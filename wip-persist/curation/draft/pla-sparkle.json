@@ -1,0 +1,761 @@
+{
+  "handle": "pla-sparkle",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T11:48:35Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 4 pages read (pdfplumber tables and the text layer): Basic Info, Specifications, Recommended Printing Settings, Properties (Physical, Mechanical (Dry state), Other Physical and Chemical), Specimen Test, Disclaimer."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/87526cb8bcce4898b578797781045e57/SDS20251127A08_Bambu_PLA_Sparkle.pdf",
+      "title": "Bambu PLA Sparkle Safety Data Sheet SDS20251127A08",
+      "retrieved_at": "2026-10-16T08:23:05Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read. Section 3 gives the composition; section 9 says \"No data available\" for melting point, density and the other physical data; sections 14-15 classify it as not hazardous goods."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Sparkle",
+      "retrieved_at": "2026-10-16T08:23:06Z",
+      "keys": [],
+      "note": "One page, 6 colours: read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, build plate and storage tables. No row names PLA Sparkle; its \"PLA\" rows exclude PLA Sparkle (note ②). PLA Sparkle is named only in the particle-filled nozzle guidelines."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility table (row \"PLA Galaxy / Wood / Marble / Sparkle\") and its tip; the drying table covers other PLA types only; the HDT remark is for PLA in general."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I has no PLA Sparkle row."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-sparkle",
+      "title": "Bambu Lab US store product page: PLA Sparkle",
+      "retrieved_at": "2026-10-16T06:58:47Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections, Printing Tips FAQ, Download block."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PLA",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition PLA",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The SDS (p.4, section 3) gives the composition as Polylactic acid 90-99 % by wt and an additive 1-10 % by wt; the TDS Basic Info says \"With metal particles included in its composition\"."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Agrees with the store page (Product Features › bullet 4: \"Diameter: 1.75mm +/- 0.03mm\"); the tolerance is the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681919551008783",
+        "value_text": "1kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Scoped to the store page's only Net weight value \"1kg\"; agrees with the store page row (option Size › 1kg)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.26,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.26 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 156,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 156 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 56,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 56 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 57,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 57 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (the TDS row reads \"Vicar Softening Temperature\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 53,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 53 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value. The next row gives 55 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Not a product disagreement: the PLA wiki says \"heat deflection temperature of only 57°C\" for PLA in general (no load stated), which is not a PLA Sparkle value. The product TDS value is kept."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 39,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Mechanical Properties (Dry state) › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 39 ± 3 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 11.7,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Mechanical Properties (Dry state) › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 11.7 ± 0.7 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2350,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Mechanical Properties (Dry state) › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2350 ± 140 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 75,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Mechanical Properties (Dry state) › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 75 ± 4 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 66.5,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.2, Mechanical Properties (Dry state) › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 66.5 ± 3.6 kJ/m²; 23.2 ± 2.4 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing). First value of the cell; the same cell gives 23.2 ± 2.4 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page bullet \"Relatively High Impact Strength\" is prose and proves no number; this value is the TDS row."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 190,
+        "max": 230
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 190 - 230 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The material-table wiki gives no PLA Sparkle row (its \"PLA*\" row, 190 - 240 °C, excludes PLA Sparkle by its note ②), so no wiki value is compared."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Cool Plate, High Temperature Plate or Textured PEI Plate, bed surface preparation: PVP glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 250 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 250 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 100%",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: PVP glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing 55 °C, 8 hours",
+      "test_method": "",
+      "test_condition": "Drying before printing, 8 hours (the TDS names no drying device)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The drying wiki (Appendix I) has no PLA Sparkle row and the material-table wiki's storage table has none either (its \"PLA\" rows exclude PLA Sparkle), so no AMS or heatbed drying value is stored for this product."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing 55 °C, 8 hours",
+      "test_method": "",
+      "test_condition": "Drying before printing at 55 °C (the TDS names no drying device)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Basic Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/pla-sparkle",
+      "source_title": "Bambu Lab US store product page: PLA Sparkle",
+      "locator": "Product Features › bullet 3",
+      "quote": "Comes with Basic Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:58:47Z",
+      "note": "Unverified: an unlabelled store-page bullet. The store page's only Spool value is \"Filament with spool\"; the TDS (p.1, Specifications) gives the spool as \"ABS (Temperature resistance 70 °C)\", 200 mm diameter, 67 mm height."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Classic Gold Sparkle (13402)",
+      "source_value_id": "564681919551008781",
+      "hex": "#CEA629",
+      "source_url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Sparkle",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Classic Gold Sparkle Hex:#CEA629",
+      "retrieved_at": "2026-10-16T08:23:06Z"
+    },
+    {
+      "value_text": "Slate Gray Sparkle (13102)",
+      "source_value_id": "564681919551008777",
+      "hex": "#8E9089",
+      "source_url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Sparkle",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Slate Gray Sparkle Hex:#8E9089",
+      "retrieved_at": "2026-10-16T08:23:06Z"
+    },
+    {
+      "value_text": "Crimson Red Sparkle (13200)",
+      "source_value_id": "564681919551008779",
+      "hex": "#792B36",
+      "source_url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Sparkle",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Crimson Red Sparkle Hex:#792B36",
+      "retrieved_at": "2026-10-16T08:23:06Z"
+    },
+    {
+      "value_text": "Royal Purple Sparkle (13700)",
+      "source_value_id": "564681919551008778",
+      "hex": "#483D8B",
+      "source_url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Sparkle",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Royal Purple Sparkle Hex:#483D8B",
+      "retrieved_at": "2026-10-16T08:23:06Z"
+    },
+    {
+      "value_text": "Alpine Green Sparkle (13501)",
+      "source_value_id": "564681919551008776",
+      "hex": "#3F5443",
+      "source_url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Sparkle",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Alpine Green Sparkle Hex:#3F5443",
+      "retrieved_at": "2026-10-16T08:23:06Z"
+    },
+    {
+      "value_text": "Onyx Black Sparkle (13101)",
+      "source_value_id": "564681919551008780",
+      "hex": "#2D2B28",
+      "source_url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Sparkle",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Onyx Black Sparkle Hex:#2D2B28",
+      "retrieved_at": "2026-10-16T08:23:06Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "AMS series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA Galaxy / Wood / Marble / Sparkle\" › Component Compatibility",
+      "quote": "PLA Galaxy / Wood / Marble / Sparkle | All standard nozzles are acceptable (excluding 0.2 mm nozzle) | All printers compatible | Fully compatible with the AMS series",
+      "note": "The store page says the same (Product Features › Cautions for Use › bullet 1: \"All AMS Series Compatible\"). The material-table wiki's AMS table has no PLA Sparkle row (its \"PLA*\" row excludes PLA Sparkle by note ②)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "all_bambu_printers",
+      "target_label": "All printers",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA Galaxy / Wood / Marble / Sparkle\" › 3rd column",
+      "quote": "PLA Galaxy / Wood / Marble / Sparkle | All standard nozzles are acceptable (excluding 0.2 mm nozzle) | All printers compatible | Fully compatible with the AMS series",
+      "note": "The cell \"All printers compatible\" sits in the column headed \"Print Bed Compatibility (Description)\"; the section opens \"All PLA series models are compatible\". The material-table wiki (1. Printer, row \"PLA, PETG, TPU …\") recommends \"Open-frame or enclosed printer\" for PLA. Left to review because of the column heading."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-sparkle",
+      "source_title": "Bambu Lab US store product page: PLA Sparkle",
+      "retrieved_at": "2026-10-16T06:58:47Z",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "0.2 mm Nozzle NOT Compatible",
+      "note": "Agreed by every source read: the store FAQ (Printing Tips › 1.Accessory Compatibility) \"Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm.\"; the TDS Basic Info (p.1) \"it is not recommended to use a 0.2 mm nozzle for printing as clogging may occur\"; the PLA wiki \"PLA Sparkle⚠️ are not compatible with 0.2 mm stainless steel nozzles\"; the material-table wiki \"Do not use a 0.2 mm nozzle. The clogging risk is extremely high.\" compat-targets.json reviews \"0.2 mm Nozzle\" as unresolvable (component_concept_not_a_product), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Standard nozzles (excluding 0.2 mm)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA Galaxy / Wood / Marble / Sparkle\" › Nozzle Compatibility",
+      "quote": "PLA Galaxy / Wood / Marble / Sparkle | All standard nozzles are acceptable (excluding 0.2 mm nozzle) | All printers compatible | Fully compatible with the AMS series",
+      "conflict": "The material-table wiki (2. Nozzle) lists PLA Sparkle among particle-filled materials and says \"Do not use a stainless steel or brass nozzle\", \"Always use a hardened steel nozzle\" and that \"a 0.4 mm hardened steel nozzle is highly recommended as the first choice\". The product page and the PLA wiki exclude only the 0.2 mm nozzle. Left to review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "No store product is the plain Bambu Cool Plate (bambu-cool-plate-supertack is a different plate), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\", which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate"
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PLA Sparkle",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "sha256": "aff0134b09ee327c60a7b5a0966aad140cbaa4373952abb7a633e5f7aacd6550"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/87526cb8bcce4898b578797781045e57/SDS20251127A08_Bambu_PLA_Sparkle.pdf",
+      "title": "Bambu PLA Sparkle Safety Data Sheet SDS20251127A08",
+      "retrieved_at": "2026-10-16T08:23:05Z",
+      "sha256": "7011cdbfc850d7d7d6198689923614563afccde5757d00f913f2af9e11e2bb3c"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Sparkle",
+      "retrieved_at": "2026-10-16T08:23:06Z",
+      "sha256": "357cbcd7b46678e001ad0e54b08c9b6278ea99276499568c8ae44dfb67d32c5e"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values (dry state); the registry has one key per scope, so the Z values (tensile 32 ± 2 MPa, elongation 6.8 ± 0.6 %, bending modulus 2150 ± 110 with no unit printed, bending strength 51 ± 2 MPa, impact 10.3 ± 0.7 kJ/m²) are not stored. Density, melting and glass transition temperatures are raw-material properties (ISO 1183, DSC) and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 1940 ± 230 MPa, Z 1660 ± 210 MPa), melt index (34.2 ± 3.3 g/10 min at 210 °C, 2.16 kg), crystallization temperature (N/A), heat deflection temperature 55 °C at 0.45 MPa, saturated water absorption rate (0.44 % at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed with desiccant), bed surface preparation (PVP glue), retraction length (0.6 - 1.0 mm) and speed (20 - 40 mm/s), chamber temperature (25 - 45 °C), max overhang angle (55°), max bridging length (30 mm), support material (Support for PLA), spool material (ABS, temperature resistance 70 °C) and spool size (diameter 200 mm, height 67 mm), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows.",
+    "The TDS recommended chamber temperature (25 - 45 °C) is not written to thermal.chamber_temp: that key is a printer capability (number, template field chamber_temp_max), not a filament print setting.",
+    "The TDS \"Bed Surface Preparation PVP Glue\" is a recommended setting, not a stated requirement, so no \"requires\" relation is written; no cached source says which store product is PVP glue.",
+    "SDS facts with no registry key are not stored: model \"A08-xx\", CLP \"Not classified\", and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO/IATA) transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "The material-table wiki's \"PLA\" values (nozzle 190 - 240 °C ±10 °C, bed 45 - 65 ℃ on the Engineering, Smooth PEI / High-Temperature and Textured PEI plates, blast-oven drying 55 ℃ for 8 h, AMS 2 Pro / AMS HT drying 45 ℃ for 12 h) are for standard PLA, which its note ② defines as excluding PLA Sparkle; they are not applied to this product.",
+    "Nozzle guidance disagreement left to review: the material-table wiki (2. Nozzle) names PLA Sparkle among particle-filled materials for which a hardened steel nozzle is to be used (0.4 mm hardened steel \"highly recommended as the first choice\") and stainless steel or brass nozzles avoided; the store page and the PLA wiki exclude only the 0.2 mm nozzle.",
+    "Marketing prose proves no number: \"Special Sparkling Look\", \"Relatively High Impact Strength\" (store page) and \"combines strength and sparkle\" (TDS Basic Info) are not stored as values.",
+    "Hex: all 6 store colours have exactly one hex cell, matched by the colour name without the code in parentheses.",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/088f0999da0c419a9630876c48842088.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 4); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store FAQ (3.Safety Tips) says the filament \"is not food-grade\"; no registry key holds it."
+  ]
+}

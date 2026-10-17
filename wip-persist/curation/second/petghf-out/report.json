@@ -1,0 +1,41 @@
+{
+ "productType": "filament",
+ "format": "page_builder",
+ "counts": {
+  "groups": 3,
+  "values": 17,
+  "variants": 15,
+  "images": 32,
+  "distinct_images": 17,
+  "swatches": 14,
+  "content_blocks": 22,
+  "content_images": 14,
+  "content_images_omitted": 0,
+  "box_items": 0,
+  "box_images": 0,
+  "specs": 5,
+  "documents": 6,
+  "relations": 1,
+  "external_ids": 30,
+  "notes": 1
+ },
+ "specsByStatus": {
+  "verified": 3,
+  "not_found": 2
+ },
+ "specsByRegion": {},
+ "relationsByState": {
+  "unresolvable": 1
+ },
+ "sentenceCounts": {
+  "money": 0,
+  "promotion": 1,
+  "shipping_policy": 1,
+  "warranty": 0,
+  "region": 0
+ },
+ "errors": [],
+ "hold": "",
+ "unknownLabels": [],
+ "soldOutCount": 13
+}

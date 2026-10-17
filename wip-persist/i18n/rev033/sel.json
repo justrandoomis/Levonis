@@ -1,0 +1,565 @@
+[
+ {
+  "i": 0,
+  "h": "c94332ef268ff9f7f9f7fa3b01bdaabe1c66838a8bc9d11a66705df9080f8ad6",
+  "en": "Note: The latest version and portable photo frames are now available on MakerWorld. For more details, click here.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "lithophane-led-backlight-board-kit",
+   "title": "Lithophane LED Backlight Board Kit",
+   "field": "blocks[0].line[0]",
+   "near": ""
+  },
+  "dict": null
+ },
+ {
+  "i": 5,
+  "h": "e6a24228f0ddc4c7ef9da68af4a5fffc4382f545bf384f2e47effdb009cab2bb",
+  "en": "Note: The latest version and portable photo frames are now available on MakerWorld, with updated supporting documents are provided below for downloading.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "lithophane-led-backlight-board-kit",
+   "title": "Lithophane LED Backlight Board Kit",
+   "field": "blocks[3].line[0]",
+   "near": "For more details, click here. We welcome everyone's feedback about the model to further improve it."
+  },
+  "dict": null
+ },
+ {
+  "i": 11,
+  "h": "f901f1093ea1b99dafe18d639dd6b3dca8158e80555388b9341649889ba31956",
+  "en": "Lithophane LED Backlight Board （4PCS）",
+  "kind": "block_cell",
+  "freq": 1,
+  "context": {
+   "handle": "lithophane-led-backlight-board-kit",
+   "title": "Lithophane LED Backlight Board Kit",
+   "field": "blocks[6].line[1].cell[3]",
+   "near": "Difference between CMYK Backlight Board And This Kit"
+  },
+  "dict": null
+ },
+ {
+  "i": 16,
+  "h": "9ddf86edacddcefa282fe7e5f12586aac415ed8950725c43c706c1eace5d9e1b",
+  "en": "2PCS：106 x 156 x （2.5-3.2）mm",
+  "kind": "block_cell",
+  "freq": 1,
+  "context": {
+   "handle": "lithophane-led-backlight-board-kit",
+   "title": "Lithophane LED Backlight Board Kit",
+   "field": "blocks[6].line[3].cell[2]",
+   "near": "Size support | Single size | Single size | Multiple sizes supported"
+  },
+  "dict": null
+ },
+ {
+  "i": 22,
+  "h": "0072e6b934945d5ba08f9729e00847391922f2f6026a435e704634fb93bf4502",
+  "en": "Design",
+  "kind": "block_cell",
+  "freq": 1,
+  "context": {
+   "handle": "lithophane-led-backlight-board-kit",
+   "title": "Lithophane LED Backlight Board Kit",
+   "field": "blocks[6].line[5].cell[0]",
+   "near": "Assemble Methods | One | Two | Five"
+  },
+  "dict": null
+ },
+ {
+  "i": 28,
+  "h": "b665bfc292d96e31d6fbb0b28ee03bd36c8266b1e7d0d61f999a874ac093d4d0",
+  "en": "Not included",
+  "kind": "block_cell",
+  "freq": 1,
+  "context": {
+   "handle": "lithophane-led-backlight-board-kit",
+   "title": "Lithophane LED Backlight Board Kit",
+   "field": "blocks[6].line[7].cell[1]",
+   "near": "Dimming function | Fixed | Adjustable (long-press dimming) | Adjustable (long-press dimming)"
+  },
+  "dict": {
+   "ar": "غير مشمول",
+   "ckb": "لەخۆناگرێت"
+  }
+ },
+ {
+  "i": 33,
+  "h": "0a8e6229a09add54a9866bd6df2c7d1c7d535976c63946b41208061e9ad49272",
+  "en": "MaKim",
+  "kind": "block_cell",
+  "freq": 2,
+  "context": {
+   "handle": "lithophane-led-backlight-board-kit",
+   "title": "Lithophane LED Backlight Board Kit",
+   "field": "blocks[6].line[10].cell[1]",
+   "near": "Models | Creators | Model Links"
+  },
+  "dict": null
+ },
+ {
+  "i": 39,
+  "h": "09020f584f720adb64f48fa18bf4f6ce11c613b1ec56f7371ad4c2f1b3e39865",
+  "en": "To download the model files of the BreezeBuddy and obtain detailed information, please visit the BreezeBuddy on MakerWorld.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "breezebuddy",
+   "title": "BreezeBuddy",
+   "field": "blocks[0].line[3]",
+   "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+  },
+  "dict": null
+ },
+ {
+  "i": 44,
+  "h": "b739d539cf08f2c7671a72f96e18c481df8cd87d560674dc4f425d80b41374eb",
+  "en": "Suitable for temperature ranges from -40℃ to 90℃",
+  "kind": "block_cell",
+  "freq": 1,
+  "context": {
+   "handle": "adhesive-foam-sponge-strip-roll",
+   "title": "Adhesive Foam Sponge Strip Roll",
+   "field": "blocks[2].line[1].cell[1]",
+   "near": "Product Feature"
+  },
+  "dict": null
+ },
+ {
+  "i": 50,
+  "h": "2ba86ab44b82fc7d7a19b2ee0d279238d89d95177a58283657a3b97c3931f213",
+  "en": "Musical Tunes List",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "piano-music-box-winding-kit",
+   "title": "Piano Music Box Winding Kit",
+   "field": "blocks[3].line[0]",
+   "near": "*Note: The melody can be confirmed by checking the stamped serial number on the movement and consulting the Musical Tunes List provided in the appendix."
+  },
+  "dict": null
+ },
+ {
+  "i": 56,
+  "h": "1897351e6a9c74492c162d25e55ef8ea6fc158a7a37360cd13f1ae8cb05f55b9",
+  "en": "Mushroom Bottle",
+  "kind": "block_cell",
+  "freq": 2,
+  "context": {
+   "handle": "water-bladder",
+   "title": "Water Bladder",
+   "field": "blocks[2].line[5].cell[0]",
+   "near": "Models | Creators | Model Links"
+  },
+  "dict": null
+ },
+ {
+  "i": 61,
+  "h": "c34aab80414d16cef2dd9363daaa79d2ac0f533576a386b76df433d1932206f7",
+  "en": "Additionally, avoid using hot liquids, as they can damage the water bladder, reduce its lifespan, or cause burns.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "water-bladder",
+   "title": "Water Bladder",
+   "field": "blocks[3].line[3]",
+   "near": "• The water bladder is not suitable for sugary drinks, as they can promote bacterial growth, mold, and odors, nor is it recommended for alcoholic beverages, whi"
+  },
+  "dict": null
+ },
+ {
+  "i": 67,
+  "h": "0423205a43ebf86c6bfa505660f45ac100ebc9a61f5e86ff2a24702583f7eb0d",
+  "en": "Easy to Use: Easy to install and convenient to use—simply press it in for secure fastening.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "smooth-ball-spring-plunger",
+   "title": "Smooth Ball Spring Plunger",
+   "field": "blocks[2].line[3]",
+   "near": "• Excellent Functionality: Ideal for delivering consistent pressure and ensuring precise positioning."
+  },
+  "dict": null
+ },
+ {
+  "i": 72,
+  "h": "b55584b035159a9171c4965932c0fa76cbb6ce9a8a2feef3caa95f9012cc24fc",
+  "en": "Essential Electrical and Physical Parameters.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "electric-push-rod",
+   "title": "Electric Push Rod",
+   "field": "blocks[2].line[2]",
+   "near": "Specification"
+  },
+  "dict": null
+ },
+ {
+  "i": 78,
+  "h": "8bf6298ae04eb614ea10774294e07237f687f0b25bc9833be5e5ee51caa299cd",
+  "en": "Improve torque transmission and meshing, reducing tooth slippage",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "gt2-timing-belt",
+   "title": "GT2 Timing Belt",
+   "field": "blocks[2].line[2]",
+   "near": "• Ensure accurate rotation alignment for motors and components, enhance system stability"
+  },
+  "dict": null
+ },
+ {
+  "i": 84,
+  "h": "850645639b9c137dc73dc382e80465907aff3859a78e17945ce26081bbbf6a5d",
+  "en": "Wide Compatibility: Fully compatible with most NFC-enabled devices, including smartphones, tablets, and NFC readers.",
+  "kind": "block_line",
+  "freq": 2,
+  "context": {
+   "handle": "nfc-tag-with-adhesive",
+   "title": "NFC Tag with Adhesive (20pcs)",
+   "field": "blocks[1].line[1]",
+   "near": "Product Feature"
+  },
+  "dict": null
+ },
+ {
+  "i": 89,
+  "h": "8244896ebe6d28d9a5591754b8e8258c72f1f37f4ace2d7b22e471e12b16990a",
+  "en": "NFC (Near Field Communication) tag stickers combine the functionality of NFC tags with a lightweight, adhesive-backed design, making them ideal for quick and versatile applications. Commonly used for contactless payments, access control, and product tracking, NFC tag stickers are particularly well-suited for embedding in 3D printing projects. They can store data such as model settings or usage instructions and can be easily affixed to 3D-printed objects. This makes them a practical and efficient choice for enhancing the interactivity and functionality of your designs.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "nfc-tag-sticker",
+   "title": "NFC Tag Sticker (20pcs)",
+   "field": "blocks[0].line[1]",
+   "near": "Introduction"
+  },
+  "dict": null
+ },
+ {
+  "i": 95,
+  "h": "4fb7273b8b444f6cd231678223bf4adb1f0d9058bc5706c7f1bcd8d1416f42d2",
+  "en": "Lightweight and Compact: Designed for easy integration into compact spaces, without adding unnecessary weight to your projects.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "single-axis-plastic-reduction-gear-kit",
+   "title": "Single-axis Plastic Reduction Gear Kit",
+   "field": "blocks[1].line[4]",
+   "near": "• Versatile Gear Sizes: Includes a range of gear sizes and tooth counts, allowing for flexible gear ratio configurations to suit various mechanical needs."
+  },
+  "dict": null
+ },
+ {
+  "i": 100,
+  "h": "76b8a86840d00d10c9e72822c26d79eccbd6b34a0eed2c48ee9a916d2d93e09c",
+  "en": "Robust Construction: Features high-quality plastic gears and durable metal dowerl pin, ensuring long-lasting reliability and performance.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "dual-axis-plastic-reduction-gear-kit",
+   "title": "Dual-axis Plastic Reduction Gear Kit",
+   "field": "blocks[1].line[2]",
+   "near": "• Dual-Axis Precision: Specifically designed for dual-axis applications, enabling complex and accurate mechanical movements in various projects."
+  },
+  "dict": null
+ },
+ {
+  "i": 106,
+  "h": "561d0d749905d5a3de1333bfb9f28b761d03762297b9b2ba4e9604ade51dccf8",
+  "en": "The product contains all the non-3D printed parts for assembling various functional Apex Legends Wingman with Reload Mechanics. To complete the work, you also need to download the Apex Legends Wingman with Reload Mechanics and 3D print the remaining parts.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "apex-legends-wingman-with-reload-mechanics",
+   "title": "Apex Legends Wingman with Reload Mechanics",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 112,
+  "h": "31bfabd1f9f5afe130655cf17066996f491ce16e2eaa4025efff788612fef279",
+  "en": "These models offer both storage and organization for desiccant packs, and are equipped with circular hygrometers for precise monitoring of environmental temperature and humidity. By maintaining optimal environmental conditions, these models effectively protect moisture-sensitive components and materials, ensuring their performance and longevity.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+   "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 117,
+  "h": "0d8277e825ba3e7a034b01547f216e154de5c22c528980560c58787872d9673b",
+  "en": "This model offers both storage and organization for desiccant packs, and is equipped with circular hygrometers for precise monitoring of environmental temperature and humidity. By maintaining optimal environmental conditions, this model effectively protect moisture-sensitive components and materials, ensuring their performance and longevity.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+   "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+   "field": "blocks[2].line[1]",
+   "near": "Ultimate Filament Spool Enclosure for AMS Lite"
+  },
+  "dict": null
+ },
+ {
+  "i": 123,
+  "h": "0d67458f2b780fcf13d761c5ffc527a6fddeb1ed02a87a4856016223a25215a4",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Halloween Classic Carved Pumpkin Lantern. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "halloween-classic-carved-pumpkin-lantern",
+   "title": "Halloween Classic Carved Pumpkin Lantern",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 128,
+  "h": "21ad09a87abc0b6438019f14edc9961c2222fcd2a2dcd97dbe16991c267aba18",
+  "en": "To download the model files of the Halloween Ghost Night Light and obtain detailed information, please visit the Halloween Ghost Night Light on MakerWorld.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "halloween-ghost-night-light",
+   "title": "Halloween Ghost Night Light",
+   "field": "blocks[0].line[3]",
+   "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+  },
+  "dict": null
+ },
+ {
+  "i": 134,
+  "h": "cfbf7b28632a8924513ba599a050e067f797f622a7e445e2b30c415ba797ad1e",
+  "en": "To download the model files of Endless Loop Express and obtain detailed information, please visit the Endless Loop Express on MakerWorld.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "endless-loop-express-kit-016",
+   "title": "Endless Loop Express Kit 016",
+   "field": "blocks[0].line[5]",
+   "near": "Endless Loop Express | IMD_Q. | Endless Loop Express"
+  },
+  "dict": null
+ },
+ {
+  "i": 140,
+  "h": "4d5ac85511aa62b94636b3b7bb662ddd792d9c4497773cf38d39f03f030ba05e",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Halloween Ghost Light. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "halloween-ghost-light",
+   "title": "Halloween Ghost Light",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 145,
+  "h": "49f1bb9e9f8b3f5cbb7d3265aa9cbe0f90ca4ca281e0b8991b3c145c31e5edc4",
+  "en": "To download the model files of the Halloween Pumpkin Light and obtain detailed information, please visit the Halloween Pumpkin Light on MakerWorld.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "halloween-pumpkin-light",
+   "title": "Halloween Pumpkin Light",
+   "field": "blocks[0].line[3]",
+   "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+  },
+  "dict": null
+ },
+ {
+  "i": 151,
+  "h": "5df31414844fe9263ef1b67245d0e8333b5171f443763ccb8a20a7682d8dc478",
+  "en": "Purchased separately 3x5mm Transparent 2m (1PCS)",
+  "kind": "block_cell",
+  "freq": 2,
+  "context": {
+   "handle": "electric-water-spray-kit-02",
+   "title": "Electric Water Spray Kit 02",
+   "field": "blocks[2].line[7].cell[1]",
+   "near": "Rate of Fire | 2 round/s | 8 round/s | 8 round/s"
+  },
+  "dict": null
+ },
+ {
+  "i": 156,
+  "h": "d7335c3e0b71c19e9801fd59bfb7d60b95589debc0c8fca032a7abff823ee78e",
+  "en": "The mechanism includes a simulated recoil feature. Please be cautious of the interference between the housing and the recoil slider.",
+  "kind": "block_line",
+  "freq": 2,
+  "context": {
+   "handle": "electric-water-spray-kit-02",
+   "title": "Electric Water Spray Kit 02",
+   "field": "blocks[3].line[4]",
+   "near": "• The required silicone tube is not included, you can purchase and cut the silicone tube as you need."
+  },
+  "dict": null
+ },
+ {
+  "i": 162,
+  "h": "5e7da653b45ec3fe05d17873c6dcaf44d515248999ffe5bf4c65c79526905976",
+  "en": "Regularly inspect the charger’s cord, plug, housing, and other components for damage. If any damage is found, discontinue use immediately until the device is fully repaired.",
+  "kind": "block_line",
+  "freq": 23,
+  "context": {
+   "handle": "electric-water-spray-kit-02",
+   "title": "Electric Water Spray Kit 02",
+   "field": "blocks[4].line[4]",
+   "near": "• Ensure the battery is installed correctly. Improper installation may result in short circuits, overheating, or potential explosion."
+  },
+  "dict": null
+ },
+ {
+  "i": 168,
+  "h": "0f1441d040126b9ce00afba2b506315741df9fe1dae4a2c2d63985fef736e04f",
+  "en": "DO NOT attempt to use or charge the battery pack if it shows any signs of leakage or corrosion.",
+  "kind": "block_line",
+  "freq": 24,
+  "context": {
+   "handle": "electric-water-spray-kit-02",
+   "title": "Electric Water Spray Kit 02",
+   "field": "blocks[6].line[1]",
+   "near": "Lithium Battery Safety Precautions"
+  },
+  "dict": null
+ },
+ {
+  "i": 173,
+  "h": "ab678146a555d334c7fe939839e69698d2399a201d79b619d3aa5f3eca9f320f",
+  "en": "Example of a model using this kit (includes other Maker's Supply parts)",
+  "kind": "block_line",
+  "freq": 2,
+  "context": {
+   "handle": "rechargeable-power-kit",
+   "title": "Rechargeable Power Kit",
+   "field": "blocks[1].line[2]",
+   "near": "This Rechargeable Power Kit features a compact PCB design with a Type-C charging port, a switch, and two ZH1.5 connectors, along with a charging indicator and p"
+  },
+  "dict": null
+ },
+ {
+  "i": 179,
+  "h": "4c9c4539f23d2901470bbc6126d6a64970ed4dac5e74b94d57fd78290e47d3b6",
+  "en": "The Electric Water Spray Kit 01 contains all the non-3D printed hardware components necessary to assemble the Electric Water Toy Gun. The electric water gun mechanism allows for continuous shooting, with a pulsing water flow activated by pulling the trigger. The mechanism features a simulated recoil function for added fun. The kit also includes a water pump that automatically draws water from open sources into the tank, reducing the need for users to detach it for refills.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "electric-water-spray-kit-01",
+   "title": "Electric Water Spray Kit 01",
+   "field": "blocks[1].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 184,
+  "h": "8b82b4362f19250160ecad3476fbca6f3586e56001bfb557ef4a6827606583b3",
+  "en": "Please note that there may be small oil stains on the gearbox surface. These stains are mainly from the residual lubricants used to protect the internal gears during manufacturing. These stains do not affect the product's sealing performance or normal use, and are not a fault or quality issue.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "electric-water-spray-kit-01",
+   "title": "Electric Water Spray Kit 01",
+   "field": "blocks[4].line[5]",
+   "near": "• The mechanism includes a simulated recoil feature. Please be cautious of the interference between the housing and the recoil slider."
+  },
+  "dict": null
+ },
+ {
+  "i": 190,
+  "h": "0d2b302ea0f128c9da2d43b20588e2aa412d20d4b1e72faad2ea160ad05bb04e",
+  "en": "@flowercat",
+  "kind": "block_cell",
+  "freq": 2,
+  "context": {
+   "handle": "electric-bubble-maker-kit-01",
+   "title": "Electric Bubble Maker Kit 01",
+   "field": "blocks[2].line[3].cell[1]",
+   "near": "Bubble Gun Toy | @MatthewGhost | Bubble Gun Toy | YES"
+  },
+  "dict": null
+ },
+ {
+  "i": 196,
+  "h": "1288a73646006a60c4ce7219a741a5c31e12c002838170bc6ef187876d5c4037",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Jack Skellington & Oogie Boogie Pumpkin TheeLight. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "jack-skellington-oogie-boogie-pumpkin-theelight",
+   "title": "Jack Skellington & Oogie Boogie Pumpkin TheeLight",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 201,
+  "h": "d248c53ad9a802b2b312f95a6a5503430f67072892174381595c426d013e64d9",
+  "en": "Cute Flexi Pets Pig (Keychain & Magnet)",
+  "kind": "block_cell",
+  "freq": 2,
+  "context": {
+   "handle": "flexi-pets-keychain-magnet-collections",
+   "title": "Cute Flexi Pets Keychain & Magnet Collection",
+   "field": "blocks[0].line[4].cell[0]",
+   "near": "Models | Creators | Model Links"
+  },
+  "dict": null
+ },
+ {
+  "i": 207,
+  "h": "487b2963d42a33d8b556c55d51798670165b90cefc9529bba59ca4c1cdbe0e96",
+  "en": "Cute Flexi Pets Raccoon ( + Keychain Version)",
+  "kind": "block_cell",
+  "freq": 2,
+  "context": {
+   "handle": "flexi-pets-keychain-magnet-collections",
+   "title": "Cute Flexi Pets Keychain & Magnet Collection",
+   "field": "blocks[0].line[10].cell[0]",
+   "near": "Cute Flexi Pets Triceratops (Keychain & Magnet) | Valeria Momo & Mattia | Cute Flexi Pets Triceratops (Keychain & Magnet)"
+  },
+  "dict": null
+ },
+ {
+  "i": 212,
+  "h": "fb9bca994e112b7a50e1c67af43a1dbfdb23e7de4b557570ea2df706b6bff6ab",
+  "en": "3D Model Application instructions",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "makers-supply-electronics-bundle",
+   "title": "Maker's Supply Electronics Bundle",
+   "field": "blocks[0].line[1]",
+   "near": "Documentation"
+  },
+  "dict": null
+ },
+ {
+  "i": 218,
+  "h": "99ebaf5521e5117c4168498d311eeff2d91713daf712885acb7ebc09c74ec008",
+  "en": "The Cipher Helmet Lock is a remarkable product designed to provide a convenient and secure solution for helmet storage. This kit contains all the non-3D printed hardware components necessary to assemble a Cipher Helmet Lock. It can be fixed onto a bicycle handle and used to lock a helmet by setting a password and inserting the helmet strap. To complete the project, you need to download the model files on MakerWorld and 3D print the parts.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "cipher-helmet-lock-kit",
+   "title": "Cipher Helmet Lock Kit",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ }
+]

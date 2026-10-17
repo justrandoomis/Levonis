@@ -1,0 +1,3158 @@
+{
+ "batch": 23,
+ "surface": "api",
+ "handles": [
+  "pla-pure",
+  "pla-basic-color-trial-set",
+  "petg-matte",
+  "hwb-pumpkinfamily",
+  "hwb-hauntedhouse",
+  "bambu-hotend-x1c",
+  "bambu-high-flow-hotend-h2-p2s-x2d",
+  "bambu-hotend-h2-p2s",
+  "obxidian-high-flow-hotend",
+  "hotends-combo-h2-series",
+  "tungsten-carbide-nozzle-h2-p2s",
+  "h2c-induction-hotend-right",
+  "vortek-utility-hotends-bundle",
+  "h2d-tpu-high-flow-kit",
+  "multi-size-hotends-kit",
+  "bambu-smooth-pei-plate",
+  "bambu-dual-texture-pei-plate",
+  "bambu-3d-effect-plate"
+ ],
+ "strings": [
+  {
+   "h": "537dd19f4132442dd2722313abd8146607101497e206050ae7bcdbf258e2d769",
+   "en": "Bambu PLA Pure",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[0].line[0]",
+    "near": "· Five ingredients, every one EU food-contact certified"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f5b12f9627ed57aa1932172e9d8e8f310c79e2fbc86f959ff7956a2d733941f",
+   "en": "Five ingredients, every one EU food-contact certified",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[0].line[1]",
+    "near": "Bambu PLA Pure"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc0d393cc3e288b171fa57b1492b8030518798237a0e9d3dcf3a1e1e1f38dd5a",
+   "en": "Safe for what kids play with, certified to EU toy-safety standards (EN 71)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[0].line[3]",
+    "near": "· Low indoor printing emissions, certified to UL GREENGUARD 2904"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c6a8b4be1c05827c5f46beffbc21269fe769b54f48b56e95e6ec320a3641097",
+   "en": "Only five ingredients. All food-contact safety certified.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[1].line[0]",
+    "near": "Most food-contact filaments are tested only as a finished spool. Bambu Lab PLA Pure is tested ingredient by ingredient. From base material to pigment—just five "
+   },
+   "dict": null
+  },
+  {
+   "h": "e2c239e341f53dcb1587a4e6f28b1f5e0ba253da3f70ad96bbcb482b94d1a187",
+   "en": "Most food-contact filaments are tested only as a finished spool. Bambu Lab PLA Pure is tested ingredient by ingredient. From base material to pigment—just five ingredients, each one passing EU food-contact testing. A first in the category. Still the only one.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[1].line[1]",
+    "near": "Only five ingredients. All food-contact safety certified."
+   },
+   "dict": null
+  },
+  {
+   "h": "dd8688a353b2931676c0911442071436b52498897d77f8f5c00e15ca05a3be16",
+   "en": "PLA Pure is certified to UL GREENGUARD (UL 2904), the recognized standard for 3D printer emissions. The particles and VOCs released measure below the levels of an average kitchen, living room, or office—cleaner than the air you're already breathing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[2].line[1]",
+    "near": "UL GREENGUARD certified. Cleaner air for indoor printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "ebe24517949b1d7c1d1157f7ca85853751b1675163c512d5520e3b8f6b5a0619",
+   "en": "Content Block-3",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[3].line[0]",
+    "near": "In a 4-hour continuous print test conducted by an accredited international laboratory, PLA Pure produced lower PM2.5 and PM10 emissions than a third-party PLA u"
+   },
+   "dict": null
+  },
+  {
+   "h": "6ea13b2eee11be0507f3a8d4b29f97d70898ec37c39a3f2ada4dfb2e200d745c",
+   "en": "In a 4-hour continuous print test conducted by an accredited international laboratory, PLA Pure produced lower PM2.5 and PM10 emissions than a third-party PLA under identical conditions.*",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[3].line[1]",
+    "near": "Content Block-3"
+   },
+   "dict": null
+  },
+  {
+   "h": "79937fa0cadd11a45a7f655d3f643c51b9354923b3b1a7f52d68a745d80671c0",
+   "en": "Passed EN 71-3 toy-safety testing. Made for little hands.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[4].line[0]",
+    "near": "PLA Pure has passed testing under EU toy-safety standard EN 71-3. It is designed for models that are touched, held, and played with.*"
+   },
+   "dict": null
+  },
+  {
+   "h": "3dc004093d5edb47f03a47e59d981b2ec7b55046af037f89d6c4f2ec98cefc66",
+   "en": "PLA Pure has passed testing under EU toy-safety standard EN 71-3. It is designed for models that are touched, held, and played with.*",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[4].line[1]",
+    "near": "Passed EN 71-3 toy-safety testing. Made for little hands."
+   },
+   "dict": null
+  },
+  {
+   "h": "1fd77448d40d67a5559d52728498abce32cb93c3745430bb803ec1e6a2b8fb97",
+   "en": "A pretend kitchen plate. A toy truck. A treat toy for the cat. PLA Pure is made for little hands and everyday moments at home.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[4].line[2]",
+    "near": "PLA Pure has passed testing under EU toy-safety standard EN 71-3. It is designed for models that are touched, held, and played with.*"
+   },
+   "dict": null
+  },
+  {
+   "h": "e3a71ed6f5d13f6161e93bb31c66bff9aec230152b17b23167d65b9e4e8ecb5c",
+   "en": "Made for everyday objects.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[5].line[0]",
+    "near": "Bambu PLA Pure has passed testing against applicable requirements of Commission Regulation (EU) No 10/2011, the European Union's regulation on plastics intended"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d0fb872ce3108296d85b46ca24175f42f947d9d30e7f1d57a79052a6905855f",
+   "en": "Bambu PLA Pure has passed testing against applicable requirements of Commission Regulation (EU) No 10/2011, the European Union's regulation on plastics intended to come into contact with food. That purity is what makes PLA Pure right for the things you use most: kids' toys, household tools, and the small objects that live close to your hands.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[5].line[1]",
+    "near": "Made for everyday objects."
+   },
+   "dict": null
+  },
+  {
+   "h": "103de76b960fbb48716fdbff9f8501a1d914250b12c50e0b357e576c1bb586b3",
+   "en": "Proven Strength.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[6].line[0]",
+    "near": "Fewer additives doesn't mean weaker prints. PLA Pure matches Bambu PLA Basic in mechanical performance, with layer adhesion comparable to most PLA on the market"
+   },
+   "dict": null
+  },
+  {
+   "h": "34f4456e232cf7e35e2a72ca65afb604e2255a7e2957e3ac737eb854c59a6c5a",
+   "en": "Fewer additives doesn't mean weaker prints. PLA Pure matches Bambu PLA Basic in mechanical performance, with layer adhesion comparable to most PLA on the market.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[6].line[1]",
+    "near": "Proven Strength."
+   },
+   "dict": null
+  },
+  {
+   "h": "86cf1552f6db02636d205f4df80e655082cb528f4606a8f24f7838b611bd9856",
+   "en": "Purity and strength. No trade-off.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[6].line[2]",
+    "near": "Fewer additives doesn't mean weaker prints. PLA Pure matches Bambu PLA Basic in mechanical performance, with layer adhesion comparable to most PLA on the market"
+   },
+   "dict": null
+  },
+  {
+   "h": "a73e983817bc2830364dc05ab3c4e6d3003a3e0d43965591036ae6fafbe2445e",
+   "en": "Purer Formula. Effortless Printing.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[7].line[0]",
+    "near": "Fewer additives.* Cleaner composition. PLA Pure doesn't just raise the bar on safety. It prints smoother too. Reduced residue helps minimize nozzle clogs and ke"
+   },
+   "dict": null
+  },
+  {
+   "h": "7cd7c3f130326aef885876ae5a7f7e52be297aa7ab936286d2e497e452eded8f",
+   "en": "Fewer additives.* Cleaner composition. PLA Pure doesn't just raise the bar on safety. It prints smoother too. Reduced residue helps minimize nozzle clogs and keeps extrusion consistent, spool after spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[7].line[1]",
+    "near": "Purer Formula. Effortless Printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "e314510b781b5b64ceafedf72996ea8b0c232dfd147440ab5587a125e93ec68a",
+   "en": "Content Block-7",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[8].line[0]",
+    "near": "Even without pre-drying, PLA Pure produces noticeably less stringing than typical third-party PLA. Fewer stray filaments. Cleaner surfaces. Less debris on the t"
+   },
+   "dict": null
+  },
+  {
+   "h": "4b3aeea6824e94fb809304170572276de1ffb48d1602ded08e8db1d366deb239",
+   "en": "Even without pre-drying, PLA Pure produces noticeably less stringing than typical third-party PLA. Fewer stray filaments. Cleaner surfaces. Less debris on the things you've made for everyday use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[8].line[1]",
+    "near": "Content Block-7"
+   },
+   "dict": null
+  },
+  {
+   "h": "62e37cfe54e76371d095a0fe3771d958684ebaf96b703e4b6e4efbed96ada5df",
+   "en": "Load. Sync. Print. No setup, no guesswork, just reliable results.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[9].line[2]",
+    "near": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+   },
+   "dict": null
+  },
+  {
+   "h": "165ba6549a58c55eb946904d06ce2470bac12ebea7a4af38352cc03b6fbdb6d2",
+   "en": "1. Printing Tips",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[1]",
+    "near": "FAQ"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a206c4599c43d3b9133cbcb57efa4988fd68f64b631c6b6775d8478d384d66c",
+   "en": "Food-contact certification applies to the filament itself. Producing food-contact-safe printed parts depends on equipment hygiene (particularly the nozzle), printing environment, and other factors.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[2]",
+    "near": "1. Printing Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "4fc51eb0dfae26411bd6a4e2f31f16242009deda419dddf7ce7857ef14abb645",
+   "en": "Due to layer lines, printed parts are not suitable for holding liquid foods. Because of PLA's properties, do not expose printed parts to temperatures above 60°C. For detailed guidance, see the PLA Pure Advanced Printing Guide on the Bambu Lab Wiki.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[3]",
+    "near": "Food-contact certification applies to the filament itself. Producing food-contact-safe printed parts depends on equipment hygiene (particularly the nozzle), pri"
+   },
+   "dict": null
+  },
+  {
+   "h": "cccd520ad224d25b6b58d9a7578e688ffa7ce376a5cb6749a08aa1b0eb87d8e6",
+   "en": "Bambu PLA Pure is specifically developed for FDM 3D printing with both emission safety and contact safety in mind. When used with its default profile, it delivers excellent print quality and supports contact-safe performance. Because real-world use can vary across environments, conditions, and workflows, applications requiring a higher level of contact safety should follow additional guidance.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[4]",
+    "near": "Due to layer lines, printed parts are not suitable for holding liquid foods. Because of PLA's properties, do not expose printed parts to temperatures above 60°C"
+   },
+   "dict": null
+  },
+  {
+   "h": "c5c89b8518ebbadff85898f06455238b167bce5e06ce2de180ff1dbeb2929224",
+   "en": "For more details, please refer to the official Bambu Lab Wiki.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[5]",
+    "near": "Bambu PLA Pure is specifically developed for FDM 3D printing with both emission safety and contact safety in mind. When used with its default profile, it delive"
+   },
+   "dict": null
+  },
+  {
+   "h": "3da970454ab288237842e43935e6f25588e54a9cc927eaee9064129b5259fe0e",
+   "en": "2. Accessory Compatibility",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a46510cfac4be90b77e538fd29ae1b00a40d64af3e5323ff7ed038abad2b6764",
+   "en": "For contact-safe finished parts, the use of Bambu Liquid Glue or Solid Glue is not recommended.(Enhanced bed",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[9]",
+    "near": "Compatible with all printers, AMS, build plate, and nozzles."
+   },
+   "dict": null
+  },
+  {
+   "h": "6e9021150fb8bb78cd18ef430b3538789b91f1a31de20119100bb6090be0908d",
+   "en": "adhesion can alternatively be achieved by increasing the bed temperature)",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[10]",
+    "near": "For contact-safe finished parts, the use of Bambu Liquid Glue or Solid Glue is not recommended.(Enhanced bed"
+   },
+   "dict": null
+  },
+  {
+   "h": "3dea26bd7b68f93e35d50cee4fdebb8f2e2862857d48168a4478e0cdebc18f10",
+   "en": "3. Drying Recommendations",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[12]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c3a3a7fd886810ee088d2b364ba04dc22cf9b38726de0d35ce3471301d2b0036",
+   "en": "For opened filament, we recommend drying it before use according to the Wiki’s recommended temperature and time settings.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[14]",
+    "near": "Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures."
+   },
+   "dict": null
+  },
+  {
+   "h": "b59a044b3b27ef3f41bf3a23f395dae6bc66264e4565424a41e30f2054540d27",
+   "en": "4. Refill Guidelines",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[16]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dcce630d5118833bc645fac19cc1e01d5aa4ca5b1d641a68a0c41a30d9582b9d",
+   "en": "5. Important Notice",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[19]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6613b6bab61256c7f30ee8034b5b1a1ee604a440f4b097a23fa8bfd6bae23ba9",
+   "en": "Although this product has passed food-contact compliance testing at both the raw material and printed sample level, 3D printing is a multi-variable process. The quality and safety of finished prints depend on factors such as equipment, printing environment, operating procedures, and post-processing.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[20]",
+    "near": "5. Important Notice"
+   },
+   "dict": null
+  },
+  {
+   "h": "88b0e2faf63631978dadd37acf211b677f38e8440f4137a064c4244ae6f436e7",
+   "en": "Bambu Lab's responsibility is limited to the compliance and quality of the filament material.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[21]",
+    "near": "Although this product has passed food-contact compliance testing at both the raw material and printed sample level, 3D printing is a multi-variable process. The"
+   },
+   "dict": null
+  },
+  {
+   "h": "f347ad8d23680a3bbf4c44346816396d11235952151d05f94c293e58d9c6f755",
+   "en": "Bambu Lab does not guarantee that such user-produced prints will meet applicable food-contact regulations, standards, or certification requirements in any jurisdiction, and shall not be held liable for any direct or indirect loss, claim, or liability arising from their use.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[10].line[22]",
+    "near": "Bambu Lab's responsibility is limited to the compliance and quality of the filament material."
+   },
+   "dict": null
+  },
+  {
+   "h": "713e16e692ba1f7f844f32f15bcad285e100ad613c57dcc50f484e976ab67bcc",
+   "en": "Five ingredients, each has passed EU food-contact testing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[11].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e1d6c2bddf281cf36a721b9c7200ff280c21693aad816b99ebd1f61e4f2dd4a",
+   "en": "Made for toy models. Passed testing under EU toy-safety standard EN 71-3",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "blocks[11].line[3]",
+    "near": "• Low indoor printing emissions, certified to UL GREENGUARD 2904"
+   },
+   "dict": null
+  },
+  {
+   "h": "bd900816b69f5c198eaf5de5f00b4a75f5b2e12b5c860605f24f75b5f57e385a",
+   "en": "12-Color Set, Practical & Aesthetic",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Basic Color Trial Set"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a7e7690ed89157bcf72ab2e8fa97e7059fa4d937e815f61973901f56911997b",
+   "en": "Direct Use with External Spool",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[0].line[2]",
+    "near": "· 12-Color Set, Practical & Aesthetic"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3104559cba29294e2f1ca570b843e60097dac777ebcb55730b8394f6cc65edd",
+   "en": "Try More Colors, Commit Less",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[1].line[0]",
+    "near": "The PLA Basic Trial Set includes 12 must-have colors in 250 g spools, giving you a perfect way to discover the perfect shade for your projects, while reducing l"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e70235101cea9379daf547309e76e4fb7a386fa082be717c9bab9c844ab4a56",
+   "en": "The PLA Basic Trial Set includes 12 must-have colors in 250 g spools, giving you a perfect way to discover the perfect shade for your projects, while reducing leftover filament and storage clutter.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[1].line[1]",
+    "near": "Try More Colors, Commit Less"
+   },
+   "dict": null
+  },
+  {
+   "h": "704222483c9b265297032c2da89a64224cba3a1dd3e72a1b738cfaab57ad7748",
+   "en": "Bambu PLA Basic, the easiest-to-use filament, delivers smooth and reliable printing right from the start. No complicated setups or calibrations required. Ideal for both hobbyists and professionals seeking dependable, hassle-free results.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[2].line[1]",
+    "near": "Your Worry-Free Start"
+   },
+   "dict": null
+  },
+  {
+   "h": "16ee184fe3fd52f774f7949d102bc550427fc47e89cd403dc5528ca1cd4a632c",
+   "en": "3.Spool Compatibility & Setup",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[4].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4a9af42c614f5ffd9111042d89d6fbc4cf28169237ab37999f3ee788e23a9a8b",
+   "en": "The filament can be used directly with an external spool. Please refer to the guide on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[4].line[8]",
+    "near": "3.Spool Compatibility & Setup"
+   },
+   "dict": null
+  },
+  {
+   "h": "2bbdb68659842df95c5ca3c41ed9e3460fd7b5661775c7c89775f0a1314092e1",
+   "en": "To use with the AMS, please transfer the filament into a Bambu Reusable Spool; for detailed instructions, please refer to the guide on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[4].line[9]",
+    "near": "The filament can be used directly with an external spool. Please refer to the guide on WIKI."
+   },
+   "dict": null
+  },
+  {
+   "h": "827e21e7629084241d6afebae357414dd37762d596bada6c45d875dded93ae46",
+   "en": "To use with the AMS lite, please print the required adapter from MakerWorld",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[4].line[10]",
+    "near": "To use with the AMS, please transfer the filament into a Bambu Reusable Spool; for detailed instructions, please refer to the guide on WIKI."
+   },
+   "dict": null
+  },
+  {
+   "h": "e7673ebb371ccf63753830d44afd168e63a39109db741809ff0e3b04c5682138",
+   "en": "Can be used directly with an external spool. Refer to the guide on WIKI",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[5].line[4]",
+    "near": "• Biodegradable"
+   },
+   "dict": null
+  },
+  {
+   "h": "42e7e5c45cbac014a52e20d990772226ed5469e84e787dadb9192789a7d2d4eb",
+   "en": "For AMS: Use with Bambu Reusable Spool. Refer to the guide on WIKI",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "blocks[5].line[5]",
+    "near": "• Can be used directly with an external spool. Refer to the guide on WIKI"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a5fc89becfe50c4b7e3e6a08700ef21e9aeaf062339aa001dab49412bd61cb8",
+   "en": "Prints like PLA. Lasts like PETG.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[0].line[1]",
+    "near": "PETG Matte"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b9ec23e9e9c256a4a2e5c9a09b653b3008a1aa3325701feee4194c09e4b28b6",
+   "en": "Matte. Vibrant. Elegant.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[1].line[0]",
+    "near": "Say goodbye to that \"plastic shine.\" Bambu Lab PETG Matte delivers a soft, low-gloss finish that helps hide layer lines and gives every print a refined, premium"
+   },
+   "dict": null
+  },
+  {
+   "h": "358c2c3645da4e46e83a83b549e321629c02edeceb9d212f71f02dc1a6069b52",
+   "en": "Say goodbye to that \"plastic shine.\" Bambu Lab PETG Matte delivers a soft, low-gloss finish that helps hide layer lines and gives every print a refined, premium feel.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[1].line[1]",
+    "near": "Matte. Vibrant. Elegant."
+   },
+   "dict": null
+  },
+  {
+   "h": "95e95ae3efcf0682cb58f7cdd2b8db986c57704e612ddaeee8d57dd0d91e6fc8",
+   "en": "With 8 vibrant colors to choose from, including baby blue, avocado green, pink, and more, there's a shade for every room and every mood.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[1].line[2]",
+    "near": "Say goodbye to that \"plastic shine.\" Bambu Lab PETG Matte delivers a soft, low-gloss finish that helps hide layer lines and gives every print a refined, premium"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e200ffb7af0bee36761faabb1c8a751894f5ca97fdac84d34cd42dea271f917",
+   "en": "Print a charming seasonal bunny, a lifelike orchid in bloom, or a soft-glow bedside lamp, the perfect choice for decor that truly belongs in your space.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[1].line[3]",
+    "near": "With 8 vibrant colors to choose from, including baby blue, avocado green, pink, and more, there's a shade for every room and every mood."
+   },
+   "dict": null
+  },
+  {
+   "h": "bd0125f86c3e1573cd38ce1bfec759c9d00e3b25b166909360438c892b143597",
+   "en": "PETG that prints like PLA",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[2].line[0]",
+    "near": "A reworked formula helps reduce the stringing, blobs, and clogs often associated with traditional PETG. Crisp details, clean bridges, and smooth overhangs come "
+   },
+   "dict": null
+  },
+  {
+   "h": "a8acd98cde04778817fefd0b799386ba37eed312358338717c82fe697b22d56c",
+   "en": "A reworked formula helps reduce the stringing, blobs, and clogs often associated with traditional PETG. Crisp details, clean bridges, and smooth overhangs come standard.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[2].line[1]",
+    "near": "PETG that prints like PLA"
+   },
+   "dict": null
+  },
+  {
+   "h": "40de1c4519b35b2efad6fd8f403eb267e847f9c63462ac688be3121c55db970c",
+   "en": "Even on long prints with hours of travel between features, the results stay reliable and consistent, with a printing experience that feels as smooth as PLA.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[2].line[2]",
+    "near": "A reworked formula helps reduce the stringing, blobs, and clogs often associated with traditional PETG. Crisp details, clean bridges, and smooth overhangs come "
+   },
+   "dict": null
+  },
+  {
+   "h": "d48c48a9a6e968a00c44fc347d61e3c2da7220cd85839acf9b6791766a77e605",
+   "en": "Bambu PETG Matte handles moisture better than most PETG filaments. Its reformulated base offers improved resistance to ambient humidity, so a spool taken straight off the shelf still prints the way it should*.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[3].line[0]",
+    "near": "*Extended exposure above 72 hours at 50% humidity still calls for drying. See Printing Tips for guidelines."
+   },
+   "dict": null
+  },
+  {
+   "h": "cf79eba50908138a20f522e4a5891dcbd872b8529f4b2d8557ad3659297dd308",
+   "en": "*Extended exposure above 72 hours at 50% humidity still calls for drying. See Printing Tips for guidelines.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[3].line[1]",
+    "near": "Bambu PETG Matte handles moisture better than most PETG filaments. Its reformulated base offers improved resistance to ambient humidity, so a spool taken straig"
+   },
+   "dict": null
+  },
+  {
+   "h": "c20f7f60695b1c3799d275979237ec77cd70a2afe3a4a5f249603eaa41786398",
+   "en": "PETG is notorious for supports that fuse to the model, the kind you have to wrestle off with pliers. Bambu PETG Matte makes removal easier. Even on steep overhangs and deep holes, supports peel away by hand, leaving the surface underneath smooth and clean. No extra support material needed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[4].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0db5c78d513e433e1b5f0efdf8b53afb387612bd1eb7b8a86aee610a0aae8b52",
+   "en": "Tough enough to earn the name",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[5].line[0]",
+    "near": "A softer look and easier printing haven’t come at the cost of strength with Bambu PETG Matte."
+   },
+   "dict": null
+  },
+  {
+   "h": "1ce088be70dd16b6dccf45ab8dda7984cabf345ce39b93006350663bc64b4aab",
+   "en": "A softer look and easier printing haven’t come at the cost of strength with Bambu PETG Matte.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[5].line[1]",
+    "near": "Tough enough to earn the name"
+   },
+   "dict": null
+  },
+  {
+   "h": "2a89a6e171d791830dad37821a0512e3c26ed547c01c3bc147c0837babbb4da7",
+   "en": "Behind the refined finish is the durability PETG is known for, tough enough for load-bearing hooks and speaker shelves, moisture-resistant enough for soap dishes and bathroom organizers, and weather-resistant enough for planters that live on a sun-beaten balcony.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[5].line[2]",
+    "near": "A softer look and easier printing haven’t come at the cost of strength with Bambu PETG Matte."
+   },
+   "dict": null
+  },
+  {
+   "h": "32cc24a2ec51ef7d85b97245b4adad6522738a024d19cbc5d2bba9d34017d8d5",
+   "en": "Heat. Humidity. Weight. Weather. Bambu PETG Matte takes it all.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[5].line[3]",
+    "near": "Behind the refined finish is the durability PETG is known for, tough enough for load-bearing hooks and speaker shelves, moisture-resistant enough for soap dishe"
+   },
+   "dict": null
+  },
+  {
+   "h": "130d9bd00aadd86a47691cbf9d20796bc8436db340eb562c3bff305911105f49",
+   "en": "1. Accessory Compatibility",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[7].line[1]",
+    "near": "FAQ"
+   },
+   "dict": null
+  },
+  {
+   "h": "8848d57e3c7c47cda4243c2b3d2709d65048e8775b65dc3885ff3c7288a1012c",
+   "en": "2. Drying Recommendations",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[7].line[4]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "692cb28ce697ae9633efcce86ba567a980e0a4bdf0838a247940801fc862feef",
+   "en": "Dry the filament before printing if it has been exposed to humidity above 50% RH for more than 72 hours. For more details, please refer to: Filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[7].line[5]",
+    "near": "2. Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "8235407ef3d6c43692a4063b9a6b068e40b1afb840ca6ffa0d75a38daf80e186",
+   "en": "3. Refill Guidelines",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[7].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4275108b4126fd63138f7dfedd436d2cdd4100235a91d8e38ecd0f1bba717110",
+   "en": "4. Important Notice",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[7].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "470e4d6ee3cf9c2aec2a3dc26e5a2638124ef896bc587d75acb7f04599735834",
+   "en": "Bambu PETG Matte adheres strongly to PEI build plates. Let the build plate cool fully before removing the print to help avoid damage to both the plate and the bottom surface of the printed object. For more guidance, search \"PETG Usage Guide\" on the Bambu Lab Wiki.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[7].line[11]",
+    "near": "4. Important Notice"
+   },
+   "dict": null
+  },
+  {
+   "h": "82fc09b1a90520adc547d83fd89eed95eb1efbfb90b4b897cba2fbdab923dd5d",
+   "en": "Bambu PETG Matte uses a specially modified formula to enable easy support removal, the matte finish, and strong layer adhesion. This greatly improves same-material support peel performance, but PETG Matte is not recommended as a support for PLA. For multi-material support, use Bambu PETG Basic",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[7].line[12]",
+    "near": "Bambu PETG Matte adheres strongly to PEI build plates. Let the build plate cool fully before removing the print to help avoid damage to both the plate and the b"
+   },
+   "dict": null
+  },
+  {
+   "h": "caf8260678414201a53cb26d0809d8850310c5ecbf408edc92116f1bda07a8ac",
+   "en": "Soft Matte Surface Finish",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[8].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "84e1a5851d1a4477fe9ba278289dcb9c2d3ab4a74ab1ea2f12aa3fdb2a42ba57",
+   "en": "Easy Printing with Reduced Stringing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[8].line[2]",
+    "near": "• Soft Matte Surface Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "061e1c026d7e2ad4418dd07c08f12c0bf522d01022bdf72ed577599ba45ee423",
+   "en": "Improved Moisture Resistance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "blocks[8].line[4]",
+    "near": "• Easy Support Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "ab8cc6298528719793079e317a86a2fc7943ad6cf945a542eb2f225abef6e4ca",
+   "en": "PLA Basic - Pumpkin Orange",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[0].line[0]",
+    "near": "Quantity: 1 Roll"
+   },
+   "dict": null
+  },
+  {
+   "h": "645fdcf64a5ae0709197e3c95745f101bfa2fc145837a9ab31655573502447df",
+   "en": "Quantity: 1 Roll",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Basic - Pumpkin Orange"
+   },
+   "dict": {
+    "ar": "الكمية: 1 بكرة",
+    "ckb": "بڕ: 1 بۆبین"
+   }
+  },
+  {
+   "h": "54715889ff48c1b8f0701e896a5560f2030ad4e1d2d708d15366727a8e225193",
+   "en": "PLA Basic - Bambu Green",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[1].line[0]",
+    "near": "Quantity: 1 Roll"
+   },
+   "dict": null
+  },
+  {
+   "h": "381306e7621e689f658407e8e119c3ce71fcf0d95829cde6687b7185ce957282",
+   "en": "LED Flame Tea Light Candle Set",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[2].line[0]",
+    "near": "Quantity: 12 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "32066a9dcd6db4687ad7a6dbae40ccdd4452a26e187aa53ebbeaddd61c299ad3",
+   "en": "Quantity: 12 pcs",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[2].line[1]",
+    "near": "LED Flame Tea Light Candle Set"
+   },
+   "dict": {
+    "ar": "الكمية: 12 قطعة",
+    "ckb": "بڕ: 12 دانە"
+   }
+  },
+  {
+   "h": "f9690d3f4c10dca42a2c02d53dacf12707808d516eb8be15e5fc3c5847e3a127",
+   "en": "More Creative Inspiration",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[3].line[0]",
+    "near": "Here are a few popular models for inspiration. The included filament and lights are great for pumpkin-themed prints as well as many other Halloween creations. F"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1f24128ee2d86d0083def7e3a2d7d98cfca0eaa92c57cc3024191db09870f71",
+   "en": "Here are a few popular models for inspiration. The included filament and lights are great for pumpkin-themed prints as well as many other Halloween creations. For more Halloween-themed models, visit MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[3].line[1]",
+    "near": "More Creative Inspiration"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c0394c2faf297acba37cf4202d57b3b00dce3f6aebb43b8ee7bca3147bfe6ce",
+   "en": "Print the main body and details of the pumpkin using orange and green consumables",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[4].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ba4f8b30adc9a8f2366c4b48da901bb83ce7c93f7502c94f6b45b9ef7e073cb0",
+   "en": "Put in the warm white light to make the pumpkin figurine glow",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[5].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c8335c839bacac600bf7763f1bd2cbf1b0ebc0c85e13737fea575ef1f6f1fc0d",
+   "en": "Halloween-Ready Bundle: Includes 2 themed filament spools in classic seasonal colors and 12 LED tea lights.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "334f1465995e8a7457453e3e6f93d293cd5f4b89fbe3f28e998f44ed3c50aeed",
+   "en": "Made for Pumpkin-Themed Prints: Ideal for creating pumpkin decorations and other Halloween-inspired display pieces.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[6].line[2]",
+    "near": "• Halloween-Ready Bundle: Includes 2 themed filament spools in classic seasonal colors and 12 LED tea lights."
+   },
+   "dict": null
+  },
+  {
+   "h": "c82944626765d06d7722b256a75f9ac9a4d8aef17d0816c62bd58ec8753e7fd9",
+   "en": "Glowing Display Effect: Add the included LED tea lights to bring warm illumination to your printed designs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[6].line[3]",
+    "near": "• Made for Pumpkin-Themed Prints: Ideal for creating pumpkin decorations and other Halloween-inspired display pieces."
+   },
+   "dict": null
+  },
+  {
+   "h": "49fbd8b1c287bb8da6654d792795b5bbc8696e5423147d9f66788c6cf9f07fb6",
+   "en": "Printed Parts Not Included: Please note that the product does not include the 3D printed parts shown in the main image.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "blocks[6].line[4]",
+    "near": "• Glowing Display Effect: Add the included LED tea lights to bring warm illumination to your printed designs."
+   },
+   "dict": null
+  },
+  {
+   "h": "b5f70c3328f1cd8204c168302907738ab6d3ea9af473671ca972997b01c0c1b8",
+   "en": "PLA Basic - Black",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[0].line[0]",
+    "near": "Quantity: 1 Roll"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbe4e49097d3b54b3cc43ad0e8a8dfbbd05ad592a9bcac97104eac034398ba2c",
+   "en": "PLA Basic - Jade White",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[1].line[0]",
+    "near": "Quantity: 1 Roll"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e630a70930723b9d99b2ba6ade772d6a65bc7a18459b0132ec3abd154e41664",
+   "en": "LED Lamp Kit - MH001",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[2].line[0]",
+    "near": "Quantity: 1 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "e8d80c67366b1360438dc6c35ab16bae1e382e08207fb33a36fb5834b2955d4c",
+   "en": "Quantity: 1 pcs",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[2].line[1]",
+    "near": "LED Lamp Kit - MH001"
+   },
+   "dict": {
+    "ar": "الكمية: 1 قطعة",
+    "ckb": "بڕ: 1 دانە"
+   }
+  },
+  {
+   "h": "0541930d7aaf8beefaec60ee694168c7680c8239095da6fa3b15543800d5db80",
+   "en": "Explore more ideas with black and white filaments, Halloween decorations, and atmospheric 3D printing projects. Click the images below to discover related models and creative inspiration. For more Halloween-themed models, visit MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[3].line[1]",
+    "near": "More Creative Inspiration"
+   },
+   "dict": null
+  },
+  {
+   "h": "84e5a72495ef4c2879c7e3a80eda34c2334cd93fdbd600ed70044da879c6e3b6",
+   "en": "Print the main haunted house structure with Black PLA Basic and add White PLA Basic for contrast and decorative details.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[4].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "207fb7fe219badfd4a0870df0c5cc81d654d0a0f939dcd4fad20ed708f42be06",
+   "en": "Combine the printed parts with the MH001 Kit to create a complete Halloween display.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[5].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d18d6f37cfcaca23fd4a7e9ccda80546ceee76909dacaea7f8180c20810479e8",
+   "en": "Halloween-Ready Bundle: Includes 2 themed PLA Basic filament spools in classic Black and White, along with 1 MH001 Kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "b56c4b370b1098a75ce526af4ba83a38eda1b01122f1a615a3355aec0f028935",
+   "en": "Made for Haunted House Prints: Ideal for creating haunted house models, spooky decorations, and other Halloween-inspired display pieces.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[6].line[2]",
+    "near": "• Halloween-Ready Bundle: Includes 2 themed PLA Basic filament spools in classic Black and White, along with 1 MH001 Kit."
+   },
+   "dict": null
+  },
+  {
+   "h": "5e7555ec3465fa06b4a507a17c793f66b10ced29f0b7bbe69cd406169e23b74c",
+   "en": "Create Atmospheric Scenes: Combine the contrasting Black and White filaments with the MH001 Kit to build a distinctive haunted house display.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "blocks[6].line[3]",
+    "near": "• Made for Haunted House Prints: Ideal for creating haunted house models, spooky decorations, and other Halloween-inspired display pieces."
+   },
+   "dict": null
+  },
+  {
+   "h": "0d617f39cec71aef38c8ce7eae45e201c86b195f2160abe3796b987a7692e543",
+   "en": "*The final display of 'Model Strength' & 'Model Fineness' depend on the results of the material testing.",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "bambu-hotend-x1c",
+    "title": "Bambu Hotend - X1C",
+    "field": "blocks[3].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4b9ec5c5e3314539d0b3edfacb2dc86bfa4e20f757d7e532d8f27fb43d18f8ce",
+   "en": "Replacing Hotend",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-hotend-x1c",
+    "title": "Bambu Hotend - X1C",
+    "field": "blocks[4].line[0]",
+    "near": "Learn more about replacing the Complete Hotend and Hotend on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "047c2b8d2998ecfe38d64d0e1f7b92b264b917999aa88478e81064a077814100",
+   "en": "Learn more about replacing the Complete Hotend and Hotend on Bambu Lab Wiki.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-hotend-x1c",
+    "title": "Bambu Hotend - X1C",
+    "field": "blocks[4].line[1]",
+    "near": "Replacing Hotend"
+   },
+   "dict": null
+  },
+  {
+   "h": "34a8b5380881bac6e34faf8121a3edf2a8c326a0af367835eacfd7e8bad337d2",
+   "en": "The Bambu High Flow Hotend's optimized melt zone enables significantly increased volumetric speed, achieving up to 62.5%1 higher max volumetric speed and reducing print time by up to 30%2 with ease. The larger your model, the more time you save—especially for prints with extensive infills.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[0]",
+    "near": "1. Tested with ABS, &Oslash;240mm single-wall cylinder, 0.2mm layer height, 1.0mm outer wall, 280℃ nozzle temperature, spiral vase mode on."
+   },
+   "dict": null
+  },
+  {
+   "h": "625657db318c588fb5a3d1c870bcf5714b62f272c90cc95fd2e1cb197e770d62",
+   "en": "1. Tested with ABS, &Oslash;240mm single-wall cylinder, 0.2mm layer height, 1.0mm outer wall, 280℃ nozzle temperature, spiral vase mode on.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[1]",
+    "near": "The Bambu High Flow Hotend's optimized melt zone enables significantly increased volumetric speed, achieving up to 62.5%1 higher max volumetric speed and reduci"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5a18877572690e7e7291980e5ebbb0619495a5770ba11364f9ce12e0f440af0",
+   "en": "2. Tested with PLA Basic, 15% infill, 300x300x300mm cube.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[2]",
+    "near": "1. Tested with ABS, &Oslash;240mm single-wall cylinder, 0.2mm layer height, 1.0mm outer wall, 280℃ nozzle temperature, spiral vase mode on."
+   },
+   "dict": null
+  },
+  {
+   "h": "548bb8820afe38fce7cde9071d2852d690a4c00fee0cb89877ed65e968ba0304",
+   "en": "Bambu Standard Flow Hotend (0.4mm)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[4].cell[0]",
+    "near": "| PLA Basic | PLA Matte | PETG HF"
+   },
+   "dict": null
+  },
+  {
+   "h": "b67ceed5a5c7257371b9a8adfcbf845778a222f440cb08793ad04c381a20c8ed",
+   "en": "Bambu High Flow Hotend (0.4mm)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[5].cell[0]",
+    "near": "Bambu Standard Flow Hotend (0.4mm) | 24 mm³/s | 28 mm³/s | 24 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "74ce90cf89dbdd22a91512e08f237bbea0d54801d1465097c11f2254bc1d4ba5",
+   "en": "Bambu High Flow Hotend (0.6mm)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[6].cell[0]",
+    "near": "Bambu High Flow Hotend (0.4mm) | 40 mm³/s | 48 mm³/s | 32 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "2471d32384a672e36d42b95fa3c63a8c31ef5adfa88a7b0067e6df6dba98efa4",
+   "en": "Bambu High Flow Hotend (0.8mm)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[7].cell[0]",
+    "near": "Bambu High Flow Hotend (0.6mm) | 40 mm³/s | 40 mm³/s | 40 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c292b50f156d6042eaf92875f01542c25d30a857c028038a03992d564207a1a",
+   "en": "High-Speed Precision: Sharp Details Every Time",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[1].line[0]",
+    "near": "Say goodbye to under-extrusion, rough surfaces, and loss of detail. Unlike standard high-flow hotends, Bambu's high yet consistent extrusion ensures crisp edges"
+   },
+   "dict": null
+  },
+  {
+   "h": "2a7db3885429be34f9770cbc2285c413903d4096517de99c0d90822530042fa0",
+   "en": "Say goodbye to under-extrusion, rough surfaces, and loss of detail. Unlike standard high-flow hotends, Bambu's high yet consistent extrusion ensures crisp edges, flawless texturing, and ultra-smooth surfaces—every single time.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[1].line[1]",
+    "near": "High-Speed Precision: Sharp Details Every Time"
+   },
+   "dict": null
+  },
+  {
+   "h": "b97b4d36ad8a00e130fc97d62749e9156dbe44c5385bb60786a0765071d2ec20",
+   "en": "Upgrade now and print faster without compromise!",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[1].line[2]",
+    "near": "Say goodbye to under-extrusion, rough surfaces, and loss of detail. Unlike standard high-flow hotends, Bambu's high yet consistent extrusion ensures crisp edges"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca8354beaa136292fff1bf44a6e5a924596ab6fcff60434be0767069db09037c",
+   "en": "Printer Compatability",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[2].line[0]",
+    "near": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series"
+   },
+   "dict": null
+  },
+  {
+   "h": "120d1307d24e54a29bedba427958198211f42e5807e46b8ad03e27a59fae7768",
+   "en": "Not Supported",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[2].line[2].cell[3]",
+    "near": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series"
+   },
+   "dict": {
+    "ar": "غير مدعوم",
+    "ckb": "پشتگیری نەکراو"
+   }
+  },
+  {
+   "h": "8f6494e58e9f800ef1cbeb6c3b3f2baa4c21ea53382c396a2d6d00575e63745e",
+   "en": "Supported*",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[2].line[2].cell[4]",
+    "near": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series"
+   },
+   "dict": null
+  },
+  {
+   "h": "72fb092895d05d97de60aa4e82e4b7d0c4d8bdd351f53dccaa8f0792ed99fd37",
+   "en": "*Bambu High Flow Hotend is compatible with A1/A2 Series, but it will not improve volumetric speed. In other words, the High Flow Hotend performs the same as a Standard Flow Hotend on the A1/A2 Series.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[2].line[3]",
+    "near": "Supported | Supported | Supported | Not Supported | Supported*"
+   },
+   "dict": null
+  },
+  {
+   "h": "63de4c6b746281d17b4e6759d92de1907956ac821b70655e900e1ac34a9f2bd2",
+   "en": "High-Speed Precision",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "68a485ab1a44adbbc018e28f1c3272141ed0597a66b81ce0ff07d1b7b8ff04c0",
+   "en": "Quick Swap Nozzle Design",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "blocks[3].line[2]",
+    "near": "• High-Speed Precision"
+   },
+   "dict": null
+  },
+  {
+   "h": "418325b3af10ebf84bfb4d04d8259a08f580a8a814ae5f03c1fde065b8e90533",
+   "en": "The special design of H2/P2S hotend heating assembly enables easy separation of the thermal and electronic components of the hotend. Simply unlock the latch for quick and easy hotend removal and installation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[1]",
+    "near": "Quick Swap Nozzle Design"
+   },
+   "dict": null
+  },
+  {
+   "h": "40383e850c1efe6e786448aaaa4d3038551795d0d6c6b6fffc970b5f69bdc054",
+   "en": "*Please ensure that the hotend has cooled down before swapping, and avoid touching the heat block (lower section of the hotend) to prevent any risk of burns.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[2]",
+    "near": "The special design of H2/P2S hotend heating assembly enables easy separation of the thermal and electronic components of the hotend. Simply unlock the latch for"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e5fb39154ac068b15ce21580eb9d0f076d6155161a68d27f58cde388706c26a",
+   "en": "Bambu Lab and E3D share the vision of future manufacturing. Today, we condense this vision into a jointly developed product. The E3D high-flow replacement hotend can provide 60% more flow rate, features the signature ObXidian™ hardened nozzle, and E3DLC™ coating for excellent durability.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[0].line[0]",
+    "near": "The new hotend is the result of seamless cooperation between E3D and Bambu Lab. Both teams shared precious know-how on the hotend, the printer, and the thermal "
+   },
+   "dict": null
+  },
+  {
+   "h": "fd4dbf8aaaba7faa1d23cdad7f73ef9ad8e4e10d59752d77e4db33c1e4c6283a",
+   "en": "The new hotend is the result of seamless cooperation between E3D and Bambu Lab. Both teams shared precious know-how on the hotend, the printer, and the thermal process of the materials. The end product is thoroughly tested by both teams and will be officially integrated into all the software ecosystems of Bambu Lab.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[0].line[1]",
+    "near": "Bambu Lab and E3D share the vision of future manufacturing. Today, we condense this vision into a jointly developed product. The E3D high-flow replacement hoten"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8da9e4441dce84baf3e3ce1427171977eb3ce55763e6913c3fd3f1af83aac4e",
+   "en": "High-Flow, High-Speed",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[1].line[0]",
+    "near": "Experience a 60% increase in volumetric flow rate, enabling faster print speeds without compromising reliability. Enjoy smooth, consistent extrusion even during"
+   },
+   "dict": null
+  },
+  {
+   "h": "14342369c72aa8ec50b63a0c9ad88ae3bce7bba88bb17c6bfb79e1992b6e36a4",
+   "en": "Experience a 60% increase in volumetric flow rate, enabling faster print speeds without compromising reliability. Enjoy smooth, consistent extrusion even during high-speed prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[1].line[1]",
+    "near": "High-Flow, High-Speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa09351074818b73b68ce8ca83af4d1997c4f1d5fc70e006ece299e69faacd37",
+   "en": "Uncompromised Layer Bonding at High Speeds",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[2].line[0]",
+    "near": "The E3D High Flow ObXidian™ Hotend delivers consistent filament flow even at high print speeds, ensuring reliable extrusion and reducing the risk of under-extru"
+   },
+   "dict": null
+  },
+  {
+   "h": "aaa8eb110796562fe403eceea845c3efe6771b8170cebacea94738701b48bf84",
+   "en": "The E3D High Flow ObXidian™ Hotend delivers consistent filament flow even at high print speeds, ensuring reliable extrusion and reducing the risk of under-extrusion. The result: stronger layer bonding and higher-quality prints without slowing down. Don't just take our word for it though - check out this video from @Printing Perspective where he puts it to the test!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[2].line[1]",
+    "near": "Uncompromised Layer Bonding at High Speeds"
+   },
+   "dict": null
+  },
+  {
+   "h": "84c8231067c55dcd3b3870427dcdcf240231b791d89c4e55e5fbec68b08a7179",
+   "en": "Non-Stick Coating, Reduce the Risk of Nozzle Blobbing",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[3].line[0]",
+    "near": "The E3DLC™ coating is a thin, diamond-like layer applied via plasma, creating an ultra-smooth surface that significantly reduces plastic build-up on the nozzle."
+   },
+   "dict": null
+  },
+  {
+   "h": "da02a4c092ff403fee146d1f9163517ea0c6a29467bad69b53980b20ece8e816",
+   "en": "The E3DLC™ coating is a thin, diamond-like layer applied via plasma, creating an ultra-smooth surface that significantly reduces plastic build-up on the nozzle. This non-stick property helps prevent nozzle blobs - especially useful when printing with sticky filaments like PETG.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[3].line[1]",
+    "near": "Non-Stick Coating, Reduce the Risk of Nozzle Blobbing"
+   },
+   "dict": null
+  },
+  {
+   "h": "c839d8a264b62e0ca9618e999db7ac3e08fa29a1be831c7c793e1d24aed9784a",
+   "en": "Official-Tuned Printer Presets",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[4].line[0]",
+    "near": "In Studio/Handy, please ensure you have updated to the latest version before following the steps below:"
+   },
+   "dict": null
+  },
+  {
+   "h": "e857c9e9e0acb80e3ee3facc172c267ecb9cf96bfb397bf7074a0a137162988f",
+   "en": "In Studio/Handy, please ensure you have updated to the latest version before following the steps below:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[4].line[1]",
+    "near": "Official-Tuned Printer Presets"
+   },
+   "dict": null
+  },
+  {
+   "h": "9d70aa8b0fb3a453807ccf0c7265bfffc61e05044986585b105064e159cf235a",
+   "en": "For X and P series models, select the nozzle flow type as \"High Flow\", and proceed to select the filament normally to start printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[4].line[2]",
+    "near": "In Studio/Handy, please ensure you have updated to the latest version before following the steps below:"
+   },
+   "dict": null
+  },
+  {
+   "h": "016ea3a65129e514e2d19c1e4bd887a238225207990d8150720dae224ebcf8d1",
+   "en": "When prompted that the printing parameters require fine-tuning, based on the \"High Flow\" nozzle type,",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[5].line[0]",
+    "near": "you can modify the corresponding filament parameters as well as the speed-related parameters in the process settings"
+   },
+   "dict": null
+  },
+  {
+   "h": "154d7d25714db15cde0e403e89773347d6e94cb3422f8e31a1759c038260a74a",
+   "en": "you can modify the corresponding filament parameters as well as the speed-related parameters in the process settings",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[5].line[1]",
+    "near": "When prompted that the printing parameters require fine-tuning, based on the \"High Flow\" nozzle type,"
+   },
+   "dict": null
+  },
+  {
+   "h": "5aac7b326ad426ce5cb4ffd310ac7c28e3a8f2d0f6ef88ca47110365478eea58",
+   "en": "according to the detailed parameters provided in the wiki.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "blocks[5].line[2]",
+    "near": "you can modify the corresponding filament parameters as well as the speed-related parameters in the process settings"
+   },
+   "dict": null
+  },
+  {
+   "h": "e41093ad5200b3646ee93af818d2e097c69d0d2164a0f68d69ee19b437e3fb9c",
+   "en": "The Bambu High Flow Nozzle's optimized melt zone enables significantly increased volumetric speed, achieving up to 62.5%1 higher max volumetric speed and reducing print time by up to 30%2 with ease. The larger your model, the more time you save—especially for prints with extensive infills.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hotends-combo-h2-series",
+    "title": "Hotends Combo - H2 Series",
+    "field": "blocks[2].line[0]",
+    "near": "1. Tested with ABS, &Oslash;240mm single-wall cylinder, 0.2mm layer height, 1.0mm outer wall, 280℃ nozzle temperature, spiral vase mode on."
+   },
+   "dict": null
+  },
+  {
+   "h": "c62d9eabc144175e9177494f4f89a129aeb01e16a0f1ba2c1759e4c822ca36dd",
+   "en": "Bambu Hardened Steel Nozzle (0.4mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "hotends-combo-h2-series",
+    "title": "Hotends Combo - H2 Series",
+    "field": "blocks[2].line[4].cell[0]",
+    "near": "| PLA Basic | PLA Matte | PETG HF"
+   },
+   "dict": null
+  },
+  {
+   "h": "382fd7d31cdaf090b0e6b1a4391f2c087665d0637c76b761e7cf150c2ad0d917",
+   "en": "Bambu High Flow Nozzle (0.4mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "hotends-combo-h2-series",
+    "title": "Hotends Combo - H2 Series",
+    "field": "blocks[2].line[5].cell[0]",
+    "near": "Bambu Hardened Steel Nozzle (0.4mm) | 24 mm³/s | 28 mm³/s | 24 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "59947b2545366b68c807299b080cb32001e0cf4c75e38b143160a13ea5eacc85",
+   "en": "Bambu High Flow Nozzle (0.6mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "hotends-combo-h2-series",
+    "title": "Hotends Combo - H2 Series",
+    "field": "blocks[2].line[6].cell[0]",
+    "near": "Bambu High Flow Nozzle (0.4mm) | 40 mm³/s | 48 mm³/s | 32 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "33906ae96f927e7119d7437de6f87bddfbdafd57cb04582b48c90255b1ec73c1",
+   "en": "Bambu High Flow Nozzle (0.8mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "hotends-combo-h2-series",
+    "title": "Hotends Combo - H2 Series",
+    "field": "blocks[2].line[7].cell[0]",
+    "near": "Bambu High Flow Nozzle (0.6mm) | 40 mm³/s | 40 mm³/s | 40 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "31ca5a531e52d4c4a93f3f819b2323cfa742a80621caa0b0b886d94051e633ac",
+   "en": "*Learn more about replacing the Hotend on Bambu Lab Wiki",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hotends-combo-h2-series",
+    "title": "Hotends Combo - H2 Series",
+    "field": "blocks[3].line[2]",
+    "near": "*Please ensure that the hotend has cooled down before swapping, and avoid touching the heat block (lower section of the hotend) to prevent any risk of burns."
+   },
+   "dict": null
+  },
+  {
+   "h": "beeb7651377f01a5b5a15defac2e78997a8aaf77c237847bc2259efbca86b5e2",
+   "en": "The special design of hotend heating assembly enables easy separation of the thermal and electronic components of the hotend. Simply unlock the latch for quick and easy hotend removal and installation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[0].line[1]",
+    "near": "Quick Swap Nozzle Design"
+   },
+   "dict": null
+  },
+  {
+   "h": "50503ac5bbdfc0c6efb6c8a3848e90149351812de32aa0a12c6e3eef0e21f4ef",
+   "en": "| 0.4 mm Nozzle",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[2].line[1].cell[0]",
+    "near": "Comparison of Different Nozzle Sizes"
+   },
+   "dict": null
+  },
+  {
+   "h": "e2a6810bb07b28106aa4027b09f3124454491c50510b6f29b694d9db421c84a3",
+   "en": "The Tungsten Carbide Super Durable Nozzle's optimized melt zone enables significantly increased volumetric speed, achieving up to 62.5%1 higher max volumetric speed and reducing print time by up to 30%2 with ease. The larger your model, the more time you save—especially for prints with extensive infills.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[4].line[0]",
+    "near": "1. Tested with ABS, &Oslash;240mm single-wall cylinder, 0.2mm layer height, 1.0mm outer wall, 280℃ nozzle temperature, spiral vase mode on."
+   },
+   "dict": null
+  },
+  {
+   "h": "51b06eecdc5ba74e61d41b20831f6075704cae8ca6d8cd98883547d5b2a1ed64",
+   "en": "Tungsten Carbide Nozzle (0.4mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[4].line[4].cell[0]",
+    "near": "| PLA Basic | PLA Matte | PETG HF"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b150c855a9e0b8d23a072c77b87404b47220b9bce9726fa87868ad8365ca747",
+   "en": "High Flow Tungsten Carbide Nozzle Nozzle (0.4mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[4].line[5].cell[0]",
+    "near": "Tungsten Carbide Nozzle (0.4mm) | 24 mm³/s | 28 mm³/s | 24 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "02d62f101d904afa80f3b7c955799b1f3003c4e912afc6b64a8f0bd24b8ae7ad",
+   "en": "High Flow Tungsten Carbide Nozzle Nozzle (0.6mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[4].line[6].cell[0]",
+    "near": "High Flow Tungsten Carbide Nozzle Nozzle (0.4mm) | 40 mm³/s | 48 mm³/s | 32 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "4acaf6c3de57616b0b03abbf9be54626ceac52898113716749e6dada8e8372f1",
+   "en": "High Flow Tungsten Carbide Nozzle Nozzle (0.8mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[4].line[7].cell[0]",
+    "near": "High Flow Tungsten Carbide Nozzle Nozzle (0.6mm) | 40 mm³/s | 40 mm³/s | 40 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac3d9ecc595940ecd0c6f652bcf60ccf9f90428749a77d20ce376d8c0bf3056d",
+   "en": "Say goodbye to under-extrusion, rough surfaces, and loss of detail. Unlike standard high-flow nozzles, Bambu's high yet consistent extrusion ensures crisp edges, flawless texturing, and ultra-smooth surfaces—every single time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[5].line[1]",
+    "near": "High-Speed Precision: Sharp Details Every Time"
+   },
+   "dict": null
+  },
+  {
+   "h": "087faba23a0d373c2ceeb489c6b34f62138e709b4ca80f6b9aa697c5191db27c",
+   "en": "Perfect for Abrasive Filament",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "9d1a591a8cc91f00a7c3e4ddaae1f0897011f6168711ea39bfc101738a5c05a5",
+   "en": "HRA 90 Tougher nozzle, lower maintenance Important Notice",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[6].line[2]",
+    "near": "• Perfect for Abrasive Filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "03d3ba93c632c26dd508337cd86f7611231d5556cd3f1e7be93b7e66d20a1ef4",
+   "en": "Important Notice",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "blocks[6].line[3]",
+    "near": "• HRA 90 Tougher nozzle, lower maintenance Important Notice"
+   },
+   "dict": null
+  },
+  {
+   "h": "ed359e5ea8a3fd4e6aa58026e262c015371dbf72e8ff01be6ccb040f4179253c",
+   "en": "Multi-Material Printing with Less Waste",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[0].line[0]",
+    "near": "The Vortek System uses up to six interchangeable induction-heated hotends to achieve true multi-material printing with significantly reduced purge waste compare"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f1102593bc1f41a460a3a1a2cb3665e74fcca2fac1c539f40ece4faf40ddbbc",
+   "en": "The Vortek System uses up to six interchangeable induction-heated hotends to achieve true multi-material printing with significantly reduced purge waste compared to single-nozzle systems. The hotend swap mechanism eliminates purge flushing during filament changes (H2C under 7 filaments), saving both material and time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[0].line[1]",
+    "near": "Multi-Material Printing with Less Waste"
+   },
+   "dict": null
+  },
+  {
+   "h": "19ab038cb24ce8b62b19d4508199b5e52b2505c88d87059afc39017f718def7d",
+   "en": "Fast and Precise Induction Heating",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[1].line[0]",
+    "near": "The Vortek Induction Hotend rapidly heats the nozzle to printing temperature in approximately 8 seconds (PLA). This fast response shortens color-change transiti"
+   },
+   "dict": null
+  },
+  {
+   "h": "423a1fa8a88c3e9efb62f2b440817340299c427f12754efb3ad2acf23fe1b7b7",
+   "en": "The Vortek Induction Hotend rapidly heats the nozzle to printing temperature in approximately 8 seconds (PLA). This fast response shortens color-change transitions and further reduces purge waste. Integrated overheat, overvoltage, short-circuit, and open-circuit protection ensure reliable performance during continuous multi-material workflows.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[1].line[1]",
+    "near": "Fast and Precise Induction Heating"
+   },
+   "dict": null
+  },
+  {
+   "h": "10f8d7456bcefc3eb2ff43ff0f4ee4ba6b2781ba664777321b9796409ff231c7",
+   "en": "Reliable Contactless Connection",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[2].line[0]",
+    "near": "Instead of contact-based metal pins—which can oxidize and degrade over time—the Vortek System employs a contactless, high-frequency power and signal interface. "
+   },
+   "dict": null
+  },
+  {
+   "h": "4ffc2252688aebddb0e23314e2ff90f18dd15c1d317ab10d327df7e59dce34fb",
+   "en": "Instead of contact-based metal pins—which can oxidize and degrade over time—the Vortek System employs a contactless, high-frequency power and signal interface. This delivers a stable, long-lasting connection for accurate temperature control and synchronized hotend operation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[2].line[1]",
+    "near": "Reliable Contactless Connection"
+   },
+   "dict": null
+  },
+  {
+   "h": "f68af66e312d76edac8666cbf7bac903d6638094fa1b5133d13846ddd52a8ce3",
+   "en": "Heatsink Overheat Monitoring",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[3].line[0]",
+    "near": "Dual temperature sensors monitor both nozzle and heatsink temperatures in real time. When heatsink temperature exceeds safe limits, the system automatically inc"
+   },
+   "dict": null
+  },
+  {
+   "h": "ae32c1238d208cd1f377059b8070f6129b5b8dc259fc48d9f9295a68a3d538b1",
+   "en": "Dual temperature sensors monitor both nozzle and heatsink temperatures in real time. When heatsink temperature exceeds safe limits, the system automatically increases cooling to prevent heat creep and reduce the risk of clogging.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[3].line[1]",
+    "near": "Heatsink Overheat Monitoring"
+   },
+   "dict": null
+  },
+  {
+   "h": "7364644d684aae3124e5696308ae6a121a936a9f9a411fd9f0be6a8417e23297",
+   "en": "Intelligent Multi-Hotend Management",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[4].line[0]",
+    "near": "Each Vortek Hotend stores its filament information locally, ensuring correct material mapping and preventing loading errors. When printing with more than seven "
+   },
+   "dict": null
+  },
+  {
+   "h": "0f1e2669da20e099baa3d3e94ed988f43e9f7c0e58ae8ae7330e508f4347c516",
+   "en": "Each Vortek Hotend stores its filament information locally, ensuring correct material mapping and preventing loading errors. When printing with more than seven filament types, the system intelligently optimizes hotend mapping to minimize purge waste and improve overall efficiency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[4].line[1]",
+    "near": "Intelligent Multi-Hotend Management"
+   },
+   "dict": null
+  },
+  {
+   "h": "41e3c890bdcb2b9144ab198f9fd63bf7b13efd3a084ea745d718579ca161533e",
+   "en": "Real High-Flow, Real Time Saved",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[0]",
+    "near": "| H2C Max Volumetric Speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "285980e7a4757781d0f887f7fc81802927772c73494eb8b090279af21de3aaf0",
+   "en": "| H2C Max Volumetric Speed",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[1]",
+    "near": "Real High-Flow, Real Time Saved"
+   },
+   "dict": null
+  },
+  {
+   "h": "317132528975d67aa3ede2519e432e4d97439c37ae046dfde953bb1d377428f0",
+   "en": "Induction Stainless Steel Nozzle (0.2mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[2].cell[0]",
+    "near": "| H2C Max Volumetric Speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4c0d75dae9f5867bdca3004aba17247fc800886200045664c7f74ca672a0e93",
+   "en": "Induction Hardened Steel Nozzle (0.4mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[3].cell[0]",
+    "near": "Induction Stainless Steel Nozzle (0.2mm) | 2 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "09c8f9759d3457671db190b699bf3d047bcccb00adfc4c7bbd6c83b6043fc677",
+   "en": "Induction Hardened Steel Nozzle (0.6mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[4].cell[0]",
+    "near": "Induction Hardened Steel Nozzle (0.4mm) | 25 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca7a83602d4eda51e0428fd45d1ca422294eceb7f79d3af3ce4d52adbc8da09c",
+   "en": "Induction Hardened Steel Nozzle (0.8mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[5].cell[0]",
+    "near": "Induction Hardened Steel Nozzle (0.6mm) | 30 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "c80a4121779e8dcf8d75fa343864faa99d15a5fc995f313af06c5a84ad7f0418",
+   "en": "High Flow Induction Hardened Steel Nozzle (0.4mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[6].cell[0]",
+    "near": "Induction Hardened Steel Nozzle (0.8mm) | 30 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a9a00351f90655f6775441ef2082f952e36b3f199c84b0f5adce4dbbb6b1f0f",
+   "en": "High Flow Induction Hardened Steel Nozzle (0.6mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[7].cell[0]",
+    "near": "High Flow Induction Hardened Steel Nozzle (0.4mm) | 40 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "b2ca5e7963b34d6119022a42539c81a75a6a3b72b7d8039414f2a422d8a1557d",
+   "en": "High Flow Induction Hardened Steel Nozzle (0.8mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[8].cell[0]",
+    "near": "High Flow Induction Hardened Steel Nozzle (0.6mm) | 40 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6a58f9cc75e68098e35ca022df61eeb59e17f801beeed005935be50d25f3133",
+   "en": "*Tested with Bambu PLA Basic.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "blocks[5].line[9]",
+    "near": "High Flow Induction Hardened Steel Nozzle (0.8mm) | 40 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "c59b7f4cddf3f1da0f1206e9e21b849b59b8fe90bf37a4d39e062d73490a7ccb",
+   "en": "Why You Need Hotend Combo",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[0].line[0]",
+    "near": "H2C includes the essential hotend configuration for multi-color, multi-material printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "bb04ab8f3b458fb257f4ca77e9f1035c372642942c99dcfad52d0be729f1ecd6",
+   "en": "H2C includes the essential hotend configuration for multi-color, multi-material printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[0].line[1]",
+    "near": "Why You Need Hotend Combo"
+   },
+   "dict": null
+  },
+  {
+   "h": "17e8c383da6c1cc499b9044ede922ffd4112d9b1f54954828f5378e1830d823e",
+   "en": "To fully unlock its Vortek System and maintain consistent print performance across different nozzle sizes, having matched combo of standard and induction hotends is crucial.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[0].line[2]",
+    "near": "H2C includes the essential hotend configuration for multi-color, multi-material printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "da2c2fcb61e170f0e23cb7a776130f901ab96c6c9a781272ec7d93c28057321c",
+   "en": "The Hotend Combo gives you:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[0]",
+    "near": "• 0.4 mm Induction hardened Steel Nozzle (RHS) ×2 – More slots for multi-color switching without frequent nozzle changes"
+   },
+   "dict": null
+  },
+  {
+   "h": "19bc5c5f5056eef2c62e63e97ea1b0bbf09457e86d84f57ef70939812ee6e5b6",
+   "en": "0.4 mm Induction hardened Steel Nozzle (RHS) ×2 – More slots for multi-color switching without frequent nozzle changes",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[1]",
+    "near": "The Hotend Combo gives you:"
+   },
+   "dict": null
+  },
+  {
+   "h": "fbf21d40323f107278a0cf61a419160e547c12745a0e0d3ccd569578f086a066",
+   "en": "0.2 mm stainless steel nozzle (LHS) ×1 – Perfect for ultra-fine details and high-precision parts",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[2]",
+    "near": "• 0.4 mm Induction hardened Steel Nozzle (RHS) ×2 – More slots for multi-color switching without frequent nozzle changes"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4a0f64754446dbb703e757afde70104ef2090440f411d67f4dfbb6b805dbd56",
+   "en": "0.6 mm hardened steel nozzle (LHS) ×1 – Ideal for faster prints and functional applications",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[3]",
+    "near": "• 0.2 mm stainless steel nozzle (LHS) ×1 – Perfect for ultra-fine details and high-precision parts"
+   },
+   "dict": null
+  },
+  {
+   "h": "9d9608b98febd11e7391e142a5d5a7646f8eb0b31ed6d8063a1b162ff0852f42",
+   "en": "With these additions, your printer can:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[4]",
+    "near": "• 0.6 mm hardened steel nozzle (LHS) ×1 – Ideal for faster prints and functional applications"
+   },
+   "dict": null
+  },
+  {
+   "h": "0023e0e11573f99eec356aab7cfa6a7f1663cda9aa77336229ed54273c72d7da",
+   "en": "Simultaneously print up to 7 filaments using 0.4 mm hotends without purging",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[5]",
+    "near": "With these additions, your printer can:"
+   },
+   "dict": null
+  },
+  {
+   "h": "640832394b3690ae9b6aa5fc237730f58b8485453f059cd67adc40568f1c09e1",
+   "en": "Perform dual-hotend printing in 0.2 / 0.6 mm, not just 0.4 mm",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[6]",
+    "near": "• Simultaneously print up to 7 filaments using 0.4 mm hotends without purging"
+   },
+   "dict": null
+  },
+  {
+   "h": "b8fae85491a87cb37ce7a73afce7addd93421e629b4e4a723926749dd4979572",
+   "en": "Maintain perfect size matching between standard & induction hotends",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[7]",
+    "near": "• Perform dual-hotend printing in 0.2 / 0.6 mm, not just 0.4 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "13abd61cc33299d5fb77bf2610601d2e9daebd86476631ceb48ce3210d9b983a",
+   "en": "Assign each of the six induction hotends to specific filament, storing filament info automatically for seamless reloads — perfect for high-value engineering filaments",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[8]",
+    "near": "• Maintain perfect size matching between standard & induction hotends"
+   },
+   "dict": null
+  },
+  {
+   "h": "8bfa2fb049a4d518e1ca37251a728938f9534f59a0e0c28ad57b49b641edf772",
+   "en": "Pair with the AMS system to print up to 24 materials simultaneously, with smart material-to-hotend matching to minimize purging while enabling complex color and material combinations",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[9]",
+    "near": "• Assign each of the six induction hotends to specific filament, storing filament info automatically for seamless reloads — perfect for high-value engineering f"
+   },
+   "dict": null
+  },
+  {
+   "h": "92b609f8d034123b74a119d5b05e4b30a5d1f8c5ed5e5d873dadff6b2095258e",
+   "en": "This Combo completes your printer' s full capability range — exactly as the Vortek System was designed to perform.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "blocks[1].line[10]",
+    "near": "• Pair with the AMS system to print up to 24 materials simultaneously, with smart material-to-hotend matching to minimize purging while enabling complex color a"
+   },
+   "dict": null
+  },
+  {
+   "h": "6c19f3798cf5bd1a185c284e601e772a9358025a36493048d0163a780c4523fa",
+   "en": "Reliable High-Speed TPU Printing",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[0].line[0]",
+    "near": "The specially designed hotend reduces extrusion resistance and extends the melting zone, enabling faster and more stable TPU printing. When printing 90A TPU, it"
+   },
+   "dict": null
+  },
+  {
+   "h": "42010656f851248a6f9bb27deffa24311e0f4e4b70c067a6b34308cab8a6a5af",
+   "en": "The specially designed hotend reduces extrusion resistance and extends the melting zone, enabling faster and more stable TPU printing. When printing 90A TPU, it delivers up to 100% higher flow rate and cuts print time by around 30% for typical applications such as footwear.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Reliable High-Speed TPU Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "95fa9f562f76537f22e416cd8b1563b2c28a4013f40886265f766888b86df068",
+   "en": "Specially Tuned for Bambu TPU Filaments",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[1].line[0]",
+    "near": "Print parameters are precisely fine-tuned for all Bambu TPU filaments when used with the TPU High-Flow Kit. No manual tweaking required—allowing sticky TPU mate"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb3f67994d8e38d9c6845b8bb64e6c05865e761d93d559e77b38af60067e855e",
+   "en": "Print parameters are precisely fine-tuned for all Bambu TPU filaments when used with the TPU High-Flow Kit. No manual tweaking required—allowing sticky TPU materials to print smoothly right out of the box.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Specially Tuned for Bambu TPU Filaments"
+   },
+   "dict": null
+  },
+  {
+   "h": "a9f04a5ccee0f18e8827b4843c6dcde02763460341df00cefbe933b48a8a1d1e",
+   "en": "| H2D Standard Flow Hotend",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[2].line[1].cell[0]",
+    "near": "Comparison of Different Nozzle Sizes"
+   },
+   "dict": null
+  },
+  {
+   "h": "8f7b55d0cba45c9327998327d259d46a3f72f9ab5f30470981da46d6e0ad04e6",
+   "en": "H2D Standard Flow Hotend",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Comparison of Different Nozzle Sizes"
+   },
+   "dict": null
+  },
+  {
+   "h": "18b4f7c31a0c581f751d54d75b9096652ef5fa636631b22fd8af3625e7a4747d",
+   "en": "H2D TPU High-Flow Hotend",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[2].line[1].cell[2]",
+    "near": "Comparison of Different Nozzle Sizes"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb9134536b1c2ae9834b39f5165ce89349b749986ceb6492d9bf8de859c76acc",
+   "en": "Not Compatible",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[2].line[3].cell[1]",
+    "near": "TPU | 0.4 mm Nozzle | 0.6 mm Nozzle | 0.4 mm Nozzle | 0.6 mm Nozzle"
+   },
+   "dict": null
+  },
+  {
+   "h": "46f16e437808579cfb1f0887d3a35ac99b17c3dcf83f741428fe8d4b5b7b9243",
+   "en": "95A HF",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[2].line[5].cell[0]",
+    "near": "90A | 2.8 mm³/s | 2.8 mm³/s | 5.6 mm³/s | 5.6 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "26fa71cb865618654e186697aa1c733d066082780faff16c3607d9c47aeffbf4",
+   "en": "Note: Parameter optimization and speed enhancements currently apply only to Bambu TPU 85A, Bambu TPU 90A, and Bambu TPU 95A HF.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[2].line[6]",
+    "near": "95A HF | 12 mm³/s | 12 mm³/s | 16 mm³/s | 16 mm³/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "759fbbc2d5c4f782a80c71a7358e196c267870ce13158e12853b0a8c1f5ed1f5",
+   "en": "Important Notice Before Purchase",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[3].line[3]",
+    "near": "• Easy Installation"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d96d2ecb0eafc3181cf21d1af688fe7d9d0c758c4888d1ae93b80852f93e072",
+   "en": "1. Limitations: After installing the TPU hotend, the filament cutter installation is not supported, so the filament cutter function cannot be used, and the right nozzle does not support automatic filament changing and automatic filament feeding and retracting.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[3].line[4]",
+    "near": "• Important Notice Before Purchase"
+   },
+   "dict": null
+  },
+  {
+   "h": "e525120e2d29fae47a60c9ca0e0c4a58463f2ba2cdf0f82963fe84bbc6c84eb1",
+   "en": "2. Only flexible filaments are allowed: The TPU hotend has a special inner coating, printing hard filaments is prohibited (such as PLA, PETG, TPU for AMS), otherwise it will cause the coating to wear and fail.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[3].line[5]",
+    "near": "• 1. Limitations: After installing the TPU hotend, the filament cutter installation is not supported, so the filament cutter function cannot be used, and the ri"
+   },
+   "dict": null
+  },
+  {
+   "h": "6dedde693fae4c1d9f21060e52f4337381c250a13704fbc138775e1232603e01",
+   "en": "3. Position Limitation: The TPU hotend can only be installed on the right nozzle. If it is installed on the left nozzle, it will cause the nozzle lifting mechanism to malfunction.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[3].line[6]",
+    "near": "• 2. Only flexible filaments are allowed: The TPU hotend has a special inner coating, printing hard filaments is prohibited (such as PLA, PETG, TPU for AMS), ot"
+   },
+   "dict": null
+  },
+  {
+   "h": "e2d2aa7df5764f5cf45929347c9b609bb1f0c600df1df5c01d505af8b63edcbc",
+   "en": "4. Installation Guide: Please read the official H2D TPU High-Flow Kit installation guide on Bambu Lab Wiki before purchasing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "blocks[3].line[7]",
+    "near": "• 3. Position Limitation: The TPU hotend can only be installed on the right nozzle. If it is installed on the left nozzle, it will cause the nozzle lifting mech"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e672bd361a3e75d3f2e336549fb6bce06be393240bd81ef2dfd3a19abcd0772",
+   "en": "All hotends included in the kit are standard flow hotends.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-size-hotends-kit",
+    "title": "Multi-Size Hotends Kit",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "25c30011318e42a3f0b1cf6bb9fc8b0366370a547079b37bbff246fe24da32f0",
+   "en": "High Z-axis Precision Printing",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[0].line[0]",
+    "near": "The use of a Smooth PEI Plate contributes to improved Z-axis precision during the printing process, ensuring greater accuracy and consistency in the vertical di"
+   },
+   "dict": null
+  },
+  {
+   "h": "39cc69e0bd7e56e99e2a9f55484337f6dd366952f8652f11b74a1f76ad8848b6",
+   "en": "The use of a Smooth PEI Plate contributes to improved Z-axis precision during the printing process, ensuring greater accuracy and consistency in the vertical dimension. These qualities make the Smooth PEI Plate an excellent choice for printing parts that demand a high level of fit accuracy, where precise alignment and tight tolerances are crucial.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[0].line[1]",
+    "near": "High Z-axis Precision Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "8eb2f345c149cac61317b8cb1fbe3df0a5c2f198feb0d070f90f358298007499",
+   "en": "Smooth and Matte Surface Finish",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[1].line[0]",
+    "near": "The use of a specially selected matte PEI sheet can impart a smooth and matte texture to the bottom surface of the printed object, enhancing its overall appeara"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7027e319d5fb009702736090b88b041af0bee4f18307dba3749187cec4886cb",
+   "en": "The use of a specially selected matte PEI sheet can impart a smooth and matte texture to the bottom surface of the printed object, enhancing its overall appearance.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[1].line[1]",
+    "near": "Smooth and Matte Surface Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f129fe4e135d52a1130a600588a3e5b0ed720ba61f514b854a8a5c864868aa9",
+   "en": "The Bambu Smooth PEI Plate features a 0.5mm-thick spring steel plate that enhances magnetic adhesion. This helps to prevent warping and ensure optimal print quality during 3D printing. It also helps when printing larger models with materials that are prone to warping such as ABS, PC, and Nylon.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[2].line[1]",
+    "near": "Reliable Magnetic Adhesion to Prevent Warping"
+   },
+   "dict": null
+  },
+  {
+   "h": "3785e8bb0bde6b59638479b87f6a2de59664fd3ddf5036922c591658d5287eec",
+   "en": "Note: The Smooth PEI Sheet cannot be peeled off from the build plates.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[2].line[2]",
+    "near": "The Bambu Smooth PEI Plate features a 0.5mm-thick spring steel plate that enhances magnetic adhesion. This helps to prevent warping and ensure optimal print qua"
+   },
+   "dict": null
+  },
+  {
+   "h": "2df786cc90e425d23a42940ebd18a2da21c9c93daa5e499cdd3b329e895435b8",
+   "en": "Please note that with the Smooth PEI Plate on the A1 there is a higher risk of the plate curling from the corners, or the printed models detaching from the plate. This is caused by the thicker Smooth PEI applied to the plate, which will increase the distance from the bed magnets and lower the magnetic attraction.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[3].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "84d87ff190dcfca034df226071b8518796f45c0cc34f00db4680354a94156f32",
+   "en": "If bubbles appear on the bottom of the sheet, heating it on the heatbed at a temperature of no less than 80 degrees for several hours can be helpful in eliminating the bubbles.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[3].line[2]",
+    "near": "• Please note that with the Smooth PEI Plate on the A1 there is a higher risk of the plate curling from the corners, or the printed models detaching from the pl"
+   },
+   "dict": null
+  },
+  {
+   "h": "14e1ad289ea63f42c246f012fd12ba82798b3bb7b3ada714f73113438a2635da",
+   "en": "Do not clean the Smooth PEI with Acetone, as it will damage the PEI surface.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[3].line[4]",
+    "near": "• Deposition of dust and grease on the build plate decrease adhesion. It is recommended to regularly clean the surface with detergent and water to maintain best"
+   },
+   "dict": null
+  },
+  {
+   "h": "c243a9c4779350b62d29e19192a5210d0d3026596e5f94806523af9fe5a519cd",
+   "en": "The Smooth PEI plate is considered a consumable part, which will degrade over time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[3].line[7]",
+    "near": "• Carefully sanding the surface with fine-grit (600 was recommended) sandpaper can help restore adhesion."
+   },
+   "dict": null
+  },
+  {
+   "h": "bbedb732b3e5ab44bfa56a2ed83610844d65295e54b316a05d77183aae5422e0",
+   "en": "Smooth PEI Plate for X1/P1/A1/P2S/X2D/H2 Series is no longer available. The new Bambu Engineering Plate is our recommended replacement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "14a9aad936335b5f5ecf9bf32c6fff64e990ccb85bf065d62d287ff2acc97a6c",
+   "en": "Two Textures (Textured and Smooth) in One Plate",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[0].line[0]",
+    "near": "Enjoy the benefits of two different textures in one plate, one side is Textured PEI surface and the other side is Smooth PEI surface. This Plate features a 0.5m"
+   },
+   "dict": null
+  },
+  {
+   "h": "6597cb22d71e974fdfe7f31e98311ec0c860711c284ab6074dcda137a7e1dce0",
+   "en": "Enjoy the benefits of two different textures in one plate, one side is Textured PEI surface and the other side is Smooth PEI surface. This Plate features a 0.5mm magnetic stainless steel plate that enhances magnetic adhesion and helps to prevent warping and ensure optimal print quality during 3D printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[0].line[1]",
+    "near": "Two Textures (Textured and Smooth) in One Plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "ce493c30be70cda0537b691efd6ed48de036f1cf1cef7000b2fc9782fb252933",
+   "en": "Smooth PEI surface contributes to improved Z-axis precision during the printing process, ensuring greater accuracy and consistency in the vertical dimension.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[1].line[1]",
+    "near": "High Z-axis Precision Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "60541b5c8098a9b53e32a2c8a57823ca3a704563461ec460713177c09c848e09",
+   "en": "Textured PEI surface has enhanced the durability, and improved the adhesion between the prints and the plate, eliminating the need for adhesives.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[3].line[1]",
+    "near": "Excellent First-layer Adhesion and Improved Durability"
+   },
+   "dict": null
+  },
+  {
+   "h": "6bd8bc7af1e3ef6fb4bb983f41a0cf9b4d46a3cd9d2dd1a18970f6196c011543",
+   "en": "Textured PEI surface can withstand the repeated heating and cooling cycles of a printer heatbed. Prints come off easily when the temperature of the heatbed reaches room temperature.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[4].line[1]",
+    "near": "Self-release when Cooled Down"
+   },
+   "dict": null
+  },
+  {
+   "h": "9feecfcbd54f66da30debe8e70b40e95bf224672309028883355b3a6cd7f28f6",
+   "en": "Deposition of dust and grease on the build plate decreases adhesion. It is recommended to regularly clean the surface with detergent and water to maintain best adhesion.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[5].line[2]",
+    "near": "• For X2D and P2S users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when pr"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e058a5850649a9a8e8ff393fc7b18e1e2552f5fc28fa65b430e9d13b58c82b1",
+   "en": "Carefully sanding the Textured PEI surface with fine-grit (600 was recommended) sandpaper can help restore adhesion.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[5].line[4]",
+    "near": "• Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve"
+   },
+   "dict": null
+  },
+  {
+   "h": "660ac2f5abf46c4ef6242d3677cc11909d10300eabb8d3af8cbc947b48f9a4b8",
+   "en": "If bubbles appear on the bottom of the Smooth PEI sheet, heating it on the heatbed at a temperature of no less than 80 degrees for several hours can be helpful in eliminating the bubbles.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[5].line[5]",
+    "near": "• Carefully sanding the Textured PEI surface with fine-grit (600 was recommended) sandpaper can help restore adhesion."
+   },
+   "dict": null
+  },
+  {
+   "h": "ab53b9b815ecd34f8eb21c69298777fc598a1b31083c9806ca8f32a27b896ea6",
+   "en": "Do not clean the Bambu Dual-Texture PEI Plate with Acetone, as it will damage the PEI surface.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[5].line[6]",
+    "near": "• If bubbles appear on the bottom of the Smooth PEI sheet, heating it on the heatbed at a temperature of no less than 80 degrees for several hours can be helpfu"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb4d42da3f6088fa92f6542ff18dad8d3450796100194b19dc37e109b6bbb0e3",
+   "en": "Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and cannot be held responsible for any damage caused to plates as a result of using third-party glue on build plates.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[5].line[7]",
+    "near": "• Do not clean the Bambu Dual-Texture PEI Plate with Acetone, as it will damage the PEI surface."
+   },
+   "dict": null
+  },
+  {
+   "h": "a5421ffc201e4cea30a51dbe7bed753d64d7c42fd423f553b9353b86ce0f49b3",
+   "en": "The Bambu Dual-Texture PEI Plate is considered a consumable part, which will degrade over time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[5].line[9]",
+    "near": "• Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and ens"
+   },
+   "dict": null
+  },
+  {
+   "h": "055a4abee7d0b7d11ccb925a8404841d2eeb81e5a53ab1ffff63616fc601514f",
+   "en": "Glue Stick Required for Smooth PEI Surface?",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[6].line[2].cell[2]",
+    "near": "Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b6f0bc720d94f23807b091be11beccf6f6b946ae414610237b7ebc93f32890f",
+   "en": "Glue Stick Required for Textured PEI Surface?",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "blocks[6].line[2].cell[3]",
+    "near": "Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2d691d3fb36aa9197a8249a4371071f8b7d1f17c1fd3583d17040652be4a57c",
+   "en": "Need some extra pizazz for your prints? Bambu 3D Effect Plate can transfer interesting surface textures to your printed objects. There are 4 exciting textures, ranging from Carbon Fiber all the way to Starry, Galaxy, and Diamond! Want to make your prints stand out? Get Bambu 3D Effect Plate and unlock a world of textural possibilities!",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[0].line[1]",
+    "near": "Bambu 3D Effect Plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b804bb7e3b2f03b1a669bd28f55990b8813fcf866b669ac7332d700ffc611dc",
+   "en": "Galaxy Surface",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[1].line[0]",
+    "near": "The Galaxy Surface transfers a vibrant galaxy rainbow effect on the first layer of the print, which glitters and changes color depending on the angle. It works "
+   },
+   "dict": null
+  },
+  {
+   "h": "f7c7e6aa7647b13e826c54780575fc1c3472281e1596d6fd94ed44f248dd9078",
+   "en": "The Galaxy Surface transfers a vibrant galaxy rainbow effect on the first layer of the print, which glitters and changes color depending on the angle. It works best with silk or shiny filaments to take advantage of the pattern transfer.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[1].line[1]",
+    "near": "Galaxy Surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3ced4fab226302aa96939be52369d18e3be76dd66dbad4cad26b71071f85356",
+   "en": "Carbon Fiber Surface",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[2].line[0]",
+    "near": "The Carbon Fiber has a very slight texture similar to real Carbon Fiber. The pattern transfers to the first layer of the 3D printed model, creating a 3D effect "
+   },
+   "dict": null
+  },
+  {
+   "h": "91e7726e122faa61701ee4f30c7d42188c6ae3be0df243bf13cd1285d0b6ff23",
+   "en": "The Carbon Fiber has a very slight texture similar to real Carbon Fiber. The pattern transfers to the first layer of the 3D printed model, creating a 3D effect with a distinctive texture, especially when used with a gray carbon filament color.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[2].line[1]",
+    "near": "Carbon Fiber Surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "298e5ae426d22cfb546bcb0f33f7414886c399dcc5448995ccb116644554fae9",
+   "en": "Starry Surface",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[3].line[0]",
+    "near": "The Starry Surface transfers a rainbow kaleidoscope starry effect on the first layer of the print, which glitters and changes color depending on the angle. It w"
+   },
+   "dict": null
+  },
+  {
+   "h": "44eb700aaf0b4d33310ef5bf5fa6c44df5671f7a825271d261ed8650a17bfed8",
+   "en": "The Starry Surface transfers a rainbow kaleidoscope starry effect on the first layer of the print, which glitters and changes color depending on the angle. It works best with silk or shiny filaments to take advantage of the pattern transfer.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[3].line[1]",
+    "near": "Starry Surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "200d28624d1380406b8617919d369e921e2784c316f0c6782739b1819384c8e6",
+   "en": "Diamond Surface",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[4].line[0]",
+    "near": "The Diamond Surface imprints a diamond pattern on the first layer with a mix of glossy and matte shapes applied to the smooth surface. It's best used with silk "
+   },
+   "dict": null
+  },
+  {
+   "h": "8c3cb5ea9a7a0322a40a4416f19d631e601a40622d1d980f3bdf037bfdd93caa",
+   "en": "The Diamond Surface imprints a diamond pattern on the first layer with a mix of glossy and matte shapes applied to the smooth surface. It's best used with silk or shiny filaments, to take advantage of the pattern transfer.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[4].line[1]",
+    "near": "Diamond Surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "9cfbadcfcf53ea497c219478a96e6b981daecc9332e1deaad9f3f2a0c685f72e",
+   "en": "1. Please set the plate type to Smooth PEI/High Temp Plate and carefully follow the Heatbed Recommended Settings when using the Bambu 3D Effect Plate. For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[5].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff5ec6be5d8947972c84620638bb3e696a56455a6cf35432358a77c05544e874",
+   "en": "2. The 3D effect patterns require a clean surface to remain visible. Grease can cause the patterns to disappear. It is essential to keep the surface clean. We recommend using hot water and detergent for cleaning, and avoid touching the surface.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[5].line[2]",
+    "near": "1. Please set the plate type to Smooth PEI/High Temp Plate and carefully follow the Heatbed Recommended Settings when using the Bambu 3D Effect Plate. For X1/X2"
+   },
+   "dict": null
+  },
+  {
+   "h": "a988df0937042c05978e89ddf16bdb17b42ddc04e03fc920b79215bba3d6cbbf",
+   "en": "3. Due to reflections, the LIDAR calibration will not work as expected when using Effect Plates. We recommend skipping the LIDAR calibration sequence, or calibrating with a regular plate.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[5].line[3]",
+    "near": "2. The 3D effect patterns require a clean surface to remain visible. Grease can cause the patterns to disappear. It is essential to keep the surface clean. We r"
+   },
+   "dict": null
+  },
+  {
+   "h": "dc6f8632d7a6554381903c8f7f09438ba422657fee0d9dd2ba4568de617f856f",
+   "en": "4. The 3D Effect Plates are considered consumables. To prolong the lifespan of the transfer textures, try placing your print objects on different areas of the sheet.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[5].line[4]",
+    "near": "3. Due to reflections, the LIDAR calibration will not work as expected when using Effect Plates. We recommend skipping the LIDAR calibration sequence, or calibr"
+   },
+   "dict": null
+  },
+  {
+   "h": "3faa200cd06fa99706265ec9ed128784da6755df8bbd51f807bda2b440b8d117",
+   "en": "5. Do not apply glue to the plate surface.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[5].line[5]",
+    "near": "4. The 3D Effect Plates are considered consumables. To prolong the lifespan of the transfer textures, try placing your print objects on different areas of the s"
+   },
+   "dict": null
+  },
+  {
+   "h": "35cb18224fad2eedef17b823590b9becf9621a1f0e2193da78a9fdadcfea5865",
+   "en": "6. Pay close attention when using a scraper to remove prints, to avoid damaging the plate surface.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[5].line[6]",
+    "near": "5. Do not apply glue to the plate surface."
+   },
+   "dict": null
+  },
+  {
+   "h": "7663a19d71ded940103a198ee3cdb2c75aeb493838b39935b653702bb661cd8b",
+   "en": "We recommend using PLA and TPU filament for printing. Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements. Please select Smooth PEI Plate/High Temp Plate for the Plate Type in Bambu Studio.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[6].line[1]",
+    "near": "Recommended Settings"
+   },
+   "dict": null
+  },
+  {
+   "h": "5497720a743a11e938e4bcd12fe756ff549b374008a95e22b018ca5326cfce6a",
+   "en": "Filaments",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "blocks[6].line[2].cell[0]",
+    "near": "We recommend using PLA and TPU filament for printing. Please note that other slicer settings might need to be adjusted based on the printed model and the filame"
+   },
+   "dict": null
+  }
+ ]
+}

@@ -1,0 +1,1418 @@
+{
+  "handle": "bambu-hotend-a1-a2",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T19:38:09Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "keys": [
+        "thermal.*",
+        "product.*",
+        "package.*",
+        "nozzle.*",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "printing.layer_height",
+        "extrusion.*",
+        "motion.max_flow",
+        "part.*",
+        "electrical.*",
+        "safety.certifications",
+        "contents.pieces"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "keys": [
+        "nozzle.*",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "motion.max_flow",
+        "thermal.max_nozzle_temp",
+        "extrusion.filament_diameter",
+        "product.*",
+        "part.*"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "printing.layer_height",
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "extrusion.filament_diameter",
+        "motion.max_flow"
+      ]
+    }
+  ],
+  "specs": [
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 320,
+      "unit": "°C",
+      "locator": "Product Specifications › row 1 › pair 1",
+      "quote": "Max. Printing Temp. | 320 ℃"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 47.3,
+      "unit": "mm",
+      "locator": "Product Specifications › row 1 › pair 2",
+      "quote": "Length | 47.3 mm"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "package.weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 30,
+      "unit": "g",
+      "locator": "Product Specifications › row 2 › pair 1",
+      "quote": "Packaging Weight | 30 g"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "package.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 60,
+      "unit": "mm",
+      "locator": "Product Specifications › row 2 › pair 2 › dimension 1 of 3",
+      "quote": "Packaging Size | 60*60*30 mm"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "package.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 60,
+      "unit": "mm",
+      "locator": "Product Specifications › row 2 › pair 2 › dimension 2 of 3",
+      "quote": "Packaging Size | 60*60*30 mm"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "package.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 30,
+      "unit": "mm",
+      "locator": "Product Specifications › row 2 › pair 2 › dimension 3 of 3",
+      "quote": "Packaging Size | 60*60*30 mm"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "value": 0.2,
+      "unit": "mm",
+      "locator": "option Size › 0.2mm Stainless Steel",
+      "quote": "0.2mm Stainless Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "value": "Stainless Steel",
+      "unit": "",
+      "locator": "option Size › 0.2mm Stainless Steel",
+      "quote": "0.2mm Stainless Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "locator": "option Size › 0.4mm Hardened Steel",
+      "quote": "0.4mm Hardened Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "locator": "option Size › 0.4mm Hardened Steel",
+      "quote": "0.4mm Hardened Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "value": 0.6,
+      "unit": "mm",
+      "locator": "option Size › 0.6mm Hardened Steel",
+      "quote": "0.6mm Hardened Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "locator": "option Size › 0.6mm Hardened Steel",
+      "quote": "0.6mm Hardened Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "value": 0.8,
+      "unit": "mm",
+      "locator": "option Size › 0.8mm Hardened Steel",
+      "quote": "0.8mm Hardened Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "locator": "option Size › 0.8mm Hardened Steel",
+      "quote": "0.8mm Hardened Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "locator": "option Size › 0.4mm Stainless Steel",
+      "quote": "0.4mm Stainless Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "value": "Stainless Steel",
+      "unit": "",
+      "locator": "option Size › 0.4mm Stainless Steel",
+      "quote": "0.4mm Stainless Steel"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "value": [
+        "General PLA",
+        "PETG",
+        "PVA",
+        "ABS",
+        "ASA",
+        "PC"
+      ],
+      "unit": "",
+      "locator": "Filament Compatibility table › column 0.2 mm Nozzle (YES)",
+      "quote": "Material | 0.2 mm Nozzle … General PLA | YES … PETG | YES … PVA | YES … ABS | YES … ASA | YES … PC | YES",
+      "conflict": "Bambu wiki filament guide (generic, all Bambu nozzles) differs at 0.2 mm: «PVA, BVOH (Dry) | Not Compatible» and «PC | Not Recommended». The product page value is kept; adjudicate."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "value": [
+        "PLA Sparkle",
+        "PLA Marble",
+        "Wood/Rock/Metal-filled PLA",
+        "PA",
+        "TPU",
+        "Bambu PLA-CF",
+        "Bambu PETG-CF",
+        "Bambu PAHT-CF",
+        "Bambu PET-CF",
+        "CF/GF Filaments from other brands"
+      ],
+      "unit": "",
+      "locator": "Filament Compatibility table › column 0.2 mm Nozzle (*①NO) › note ①",
+      "quote": "*① Filaments with carbon fiber, glass fiber, metal, or other inorganic particles are prone to clog a 0.2 mm nozzle.",
+      "conflict": "Bambu wiki filament guide differs at 0.2 mm: «PLA Metal | Compatible» (page row «Wood/Rock/Metal-filled PLA | *①NO»); TPU rows there say «Not Recommended» rather than not compatible."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "value": [
+        "General PLA",
+        "PLA Sparkle",
+        "PLA Marble",
+        "Wood/Rock/Metal-filled PLA",
+        "PETG",
+        "PVA",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "TPU",
+        "Bambu PLA-CF",
+        "Bambu PETG-CF",
+        "Bambu PAHT-CF",
+        "Bambu PET-CF"
+      ],
+      "unit": "",
+      "locator": "Filament Compatibility table › column 0.4 mm Nozzle (YES / Recommended)",
+      "quote": "Bambu PLA-CF | *①NO | *②Recommended | YES | YES | Required … CF/GF Filaments from other brands | *①NO | Not Recommended | YES | YES | Required",
+      "note": "«CF/GF Filaments from other brands» is «Not Recommended» at 0.4 mm and is left out of both lists. Recommended at 0.4 mm hardened steel: Bambu PLA-CF, Bambu PETG-CF (note ②)."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "value": [
+        "General PLA",
+        "PLA Sparkle",
+        "PLA Marble",
+        "Wood/Rock/Metal-filled PLA",
+        "PETG",
+        "PVA",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "TPU"
+      ],
+      "unit": "",
+      "locator": "Filament Compatibility table › column 0.4 mm Nozzle × column Hardened Steel Required? (Optional)",
+      "quote": "Material | 0.2 mm Nozzle | 0.4 mm Nozzle | 0.6 mm Nozzle | 0.8 mm Nozzle | Hardened Steel Required? … PLA Sparkle | *①NO | YES | YES | YES | Optional",
+      "conflict": "Bambu wiki filament guide text says particle-filled filaments (PLA Marble, PLA Sparkle, PLA Glow) should not use a stainless steel nozzle, while its own table says PLA Marble «Not Required». The product page («Optional») is kept; adjudicate."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "value": [
+        "Bambu PLA-CF",
+        "Bambu PETG-CF",
+        "Bambu PAHT-CF",
+        "Bambu PET-CF",
+        "CF/GF Filaments from other brands"
+      ],
+      "unit": "",
+      "locator": "Filament Compatibility table › column Hardened Steel Required? (Required)",
+      "quote": "Bambu PLA-CF | *①NO | *②Recommended | YES | YES | Required … Bambu PET-CF | *①NO | YES | *③Recommended | YES | Required",
+      "note": "Stainless steel option: every row whose «Hardened Steel Required?» cell is «Required» is excluded."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "value": [
+        "General PLA",
+        "PLA Sparkle",
+        "PLA Marble",
+        "Wood/Rock/Metal-filled PLA",
+        "PETG",
+        "PVA",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "TPU",
+        "Bambu PLA-CF",
+        "Bambu PETG-CF",
+        "Bambu PAHT-CF",
+        "Bambu PET-CF",
+        "CF/GF Filaments from other brands"
+      ],
+      "unit": "",
+      "locator": "Filament Compatibility table › column 0.6 mm Nozzle (YES / Recommended)",
+      "quote": "Bambu PAHT-CF | *①NO | YES | *③Recommended | YES | Required … CF/GF Filaments from other brands | *①NO | Not Recommended | YES | YES | Required",
+      "note": "Recommended at 0.6 mm hardened steel: Bambu PAHT-CF, Bambu PET-CF (note ③)."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "source_title": "Bambu Hotend - A1/A2 (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:40Z",
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "value": [
+        "General PLA",
+        "PLA Sparkle",
+        "PLA Marble",
+        "Wood/Rock/Metal-filled PLA",
+        "PETG",
+        "PVA",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "TPU",
+        "Bambu PLA-CF",
+        "Bambu PETG-CF",
+        "Bambu PAHT-CF",
+        "Bambu PET-CF",
+        "CF/GF Filaments from other brands"
+      ],
+      "unit": "",
+      "locator": "Filament Compatibility table › column 0.8 mm Nozzle (YES)",
+      "quote": "Material | … | 0.8 mm Nozzle | Hardened Steel Required? … General PLA | YES | YES | YES | YES | Optional … CF/GF Filaments from other brands | *①NO | Not Recommended | YES | YES | Required"
+    },
+    {
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "unit": "mm",
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "value": {
+        "min": 0.05,
+        "max": 0.12
+      },
+      "locator": "Size › nozzle table › row 0.2 mm › Layer heights",
+      "quote": "Typically 0.05 mm to 0.12 mm (25-60% of nozzle diameter for optimal results)."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "unit": "mm",
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "value": {
+        "min": 0.1,
+        "max": 0.3
+      },
+      "locator": "Size › nozzle table › row 0.4 mm › Layer heights",
+      "quote": "0.1 mm to 0.3 mm (25-75% of nozzle diameter), with 0.2 mm being standard.",
+      "note": "The filament guide recommends 0.15–0.3 mm on a 0.4 mm hardened steel nozzle for CF/GF and particle-filled filaments (a narrower, material-specific condition, not stored)."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "unit": "mm",
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "value": {
+        "min": 0.1,
+        "max": 0.3
+      },
+      "locator": "Size › nozzle table › row 0.4 mm › Layer heights",
+      "quote": "0.1 mm to 0.3 mm (25-75% of nozzle diameter), with 0.2 mm being standard."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "unit": "mm",
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "value": {
+        "min": 0.15,
+        "max": 0.45
+      },
+      "locator": "Size › nozzle table › row 0.6 mm › Layer heights",
+      "quote": "0.15 mm to 0.45 mm (25-75% of nozzle diameter), with 0.3-0.4 mm being common."
+    },
+    {
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "unit": "mm",
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "value": {
+        "min": 0.2,
+        "max": 0.6
+      },
+      "locator": "Size › nozzle table › row 0.8 mm › Layer heights",
+      "quote": "0.2 mm to 0.6 mm (25-75% of nozzle diameter), with 0.4-0.5 mm being typical."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "evidence_kind": "compat_section",
+      "locator": "Compatibility",
+      "quote": "Compatibility A1 Series"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Printer Model",
+        "source_value_id": "737888342695104514",
+        "id": "ov_13695372b372ce837ce8627f",
+        "value_text": "A1"
+      },
+      "target_kind": "printer",
+      "target_label": "A1",
+      "target_source_handle": "a1",
+      "evidence_kind": "option_value",
+      "locator": "option Printer Model › A1",
+      "quote": "Printer Model: A1"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Printer Model",
+        "source_value_id": "737888342695104515",
+        "id": "ov_80b85df0829a8990ac6a1754",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "printer",
+      "target_label": "A1 mini",
+      "target_source_handle": "a1-mini",
+      "evidence_kind": "option_value",
+      "locator": "option Printer Model › A1 mini",
+      "quote": "Printer Model: A1 mini"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Printer Model",
+        "source_value_id": "737888342695104516",
+        "id": "ov_b64ca3f627e36f9f303d5255",
+        "value_text": "A2L"
+      },
+      "target_kind": "printer",
+      "target_label": "A2L",
+      "target_source_handle": "a2l",
+      "evidence_kind": "option_value",
+      "locator": "option Printer Model › A2L",
+      "quote": "Printer Model: A2L"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "pla-sparkle",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Sparkle",
+      "quote": "PLA Sparkle | *①NO | YES | YES | YES | Optional",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "reason": "0.2 mm column: *①NO"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "pla-sparkle",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Sparkle",
+      "quote": "PLA Sparkle | *①NO | YES | YES | YES | Optional",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "pla-sparkle",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Sparkle",
+      "quote": "PLA Sparkle | *①NO | YES | YES | YES | Optional",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "reason": "Hardened Steel Required? Optional",
+      "conflict": "Bambu wiki filament guide text: do not use a stainless steel nozzle for particle-filled filaments such as PLA Marble and PLA Sparkle."
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "pla-sparkle",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Sparkle",
+      "quote": "PLA Sparkle | *①NO | YES | YES | YES | Optional",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "pla-sparkle",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Sparkle",
+      "quote": "PLA Sparkle | *①NO | YES | YES | YES | Optional",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Marble",
+      "target_source_handle": "pla-marble",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Marble",
+      "quote": "PLA Marble | *①NO | YES | YES | YES | Optional",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "reason": "0.2 mm column: *①NO"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Marble",
+      "target_source_handle": "pla-marble",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Marble",
+      "quote": "PLA Marble | *①NO | YES | YES | YES | Optional",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Marble",
+      "target_source_handle": "pla-marble",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Marble",
+      "quote": "PLA Marble | *①NO | YES | YES | YES | Optional",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "reason": "Hardened Steel Required? Optional",
+      "conflict": "Bambu wiki filament guide text: do not use a stainless steel nozzle for particle-filled filaments such as PLA Marble and PLA Sparkle."
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Marble",
+      "target_source_handle": "pla-marble",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Marble",
+      "quote": "PLA Marble | *①NO | YES | YES | YES | Optional",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "PLA Marble",
+      "target_source_handle": "pla-marble",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row PLA Marble",
+      "quote": "PLA Marble | *①NO | YES | YES | YES | Optional",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PLA-CF",
+      "target_source_handle": "pla-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PLA-CF",
+      "quote": "Bambu PLA-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "reason": "0.2 mm column: *①NO"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PLA-CF",
+      "target_source_handle": "pla-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PLA-CF",
+      "quote": "Bambu PLA-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "qualifier": "recommended"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PLA-CF",
+      "target_source_handle": "pla-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PLA-CF",
+      "quote": "Bambu PLA-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "reason": "Hardened Steel Required? Required"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PLA-CF",
+      "target_source_handle": "pla-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PLA-CF",
+      "quote": "Bambu PLA-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PLA-CF",
+      "target_source_handle": "pla-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PLA-CF",
+      "quote": "Bambu PLA-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PETG-CF",
+      "target_source_handle": "petg-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PETG-CF",
+      "quote": "Bambu PETG-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "reason": "0.2 mm column: *①NO"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PETG-CF",
+      "target_source_handle": "petg-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PETG-CF",
+      "quote": "Bambu PETG-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "qualifier": "recommended"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PETG-CF",
+      "target_source_handle": "petg-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PETG-CF",
+      "quote": "Bambu PETG-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "reason": "Hardened Steel Required? Required"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PETG-CF",
+      "target_source_handle": "petg-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PETG-CF",
+      "quote": "Bambu PETG-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PETG-CF",
+      "target_source_handle": "petg-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PETG-CF",
+      "quote": "Bambu PETG-CF | *①NO | *②Recommended | YES | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PAHT-CF",
+      "target_source_handle": "paht-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PAHT-CF",
+      "quote": "Bambu PAHT-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "reason": "0.2 mm column: *①NO"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PAHT-CF",
+      "target_source_handle": "paht-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PAHT-CF",
+      "quote": "Bambu PAHT-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PAHT-CF",
+      "target_source_handle": "paht-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PAHT-CF",
+      "quote": "Bambu PAHT-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "reason": "Hardened Steel Required? Required"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PAHT-CF",
+      "target_source_handle": "paht-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PAHT-CF",
+      "quote": "Bambu PAHT-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "qualifier": "recommended"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PAHT-CF",
+      "target_source_handle": "paht-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PAHT-CF",
+      "quote": "Bambu PAHT-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PET-CF",
+      "target_source_handle": "pet-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PET-CF",
+      "quote": "Bambu PET-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835082",
+        "id": "ov_8b4064f4ef4ee5535936ce45",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "reason": "0.2 mm column: *①NO"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PET-CF",
+      "target_source_handle": "pet-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PET-CF",
+      "quote": "Bambu PET-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835079",
+        "id": "ov_86bd75275a007b69b0b4d2b2",
+        "value_text": "0.4mm Hardened Steel"
+      }
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PET-CF",
+      "target_source_handle": "pet-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PET-CF",
+      "quote": "Bambu PET-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835083",
+        "id": "ov_b4e5c1200250c6ce41e928ee",
+        "value_text": "0.4mm Stainless Steel"
+      },
+      "reason": "Hardened Steel Required? Required"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PET-CF",
+      "target_source_handle": "pet-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PET-CF",
+      "quote": "Bambu PET-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835080",
+        "id": "ov_0b465fc1ba5d51b495904c95",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "qualifier": "recommended"
+    },
+    {
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "target_kind": "product",
+      "target_label": "Bambu PET-CF",
+      "target_source_handle": "pet-cf",
+      "evidence_kind": "store_table",
+      "locator": "Filament Compatibility table › row Bambu PET-CF",
+      "quote": "Bambu PET-CF | *①NO | YES | *③Recommended | YES | Required",
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "group": "Size",
+        "source_value_id": "564681835144835081",
+        "id": "ov_4772a0db32b0f9206a55b2b5",
+        "value_text": "0.8mm Hardened Steel"
+      }
+    }
+  ],
+  "in_the_box": [
+    {
+      "text": "Hotend with Nozzle",
+      "qty": null,
+      "source_url": "https://us.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "locator": "In the Box › item 1",
+      "quote": "- Hotend with Nozzle"
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/a1-mini/maintenance/toolhead",
+      "title": "Replacing the hotend with nozzle",
+      "note": "linked from the product page; not cached, not read"
+    }
+  ],
+  "not_published": [
+    "product.width",
+    "product.height",
+    "product.net_weight",
+    "extrusion.filament_diameter",
+    "motion.max_flow"
+  ]
+}

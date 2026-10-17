@@ -1,0 +1,1346 @@
+{
+ "protocol": 2,
+ "source": "bambu_us",
+ "source_product_id": "7463000342664",
+ "handle": "asa-filament",
+ "route": "552709755819347968>552709756700151808>552709756742094848",
+ "write_mode": "create",
+ "product_id": "p_6ff4fd9a32631efb1b40e2b0",
+ "curated_sha256": "",
+ "extraction_sha256": "f16fc3365cac10384d3dd02c804c1ce21b98c460178a79d34543c5be4c8595ab",
+ "product": {
+  "title_en": "ASA",
+  "short_description_en": "Bambu ASA is a highly durable material that offers exceptional UV, weather, mechanical, and thermal resistance. Its unique combination of properties makes it an ideal material for printing outdoor models (plant signs, mailboxes, wind vanes, etc.) and structural parts that require long-term exposure to challenging outdoor conditions.",
+  "variant_mode": "VARIANT_COMBINATION",
+  "usage_steps": [],
+  "usage_official_url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament"
+ },
+ "groups": [
+  {
+   "id": "og_f3cc572a6f5a882d503010a4",
+   "source_id": "9742077755528",
+   "sort": 1,
+   "name_en": "Colour",
+   "name_ar": "اللون",
+   "name_ckb": "ڕەنگ",
+   "kind": "color",
+   "source_label": "Color",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_57134368730cc3237df4917a",
+     "source_id": "564681853373280263",
+     "name_en": "White (45100)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-5715c82b067c99953dcd8e2c",
+     "variant_label": "White (45100)",
+     "sort": 0,
+     "colour_code": "45100"
+    },
+    {
+     "id": "ov_27c65dac22d38d8f0f070d6e",
+     "source_id": "564681853373280264",
+     "name_en": "Green (45500)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-6d1403c4bae63c4aabc36ed4",
+     "variant_label": "Green (45500)",
+     "sort": 1,
+     "colour_code": "45500"
+    },
+    {
+     "id": "ov_97226bd1952f8040e1cf8c21",
+     "source_id": "564681853373280265",
+     "name_en": "Black (45101)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-7b9729be9e17afee9b31f3dc",
+     "variant_label": "Black (45101)",
+     "sort": 2,
+     "colour_code": "45101"
+    },
+    {
+     "id": "ov_53e6ce6b608d4e476b3d0a35",
+     "source_id": "564681853373280266",
+     "name_en": "Gray (45102)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-6e289af9b41102be534693d2",
+     "variant_label": "Gray (45102)",
+     "sort": 3,
+     "colour_code": "45102"
+    },
+    {
+     "id": "ov_01fd3cf8fc0ccbb3b685c04d",
+     "source_id": "564681853373280267",
+     "name_en": "Red (45200)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-3822a896c6c450bcb3e077cf",
+     "variant_label": "Red (45200)",
+     "sort": 4,
+     "colour_code": "45200"
+    },
+    {
+     "id": "ov_9dc7ff75078dd217c2d5bbce",
+     "source_id": "564681853373280268",
+     "name_en": "Blue (45600)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-365bcfb8387f7d7599c1234b",
+     "variant_label": "Blue (45600)",
+     "sort": 5,
+     "colour_code": "45600"
+    }
+   ]
+  },
+  {
+   "id": "og_41491f20011998488ac80b70",
+   "source_id": "9742077689992",
+   "sort": 2,
+   "name_en": "Spool",
+   "name_ar": "البكرة",
+   "name_ckb": "ماسوورە",
+   "kind": "spool",
+   "source_label": "Type",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_71b63678c64c80442d78b377",
+     "source_id": "564681853373280269",
+     "name_en": "Filament with spool",
+     "name_ar": "مع بكرة",
+     "name_ckb": "لەگەڵ ماسوورە",
+     "variant_key": "bv-373f6a8249436501015fe816",
+     "variant_label": "Filament with spool",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  },
+  {
+   "id": "og_185bbb50c9a5bddf458285e6",
+   "source_id": "9742077722760",
+   "sort": 3,
+   "name_en": "Net weight",
+   "name_ar": "الوزن الصافي",
+   "name_ckb": "کێشی پوخت",
+   "kind": "pack",
+   "source_label": "Size",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_65cef6ca3bd2f722325ef4a4",
+     "source_id": "564681853373280270",
+     "name_en": "1kg",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-40193d2925230b3064546a72",
+     "variant_label": "1kg",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  }
+ ],
+ "variants": [
+  {
+   "id": "pv_96369fa13eea7ea54576cbeb",
+   "source_id": "41227780718728",
+   "combo_key": "o:ov_01fd3cf8fc0ccbb3b685c04d|o:ov_65cef6ca3bd2f722325ef4a4|o:ov_71b63678c64c80442d78b377",
+   "value_ids": [
+    "ov_01fd3cf8fc0ccbb3b685c04d",
+    "ov_71b63678c64c80442d78b377",
+    "ov_65cef6ca3bd2f722325ef4a4"
+   ]
+  },
+  {
+   "id": "pv_35ab8a4b230660b310eac184",
+   "source_id": "41227780751496",
+   "combo_key": "o:ov_27c65dac22d38d8f0f070d6e|o:ov_65cef6ca3bd2f722325ef4a4|o:ov_71b63678c64c80442d78b377",
+   "value_ids": [
+    "ov_27c65dac22d38d8f0f070d6e",
+    "ov_71b63678c64c80442d78b377",
+    "ov_65cef6ca3bd2f722325ef4a4"
+   ]
+  },
+  {
+   "id": "pv_693a4be746184f1fa7e450cf",
+   "source_id": "41227780784264",
+   "combo_key": "o:ov_65cef6ca3bd2f722325ef4a4|o:ov_71b63678c64c80442d78b377|o:ov_9dc7ff75078dd217c2d5bbce",
+   "value_ids": [
+    "ov_9dc7ff75078dd217c2d5bbce",
+    "ov_71b63678c64c80442d78b377",
+    "ov_65cef6ca3bd2f722325ef4a4"
+   ]
+  },
+  {
+   "id": "pv_aa8e36eab3288be3c0b08a0a",
+   "source_id": "41227780817032",
+   "combo_key": "o:ov_65cef6ca3bd2f722325ef4a4|o:ov_71b63678c64c80442d78b377|o:ov_97226bd1952f8040e1cf8c21",
+   "value_ids": [
+    "ov_97226bd1952f8040e1cf8c21",
+    "ov_71b63678c64c80442d78b377",
+    "ov_65cef6ca3bd2f722325ef4a4"
+   ]
+  },
+  {
+   "id": "pv_d1af2067ebc7804987ea344d",
+   "source_id": "41227780849800",
+   "combo_key": "o:ov_57134368730cc3237df4917a|o:ov_65cef6ca3bd2f722325ef4a4|o:ov_71b63678c64c80442d78b377",
+   "value_ids": [
+    "ov_57134368730cc3237df4917a",
+    "ov_71b63678c64c80442d78b377",
+    "ov_65cef6ca3bd2f722325ef4a4"
+   ]
+  },
+  {
+   "id": "pv_b64242df018f6d6f3eb9eb80",
+   "source_id": "41227780882568",
+   "combo_key": "o:ov_53e6ce6b608d4e476b3d0a35|o:ov_65cef6ca3bd2f722325ef4a4|o:ov_71b63678c64c80442d78b377",
+   "value_ids": [
+    "ov_53e6ce6b608d4e476b3d0a35",
+    "ov_71b63678c64c80442d78b377",
+    "ov_65cef6ca3bd2f722325ef4a4"
+   ]
+  }
+ ],
+ "images": [
+  {
+   "id": "pi_d9a7110ba6b15bd2fa41bd07",
+   "source_media_id": "761009341582024704",
+   "source_url": "https://store.bblcdn.com/s7/default/064eb368ba6e494f97c74b73e3f6c6ca/ASA_White.jpg",
+   "sort_order": 0,
+   "is_primary": true,
+   "option_value_id": null,
+   "variant_id": "pv_d1af2067ebc7804987ea344d",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "ASA — White (45100) / Filament with spool / 1kg",
+   "alt_ar": "صورة ASA — White (45100) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی ASA — White (45100) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_4ca680b3e47dd7f9390c5ac3",
+   "source_media_id": "761009341582024704",
+   "source_url": "https://store.bblcdn.com/s7/default/064eb368ba6e494f97c74b73e3f6c6ca/ASA_White.jpg",
+   "sort_order": 1,
+   "is_primary": false,
+   "option_value_id": "ov_57134368730cc3237df4917a",
+   "variant_id": null,
+   "via_variant_id": "pv_d1af2067ebc7804987ea344d",
+   "binding_rule": "representative",
+   "alt_en": "ASA — White (45100)",
+   "alt_ar": "صورة ASA — White (45100)",
+   "alt_ckb": "وێنەی ASA — White (45100)"
+  },
+  {
+   "id": "pi_51ee8c90646aa1b0b77c0638",
+   "source_media_id": "32596672413832",
+   "source_url": "https://store.bblcdn.com/s7/default/7fda50731fb64a90b802d818292b17ec/ASAModel_1.png",
+   "sort_order": 2,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "general",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA"
+  },
+  {
+   "id": "pi_0bdb78728f499a9ad6eb4bfc",
+   "source_media_id": "32591766487176",
+   "source_url": "https://store.bblcdn.com/s7/default/b354737985754345846640b7fe49668a/ab6743fac3b96abc3a53833a12993981.png",
+   "sort_order": 3,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_35ab8a4b230660b310eac184",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "ASA — Green (45500) / Filament with spool / 1kg",
+   "alt_ar": "صورة ASA — Green (45500) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی ASA — Green (45500) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_f3a26b13f09bf189e93c2f67",
+   "source_media_id": "32591766487176",
+   "source_url": "https://store.bblcdn.com/s7/default/b354737985754345846640b7fe49668a/ab6743fac3b96abc3a53833a12993981.png",
+   "sort_order": 4,
+   "is_primary": false,
+   "option_value_id": "ov_27c65dac22d38d8f0f070d6e",
+   "variant_id": null,
+   "via_variant_id": "pv_35ab8a4b230660b310eac184",
+   "binding_rule": "representative",
+   "alt_en": "ASA — Green (45500)",
+   "alt_ar": "صورة ASA — Green (45500)",
+   "alt_ckb": "وێنەی ASA — Green (45500)"
+  },
+  {
+   "id": "pi_da34bb6a09fea6f006b03a8b",
+   "source_media_id": "32591766552712",
+   "source_url": "https://store.bblcdn.com/s7/default/596088848a2b4665853f66fdaec41da1/black.png",
+   "sort_order": 5,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_aa8e36eab3288be3c0b08a0a",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "ASA — Black (45101) / Filament with spool / 1kg",
+   "alt_ar": "صورة ASA — Black (45101) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی ASA — Black (45101) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_8388573b2e906e3d24fc6c8a",
+   "source_media_id": "32591766552712",
+   "source_url": "https://store.bblcdn.com/s7/default/596088848a2b4665853f66fdaec41da1/black.png",
+   "sort_order": 6,
+   "is_primary": false,
+   "option_value_id": "ov_97226bd1952f8040e1cf8c21",
+   "variant_id": null,
+   "via_variant_id": "pv_aa8e36eab3288be3c0b08a0a",
+   "binding_rule": "representative",
+   "alt_en": "ASA — Black (45101)",
+   "alt_ar": "صورة ASA — Black (45101)",
+   "alt_ckb": "وێنەی ASA — Black (45101)"
+  },
+  {
+   "id": "pi_b7defabde2a54c665d29ede9",
+   "source_media_id": "32591766519944",
+   "source_url": "https://store.bblcdn.com/s7/default/969e2bd5b33c47fd9aeba00f7d81fd32/gray.png",
+   "sort_order": 7,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_b64242df018f6d6f3eb9eb80",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "ASA — Gray (45102) / Filament with spool / 1kg",
+   "alt_ar": "صورة ASA — Gray (45102) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی ASA — Gray (45102) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_05691e33022f800b143e502b",
+   "source_media_id": "32591766519944",
+   "source_url": "https://store.bblcdn.com/s7/default/969e2bd5b33c47fd9aeba00f7d81fd32/gray.png",
+   "sort_order": 8,
+   "is_primary": false,
+   "option_value_id": "ov_53e6ce6b608d4e476b3d0a35",
+   "variant_id": null,
+   "via_variant_id": "pv_b64242df018f6d6f3eb9eb80",
+   "binding_rule": "representative",
+   "alt_en": "ASA — Gray (45102)",
+   "alt_ar": "صورة ASA — Gray (45102)",
+   "alt_ckb": "وێنەی ASA — Gray (45102)"
+  },
+  {
+   "id": "pi_33ca92de27871f4aded84c66",
+   "source_media_id": "32591766454408",
+   "source_url": "https://store.bblcdn.com/s7/default/cd9e457c7fb14dd7be4443336a1542eb/RED.png",
+   "sort_order": 9,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_96369fa13eea7ea54576cbeb",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "ASA — Red (45200) / Filament with spool / 1kg",
+   "alt_ar": "صورة ASA — Red (45200) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی ASA — Red (45200) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_724d2811589e371a47db359d",
+   "source_media_id": "32591766454408",
+   "source_url": "https://store.bblcdn.com/s7/default/cd9e457c7fb14dd7be4443336a1542eb/RED.png",
+   "sort_order": 10,
+   "is_primary": false,
+   "option_value_id": "ov_01fd3cf8fc0ccbb3b685c04d",
+   "variant_id": null,
+   "via_variant_id": "pv_96369fa13eea7ea54576cbeb",
+   "binding_rule": "representative",
+   "alt_en": "ASA — Red (45200)",
+   "alt_ar": "صورة ASA — Red (45200)",
+   "alt_ckb": "وێنەی ASA — Red (45200)"
+  },
+  {
+   "id": "pi_758eb2a009c43a15e459c2f5",
+   "source_media_id": "32591766421640",
+   "source_url": "https://store.bblcdn.com/s7/default/5bd780d0213340049ba2a737bfe13c5e/ASABlue.jpg",
+   "sort_order": 11,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_693a4be746184f1fa7e450cf",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "ASA — Blue (45600) / Filament with spool / 1kg",
+   "alt_ar": "صورة ASA — Blue (45600) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی ASA — Blue (45600) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_00de3d88914687cadeff3901",
+   "source_media_id": "32591766421640",
+   "source_url": "https://store.bblcdn.com/s7/default/5bd780d0213340049ba2a737bfe13c5e/ASABlue.jpg",
+   "sort_order": 12,
+   "is_primary": false,
+   "option_value_id": "ov_9dc7ff75078dd217c2d5bbce",
+   "variant_id": null,
+   "via_variant_id": "pv_693a4be746184f1fa7e450cf",
+   "binding_rule": "representative",
+   "alt_en": "ASA — Blue (45600)",
+   "alt_ar": "صورة ASA — Blue (45600)",
+   "alt_ckb": "وێنەی ASA — Blue (45600)"
+  }
+ ],
+ "swatches": [
+  {
+   "value_id": "ov_57134368730cc3237df4917a",
+   "source_media_id": "swatch:564681853373280263",
+   "source_url": "https://store.bblcdn.com/s7/default/50d1a72331c740578d4893eb212d3107/12007d17a7d9416abc87a01a8a299869.media"
+  },
+  {
+   "value_id": "ov_27c65dac22d38d8f0f070d6e",
+   "source_media_id": "swatch:564681853373280264",
+   "source_url": "https://store.bblcdn.com/s7/default/bf68172ec3754e9f8da0e48fa105fcc4/cb784d59ca1d48cea42f9c2e545854b7.media"
+  },
+  {
+   "value_id": "ov_97226bd1952f8040e1cf8c21",
+   "source_media_id": "swatch:564681853373280265",
+   "source_url": "https://store.bblcdn.com/s7/default/97b5ec1c47b044c4a29b43f7a787441c/11d6469b590e4b8080ca5bd3f2385e22.media"
+  },
+  {
+   "value_id": "ov_53e6ce6b608d4e476b3d0a35",
+   "source_media_id": "swatch:564681853373280266",
+   "source_url": "https://store.bblcdn.com/s7/default/6165d25792ba48ab97860e4cb515a734/7e5829465d8a48b39c5ad1d103db0b5e.media"
+  },
+  {
+   "value_id": "ov_01fd3cf8fc0ccbb3b685c04d",
+   "source_media_id": "swatch:564681853373280267",
+   "source_url": "https://store.bblcdn.com/s7/default/05a63b0cfeaf42cc9bdd7d4a2ddda66f/1e6d5f24fcc14949a25332fbbd52f7f2.media"
+  },
+  {
+   "value_id": "ov_9dc7ff75078dd217c2d5bbce",
+   "source_media_id": "swatch:564681853373280268",
+   "source_url": "https://store.bblcdn.com/s7/default/e9e66e4dbbc146daaa67f573c7e23dd0/08592504ef0c4ed4a3054fac903bf20f.media"
+  }
+ ],
+ "content_blocks": [
+  {
+   "id": "cb_6b3595eef51fe1570554e9d8",
+   "order": 0,
+   "title_en": "ASA",
+   "body_en": "· Extraordinary UV Resistance\n· Exceptional Temperature Resistance\n· High Impact Strength and Durability",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_9f5b39e2074d1150eaef5ae3",
+   "order": 1,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:1e923e85943d096778ef16c2",
+   "source_url": "https://store.bblcdn.com/s7/default/ce89de992d834b4e8c7b35c653c2c6a2/Banner_Media-1-tuya.jpg",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_8546272727a03ef3d923bd5d",
+   "order": 2,
+   "title_en": "Extraordinary Weather & UV Resistance",
+   "body_en": "Bambu ASA offers extraordinary UV, oxidation, and aging resistance, providing effective protection against breakage and color degradation when used outdoors for long-term purposes.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_75a31caf444dde3206b9a5c6",
+   "order": 3,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:0d983d72b9d0dda6b483fcac",
+   "source_url": "https://store.bblcdn.com/s7/default/20b6474610614dd3868006cb80517899/Frame_1123864901-tuya.jpg",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_d53481988b62ed63c425ba39",
+   "order": 4,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:eae9585aa2dd62bba642682c",
+   "source_url": "https://store.bblcdn.com/s7/default/7496653a970149ba90ffec6c29a4b49a/Frame_1123864805-tuya.jpg",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_9be94f520815bd449a7dbed6",
+   "order": 5,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:2fff5a41907b385c33a49f71",
+   "source_url": "https://store.bblcdn.com/s7/default/4d2f4300b9d443f38b16245fc2b5d392/Frame_1123864806-tuya.jpg",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_b6b87c139c7d7702f7ade470",
+   "order": 6,
+   "title_en": "Tough and Durable",
+   "body_en": "Suitable for outdoor applications and regular structural requirements due to its toughness and high impact strength.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_4f2440fd34589d8ca5e9a42f",
+   "order": 7,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:b4a16d4dca7f21bff48fcf0d",
+   "source_url": "https://store.bblcdn.com/s7/default/db764cbe59cb4784a59467a731b789e6/Frame_1123864805-1-tuya.jpg",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_6ab035db3b8ddf2ba09b69bc",
+   "order": 8,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:1cd2a2a8df92000cf2a5d31a",
+   "source_url": "https://store.bblcdn.com/s7/default/2c889e49dd214c94b2963fe9667906ee/Frame_1123864806-1-tuya.jpg",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_3c351f89f40cbee4b5ad5922",
+   "order": 9,
+   "title_en": "Better Temperature Resistance",
+   "body_en": "Compared to normal PETG or ABS, Bambu ASA can remain in shape even at a temperature of 100°C.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_35d82894eecf46ce8d21687c",
+   "order": 10,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:d3a1c54f621b4aedfbdfe1c9",
+   "source_url": "https://store.bblcdn.com/s7/default/e6ed44f3ef1449ecb5eadc34e4b81153/Frame_1123864805-2-tuya.jpg",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_43bef5bd7d8c8c8dc73cef2e",
+   "order": 11,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:d274272174f8d7be8ecb5cf0",
+   "source_url": "https://store.bblcdn.com/s7/default/b23dcb3f16594f038a31b3ab10fe7c20/Frame_1123864807-tuya.jpg",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_df06935164feb0d749aaeb65",
+   "order": 12,
+   "title_en": "RFID for Intelligent Printing",
+   "body_en": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System).",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_07b2fa89207f8d258004f356",
+   "order": 13,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:707ffd2d80cf44a99b77b829",
+   "source_url": "https://store.bblcdn.com/s7/default/7582b13ce2604750968dafbc244de91a/RFID_for_Intelligent_Printing-compressed.jpg",
+   "alt_en": "ASA",
+   "alt_ar": "صورة ASA",
+   "alt_ckb": "وێنەی ASA",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_c72ffbf17fe1e27645f3a16b",
+   "order": 14,
+   "title_en": "FAQ",
+   "body_en": "1.What's the difference between ABS and ASA?\nABS is composed of acrylonitrile, butadiene, and styrene, while ASA is composed of acrylonitrile, styrene, and acrylate.\nASA is a modified version of ABS that contains an additional acrylate component, which improves its weather adaptability and UV resistance.\nASA retains the impact resistance and processability of ABS while providing better resistance to fading, yellowing, and degradation from sunlight exposure. Both of them may release pungent and unpleasant odors during printing, but the pungent odor of ASA is notably lighter than ABS.\n\n2.What are the different applications of ABS and ASA?\nASA is ideal for outdoor applications, such as automotive exterior parts, signage, and outdoor equipment, thanks to its enhanced weather resistance and color stability. ABS is a versatile material with excellent mechanical properties that is commonly used for indoor applications.\n\n3.What are the similarities between ABS and ASA?\nIn terms of physical and mechanical properties, both exhibit good impact resistance and high tensile strength, with almost the same levels of strength, toughness, and stiffness. Both ABS and ASA may release pungent and unpleasant odors during printing and the same warping tendency and enclosed printer requirement when printing large-size and/or high infill density models.\n\n4.Safety Tips\nPlease store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.\nPlease keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.\nFor opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings.\nPlease print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.\nAs this filament is not food-grade, please avoid using finished prints for food storage or contact.\nWe recommend using an enclosed printer. At printing temperatures, this filament may release harmful gases, including styrene, which can cause dizziness or nausea. For extended operation, please wear a protective mask with a vapor filter (such as an activated carbon mask). If individuals with asthma or respiratory conditions, pregnant women, or children are present, please increase ventilation or pause printing with this material.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "faq",
+   "section_path": "components[4]"
+  },
+  {
+   "id": "cb_ab6d7f455d5575755fdd72be",
+   "order": 15,
+   "title_en": "FAQ",
+   "body_en": "1.Accessory Compatibility\nNot compatible with Cool Plate SuperTack.\n\n2.Drying Recommendations\nDry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: Filament drying instructions on WIKI.\n\n3.Ventilation & Odor Notice\nPungent and unpleasant odors may be released during printing. Make sure your printer is placed in a well-ventilated area.\n\n4.Warping Prevention Tips\nASA is prone to warping when printing large size and/or high infill density model. To avoid warping: 1) Not recommended to print too large size and/or high infill density models. 2) Use enclosure printers and ensure the build plate is properly glued before printing. 3) Set lower printing speed and higher heatbed temperature. For more details, please refer to: Common print quality problems and solutions on WIKI.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "faq",
+   "section_path": "components[5]"
+  },
+  {
+   "id": "cb_483233421f83dc55e63e4a1f",
+   "order": 16,
+   "title_en": "Highlights",
+   "body_en": "• Extraordinary UV Resistance\n• Exceptional Temperature Resistance\n• High Impact Strength and Durability\n• Outdoor Use for Long-Term Purpose\n• Comes with High Temperature Reusable Spool\n• Cautions for Use",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "P.productFeaturesModuleList"
+  }
+ ],
+ "specs": [
+  {
+   "id": "sv_389860f5c099a64ea172ab78",
+   "key": "material.diameter",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "1.75 mm",
+   "value_num": 1.75,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 6",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 0
+  },
+  {
+   "id": "sv_bc90e739cbe5f111e925dd85",
+   "key": "material.diameter_tolerance",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "± 0.03 mm",
+   "value_num": 0.03,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 6",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 1
+  },
+  {
+   "id": "sv_6b7ad00ad006b5d97a490086",
+   "key": "material.net_weight",
+   "group": "material",
+   "scope_kind": "option_value",
+   "scope_id": "ov_65cef6ca3bd2f722325ef4a4",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Size",
+   "original_value": "1kg",
+   "value_text": "1000 g",
+   "value_num": 1000,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g",
+   "status": "verified",
+   "confidence": "official_variant",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "option Size › 1kg",
+   "source_excerpt": "1kg",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 2
+  },
+  {
+   "id": "sv_ee2dc92fb25656bbe6c8ee91",
+   "key": "material.density",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g/cm³",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/asa-filament",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 3
+  },
+  {
+   "id": "sv_bc245ce15faa828c5e8ff832",
+   "key": "print_settings.nozzle_temp",
+   "group": "print_settings",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "range",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "°C",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/asa-filament",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 4
+  }
+ ],
+ "documents": [
+  {
+   "id": "pd_c240589ecb7848f28269e4de",
+   "kind": "tds",
+   "title_en": "Filament TDS",
+   "title_ar": "ورقة البيانات الفنية (TDS) — Filament TDS",
+   "title_ckb": "پەڕەی زانیاری تەکنیکی (TDS) — Filament TDS",
+   "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 0
+  },
+  {
+   "id": "pd_734ef86bf232d13c7ba3063d",
+   "kind": "sds",
+   "title_en": "Filament MSDS",
+   "title_ar": "ورقة بيانات السلامة (SDS) — Filament MSDS",
+   "title_ckb": "پەڕەی زانیاری سەلامەتی (SDS) — Filament MSDS",
+   "url": "https://store.bblcdn.com/s7/default/10a896db93e04636a9f70b841867e7e6/SDS20251127B01_Bambu_ASA.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 1
+  },
+  {
+   "id": "pd_67cca1367a759d0908c226d8",
+   "kind": "certificate",
+   "title_en": "Filament RoHS",
+   "title_ar": "شهادة مطابقة — Filament RoHS",
+   "title_ckb": "بڕوانامەی گونجان — Filament RoHS",
+   "url": "https://store.bblcdn.com/94d2da6ca64b4d0e9c1e48faca32c89e.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 2
+  },
+  {
+   "id": "pd_e8eabd3a37cfe2acc83443d7",
+   "kind": "hex_codes",
+   "title_en": "Hex Code",
+   "title_ar": "رموز الألوان — Hex Code",
+   "title_ckb": "کۆدەکانی ڕەنگ — Hex Code",
+   "url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 3
+  },
+  {
+   "id": "pd_51613117f3cf7c9d7043afba",
+   "kind": "wiki",
+   "title_en": "Filament drying instructions",
+   "title_ar": "ويكي Bambu Lab — Filament drying instructions",
+   "title_ckb": "ویکی Bambu Lab — Filament drying instructions",
+   "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+   "host": "wiki.bambulab.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 4
+  },
+  {
+   "id": "pd_c4e8fccffc9ed75e0f7d479b",
+   "kind": "wiki",
+   "title_en": "Common print quality problems and solutions",
+   "title_ar": "ويكي Bambu Lab — Common print quality problems and solutions",
+   "title_ckb": "ویکی Bambu Lab — Common print quality problems and solutions",
+   "url": "https://wiki.bambulab.com/en/knowledge-sharing/common-print-quality-problem",
+   "host": "wiki.bambulab.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 5
+  }
+ ],
+ "relations": [
+  {
+   "id": "pr_74178df33ea67db75d02dc47",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "other",
+   "target_product_id": null,
+   "target_source": "",
+   "target_source_handle": "",
+   "target_family": "",
+   "target_label": "AMS 2 Pro",
+   "state": "unresolvable",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "AMS 2 Pro, AMS HT & AMS Compatible"
+  },
+  {
+   "id": "pr_513b7dcdfc40a69cec1cdd7e",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "other",
+   "target_product_id": null,
+   "target_source": "",
+   "target_source_handle": "",
+   "target_family": "",
+   "target_label": "AMS HT",
+   "state": "unresolvable",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "AMS 2 Pro, AMS HT & AMS Compatible"
+  },
+  {
+   "id": "pr_3ca2d48016024b6a49987289",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "other",
+   "target_product_id": null,
+   "target_source": "",
+   "target_source_handle": "",
+   "target_family": "",
+   "target_label": "AMS",
+   "state": "unresolvable",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "AMS 2 Pro, AMS HT & AMS Compatible"
+  },
+  {
+   "id": "pr_b9ab2c97976b079873fc4dc5",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "not_compatible_with",
+   "target_kind": "other",
+   "target_product_id": null,
+   "target_source": "",
+   "target_source_handle": "",
+   "target_family": "",
+   "target_label": "AMS lite",
+   "state": "unresolvable",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "AMS lite NOT Compatible"
+  }
+ ],
+ "external_ids": [
+  {
+   "scope_kind": "product",
+   "scope_id": "",
+   "id_type": "bambu_product_id",
+   "value": "7463000342664",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_96369fa13eea7ea54576cbeb",
+   "id_type": "bambu_variant_id",
+   "value": "41227780718728",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_35ab8a4b230660b310eac184",
+   "id_type": "bambu_variant_id",
+   "value": "41227780751496",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_693a4be746184f1fa7e450cf",
+   "id_type": "bambu_variant_id",
+   "value": "41227780784264",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_aa8e36eab3288be3c0b08a0a",
+   "id_type": "bambu_variant_id",
+   "value": "41227780817032",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_d1af2067ebc7804987ea344d",
+   "id_type": "bambu_variant_id",
+   "value": "41227780849800",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_b64242df018f6d6f3eb9eb80",
+   "id_type": "bambu_variant_id",
+   "value": "41227780882568",
+   "searchable": false
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_57134368730cc3237df4917a",
+   "id_type": "color_code",
+   "value": "45100",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_27c65dac22d38d8f0f070d6e",
+   "id_type": "color_code",
+   "value": "45500",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_97226bd1952f8040e1cf8c21",
+   "id_type": "color_code",
+   "value": "45101",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_53e6ce6b608d4e476b3d0a35",
+   "id_type": "color_code",
+   "value": "45102",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_01fd3cf8fc0ccbb3b685c04d",
+   "id_type": "color_code",
+   "value": "45200",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_9dc7ff75078dd217c2d5bbce",
+   "id_type": "color_code",
+   "value": "45600",
+   "searchable": true
+  }
+ ],
+ "source_refs": [
+  {
+   "kind": "group",
+   "source_id": "9742077755528",
+   "levonis_id": "og_f3cc572a6f5a882d503010a4",
+   "source_label": "Color",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681853373280263",
+   "levonis_id": "ov_57134368730cc3237df4917a",
+   "source_label": "White (45100)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681853373280264",
+   "levonis_id": "ov_27c65dac22d38d8f0f070d6e",
+   "source_label": "Green (45500)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681853373280265",
+   "levonis_id": "ov_97226bd1952f8040e1cf8c21",
+   "source_label": "Black (45101)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681853373280266",
+   "levonis_id": "ov_53e6ce6b608d4e476b3d0a35",
+   "source_label": "Gray (45102)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681853373280267",
+   "levonis_id": "ov_01fd3cf8fc0ccbb3b685c04d",
+   "source_label": "Red (45200)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681853373280268",
+   "levonis_id": "ov_9dc7ff75078dd217c2d5bbce",
+   "source_label": "Blue (45600)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "9742077689992",
+   "levonis_id": "og_41491f20011998488ac80b70",
+   "source_label": "Type",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681853373280269",
+   "levonis_id": "ov_71b63678c64c80442d78b377",
+   "source_label": "Filament with spool",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "9742077722760",
+   "levonis_id": "og_185bbb50c9a5bddf458285e6",
+   "source_label": "Size",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681853373280270",
+   "levonis_id": "ov_65cef6ca3bd2f722325ef4a4",
+   "source_label": "1kg",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41227780718728",
+   "levonis_id": "pv_96369fa13eea7ea54576cbeb",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41227780751496",
+   "levonis_id": "pv_35ab8a4b230660b310eac184",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41227780784264",
+   "levonis_id": "pv_693a4be746184f1fa7e450cf",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41227780817032",
+   "levonis_id": "pv_aa8e36eab3288be3c0b08a0a",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41227780849800",
+   "levonis_id": "pv_d1af2067ebc7804987ea344d",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41227780882568",
+   "levonis_id": "pv_b64242df018f6d6f3eb9eb80",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "761009341582024704",
+   "levonis_id": "pi_d9a7110ba6b15bd2fa41bd07",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "761009341582024704",
+   "levonis_id": "pi_4ca680b3e47dd7f9390c5ac3",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_d1af2067ebc7804987ea344d"
+  },
+  {
+   "kind": "image",
+   "source_id": "32596672413832",
+   "levonis_id": "pi_51ee8c90646aa1b0b77c0638",
+   "source_label": "",
+   "binding_rule": "general",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766487176",
+   "levonis_id": "pi_0bdb78728f499a9ad6eb4bfc",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766487176",
+   "levonis_id": "pi_f3a26b13f09bf189e93c2f67",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_35ab8a4b230660b310eac184"
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766552712",
+   "levonis_id": "pi_da34bb6a09fea6f006b03a8b",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766552712",
+   "levonis_id": "pi_8388573b2e906e3d24fc6c8a",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_aa8e36eab3288be3c0b08a0a"
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766519944",
+   "levonis_id": "pi_b7defabde2a54c665d29ede9",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766519944",
+   "levonis_id": "pi_05691e33022f800b143e502b",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_b64242df018f6d6f3eb9eb80"
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766454408",
+   "levonis_id": "pi_33ca92de27871f4aded84c66",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766454408",
+   "levonis_id": "pi_724d2811589e371a47db359d",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_96369fa13eea7ea54576cbeb"
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766421640",
+   "levonis_id": "pi_758eb2a009c43a15e459c2f5",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32591766421640",
+   "levonis_id": "pi_00de3d88914687cadeff3901",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_693a4be746184f1fa7e450cf"
+  }
+ ],
+ "notes": [
+  {
+   "kind": "relation_unresolvable",
+   "field": "compatible_with"
+  },
+  {
+   "kind": "relation_unresolvable",
+   "field": "compatible_with"
+  },
+  {
+   "kind": "relation_unresolvable",
+   "field": "compatible_with"
+  },
+  {
+   "kind": "relation_unresolvable",
+   "field": "not_compatible_with"
+  }
+ ]
+}

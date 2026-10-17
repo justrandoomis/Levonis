@@ -1,0 +1,802 @@
+{
+  "handle": "pla-basic-gradient",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T12:20:22Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 4 pages read (text layer page by page; pp.1-3 also as images): Basic Info, Specifications, Recommended Printing Settings, Physical, Mechanical and Other Properties, Specimen Test, test specimen drawings, Disclaimer. Headed \"PLA Basic\"; the impact values carry * and a gradient footnote."
+    },
+    {
+      "kind": "sds",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_MSDS.pdf",
+      "title": "Bambu PLA Basic MSDS EGZ2302280031C00102RM1 (prepared by EMTEK (Guangzhou) for Shenzhen Tuozhu Technology)",
+      "retrieved_at": "2026-10-16T08:23:41Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 20 pages read (text layer). A third-party lab document (EMTEK) for \"Bambu PLA Basic\" (sample colour Blue), not the gradient by name; nothing is stored from it. Section 3 composition, section 9 melting point 160℃ and density 1.24 g/cm3, section 14 not hazardous goods."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "retrieved_at": "2026-10-16T08:23:45Z",
+      "keys": [],
+      "note": "One page, 8 colours, two hex codes each (text layer and the page as an image): read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Generic \"PLA*\" / \"PLA\" rows (note ② says they include PLA Basic): nozzle, AMS, build plate and storage tables; no row names the gradient. Used as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\", drying table (special PLAs only), HDT remark for PLA in general, impact (Z) table for PLA Basic. No gradient row."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PLA Basic / PLA Matte\": forced-air oven 50 °C 8 h, AMS 2 Pro / AMS HT 45 °C 12 h, printer heatbed 60-70 °C 12 h. The store FAQ links this page."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-basic-gradient",
+      "title": "Bambu Lab US store product page: PLA Basic Gradient",
+      "retrieved_at": "2026-10-16T07:00:15Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, Highlights, page-builder sections, FAQ, Download block."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PLA",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition PLA",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "The SDS (p.5, section 3; a third-party lab document for \"Bambu PLA Basic\") gives polylactic acid 99 % by wt (CAS 26023-30-3) and additive 0-1 % by wt; not stored as a value."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "Agrees with the store page (Product Features › bullet 4: \"Diameter: 1.75mm +/- 0.03mm\"); the tolerance is the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681874462240786",
+        "value_text": "1kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "Scoped to the store page's only Size value \"1kg\"; agrees with the store page row (option Size › 1kg)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.24,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.24 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "The SDS (p.9, section 9; third-party lab) also gives 1.24 g/cm3; only the TDS value is stored."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 160,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 160 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "The SDS (p.9, section 9; third-party lab) also gives 160℃; only the TDS value is stored."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 60,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 60 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 57,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 57 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (the TDS row reads \"Vicar Softening Temperature\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 54,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 54 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value. The next row gives 57 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "Not a product disagreement: the PLA wiki says \"heat deflection temperature of only 57°C\" for PLA in general (no load stated), which matches the TDS 0.45 MPa row. The product TDS 1.8 MPa value is kept."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 36,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 36 ± 2 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "Unstarred row of the PLA Basic Gradient TDS (headed \"PLA Basic\"); its footnote says the gradient \"retains similar performance to PLA Basic\"."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 15.2,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 15.2 ± 0.5%",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "Unstarred row of the PLA Basic Gradient TDS (headed \"PLA Basic\"); its footnote says the gradient \"retains similar performance to PLA Basic\"."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2270,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2270 ± 60 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "Unstarred row of the PLA Basic Gradient TDS (headed \"PLA Basic\"); its footnote says the gradient \"retains similar performance to PLA Basic\"."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 73,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 73 ± 3 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "Unstarred row of the PLA Basic Gradient TDS (headed \"PLA Basic\"); its footnote says the gradient \"retains similar performance to PLA Basic\"."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 61.2,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 61.2 ± 2.8 kJ/m² *; 20.3 ± 1.2 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing). First value of the cell, marked *; the same cell gives 20.3 ± 1.2 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "The * ties the value to the TDS footnote: the gradient gives \"even stronger toughness and Z-layer strength\" than PLA Basic."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 190,
+        "max": 230
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 190 - 230 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "conflict": "The material-table wiki gives 190 - 240 °C (±10 °C) for standard PLA in general (\"PLA*\", note ② naming PLA Basic); the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Cool Plate, High Temperature Plate or Textured PEI Plate, bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "conflict": "The material-table wiki (Build Plate Settings › 3, row \"PLA\") gives 35 - 45 ℃ on the Cool Plate / PLA Plate and 45 - 65 ℃ on the Engineering (glue required), Smooth PEI / High-Temperature and Textured PEI plates. The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 300 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 300 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "Kept as text: the TDS gives only an upper bound. The store page prose \"Up to 300mm/s (with 0.4mm nozzle)\" is marketing and proves no number (it agrees)."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 100%",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z"
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing 55 °C, 8 hours",
+      "test_method": "",
+      "test_condition": "Drying before printing, 8 hours (the TDS names no drying device)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "The material-table wiki (Storage, row \"PLA\") agrees: blast drying oven 55 ℃ for 8 h; it also gives AMS 2 Pro and AMS HT 45 ℃ for 12 h.",
+      "conflict": "The drying wiki (Appendix I, row \"PLA Basic / PLA Matte\") gives forced-air oven 50 °C for 8 h; the product TDS value (55 °C) is kept."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing 55 °C, 8 hours",
+      "test_method": "",
+      "test_condition": "Drying before printing at 55 °C (the TDS names no drying device)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "note": "The material-table wiki row \"PLA\" (blast drying oven 55 ℃ for 8 h) and the drying wiki row \"PLA Basic / PLA Matte\" (forced-air oven 50 °C, 8 h) agree on 8 h."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Basic Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/pla-basic-gradient",
+      "source_title": "Bambu Lab US store product page: PLA Basic Gradient",
+      "locator": "Product Features › bullet 3",
+      "quote": "Comes with Basic Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:00:15Z",
+      "note": "Unverified: an unlabelled store-page bullet. The store page's only Type value is \"Filament with spool\"; the TDS (p.1, Specifications) gives the spool as \"ABS (Temperature resistance 70 °C)\", diameter 200 mm, height 67 mm."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Arctic Whisper (10900)",
+      "source_value_id": "564681874462240784",
+      "hexes": [
+        "#FFFFFF",
+        "#9CDBD9"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Arctic Whisper Hex:#FFFFFF,#9CDBD9",
+      "retrieved_at": "2026-10-16T08:23:45Z"
+    },
+    {
+      "value_text": "Ocean to Meadow (10902)",
+      "source_value_id": "564681874462240782",
+      "hexes": [
+        "#54FF9B",
+        "#307FE2"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Ocean to Meadow Hex:#54FF9B,#307FE2",
+      "retrieved_at": "2026-10-16T08:23:45Z"
+    },
+    {
+      "value_text": "Cotton Candy Cloud (10907)",
+      "source_value_id": "564681874462240778",
+      "hexes": [
+        "#E7C1D5",
+        "#8EC9E9"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Cotton Candy Cloud Hex:#E7C1D5,#8EC9E9",
+      "retrieved_at": "2026-10-16T08:23:45Z"
+    },
+    {
+      "value_text": "Blueberry Bubblegum (10905)",
+      "source_value_id": "564681874462240777",
+      "hexes": [
+        "#6FCAEF",
+        "#8573DD"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Blueberry Bubblegum Hex:#6FCAEF,#8573DD",
+      "retrieved_at": "2026-10-16T08:23:45Z"
+    },
+    {
+      "value_text": "Mint Lime (10904)",
+      "source_value_id": "564681874462240780",
+      "hexes": [
+        "#4EC939",
+        "#B6FF43"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Mint Lime Hex:#4EC939,#B6FF43",
+      "retrieved_at": "2026-10-16T08:23:45Z"
+    },
+    {
+      "value_text": "Solar Breeze (10901)",
+      "source_value_id": "564681874462240783",
+      "hexes": [
+        "#FFFFFF",
+        "#E94B3C"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Solar Breeze Hex:#FFFFFF,#E94B3C",
+      "retrieved_at": "2026-10-16T08:23:45Z"
+    },
+    {
+      "value_text": "Pink Citrus (10903)",
+      "source_value_id": "564681874462240779",
+      "hexes": [
+        "#F78F77",
+        "#E4505A"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "locator": "p.1, row 4, column 1",
+      "quote": "Pink Citrus Hex:#F78F77,#E4505A",
+      "retrieved_at": "2026-10-16T08:23:45Z"
+    },
+    {
+      "value_text": "Dusk Glare (10906)",
+      "source_value_id": "564681874462240781",
+      "hexes": [
+        "#ED9558",
+        "#CE4406"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "locator": "p.1, row 4, column 2",
+      "quote": "Dusk Glare Hex:#ED9558,#CE4406",
+      "retrieved_at": "2026-10-16T08:23:45Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "AMS series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-basic-gradient",
+      "source_title": "Bambu Lab US store product page: PLA Basic Gradient",
+      "retrieved_at": "2026-10-16T07:00:15Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "All AMS Series Compatible",
+      "note": "The store FAQ (1.Accessory Compatibility) says \"Compatible with all printers, AMS, build plate, and nozzles.\"; the PLA wiki row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\" says \"Fully compatible with the AMS series\"; the material-table wiki gives \"PLA* | Compatible\" for AMS / AMS lite (note ② names PLA Basic)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "all_bambu_printers",
+      "target_label": "All printers",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-basic-gradient",
+      "source_title": "Bambu Lab US store product page: PLA Basic Gradient",
+      "retrieved_at": "2026-10-16T07:00:15Z",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Compatible with all printers, AMS, build plate, and nozzles.",
+      "note": "The PLA wiki row \"PLA Basic / ...\" says \"All printers compatible\"; the material-table wiki gives \"PLA* | Compatible | Compatible\" for open-frame (A Series, P1P, etc.) and enclosed (H2 Series, X2D, P2S, X1 Series, P1S, etc.) printers."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (PLA 45 - 65 ℃), which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "No store product is the plain Bambu Cool Plate (bambu-cool-plate-supertack is a different plate), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "All standard nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\" › Nozzle Compatibility",
+      "quote": "PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal | All standard nozzles are compatible (no special restrictions) | All printers compatible | Fully compatible with the AMS series",
+      "note": "The row names PLA Basic; the store FAQ (3.Printing Setting) says \"PLA Basic Gradient is a new color option of PLA Basic series\" and its 1.Accessory Compatibility says compatible with all nozzles. The material-table wiki row \"PLA*\" gives Compatible for 0.2, 0.4, 0.6, 0.8 mm and 0.4, 0.6, 0.8 mm high flow nozzles, hardened steel \"Not Required\". The TDS V2.0 has no Nozzle Size row."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+      "title": "Bambu PLA Basic Gradient Technical Data Sheet (Bambu Filament TDS V2.0, headed \"PLA Basic\")",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "sha256": "84f9fde455348a11c3861307bd391a8e4cebdf6f367c19506b56eee413512a50"
+    },
+    {
+      "kind": "sds",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_MSDS.pdf",
+      "title": "Bambu PLA Basic MSDS EGZ2302280031C00102RM1 (prepared by EMTEK (Guangzhou) for Shenzhen Tuozhu Technology)",
+      "retrieved_at": "2026-10-16T08:23:41Z",
+      "sha256": "881c5a7f76d383a106146dbe4c6e145c0e101e10fea780ee3a54da913a5fe4dc"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Basic Gradient",
+      "retrieved_at": "2026-10-16T08:23:45Z",
+      "sha256": "cc89e7e0da78acfffde2a3d943a8f4f5d972a91c9692bad0b9761d850d9ed13c"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "The TDS file is the store page's \"Filament TDS\" link (Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf), but its heading reads \"PLA Basic\" (TDS V2.0). Only the impact values carry *, tied to the footnote \"As new color options in the PLA Basic series, the gradient filament retains similar performance to PLA Basic while providing even stronger toughness and Z-layer strength.\" The other rows are stored as this product's official TDS values, each noted.",
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 32 ± 5 MPa, elongation 8.3 ± 0.3 %, bending modulus 1990 ± 50 MPa, bending strength 68 ± 5 MPa, impact 23.8 ± 0.9 kJ/m² *) are not stored. Density, melting, glass transition, Vicat and HDT are raw-material properties (ISO 1183, DSC, ISO 306, ISO 75) and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 2580 ± 150 MPa, Z 1980 ± 100 MPa), melt index (45.8 ± 6.6 g/10 min at 210 °C, 2.16 kg), crystallization temperature (N/A), heat deflection temperature 57 °C at 0.45 MPa, saturated water absorption rate (0.43 % at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed with desiccant), bed surface preparation (glue), retraction length (0.6 - 1.0 mm) and speed (20 - 40 mm/s), chamber temperature (25 - 45 °C), max overhang angle (55°), max bridging length (30 mm), support material (Support for PLA), spool material (ABS, temperature resistance 70 °C) and size (diameter 200 mm, height 67 mm), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows.",
+    "The TDS recommended chamber temperature (25 - 45 °C) is not written to thermal.chamber_temp: that key is a printer capability (number, template field chamber_temp_max), not a filament print setting.",
+    "The TDS \"Bed Surface Preparation Glue\" is a recommended setting, not a stated requirement, so no \"requires\" relation is written; the material-table wiki's \"Glue Required\" applies to the Engineering Plate only.",
+    "The SDS is a third-party lab document (prepared by EMTEK (Guangzhou) Co., Ltd. for Shenzhen Tuozhu Technology, data audit by EMTEK) for \"Bambu PLA Basic\"; a third-party lab value is never stored as a manufacturer spec, so its section 9 values (melting point 160℃, density 1.24 g/cm3, both agreeing with the TDS), its composition (polylactic acid 99 %, additive 0-1 %), CLP \"not classified as hazardous\" and \"Not hazardous goods\" for IMDG, DOT, ADR/RID and ICAO/IATA transport are not stored.",
+    "Source disagreements left to review: drying temperature (TDS and material-table wiki 55 °C, drying wiki 50 °C for \"PLA Basic / PLA Matte\"); bed temperature on the High Temperature and Textured PEI plates (TDS 35 - 45 °C for all three bed types vs material-table wiki 45 - 65 ℃ for \"PLA\"); nozzle temperature (TDS 190 - 230 °C vs material-table wiki 190 - 240 °C ±10 °C for \"PLA*\"). The product TDS values are kept.",
+    "The wiki pages name PLA Basic, never the gradient; they are applied through the store FAQ \"PLA Basic Gradient is a new color option of PLA Basic series, please use the default PLA Basic setting for printing.\" and used only as corroboration and for relations.",
+    "Marketing prose proves no number: \"Soft Bicolor Gradient\", \"Delicate Finish\", \"Good Layer Adhesion\", \"Up to 300mm/s (with 0.4mm nozzle)\", \"8 ~ 10 Meters Gradient Length\" (the colour-transition length, not material.length) and the example consumptions (\"14.8 m/45.09 g\", \"54.3 m/164.56 g\") are not stored as values.",
+    "Hex: every store colour has exactly one cell in the hex table, matched by the colour name without the code in parentheses. Each cell publishes TWO hex codes (the gradient's top and bottom colours). published_hex holds a single #RRGGBB, so no single hex is chosen: both are kept as \"hexes\" in published order, with \"gradient\": true, and no \"hex\" field is written. How a two-stop gradient is shown is left to the integrator.",
+    "The store page links a \"Filament RoHS\" certificate (https://cdn.shopify.com/s/files/1/0573/5320/7868/files/Bambu_PLA_Basic_RoHS.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 4); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store page states RFID (\"All printing parameters are embedded in RFID, which can be read through our AMS\"); no registry key holds it."
+  ]
+}

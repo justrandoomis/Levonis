@@ -1,0 +1,939 @@
+{
+ "protocol": 2,
+ "source": "bambu_us",
+ "source_product_id": "8441318244488",
+ "handle": "pc-fr",
+ "route": "552709755819347968>552709756834369536>552709756901478400",
+ "write_mode": "create",
+ "product_id": "p_78a4e57dcfd5b251ad31cc09",
+ "curated_sha256": "",
+ "extraction_sha256": "ba889328c17b6eca76aa0653542cf42895657482a6e7379fc7045ae355f69894",
+ "product": {
+  "title_en": "PC FR",
+  "short_description_en": "",
+  "variant_mode": "VARIANT_COMBINATION",
+  "usage_steps": [],
+  "usage_official_url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament"
+ },
+ "groups": [
+  {
+   "id": "og_3bef03d285593348c3f7b20d",
+   "source_id": "11138417459336",
+   "sort": 1,
+   "name_en": "Colour",
+   "name_ar": "اللون",
+   "name_ckb": "ڕەنگ",
+   "kind": "color",
+   "source_label": "Color",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_1833440e8bca7d16135ecf6d",
+     "source_id": "564681962718785540",
+     "name_en": "Black (63100)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-10f3627d4551a94b051bd3be",
+     "variant_label": "Black (63100)",
+     "sort": 0,
+     "colour_code": "63100"
+    },
+    {
+     "id": "ov_6b94a855081f45301e9e03e8",
+     "source_id": "564681962718785541",
+     "name_en": "White (63101)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-54d894d4b227ebe96e182c7d",
+     "variant_label": "White (63101)",
+     "sort": 1,
+     "colour_code": "63101"
+    },
+    {
+     "id": "ov_6a7c3ec360f00add93af4109",
+     "source_id": "564681962718785542",
+     "name_en": "Gray (63102)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-469b293911fae4d137298949",
+     "variant_label": "Gray (63102)",
+     "sort": 2,
+     "colour_code": "63102"
+    }
+   ]
+  },
+  {
+   "id": "og_077b598802d94c27c6deb8f1",
+   "source_id": "11138417492104",
+   "sort": 2,
+   "name_en": "Spool",
+   "name_ar": "البكرة",
+   "name_ckb": "ماسوورە",
+   "kind": "spool",
+   "source_label": "Type",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_377a91b938216fb7e6080e3a",
+     "source_id": "564681962718785543",
+     "name_en": "Filament with spool",
+     "name_ar": "مع بكرة",
+     "name_ckb": "لەگەڵ ماسوورە",
+     "variant_key": "bv-19f9360ad07d3a194dc38bdb",
+     "variant_label": "Filament with spool",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  },
+  {
+   "id": "og_6e419d63c5221db0a76e5c1e",
+   "source_id": "11138417524872",
+   "sort": 3,
+   "name_en": "Net weight",
+   "name_ar": "الوزن الصافي",
+   "name_ckb": "کێشی پوخت",
+   "kind": "pack",
+   "source_label": "Size",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_b1d4ab4156ad01254c39fb19",
+     "source_id": "564681962718785544",
+     "name_en": "1 kg",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-c39f1368866d9330801501cd",
+     "variant_label": "1 kg",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  }
+ ],
+ "variants": [
+  {
+   "id": "pv_69bc0f66097fff6d5eca610b",
+   "source_id": "43160587993224",
+   "combo_key": "o:ov_377a91b938216fb7e6080e3a|o:ov_6b94a855081f45301e9e03e8|o:ov_b1d4ab4156ad01254c39fb19",
+   "value_ids": [
+    "ov_6b94a855081f45301e9e03e8",
+    "ov_377a91b938216fb7e6080e3a",
+    "ov_b1d4ab4156ad01254c39fb19"
+   ]
+  },
+  {
+   "id": "pv_6fc4a697a1ba5891457bc109",
+   "source_id": "43160588025992",
+   "combo_key": "o:ov_377a91b938216fb7e6080e3a|o:ov_6a7c3ec360f00add93af4109|o:ov_b1d4ab4156ad01254c39fb19",
+   "value_ids": [
+    "ov_6a7c3ec360f00add93af4109",
+    "ov_377a91b938216fb7e6080e3a",
+    "ov_b1d4ab4156ad01254c39fb19"
+   ]
+  },
+  {
+   "id": "pv_3e46c47ce0e1348b21f53283",
+   "source_id": "43160588058760",
+   "combo_key": "o:ov_1833440e8bca7d16135ecf6d|o:ov_377a91b938216fb7e6080e3a|o:ov_b1d4ab4156ad01254c39fb19",
+   "value_ids": [
+    "ov_1833440e8bca7d16135ecf6d",
+    "ov_377a91b938216fb7e6080e3a",
+    "ov_b1d4ab4156ad01254c39fb19"
+   ]
+  }
+ ],
+ "images": [
+  {
+   "id": "pi_4691182d2a1d2898ae31a667",
+   "source_media_id": "570744915879718912",
+   "source_url": "https://store.bblcdn.com/s7/default/5ecd124435bb4b24b96c5e35460d433d/20250224-142244.jpg",
+   "sort_order": 0,
+   "is_primary": true,
+   "option_value_id": null,
+   "variant_id": "pv_3e46c47ce0e1348b21f53283",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PC FR — Black (63100) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PC FR — Black (63100) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PC FR — Black (63100) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_176ca1cf28793656ff0f614d",
+   "source_media_id": "570744915879718912",
+   "source_url": "https://store.bblcdn.com/s7/default/5ecd124435bb4b24b96c5e35460d433d/20250224-142244.jpg",
+   "sort_order": 1,
+   "is_primary": false,
+   "option_value_id": "ov_1833440e8bca7d16135ecf6d",
+   "variant_id": null,
+   "via_variant_id": "pv_3e46c47ce0e1348b21f53283",
+   "binding_rule": "representative",
+   "alt_en": "PC FR — Black (63100)",
+   "alt_ar": "صورة PC FR — Black (63100)",
+   "alt_ckb": "وێنەی PC FR — Black (63100)"
+  },
+  {
+   "id": "pi_dbe07e2b8b674c9d63a11119",
+   "source_media_id": "42928119873672",
+   "source_url": "https://store.bblcdn.com/s7/default/72a56ba4fac24997a86949b0303f3a66/PC_FR.png",
+   "sort_order": 2,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "general",
+   "alt_en": "PC FR",
+   "alt_ar": "صورة PC FR",
+   "alt_ckb": "وێنەی PC FR"
+  },
+  {
+   "id": "pi_9bf082d1fad1d311aeabe609",
+   "source_media_id": "42928117186696",
+   "source_url": "https://store.bblcdn.com/s7/default/e4b4c08445c04eb6812147c18cdfc4e0/2_45300790-0a35-4652-8fb4-bc5ebcb466bd.jpg",
+   "sort_order": 3,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_69bc0f66097fff6d5eca610b",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PC FR — White (63101) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PC FR — White (63101) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PC FR — White (63101) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_0218f1713e92843cca419e07",
+   "source_media_id": "42928117186696",
+   "source_url": "https://store.bblcdn.com/s7/default/e4b4c08445c04eb6812147c18cdfc4e0/2_45300790-0a35-4652-8fb4-bc5ebcb466bd.jpg",
+   "sort_order": 4,
+   "is_primary": false,
+   "option_value_id": "ov_6b94a855081f45301e9e03e8",
+   "variant_id": null,
+   "via_variant_id": "pv_69bc0f66097fff6d5eca610b",
+   "binding_rule": "representative",
+   "alt_en": "PC FR — White (63101)",
+   "alt_ar": "صورة PC FR — White (63101)",
+   "alt_ckb": "وێنەی PC FR — White (63101)"
+  },
+  {
+   "id": "pi_0d771423f73ce9146aa3447c",
+   "source_media_id": "42928117153928",
+   "source_url": "https://store.bblcdn.com/s7/default/0a2e96d9a27e40d6bc4556dbaf481a98/1_ecff4b9c-4943-4364-8593-3b9e9fa9bab5.jpg",
+   "sort_order": 5,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_6fc4a697a1ba5891457bc109",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PC FR — Gray (63102) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PC FR — Gray (63102) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PC FR — Gray (63102) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_28930b247dbb5f0fb722506c",
+   "source_media_id": "42928117153928",
+   "source_url": "https://store.bblcdn.com/s7/default/0a2e96d9a27e40d6bc4556dbaf481a98/1_ecff4b9c-4943-4364-8593-3b9e9fa9bab5.jpg",
+   "sort_order": 6,
+   "is_primary": false,
+   "option_value_id": "ov_6a7c3ec360f00add93af4109",
+   "variant_id": null,
+   "via_variant_id": "pv_6fc4a697a1ba5891457bc109",
+   "binding_rule": "representative",
+   "alt_en": "PC FR — Gray (63102)",
+   "alt_ar": "صورة PC FR — Gray (63102)",
+   "alt_ckb": "وێنەی PC FR — Gray (63102)"
+  }
+ ],
+ "swatches": [
+  {
+   "value_id": "ov_1833440e8bca7d16135ecf6d",
+   "source_media_id": "swatch:564681962718785540",
+   "source_url": "https://store.bblcdn.com/s7/default/b26293fe5b874ab68991e3aa77768161/c77c831a3d1b4d70845e860b277044f9.png"
+  },
+  {
+   "value_id": "ov_6b94a855081f45301e9e03e8",
+   "source_media_id": "swatch:564681962718785541",
+   "source_url": "https://store.bblcdn.com/s7/default/b2f18998223e41bea66f27af0c87cf31/948510dcfbf4499f945fe6528ada710e.png"
+  },
+  {
+   "value_id": "ov_6a7c3ec360f00add93af4109",
+   "source_media_id": "swatch:564681962718785542",
+   "source_url": "https://store.bblcdn.com/s7/default/1698585819314488b4ee28fb8f46f2b1/f4d4c5abbc8242c294d255ce5da4f467.png"
+  }
+ ],
+ "content_blocks": [
+  {
+   "id": "cb_e3e0e340dd4796ad91537a21",
+   "order": 0,
+   "title_en": "PC FR",
+   "body_en": "· UL 94-2023 V-0 Flame Retardancy\n· Engineering-Level Mechanical Properties",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_07f7442e44515598caebf2dd",
+   "order": 1,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:69b35cbbd3db21a30d950844",
+   "source_url": "https://store.bblcdn.com/s7/default/f871297ca812463187952cbc32b8768c/Banner_Media-1-tuya.jpg",
+   "alt_en": "PC FR",
+   "alt_ar": "صورة PC FR",
+   "alt_ckb": "وێنەی PC FR",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_7aec0bdccf71e99914a82d69",
+   "order": 2,
+   "title_en": "Top-Tier Flame Retardancy",
+   "body_en": "Tested to meet the UL 94-2023 V-0 standard, the top level of flame resistance for 3D printing filament, Bambu PC FR is engineered to prevent or slow flame propagation with exceptional self-extinguishing properties. Ideal for critical applications in electronics, automotive, and mechanical engineering.\n* UL 94 is a plastics flammability standard established by Underwriters Laboratories (USA). V-0—the highest UL 94 V rating—indicates that burning stops within 10 seconds on a vertically positioned specimen, with dripping particles allowed as long as they are not ignited.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_661bc0a95e7f6f598d9d7c2a",
+   "order": 3,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:d979af460e5ab042a5b28fdb",
+   "source_url": "https://store.bblcdn.com/s7/default/81ba552c931046d3baaac63d3a3eeb3c/Frame_1123864805-tuya.jpg",
+   "alt_en": "PC FR",
+   "alt_ar": "صورة PC FR",
+   "alt_ckb": "وێنەی PC FR",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_19fc8bc8675ad12a213d9f83",
+   "order": 4,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:ccc7b136221adf0e5e6d087a",
+   "source_url": "https://store.bblcdn.com/s7/default/b31ac01bd82745d0bbfd2f3fe22bc90f/Frame_1123864806-tuya.jpg",
+   "alt_en": "PC FR",
+   "alt_ar": "صورة PC FR",
+   "alt_ckb": "وێنەی PC FR",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_ce44833749d6bd179bcea1db",
+   "order": 5,
+   "title_en": "Engineering-Level Mechanical Properties",
+   "body_en": "Bambu PC FR is an engineering-grade material with toughness comparable to PAHT-CF. Its exceptional stiffness and strength make it a top choice for structural components and protective casings.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_9ff9261642f93fef60b3f4f9",
+   "order": 6,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:34aeb5a15b49d84cd9488701",
+   "source_url": "https://store.bblcdn.com/s7/default/9dd9bab72974435fbfed7ba24b7ee415/PC06-tuya.jpg",
+   "alt_en": "PC FR",
+   "alt_ar": "صورة PC FR",
+   "alt_ckb": "وێنەی PC FR",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_e6381b1a462ca115cbc32c4e",
+   "order": 7,
+   "title_en": "RFID for Intelligent Printing",
+   "body_en": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System).",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_58739637095f99934a8ab818",
+   "order": 8,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:707ffd2d80cf44a99b77b829",
+   "source_url": "https://store.bblcdn.com/s7/default/7582b13ce2604750968dafbc244de91a/RFID_for_Intelligent_Printing-compressed.jpg",
+   "alt_en": "PC FR",
+   "alt_ar": "صورة PC FR",
+   "alt_ckb": "وێنەی PC FR",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_a8068aa1acf3cf1d808814eb",
+   "order": 9,
+   "title_en": "FAQ",
+   "body_en": "1.Accessory Compatibility\nNot compatible with Cool Plate SuperTack and AMS lite.\n\n2.Drying Recommendations\nAs this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing. For more details, please refer to: Filament drying instructions on WIKI.\n\n3.Safety Tips\nThe nozzle temperature should be between 260-280°C, and the heat bed temperature should be between 90-110°C. Please ensure safety during printing.\nPlease store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.\nPlease keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.\nPlease print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.\nAs this filament is not food-grade, please avoid using finished prints for food storage or contact.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "faq",
+   "section_path": "components[4]"
+  },
+  {
+   "id": "cb_ee81a10f7913760c2c24588d",
+   "order": 10,
+   "title_en": "Highlights",
+   "body_en": "• UL 94-2023 V-0 Flame Retardancy\n• Engineering-Level Mechanical Properties\n• Comes with High Temperature Reusable Spool\n• Dry Out Before Use\n• Cautions for Use",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "P.productFeaturesModuleList"
+  }
+ ],
+ "specs": [
+  {
+   "id": "sv_cdc1a7f892a1b203a5f4b583",
+   "key": "material.diameter",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "1.75 mm",
+   "value_num": 1.75,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 4",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 0
+  },
+  {
+   "id": "sv_68d24822f0bc7f37ebbb0d3d",
+   "key": "material.diameter_tolerance",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "± 0.03 mm",
+   "value_num": 0.03,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 4",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 1
+  },
+  {
+   "id": "sv_03bc7ffa854c5b6d2e7f5beb",
+   "key": "material.net_weight",
+   "group": "material",
+   "scope_kind": "option_value",
+   "scope_id": "ov_b1d4ab4156ad01254c39fb19",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Size",
+   "original_value": "1 kg",
+   "value_text": "1000 g",
+   "value_num": 1000,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g",
+   "status": "verified",
+   "confidence": "official_variant",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "option Size › 1 kg",
+   "source_excerpt": "1 kg",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 2
+  },
+  {
+   "id": "sv_b6b97e026b1574e022f16338",
+   "key": "material.density",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g/cm³",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/pc-fr",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 3
+  },
+  {
+   "id": "sv_cca87073958bd44d6b669f1f",
+   "key": "print_settings.nozzle_temp",
+   "group": "print_settings",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "range",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "°C",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/pc-fr",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 4
+  }
+ ],
+ "documents": [
+  {
+   "id": "pd_ffb2da159f3bebdc9515fc61",
+   "kind": "tds",
+   "title_en": "Filament TDS",
+   "title_ar": "ورقة البيانات الفنية (TDS) — Filament TDS",
+   "title_ckb": "پەڕەی زانیاری تەکنیکی (TDS) — Filament TDS",
+   "url": "https://store.bblcdn.com/s1/default/4adf3c9827a0475d8777e9b8cfd11fbe.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 0
+  },
+  {
+   "id": "pd_8e58cef6ec5d992dad0770f5",
+   "kind": "sds",
+   "title_en": "Filament MSDS",
+   "title_ar": "ورقة بيانات السلامة (SDS) — Filament MSDS",
+   "title_ckb": "پەڕەی زانیاری سەلامەتی (SDS) — Filament MSDS",
+   "url": "https://store.bblcdn.com/s7/default/6193891bd51e4a5d806125e1d6117583/SDS20250724C01_Bambu_PC_FR.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 1
+  },
+  {
+   "id": "pd_2737d8f2a858048de51aa4cf",
+   "kind": "certificate",
+   "title_en": "Filament RoHS",
+   "title_ar": "شهادة مطابقة — Filament RoHS",
+   "title_ckb": "بڕوانامەی گونجان — Filament RoHS",
+   "url": "https://store.bblcdn.com/s1/default/8f1f399e5f7f4101980977fc59f34687.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 2
+  },
+  {
+   "id": "pd_bedbc199b9204ba75f7254fc",
+   "kind": "certificate",
+   "title_en": "Filament UL 94 Test Report",
+   "title_ar": "شهادة مطابقة — Filament UL 94 Test Report",
+   "title_ckb": "بڕوانامەی گونجان — Filament UL 94 Test Report",
+   "url": "https://store.bblcdn.com/s1/default/a7ac91acf11b41bea0883615f46ed557.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 3
+  },
+  {
+   "id": "pd_b76e13d1209a8c1224cbf40f",
+   "kind": "hex_codes",
+   "title_en": "Hex Code",
+   "title_ar": "رموز الألوان — Hex Code",
+   "title_ckb": "کۆدەکانی ڕەنگ — Hex Code",
+   "url": "https://store.bblcdn.com/s7/default/9fc931c1464542df9c5fc5d9f6f9bf4b/PC_FR_Hex_Code_Table.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 4
+  },
+  {
+   "id": "pd_704812040dd900ecf93b5784",
+   "kind": "wiki",
+   "title_en": "Filament drying instructions",
+   "title_ar": "ويكي Bambu Lab — Filament drying instructions",
+   "title_ckb": "ویکی Bambu Lab — Filament drying instructions",
+   "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+   "host": "wiki.bambulab.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 5
+  }
+ ],
+ "relations": [
+  {
+   "id": "pr_4f4fe393ffacbd78c3c59557",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "ams",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "ams-2-pro",
+   "target_family": "",
+   "target_label": "AMS 2 Pro",
+   "state": "pending",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "AMS 2 Pro, AMS HT & AMS Compatible"
+  },
+  {
+   "id": "pr_bf4f1854e0a75bf64e261524",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "ams",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "ams-ht",
+   "target_family": "",
+   "target_label": "AMS HT",
+   "state": "pending",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "AMS 2 Pro, AMS HT & AMS Compatible"
+  },
+  {
+   "id": "pr_984fe14644c4433255e95eff",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "ams",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "ams-multicolor-printing",
+   "target_family": "",
+   "target_label": "AMS",
+   "state": "pending",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "AMS 2 Pro, AMS HT & AMS Compatible"
+  },
+  {
+   "id": "pr_b6147b174c623b0f35dadb11",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "not_compatible_with",
+   "target_kind": "ams",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "ams-lite",
+   "target_family": "",
+   "target_label": "AMS lite",
+   "state": "pending",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "AMS lite NOT Compatible"
+  }
+ ],
+ "external_ids": [
+  {
+   "scope_kind": "product",
+   "scope_id": "",
+   "id_type": "bambu_product_id",
+   "value": "8441318244488",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_69bc0f66097fff6d5eca610b",
+   "id_type": "bambu_variant_id",
+   "value": "43160587993224",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_6fc4a697a1ba5891457bc109",
+   "id_type": "bambu_variant_id",
+   "value": "43160588025992",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_3e46c47ce0e1348b21f53283",
+   "id_type": "bambu_variant_id",
+   "value": "43160588058760",
+   "searchable": false
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_1833440e8bca7d16135ecf6d",
+   "id_type": "color_code",
+   "value": "63100",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_6b94a855081f45301e9e03e8",
+   "id_type": "color_code",
+   "value": "63101",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_6a7c3ec360f00add93af4109",
+   "id_type": "color_code",
+   "value": "63102",
+   "searchable": true
+  }
+ ],
+ "source_refs": [
+  {
+   "kind": "group",
+   "source_id": "11138417459336",
+   "levonis_id": "og_3bef03d285593348c3f7b20d",
+   "source_label": "Color",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681962718785540",
+   "levonis_id": "ov_1833440e8bca7d16135ecf6d",
+   "source_label": "Black (63100)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681962718785541",
+   "levonis_id": "ov_6b94a855081f45301e9e03e8",
+   "source_label": "White (63101)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681962718785542",
+   "levonis_id": "ov_6a7c3ec360f00add93af4109",
+   "source_label": "Gray (63102)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "11138417492104",
+   "levonis_id": "og_077b598802d94c27c6deb8f1",
+   "source_label": "Type",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681962718785543",
+   "levonis_id": "ov_377a91b938216fb7e6080e3a",
+   "source_label": "Filament with spool",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "11138417524872",
+   "levonis_id": "og_6e419d63c5221db0a76e5c1e",
+   "source_label": "Size",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681962718785544",
+   "levonis_id": "ov_b1d4ab4156ad01254c39fb19",
+   "source_label": "1 kg",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "43160587993224",
+   "levonis_id": "pv_69bc0f66097fff6d5eca610b",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "43160588025992",
+   "levonis_id": "pv_6fc4a697a1ba5891457bc109",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "43160588058760",
+   "levonis_id": "pv_3e46c47ce0e1348b21f53283",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "570744915879718912",
+   "levonis_id": "pi_4691182d2a1d2898ae31a667",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "570744915879718912",
+   "levonis_id": "pi_176ca1cf28793656ff0f614d",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_3e46c47ce0e1348b21f53283"
+  },
+  {
+   "kind": "image",
+   "source_id": "42928119873672",
+   "levonis_id": "pi_dbe07e2b8b674c9d63a11119",
+   "source_label": "",
+   "binding_rule": "general",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "42928117186696",
+   "levonis_id": "pi_9bf082d1fad1d311aeabe609",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "42928117186696",
+   "levonis_id": "pi_0218f1713e92843cca419e07",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_69bc0f66097fff6d5eca610b"
+  },
+  {
+   "kind": "image",
+   "source_id": "42928117153928",
+   "levonis_id": "pi_0d771423f73ce9146aa3447c",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "42928117153928",
+   "levonis_id": "pi_28930b247dbb5f0fb722506c",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_6fc4a697a1ba5891457bc109"
+  }
+ ],
+ "notes": []
+}

@@ -1,0 +1,16 @@
+{
+  "compared": 40,
+  "meaning_disagreements": 0,
+  "fixed": 0,
+  "notes": [
+    "Sample: 40 of 248 strings, indices floor(i*248/40) = 0,6,12,...,241 (all kinds: short_description, spec_label, spec_value_text, usage_body, box_item, doc_title). Translated independently into rev003/mine.json before out/003.json was opened.",
+    "Result: no disagreement of meaning in the 40. out/003.json is unchanged.",
+    "Validator: packages/catalog/src/bambuImport/i18n.ts validateTranslationRow (feat/import-i18n worktree), with names.json + IDENTITY, passes all 237 translated rows of out/003.json. The 11 keep rows are names, codes or filenames only (PLA Basic - Black (10101), MH001, *_MSDS.pdf, HS-02A, Type-C, PD & QC, @Printing Perspective, 4-In-1 PTFE Adapter II). Row 205 (soldering-iron compatibility table) is needs_review. A scan of every ckb slot found no Arabic-only letters (ة ى ي) or Arabic article, and no ckb that mostly repeats the Arabic.",
+    "Row 18 (bambu-hotend-h2-p2s, specs[compat.statement]): the English source repeats 'Learn more about filament compatibility on Bambu Lab Wiki.' twice. The first translation gives it once in ar and ckb. No fact is lost, and this matches the owner's report that compatibility is repeated (التوافق مكرر). The repetition is still in the English source, so the English fallback still shows it. Remove it at extraction so all three languages match. If the English changes, its hash h changes and this row must be keyed again.",
+    "Rows 29-31 (vortek-utility-hotends-bundle box items): '(RHS)/(LHS)' are written as the right/left side (الجهة اليمنى/اليسرى، لای ڕاست/چەپ). This is correct: the same product's compatibility text puts the Induction (Fixed) Hotend on the right. LHS/RHS are not part codes and the validator does not protect them. Optionally keep the Latin abbreviation in brackets as well.",
+    "Rows 147-151 (smoke-purifier-air-filter): the variant labels 'Smoke Purifier Primary Filter' and '... Medium/High Efficient Particulate Filter' are translated descriptively (الفلتر الأولي لـ Smoke Purifier …), while 'Smoke Purifier Air Filter Combo' is kept in English. The meaning is correct and none of these labels are in names.json. If they are the option values shown on the variant selector, keep them in English so the spec rows match the buttons (owner rule: option names stay English). This is a consistency item, not a wrong fact.",
+    "Row 12: the first translation adds the head noun «رأس صهر» / «سەری تواندنەوەی» before 'Standard Flow' (the hotend variant). Row 192 adds «الجهد» and «القدرة القصوى» before the values. Both additions are correct and are style only.",
+    "Rows 68 and 74: 'Textured PEI' and 'Engineering Plate' are translated generically (صفيحة PEI المحبّبة، الصفيحة الهندسية). This is acceptable: in Build Plate Combo they are component plates, not option names (the option values are like 'Cool Plate + Engineering (with Glue Stick)'). 'Cool Plate SuperTack' is kept verbatim as the glossary requires.",
+    "All other differences are style only (for example اعرف المزيد vs تعرّف أكثر; زانیاری زیاتر … ببینە vs زیاتر … بزانە). No price, stock or shipping wording, no bidi controls, and no translated model codes or units were found."
+  ]
+}

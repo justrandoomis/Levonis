@@ -1,0 +1,971 @@
+#1 [usage_title] mini-waterproof-rgb-led-tea-lights-with-remote-control usage[0].title.line[0]
+  EN: User Instructions
+  AR: تعليمات الاستخدام
+  CK: ڕێنماییەکانی بەکارهێنان
+#2 [usage_body] mini-waterproof-rgb-led-tea-lights-with-remote-control usage[0].body.line[0]
+  EN: Light Installation & Activations
+  near: Rotate the base of the light to open it. Remove the white circular insulation sheet and then screw the cap back on. Ensu
+  AR: تركيب المصباح وتشغيله
+  CK: دامەزراندن و هەڵکردنی چراکە
+#3 [usage_body] mini-waterproof-rgb-led-tea-lights-with-remote-control usage[0].body.line[1]
+  EN: Rotate the base of the light to open it. Remove the white circular insulation sheet and then screw the cap back on. Ensure the spring inside makes contact with the battery. The light will automatically turn on and enter gradient mode (no remote control needed). If the light doesn’t turn on, reseal the cap to ensure proper contact.
+  near: Light Installation & Activations
+  AR: أدِر قاعدة المصباح لفتحه. انزع رقاقة العزل الدائرية البيضاء ثم أعِد ربط الغطاء. تأكّد من أن النابض الموجود في الداخل يلامس البطارية. سيعمل المصباح تلقائيًا ويدخل وضع التدرّج اللوني (دون الحاجة إلى جهاز التحكم عن بُعد). إذا لم يعمل المصباح، فأعِد إحكام إغلاق الغطاء لضمان التلامس الجيد.
+  CK: بنکەی چراکە بسووڕێنە بۆ ئەوەی بکرێتەوە. پەڕە عازلە بازنەییە سپییەکە لاببە و پاشان قەپاغەکە بپێچەرەوە شوێنی خۆی. دڵنیابە کە فەنەرەکەی ناوەوە بەر باترییەکە دەکەوێت. چراکە خۆکارانە هەڵدەبێت و دەچێتە دۆخی ڕەنگی پلەپلە (پێویستی بە ڕیمۆت نییە). ئەگەر چراکە هەڵنەبوو، قەپاغەکە دووبارە توند دابخەرەوە بۆ دڵنیابوون لە بەرکەوتنی دروست.
+#4 [usage_body] mini-waterproof-rgb-led-tea-lights-with-remote-control usage[0].body.line[2]
+  EN: Remote Control Operation
+  near: Rotate the base of the light to open it. Remove the white circular insulation sheet and then screw the cap back on. Ensu
+  AR: تشغيل جهاز التحكم عن بُعد
+  CK: بەکارهێنانی ڕیمۆت
+#5 [usage_body] mini-waterproof-rgb-led-tea-lights-with-remote-control usage[0].body.line[3]
+  EN: Remove the transparent piece at the bottom of the remote control and press the "OFF" button to test its functionality. Press "ON" and select the desired color/function. Press "RESET" to revert the light to red.The remote control can operate multiple lights at once, with a working range of 5-10 meters. Note that the remote control is not waterproof, so keep it away from water.
+  near: Remote Control Operation
+  AR: انزع القطعة الشفافة الموجودة أسفل جهاز التحكم عن بُعد واضغط زر «OFF» لاختبار عمله. اضغط «ON» واختر اللون/الوظيفة المطلوبة. اضغط «RESET» لإعادة المصباح إلى اللون الأحمر. يمكن لجهاز التحكم عن بُعد تشغيل عدة مصابيح في آنٍ واحد، بمدى عمل يتراوح بين 5-10 أمتار. يُرجى ملاحظة أن جهاز التحكم عن بُعد غير مقاوم للماء، لذا أبعِده عن الماء.
+  CK: پارچە ڕوونەکەی بنی ڕیمۆتەکە لاببە و دوگمەی «OFF» دابگرە بۆ تاقیکردنەوەی کارکردنی. «ON» دابگرە و ڕەنگ/ئەرکی دڵخواز هەڵبژێرە. «RESET» دابگرە بۆ گەڕاندنەوەی چراکە بۆ ڕەنگی سوور. ڕیمۆتەکە دەتوانێت لە یەک کاتدا چەند چرایەک کار پێ بکات، بە مەودای کارکردنی 5-10 مەتر. ئاگاداربە کە ڕیمۆتەکە دژە ئاو نییە، بۆیە لە ئاو دووری بخەرەوە.
+#7 [usage_body] mini-waterproof-rgb-led-tea-lights-with-remote-control usage[0].body.line[5]
+  EN: The battery lasts about 16 hours per use. If the light only shows red and doesn't respond to the remote, the two CR2032 batteries may need replacing. If the remote still doesn't control the light, consider replacing the remote's CR2025 battery. For long-term storage, it's recommended to remove the batteries or replace the insulation sheet.
+  near: Life & Replacement
+  AR: تدوم البطارية نحو 16 ساعة في كل استخدام. إذا كان المصباح يُظهر اللون الأحمر فقط ولا يستجيب لجهاز التحكم، فقد تحتاج بطاريتا CR2032 إلى الاستبدال. وإذا بقي جهاز التحكم لا يتحكم بالمصباح، ففكّر في استبدال بطارية جهاز التحكم (CR2025). للتخزين لفترة طويلة، يُنصح بإزالة البطاريات أو إعادة وضع رقاقة العزل.
+  CK: باترییەکە لە هەر جارێکی بەکارهێناندا نزیکەی 16 کاتژمێر دەخایەنێت. ئەگەر چراکە تەنها ڕەنگی سوور پیشان بدات و وەڵامی ڕیمۆتەکە نەداتەوە، لەوانەیە پێویست بێت هەردوو باتریی CR2032 بگۆڕدرێن. ئەگەر ڕیمۆتەکە هێشتا چراکە کۆنترۆڵ نەکات، بیر لە گۆڕینی باتریی ڕیمۆتەکە (CR2025) بکەرەوە. بۆ هەڵگرتنی ماوە درێژ، پێشنیار دەکرێت باترییەکان دەربهێنرێن یان پەڕە عازلەکە بخرێتەوە شوێنی خۆی.
+#8 [spec_label] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[x.number_of_colors].label
+  EN: Number of Colors
+  near: 13
+  AR: عدد الألوان
+  CK: ژمارەی ڕەنگەکان
+#9 [spec_label] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[x.control_modes].label
+  EN: Control Modes
+  near: Static color, Gradient, Flash
+  AR: أوضاع التحكم
+  CK: دۆخەکانی کۆنترۆڵ
+#10 [spec_value_text] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[x.control_modes]
+  EN: Static color, Gradient, Flash
+  near: Control Modes
+  AR: لون ثابت، تدرّج لوني، وميض
+  CK: ڕەنگی جێگیر، ڕەنگی پلەپلە، ترووسکەدان
+#11 [spec_value_text] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[part.material] KEEP
+  EN: PS
+  near: Materials
+  AR: PS
+  CK: PS
+#13 [spec_value_text] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[x.remote_control_type]
+  EN: Infrared
+  near: Remote Control Type
+  AR: الأشعة تحت الحمراء
+  CK: تیشکی ژێرسوور
+#14 [spec_value_text] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[x.remote_control_distance]
+  EN: 10 meters
+  near: Remote Control Distance
+  AR: 10 أمتار
+  CK: 10 مەتر
+#15 [spec_label] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[x.led_efficiency].label
+  EN: LED Efficiency
+  near: 100 lm/w
+  AR: كفاءة LED
+  CK: کارایی LED
+#16 [spec_value_text] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[x.led_efficiency] KEEP
+  EN: 100 lm/w
+  near: LED Efficiency
+  AR: 100 lm/w
+  CK: 100 lm/w
+#17 [spec_label] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[x.working_hours].label
+  EN: Working Hours
+  near: 16h
+  AR: ساعات التشغيل
+  CK: کاتژمێرەکانی کارکردن
+#19 [spec_label] mini-waterproof-rgb-led-tea-lights-with-remote-control specs[x.remote_control_dimensions].label
+  EN: Remote Control Dimensions
+  near: 3*8.5*0.6 cm
+  AR: أبعاد جهاز التحكم عن بُعد
+  CK: ڕەهەندەکانی ڕیمۆت
+#20 [doc_title] mini-waterproof-rgb-led-tea-lights-with-remote-control documents[1]
+  EN: Application instruction
+  near: other
+  AR: تعليمات الاستخدام
+  CK: ڕێنمایی بەکارهێنان
+#21 [short_description] 150mm-zh1-5-to-sh1-0-conversion-wire description.line[0]
+  EN: 150mm ZH1.5 to SH1.0 conversion cable for the Rechargeable Power Supply Kit - ZC003, allowing the connection of COB LED Strip Light - KA007, N20 Dual Shaft Worm Gear Motor - LA009 and many more appliances.
+  AR: كابل تحويل 150mm من ZH1.5 إلى SH1.0 مخصّص لطقم Rechargeable Power Supply Kit - ZC003، يتيح توصيل COB LED Strip Light - KA007 وN20 Dual Shaft Worm Gear Motor - LA009 والعديد من الأجهزة الأخرى.
+  CK: کێبڵی گۆڕینی 150mm لە ZH1.5 بۆ SH1.0 بۆ کیتی Rechargeable Power Supply Kit - ZC003، کە ڕێگە دەدات بە پەیوەستکردنی COB LED Strip Light - KA007 و N20 Dual Shaft Worm Gear Motor - LA009 و چەندین ئامێری تر.
+#22 [short_description] turntable-kit description.line[0]
+  EN: Your PrintMon, Your Stage!Ever dreamed of adding your own twist to a popular animation? With PrintMon Maker, you can turn those ideas into reality and transform them into real, tangible creations! No 3D modeling skills are required—this AI-powered generator helps you hatch your one-of-a-kind PrintMon effortlessly. To showcase your unique creation, pair it with our Turntable Kit—the perfect stage for your PrintMon. Designed with rechargeable components and 608ZZ bearings, this kit ensures smooth, quiet rotations while enhancing load-bearing capacity. The turntable supports 360-degree rotation, bringing your design to life and making every angle shine. Start creating your own PrintMon today with PrintMon Maker, and let the Turntable Kit elevate your creations to the next level!
+  AR: شخصية PrintMon خاصتك، والمسرح مسرحك! هل حلمت يومًا بإضافة لمستك الخاصة إلى رسوم متحركة مشهورة؟ مع PrintMon Maker يمكنك تحويل تلك الأفكار إلى واقع وإلى إبداعات حقيقية ملموسة! لا حاجة إلى أي مهارات في النمذجة 3D، فهذا المولّد المدعوم بالذكاء الاصطناعي (AI) يساعدك على ابتكار شخصية PrintMon الفريدة الخاصة بك بكل سهولة. ولعرض إبداعك المميز، استخدمه مع Turntable Kit، المسرح المثالي لشخصية PrintMon الخاصة بك. صُمّم هذا الطقم بمكوّنات قابلة لإعادة الشحن ومحامل 608ZZ، ليضمن دورانًا سلسًا وهادئًا مع تعزيز قدرة تحمّل الأحمال. تدعم القاعدة الدوّارة الدوران بزاوية 360 درجة، فتبعث الحياة في تصميمك وتُبرز كل زاوية منه. ابدأ اليوم بإنشاء شخصية PrintMon الخاصة بك مع PrintMon Maker، ودع Turntable Kit يرتقي بإبداعاتك إلى المستوى التالي!
+  CK: کارەکتەری PrintMon هی خۆتە، شانۆکەش هی خۆتە! هەرگیز خەونت بەوەوە بینیوە کە دەستکاریی تایبەتی خۆت بخەیتە سەر ئەنیمەیشنێکی بەناوبانگ؟ بە PrintMon Maker دەتوانیت ئەو بیرۆکانە بکەیتە ڕاستی و بیانگۆڕیت بۆ داهێنانی ڕاستەقینە و هەستپێکراو! هیچ شارەزاییەکی مۆدێلسازیی 3D پێویست نییە، ئەم دروستکەرە کە بە AI کار دەکات یارمەتیت دەدات بە ئاسانی کارەکتەرێکی بێهاوتای PrintMon بۆ خۆت دروست بکەیت. بۆ نمایشکردنی داهێنانە تایبەتەکەت، لەگەڵ Turntable Kit بەکاری بهێنە، کە شانۆیەکی تەواو گونجاوە بۆ کارەکتەرەکەت لە PrintMon. ئەم کیتە بە پێکهاتەی شیاوی دووبارە بارگاویکردنەوە و بێرینگی 608ZZ دیزاین کراوە، کە سووڕانەوەیەکی نەرم و بێدەنگ دابین دەکات و توانای هەڵگرتنی بار بەهێزتر دەکات. سەکۆ سووڕاوەکە سووڕانەوەی 360 پلە پشتگیری دەکات، دیزاینەکەت زیندوو دەکاتەوە و هەموو گۆشەیەکی دەدرەوشێنێتەوە. هەر ئەمڕۆ بە PrintMon Maker دەست بکە بە دروستکردنی کارەکتەرەکەی خۆت لە PrintMon، و با Turntable Kit داهێنانەکانت بەرز بکاتەوە بۆ ئاستی دواتر!
+#23 [short_description] m6-carbon-steel-socket-head-cap-machine-screws-shcs description.line[0] NR
+  EN: Documentation Specification 3D Model maker Product ID L (mm) Bolt Length D (mm) Head Diameter H (mm) Head Thickness k (mm) Hexagon Across Flats t (mm) Groove Depth Screwdriver BitSize AA225 35 10 6 5 3 H5 *Compliant with the requirements of GB/T 70.2-2015 standard [Equivalent standards: ISO 7380-1 - 2011, DIN EN ISO 7380 (-1) - 2011] Forgot the screw specs? Just print the Screw Gauge model from MakerWorld to help with sorting. .pct_hardware-tableList-t-icpc { padding: '0 20px' } .pct_hardware-tableList { width: 100%; row-gap: 15px !important; column-gap: 15px !important; } .pct_hardware-tableList .pct_ic-p { overflow: hidden; } .pct_hardware-tableList .pct_st-tbc .pct_tb .pct_td { border-color: #ADADAD; } @media (min-width: 640px) { .pct_hardware-tableList-t-icpc { padding: 0px !important } .pct_hardware-tableList { width: 100%; row-gap: 15px; column-gap: 15px; } .pct_hardware-tableList
+  AR: الوثائق المواصفات نموذج 3D maker رمز المنتج L (mm) طول البرغي D (mm) قطر الرأس H (mm) سماكة الرأس k (mm) المسافة بين الوجهين المتقابلين للشكل السداسي t (mm) عمق المجرى مقاس رأس المفك AA225 35 10 6 5 3 H5 *متوافق مع متطلبات معيار GB/T 70.2-2015 [المعايير المكافئة: ISO 7380-1 - 2011، DIN EN ISO 7380 (-1) - 2011] نسيت مواصفات البرغي؟ ما عليك سوى طباعة نموذج Screw Gauge من MakerWorld للمساعدة في الفرز. .pct_hardware-tableList-t-icpc { padding: '0 20px' } .pct_hardware-tableList { width: 100%; row-gap: 15px !important; column-gap: 15px !important; } .pct_hardware-tableList .pct_ic-p { overflow: hidden; } .pct_hardware-tableList .pct_st-tbc .pct_tb .pct_td { border-color: #ADADAD; } @media (min-width: 640px) { .pct_hardware-tableList-t-icpc { padding: 0px !important } .pct_hardware-tableList { width: 100%; row-gap: 15px; column-gap: 15px; } .pct_hardware-tableList
+  CK: بەڵگەنامەکان تایبەتمەندییەکان مۆدێلی 3D maker کۆدی بەرهەم L (mm) درێژیی بۆڵت D (mm) تیرەی سەر H (mm) ئەستووریی سەر k (mm) پانیی نێوان دوو ڕووی تەختی شەشپاڵوو t (mm) قووڵایی شیار قەبارەی سەری دەرنەفیس AA225 35 10 6 5 3 H5 *گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB/T 70.2-2015 [ستانداردە هاوتاکان: ISO 7380-1 - 2011، DIN EN ISO 7380 (-1) - 2011] تایبەتمەندییەکانی بورغییەکەت لەبیر چووە؟ تەنها مۆدێلی Screw Gauge لە MakerWorld چاپ بکە بۆ یارمەتیدان لە ڕیزکردنیان. .pct_hardware-tableList-t-icpc { padding: '0 20px' } .pct_hardware-tableList { width: 100%; row-gap: 15px !important; column-gap: 15px !important; } .pct_hardware-tableList .pct_ic-p { overflow: hidden; } .pct_hardware-tableList .pct_st-tbc .pct_tb .pct_td { border-color: #ADADAD; } @media (min-width: 640px) { .pct_hardware-tableList-t-icpc { padding: 0px !important } .pct_hardware-tableList { width: 100%; row-gap: 15px; column-gap: 15px; } .pct_hardware-tableList
+#25 [spec_value_text] m6-carbon-steel-socket-head-cap-machine-screws-shcs specs[part.screw_type]
+  EN: Machine thread
+  near: Screw type
+  AR: سنّ ميكانيكي
+  CK: پێچی ئامێر
+#26 [spec_value_text] m6-carbon-steel-socket-head-cap-machine-screws-shcs specs[part.thread_type]
+  EN: Full thread
+  near: Thread type
+  AR: سنّ كامل
+  CK: پێچی تەواو
+#27 [short_description] universal-joint-shaft-coupling-with-screws description.line[0]
+  EN: The Universal Joint Coupling is essential for transmitting power and motion, accommodating misalignments and angular variations. It's an ideal choice for makers and DIY enthusiasts looking to build innovative projects with flexible and reliable motion connections.
+  AR: وصلة الكردان (Universal Joint Coupling) ضرورية لنقل القدرة والحركة، إذ تستوعب عدم المحاذاة والاختلافات الزاوية. وهي خيار مثالي للصنّاع وهواة مشاريع DIY الذين يتطلعون إلى بناء مشاريع مبتكرة بوصلات حركة مرنة وموثوقة.
+  CK: گەیەنەری کاردان (Universal Joint Coupling) بۆ گواستنەوەی هێز و جووڵە پێویستە، و ڕێکنەبوونی تەوەرەکان و جیاوازیی گۆشەکان قەرەبوو دەکاتەوە. هەڵبژاردنێکی گونجاوە بۆ دروستکەران و حەزلێکەرانی DIY کە دەیانەوێت پڕۆژەی داهێنەرانە بە پەیوەندیی جووڵەی نەرمونیان و متمانەپێکراو دروست بکەن.
+#28 [short_description] ac-dc-power-adapter description.line[0]
+  EN: The AC to DC Power Adapter universally supports devices requires 12V or 24V with a power output of up to 2A. It includes four interchangeable AC connectors, making it compatible with power outlets in North America, Europe, the United Kingdom, and Australia. This power supply is a good replacement for a lost or damaged power adapter. Having a spare one in hand will ensure that you always have a power source.
+  AR: يدعم محوّل الطاقة AC to DC Power Adapter بشكل عام الأجهزة التي تتطلب 12V أو 24V بخرج يصل إلى 2A. ويتضمن أربعة موصلات AC قابلة للتبديل، ما يجعله متوافقًا مع مقابس الكهرباء في أمريكا الشمالية وأوروبا والمملكة المتحدة وأستراليا. يُعدّ مزوّد الطاقة هذا بديلًا جيدًا لمحوّل طاقة مفقود أو تالف. ووجود محوّل احتياطي في متناول يدك يضمن لك توفّر مصدر طاقة دائمًا.
+  CK: ئەداپتەری وزەی AC to DC Power Adapter بە گشتی پشتگیریی ئەو ئامێرانە دەکات کە پێویستیان بە 12V یان 24V هەیە، بە وزەی دەرچوونی تا 2A. چوار گەیەنەری AC لەخۆدەگرێت کە دەگۆڕدرێن، بەمەش لەگەڵ پریزەکانی کارەبا لە ئەمریکای باکوور، ئەورووپا، شانشینی یەکگرتوو و ئوسترالیا گونجاوە. ئەم دابینکەری وزەیە جێگرەوەیەکی باشە بۆ ئەداپتەرێکی ونبوو یان تێکچوو. بوونی یەکێکی یەدەگ لە دەستتدا دڵنیات دەکاتەوە کە هەمیشە سەرچاوەیەکی وزەت هەیە.
+#29 [short_description] m3-carbon-steel-full-thread-rod description.line[0]
+  EN: This fully threaded rod is made from high-quality carbon steel, and is available in M3x16mm and M3x30mm sizes. It's durable and great for various DIY projects. Primarily used to connect nuts and secure components, it serves as an essential fixture in U-bolts, hangers, and other applications. Additionally, it pairs perfectly with&nbsp;M3 Aluminum Rod End Ball Joints, offering an effective solution for connections and flexible movement.
+  AR: هذا القضيب الملولب بالكامل مصنوع من فولاذ كربوني عالي الجودة، ويأتي بمقاسَي M3x16mm وM3x30mm. وهو متين ومناسب لمختلف مشاريع DIY. يُستخدم أساسًا لربط الصواميل وتثبيت المكوّنات، ويُعدّ عنصر تثبيت أساسيًا في البراغي على شكل U والعلّاقات وغيرها من الاستخدامات. كما أنه يتكامل تمامًا مع مفاصل M3 Aluminum Rod End Ball Joint، ليقدّم حلًا فعّالًا للوصلات والحركة المرنة.
+  CK: ئەم میلە کە بە تەواوی پێچدارە، لە پۆڵای کاربۆنیی جۆرایەتی بەرز دروستکراوە، و بە دوو قەبارەی M3x16mm و M3x30mm دێت. بەرگەگرە و بۆ پڕۆژە جۆراوجۆرەکانی DIY زۆر گونجاوە. بە شێوەیەکی سەرەکی بۆ بەستنەوەی سامۆڵەکان و جێگیرکردنی پێکهاتەکان بەکاردێت، و وەک پارچەیەکی جێگیرکەری بنەڕەتی لە بۆڵتی شێوە U، هەڵواسەرەکان و بەکارهێنانەکانی تردا کار دەکات. هەروەها بە تەواوی لەگەڵ جومگەکانی M3 Aluminum Rod End Ball Joint دەگونجێت، و چارەسەرێکی کاریگەر بۆ پەیوەندییەکان و جووڵەی نەرمونیان پێشکەش دەکات.
+#31 [spec_label] m3-carbon-steel-full-thread-rod specs[x.type_of_thread].label
+  EN: Type of Thread
+  near: Complete thread
+  AR: نوع السنّ
+  CK: جۆری پێچ
+#32 [spec_value_text] m3-carbon-steel-full-thread-rod specs[part.material]
+  EN: Carbon Steel
+  near: Materials
+  AR: فولاذ كربوني
+  CK: پۆڵای کاربۆنی
+#33 [short_description] m3-aluminum-rod-end-ball-joint description.line[0]
+  EN: This Aluminum Alloy Rod End Ball Joint is a premium-grade component designed for precision and durability. Made from high-strength aluminum alloy, it offers excellent wear resistance, corrosion protection, and lightweight performance. This ball joint is ideal for RC cars, robotics, and 3D printing projects, providing smooth and reliable pivot points for mechanical assemblies. Compatible with Carbon Steel Full-Thread Rod, it can be easily integrated into various designs, offering flexibility and convenience for makers and hobbyists.
+  AR: مفصل نهاية القضيب الكروي هذا المصنوع من سبيكة الألمنيوم مكوّن عالي الجودة صُمّم للدقة والمتانة. وهو مصنوع من سبيكة ألمنيوم عالية المتانة، ويوفّر مقاومة ممتازة للتآكل بالاحتكاك وحماية من التآكل وأداءً خفيف الوزن. هذا المفصل الكروي مثالي لسيارات RC والروبوتات ومشاريع الطباعة 3D، إذ يوفّر نقاط ارتكاز سلسة وموثوقة للتجميعات الميكانيكية. وهو متوافق مع Carbon Steel Full-Thread Rod، ويمكن دمجه بسهولة في تصاميم متنوعة، ما يمنح الصنّاع والهواة مرونة وراحة في الاستخدام.
+  CK: ئەم جومگە تۆپەڵەییەی سەری میل کە لە ئاوێتەی ئەلەمنیۆم دروستکراوە، پێکهاتەیەکی جۆرایەتی بەرزە و بۆ وردی و بەرگەگری دیزاین کراوە. لە ئاوێتەی ئەلەمنیۆمی بەهێز دروستکراوە، و بەرگەی سووانی نایاب، پاراستن لە داخوران و کێشێکی سووک پێشکەش دەکات. ئەم جومگە تۆپەڵەییە بۆ ئۆتۆمبێلی RC، ڕۆبۆتەکان و پڕۆژەکانی چاپی 3D گونجاوترینە، و خاڵی سووڕانەوەی نەرم و متمانەپێکراو بۆ کۆمەڵە میکانیکییەکان دابین دەکات. لەگەڵ Carbon Steel Full-Thread Rod گونجاوە، و بە ئاسانی دەخرێتە ناو دیزاینە جۆراوجۆرەکانەوە، و نەرمی و ئاسوودەیی بۆ دروستکەران و حەزلێکەران دەستەبەر دەکات.
+#34 [spec_label] m3-aluminum-rod-end-ball-joint specs[x.articulation_angle].label
+  EN: Articulation Angle
+  near: Approximately 20°
+  AR: زاوية الحركة المفصلية
+  CK: گۆشەی جووڵەی جومگە
+#35 [spec_value_text] m3-aluminum-rod-end-ball-joint specs[x.articulation_angle]
+  EN: Approximately 20°
+  near: Articulation Angle
+  AR: حوالي 20°
+  CK: نزیکەی 20°
+#37 [spec_label] m3-aluminum-rod-end-ball-joint specs[x.thread_direction].label
+  EN: Thread Direction
+  near: CW Thred
+  AR: اتجاه السنّ
+  CK: ئاراستەی پێچ
+#38 [spec_value_text] m3-aluminum-rod-end-ball-joint specs[x.thread_direction]
+  EN: CW Thred
+  near: Thread Direction
+  AR: سنّ باتجاه عقارب الساعة (CW)
+  CK: پێچی ئاراستەی میلی کاتژمێر (CW)
+#39 [spec_label] m3-aluminum-rod-end-ball-joint specs[x.thread_size].label
+  EN: Thread Size
+  near: M3 Bottom Hole
+  AR: مقاس السنّ
+  CK: قەبارەی پێچ
+#40 [spec_value_text] m3-aluminum-rod-end-ball-joint specs[x.thread_size]
+  EN: M3 Bottom Hole
+  near: Thread Size
+  AR: ثقب سفلي M3
+  CK: کونی خوارەوەی M3
+#41 [spec_label] m3-aluminum-rod-end-ball-joint specs[x.qty].label
+  EN: Qty
+  near: 12 PCS
+  AR: العدد
+  CK: ژمارە
+#43 [short_description] dc5521-female-to-2pin-solderless-quick-connector description.line[0]
+  EN: The DC5521 Female to 2-Pin Solderless Quick Connector offers a simple and efficient power solution for the White CCT Tunable COB LED Strip Light.
+  AR: يقدّم موصل DC5521 Female to 2-Pin Solderless Quick Connector حلًا بسيطًا وفعّالًا لتزويد White CCT Tunable COB LED Strip Light بالطاقة.
+  CK: گەیەنەری DC5521 Female to 2-Pin Solderless Quick Connector چارەسەرێکی سادە و کارا بۆ دابینکردنی وزەی White CCT Tunable COB LED Strip Light پێشکەش دەکات.
+#44 [usage_body] dc5521-female-to-2pin-solderless-quick-connector usage[0].body.line[0]
+  EN: The DC5521 Female to 2-Pin Solderless Quick Connector offers a simple and efficient power solution for the White CCT Tunable COB LED Strip Light. Designed for convenience, it features a solder-free connector on one end for effortless attachment to the LED strip, and a DC plug on the other end for seamless connection to a 24V AC-to-DC power adapter. This connector makes completing your illuminated DIY projects easier and more efficient than ever.
+  AR: يقدّم موصل DC5521 Female to 2-Pin Solderless Quick Connector حلًا بسيطًا وفعّالًا لتزويد White CCT Tunable COB LED Strip Light بالطاقة. صُمّم ليكون سهل الاستخدام، إذ يحتوي في أحد طرفيه على موصل لا يحتاج إلى لحام لتثبيته بسهولة على شريط LED، وفي الطرف الآخر على قابس DC للتوصيل السلس بمحوّل طاقة AC-to-DC بجهد 24V. يجعل هذا الموصل إكمال مشاريع الإضاءة DIY الخاصة بك أسهل وأكثر كفاءة من أي وقت مضى.
+  CK: گەیەنەری DC5521 Female to 2-Pin Solderless Quick Connector چارەسەرێکی سادە و کارا بۆ دابینکردنی وزەی White CCT Tunable COB LED Strip Light پێشکەش دەکات. بۆ ئاسانکاری دیزاین کراوە: لە سەرێکیەوە گەیەنەرێکی بێ لەحیمی هەیە بۆ لکاندنی ئاسان بە شریتی LED، و لە سەرەکەی تریشەوە فیشێکی DC هەیە بۆ پەیوەستبوونی ڕێک بە ئەداپتەرێکی وزەی AC-to-DC بە 24V. ئەم گەیەنەرە تەواوکردنی پڕۆژەکانت لە بواری ڕووناکیی DIY لە هەموو کاتێک ئاسانتر و کاراتر دەکات.
+#45 [short_description] sh1-0-to-sh1-0-connector-adapter-board description.line[0]
+  EN: SH1.0 to SH1.0 Connector Adapter Board enables quick SH1.0 aerial docking, ensuring stable signal and power transmission for compact devices and modular systems. Can be paired with Wire Pair with SH1.0 as an extension kit for SH1.0 aerial docking.
+  AR: تتيح لوحة SH1.0 to SH1.0 Connector Adapter Board توصيل موصلات SH1.0 ببعضها بسرعة مباشرةً بين الأسلاك (توصيل معلّق)، مع ضمان نقل مستقر للإشارة والطاقة للأجهزة صغيرة الحجم والأنظمة المعيارية. ويمكن استخدامها مع Wire Pair with SH1.0 كطقم تمديد لتوصيل SH1.0 المعلّق.
+  CK: بۆردی SH1.0 to SH1.0 Connector Adapter Board ڕێگە دەدات گەیەنەرەکانی SH1.0 بە خێرایی ڕاستەوخۆ لە نێوان وایەرەکاندا (بە هەڵواسراوی) بەیەکەوە ببەسترێن، و گواستنەوەی جێگیری سیگناڵ و وزە بۆ ئامێرە بچووکەکان و سیستەمە مۆدیولارەکان دەستەبەر دەکات. دەتوانرێت لەگەڵ Wire Pair with SH1.0 وەک کیتی درێژکردنەوە بۆ بەستنەوەی هەڵواسراوی SH1.0 بەکاربهێنرێت.
+#46 [short_description] sh1-0-to-ph2-0-power-adapter-board description.line[0]
+  EN: SH1.0 to PH2.0 Power Adapter Board enables quick connections between SH1.0 and PH2.0 interfaces, ensuring stable power transmission for embedded devices and modular systems. Can be paired with USB-A Power Cable with PH2.0 Connector to provide power for devices with SH1.0 interfaces, like 030 Micro DC Motor with SH1.0.
+  AR: تتيح لوحة SH1.0 to PH2.0 Power Adapter Board توصيلًا سريعًا بين منافذ SH1.0 وPH2.0، مع ضمان نقل مستقر للطاقة للأجهزة المضمّنة والأنظمة المعيارية. ويمكن استخدامها مع USB-A Power Cable with PH2.0 Connector لتزويد الأجهزة ذات منافذ SH1.0 بالطاقة، مثل 030 Micro DC Motor with SH1.0.
+  CK: بۆردی SH1.0 to PH2.0 Power Adapter Board ڕێگە بە پەیوەستکردنی خێرا لە نێوان دەرچەکانی SH1.0 و PH2.0 دەدات، و گواستنەوەی جێگیری وزە بۆ ئامێرە ئێمبێددەکان و سیستەمە مۆدیولارەکان دەستەبەر دەکات. دەتوانرێت لەگەڵ USB-A Power Cable with PH2.0 Connector بەکاربهێنرێت بۆ دابینکردنی وزە بۆ ئەو ئامێرانەی دەرچەی SH1.0 یان هەیە، وەک 030 Micro DC Motor with SH1.0.
+#47 [short_description] foldable-key-phone-stand description.line[0]
+  EN: The product contains all the non-3D printed parts for assembling an entirely functional Foldable Key Phone Stand. To complete the work, you also need to download the model files and 3D print the remaining parts.
+  AR: يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Foldable Key Phone Stand يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.
+  CK: بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Foldable Key Phone Stand بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.
+#48 [short_description] 360-rotating-marble-run-enclosed-with-lights description.line[0]
+  EN: The product contains all the non-3D printed parts for assembling an entirely functional 360˚ Rotating Marble Run - Enclosed with Lights. To complete the work, you also need to download the model files and 3D print the remaining parts.
+  AR: يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع 360˚ Rotating Marble Run - Enclosed with Lights يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.
+  CK: بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی 360˚ Rotating Marble Run - Enclosed with Lights بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.
+#50 [usage_body] white-cct-tunable-cob-led-strip-light-combo-kit usage[0].body.line[0]
+  EN: This COB LED Strip Light Combo Kit offers a seamless DIY lighting experience. The set includes high-quality White CCT Tunable COB LED Strip Light, Solderless Quick Connector, and a 24V Power Adapter. Simply connect the components to control and switch between various lighting modes. Whether you're a beginner or an experienced maker, you can use this all-in-one kit to ccreate lighting projects effortlessly.
+  AR: يوفّر طقم COB LED Strip Light Combo Kit هذا تجربة إضاءة DIY سلسة. تتضمن المجموعة White CCT Tunable COB LED Strip Light عالي الجودة، وموصل Solderless Quick Connector، ومحوّل الطاقة 24V Power Adapter. ما عليك سوى توصيل المكوّنات للتحكم بأوضاع الإضاءة المختلفة والتبديل بينها. سواء كنت مبتدئًا أو صانعًا متمرّسًا، يمكنك استخدام هذا الطقم المتكامل لإنشاء مشاريع إضاءة بكل سهولة.
+  CK: کیتی COB LED Strip Light Combo Kit ئەزموونێکی بێ کێشەی ڕووناکی بۆ پڕۆژەکانی DIY پێشکەش دەکات. کۆمەڵەکە ئەمانە لەخۆدەگرێت: White CCT Tunable COB LED Strip Light بە جۆرایەتیی بەرز، گەیەنەری Solderless Quick Connector، و ئەداپتەری وزەی 24V Power Adapter. تەنها پێکهاتەکان بەیەکەوە ببەستە بۆ کۆنترۆڵکردن و گۆڕین لە نێوان دۆخە جیاوازەکانی ڕووناکیدا. جا تازەکار بیت یان دروستکەرێکی بەئەزموون، دەتوانیت ئەم کیتە گشتگیرە بەکاربهێنیت بۆ دروستکردنی پڕۆژەی ڕووناکی بە ئاسانی.
+#51 [short_description] led-light-strip-256rgb-5050led-815mm description.line[0]
+  EN: This LED Light Strip features 5050 RGB LEDs, it has 256 light beads in a 815-mm length. This strip delivers vibrant, customizable lighting that is great for DIY electronics, home decor, and creative projects. It can be used with the Motion-Activated Sound and Light Props Kit-01 & 02 to create your unique model projects.
+  AR: يضم شريط LED هذا مصابيح RGB LED من نوع 5050، ويحتوي على 256 حبة إضاءة بطول 815 mm. يقدّم هذا الشريط إضاءة نابضة بالحياة وقابلة للتخصيص، وهو رائع لمشاريع الإلكترونيات DIY وديكور المنزل والمشاريع الإبداعية. ويمكن استخدامه مع Motion-Activated Sound and Light Props Kit-01 & 02 لإنشاء مشاريع نماذج فريدة خاصة بك.
+  CK: ئەم شریتە ڕووناکییە گڵۆپی 5050 RGB LED لەخۆدەگرێت و 256 دەنکە ڕووناکیی هەیە بە درێژیی 815 mm. ئەم شریتە ڕووناکییەکی زیندوو پێشکەش دەکات کە دەتوانرێت بەدڵی خۆت ڕێکبخرێت، و بۆ ئەلیکترۆنیاتی DIY، ڕازاندنەوەی ماڵ و پڕۆژە داهێنەرانەکان زۆر گونجاوە. دەتوانرێت لەگەڵ Motion-Activated Sound and Light Props Kit-01 & 02 بەکاربهێنرێت بۆ دروستکردنی پڕۆژەی مۆدێلی تایبەت بە خۆت.
+#52 [usage_body] led-light-strip-256rgb-5050led-815mm usage[0].body.line[0]
+  EN: This LED Light Strip features 5050 RGB LEDs, it has 256 light beads in a 815-mm length. This strip delivers vibrant, customizable lighting that is great for DIY electronics, home decor, and creative projects.
+  near: It can be used with the Motion-Activated Sound and Light Props Kit-01 & 02 to create your unique model projects.
+  AR: يضم شريط LED هذا مصابيح RGB LED من نوع 5050، ويحتوي على 256 حبة إضاءة بطول 815 mm. يقدّم هذا الشريط إضاءة نابضة بالحياة وقابلة للتخصيص، وهو رائع لمشاريع الإلكترونيات DIY وديكور المنزل والمشاريع الإبداعية.
+  CK: ئەم شریتە ڕووناکییە گڵۆپی 5050 RGB LED لەخۆدەگرێت و 256 دەنکە ڕووناکیی هەیە بە درێژیی 815 mm. ئەم شریتە ڕووناکییەکی زیندوو پێشکەش دەکات کە دەتوانرێت بەدڵی خۆت ڕێکبخرێت، و بۆ ئەلیکترۆنیاتی DIY، ڕازاندنەوەی ماڵ و پڕۆژە داهێنەرانەکان زۆر گونجاوە.
+#53 [usage_body] led-light-strip-256rgb-5050led-815mm usage[0].body.line[1]
+  EN: It can be used with the Motion-Activated Sound and Light Props Kit-01 & 02 to create your unique model projects.
+  near: This LED Light Strip features 5050 RGB LEDs, it has 256 light beads in a 815-mm length. This strip delivers vibrant, cus
+  AR: ويمكن استخدامه مع Motion-Activated Sound and Light Props Kit-01 & 02 لإنشاء مشاريع نماذج فريدة خاصة بك.
+  CK: دەتوانرێت لەگەڵ Motion-Activated Sound and Light Props Kit-01 & 02 بەکاربهێنرێت بۆ دروستکردنی پڕۆژەی مۆدێلی تایبەت بە خۆت.
+#54 [short_description] bike-saddle-rail description.line[0]
+  EN: This bike saddle rail is specifically designed for 3D-printed saddles, crafted from high-strength Chromoly Steel with a durable rust-resistant coating that withstands rainy rides. Its streamlined design enables tool-free installation, balancing structural integrity and practicality to meet daily commuting and casual cycling needs effortlessly.
+  AR: صُمّم قضيب سرج الدراجة هذا خصيصًا للسروج المطبوعة (3D-printed)، وهو مصنوع من فولاذ الكرومولي (Chromoly Steel) عالي المتانة مع طلاء متين مقاوم للصدأ يتحمّل القيادة تحت المطر. ويتيح تصميمه الانسيابي التركيب دون أدوات، فيوازن بين المتانة الهيكلية والعملية لتلبية احتياجات التنقّل اليومي وركوب الدراجات الترفيهي بكل سهولة.
+  CK: ئەم میلەی زینی پاسکیلە بە تایبەتی بۆ زینە چاپکراوەکان (3D-printed) دیزاین کراوە، لە پۆڵای کرۆمۆلیی بەهێز (Chromoly Steel) دروستکراوە بە ڕووپۆشێکی بەرگەگری دژە ژەنگ کە بەرگەی پاسکیلسواری لە کاتی باراندا دەگرێت. دیزاینە ڕێکوپێکەکەی ڕێگە دەدات بێ ئامراز دابمەزرێت، و هاوسەنگی لە نێوان پتەویی پێکهاتە و کارامەییدا دەپارێزێت بۆ پڕکردنەوەی پێداویستییەکانی هاتوچۆی ڕۆژانە و پاسکیلسواریی ئاسایی بە ئاسانی.
+#56 [short_description] round-shoelace description.line[0]
+  EN: The Round Shoelace, designed for 3D-printed footwear, features a snag-resistant weave. Two styles are available: the Normal version uses 100% abrasion-resistant polyester for daily wear, while the Reflective version incorporates light-reactive strips that create striking flashes under direct lighting, making it ideal for night runs or parties. Both versions thread smoothly through printed eyelets and lock securely.
+  AR: صُمّم رباط الحذاء Round Shoelace للأحذية المطبوعة (3D-printed)، ويتميّز بنسيج مقاوم للتعلّق. يأتي بطرازين: النسخة العادية (Normal) مصنوعة من بوليستر مقاوم للاحتكاك بنسبة 100% للاستخدام اليومي، أما النسخة العاكسة (Reflective) فتضم شرائط تتفاعل مع الضوء وتُصدر ومضات لافتة تحت الإضاءة المباشرة، ما يجعلها مثالية للجري ليلًا أو للحفلات. وتمرّ النسختان بسلاسة عبر الثقوب المطبوعة وتُثبَّتان بإحكام.
+  CK: بەندی پێڵاوی Round Shoelace بۆ پێڵاوی چاپکراو (3D-printed) دیزاین کراوە، و چنینێکی هەیە کە بە شتەوە گیر ناخوات. بە دوو شێواز دێت: جۆری ئاسایی (Normal) لە پۆلیەستەری 100% بەرگەگر بەرامبەر سووان دروستکراوە بۆ بەکارهێنانی ڕۆژانە، لە کاتێکدا جۆری تیشکدەرەوە (Reflective) شریتی هەستیار بە ڕووناکی تێدایە کە لە ژێر ڕووناکیی ڕاستەوخۆدا درەوشانەوەی سەرنجڕاکێش دروست دەکەن، بۆیە بۆ ڕاکردنی شەوانە یان ئاهەنگەکان گونجاوترینە. هەردوو جۆرەکە بە نەرمی بە کونە چاپکراوەکاندا تێدەپەڕن و بە توندی قایم دەبن.
+#57 [spec_value_text] round-shoelace specs[contents.pieces]
+  EN: Normal: Black & White / Reflective: Black & White
+  near: Pieces per pack
+  AR: النسخة العادية (Normal): Black & White / النسخة العاكسة (Reflective): Black & White
+  CK: جۆری ئاسایی (Normal): Black & White / جۆری تیشکدەرەوە (Reflective): Black & White
+#58 [spec_value_text] round-shoelace specs[product.net_weight]
+  EN: 2 Pairs per set
+  near: Net weight
+  AR: 2 زوج في كل مجموعة
+  CK: 2 جووت لە هەر کۆمەڵەیەکدا
+#59 [spec_value_text] round-shoelace specs[part.material]
+  EN: Normal: 100% polyester thread / Reflective: 72% polyester thread + 28% reflective thread
+  near: Materials
+  AR: النسخة العادية (Normal): خيط بوليستر 100% / النسخة العاكسة (Reflective): خيط بوليستر 72% + خيط عاكس 28%
+  CK: جۆری ئاسایی (Normal): دەزووی پۆلیەستەری 100% / جۆری تیشکدەرەوە (Reflective): دەزووی پۆلیەستەری 72% + دەزووی تیشکدەرەوەی 28%
+#60 [short_description] 0-3mm-transparent-pvc-sheet-5pcs description.line[0]
+  EN: Bambu Transparent PVC Sheet offers a clear, glass-like finish. Its transparency and durable design make its perfect for transparent sections in your projects such as car windows or photo frames.
+  AR: يمنح لوح Bambu Transparent PVC Sheet تشطيبًا شفافًا يشبه الزجاج. وشفافيته وتصميمه المتين يجعلانه مثاليًا للأجزاء الشفافة في مشاريعك، مثل نوافذ السيارات أو إطارات الصور.
+  CK: پەڕەی Bambu Transparent PVC Sheet ڕووکارێکی ڕوونی وەک شووشە پێشکەش دەکات. ڕوونییەکەی و دیزاینە بەرگەگرەکەی وای لێدەکەن بۆ بەشە ڕوونەکانی پڕۆژەکانت تەواو گونجاو بێت، وەک پەنجەرەی ئۆتۆمبێل یان چوارچێوەی وێنە.
+#62 [short_description] ws2812-rgb-led-with-idc0-8-4pin-2pcs description.line[0]
+  EN: The WS2812 RGB LED is a pre-wired module that supports the WS2812 protocol and emits multiple colors of light. When used with the WS2812 LED Hub, it enables various visual effects and is ideal for models requiring multiple LEDs, such as lights in model vehicles.
+  AR: وحدة WS2812 RGB LED هي وحدة موصولة الأسلاك مسبقًا تدعم بروتوكول WS2812 وتُصدر ضوءًا بألوان متعددة. وعند استخدامها مع WS2812 LED Hub، تتيح تأثيرات بصرية متنوعة، وهي مثالية للنماذج التي تتطلب عدة مصابيح LED، مثل أضواء نماذج المركبات.
+  CK: مۆدیولی WS2812 RGB LED مۆدیولێکی پێشوەختە وایەرکراوە کە پشتگیریی پرۆتۆکۆلی WS2812 دەکات و ڕووناکی بە چەند ڕەنگێک دەردەکات. کاتێک لەگەڵ WS2812 LED Hub بەکاردەهێنرێت، کاریگەریی بینراوی جۆراوجۆر دروست دەکات و بۆ ئەو مۆدێلانە گونجاوترینە کە پێویستیان بە چەندین گڵۆپی LED هەیە، وەک گڵۆپەکانی ئۆتۆمبێلی مۆدێل.
+#63 [doc_title] ws2812-rgb-led-with-idc0-8-4pin-2pcs documents[0]
+  EN: User's Manual
+  near: model_file
+  AR: دليل الاستخدام
+  CK: ڕێبەری بەکارهێنان
+#64 [short_description] ws2812-led-hub-with-3pin-sh1-0-connector-1pcs description.line[0]
+  EN: The WS2812 LED Hub is designed to connect WS2812 RGB LEDs to the LED output port of an expansion board. It enables independent control of multiple LEDs through the supported communication protocol. When used with multiple WS2812 LEDs, it delivers a variety of visual effects, making it suitable for models or applications that require multiple LED units.
+  AR: صُمّم موزّع WS2812 LED Hub لتوصيل مصابيح WS2812 RGB LED بمنفذ خرج LED في لوحة التوسعة. ويتيح التحكم المستقل بعدة مصابيح LED عبر بروتوكول الاتصال المدعوم. وعند استخدامه مع عدة مصابيح WS2812 LED، يقدّم مجموعة متنوعة من التأثيرات البصرية، ما يجعله مناسبًا للنماذج أو التطبيقات التي تتطلب عدة وحدات LED.
+  CK: دابەشکەری WS2812 LED Hub بۆ بەستنەوەی گڵۆپەکانی WS2812 RGB LED بە دەرچەی دەرچوونی LED لە بۆردی فراوانکردندا دیزاین کراوە. ڕێگە دەدات چەندین LED بە شێوەی سەربەخۆ لە ڕێگەی پرۆتۆکۆلی پەیوەندیی پشتگیریکراوەوە کۆنترۆڵ بکرێن. کاتێک لەگەڵ چەندین WS2812 LED بەکاردەهێنرێت، کۆمەڵێک کاریگەریی بینراوی جۆراوجۆر پێشکەش دەکات، بۆیە بۆ ئەو مۆدێل یان بەکارهێنانانە گونجاوە کە پێویستیان بە چەندین یەکەی LED هەیە.
+#65 [doc_title] ws2812-led-hub-with-3pin-sh1-0-connector-1pcs documents[1]
+  EN: Specifications
+  near: spec_sheet
+  AR: المواصفات
+  CK: تایبەتمەندییەکان
+#66 [short_description] rubber-tire-4pcs description.line[0]
+  EN: These 33.7mm rubber tires feature a durable, realistic design and a stylish black finish, perfect for various toy models and RC cars. Their compact size allows for precise control, and easy installation makes them an ideal choice for upgrades or repairs.
+  AR: تتميّز هذه الإطارات المطاطية بقياس 33.7mm بتصميم متين وواقعي ولمسة نهائية سوداء أنيقة، وهي مثالية لمختلف نماذج الألعاب وسيارات RC. ويتيح حجمها الصغير تحكمًا دقيقًا، كما أن سهولة تركيبها تجعلها خيارًا مثاليًا للترقيات أو الإصلاحات.
+  CK: ئەم تایە لاستیکییانەی 33.7mm دیزاینێکی بەرگەگر و واقیعی و ڕووکارێکی ڕەشی جوانیان هەیە، و بۆ مۆدێلە جۆراوجۆرەکانی یاری و ئۆتۆمبێلی RC گونجاون. قەبارە بچووکەکەیان ڕێگە بە کۆنترۆڵی ورد دەدات، و دامەزراندنی ئاسانیان وایان لێدەکات هەڵبژاردنێکی گونجاو بن بۆ نوێکردنەوە یان چاککردنەوە.
+#68 [short_description] cyberbrick-hardware-kit description.line[0]
+  EN: CyberBrick offers a series of smart modules that empower anyone to build and enjoy a wide range of 3D-printed projects. From R/C toys to functional productivity tools. Powered by the MakerWorld team, CyberBrick is designed to be user-friendly and supported by an abundant content library, ensuring endless opportunities for creativity and innovation.
+  AR: تقدّم CyberBrick مجموعة من الوحدات الذكية التي تمكّن أي شخص من بناء طيف واسع من المشاريع المطبوعة (3D-printed) والاستمتاع بها. من ألعاب R/C إلى أدوات إنتاجية عملية. وبدعم من فريق MakerWorld، صُمّمت CyberBrick لتكون سهلة الاستخدام، مدعومة بمكتبة محتوى غنية، ما يضمن فرصًا لا تنتهي للإبداع والابتكار.
+  CK: سیستەمی CyberBrick زنجیرەیەک مۆدیولی زیرەک پێشکەش دەکات کە هەموو کەسێک دەتوانێت پێیان کۆمەڵێکی فراوان لە پڕۆژەی چاپکراو (3D-printed) دروست بکات و چێژیان لێ ببینێت. لە یاریی R/C تا ئامرازە بەسوودەکانی کارکردن. بە پشتگیریی تیمی MakerWorld، CyberBrick بە شێوەیەک دیزاین کراوە کە بەکارهێنانی ئاسان بێت و کتێبخانەیەکی دەوڵەمەندی ناوەڕۆک پشتگیری دەکات، بەمەش دەرفەتی بێکۆتا بۆ داهێنان و نوێگەری دابین دەکات.
+#69 [usage_title] cyberbrick-hardware-kit usage[0].title.line[0]
+  EN: CyberBrick App Connection Tutorial
+  AR: شرح ربط تطبيق CyberBrick
+  CK: فێرکاریی پەیوەستکردنی ئەپی CyberBrick
+#70 [usage_body] cyberbrick-hardware-kit usage[0].body.line[0]
+  EN: *The following is the App connection of CyberBrick Official SoccerBot as an example.
+  near: Explore the Product Wiki & Documentation
+  AR: *فيما يلي طريقة ربط التطبيق باستخدام CyberBrick Official SoccerBot كمثال.
+  CK: *ئەوەی خوارەوە پەیوەستکردنی ئەپەکەیە بە نموونەی CyberBrick Official SoccerBot.
+#71 [usage_body] cyberbrick-hardware-kit usage[0].body.line[1]
+  EN: Explore the Product Wiki & Documentation
+  near: *The following is the App connection of CyberBrick Official SoccerBot as an example.
+  AR: استكشف ويكي المنتج ووثائقه
+  CK: سەیری ویکی و بەڵگەنامەکانی بەرهەمەکە بکە
+#72 [usage_body] cyberbrick-hardware-kit usage[0].body.line[2]
+  EN: Need in-depth assembly guides, troubleshooting, or technical details for this product?
+  near: Explore the Product Wiki & Documentation
+  AR: هل تحتاج إلى أدلة تجميع مفصّلة أو استكشاف الأخطاء وإصلاحها أو تفاصيل فنية لهذا المنتج؟
+  CK: پێویستت بە ڕێبەری پێکەوەنانی ورد، چارەسەرکردنی کێشەکان یان وردەکاریی تەکنیکی بۆ ئەم بەرهەمە هەیە؟
+#74 [usage_body] cyberbrick-hardware-kit usage[0].body.line[4]
+  EN: Visit Wiki
+  near: Visit our official Wiki to discover comprehensive resources and answers to all your questions.
+  AR: زُر الويكي
+  CK: سەردانی ویکی بکە
+#75 [spec_label] cyberbrick-hardware-kit specs[x.communication_method].label
+  EN: Communication Method
+  near: 2.4G WiFi / Bluetooth
+  AR: طريقة الاتصال
+  CK: شێوازی پەیوەندی
+#76 [spec_value_text] cyberbrick-hardware-kit specs[x.communication_method] KEEP
+  EN: 2.4G WiFi / Bluetooth
+  near: Communication Method
+  AR: 2.4G WiFi / Bluetooth
+  CK: 2.4G WiFi / Bluetooth
+#77 [spec_label] cyberbrick-hardware-kit specs[x.support_control_mode].label
+  EN: Support Control Mode
+  near: One-to-One / One-to-Many
+  AR: أوضاع التحكم المدعومة
+  CK: دۆخەکانی کۆنترۆڵی پشتگیریکراو
+#78 [spec_value_text] cyberbrick-hardware-kit specs[x.support_control_mode]
+  EN: One-to-One / One-to-Many
+  near: Support Control Mode
+  AR: واحد إلى واحد / واحد إلى متعدد
+  CK: یەک بۆ یەک / یەک بۆ زۆر
+#80 [spec_value_text] cyberbrick-hardware-kit specs[x.developable_forms]
+  EN: Car / Boat / Robot-like
+  near: Developable Forms
+  AR: سيارة / قارب / شكل روبوت
+  CK: ئۆتۆمبێل / بەلەم / شێوەی ڕۆبۆت
+#81 [spec_value_text] cyberbrick-hardware-kit specs[x.remote_control_distance]
+  EN: Up to 100 meters
+  near: Remote Control Distance
+  AR: حتى 100 متر
+  CK: تا 100 مەتر
+#82 [spec_label] cyberbrick-hardware-kit specs[x.configuration_method].label
+  EN: Configuration Method
+  near: Mobile / PC
+  AR: طريقة الإعداد
+  CK: شێوازی ڕێکخستن
+#83 [spec_value_text] cyberbrick-hardware-kit specs[x.configuration_method]
+  EN: Mobile / PC
+  near: Configuration Method
+  AR: الهاتف المحمول / الحاسوب (PC)
+  CK: مۆبایل / کۆمپیوتەر (PC)
+#84 [spec_label] cyberbrick-hardware-kit specs[x.compatible_development_tool].label
+  EN: Compatible Development Tool
+  near: MicroPython
+  AR: أداة التطوير المتوافقة
+  CK: ئامرازی پەرەپێدانی گونجاو
+#86 [box_item] cyberbrick-hardware-kit box[0]
+  EN: User’s Manual
+  near: In the box
+  AR: دليل الاستخدام
+  CK: ڕێبەری بەکارهێنان
+#87 [box_item] cyberbrick-hardware-kit box[1]
+  EN: Product function and configuration guidelines.
+  near: In the box
+  AR: إرشادات وظائف المنتج وإعداده.
+  CK: ڕێنماییەکانی ئەرکەکان و ڕێکخستنی بەرهەم.
+#88 [box_item] cyberbrick-hardware-kit box[4]
+  EN: Essential electrical and physical parameters.
+  near: In the box
+  AR: المعاملات الكهربائية والفيزيائية الأساسية.
+  CK: پێوەرە سەرەکییە کارەبایی و فیزیکییەکان.
+#89 [box_item] cyberbrick-hardware-kit box[6]
+  EN: 3D model of structure and dimensions.
+  near: In the box
+  AR: نموذج 3D للهيكل والأبعاد.
+  CK: مۆدێلی 3D بۆ پێکهاتە و ڕەهەندەکان.
+#90 [box_item] cyberbrick-hardware-kit box[8]
+  EN: Assembly guide for extended application cases.
+  near: In the box
+  AR: دليل التجميع لحالات الاستخدام الموسّعة.
+  CK: ڕێبەری پێکەوەنان بۆ نموونە فراوانکراوەکانی بەکارهێنان.
+#92 [spec_value_text] cyberbrick-hardware-kit specs[compat.statement]
+  EN: The below models may require additional accessories. Please refer to the "Bill of Materials" for details. Please refer to the "Description" section on each model page for Remote details. Click here to get the Official Standard Remote.
+  near: Compatibility
+  AR: قد تتطلب النماذج أدناه ملحقات إضافية. يُرجى الرجوع إلى «قائمة المواد» (Bill of Materials) للاطلاع على التفاصيل. يُرجى الرجوع إلى قسم «الوصف» (Description) في صفحة كل نموذج للاطلاع على تفاصيل جهاز التحكم. انقر هنا للحصول على Official Standard Remote.
+  CK: لەوانەیە مۆدێلەکانی خوارەوە پێویستیان بە پێداویستیی زیادە هەبێت. تکایە بۆ وردەکاری سەیری «لیستی کەرەستەکان» (Bill of Materials) بکە. تکایە بۆ وردەکاریی ڕیمۆت سەیری بەشی «وەسف» (Description) لە پەڕەی هەر مۆدێلێک بکە. کلیک لێرە بکە بۆ بەدەستهێنانی Official Standard Remote.
+#93 [doc_title] cyberbrick-hardware-kit documents[14]
+  EN: Please refer to the "Description" section on each model page for Remote details. Click here to get the Official Standard Remote
+  near: other
+  AR: يُرجى الرجوع إلى قسم «الوصف» (Description) في صفحة كل نموذج للاطلاع على تفاصيل جهاز التحكم. انقر هنا للحصول على Official Standard Remote
+  CK: تکایە بۆ وردەکاریی ڕیمۆت سەیری بەشی «وەسف» (Description) لە پەڕەی هەر مۆدێلێک بکە. کلیک لێرە بکە بۆ بەدەستهێنانی Official Standard Remote
+#94 [short_description] 7-4v-lithium-battery-charger-with-xh2-54-connector-1pcs description.line[0]
+  EN: This charger is equipped with a standard XH2.54 connector and is suitable for charging 14500 7.4V 800mAh Li-ion batteries. It is widely used in battery-powered applications such as model toys, small robots, and DIY projects.
+  AR: هذا الشاحن مزوّد بموصل XH2.54 قياسي، وهو مناسب لشحن بطاريات Li-ion من نوع 14500 7.4V 800mAh. ويُستخدم على نطاق واسع في التطبيقات التي تعمل بالبطاريات مثل ألعاب النماذج والروبوتات الصغيرة ومشاريع DIY.
+  CK: ئەم بارگاویکەرە گەیەنەرێکی ستانداردی جۆری XH2.54 لەسەرە، و بۆ بارگاویکردنی باتریی 14500 7.4V 800mAh لە جۆری Li-ion گونجاوە. بە شێوەیەکی بەرفراوان لە بەکارهێنانە باترییدارەکاندا بەکاردێت، وەک یارییە مۆدێلییەکان، ڕۆبۆتە بچووکەکان و پڕۆژەکانی DIY.
+#95 [short_description] cyberbrick-timelapse-kit description.line[0]
+  EN: The CyberBrick Time-lapse Kit is specifically developed and designed for Bambu Lab series 3D printers. Easily hook up your own high-end camera to create sharper, smoother time-lapse videos with pro-level detail.
+  AR: طُوّر طقم CyberBrick Time-lapse Kit وصُمّم خصيصًا لطابعات 3D من Bambu Lab بمختلف سلاسلها. وصّل كاميرتك المتطورة بسهولة لإنشاء فيديوهات تصوير بفاصل زمني أوضح وأكثر سلاسة بتفاصيل بمستوى احترافي.
+  CK: کیتی CyberBrick Time-lapse Kit بە تایبەتی بۆ زنجیرە چاپکەرەکانی 3D لە Bambu Lab پەرەپێدراوە و دیزاین کراوە. بە ئاسانی کامێرا پێشکەوتووەکەی خۆت پێوە ببەستە بۆ دروستکردنی ڤیدیۆی کاتی خێراکراوی ڕوونتر و نەرمتر بە وردەکاریی ئاستی پیشەگەرانە.
+#96 [spec_label] cyberbrick-timelapse-kit specs[x.4_pin_interface].label
+  EN: 1 › 4-Pin interface
+  near: Connect the printer 4pin interface
+  AR: 1 › منفذ 4-Pin
+  CK: 1 › دەرچەی 4-Pin
+#97 [spec_value_text] cyberbrick-timelapse-kit specs[x.4_pin_interface]
+  EN: Connect the printer 4pin interface
+  near: 1 › 4-Pin interface
+  AR: للتوصيل بمنفذ 4pin في الطابعة
+  CK: بۆ بەستنەوە بە دەرچەی 4pin لە چاپکەرەکەدا
+#99 [spec_value_text] cyberbrick-timelapse-kit specs[x.6_pin_interface]
+  EN: Connect to AMS 6pin interface
+  near: 2 › 6-Pin interface
+  AR: للتوصيل بمنفذ 6pin في وحدة AMS
+  CK: بۆ بەستنەوە بە دەرچەی 6pin لەسەر یەکەی AMS
+#100 [spec_label] cyberbrick-timelapse-kit specs[x.2_5mm_shutter_cable_interface].label
+  EN: 3 › 2.5mm shutter cable interface
+  near: Connect the camera shutter cable and control the camera shutter
+  AR: 3 › منفذ كابل الغالق 2.5mm
+  CK: 3 › دەرچەی کێبڵی شەتەری 2.5mm
+#101 [spec_value_text] cyberbrick-timelapse-kit specs[x.2_5mm_shutter_cable_interface]
+  EN: Connect the camera shutter cable and control the camera shutter
+  near: 3 › 2.5mm shutter cable interface
+  AR: لتوصيل كابل غالق الكاميرا والتحكم بغالق الكاميرا
+  CK: بۆ بەستنەوەی کێبڵی شەتەری کامێرا و کۆنترۆڵکردنی شەتەری کامێرا
+#102 [spec_label] cyberbrick-timelapse-kit specs[x.multi_function_buttons_indicator_lights].label
+  EN: 4 › Multi-function buttons & Indicator lights
+  near: Connection, Debugging, Light language
+  AR: 4 › أزرار متعددة الوظائف ومصابيح مؤشرة
+  CK: 4 › دوگمەی فرەئەرک و گڵۆپی ئاماژە
+#103 [spec_value_text] cyberbrick-timelapse-kit specs[x.multi_function_buttons_indicator_lights]
+  EN: Connection, Debugging, Light language
+  near: 4 › Multi-function buttons & Indicator lights
+  AR: الاتصال، تصحيح الأخطاء، لغة الأضواء
+  CK: پەیوەندیکردن، هەڵەدۆزی، زمانی ڕووناکی
+#105 [spec_value_text] cyberbrick-timelapse-kit specs[x.servo_connection]
+  EN: Connect to the servo to simulate button operation and control shutter release
+  near: 5 › Servo connection
+  AR: للتوصيل بالسيرفو لمحاكاة الضغط على الزر والتحكم بتحرير الغالق
+  CK: بۆ بەستنەوە بە سێرڤۆوە بۆ لاساییکردنەوەی کارکردنی دوگمە و کۆنترۆڵکردنی بەردانی شەتەر
+#106 [spec_label] cyberbrick-timelapse-kit specs[x.multi_function_core_board_access].label
+  EN: 6 › Multi-Function Core Board access
+  near: Plug-in Multi-Function Core Board
+  AR: 6 › موضع تركيب Multi-Function Core Board
+  CK: 6 › شوێنی دانانی Multi-Function Core Board
+#107 [spec_value_text] cyberbrick-timelapse-kit specs[x.multi_function_core_board_access]
+  EN: Plug-in Multi-Function Core Board
+  near: 6 › Multi-Function Core Board access
+  AR: لتركيب لوحة Multi-Function Core Board بإدخالها مباشرةً
+  CK: بۆ چەقاندنی بۆردی Multi-Function Core Board
+#108 [spec_label] cyberbrick-timelapse-kit specs[x.orientation_marks].label
+  EN: 7 › Orientation marks
+  near: Ensure proper installation alignment
+  AR: 7 › علامات الاتجاه
+  CK: 7 › نیشانەکانی ئاراستە
+#109 [spec_value_text] cyberbrick-timelapse-kit specs[x.orientation_marks]
+  EN: Ensure proper installation alignment
+  near: 7 › Orientation marks
+  AR: تضمن التركيب بالمحاذاة الصحيحة
+  CK: دڵنیایی دەدەن کە دامەزراندن بە ئاراستەی دروست بێت
+#111 [doc_title] cyberbrick-timelapse-kit documents[4]
+  EN: please refer to the wiki to flash the time-lapse photography firmware
+  near: wiki
+  AR: يُرجى الرجوع إلى الويكي لتثبيت البرنامج الثابت الخاص بالتصوير بفاصل زمني
+  CK: تکایە سەیری ویکی بکە بۆ دامەزراندنی فێرموێری وێنەگرتنی کاتی خێراکراو
+#112 [short_description] sh1-0-to-dual-sh1-0-adapter-2pcs description.line[0]
+  EN: The SH1.0 to Dual SH1.0 Adapter enables a single signal or power source to be distributed to two separate devices, providing reliable signal or power transmission to both. It can also be used to tap into the signal for testing or monitoring purposes without affecting the original circuit.
+  AR: يتيح محوّل SH1.0 to Dual SH1.0 Adapter توزيع مصدر إشارة أو طاقة واحد على جهازين منفصلين، مع نقل موثوق للإشارة أو الطاقة إلى كليهما. ويمكن استخدامه أيضًا لالتقاط الإشارة لأغراض الاختبار أو المراقبة دون التأثير في الدائرة الأصلية.
+  CK: ئەداپتەری SH1.0 to Dual SH1.0 Adapter ڕێگە دەدات یەک سەرچاوەی سیگناڵ یان وزە بەسەر دوو ئامێری جیادا دابەش بکرێت، و گواستنەوەی متمانەپێکراوی سیگناڵ یان وزە بۆ هەردووکیان دابین دەکات. هەروەها دەتوانرێت بۆ وەرگرتنی سیگناڵ بە مەبەستی تاقیکردنەوە یان چاودێری بەکاربهێنرێت بێ ئەوەی کار لە بازنە ئەسڵییەکە بکات.
+#113 [short_description] multi-function-controller-core-1pcs description.line[0]
+  EN: The Multi-Function Core Board is designed for various CyberBrick projects, featuring built-in Bluetooth and WiFi connectivity. It can be quickly connected and disconnected via dual-pin headers, allowing easy switching between different expansion boards. The Core works with the Receiver Shield and the Transmitter Shield to create a basic remote control system, and it can also pair with the Time-lapse Trigger Shield to capture customized time-lapse videos.
+  AR: صُمّمت لوحة Multi-Function Core Board لمشاريع CyberBrick المختلفة، وهي مزوّدة باتصال Bluetooth وWiFi مدمج. ويمكن توصيلها وفصلها بسرعة عبر صفَّين من الدبابيس، ما يسهّل التبديل بين لوحات التوسعة المختلفة. وتعمل النواة (Core) مع Receiver Shield وTransmitter Shield لإنشاء نظام تحكم عن بُعد أساسي، ويمكن أيضًا إقرانها مع Time-lapse Trigger Shield لالتقاط فيديوهات مخصّصة بتقنية التصوير بفاصل زمني.
+  CK: بۆردی Multi-Function Core Board بۆ پڕۆژە جیاوازەکانی CyberBrick دیزاین کراوە، و Bluetooth و WiFi لەناو خۆیدا هەیە. دەتوانرێت بە خێرایی لە ڕێگەی دوو ڕیز پینەوە ببەسترێت و جیا بکرێتەوە، بەمەش گۆڕین لە نێوان بۆردە فراوانکەرە جیاوازەکاندا ئاسان دەبێت. ناوکەکە (Core) لەگەڵ Receiver Shield و Transmitter Shield کار دەکات بۆ دروستکردنی سیستەمێکی سەرەتایی کۆنترۆڵی لە دوورەوە، و هەروەها دەتوانرێت لەگەڵ Time-lapse Trigger Shield جووت بکرێت بۆ تۆمارکردنی ڤیدیۆی کاتی خێراکراوی تایبەت.
+#114 [spec_value_text] multi-function-controller-core-1pcs specs[x.ws2812_led]
+  EN: RGB system status indicator
+  near: 1 › WS2812 LED
+  AR: مؤشر RGB لحالة النظام
+  CK: ئاماژەی RGB بۆ دۆخی سیستەم
+#115 [spec_label] multi-function-controller-core-1pcs specs[x.stamp_cut].label
+  EN: 2 › Stamp Cut
+  near: Solderable pinout
+  AR: 2 › حافة بثقوب نصفية (Stamp Cut)
+  CK: 2 › لێواری نیوە کون (Stamp Cut)
+#117 [spec_label] multi-function-controller-core-1pcs specs[x.reset_button].label
+  EN: 3 › Reset Button
+  near: Press to reset the main program
+  AR: 3 › زر إعادة الضبط
+  CK: 3 › دوگمەی ڕیسێت
+#118 [spec_value_text] multi-function-controller-core-1pcs specs[x.reset_button]
+  EN: Press to reset the main program
+  near: 3 › Reset Button
+  AR: اضغط لإعادة تشغيل البرنامج الرئيسي
+  CK: دایبگرە بۆ ڕیسێتکردنی بەرنامە سەرەکییەکە
+#119 [spec_label] multi-function-controller-core-1pcs specs[x.type_c_port].label
+  EN: 4 › Type-C Port
+  near: Burning firmware & programming
+  AR: 4 › منفذ Type-C
+  CK: 4 › دەرچەی Type-C
+#120 [spec_value_text] multi-function-controller-core-1pcs specs[x.type_c_port]
+  EN: Burning firmware & programming
+  near: 4 › Type-C Port
+  AR: تحميل البرنامج الثابت والبرمجة
+  CK: دابەزاندنی فێرموێر و پرۆگرامسازی
+#121 [spec_label] multi-function-controller-core-1pcs specs[x.user_button].label
+  EN: 5 › User Button
+  near: Custom function
+  AR: 5 › زر المستخدم
+  CK: 5 › دوگمەی بەکارهێنەر
+#123 [spec_label] multi-function-controller-core-1pcs specs[x.pin_header].label
+  EN: 6 › Pin Header
+  near: Connectable with various shields
+  AR: 6 › صف الدبابيس
+  CK: 6 › ڕیزی پینەکان
+#124 [spec_value_text] multi-function-controller-core-1pcs specs[x.pin_header]
+  EN: Connectable with various shields
+  near: 6 › Pin Header
+  AR: قابل للتوصيل بمختلف لوحات التوسعة (Shields)
+  CK: دەتوانرێت بە بۆردە فراوانکەرە جیاوازەکانەوە (Shields) ببەسترێت
+#125 [spec_label] multi-function-controller-core-1pcs specs[x.orientation_mark].label
+  EN: 7 › Orientation Mark
+  near: Ensure proper installation alignment
+  AR: 7 › علامة الاتجاه
+  CK: 7 › نیشانەی ئاراستە
+#126 [short_description] remote-control-receiver-shield-1pcs description.line[0]
+  EN: The Remote Control Receiver Shield can be combined with the Multi-Function Core Board as the signal receiving end of various CyberBrick projects, integrating 2 DC Motor Ports, 4 DC Motor Ports, and 2 WS2812 RGB LED Ports, achieving coordination of powertrain, steering, and lighting systems without soldering.
+  AR: يمكن دمج لوحة Remote Control Receiver Shield مع Multi-Function Core Board لتكون طرف استقبال الإشارة في مختلف مشاريع CyberBrick، إذ تضم 2 منفذ لمحركات DC و4 منافذ لمحركات DC و2 منفذ لمصابيح WS2812 RGB LED، ما يحقق التنسيق بين أنظمة الدفع والتوجيه والإضاءة دون الحاجة إلى لحام.
+  CK: بۆردی Remote Control Receiver Shield دەتوانرێت لەگەڵ Multi-Function Core Board بەیەکەوە ببەسترێت وەک لایەنی وەرگرتنی سیگناڵ لە پڕۆژە جیاوازەکانی CyberBrick، و 2 دەرچەی بزوێنەری DC، 4 دەرچەی بزوێنەری DC و 2 دەرچەی WS2812 RGB LED لەخۆدەگرێت، و هەماهەنگی لە نێوان سیستەمەکانی هێزی جووڵە، ئاراستەکردن و ڕووناکیدا بێ لەحیمکردن بەدی دەهێنێت.
+#127 [spec_label] remote-control-receiver-shield-1pcs specs[x.ws2812_port].label
+  EN: 1 › WS2812 Port
+  near: Connectable with WS2812 LED hub or WS2812 LED strip
+  AR: 1 › منفذ WS2812
+  CK: 1 › دەرچەی WS2812
+#129 [spec_label] remote-control-receiver-shield-1pcs specs[x.dc_motor_port].label
+  EN: 2 › DC Motor Port
+  near: Connectable with DC motor
+  AR: 2 › منفذ محرك DC
+  CK: 2 › دەرچەی بزوێنەری DC
+#130 [spec_value_text] remote-control-receiver-shield-1pcs specs[x.dc_motor_port]
+  EN: Connectable with DC motor
+  near: 2 › DC Motor Port
+  AR: قابل للتوصيل بمحرك DC
+  CK: بۆ بەستنی بزوێنەری DC
+#131 [spec_label] remote-control-receiver-shield-1pcs specs[x.servo_port].label
+  EN: 3 › Servo Port
+  near: Connectable with universal 5V servo motors
+  AR: 3 › منفذ السيرفو
+  CK: 3 › دەرچەی سێرڤۆ
+#132 [spec_value_text] remote-control-receiver-shield-1pcs specs[x.servo_port]
+  EN: Connectable with universal 5V servo motors
+  near: 3 › Servo Port
+  AR: قابل للتوصيل بمحركات سيرفو قياسية شائعة بجهد 5V
+  CK: بۆ بەستنی بزوێنەری سێرڤۆی گشتیی 5V
+#133 [spec_label] remote-control-receiver-shield-1pcs specs[x.power_input].label
+  EN: 4 › Power Input
+  near: XH2.54 2Pin DC power input
+  AR: 4 › دخل الطاقة
+  CK: 4 › چوونەژوورەوەی وزە
+#135 [spec_label] remote-control-receiver-shield-1pcs specs[x.power_indicator].label
+  EN: 5 › Power Indicator
+  near: White light means power on
+  AR: 5 › مؤشر الطاقة
+  CK: 5 › ئاماژەی وزە
+#136 [spec_value_text] remote-control-receiver-shield-1pcs specs[x.power_indicator]
+  EN: White light means power on
+  near: 5 › Power Indicator
+  AR: الضوء الأبيض يدل على تشغيل الطاقة
+  CK: ڕووناکیی سپی واتە وزەکە هەڵکراوە
+#137 [spec_label] remote-control-receiver-shield-1pcs specs[x.core_slot].label
+  EN: 6 › Core Slot
+  near: Connectable with multi-function controller core
+  AR: 6 › فتحة النواة (Core)
+  CK: 6 › شوێنی ناوک (Core)
+#138 [spec_value_text] remote-control-receiver-shield-1pcs specs[x.core_slot]
+  EN: Connectable with multi-function controller core
+  near: 6 › Core Slot
+  AR: قابلة للتوصيل بنواة التحكم متعددة الوظائف
+  CK: بۆ بەستنی ناوکی کۆنترۆڵەری فرەئەرک
+#139 [short_description] remote-control-transmitter-shield-1pcs description.line[0]
+  EN: The Remote Control Transmitter Shield can be combined with the Multi-Function Core Board as the signal transmitting end for various CyberBrick projects. It is equipped with equipped with 6 ADC input channels and 4 digital input channels, which can be flexibly configured with joysticks, knobs, and custom buttons to meet diverse needs from basic remote control to advanced command programming.
+  AR: يمكن دمج لوحة Remote Control Transmitter Shield مع Multi-Function Core Board لتكون طرف إرسال الإشارة في مختلف مشاريع CyberBrick. وتضم 6 قنوات إدخال ADC و4 قنوات إدخال رقمية، يمكن تهيئتها بمرونة مع عصي التحكم والمقابض الدوّارة والأزرار المخصّصة لتلبية احتياجات متنوعة، من التحكم الأساسي عن بُعد إلى برمجة الأوامر المتقدمة.
+  CK: بۆردی Remote Control Transmitter Shield دەتوانرێت لەگەڵ Multi-Function Core Board بەیەکەوە ببەسترێت وەک لایەنی ناردنی سیگناڵ بۆ پڕۆژە جیاوازەکانی CyberBrick. 6 کەناڵی چوونەژوورەوەی ADC و 4 کەناڵی چوونەژوورەوەی دیجیتاڵی هەیە، کە دەتوانرێت بە نەرمی لەگەڵ جۆیستیک، دەسکی سووڕاوە و دوگمەی دڵخواز ڕێکبخرێن بۆ پڕکردنەوەی پێداویستییە جۆراوجۆرەکان، لە کۆنترۆڵی سەرەتایی لە دوورەوە تا پرۆگرامکردنی فەرمانی پێشکەوتوو.
+#141 [spec_label] remote-control-transmitter-shield-1pcs specs[x.adc_input_port].label
+  EN: 2 › ADC Input Port
+  near: Connecting ADC modules such as joystick
+  AR: 2 › منفذ إدخال ADC
+  CK: 2 › دەرچەی چوونەژوورەوەی ADC
+#142 [spec_value_text] remote-control-transmitter-shield-1pcs specs[x.adc_input_port]
+  EN: Connecting ADC modules such as joystick
+  near: 2 › ADC Input Port
+  AR: لتوصيل وحدات ADC مثل عصا التحكم
+  CK: بۆ بەستنی مۆدیولەکانی ADC وەک جۆیستیک
+#143 [spec_label] remote-control-transmitter-shield-1pcs specs[x.digital_input_port].label
+  EN: 3 › Digital Input Port
+  near: Connecting binary-input modules such as momentary button
+  AR: 3 › منفذ الإدخال الرقمي
+  CK: 3 › دەرچەی چوونەژوورەوەی دیجیتاڵی
+#144 [spec_value_text] remote-control-transmitter-shield-1pcs specs[x.digital_input_port]
+  EN: Connecting binary-input modules such as momentary button
+  near: 3 › Digital Input Port
+  AR: لتوصيل وحدات الإدخال الثنائي مثل الزر اللحظي
+  CK: بۆ بەستنی مۆدیولەکانی چوونەژوورەوەی دووانەیی وەک دوگمەی چرکەیی
+#145 [spec_label] remote-control-transmitter-shield-1pcs specs[x.core_slot].label
+  EN: 4 › Core Slot
+  near: Connectable with multi-function controller core
+  AR: 4 › فتحة النواة (Core)
+  CK: 4 › شوێنی ناوک (Core)
+#146 [spec_label] remote-control-transmitter-shield-1pcs specs[x.orientation_mark].label
+  EN: 5 › Orientation Mark
+  near: Ensure proper installation alignmen
+  AR: 5 › علامة الاتجاه
+  CK: 5 › نیشانەی ئاراستە
+#148 [short_description] single-axis-joystick-module-with-3pin-sh1-0-connector-1pcs description.line[0]
+  EN: The Single-Axis Joystick Module is a 1-channel analog input module. It automatically returns to the center position. Compared to a Dual-Axis Joystick Module, the single-axis joystick moves in only one direction and outputs a single analog signal, making it ideal for use as a control lever in various scenarios that require speed control or position control with automatic centering — especially when the control logic of these motions needs to remain independent.
+  AR: وحدة Single-Axis Joystick Module هي وحدة إدخال تناظري أحادية القناة (1-channel). تعود تلقائيًا إلى وضع المنتصف. ومقارنةً بوحدة Dual-Axis Joystick Module، تتحرك عصا التحكم أحادية المحور في اتجاه واحد فقط وتُخرج إشارة تناظرية واحدة، ما يجعلها مثالية للاستخدام كذراع تحكم في سيناريوهات مختلفة تتطلب التحكم بالسرعة أو بالموضع مع العودة التلقائية إلى المنتصف — خاصةً عندما يجب أن يبقى منطق التحكم في هذه الحركات مستقلًا.
+  CK: مۆدیولی Single-Axis Joystick Module مۆدیولێکی چوونەژوورەوەی ئەنالۆگی یەک کەناڵییە (1-channel). بە شێوەی خۆکار دەگەڕێتەوە بۆ شوێنی ناوەڕاست. بە بەراورد لەگەڵ Dual-Axis Joystick Module، جۆیستیکی یەک تەوەرە تەنها بە یەک ئاراستەدا دەجووڵێت و یەک سیگناڵی ئەنالۆگی دەردەکات، بۆیە بۆ بەکارهێنان وەک لیڤەری کۆنترۆڵ لە بارودۆخە جیاوازەکاندا گونجاوترینە کە پێویستیان بە کۆنترۆڵی خێرایی یان کۆنترۆڵی شوێن هەیە لەگەڵ گەڕانەوەی خۆکار بۆ ناوەڕاست — بە تایبەتی کاتێک پێویستە لۆژیکی کۆنترۆڵی ئەم جووڵانە سەربەخۆ بمێنێتەوە.
+#149 [short_description] dual-axis-joystick-module-with-3pin-sh1-0-connectors-1pcs description.line[0]
+  EN: The Dual-Axis Joystick Module is a 2-channel analog input module. It automatically returns to the center. The dual-channel joystick is suitable for use as a control lever in various scenarios where control of both movement speed and direction is required, especially when these movements are interrelated.
+  AR: وحدة Dual-Axis Joystick Module هي وحدة إدخال تناظري ثنائية القناة (2-channel). تعود تلقائيًا إلى المنتصف. وعصا التحكم ثنائية القناة مناسبة للاستخدام كذراع تحكم في سيناريوهات مختلفة تتطلب التحكم بسرعة الحركة واتجاهها معًا، خاصةً عندما تكون هذه الحركات مترابطة.
+  CK: مۆدیولی Dual-Axis Joystick Module مۆدیولێکی چوونەژوورەوەی ئەنالۆگی دوو کەناڵییە (2-channel). بە شێوەی خۆکار دەگەڕێتەوە بۆ ناوەڕاست. جۆیستیکی دوو کەناڵی گونجاوە بۆ بەکارهێنان وەک لیڤەری کۆنترۆڵ لە بارودۆخە جیاوازەکاندا کە پێویستیان بە کۆنترۆڵی هەردوو خێرایی و ئاراستەی جووڵە هەیە، بە تایبەتی کاتێک ئەم جووڵانە پەیوەندییان بە یەکەوە هەیە.
+#150 [short_description] 100mm-wire-with-2pin-xh2-54-connectors-2pcs description.line[0]
+  EN: Peripheral connection cable - XH2.54-2PIN is a standard interface used for connecting various electronic modules and expansion boards. It is compatible with 2.54mm pitch pin headers or sockets, making it convenient for quickly building circuit systems.
+  AR: كابل توصيل الملحقات - XH2.54-2PIN هو موصل قياسي يُستخدم لتوصيل مختلف الوحدات الإلكترونية ولوحات التوسعة. وهو متوافق مع صفوف الدبابيس أو المقابس ذات الخطوة 2.54mm، ما يجعله مناسبًا لبناء أنظمة الدوائر بسرعة.
+  CK: کێبڵی پەیوەندیی ئامێرە لاوەکییەکان - XH2.54-2PIN گەیەنەرێکی ستانداردە کە بۆ بەستنەوەی مۆدیولە ئەلیکترۆنییە جۆراوجۆرەکان و بۆردە فراوانکەرەکان بەکاردێت. لەگەڵ ڕیزە پین یان سۆکێتەکانی بە مەودای 2.54mm گونجاوە، بۆیە بۆ دروستکردنی خێرای سیستەمی بازنەی کارەبایی ئاسانە.
+#151 [short_description] 100mm-wire-with-3pin-sh1-0-connectors-2pcs description.line[0]
+  EN: Peripheral connection cable - SH1.0-3PIN is commonly used for signal transmission between miniature modules and control boards that support the SH1.0 interface. It is compatible with 1.0mm pitch sockets, making it suitable for space-constrained electronic projects.
+  AR: كابل توصيل الملحقات - SH1.0-3PIN يُستخدم عادةً لنقل الإشارات بين الوحدات المصغّرة ولوحات التحكم التي تدعم منفذ SH1.0. وهو متوافق مع المقابس ذات الخطوة 1.0mm، ما يجعله مناسبًا للمشاريع الإلكترونية محدودة المساحة.
+  CK: کێبڵی پەیوەندیی ئامێرە لاوەکییەکان - SH1.0-3PIN بە زۆری بۆ گواستنەوەی سیگناڵ لە نێوان مۆدیولە زۆر بچووکەکان و بۆردەکانی کۆنترۆڵ بەکاردێت کە پشتگیریی دەرچەی SH1.0 دەکەن. لەگەڵ سۆکێتەکانی بە مەودای 1.0mm گونجاوە، بۆیە بۆ ئەو پڕۆژە ئەلیکترۆنییانە گونجاوە کە شوێنیان سنووردارە.
+#152 [short_description] 200mm-servo-extension-cable-3pin-2pcs description.line[0]
+  EN: Servo extension cable was used to connect servos to controllers, ideal for extending or distributing servo connections to RC model devices. Maker's Supply offers both straight and Y-type configurations to meet different installation and control needs.
+  AR: يُستخدم كابل تمديد السيرفو لتوصيل محركات السيرفو بوحدات التحكم، وهو مثالي لتمديد توصيلات السيرفو أو توزيعها على أجهزة نماذج RC. وتقدّم Maker's Supply نوعين: مستقيم وعلى شكل Y، لتلبية احتياجات التركيب والتحكم المختلفة.
+  CK: کێبڵی درێژکردنەوەی سێرڤۆ بۆ بەستنەوەی سێرڤۆکان بە کۆنترۆڵەرەکانەوە بەکاردێت، و بۆ درێژکردنەوە یان دابەشکردنی پەیوەندییەکانی سێرڤۆ بۆ ئامێرەکانی مۆدێلی RC گونجاوترینە. Maker's Supply هەردوو شێوەی ڕاست و جۆری Y پێشکەش دەکات بۆ پڕکردنەوەی پێداویستییە جیاوازەکانی دامەزراندن و کۆنترۆڵ.
+#154 [short_description] momentary-button-module-with-2pin-sh1-0-connector-1pcs description.line[0]
+  EN: The momentary button module can be used to switch between various modes in a specified order, trigger and stop some actions in real time.
+  AR: يمكن استخدام وحدة الزر اللحظي للتبديل بين أوضاع مختلفة بترتيب محدّد، ولتشغيل بعض الإجراءات وإيقافها في الوقت الفعلي.
+  CK: مۆدیولی دوگمەی چرکەیی دەتوانرێت بەکاربهێنرێت بۆ گۆڕین لە نێوان دۆخە جیاوازەکاندا بە ڕیزبەندییەکی دیاریکراو، و بۆ دەستپێکردن و وەستاندنی هەندێک کردار لە کاتی ڕاستەقینەدا.
+#155 [short_description] 14500-7-4v-800mah-li-ion-battery-1pcs description.line[0]
+  EN: The 14500 7.4V 800mAh Li-ion battery provides high-performance, rechargeable power for portable devices. Similar in size to AA batteries, it offers higher voltage and energy density, suitable for devices requiring more power and longer runtime, such as flashlights and remote controls.
+  AR: توفّر بطارية Li-ion من نوع 14500 7.4V 800mAh طاقة عالية الأداء وقابلة لإعادة الشحن للأجهزة المحمولة. وهي مماثلة في الحجم لبطاريات AA، لكنها تقدّم جهدًا وكثافة طاقة أعلى، ما يجعلها مناسبة للأجهزة التي تحتاج إلى طاقة أكبر ومدة تشغيل أطول، مثل المصابيح اليدوية وأجهزة التحكم عن بُعد.
+  CK: باتریی 14500 7.4V 800mAh لە جۆری Li-ion وزەیەکی کارایی بەرز و دووبارە بارگاویکراو بۆ ئامێرە هەڵگیراوەکان دابین دەکات. لە قەبارەدا لە باتریی AA دەچێت، بەڵام ڤۆڵتیە و چڕیی وزەی بەرزتری هەیە، بۆیە گونجاوە بۆ ئەو ئامێرانەی پێویستیان بە وزەی زیاتر و ماوەی کارکردنی درێژتر هەیە، وەک چرای دەستی و ڕیمۆتەکان.
+#156 [spec_label] 14500-7-4v-800mah-li-ion-battery-1pcs specs[x.nominal_voltage].label
+  EN: Nominal Voltage
+  near: 7.4V
+  AR: الجهد الاسمي
+  CK: ڤۆڵتیەی ناوزەد
+#157 [spec_label] 14500-7-4v-800mah-li-ion-battery-1pcs specs[x.nominal_capacity].label
+  EN: Nominal Capacity
+  near: 800mAh
+  AR: السعة الاسمية
+  CK: توانای ناوزەد
+#158 [spec_value_text] 14500-7-4v-800mah-li-ion-battery-1pcs specs[physical.operating_temp]
+  EN: Charging：0℃~45℃ / Discharging：-20℃~60℃
+  near: Operating temperature
+  AR: الشحن: من 0℃ إلى 45℃ / التفريغ: من -20℃ إلى 60℃
+  CK: بارگاویکردن: لە 0℃ تا 45℃ / بەتاڵکردنەوە: لە -20℃ تا 60℃
+#160 [spec_value_text] 14500-7-4v-800mah-li-ion-battery-1pcs specs[x.charging_current]
+  EN: Standard Charging 160 mA / Max Charging 800 mA
+  near: Charging Current
+  AR: الشحن القياسي 160 mA / أقصى شحن 800 mA
+  CK: بارگاویکردنی ستاندارد 160 mA / زۆرترین بارگاویکردن 800 mA
+#161 [spec_label] 14500-7-4v-800mah-li-ion-battery-1pcs specs[x.overcharge_voltage].label
+  EN: Overcharge Voltage
+  near: 8.4V±0.05V
+  AR: جهد الشحن الزائد
+  CK: ڤۆڵتیەی زیادە بارگاویکردن
+#162 [spec_label] 14500-7-4v-800mah-li-ion-battery-1pcs specs[x.max_continuous_discharge_current].label
+  EN: Max continuous discharge current
+  near: 3A
+  AR: أقصى تيار تفريغ مستمر
+  CK: زۆرترین تەزووی بەتاڵبوونەوەی بەردەوام
+#163 [spec_label] 14500-7-4v-800mah-li-ion-battery-1pcs specs[x.overdischarge_protection_voltage].label
+  EN: Overdischarge Protection Voltage
+  near: 5.8V±0.08V
+  AR: جهد الحماية من التفريغ الزائد
+  CK: ڤۆڵتیەی پاراستن لە زیادە بەتاڵبوونەوە
+#164 [spec_label] 14500-7-4v-800mah-li-ion-battery-1pcs specs[x.overcurrent_protection].label
+  EN: OverCurrent Protection
+  near: 20A±3A
+  AR: الحماية من التيار الزائد
+  CK: پاراستن لە زیادە تەزوو
+#166 [spec_value_text] 1-4-camera-screw-3pcs specs[part.surface_treatment]
+  EN: Passivated Stainless Steel
+  near: Surface treatment
+  AR: فولاذ مقاوم للصدأ معالج بالتخميل
+  CK: پۆڵای زەنگنەگری پاسیڤکراو
+#167 [spec_value_text] 1-4-camera-screw-3pcs specs[part.thread_type]
+  EN: UNC / Coarse Thread
+  near: Thread type
+  AR: سنّ UNC / سنّ خشن
+  CK: پێچی UNC / پێچی زبر
+#168 [short_description] 1-4-camera-quick-release-plate-nut-2pcs description.line[0]
+  EN: The 1/4" quick release plate nut is a small accessory used to securely attach a camera or other equipment to a tripod, gimbal, or quick release plate.
+  AR: صامولة صفيحة التحرير السريع مقاس 1/4" ملحق صغير يُستخدم لتثبيت الكاميرا أو المعدات الأخرى بإحكام على حامل ثلاثي أو جيمبال أو صفيحة تحرير سريع.
+  CK: سامۆڵەی پلێتی کردنەوەی خێرای 1/4" پێداویستییەکی بچووکە کە بۆ قایمکردنی کامێرا یان ئامێری تر بە سێپایە، گیمباڵ یان پلێتی کردنەوەی خێراوە بەکاردێت.
+#169 [short_description] ams-flipper-for-p1s-x1-series description.line[0]
+  EN: The product contains all the non-3D printed parts for assembling an entirely functional AMS Flipper. To complete the work, you also need to download the model files and 3D print the remaining parts.
+  AR: يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع ملحق AMS Flipper يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.
+  CK: بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی AMS Flipper بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.
+#170 [short_description] adjustable-hand-wrist-strap description.line[0]
+  EN: Crafted from premium, rigorously tested polyester, this durable lanyard offers tool-free installation and keeps charging ports accessible.
+  AR: هذا الحزام المتين مصنوع من بوليستر فاخر خضع لاختبارات صارمة، ويتيح التركيب دون أدوات ويُبقي منافذ الشحن في متناول اليد.
+  CK: ئەم بەندە بەرگەگرە لە پۆلیەستەری جۆرایەتی بەرز دروستکراوە کە بە وردی تاقیکراوەتەوە، بێ ئامراز دادەمەزرێت و دەرچەکانی بارگاویکردن بە ئاسانی بەردەست دەهێڵێتەوە.
+#172 [short_description] 1-4-8x8-brass-knurled-heat-insert-nut-10pcs description.line[0]
+  EN: 1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS) 1. Round threaded brass heat-insert nut with vertical knurling 2. High thermal conductivity brass for fast and uniform heat transfer 3. Easy to install in 3D printed parts with a heated soldering iron
+  AR: صامولة 1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS): 1. صامولة نحاسية دائرية ملولبة تُدخَل بالحرارة، بتحزيز عمودي 2. نحاس أصفر عالي التوصيل الحراري لنقل الحرارة بسرعة وبشكل متجانس 3. سهلة التركيب في القطع المطبوعة بطابعة 3D باستخدام كاوية لحام ساخنة
+  CK: سامۆڵەی 1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS): 1. سامۆڵەی برنجی خڕی پێچدار کە بە گەرمی تێدەخرێت، بە زبرکردنی ستوونی 2. برنجی گەیاندنی گەرمیی بەرز بۆ گواستنەوەی خێرا و یەکسانی گەرمی 3. بە ئاسانی لەناو پارچەی چاپکراوی 3D دادەمەزرێت بە کاویەی لەحیمی گەرم
+#173 [spec_value_text] 1-4-8x8-brass-knurled-heat-insert-nut-10pcs specs[x.knurling_type]
+  EN: Vertical
+  near: Knurling type
+  AR: عمودي
+  CK: ستوونی
+#174 [spec_value_text] 1-4-8x8-brass-knurled-heat-insert-nut-10pcs specs[part.thread_type]
+  EN: Whitworth Coarse
+  near: Thread type
+  AR: سنّ Whitworth خشن
+  CK: پێچی زبری Whitworth
+#175 [short_description] lipo-battery-fireproof-storage-bag description.line[0]
+  EN: This lightweight and portable fireproof bag is designed with heat-resistant materials for the safe storage and transport of LiPo batteries.
+  AR: صُمّمت هذه الحقيبة المقاومة للحريق، الخفيفة وسهلة الحمل، من مواد مقاومة للحرارة لتخزين بطاريات LiPo ونقلها بأمان.
+  CK: ئەم جانتا دژە ئاگرە سووک و هەڵگرە لە کەرەستەی بەرگەگری گەرمی دیزاین کراوە بۆ هەڵگرتن و گواستنەوەی سەلامەتی باترییەکانی LiPo.
+#176 [spec_value_text] lipo-battery-fireproof-storage-bag specs[part.surface_treatment]
+  EN: PVC mesh cloth
+  near: Surface treatment
+  AR: قماش شبكي من PVC
+  CK: قوماشی تۆڕی PVC
+#178 [short_description] type-c-female-head-to-ph2-0-power-supply-cable description.line[0]
+  EN: This is a power supply cable that converts a USB Type-C power source to a PH2.0 connector, suitable for powering small electronic devices and development boards.
+  AR: هذا كابل تغذية بالطاقة يحوّل مصدر طاقة USB Type-C إلى موصل PH2.0، وهو مناسب لتزويد الأجهزة الإلكترونية الصغيرة ولوحات التطوير بالطاقة.
+  CK: ئەمە کێبڵێکی دابینکردنی وزەیە کە سەرچاوەی وزەی USB Type-C دەگۆڕێت بۆ گەیەنەری PH2.0، و بۆ دابینکردنی وزەی ئامێرە ئەلیکترۆنییە بچووکەکان و بۆردەکانی پەرەپێدان گونجاوە.
+#179 [short_description] 20w-dual-port-fast-charger-1pcs description.line[0]
+  EN: The 20W Dual-Port Fast Charger delivers quick and efficient charging for your devices. Featuring both USB-A and USB-C ports, it allows you to power two devices simultaneously with a combined output of up to 20W. Compact and lightweight, the two adapters and the main body can be used in European, British and American standard usage scenarios, it’s perfect for use at home, in the office, or while traveling. Compatible with a wide range of smartphones, tablets, and other USB-powered devices, this charger ensures your essentials are always powered and ready to go.
+  AR: يوفّر الشاحن السريع ثنائي المنافذ 20W شحنًا سريعًا وفعّالًا لأجهزتك. وبفضل منفذَي USB-A وUSB-C، يتيح لك تزويد جهازين بالطاقة في الوقت نفسه بقدرة خرج إجمالية تصل إلى 20W. وهو صغير الحجم وخفيف الوزن، ويمكن استخدام المحوّلَين والجسم الرئيسي مع المقابس القياسية الأوروبية والبريطانية والأمريكية، ما يجعله مثاليًا للاستخدام في المنزل أو المكتب أو أثناء السفر. وهو متوافق مع مجموعة واسعة من الهواتف الذكية والأجهزة اللوحية وغيرها من الأجهزة التي تعمل عبر USB، ليضمن بقاء أجهزتك الأساسية مشحونة وجاهزة دائمًا.
+  CK: بارگاویکەری خێرای دوو دەرچەیی 20W بارگاویکردنێکی خێرا و کارا بۆ ئامێرەکانت دابین دەکات. بە هەبوونی هەردوو دەرچەی USB-A و USB-C، ڕێگەت پێدەدات لە هەمان کاتدا وزە بە دوو ئامێر بدەیت بە کۆی دەرچوونی تا 20W. بچووک و سووکە، و دەتوانرێت هەردوو ئەداپتەرەکە و لاشە سەرەکییەکە لەگەڵ ستانداردەکانی ئەورووپی، بەریتانی و ئەمریکی بەکاربهێنرێن، بۆیە بۆ بەکارهێنان لە ماڵ، نووسینگە یان لە کاتی گەشتکردندا تەواو گونجاوە. لەگەڵ کۆمەڵێکی فراوان لە مۆبایلە زیرەکەکان، تابلێتەکان و ئامێرەکانی تری کە بە USB وزە وەردەگرن گونجاوە، و ئەم بارگاویکەرە دڵنیات دەکاتەوە کە ئامێرە پێویستەکانت هەمیشە بارگاوی و ئامادەن.
+#180 [usage_body] cyberbrick-tank usage[0].body.line[0]
+  EN: The Mini Tank is designed to work with the CyberBrick Remote. The pre-configured settings have been uploaded for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّم نموذج Mini Tank للعمل مع جهاز التحكم CyberBrick Remote. وقد رُفعت الإعدادات المُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: مۆدێلی Mini Tank بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Remote دیزاین کراوە. ڕێکخستنە پێشوەختەکان بارکراون بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#181 [usage_body] cyberbrick-tank usage[0].body.line[1]
+  EN: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  near: The Mini Tank is designed to work with the CyberBrick Remote. The pre-configured settings have been uploaded for immedia
+  AR: بينما يتيح تطبيق CyberBrick App تخصيص وظائف وحدة التحكم بالكامل بما يتوافق مع تفضيلاتك الشخصية.
+  CK: لە کاتێکدا ئەپی CyberBrick App ڕێگە دەدات ئەرکەکانی کۆنترۆڵەرەکە بە تەواوی بەپێی حەزی تایبەتی خۆت ڕێکبخەیت.
+#182 [usage_body] cyberbrick-tank usage[0].body.line[2]
+  EN: Please visit the CyberBrick Official Standard Remote on Makerworld for more details.
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: يُرجى زيارة صفحة CyberBrick Official Standard Remote على Makerworld لمزيد من التفاصيل.
+  CK: تکایە بۆ وردەکاریی زیاتر سەردانی پەڕەی CyberBrick Official Standard Remote لە Makerworld بکە.
+#184 [doc_title] cyberbrick-tank documents[8]
+  EN: Download Models on MakerWorld ↗
+  near: other
+  AR: تنزيل النماذج من MakerWorld ↗
+  CK: داگرتنی مۆدێلەکان لە MakerWorld ↗
+#185 [doc_title] cyberbrick-tank documents[9]
+  EN: CyberBrick Official Standard Remote on Makerworld
+  near: other
+  AR: صفحة CyberBrick Official Standard Remote على Makerworld
+  CK: پەڕەی CyberBrick Official Standard Remote لە Makerworld
+#186 [usage_body] duel-bumper-car-cyberbrick usage[0].body.line[0]
+  EN: The Bumper Car is designed to work with the CyberBrick Remote. The pre-configured settings have been uploaded for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّم نموذج Bumper Car للعمل مع جهاز التحكم CyberBrick Remote. وقد رُفعت الإعدادات المُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: مۆدێلی Bumper Car بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Remote دیزاین کراوە. ڕێکخستنە پێشوەختەکان بارکراون بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#187 [usage_body] cyberbrick-mini-tank usage[0].body.line[0]
+  EN: The Mini Tank is designed to work with the CyberBrick Official Remote. The creator has uploaded pre-configured settings for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّم نموذج Mini Tank للعمل مع جهاز التحكم CyberBrick Official Remote. وقد رفع المصمّم إعدادات مُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: مۆدێلی Mini Tank بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Official Remote دیزاین کراوە. دروستکەرەکە ڕێکخستنی پێشوەختەی بارکردووە بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#188 [usage_body] cyberbrick-mini-tank usage[1].body.line[0]
+  EN: *The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Mini Tank.
+  AR: *فيما يلي طريقة ربط التطبيق باستخدام CyberBrick Official SoccerBot كمثال، وهي مشابهة لنموذج Mini Tank.
+  CK: *ئەوەی خوارەوە پەیوەستکردنی ئەپەکەیە بە نموونەی CyberBrick Official SoccerBot، کە لە مۆدێلی Mini Tank دەچێت.
+#190 [doc_title] cyberbrick-mini-tank documents[6]
+  EN: View More
+  near: other
+  AR: عرض المزيد
+  CK: زیاتر ببینە
+#191 [usage_body] mini-suv-cyberbrick-rc usage[0].body.line[0]
+  EN: The Mini SUV is designed to work with the CyberBrick Official Remote. The creator has uploaded pre-configured settings for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّم نموذج Mini SUV للعمل مع جهاز التحكم CyberBrick Official Remote. وقد رفع المصمّم إعدادات مُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: مۆدێلی Mini SUV بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Official Remote دیزاین کراوە. دروستکەرەکە ڕێکخستنی پێشوەختەی بارکردووە بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#192 [usage_body] mini-suv-cyberbrick-rc usage[1].body.line[0]
+  EN: *The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Mini SUV.
+  AR: *فيما يلي طريقة ربط التطبيق باستخدام CyberBrick Official SoccerBot كمثال، وهي مشابهة لنموذج Mini SUV.
+  CK: *ئەوەی خوارەوە پەیوەستکردنی ئەپەکەیە بە نموونەی CyberBrick Official SoccerBot، کە لە مۆدێلی Mini SUV دەچێت.
+#193 [usage_body] cyberbrick-official-soccerbot usage[0].body.line[0]
+  EN: The SoccerBot is designed to work with the CyberBrick Official Remote. Pre-configured settings have been uploaded for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّم نموذج SoccerBot للعمل مع جهاز التحكم CyberBrick Official Remote. وقد رُفعت إعدادات مُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: مۆدێلی SoccerBot بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Official Remote دیزاین کراوە. ڕێکخستنی پێشوەختە بارکراون بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#194 [usage_body] bulldozer-cyberbrick-rc usage[0].body.line[0]
+  EN: The Bulldozer is designed to work with the CyberBrick Official Remote. The creator has uploaded pre-configured settings for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّم نموذج Bulldozer للعمل مع جهاز التحكم CyberBrick Official Remote. وقد رفع المصمّم إعدادات مُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: مۆدێلی Bulldozer بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Official Remote دیزاین کراوە. دروستکەرەکە ڕێکخستنی پێشوەختەی بارکردووە بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#195 [usage_body] bulldozer-cyberbrick-rc usage[1].body.line[0]
+  EN: *The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Bulldozer.
+  AR: *فيما يلي طريقة ربط التطبيق باستخدام CyberBrick Official SoccerBot كمثال، وهي مشابهة لنموذج Bulldozer.
+  CK: *ئەوەی خوارەوە پەیوەستکردنی ئەپەکەیە بە نموونەی CyberBrick Official SoccerBot، کە لە مۆدێلی Bulldozer دەچێت.
+#197 [spec_value_text] handheld-vacuum-cleaner-kit specs[x.supported_functions]
+  EN: Vacuuming / Blowing / 2 in 1 Design
+  near: Supported Functions
+  AR: شفط / نفخ / تصميم 2 في 1
+  CK: مژین / فووکردن / دیزاینی 2 لە 1
+#198 [spec_label] handheld-vacuum-cleaner-kit specs[x.suction_power_options].label
+  EN: Suction Power Options
+  near: 7K / 13K / 16K Pa
+  AR: خيارات قوة الشفط
+  CK: هەڵبژاردەکانی هێزی مژین
+#199 [spec_value_text] handheld-vacuum-cleaner-kit specs[x.suction_power_options] KEEP
+  EN: 7K / 13K / 16K Pa
+  near: Suction Power Options
+  AR: 7K / 13K / 16K Pa
+  CK: 7K / 13K / 16K Pa
+#200 [spec_label] handheld-vacuum-cleaner-kit specs[x.charging_voltage].label
+  EN: Charging Voltage
+  near: 5V – 9V
+  AR: جهد الشحن
+  CK: ڤۆڵتیەی بارگاویکردن
+#201 [spec_label] handheld-vacuum-cleaner-kit specs[x.charging_port].label
+  EN: Charging Port
+  near: Type-C Port (Supports QC Protocol)
+  AR: منفذ الشحن
+  CK: دەرچەی بارگاویکردن
+#203 [spec_label] handheld-vacuum-cleaner-kit specs[x.max_output_power].label
+  EN: Max Output Power
+  near: Level 1 (Low Power): 30.3 W / Level 3 (High Power): 110 W
+  AR: أقصى قدرة خرج
+  CK: زۆرترین وزەی دەرچوون
+#204 [spec_value_text] handheld-vacuum-cleaner-kit specs[x.max_output_power]
+  EN: Level 1 (Low Power): 30.3 W / Level 3 (High Power): 110 W
+  near: Max Output Power
+  AR: المستوى 1 (قدرة منخفضة): 30.3 W / المستوى 3 (قدرة عالية): 110 W
+  CK: ئاستی 1 (وزەی نزم): 30.3 W / ئاستی 3 (وزەی بەرز): 110 W
+#205 [spec_label] handheld-vacuum-cleaner-kit specs[x.button_functions].label
+  EN: Button Functions
+  near: Long Press to Power Toggle / Short Press to Shift Gears
+  AR: وظائف الأزرار
+  CK: ئەرکەکانی دوگمە
+#206 [spec_value_text] handheld-vacuum-cleaner-kit specs[x.button_functions]
+  EN: Long Press to Power Toggle / Short Press to Shift Gears
+  near: Button Functions
+  AR: ضغطة طويلة للتشغيل/الإيقاف / ضغطة قصيرة لتغيير المستوى
+  CK: پەستانی درێژ بۆ هەڵکردن/کوژاندنەوە / پەستانی کورت بۆ گۆڕینی ئاست
+#207 [spec_label] handheld-vacuum-cleaner-kit specs[x.rated_input_power].label
+  EN: Rated Input Power
+  near: 15W
+  AR: قدرة الدخل المقدّرة
+  CK: وزەی چوونەژوورەوەی دیاریکراو
+#209 [spec_value_text] handheld-vacuum-cleaner-kit specs[x.full_charge_time]
+  EN: ~1.5 hours
+  near: Full Charge Time
+  AR: ~1.5 ساعة
+  CK: ~1.5 کاتژمێر
+#210 [spec_label] handheld-vacuum-cleaner-kit specs[x.theoretical_runtime].label
+  EN: Theoretical Runtime
+  near: Level 1 (Low Power): ~43 mins / Level 3 (High Power): ~12 mins
+  AR: مدة التشغيل النظرية
+  CK: ماوەی کارکردنی تیۆری
+#211 [spec_value_text] handheld-vacuum-cleaner-kit specs[x.theoretical_runtime]
+  EN: Level 1 (Low Power): ~43 mins / Level 3 (High Power): ~12 mins
+  near: Theoretical Runtime
+  AR: المستوى 1 (قدرة منخفضة): ~43 دقيقة / المستوى 3 (قدرة عالية): ~12 دقيقة
+  CK: ئاستی 1 (وزەی نزم): ~43 خولەک / ئاستی 3 (وزەی بەرز): ~12 خولەک
+#212 [usage_body] christmas-santa-s-snowcat-cyberbrick-rc usage[0].body.line[0]
+  EN: The Snowcat is designed to work with the CyberBrick Official Remote. Pre-configured settings have been uploaded to MakerWorld for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّم نموذج Snowcat للعمل مع جهاز التحكم CyberBrick Official Remote. وقد رُفعت إعدادات مُعدّة مسبقًا إلى MakerWorld لتتمكن من اللعب فورًا،
+  CK: مۆدێلی Snowcat بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Official Remote دیزاین کراوە. ڕێکخستنی پێشوەختە لە MakerWorld بارکراون بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#213 [usage_body] christmas-santa-s-snowcat-cyberbrick-rc usage[1].body.line[0]
+  EN: *The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Snowcat.
+  AR: *فيما يلي طريقة ربط التطبيق باستخدام CyberBrick Official SoccerBot كمثال، وهي مشابهة لنموذج Snowcat.
+  CK: *ئەوەی خوارەوە پەیوەستکردنی ئەپەکەیە بە نموونەی CyberBrick Official SoccerBot، کە لە مۆدێلی Snowcat دەچێت.
+#215 [doc_title] fcyberbrick-official-forklift-and-truck documents[5]
+  EN: Forklift
+  near: other
+  AR: الرافعة الشوكية (Forklift)
+  CK: فۆرکلیفت (Forklift)
+#216 [doc_title] fcyberbrick-official-forklift-and-truck documents[6]
+  EN: Truck
+  near: other
+  AR: الشاحنة (Truck)
+  CK: لۆری (Truck)
+#217 [doc_title] fcyberbrick-official-forklift-and-truck documents[7]
+  EN: Lift & Load Combo
+  near: other
+  AR: باقة Lift & Load Combo
+  CK: کۆمەڵەی Lift & Load Combo
+#218 [usage_body] arctic-snowcat-cyberbrick-rc usage[0].body.line[0]
+  EN: The Model is designed to work with the CyberBrick Official Remote. Pre-configured settings have been prepared for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّم هذا النموذج للعمل مع جهاز التحكم CyberBrick Official Remote. وقد جُهّزت إعدادات مُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: ئەم مۆدێلە بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Official Remote دیزاین کراوە. ڕێکخستنی پێشوەختە ئامادە کراون بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#219 [doc_title] arctic-snowcat-cyberbrick-rc documents[4]
+  EN: Classic
+  near: other
+  AR: الإصدار الكلاسيكي (Classic)
+  CK: وەشانی کلاسیک (Classic)
+#221 [usage_body] 200mm-xh2-54-female-to-ph2-0-male-conversion-wire usage[0].body.line[0]
+  EN: This cable enables the connection between the 14500 7.4V 800mAh Li-ion Battery - PC003 and the 4 Channels Power Distribution Board (PDB) - IA005, as well as components such as the 100mm Y-Type PH2.0 to Dual SH1.0 Conversion Wire-XC003, delivering a portable, high-capacity power solution.
+  AR: يتيح هذا الكابل التوصيل بين 14500 7.4V 800mAh Li-ion Battery - PC003 و4 Channels Power Distribution Board (PDB) - IA005، وكذلك مكوّنات مثل 100mm Y-Type PH2.0 to Dual SH1.0 Conversion Wire-XC003، ليقدّم حلًا محمولًا للطاقة بسعة عالية.
+  CK: ئەم کێبڵە ڕێگە بە پەیوەستکردن دەدات لە نێوان 14500 7.4V 800mAh Li-ion Battery - PC003 و 4 Channels Power Distribution Board (PDB) - IA005، هەروەها پێکهاتەکانی وەک 100mm Y-Type PH2.0 to Dual SH1.0 Conversion Wire-XC003، و چارەسەرێکی وزەی گوازراوە بە توانای بەرز پێشکەش دەکات.
+#222 [short_description] easy-grip-jumper-shunt description.line[0]
+  EN: This Jumper Shunt is a specialized reset tool designed for the CyberBrick programmable hardware core board. It consists of a plastic cap containing an internal metal conductor, which enables hardware-level system recovery and debugging by physically short-circuiting specific pins on the core board. It serves as an essential accessory for in-depth device maintenance and troubleshooting.
+  AR: جسر التوصيل (Jumper Shunt) هذا أداة إعادة ضبط مخصّصة صُمّمت للوحة النواة ذات العتاد القابل للبرمجة من CyberBrick. ويتكوّن من غطاء بلاستيكي يحتوي على موصل معدني داخلي، يتيح استعادة النظام وتصحيح أخطائه على مستوى العتاد عبر توصيل دبابيس محددة في لوحة النواة توصيلًا قصيرًا فعليًا. ويُعدّ ملحقًا أساسيًا للصيانة المتعمقة للجهاز واستكشاف الأخطاء وإصلاحها.
+  CK: ئەم جەمپەرە (Jumper Shunt) ئامرازێکی تایبەتی ڕیسێتکردنە کە بۆ بۆردی ناوکی ڕەقەکاڵای پرۆگرامپێکراوی CyberBrick دیزاین کراوە. لە قەپاغێکی پلاستیکی پێکدێت کە گەیەنەرێکی کانزایی لە ناوەوەیدایە، و بە کورتە بازنەکردنی فیزیکیی هەندێک پینی دیاریکراو لەسەر بۆردی ناوک، ڕێگە بە گەڕاندنەوەی سیستەم و هەڵەدۆزی لە ئاستی ڕەقەکاڵادا دەدات. پێداویستییەکی بنەڕەتییە بۆ چاککردنەوەی قووڵی ئامێر و چارەسەرکردنی کێشەکان.
+#223 [usage_body] 4x4-mini-off-roader-cyberbrick-rc usage[1].body.line[0]
+  EN: *The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Mini Off-Roader.
+  AR: *فيما يلي طريقة ربط التطبيق باستخدام CyberBrick Official SoccerBot كمثال، وهي مشابهة لنموذج Mini Off-Roader.
+  CK: *ئەوەی خوارەوە پەیوەستکردنی ئەپەکەیە بە نموونەی CyberBrick Official SoccerBot، کە لە مۆدێلی Mini Off-Roader دەچێت.
+#224 [spec_value_text] 4x4-mini-off-roader-cyberbrick-rc specs[compat.statement]
+  EN: To help you understand what additional parts are needed based on the kit you own or plan to buy, please refer to the following table:
+  near: Compatibility
+  AR: لمساعدتك على معرفة القطع الإضافية التي تحتاجها بحسب الطقم الذي تملكه أو تخطط لشرائه، يُرجى الرجوع إلى الجدول التالي:
+  CK: بۆ ئەوەی یارمەتیت بدەین بزانیت پێویستت بە چ پارچەیەکی زیادە هەیە بەپێی ئەو کیتەی کە هەتە یان پلانی کڕینیت هەیە، تکایە سەیری خشتەی خوارەوە بکە:
+#225 [usage_body] relic-rush-board-game usage[0].body.line[0]
+  EN: Relic Rush Board Game is designed to work with the Remote Control. The creator has uploaded pre-configured settings for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّمت لعبة Relic Rush Board Game للعمل مع جهاز التحكم عن بُعد. وقد رفع المصمّم إعدادات مُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: یاریی Relic Rush Board Game بۆ کارکردن لەگەڵ ڕیمۆت دیزاین کراوە. دروستکەرەکە ڕێکخستنی پێشوەختەی بارکردووە بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#227 [doc_title] relic-rush-board-game documents[4]
+  EN: creator’s page on MakerWorld
+  near: other
+  AR: صفحة المصمّم على MakerWorld
+  CK: پەڕەی دروستکەر لە MakerWorld
+#228 [usage_body] xh2-54-male-to-ph2-0-female-conversion-cable usage[0].body.line[0]
+  EN: This connector cable is designed for linking 18650 battery packs equipped with PH2.0 terminals, and supplies power to electronic components fitted with XH2.54 connectors—such as CyberBrick RC Shields.
+  AR: صُمّم كابل التوصيل هذا لربط حزم بطاريات 18650 المزوّدة بأطراف PH2.0، ويزوّد بالطاقة المكوّنات الإلكترونية المزوّدة بموصلات XH2.54، مثل لوحات CyberBrick RC Shields.
+  CK: ئەم کێبڵە گەیەنەرە بۆ بەستنەوەی کۆمەڵە باترییەکانی 18650 دیزاین کراوە کە بە سەری PH2.0 ئامادەکراون، و وزە دەداتە ئەو پێکهاتە ئەلیکترۆنییانەی کە گەیەنەری XH2.54 لەسەر دانراوە — وەک بۆردەکانی CyberBrick RC Shields.
+#229 [usage_body] 50mm-y-type-xh2-54-male-to-dual-xh2-54-female-conversion-cable-2pcs-pd003 usage[0].body.line[0]
+  EN: This cable enables the integration of multiple electronic devices to a single 14500 7.4V 800mAh Li-ion Battery, facilitating a more compact power supply setup.
+  AR: يتيح هذا الكابل ربط عدة أجهزة إلكترونية ببطارية Li-ion واحدة من نوع 14500 7.4V 800mAh، ما يسهّل تجهيز نظام تغذية بالطاقة أكثر إحكامًا.
+  CK: ئەم کێبڵە ڕێگە دەدات چەندین ئامێری ئەلیکترۆنی بە تەنها یەک باتری ببەسترێن (14500 7.4V 800mAh Li-ion)، و ڕێکخستنێکی دابینکردنی وزەی بچووکتر و ڕێکتر ئاسان دەکات.
+#230 [spec_value_text] led-mini-spotlight specs[part.material]
+  EN: Black Aluminum Alloy
+  near: Materials
+  AR: سبيكة ألمنيوم سوداء
+  CK: ئاوێتەی ئەلەمنیۆمی ڕەش
+#231 [spec_value_text] led-mini-spotlight specs[connectivity.interface]
+  EN: USB Type-A with Switch
+  near: Interfaces
+  AR: قابس USB Type-A مع مفتاح
+  CK: فیشی USB Type-A لەگەڵ کلیل
+#233 [spec_value_text] led-mini-spotlight specs[x.dimensions]
+  EN: Height: 40.5 mm; Base: &Oslash;30 mm
+  near: Dimensions
+  AR: الارتفاع: 40.5 mm؛ القاعدة: Ø30 mm
+  CK: بەرزی: 40.5 mm؛ بنکە: Ø30 mm
+#234 [spec_label] led-mini-spotlight specs[x.light_strip_current].label
+  EN: Light Strip Current
+  near: KC026 0.1 A; KC027 0.2 A
+  AR: تيار شريط الإضاءة
+  CK: تەزووی شریتی ڕووناکی
+#235 [spec_label] led-mini-spotlight specs[x.color_temperature_cct].label
+  EN: Color Temperature (CCT)
+  near: 3000K-3200K
+  AR: درجة حرارة اللون (CCT)
+  CK: پلەی گەرمیی ڕەنگ (CCT)
+#236 [spec_label] led-mini-spotlight specs[x.circuit_configuration].label
+  EN: Circuit Configuration
+  near: 1pcs Resistor
+  AR: تكوين الدائرة
+  CK: ڕێکخستنی بازنە
+#237 [spec_value_text] led-mini-spotlight specs[x.circuit_configuration]
+  EN: 1pcs Resistor
+  near: Circuit Configuration
+  AR: مقاومة كهربائية (1 قطعة)
+  CK: بەرگرێکی کارەبایی (1 دانە)
+#239 [usage_body] the-crazy-factory-cyberbrick-rc usage[0].body.line[0]
+  EN: Comes with detailed step-by-step assembly instructions designed to make the build as smooth and enjoyable as possible. Despite its many moving parts and mechanisms, every step is clearly explained, well illustrated, and easy to follow.
+  AR: يأتي مع تعليمات تجميع مفصّلة خطوة بخطوة، صُمّمت لجعل عملية البناء سلسة وممتعة قدر الإمكان. ورغم كثرة أجزائه المتحركة وآلياته، فإن كل خطوة مشروحة بوضوح ومصوّرة جيدًا وسهلة المتابعة.
+  CK: لەگەڵ ڕێنمایی وردی هەنگاو بە هەنگاوی پێکەوەناندا دێت کە بۆ ئەوە دیزاین کراون دروستکردنەکە تا بکرێت نەرم و خۆش بێت. سەرەڕای زۆریی پارچە جووڵاوەکان و میکانیزمەکانی، هەموو هەنگاوێک بە ڕوونی ڕوونکراوەتەوە، بە باشی وێنەی بۆ کێشراوە و شوێنکەوتنی ئاسانە.
+#240 [usage_body] the-crazy-factory-cyberbrick-rc usage[1].body.line[0]
+  EN: The Model is designed to work with the CyberBrick Official Remote. Pre-configured settings has been prepared for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّم هذا النموذج للعمل مع جهاز التحكم CyberBrick Official Remote. وقد جُهّزت إعدادات مُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: ئەم مۆدێلە بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Official Remote دیزاین کراوە. ڕێکخستنی پێشوەختە ئامادە کراون بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#241 [doc_title] the-crazy-factory-cyberbrick-rc documents[9]
+  EN: project’s page on MakerWorld
+  near: other
+  AR: صفحة المشروع على MakerWorld
+  CK: پەڕەی پڕۆژەکە لە MakerWorld
+#242 [usage_body] l-one-desktop-robotic-arm-cyberbrick-rc usage[0].body.line[0]
+  EN: The Desktop Robotic Arm is designed to work with the CyberBrick Remote. The pre-configured settings have been uploaded for immediate play,
+  near: while the CyberBrick App allows full customization of controller functions to match your personal preferences.
+  AR: صُمّمت الذراع الروبوتية المكتبية (Desktop Robotic Arm) للعمل مع جهاز التحكم CyberBrick Remote. وقد رُفعت الإعدادات المُعدّة مسبقًا لتتمكن من اللعب فورًا،
+  CK: قۆڵی ڕۆبۆتیی سەر مێز (Desktop Robotic Arm) بۆ کارکردن لەگەڵ ڕیمۆتی CyberBrick Remote دیزاین کراوە. ڕێکخستنە پێشوەختەکان بارکراون بۆ ئەوەی یەکسەر یاری پێ بکەیت،
+#243 [doc_title] cryptatrope-adventure documents[4]
+  EN: Purchase & Download Models on MakerWorld↗
+  near: other
+  AR: شراء النماذج وتنزيلها على MakerWorld↗
+  CK: کڕین و داگرتنی مۆدێلەکان لە MakerWorld↗
+#244 [doc_title] cryptatrope-adventure documents[5]
+  EN: Chapter 1
+  near: other
+  AR: الفصل 1
+  CK: بەشی 1

@@ -1,0 +1,482 @@
+[
+ {
+  "i": 0,
+  "h": "aca25ac54cc55128165861b73da8904ee2a0f1b94bfbc8f45c1eda43606729d3",
+  "en": "Create a spooky Halloween haunted house display with one Black PLA Basic filament roll, one White PLA Basic filament roll, and one MH001 Kit. A seasonal bundle for haunted house models, Halloween decorations, and atmospheric tabletop scenes.",
+  "kind": "short_description",
+  "ctx": {
+   "handle": "hwb-hauntedhouse",
+   "title": "Halloween Special Bundle - Haunted House",
+   "field": "description.line[0]",
+   "near": ""
+  }
+ },
+ {
+  "i": 6,
+  "h": "59e66b450ec095299d8dfebcc0b83cc6586ae855ab2e39c004a1d29df9c1033e",
+  "en": "[*Note] Learn more about filament compatibility on Bambu Lab Wiki.",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "bambu-hotend-x1c",
+   "title": "Bambu Hotend - X1C",
+   "field": "specs[compat.statement]",
+   "near": "Compatibility"
+  }
+ },
+ {
+  "i": 12,
+  "h": "1f67dd8034b5a9b68f95bbfa0c47f9c15547c35f8f1efd4e16ecafd0de41c3f5",
+  "en": "Standard Flow › Packaging Weight",
+  "kind": "spec_label",
+  "ctx": {
+   "handle": "bambu-hotend-h2-p2s",
+   "title": "Bambu Hotend - H2/P2S/X2D",
+   "field": "specs[x.standard_flow_package_weight].label",
+   "near": "0.026 kg"
+  }
+ },
+ {
+  "i": 18,
+  "h": "a41a2660235c918a9ded52fc6a6a8a5aa8be6e83d88bb65588ee1377a4018f0e",
+  "en": "[Note] Learn more about filament compatibility on Bambu Lab Wiki. Learn more about filament compatibility on Bambu Lab Wiki. For Dual-Nozzle printers (H2D, H2C, X2D) : 1. If you print only single-color filament, we recommend using the Fixed Hotend for printing. 2. If you need multi-color printing with the AMS, connect the AMS to the Fixed Hotend. 3. If you want to use the second hotend for support-material printing, we recommend using the Liftable Hotend. 4. TPU85A is only supported on the Fixed Hotend. TPU95AHF/90A is expected to be supported on the Liftable Hotend starting from firmware version U2. 5. PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "bambu-hotend-h2-p2s",
+   "title": "Bambu Hotend - H2/P2S/X2D",
+   "field": "specs[compat.statement]",
+   "near": "Compatibility"
+  }
+ },
+ {
+  "i": 24,
+  "h": "2ec2b117a61594a2fc5758dd8e0c5b2f67245985aa0b2c8a9798176e9a332b01",
+  "en": "With HRA 90 compared to hardened steel's 74, the Tungsten Carbide nozzle provides exceptional wear resistance. This results in a 50% increase in lifespan when printing abrasive, high-performance fiber-reinforced filaments.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "tungsten-carbide-nozzle-h2-p2s",
+   "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  }
+ },
+ {
+  "i": 31,
+  "h": "511ae5834cde76aa2607fe5c063b6676b485497266aa92167669e0285b19282b",
+  "en": "0.6mm Hotend (LHS)",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "vortek-utility-hotends-bundle",
+   "title": "Vortek Utility Hotends Bundle",
+   "field": "box[2]",
+   "near": "In the box"
+  }
+ },
+ {
+  "i": 37,
+  "h": "0799d4535abd2589e2de65baa37fb8385a2e37a0cc0e9f8a858fbfce97f4b56c",
+  "en": "For TPU printing recommendations, please also refer to the TPU 85A & 90A Printing Guide for the H2 Series on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "h2d-tpu-high-flow-kit",
+   "title": "H2D TPU High-Flow Kit",
+   "field": "usage[1].body.line[1]",
+   "near": "Please refer to the installation guide for the H2D TPU High-Flow Kit available on Bambu Lab Wiki."
+  }
+ },
+ {
+  "i": 43,
+  "h": "974d8b579801885b33c2e61c71f6243ce897a1fe88fbb8ed1734c3ae245965b9",
+  "en": "Up to 120℃",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "bambu-smooth-pei-plate",
+   "title": "Bambu Smooth PEI Plate",
+   "field": "specs[x.surface_temperature_resistance]",
+   "near": "Surface Temperature Resistance"
+  }
+ },
+ {
+  "i": 49,
+  "h": "a946623b7574ca99454c465b39562ccbdd28eab893ea15db327a5fdb4524982c",
+  "en": "Textured PEI - 0.075mm / Smooth PEI - 0.125mm / Stainless Steel Plate - 0.4mm",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "bambu-dual-texture-pei-plate",
+   "title": "Bambu Dual-Texture PEI Plate",
+   "field": "specs[physical.thickness]",
+   "near": "Thickness"
+  }
+ },
+ {
+  "i": 55,
+  "h": "bbb619ba51c5b09852170978084f2d5ccf4f5d31b26f85df12b0c6af23e1f454",
+  "en": "(The instruction below shows you how to remove the prints without damaging the coating)",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "bambu-cool-plate-supertack",
+   "title": "Bambu Cool Plate SuperTack Series",
+   "field": "usage[0].body.line[0]",
+   "near": "Use the scraper included with your printer to gently lift the print, then pry it off carefully. If the print is sticking too tightly, heat the plate on the heat"
+  }
+ },
+ {
+  "i": 62,
+  "h": "b5f9ee56183e8d2f1abebe5a4e5c9c90a4ecd0b8ef73f7c71f3037ff876c59ab",
+  "en": "Includes Glue Stick (1 pc) and Liquid Glue (1 pc)",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "bambu-engineering-plate",
+   "title": "Bambu Engineering Plate",
+   "field": "specs[variant.note]",
+   "near": "Option note"
+  }
+ },
+ {
+  "i": 68,
+  "h": "e543b0163ed77c91dbc0c4d5549eeb7b2683051131c50f77b5fe6aaa34fe254b",
+  "en": "Textured PEI › Packaging Weight",
+  "kind": "spec_label",
+  "ctx": {
+   "handle": "build-plate-combo",
+   "title": "Build Plate Combo",
+   "field": "specs[x.textured_pei_package_weight].label",
+   "near": "0.78 / 0.45 / 0.23 kg"
+  }
+ },
+ {
+  "i": 74,
+  "h": "8448fdd31da23a59b33daf964c10445211c8d0995481aae66ac1332b862a8b26",
+  "en": "Engineering Plate › Packaging Weight",
+  "kind": "spec_label",
+  "ctx": {
+   "handle": "build-plate-combo",
+   "title": "Build Plate Combo",
+   "field": "specs[x.engineering_plate_package_weight].label",
+   "near": "0.5 / 0.78 / 0.78 kg"
+  }
+ },
+ {
+  "i": 80,
+  "h": "ecb05e0ff0c39418f92ef53316bf1007f908d20083004921e6134ddb4ff2ef15",
+  "en": "Cool Plate SuperTack › Packaging Weight",
+  "kind": "spec_label",
+  "ctx": {
+   "handle": "build-plate-combo",
+   "title": "Build Plate Combo",
+   "field": "specs[x.cool_plate_supertack_package_weight].label",
+   "near": "0.22 / 0.48 / 0.46 kg"
+  }
+ },
+ {
+  "i": 86,
+  "h": "3145a7f470e15c338b034475b88dd2623c27eaf42b6caaffa1a95d08d1fbaefe",
+  "en": "24 months",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "glue-stick-for-build-plate",
+   "title": "Glue Stick",
+   "field": "specs[part.life_cycle]",
+   "near": "Life cycle"
+  }
+ },
+ {
+  "i": 93,
+  "h": "12feb40d7b861f7cfb23dbc2965f5155c35f795b6a585b3bf56dc8416b29a8c5",
+  "en": "Plastic, metal, printed circuit board",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "ams-hub",
+   "title": "Bambu Lab AMS Hub",
+   "field": "specs[part.material]",
+   "near": "Materials"
+  }
+ },
+ {
+  "i": 99,
+  "h": "530958a469881f83ada74821c344a674ec1ae776c482e7cb40e4bac8375b2c94",
+  "en": "Apply pressure to the applicator head to open the internal valve; then, spread glue evenly over the print area. After printing, simply clean the build plate and the bottom of the model with water.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "liquid-glue-for-build-plate",
+   "title": "Liquid Glue",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  }
+ },
+ {
+  "i": 105,
+  "h": "5e81b15c5bd0a1c2d641bfbc4a38c7172da793d9aa71463d3a24cca41e1dfbb5",
+  "en": "Anti-Vibration Feet Adapter",
+  "kind": "doc_title",
+  "ctx": {
+   "handle": "anti-vibration-feet",
+   "title": "Anti-Vibration Feet",
+   "field": "documents[2]",
+   "near": "other"
+  }
+ },
+ {
+  "i": 111,
+  "h": "ff832b8e7282e386d0ce158522562909aa3c32c1f66fcad8f448b35e3ff4f028",
+  "en": "5. Right Plastic Panel",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "p1p-enclosure-kit",
+   "title": "P1P Enclosure Kit",
+   "field": "box[4]",
+   "near": "In the box"
+  }
+ },
+ {
+  "i": 117,
+  "h": "44472d61e29792c2c5dc56e92431cac33897389b5adebb62777e2c52191a779d",
+  "en": "Total Weight: 6.5 kg",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "p1p-enclosure-kit",
+   "title": "P1P Enclosure Kit",
+   "field": "box[14]",
+   "near": "In the box"
+  }
+ },
+ {
+  "i": 124,
+  "h": "2e3f14ee3e49aa569519ded00c936fdc5703f3d6692090c9b343f187dae242f0",
+  "en": "2. When the AMS is not being used:",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "bambu-4-in-1-ptfe-adapter",
+   "title": "Bambu 4-in-1 PTFE Adapter",
+   "field": "usage[1].body.line[4]",
+   "near": "- Connect the PTFE tube from the buffer output to one of its IN ends. - Directly insert a maximum of three filament wires into each hole of the Bambu 4-in-1 PTF"
+  }
+ },
+ {
+  "i": 130,
+  "h": "423d5a5c0e088cc46725deb736ee534db433e66a66e4849cb07b408a95060be6",
+  "en": "Learn more about the Lubricant Grease on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "lubricant-grease",
+   "title": "Lubricant Grease",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  }
+ },
+ {
+  "i": 136,
+  "h": "eb0af07971505097485594b8ea2613a9d7c36833ff91517684c00d0707bbb92c",
+  "en": "Lubricant_Oil_MSDS.pdf",
+  "kind": "doc_title",
+  "ctx": {
+   "handle": "lubricant-oil",
+   "title": "Lubricant Oil",
+   "field": "documents[0]",
+   "near": "sds"
+  }
+ },
+ {
+  "i": 142,
+  "h": "493dd42a46ae81191209881e0419ec56ed55eda3bd2fd097e7bb73464ee7df36",
+  "en": "Learn more about the Material Pins on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "material-pins",
+   "title": "Material Pins",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  }
+ },
+ {
+  "i": 148,
+  "h": "b13f27aa176f23133911a3287719523abf49b6866e34e0d2caa274ed970ad6da",
+  "en": "Smoke Purifier Air Filter Combo - White, Gray / Smoke Purifier Primary Filter - White / Smoke Purifier Medium Efficient Particulate Filter - White",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "smoke-purifier-air-filter",
+   "title": "Smoke Purifier Air Filter",
+   "field": "specs[part.color]",
+   "near": "Colour"
+  }
+ },
+ {
+  "i": 155,
+  "h": "4b252cfca96cd513a2706a7fca2fd2d56001c387842f75cc4b5403680b3608bb",
+  "en": "Structural micro-deformations from operational vibration or relocation",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "vision-encoder",
+   "title": "Vision Encoder",
+   "field": "usage[0].body.line[2]",
+   "near": "• Ambient temperature fluctuations"
+  }
+ },
+ {
+  "i": 161,
+  "h": "48a0caeba6351042dec3542c9a5f48ed4a3f94991806b98cc31b22f2073f6e71",
+  "en": "Ensure the toolhead camera is functioning properly, with no HMS errors (e.g., dirty lenses).",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "vision-encoder",
+   "title": "Vision Encoder",
+   "field": "usage[0].body.line[8]",
+   "near": "• Please remove the transparent plastic protective film from the surface of the Vision Encoder before use."
+  }
+ },
+ {
+  "i": 167,
+  "h": "f7d679dc5dc2adb3ecac38caf66d5fbe7c49d91bd8ce00e479ac47ea099ab6d9",
+  "en": "1. The smoke purifier will emit an audible beep when filters reach the end of their service life. For details on replacement and additional instructions, please refer to the quick start guide.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "smoke-purifier",
+   "title": "Smoke Purifier",
+   "field": "usage[0].body.line[0]",
+   "near": "2. After assembly, manually pull the ventilation pipe to confirm that it does not detach. Ensure the clamp is fully secured. The ventilation pipe can extend out"
+  }
+ },
+ {
+  "i": 173,
+  "h": "b83700147fd748ac3e56451c4d48283e1de5740d33ffa6b49785109c507fb236",
+  "en": "Plastic",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "smoke-purifier",
+   "title": "Smoke Purifier",
+   "field": "specs[part.material]",
+   "near": "Materials"
+  }
+ },
+ {
+  "i": 179,
+  "h": "c77e934cb4f4297a79c64289b6790c206bc949735e2f3f3b0fb2e1c4d308d03e",
+  "en": "Learn more about the replacement of hardened steel extruder gear for P1 Series on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "hardened-steel-upgrade-combo",
+   "title": "Hardened Steel Upgrade Combo",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  }
+ },
+ {
+  "i": 186,
+  "h": "b8e088f662dcbcd8b93c5986535b952611bb6622eac2fc5258a67ac56e1b785a",
+  "en": "The 100W USB‑C Smart Soldering Iron Kit includes two custom tips designed specifically for heat-set insert installation, allowing inserts to be installed directly with fast heating and accurate control. This provides a cleaner and more reliable way to add threaded metal fastening points to printed parts.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+   "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  }
+ },
+ {
+  "i": 192,
+  "h": "5791cddf26c193d87713cc9d5a8077043444e326a53c4d51bee5df82913bb29e",
+  "en": "9V/12V/15V/20V, max 100W",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+   "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+   "field": "specs[electrical.rated_power]",
+   "near": "Rated power"
+  }
+ },
+ {
+  "i": 198,
+  "h": "eaf9795dc7839efd4924e4e4f6d4d0fa1a61eb921893caebbfb3ec0b6d828830",
+  "en": "Cable",
+  "kind": "spec_label",
+  "ctx": {
+   "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+   "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+   "field": "specs[x.cable].label",
+   "near": "C2C 250W (E-marker chip), 1.2m, anti-scald/oxidation"
+  }
+ },
+ {
+  "i": 204,
+  "h": "7929e3992f1e674ee574e3176083c472f4c6e81bcbca762b147e25e3267329ea",
+  "en": "The Heat-Stake Nut Tool Tip Set is a specialized tool kit designed for embedding brass heat-set inserts into plastic components. It is ideal for enhancing connections between 3D printed parts and reinforcing the structural integrity of plastic enclosures. This tool set is compatible with a variety of materials including PLA, ABS, PETG and other popular thermoplastics.",
+  "kind": "short_description",
+  "ctx": {
+   "handle": "heat-stake-nut-tool-tip-set-1pcs",
+   "title": "Heat-Stake Nut Tool Tip Set",
+   "field": "description.line[0]",
+   "near": ""
+  }
+ },
+ {
+  "i": 210,
+  "h": "eb98ab087302a05a4f433bef38d5f105b754d7a5f5b4b8dc4adb0765afa605e8",
+  "en": "Laser Type",
+  "kind": "spec_label",
+  "ctx": {
+   "handle": "laser-upgrade-kit",
+   "title": "Laser Upgrade Kit",
+   "field": "specs[x.laser_type].label",
+   "near": "Semiconductor Laser"
+  }
+ },
+ {
+  "i": 217,
+  "h": "c3380748a8dd990e44d082f36c68e378480e33c4640a7f6681e7a87b0ce71e1b",
+  "en": "Laser Safety Class for Laser Module",
+  "kind": "spec_label",
+  "ctx": {
+   "handle": "laser-upgrade-kit",
+   "title": "Laser Upgrade Kit",
+   "field": "specs[x.laser_safety_class_for_laser_module].label",
+   "near": "Class 4"
+  }
+ },
+ {
+  "i": 223,
+  "h": "2236e71aa311f9a4243abf14e6b2b9d71805295909fa1ef9a3f980f092d5a8e2",
+  "en": "White, Black",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "ams-hub-a1-series",
+   "title": "AMS Hub - A1 Series",
+   "field": "specs[part.color]",
+   "near": "Colour"
+  }
+ },
+ {
+  "i": 229,
+  "h": "0f188b65618553dc35886996dfef9a1249edf8043539778edf7aaf21afed9792",
+  "en": "Routine maintenance, upgrades, and printed part assembly often require accessing tightly spaced screws on hotends, extruders, frames, and small mechanical components. This precision screwdriver kit provides the essential tools needed to handle these tasks efficiently and safely.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "maker-s-supply-screwdriver-kit",
+   "title": "Maker's Supply Screwdriver Kit",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  }
+ },
+ {
+  "i": 235,
+  "h": "9ddea63b51d4158e84e56641528724de928e07844c466a9427ebaed6d129dd20",
+  "en": "Wipe bits dry after use in humid environments to maintain rust resistance.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "maker-s-supply-screwdriver-kit",
+   "title": "Maker's Supply Screwdriver Kit",
+   "field": "usage[1].body.line[4]",
+   "near": "Always match the bit size to your screw to prevent damage."
+  }
+ },
+ {
+  "i": 241,
+  "h": "be75fab84019f7703403ef31b04cf394f01add1a9475c8ca9e3feffbe0ae5451",
+  "en": "Bit Length",
+  "kind": "spec_label",
+  "ctx": {
+   "handle": "maker-s-supply-screwdriver-kit",
+   "title": "Maker's Supply Screwdriver Kit",
+   "field": "specs[x.bit_length].label",
+   "near": "Approx. 100 mm, suitable for blind holes up to 60 mm depth"
+  }
+ }
+]

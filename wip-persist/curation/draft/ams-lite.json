@@ -1,0 +1,527 @@
+{
+  "handle": "ams-lite",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T11:11:41Z",
+  "searched": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "keys": [
+        "ams.*",
+        "printing.*",
+        "extrusion.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*",
+        "part.material",
+        "compat.statement"
+      ],
+      "note": "Cached copy read in full (no tables): Precautions before use, feeding system, functions, workflow."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-lite",
+      "title": "AMS lite | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:25:11Z",
+      "keys": [
+        "ams.*",
+        "electrical.*",
+        "physical.*",
+        "safety.*",
+        "package.contents",
+        "compat.statement"
+      ],
+      "note": "An index of article links only (no values). The linked FAQ, Glossary, Packing Guide, Installation, LED status and maintenance articles are not cached and were not read."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "compat.statement"
+      ],
+      "note": "Cached copy read in full; AMS lite facts in \"3. AMS & AMS lite\" (text and the AMS / AMS lite Compatibility column)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "keys": [
+        "ams.*",
+        "compat.statement",
+        "connectivity.interface",
+        "electrical.*"
+      ],
+      "note": "Cached copy read in full; AMS lite in AMS Connection Components › AMS, A1 Series and A2L Connection Guide. The drying power section concerns the AMS 2 Pro / AMS HT only."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "title": "A2L AMS Connection Guide | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:24:08Z",
+      "keys": [
+        "ams.*",
+        "connectivity.interface",
+        "electrical.*",
+        "compat.statement",
+        "printing.multi_color"
+      ],
+      "note": "Cached copy read in full; AMS lite in Preface, A2L + 4 AMS + 1 AMS lite (Required Accessories, Step 5) and FAQs."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/ams-lite",
+      "title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "retrieved_at": "2026-10-16T06:57:31Z",
+      "keys": [
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "part.material",
+        "printing.*",
+        "extrusion.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "safety.*",
+        "ams.*",
+        "compat.statement"
+      ],
+      "note": "Corpus copy parsed with extractPage/buildImportPayload: AMS lite Tech Specs (10 rows and three table notes), feature blocks, What's in the box, options (Compatibility: A1&A2 Series)."
+    }
+  ],
+  "specs": [
+    {
+      "key": "ams.slots",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "AMS Workflow › Check Filament location",
+      "quote": "When all four slots have filaments inserted, AMS cannot determine which slot the filament is dispensed from based on the sensors alone.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "Same page: \"The PTFE tubes corresponding to each slot of the AMS lite are connected to the filament hub, which holds the four tubes together.\" The store box lists \"AMS lite Rotary Spool Holder (x4)\"."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "1",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "AMS Connection Components › AMS",
+      "quote": "The AMS lite is only compatible with A series printers. Each A series printer supports only one AMS lite.",
+      "test_method": "",
+      "test_condition": "Per A series printer",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "note": "The AMS lite intro agrees (\"The A1 series printers can be connected to a single AMS lite\"). On an A1 series printer it cannot be combined with other AMS models; the A2L takes up to 4 AMS units plus 1 AMS lite (A1 Series / A2L Connection Guide sections of the same page)."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Only compatible with A series printers; each A series printer supports only one AMS lite.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "AMS Connection Components › AMS",
+      "quote": "The AMS lite is only compatible with A series printers. Each A series printer supports only one AMS lite.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "conflict_note": "The store page row compat.statement (unverified, \"compatibility section\") holds feature prose about spools: \"The spring loaded rotary spool holder grips the spool at the center hole, improving spool compatibility especially for those paper spools.\" It is not a printer compatibility statement. This official_doc row outranks it; the merge records the disagreement.",
+      "note": "The AMS lite intro adds: \"AMS lite is unsuitable for use with X1 and P1 series printers.\" The store option value is \"A1&A2 Series\"."
+    },
+    {
+      "key": "printing.multi_color",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Up to 4 colours",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "Precautions before use › 1",
+      "quote": "The A1 series printers can be connected to a single AMS lite, limiting its support to a maximum of 4-color printing.",
+      "test_method": "",
+      "test_condition": "One AMS lite on an A1 series printer",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "On the A2L combined with 4 AMS units the AMS lite provides 3 feeding channels (A2L AMS Connection Guide, FAQ: \"the AMS lite provides 3 feeding channels ... enabling up to 19-color printing\")."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "AMS lite feeding system › First stage feeder",
+      "quote": "Each slot in AMS lite is equipped with a feeder responsible for feeding the filament into or out of the tool head. The feeder includes a filament detection sensor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "Same page, \"Filament run-out detection and filament backup function\": the feeder's Hall switch is checked when the tool head detects run-out."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "AMS lite feeding system › First stage feeder",
+      "quote": "Each feeder is equipped with an odometer featuring a passive wheel.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:05Z"
+    },
+    {
+      "key": "connectivity.interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "4-pin cable to the printer's 4-pin interface",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "source_title": "A2L AMS Connection Guide | Bambu Lab Wiki",
+      "locator": "A2L + 4 AMS + 1 AMS lite › Operation Steps › Step 5: Connect the AMS lite",
+      "quote": "Insert the cable into the two cable organizers, then plug it into the printer's 4-pin interface.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:08Z",
+      "note": "Same page, Required Accessories › AMS and Cable: \"AMS lite | 1 | Comes with a 4-pin cable\". The store box lists \"Bambu Bus Cable-4Pin\"."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "ASA",
+        "PET",
+        "PA",
+        "PC",
+        "PVA (dry)",
+        "BVOH (dry)",
+        "PP",
+        "POM",
+        "HIPS",
+        "Bambu PLA-CF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "locator": "AMS lite Tech Specs › row 7 (Supported Filament*¹)",
+      "quote": "PLA, PETG,ASA, PET, PA, PC, PVA (dry), BVOH (dry), PP, POM, HIPS and Bambu PLA-CF",
+      "test_method": "",
+      "test_condition": "Judged from loading/unloading only (table note *¹); printer compatibility is checked separately",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:31Z",
+      "conflict_note": "The page row parses as x.supported_filament_1 (the footnote marker \"*¹\" defeats the \"Supported Filament\" synonym); same items, this row types them. The wiki filament guide (AMS / AMS lite column) also names PLA Metal/Wood/Marble, PETG HF/Translucent, Support for PLA, PLA/PETG and PA/PET, and Bambu PA-CF / PAHT-CF as compatible, while its text says PLA Wood is not recommended for the AMS lite."
+    },
+    {
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "TPE",
+        "TPU",
+        "PVA (wet)",
+        "BVOH (wet)",
+        "Bambu PET-CF",
+        "Bambu PA6-CF",
+        "Bambu TPU 95A",
+        "other brand filament that contains carbon fiber or glass fiber"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "locator": "AMS lite Tech Specs › row 9 (Unsupported Filament*³)",
+      "quote": "TPE, TPU, PVA (wet), BVOH (wet), Bambu PET-CF / PA6-CF / TPU 95A and other brand filament that contains carbon fiber or glass fiber",
+      "test_method": "",
+      "test_condition": "Too soft, too brittle or too abrasive for the AMS lite (table note *³)",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:31Z",
+      "conflict_note": "The page row parses as x.unsupported_filament_3 (footnote marker \"*³\"); same items, here \"Bambu PET-CF / PA6-CF / TPU 95A\" is three items. The wiki filament guide agrees on TPU and PET-CF/GF (Not Compatible) and adds PPA-CF/GF and PPS-CF/GF. Not the \"Not Recommended Filament*²\" row (Bambu PLA Glow, Bambu PETG-CF, generic glow PLA), which has no registry key and stays x.not_recommended_filament_2; the wiki also marks ABS and ABS-GF \"AMS lite: Not Recommended\"."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "target_source_handle": "a1",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681813619666947",
+        "value_text": "A1&A2 Series"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "locator": "Precautions before use › 1",
+      "quote": "The A1 series printers can be connected to a single AMS lite, limiting its support to a maximum of 4-color printing.",
+      "note": "One AMS lite per A1 series printer; on the A1 series it cannot be combined with other AMS models (multi-model AMS guide, A1 Series Connection Guide)."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "A2L",
+      "target_source_handle": "a2l",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681813619666947",
+        "value_text": "A1&A2 Series"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "locator": "Preface",
+      "quote": "The A2L printer supports connection with external spool, AMS lite and AMS / AMS 2 Pro / AMS HT",
+      "note": "The store option value is \"A1&A2 Series\". The A2L takes up to 4 AMS units plus 1 AMS lite; the AMS lite then provides 3 feeding channels."
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "family",
+      "target_label": "X1 Series",
+      "target_source_handle": "refurbished-x1c",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "locator": "Precautions before use › 2",
+      "quote": "AMS lite is unsuitable for use with X1 and P1 series printers."
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "family",
+      "target_label": "P1 Series",
+      "target_source_handle": "p1s",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "locator": "Precautions before use › 2",
+      "quote": "AMS lite is unsuitable for use with X1 and P1 series printers."
+    }
+  ],
+  "in_the_box": [
+    {
+      "text": "AMS lite Body",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "locator": "What's in the box › 1",
+      "quote": "AMS lite Body",
+      "retrieved_at": "2026-10-16T06:57:31Z"
+    },
+    {
+      "text": "AMS lite Stand",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "locator": "What's in the box › 2",
+      "quote": "AMS lite Stand",
+      "retrieved_at": "2026-10-16T06:57:31Z"
+    },
+    {
+      "text": "AMS lite Rotary Spool Holder",
+      "qty": 4,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "locator": "What's in the box › 3",
+      "quote": "AMS lite Rotary Spool Holder (x4)",
+      "retrieved_at": "2026-10-16T06:57:31Z"
+    },
+    {
+      "text": "Allen Key H2",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "locator": "What's in the box › 4",
+      "quote": "Allen Key H2",
+      "retrieved_at": "2026-10-16T06:57:31Z"
+    },
+    {
+      "text": "PTFE Tubes for AMS lite",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "locator": "What's in the box › 5",
+      "quote": "PTFE Tubes for AMS lite",
+      "retrieved_at": "2026-10-16T06:57:31Z"
+    },
+    {
+      "text": "Screw (For AMS Stand)",
+      "qty": 5,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "locator": "What's in the box › 6",
+      "quote": "Screw (×5) (For AMS Stand)",
+      "retrieved_at": "2026-10-16T06:57:31Z"
+    },
+    {
+      "text": "Bambu Bus Cable-4Pin",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite - Automatic Material System (store page)",
+      "locator": "What's in the box › 7",
+      "quote": "Bambu Bus Cable-4Pin",
+      "retrieved_at": "2026-10-16T06:57:31Z"
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "title": "Introduction to the modules and functions of AMS lite",
+      "text": "Introduction to the modules and functions of AMS lite",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "Linked from the store page (\"Learn more about how AMS lite works\")."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-lite",
+      "title": "AMS lite",
+      "text": "AMS lite",
+      "retrieved_at": "2026-10-16T08:25:11Z",
+      "note": "The AMS lite wiki hub. The store page links it as \"Quick Start Guide\"; the hub's own Quick Start Guide link points to bambulab.com/en/support/documentation (not an allowed document host)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "Linked from the store page (\"Filament Guide\"); section \"3. AMS & AMS lite\"."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "title": "Connection Guide for Multiple AMS Units with Different Printer Models",
+      "text": "Connection Guide for Multiple AMS Units with Different Printer Models",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "note": "Not linked from this store page; official wiki page cached for ams-2-pro. AMS lite: AMS Connection Components, A1 Series and A2L sections."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "title": "A2L AMS Connection Guide",
+      "text": "A2L AMS Connection Guide",
+      "retrieved_at": "2026-10-16T08:24:08Z",
+      "note": "Not linked from this store page; official wiki page cached for a2l. Connecting an AMS lite to the A2L."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/EN/x1/manual/ams-setup-and-filament-loading",
+      "title": "AMS setup and filament loading",
+      "text": "Non Bambu Lab Filaments need to be manually configured in Bambu Studio or in the printer",
+      "note": "Linked from the store page (the whole sentence is the link text; the builder uses it as the title). An X1 page; not cached, so not read for specs."
+    }
+  ],
+  "not_published": [
+    "electrical.voltage",
+    "electrical.current",
+    "electrical.rated_power",
+    "electrical.max_power",
+    "physical.noise",
+    "physical.operating_temp",
+    "safety.certifications"
+  ]
+}

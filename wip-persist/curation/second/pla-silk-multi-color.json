@@ -1,0 +1,796 @@
+{
+  "handle": "pla-silk-multi-color",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T17:41:31Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*"
+      ],
+      "note": "All 5 pages read (pdftotext per page): Basic Info, Specifications, Recommended Printing Settings (p.1-2), Physical and Mechanical Properties (p.2), Other Properties and Specimen Test (p.3), specimen drawings and Disclaimer (p.4-5). Headed \"PLA Silk\"; its Basic Info describes PLA Silk Dual-Color. No hardness, no filament length, no tolerance, no certification."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s1/default/805aa06ac0aa426db6ac3141eb326d8a/SDS20251127A05_Bambu_PLA_Silk.pdf",
+      "title": "Bambu PLA Silk Safety Data Sheet SDS20251127A05 (Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:24:12Z",
+      "keys": [
+        "material.density",
+        "material.type",
+        "thermal.melting_temp",
+        "mechanical.hardness",
+        "material.length"
+      ],
+      "note": "All 20 pages read (text layer). Manufacturer-prepared (Shenzhen Tuozhu Technology). Product \"Bambu PLA Silk\", model A05-xx. Section 3: PLA 60-90 %, TPU 10-40 %. Section 9: melting point, density and the other physical data \"No data available\". Section 14: not hazardous goods. No numeric value stored from it."
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "retrieved_at": "2026-10-16T08:24:13Z",
+      "keys": [],
+      "note": "One image-only page (no text layer); read from a 250 dpi render. All 10 colours of the page's Colour group are listed; swatch pixels match the printed codes."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "drying.*",
+        "mechanical.impact_strength",
+        "mechanical.hardness",
+        "material.length",
+        "print_settings.*"
+      ],
+      "note": "PLA family guide. PLA Silk rows: drying (convection oven 55 °C 8 h, hot bed 70 °C 12 h, AMS HT/AMS 2 Pro 55 °C 8 h), hardware compatibility, impact strength (Z) 8.5 kJ/m² for PLA Silk generally. Family-level: nothing stored as a spec."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.nozzle_temp",
+        "print_settings.bed_temp",
+        "print_settings.recommended_plate",
+        "drying.*"
+      ],
+      "note": "Family table rows for \"PLA*\" (note ② includes PLA Silk): nozzle 190 - 240 °C, plates and bed temperatures, AMS / AMS lite compatible, drying 55 °C 8 h. Family-level: used only as relation evidence."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PLA Silk\": heatbed 65-75 °C 12 h, forced-air oven 55 °C 8 h, AMS 2 Pro 45 °C 12 h, AMS HT 45 °C 12 h. Agrees with the TDS."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-silk-multi-color",
+      "title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:01:21Z",
+      "keys": [
+        "material.diameter",
+        "material.diameter_tolerance",
+        "material.net_weight",
+        "material.spool_type"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload, format page_builder): 3 groups, 12 values, 10 variants; specs material.diameter 1.75 mm, material.diameter_tolerance 0.03 mm, material.net_weight 1 kg (value scope); density and nozzle temperature not_found."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PLA",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polylactic acid",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "The SDS (p.5, section 3) gives the composition as Polylactic acid 60-90 % and Thermoplastic Polyurethane 10-40 % by weight; the TDS heading names the material \"PLA Silk\"."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "nominal (TDS Specifications table)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Agrees with the store page feature bullet \"Diameter: 1.75mm +/- 0.03mm\" (the tolerance is stated by the store page only, not by the TDS)."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681970461470733",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "nominal (TDS Specifications table)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Scoped to the store page's only weight value \"1 kg\" (group \"Size\"/net weight), where the page already records 1 kg at official_variant rank; the TDS agrees."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.32,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.32 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "TDS typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z"
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Basic Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/pla-silk-multi-color",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Product Features › bullet 2",
+      "quote": "Comes with Basic Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:01:21Z",
+      "note": "Feature-bullet prose, so unverified. The TDS (p.1) adds the spool itself: \"Spool Material ABS (Temperature resistance 70 °C)\", \"Spool Size Diameter: 200 mm; Height: 67 mm\" (no registry key for either)."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 152,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 152 °C",
+      "test_method": "DSC",
+      "test_condition": "10 °C/min",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z"
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 57,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 57 °C",
+      "test_method": "DSC",
+      "test_condition": "10 °C/min",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 56,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 56 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "TDS typical value (the TDS spells it \"Vicar\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 53,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (0.45 MPa)",
+      "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 53 °C",
+      "test_method": "ISO 75",
+      "test_condition": "0.45 MPa load",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "The same table also gives \"Heat Deflection Temperature ISO 75 1.8 MPa 50 °C\"; one row per key, so the 0.45 MPa value is stored and the 1.8 MPa value is kept here."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 27,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 27 ± 4 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "X-Y, ±4 MPa; printed specimen; nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Printed-specimen result (TDS p.3 Specimen Test). Z: \"Tensile Strength (Z) ISO 527, GB/T 1040 18 ± 4 MPa\". Young's Modulus 1830 ± 210 MPa (X-Y) / 1250 ± 140 MPa (Z) has no registry key."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 3.5,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 3.5 ± 0.6 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "X-Y, ±0.6 %; printed specimen; nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Printed-specimen result. Z: \"Breaking Elongation Rate (Z) ISO 527, GB/T 1040 1.7 ± 0.2 %\"."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 66,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 66 ± 4 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "X-Y, ±4 MPa; printed specimen; nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Printed-specimen result. Z: \"Bending Strength (Z) ISO 178, GB/T 9341 21 ± 5 MPa\"."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2370,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2370 ± 150 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "X-Y, ±150 MPa; printed specimen; nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Printed-specimen result. Z: \"Bending Modulus (Z) ISO 178, GB/T 9341 1840 ± 160 MPa\"."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 24.5,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 24.5 ± 1.7 kJ/m²；8.2 ± 0.5 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "X-Y, unnotched, ±1.7 kJ/m²; printed specimen; nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Printed-specimen result. Notched X-Y: 8.2 ± 0.5 kJ/m². Z: \"Impact Strength (Z) ISO 179，GB/T 1043 4.6 ± 1.1 kJ/m²\". The wiki PLA guide (§4.3) gives \"PLA Silk | 8.5kJ/m²\" for Impact Strength (Z) of PLA Silk generally; not stored (not this product's document, and it differs from this TDS's 4.6)."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 210,
+        "max": 240
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 210 - 240 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Range sanity: inside 150-350 °C. The wiki material table gives 190 - 240 for PLA* generally; the product TDS value is stored."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45°C",
+      "test_method": "",
+      "test_condition": "recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z"
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 250 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 250 mm/s",
+      "test_method": "",
+      "test_condition": "recommended printing setting (upper limit only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "An upper bound with no lower bound, kept as text. The store page separately recommends reducing the outer wall speed to 40 mm/s."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z"
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h",
+      "test_method": "",
+      "test_condition": "blast drying oven (forced-air), before printing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Second method on the same row: \"X1 Series Printer Heatbed: 65 - 75 °C, 12 h\". The wiki drying guide (Appendix I, PLA Silk) agrees: forced-air oven 55 °C, 8 h; heatbed 65-75 °C, 12 h; AMS 2 Pro / AMS HT 45 °C, 12 h."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h",
+      "test_method": "",
+      "test_condition": "blast drying oven (forced-air) at 55 °C, before printing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:11Z",
+      "note": "Heatbed alternative: 12 h at 65 - 75 °C (X1 Series)."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Mystic Magenta (13913)",
+      "source_value_id": "665320147333804033",
+      "hexes": [
+        "#720062",
+        "#3A913F"
+      ],
+      "dual_color": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 1, column 1",
+      "quote": "Mystic Magenta (Green-Purple) Hex: #720062, #3A913F",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "value_text": "Phantom Blue (13916)",
+      "source_value_id": "665320147333804034",
+      "hexes": [
+        "#00629B",
+        "#000000"
+      ],
+      "dual_color": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 1, column 2",
+      "quote": "Phantom Blue (Blue-Black) Hex: #00629B, #000000",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "value_text": "Velvet Eclipse (13905)",
+      "source_value_id": "564681970461470727",
+      "hexes": [
+        "#000000",
+        "#A34342"
+      ],
+      "dual_color": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 2, column 1",
+      "quote": "Velvet Eclipse (Black-Red) Hex: #000000, #A34342",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "value_text": "Midnight Blaze (13902)",
+      "source_value_id": "564681970461470729",
+      "hexes": [
+        "#0047BB",
+        "#7D1B49"
+      ],
+      "dual_color": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 2, column 2",
+      "quote": "Midnight Blaze (Blue-Red) Hex: #0047BB, #7D1B49",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "value_text": "Gilded Rose (13901)",
+      "source_value_id": "564681970461470730",
+      "hexes": [
+        "#FF9425",
+        "#FCA2BF"
+      ],
+      "dual_color": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 3, column 1",
+      "quote": "Gilded Rose (Pink-Gold) Hex: #FF9425,#FCA2BF",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "value_text": "Blue Hawaii (13904)",
+      "source_value_id": "564681970461470731",
+      "hexes": [
+        "#60A4E8",
+        "#4CE4A0"
+      ],
+      "dual_color": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 3, column 2",
+      "quote": "Blue Hawaii (Blue-Green) Hex: #60A4E8,#4CE4A0",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "value_text": "Neon City (13903)",
+      "source_value_id": "564681970461470728",
+      "hexes": [
+        "#0047BB",
+        "#BB22A3"
+      ],
+      "dual_color": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 4, column 1",
+      "quote": "Neon City (Blue-Magenta) Hex: #0047BB, #BB22A3",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "value_text": "Aurora Purple (13909)",
+      "source_value_id": "601310725769670658",
+      "hexes": [
+        "#7F3696",
+        "#006EC9"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 4, column 2",
+      "quote": "Aurora Purple Hex: #7F3696,#006EC9",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "value_text": "South Beach (13906)",
+      "source_value_id": "601310725769670659",
+      "hexes": [
+        "#F772A4",
+        "#00918B"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 5, column 1",
+      "quote": "South Beach Hex: #F772A4,#00918B",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "value_text": "Dawn Radiance (13912)",
+      "source_value_id": "601310725769670657",
+      "hexes": [
+        "#EC984C",
+        "#6CD4BC",
+        "#A66EB9",
+        "#D87694"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "locator": "p.1 (image-only page), row 5, column 2",
+      "quote": "Dawn Radiance Hex: #EC984C,#6CD4BC,#A66EB9,#D87694",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_family": "ams_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide | Bambu Lab Wiki",
+      "locator": "§1.1 Hardware compatibility › PLA Silk / Silk+ › Component Compatibility",
+      "quote": "PLA Silk / Silk+ | All standard nozzles are acceptable (A 0.4 mm nozzle is recommended) | Not recommended to use low-temperature stabilization board | Fully compatible with the AMS series",
+      "also": [
+        {
+          "evidence_kind": "feature_bullet",
+          "source_url": "https://us.store.bambulab.com/products/pla-silk-multi-color",
+          "locator": "Product Features › Cautions for Use › bullet 1",
+          "quote": "All AMS Series Compatible"
+        },
+        {
+          "evidence_kind": "wiki_table",
+          "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+          "locator": "§3 AMS & AMS lite › PLA* (note ② includes PLA Silk)",
+          "quote": "PLA* | Compatible | Compatible | Compatible |"
+        }
+      ],
+      "retrieved_at": "2026-10-16T08:22:37Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-silk-multi-color",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Printing Tips › 1.Accessory Compatibility",
+      "quote": "Not Compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm.",
+      "retrieved_at": "2026-10-16T07:01:21Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Hardened Steel Nozzle 0.6 mm",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-silk-multi-color",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Printing Tips › 1.Accessory Compatibility",
+      "quote": "Not Compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm.",
+      "retrieved_at": "2026-10-16T07:01:21Z",
+      "note": "Split from the source phrase \"Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Hardened Steel Nozzle 0.8 mm",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-silk-multi-color",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Printing Tips › 1.Accessory Compatibility",
+      "quote": "Not Compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm.",
+      "retrieved_at": "2026-10-16T07:01:21Z",
+      "note": "Split from the source phrase \"Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm\"."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+      "title": "Filament TDS",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Silk (Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf)",
+      "retrieved_at": "2026-10-16T08:24:11Z"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s1/default/805aa06ac0aa426db6ac3141eb326d8a/SDS20251127A05_Bambu_PLA_Silk.pdf",
+      "title": "Filament MSDS",
+      "source_title": "Bambu PLA Silk Safety Data Sheet SDS20251127A05 (Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:24:12Z"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+      "title": "Hex Code",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk Multi-Color",
+      "retrieved_at": "2026-10-16T08:24:13Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS and build plate compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "filament drying instructions",
+      "retrieved_at": "2026-10-16T08:22:43Z"
+    }
+  ],
+  "not_published": [
+    "mechanical.hardness",
+    "material.length"
+  ],
+  "notes": [
+    "The only TDS the page links is the PLA Silk Dual Color sheet (headed \"PLA Silk\"; Basic Info describes the Dual-Color line). The page links it as the product's \"Filament TDS\" for every colour, so its values are scoped to the product; the three Gradient colours (Aurora Purple, South Beach, Dawn Radiance) have no separate TDS among the documents.",
+    "Mechanical values are printed-specimen results in X-Y (TDS p.3 Specimen Test: 230 °C nozzle, 35 °C bed, 200 mm/s, 100% infill, annealed and dried 55 °C 8 h). The registry has no printed/material split and no Z-direction keys; Z values are kept in each row's note.",
+    "TDS values with no registry key: Melt Index 20.5 ± 1.2 g/10 min (210 °C, 2.16 kg); Crystallization Temperature N/A; Saturated Water Absorption Rate 0.52% (25 °C, 55% RH); Young's Modulus 1830 ± 210 MPa (X-Y) / 1250 ± 140 MPa (Z); Printing and Storage Humidity < 20% RH (sealed, with desiccant); Nozzle Size 0.2, 0.4, 0.6, 0.8 mm; Retraction Length 0.6 - 1.0 mm; Retraction Speed 20 - 40 mm/s; Chamber Temperature 25 - 45 °C; Max Overhang Angle 55 °; Max Bridging Length ~ 30 mm; Support Material Support for PLA; Bed Surface Preparation Glue; Spool Material ABS (Temperature resistance 70 °C); Spool Size Diameter 200 mm, Height 67 mm; suggested annealing 50 to 55 °C for 6 to 12 h.",
+    "TDS p.1 lists Nozzle Size 0.2-0.8 mm while the store page FAQ says the product is not compatible with hardened steel 0.6 / 0.8 mm nozzles; both kept as stated (the nozzle-size row is not a hardened-steel statement).",
+    "The store page FAQ says use with A-series printers is not recommended (risk of filament rotation for PLA Silk Dual Color). No relation kind expresses \"not recommended\"; not recorded as a relation.",
+    "The hex table prints two codes for each Dual Color value and 2-4 for each Gradient value, so each entry carries \"hexes\" in the printed order (Mystic Magenta and Gilded Rose list their codes in the reverse order of their parenthesised colour names).",
+    "safety.certifications is neither stored nor listed as not_published: the page's RoHS document (cdn.shopify.com/.../Bambu_PLA_Silk_RoHS.pdf) is not in the offline cache and was not read."
+  ]
+}

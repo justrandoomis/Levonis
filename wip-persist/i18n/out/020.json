@@ -1,0 +1,1761 @@
+[
+ {
+  "h": "3521fc13e90d2c4472983cba12fe807ffc8696d568170e07e18b8aeb12724a4c",
+  "en": "Big job. Light work.",
+  "ar": "مهام كبيرة. بجهد خفيف.",
+  "ckb": "کاری گەورە. ماندووبوونی کەم.",
+  "kind": "block_title"
+ },
+ {
+  "h": "7b2c136dd56dfa661082100fc320202d6528ebcef71a560574f20b0e4c4cd502",
+  "en": "See what R1 can make.",
+  "ar": "شاهد ما يمكن أن يصنعه R1.",
+  "ckb": "ببینە ئامێری R1 چی دەتوانێت دروست بکات.",
+  "kind": "block_title"
+ },
+ {
+  "h": "efbab942b26a9864bcc8e753bb5c73cb1b1face7c1395576d4e699a801768e86",
+  "en": "PlayDeck – Modular Play Table & Stool Set @janberrydesign",
+  "ar": "PlayDeck – Modular Play Table & Stool Set @janberrydesign",
+  "ckb": "PlayDeck – Modular Play Table & Stool Set @janberrydesign",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "87c0415af3ff9434e6376fe25734946b3ef0ed1f4bd282d7c0b9081532dcc42b",
+  "en": "Crystal Canyon Mine – Marble Run @Daniel4d",
+  "ar": "Crystal Canyon Mine – Marble Run @Daniel4d",
+  "ckb": "Crystal Canyon Mine – Marble Run @Daniel4d",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "f9b5d0d96964df398032d7aa045568977337ae4829edbf1b969f0ab92fdf5433",
+  "en": "Prairie Lamp @Makim",
+  "ar": "Prairie Lamp @Makim",
+  "ckb": "Prairie Lamp @Makim",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "61333ecc6f5cefbb82f34be07bd3a5f72d4b165910f88af9478933cc00cc54a2",
+  "en": "Sunflower Painting @miyabi",
+  "ar": "Sunflower Painting @miyabi",
+  "ckb": "Sunflower Painting @miyabi",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "30b2c9fa1996c1e0809fbea91e18c50eaf237d65abc5d680a374a4a95bf62e4b",
+  "en": "Thundercloud – Layered Acrylic Lamp @Daniel4d",
+  "ar": "Thundercloud – Layered Acrylic Lamp @Daniel4d",
+  "ckb": "Thundercloud – Layered Acrylic Lamp @Daniel4d",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "e9907a8bfbbac86a92978973ccea6c7461b8ec318247788979bd036ff9ba4e84",
+  "en": "Layered Clock @Bambu Lab",
+  "ar": "Layered Clock @Bambu Lab",
+  "ckb": "Layered Clock @Bambu Lab",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "5272af041377a26c3e2d6a9ad9d4fe11d192aa026bfbebed09a21f05f1190011",
+  "en": "CO₂ laser. Wood to glass. Tabletop decor to furniture.",
+  "ar": "ليزر CO₂. من الخشب إلى الزجاج. من ديكورات الطاولة إلى الأثاث.",
+  "ckb": "لەیزەری CO₂. لە دارەوە بۆ شووشە. لە ڕازاندنەوەی سەر مێزەوە بۆ مۆبیلیا.",
+  "kind": "block_title"
+ },
+ {
+  "h": "6146451cfddbc2c8ffc3cf8fc51e8c4d6ae12497a3f537a3103546d022c91b9c",
+  "en": "A 55W CO₂ laser with Bambu Lab's proven motion control, making laser work faster, finer, and easier.",
+  "ar": "ليزر CO₂ بقدرة 55W مع نظام التحكم في الحركة المجرَّب من Bambu Lab، ليجعل العمل بالليزر أسرع وأدق وأسهل.",
+  "ckb": "لەیزەری CO₂ بە توانای 55W، لەگەڵ کۆنترۆڵی جووڵەی سەلمێنراوی Bambu Lab، کە کاری لەیزەر خێراتر و وردتر و ئاسانتر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "386db83a03c59e2b24b78fec9ce87129f2cf78383c61f22d5ced46ed38076634",
+  "en": "The 55W CO₂ laser cuts up to 18 mm walnut and 20 mm acrylic¹ in a single pass — fast, clean, and without the extra passes that slow you down.",
+  "ar": "يقطع ليزر CO₂ بقدرة 55W خشب الجوز بسماكة تصل إلى 18 mm والأكريليك¹ بسماكة تصل إلى 20 mm في تمريرة واحدة — بسرعة ونظافة، ودون تمريرات إضافية تبطئ عملك.",
+  "ckb": "لەیزەری CO₂ بە توانای 55W داری گوێز تا ئەستووریی 18 mm و ئاکریلیک¹ تا ئەستووریی 20 mm بە یەک جار تێپەڕین دەبڕێت — خێرا و پاک، و بەبێ تێپەڕینی زیادە کە کارەکەت خاو دەکەنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c0b58a56b57c9cc1695e315c056baac0bd7a7ba084876cf1c36f010d2cf4e102",
+  "en": "With the auto-feed conveyor³, R1 handles material up to 3 meters long. Pass-through feeding and deep cutting turn full-length panels into tables, shelving and furniture.",
+  "ar": "مع السير الناقل ذي التغذية التلقائية³، يتعامل R1 مع خامات يصل طولها إلى 3 أمتار. وتحوّل التغذية العابرة والقص العميق الألواح الكاملة الطول إلى طاولات ورفوف وأثاث.",
+  "ckb": "بە کۆنڤەیەری پێدانی خۆکار³، ئامێری R1 دەتوانێت کار لەسەر کەرەستەی تا 3 مەتر درێژ بکات. پێدانی تێپەڕ و بڕینی قووڵ پانێڵە تەواو درێژەکان دەکەنە مێز و ڕەف و مۆبیلیا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "abec955a44a3c0fe6810172aecd71a6d7da2c02018b358dc35f1be45818021b8",
+  "en": "Bring out the best in every material.",
+  "ar": "أظهِر أفضل ما في كل مادة.",
+  "ckb": "باشترین لایەنی هەر کەرەستەیەک دەربخە.",
+  "kind": "block_title"
+ },
+ {
+  "h": "4738090ddc5dc87b93e04401bdef78ada8bc66ba0e51814c68a5e687bbbea4c9",
+  "en": "Powered by a 55W CO₂ laser, R1 works across a wide range of materials — from wood and acrylic to glass, leather, fabric, and more — each bringing its own character to the piece.",
+  "ar": "بفضل ليزر CO₂ بقدرة 55W، يعمل R1 على مجموعة واسعة من المواد — من الخشب والأكريليك إلى الزجاج والجلد والقماش وغيرها — وكلٌّ منها يضفي طابعه الخاص على القطعة.",
+  "ckb": "ئامێری R1 بە لەیزەرێکی CO₂ بە توانای 55W لەسەر کۆمەڵێکی فراوان لە کەرەستەکان کار دەکات — لە دار و ئاکریلیکەوە تا شووشە و چەرم و قوماش و زیاتر — هەر یەکەیان تایبەتمەندیی خۆی دەبەخشێتە پارچەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "731140284eac4aca18aa8cfd15ad56f45d4423067910729caccaf21683e013e1",
+  "en": "Wood",
+  "ar": "خشب",
+  "ckb": "دار",
+  "kind": "block_line"
+ },
+ {
+  "h": "aa63b4b179e786f61c70bb9d83573a97971df1cc863b92756767d0ecbf56ce25",
+  "en": "Transparent acrylic",
+  "ar": "أكريليك شفاف",
+  "ckb": "ئاکریلیکی ڕوون",
+  "kind": "block_line"
+ },
+ {
+  "h": "de7b2b8384b81848fa58aef4ac6208b14f283d08c6a3f1090d32855d46fb8e74",
+  "en": "Fabric",
+  "ar": "قماش",
+  "ckb": "قوماش",
+  "kind": "block_line"
+ },
+ {
+  "h": "e8e775159a57aaaf0f554dad0979a5c41009ee7b19a342c0aa4e4efd10afd03e",
+  "en": "Leather",
+  "ar": "جلد",
+  "ckb": "چەرم",
+  "kind": "block_line"
+ },
+ {
+  "h": "92d3325311ccf4b724ee8b641e6d1ab5153dffac90080f6f6b13d467649a1aee",
+  "en": "Anodized aluminum",
+  "ar": "ألمنيوم مؤكسَد (أنودايز)",
+  "ckb": "ئەلەمنیۆمی ئەنۆدایزکراو",
+  "kind": "block_line"
+ },
+ {
+  "h": "10ad4c3873636fa8bcd943493cc5b4b17e164a7f57e306b124ff6f1a9f3cd26b",
+  "en": "Slate",
+  "ar": "حجر الأردواز",
+  "ckb": "بەردی سلەیت",
+  "kind": "block_line"
+ },
+ {
+  "h": "c62d1a8d28f3827219f184b1c1366b41837b3e18ee5fb6607d3726b0e596b7a1",
+  "en": "What you mark is what you cut.",
+  "ar": "ما تحدّده هو ما تقطعه.",
+  "ckb": "ئەوەی نیشانەی دەکەیت، هەمان ئەوەیە کە دەیبڕیت.",
+  "kind": "block_title"
+ },
+ {
+  "h": "4ae491a3267c9a6fd869a2157017bff0af5a590d97e8e60035e8f3269f3da622",
+  "en": "Drop in your workpiece — crooked, curved, or tiny. R1 locates it, reads the surface, and tracks every move as it works, so every line lands exactly where you set it. This is TriSense. What you mark is what you cut.",
+  "ar": "ضع قطعة العمل — مائلة كانت أو منحنية أو صغيرة جدًا. يحدّد R1 موقعها، ويقرأ سطحها، ويتتبّع كل حركة أثناء العمل، ليقع كل خط تمامًا حيث حدّدته. هذا هو TriSense. ما تحدّده هو ما تقطعه.",
+  "ckb": "پارچەی کارەکەت دابنێ — لار بێت، چەماوە بێت یان زۆر بچووک. ئامێری R1 شوێنەکەی دەدۆزێتەوە، ڕووکارەکەی دەخوێنێتەوە و لە کاتی کارکردندا بەدوای هەموو جووڵەیەکدا دەچێت، بۆیە هەر هێڵێک ڕێک لەو شوێنە دەکەوێت کە دیاریت کردووە. ئەمەیە TriSense. ئەوەی نیشانەی دەکەیت، هەمان ئەوەیە کە دەیبڕیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "05ba0227036737d2ac9af72d6682df5f472898ae8a7c3dd84545a5c65279f6b1",
+  "en": "From curved cups and spheres to uneven surfaces. Height sensing follows every rise and fall to keep the engraving sharp and consistent across the entire surface.⁴",
+  "ar": "من الأكواب المنحنية والكرات إلى الأسطح غير المستوية. يتتبّع استشعار الارتفاع كل ارتفاع وانخفاض ليبقى الحفر حادًّا ومتجانسًا على كامل السطح.⁴",
+  "ckb": "لە پەرداخی چەماوە و گۆکانەوە تا ڕووکارە ناڕێکەکان. هەستکردن بە بەرزی بەدوای هەموو بەرزبوونەوە و نزمبوونەوەیەکدا دەچێت بۆ ئەوەی هەڵکۆڵینەکە لە سەرانسەری ڕووکارەکەدا تیژ و یەکدەست بمێنێتەوە.⁴",
+  "kind": "block_line"
+ },
+ {
+  "h": "da0e183687cd49880b6502167f59296fa723bf5f04b69d28f167b94665cfd195",
+  "en": "R1 keeps surface measurement accurate even on transparent materials like glass and clear acrylic, so engraving stays precisely placed.",
+  "ar": "يحافظ R1 على دقة قياس السطح حتى على المواد الشفافة مثل الزجاج والأكريليك الشفاف، فيبقى الحفر في موضعه بدقة.",
+  "ckb": "ئامێری R1 وردیی پێوانەکردنی ڕووکار دەپارێزێت تەنانەت لەسەر کەرەستە ڕوونەکانی وەک شووشە و ئاکریلیکی ڕوون، بۆیە هەڵکۆڵین بە وردی لە شوێنی خۆیدا دەمێنێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e765589016e68bc135a14647a45f4c52e29d0795a7950d1ab9fc2c1e7512009e",
+  "en": "The Toolhead Camera pinpoints small objects and places fine detail exactly where you want it.",
+  "ar": "تحدّد كاميرا رأس الطباعة مواضع الأجسام الصغيرة بدقة، وتضع التفاصيل الدقيقة تمامًا حيث تريدها.",
+  "ckb": "کامێرای سەری چاپ شوێنی تەنە بچووکەکان بە وردی دیاری دەکات و وردەکارییە ناسکەکان ڕێک لەو شوێنە دادەنێت کە دەتەوێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "62385cd1f1921fcfa767cd344e447f45ee55ed6deb5d4d52c5ed664eddd1d95b",
+  "en": "Cut around a printed design, trim a sticker, or follow a drawn outline. The Toolhead Camera traces the edge and keeps the cut precisely on path.",
+  "ar": "اقطع حول تصميم مطبوع، أو قُصّ ملصقًا، أو اتبع مخططًا مرسومًا. تتتبّع كاميرا رأس الطباعة الحافة وتُبقي القطع على مساره بدقة.",
+  "ckb": "بە دەوری دیزاینێکی چاپکراودا ببڕە، ستیکەرێک ڕێک ببڕە، یان بەدوای هێڵێکی کێشراودا بڕۆ. کامێرای سەری چاپ بەدوای لێوارەکەدا دەچێت و بڕینەکە بە وردی لەسەر ڕێڕەوەکەی دەهێڵێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "aef47bcad99e66d65daf8571880cd191ea6a51e936fc6bb75fbef6435fcffe13",
+  "en": "The motion control that keeps our printers precise. Now in R1.",
+  "ar": "نظام التحكم في الحركة الذي يمنح طابعاتنا دقتها. أصبح الآن في R1.",
+  "ckb": "ئەو کۆنترۆڵی جووڵەیەی چاپکەرەکانمان ورد دەهێڵێتەوە. ئێستا لە ئامێری R1 یشدا هەیە.",
+  "kind": "block_title"
+ },
+ {
+  "h": "ba0108b616461c79c1219a3262f1a2deff19c6ab490c7d69e403621fdcad55f4",
+  "en": "When the toolhead changes direction, a split-second shake can ripple the line that follows. R1's vibration compensation cancels it out, keeping lines crisp right out of the turn — the same technology as in our 3D printers.",
+  "ar": "عندما يغيّر رأس الطباعة اتجاهه، قد يُحدث اهتزاز يدوم جزءًا من الثانية تموّجًا في الخط الذي يليه. يُلغي تعويض الاهتزاز في R1 هذا الأثر، ليبقى الخط حادًّا مباشرةً بعد المنعطف — وهي التقنية نفسها الموجودة في طابعاتنا للطباعة 3D.",
+  "ckb": "کاتێک سەری چاپ ئاراستەی دەگۆڕێت، لەرزینێکی چرکەساتی دەتوانێت هێڵی دواتر شەپۆلاوی بکات. قەرەبووکردنەوەی لەرینەوەی R1 ئەمە لادەبات و هێڵەکان ڕاستەوخۆ دوای سووڕانەوەکە تیژ دەهێڵێتەوە — هەمان تەکنەلۆژیای ناو چاپکەرەکانمان بۆ چاپی 3D.",
+  "kind": "block_line"
+ },
+ {
+  "h": "57103ec2fec5a95815d4530e7db46e82bcfd206ab095916d625ed4e5de5244dc",
+  "en": "Higher speeds usually mean shallower engraving. R1 compensates as it moves, keeping engraving depth consistent at up to 1,000 mm/s — while completing the same job nearly 3× as fast.²",
+  "ar": "السرعات الأعلى تعني عادةً حفرًا أقل عمقًا. يعوّض R1 ذلك أثناء حركته، فيحافظ على عمق حفر ثابت بسرعة تصل إلى 1,000 mm/s — مع إنجاز المهمة نفسها أسرع بنحو 3 أضعاف.²",
+  "ckb": "خێرایی زیاتر بە زۆری واتای هەڵکۆڵینی کەمقووڵترە. ئامێری R1 لە کاتی جووڵەدا قەرەبووی دەکاتەوە و قووڵایی هەڵکۆڵین تا خێرایی 1,000 mm/s یەکسان دەهێڵێتەوە — لە هەمان کاتدا هەمان کار نزیکەی 3 هێندە خێراتر تەواو دەکات.²",
+  "kind": "block_line"
+ },
+ {
+  "h": "020fbe3b7a2b9c38c378cc2d060a7a9ef3583b369138df7b656a189ab47947c1",
+  "en": "Mechanical accuracy can drift with use. The Vision Encoder⁵ corrects for it, keeping absolute motion accuracy within 0.1 mm across the full work area. Draw 300 mm. Cut 300 mm.",
+  "ar": "قد تنحرف الدقة الميكانيكية مع الاستخدام. يصحّح Vision Encoder⁵ هذا الانحراف، فيحافظ على دقة الحركة المطلقة ضمن 0.1 mm على كامل مساحة العمل. ارسم 300 mm. اقطع 300 mm.",
+  "ckb": "وردیی میکانیکی لەگەڵ بەکارهێناندا دەکرێت لابدات. Vision Encoder⁵ ئەمە ڕاست دەکاتەوە و وردیی ڕەهای جووڵە لە سەرانسەری ڕووبەری کاردا لە سنووری 0.1 mm دەپارێزێت. 300 mm بکێشە. 300 mm ببڕە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1b1282fccbd7d8f5686c6e60cb9242a93c42a978920f51f82a3d159708ea3011",
+  "en": "Safer by design. Made for everyday spaces.",
+  "ar": "أكثر أمانًا بالتصميم. مصمَّم للأماكن اليومية.",
+  "ckb": "سەلامەتتر بە دیزاین. دروستکراو بۆ شوێنە ڕۆژانەکان.",
+  "kind": "block_title"
+ },
+ {
+  "h": "4e6567d8cfafe62cc71ae37592d9fb7b1cf3b70c833dd4cbcfe58a765a33fdc6",
+  "en": "Most lasers rely on a single exhaust fan. R1 brings fresh air in from one side and exhausts smoke from the other, creating a steady crossflow through the entire chamber.",
+  "ar": "تعتمد معظم أجهزة الليزر على مروحة شفط واحدة. أما R1 فيُدخل الهواء النقي من جانب ويطرد الدخان من الجانب الآخر، ليُنشئ تيارًا هوائيًا عرضيًا ثابتًا عبر الحجرة بأكملها.",
+  "ckb": "زۆربەی ئامێرەکانی لەیزەر پشت بە یەک پانکەی دەرکردنی هەوا دەبەستن. ئامێری R1 هەوای پاک لە لایەکەوە دەهێنێتە ژوورەوە و دووکەڵ لە لاکەی ترەوە دەردەکات، و ڕەوتێکی هەوای ڕاگوزەری جێگیر بە ناو هەموو ژوورەکەدا دروست دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4ec404872638194d69a09c05cbe98a8b262f33cefb5cd54cb2820a363adfa966",
+  "en": "R1 is Class 1 under IEC 60825-1 in standard enclosed use. Laser radiation stays contained inside the enclosure, so no safety goggles or dedicated laser room are needed.⁷",
+  "ar": "يُصنَّف R1 ضمن Class 1 وفق معيار IEC 60825-1 عند استخدامه مغلقًا بالشكل القياسي. يبقى إشعاع الليزر محصورًا داخل الهيكل المغلق، فلا حاجة إلى نظارات أمان أو غرفة مخصّصة لليزر.⁷",
+  "ckb": "ئامێری R1 لە بەکارهێنانی ستانداردی داخراودا بەپێی IEC 60825-1 لە پۆلی Class 1 دایە. تیشکی لەیزەر لە ناو ژووری داخراودا دەمێنێتەوە، بۆیە پێویستت بە چاویلکەی سەلامەتی یان ژووری تایبەت بە لەیزەر نییە.⁷",
+  "kind": "block_line"
+ },
+ {
+  "h": "38b9b8933c30a6c1697b5bca4c53a42d82f7c504183f8a18ecd4eed489aa1aef",
+  "en": "Open the lid and the laser stops immediately. It stays disabled while the lid is open.",
+  "ar": "افتح الغطاء فيتوقف الليزر فورًا. ويبقى معطّلًا ما دام الغطاء مفتوحًا.",
+  "ckb": "قەپاغەکە بکەرەوە و لەیزەرەکە دەستبەجێ دەوەستێت. تا قەپاغەکە کراوە بێت، لەیزەرەکە ناچالاک دەمێنێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "460733c9a306bcd4b3df0abee7428c7f431322febd6e81fb95b4d08540643a30",
+  "en": "Built-in sensors continuously watch for signs of flame and respond as soon as one is detected.",
+  "ar": "تراقب حساسات مدمجة باستمرار أي علامات للهب، وتستجيب فور اكتشاف أيٍّ منها.",
+  "ckb": "هەستەوەرە ناوەکییەکان بەردەوام چاودێری نیشانەکانی گڕ دەکەن و هەر کە یەکێکیان دۆزرایەوە کاردانەوە دەنوێنن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e97155c64c7f91ef77b681ac459580cf23ef863a8df0bc1a7b3d6e9de34c2d46",
+  "en": "One press cuts power to the machine immediately.",
+  "ar": "ضغطة واحدة تقطع الطاقة عن الجهاز فورًا.",
+  "ckb": "بە یەک جار داگرتن، کارەبای ئامێرەکە دەستبەجێ دەبڕدرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "15e5c31794b95210e73f22c305f398de1c454a229bb28fca3ce39bde0df613c3",
+  "en": "Same work area. Smaller footprint.",
+  "ar": "مساحة العمل نفسها. ومساحة إشغال أصغر.",
+  "ckb": "هەمان ڕووبەری کار. شوێنی کەمتر دەگرێت.",
+  "kind": "block_title"
+ },
+ {
+  "h": "2e4b6cf74ff70fea061bd8a789028fbcbc3388cec1019f04719f95462f6864d7",
+  "en": "R1 delivers the same working area as a typical CO₂ laser while taking up about a third less space.⁸",
+  "ar": "يوفّر R1 مساحة العمل نفسها التي يوفّرها جهاز ليزر CO₂ نموذجي، مع شغل مساحة أقل بنحو الثلث.⁸",
+  "ckb": "ئامێری R1 هەمان ڕووبەری کاری لەیزەرێکی ئاسایی CO₂ دەدات، لە کاتێکدا نزیکەی یەک لەسەر سێ شوێنی کەمتر دەگرێت.⁸",
+  "kind": "block_line"
+ },
+ {
+  "h": "e1c9b0fbc6bcb49190c74feddff6ecf020658f4d0ca424db1522b2bd77abdb3d",
+  "en": "E1 Pro Air Purifier. Cleaner air, back in the room.",
+  "ar": "جهاز تنقية الهواء E1 Pro. هواء أنظف يعود إلى الغرفة.",
+  "ckb": "پاککەرەوەی هەوای E1 Pro. هەوای پاکتر دەگەڕێتەوە ناو ژوورەکە.",
+  "kind": "block_title"
+ },
+ {
+  "h": "6d91a5be32630ebe0e1b0777147f0525f9fe1d6fa3dc9a390a7e934099c802c4",
+  "en": "Built for R1, E1 Pro⁶ connects directly to R1's exhaust outlet and pulls smoke out at the source. Multiple filter layers, with activated carbon, catch smoke and fine particles and reduce odors.",
+  "ar": "صُمّم E1 Pro⁶ خصيصًا لـ R1، ويتصل مباشرةً بمخرج الشفط في R1 ليسحب الدخان من مصدره. وتلتقط طبقات الترشيح المتعددة، ومنها الكربون المنشّط، الدخان والجسيمات الدقيقة وتقلّل الروائح.",
+  "ckb": "پاککەرەوەی E1 Pro⁶ کە تایبەت بۆ ئامێری R1 دروستکراوە، ڕاستەوخۆ بە دەرچەی دەرکردنی هەوای ئامێری R1 دەبەسترێت و دووکەڵ لە سەرچاوەکەیدا ڕادەکێشێت. چەند چینێکی فلتەر، لەگەڵ کاربۆنی چالاککراو، دووکەڵ و گەردیلە وردەکان دەگرن و بۆنەکان کەم دەکەنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d553d5518f25ded0f043cfe8ec266e2c17999d59e408f957ddd3bbafa57ca662",
+  "en": "Go taller. Rounder. Longer. Thicker.",
+  "ar": "ارتفاع أكبر. أشكال دائرية. أطوال أكبر. سماكة أكبر.",
+  "ckb": "بەرزتر. خڕتر. درێژتر. ئەستوورتر.",
+  "kind": "block_title"
+ },
+ {
+  "h": "6b5831650d6322572ad76a87aae92d74bc4512d5f148ff79d275f452a6755f16",
+  "en": "Add the setup you need for taller objects, round pieces, thicker stock, and extra-long boards.³",
+  "ar": "أضف التجهيزات التي تحتاجها للأجسام الأطول، والقطع الدائرية، والخامات الأسمك، والألواح الطويلة جدًا.³",
+  "ckb": "ئەو پاشکۆیانە زیاد بکە کە پێویستتن بۆ تەنە بەرزترەکان، پارچە خڕەکان، کەرەستە ئەستوورترەکان و تەختە زۆر درێژەکان.³",
+  "kind": "block_line"
+ },
+ {
+  "h": "d2b92eda564db8be4b9e761504ace8bcfd0289ece976fd99a9b80ffd8e3d3e2a",
+  "en": "Raises R1 to create clearance for taller objects. Also required for the Conveyor and Rotary.",
+  "ar": "يرفع R1 لتوفير مساحة كافية للأجسام الأطول. وهو مطلوب أيضًا لاستخدام السير الناقل (Conveyor) وملحق التدوير (Rotary).",
+  "ckb": "ئامێری R1 بەرز دەکاتەوە بۆ ئەوەی بۆشایی بۆ تەنە بەرزترەکان دروست بێت. هەروەها بۆ کۆنڤەیەر (Conveyor) و پاشکۆی سووڕاوە (Rotary) پێویستە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ba24f124cec0835d33dba2341a79d3e1edb6f0e857591766e83ca6de4dfe5ff1",
+  "en": "Learn more.",
+  "ar": "اعرف المزيد.",
+  "ckb": "زیاتر بزانە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ebce6c0876343f2261b5d963fc7cc644ccb8c4f2e73bef8fad47a73772626546",
+  "en": "Automatically feeds long stock through R1, letting you cut and engrave boards up to 3 meters long.",
+  "ar": "يغذّي الخامات الطويلة عبر R1 تلقائيًا، ليتيح لك قص الألواح وحفرها بطول يصل إلى 3 أمتار.",
+  "ckb": "کەرەستە درێژەکان بە شێوەی خۆکار بە ناو ئامێری R1 دا تێدەپەڕێنێت، بۆ ئەوەی بتوانیت تەختەی تا 3 مەتر درێژ ببڕیت و هەڵبکۆڵیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e2e08ca206a8f372090a5fca9503380be40f58a68c828c8899bc1f398e9e5635",
+  "en": "Rotates round objects for full 360° engraving on bottles, bowls, cups, and more. Requires the Riser Base.",
+  "ar": "يدوّر الأجسام الدائرية لحفر كامل بزاوية 360° على الزجاجات والأوعية والأكواب وغيرها. يتطلب Riser Base.",
+  "ckb": "تەنە خڕەکان دەسووڕێنێت بۆ هەڵکۆڵینی تەواوی 360° لەسەر بوتڵ، کاسە، پەرداخ و زیاتر. پێویستی بە Riser Base هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "657faaa4049ab7f5e489287defe37e1270de37a4a8a0f969c9abe05fd4ed0016",
+  "en": "Greater depth of focus for cleaner cuts through thicker materials — up to 20 mm with the long-focus lens.",
+  "ar": "عمق تركيز أكبر لقطع أنظف عبر المواد الأسمك — حتى 20 mm مع عدسة التركيز الطويل.",
+  "ckb": "قووڵایی فۆکەسی زیاتر بۆ بڕینی پاکتری کەرەستە ئەستوورترەکان — تا 20 mm لەگەڵ هاوێنەی فۆکەسی درێژ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ae7ecbeb7140709a12f6090316c85887a6ab57dbfa00306da41fdc796b69f7bb",
+  "en": "1.What are the differences between focusing lenses of different specifications?",
+  "ar": "1. ما الفروق بين عدسات التركيز ذات المواصفات المختلفة؟",
+  "ckb": "1. جیاوازیی نێوان هاوێنەکانی فۆکەس بە تایبەتمەندیی جیاواز چییە؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "7730d080111be9933d9119426d58dadf61b1db7792220109fe49ea18330c086e",
+  "en": "2.When does the R1 require optical path calibration?",
+  "ar": "2. متى يتطلب R1 معايرة المسار البصري؟",
+  "ckb": "2. ئامێری R1 کەی پێویستی بە کالیبرەکردنی ڕێڕەوی ئۆپتیکی هەیە؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "fd8edb03d571abf288b5bd41d3a778edf94b5ecf5448ae801e5bb69b67acb2b8",
+  "en": "3.What are the differences in processing capabilities between the R1 and H2 series laser modules?",
+  "ar": "3. ما الفروق في قدرات المعالجة بين R1 ووحدات الليزر في H2 series؟",
+  "ckb": "3. جیاوازییەکانی توانای کارکردن لە نێوان R1 و مۆدیولەکانی لەیزەری H2 series چین؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "43239f3955fad9754b56ee6258fc89331ba72dc8cd86120d9c2a7d3c62941b3f",
+  "en": "4.Which materials are not recommended for processing?",
+  "ar": "4. ما المواد غير الموصى بمعالجتها؟",
+  "ckb": "4. کام کەرەستانە بۆ کارلەسەرکردن پێشنیار ناکرێن؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "54fdc9fa11a022b67b23e8ad789b08b52df83d3f21bb28c21150ac2549f5b4b0",
+  "en": "5.Which Bambu Lab air purifier is the R1 compatible with? Are older models compatible?",
+  "ar": "5. ما جهاز تنقية الهواء من Bambu Lab المتوافق مع R1؟ وهل الطرازات الأقدم متوافقة؟",
+  "ckb": "5. ئامێری R1 لەگەڵ کام پاککەرەوەی هەوای Bambu Lab گونجاوە؟ ئایا مۆدێلە کۆنترەکانیش گونجاون؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "823f3c1768585a32f0fbab38ee71e24ca58fa4d0d5847078843211ad313f74b2",
+  "en": "55W CO2 Laser: Cut and engrave wood, clear acrylic, leather, and more, with materials up to 20 mm thick in a single pass.",
+  "ar": "ليزر CO2 بقدرة 55W: اقطع واحفر الخشب والأكريليك الشفاف والجلد وغيرها، لمواد بسماكة تصل إلى 20 mm في تمريرة واحدة.",
+  "ckb": "لەیزەری CO2 بە توانای 55W: دار، ئاکریلیکی ڕوون، چەرم و زیاتر ببڕە و هەڵبکۆڵە، بۆ کەرەستەی تا ئەستووریی 20 mm بە یەک جار تێپەڕین.",
+  "kind": "block_line"
+ },
+ {
+  "h": "72b571be2af6c3a9d89eb2b738e497f2abbceba67ee9de5d6b49f53dc7f7949c",
+  "en": "Large Work Area: 600 × 300 mm, or up to 3000 mm long stock with the Conveyor.",
+  "ar": "مساحة عمل كبيرة: 600 × 300 mm، أو خامات بطول يصل إلى 3000 mm مع السير الناقل (Conveyor).",
+  "ckb": "ڕووبەری کاری گەورە: 600 × 300 mm، یان کەرەستەی تا درێژیی 3000 mm لەگەڵ کۆنڤەیەر (Conveyor).",
+  "kind": "block_line"
+ },
+ {
+  "h": "191ae04b06011612a9bd7babc0605c8e0973b5f382ac1ce7684f34096df38072",
+  "en": "Auto Laser Alignment: Hands-free optical path calibration in about a minute. No thermal paper, no test shots.",
+  "ar": "المحاذاة التلقائية لليزر: معايرة المسار البصري دون تدخّل يدوي في نحو دقيقة. بلا ورق حراري ولا طلقات اختبار.",
+  "ckb": "ڕێکخستنی خۆکاری لەیزەر: کالیبرەکردنی ڕێڕەوی ئۆپتیکی بەبێ دەستتێوەردان لە نزیکەی یەک خولەکدا. نە کاغەزی گەرمی، نە تیشکی تاقیکاری.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6d82e7ffb762e3bb88726f7ec1cdb0ef4fad88a05cff9a6028d76fa89d7f6fda",
+  "en": "TriSense System: Cameras, lasers and XY encoders combined for positioning accuracy within 0.2 mm.",
+  "ar": "نظام TriSense: كاميرات وليزرات ومشفّرات حركة XY تعمل معًا لتحقيق دقة تموضع ضمن 0.2 mm.",
+  "ckb": "سیستەمی TriSense: کامێرا و لەیزەر و ئینکۆدەرەکانی XY پێکەوە بۆ وردیی شوێندانان لە سنووری 0.2 mm.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5a413cee028a9d7dc7566c017cc718b8ffe0f2d775a490434590d468653ac421",
+  "en": "Vibration Compensation: Cancels residual shake after a turn for clean, crisp lines.",
+  "ar": "تعويض الاهتزاز: يلغي الاهتزاز المتبقي بعد المنعطف للحصول على خطوط نظيفة وحادّة.",
+  "ckb": "قەرەبووکردنەوەی لەرینەوە: لەرزینی ماوە دوای سووڕانەوە لادەبات بۆ هێڵی پاک و تیژ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a43d34ba8ca0841c291f371a6f8afb2479167410752ac9f55c8b296b2d5091ed",
+  "en": "High-Speed Engraving: Up to 1000 mm/s with 20,000 mm/s² acceleration.",
+  "ar": "حفر عالي السرعة: حتى 1000 mm/s مع تسارع 20,000 mm/s².",
+  "ckb": "هەڵکۆڵینی خێرا: تا 1000 mm/s لەگەڵ خێرابوونی 20,000 mm/s².",
+  "kind": "block_line"
+ },
+ {
+  "h": "adc154fccf2217be0df9fea68fd35b8184d9f04f11301f6113e7194d4d0e9917",
+  "en": "Class 1 Laser Safety: Fully enclosed beam in normal use, with lid-stop, flame detection and emergency stop.",
+  "ar": "سلامة ليزر Class 1: شعاع مغلق بالكامل في الاستخدام العادي، مع إيقاف عند فتح الغطاء، وكشف اللهب، وزر الإيقاف الطارئ.",
+  "ckb": "سەلامەتیی لەیزەری Class 1: تیشکی تەواو داخراو لە بەکارهێنانی ئاساییدا، لەگەڵ وەستان بە کردنەوەی قەپاغ، دۆزینەوەی گڕ و دوگمەی وەستانی خێرا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e928b608acb32fa06d8cf6be911d00351e06bf2e43476d204059f6d66ac573a9",
+  "en": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System). Load and print! No more tedious setting steps.",
+  "ar": "جميع إعدادات الطباعة مخزّنة في شريحة RFID، ويمكن قراءتها عبر نظام AMS (نظام المواد التلقائي) الخاص بنا. حمِّل واطبع! لا مزيد من خطوات الضبط المملّة.",
+  "ckb": "هەموو ڕێکخستنەکانی چاپ لە چیپی RFID دا هەڵگیراون، کە سیستەمەکەمان، AMS (سیستەمی خۆکاری کەرەستە)، دەتوانێت بیانخوێنێتەوە. باری بکە و چاپ بکە! چیتر هەنگاوی ڕێکخستنی بێزارکەر نییە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1aa3f780d7c433fed4df5e90081b564539065b7ca97c46c5d4065a60dc19e9eb",
+  "en": "Recommended Printing Settings",
+  "ar": "إعدادات الطباعة الموصى بها",
+  "ckb": "ڕێکخستنە پێشنیارکراوەکانی چاپ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "afea26a25044e8f0874b1e1aa86c3a1a765cec7030791879ee867b53affa76a0",
+  "en": "Drying Settings (Blast Drying Oven)",
+  "ar": "إعدادات التجفيف (فرن تجفيف بالهواء الساخن)",
+  "ckb": "ڕێکخستنەکانی وشککردنەوە (فڕنی وشککردنەوە بە هەوای گەرم)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "4c42dd65d3411402a6efcb964aec23550aa4778e4e374ebfb3a214bea1c600b2",
+  "en": "Printing and Keeping Container's Humidity",
+  "ar": "رطوبة حاوية الطباعة والتخزين",
+  "ckb": "شێی دەفری چاپ و هەڵگرتن",
+  "kind": "block_cell"
+ },
+ {
+  "h": "7181bb6aaa6a1422bb72454b0b44b4c2484c067a058c92e1c50e85c05fcaa443",
+  "en": "< 20% RH (Sealed, with Desiccant)",
+  "ar": "أقل من 20% RH (محكم الإغلاق، مع مادة مجففة)",
+  "ckb": "کەمتر لە 20% RH (داخراو، لەگەڵ ماددەی وشککەرەوە)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "a9e45bf78f9c53fd86ab322ba7076c3454c0832634caeae463ffd654b1913864",
+  "en": "Nozzle Temperature",
+  "ar": "حرارة النوزل",
+  "ckb": "پلەی گەرمیی نۆزڵ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9054571171a05b0ca7479a27f4030333f4b2c04e2a77541a3b7d6e86bc03de92",
+  "en": "Bed Temperature (with Glue)",
+  "ar": "حرارة السرير (مع الغراء)",
+  "ckb": "پلەی گەرمیی بێد (لەگەڵ چەسپ)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ecd92b7d7bbbc03572924674ef7b1611bc38124ee150b82d4cd669198b6c4398",
+  "en": "Printing Speed",
+  "ar": "سرعة الطباعة",
+  "ckb": "خێرایی چاپ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "da88a5d625c23c2d4fea7292d3e475d484d394594779df2ad79f520999b2c8eb",
+  "en": "Physical Properties",
+  "ar": "الخصائص الفيزيائية",
+  "ckb": "تایبەتمەندییە فیزیاییەکان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "91962c1925ea6852f8f2e21e99721b9e6edd6da06d897b59cde605e1d71884aa",
+  "en": "Vicat Softening Temperature",
+  "ar": "درجة حرارة تليّن Vicat",
+  "ckb": "پلەی گەرمیی نەرمبوونی Vicat",
+  "kind": "block_cell"
+ },
+ {
+  "h": "1252603d2c85fa33046ef248158fd20d2676e34d952298a8950b6e811d6169b1",
+  "en": "Heat Deflection Temperature",
+  "ar": "درجة حرارة الانحراف الحراري",
+  "ckb": "پلەی گەرمیی لاربوونەوە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "936dacce62daedfc355b6462f737723cf464ded996f332c1d0ab20b743295009",
+  "en": "Melting Temperature",
+  "ar": "درجة حرارة الانصهار",
+  "ckb": "پلەی گەرمیی توانەوە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "89dbcf81f634ab5a336bebd55481e2f43363ad4ce74e364d6e750d3ead719402",
+  "en": "Melt Index",
+  "ar": "مؤشر الانصهار",
+  "ckb": "ئیندێکسی توانەوە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9a7ea56091fa901665d7d92ae4342b269b802c4e2228a87728b241734c2257e3",
+  "en": "29.2 ± 2.1 g/10 min",
+  "ar": "29.2 ± 2.1 g/10 min",
+  "ckb": "29.2 ± 2.1 g/10 min",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "f501babf49dc5154a458babc6fd3b9528811eeed78d1b26858651ba9fad0d5ed",
+  "en": "Mechanical Properties",
+  "ar": "الخصائص الميكانيكية",
+  "ckb": "تایبەتمەندییە میکانیکییەکان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e85bf5edc51a242a7ab307c3a7dd42c6f82e5e59415cf64a6a038a878520b655",
+  "en": "Tensile Strength",
+  "ar": "مقاومة الشد",
+  "ckb": "بەرگەی ڕاکێشان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "b8cb84529e3d20ee7940f2ef3bf1aeebb73428e67c0c8064e09f0e8b8820af38",
+  "en": "Breaking Elongation Rate",
+  "ar": "نسبة الاستطالة عند الكسر",
+  "ckb": "ڕێژەی درێژبوونەوە لە کاتی شکان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "3b0cd2d2ceffe7efdfa294b0311634dde812b9812fd2b84b35c272e35b5fbefc",
+  "en": "Bending Modulus",
+  "ar": "معامل الانحناء",
+  "ckb": "مۆدیولی چەماندن",
+  "kind": "block_cell"
+ },
+ {
+  "h": "da8d5cfca65c82a05bdbbd268fa5c7ee6a61a5105d69e3a8859aa4492c0ad1c0",
+  "en": "Bending Strength",
+  "ar": "مقاومة الانحناء",
+  "ckb": "بەرگەی چەماندن",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2e15e70da7c17fa402fecc2750d02d3b02341aa7e8ae46c919fe0d1ced5ad5f5",
+  "en": "Impact Strength",
+  "ar": "مقاومة الصدمات",
+  "ckb": "بەرگەی لێدان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "d5fdc1af021e2d360ff80496c4c5d698e77fc3015a157ea08e8e60cf81690a46",
+  "en": "Downloads",
+  "ar": "التنزيلات",
+  "ckb": "داگرتنەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "52bfcef3a772d2913aa433a157e0935d140f96f7c26b1a54147be8db3f014511",
+  "en": "Easy removal by hand",
+  "ar": "سهولة الإزالة باليد",
+  "ckb": "بە ئاسانی بە دەست لادەبرێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "0383efc8d9dd50a3a8c8585f3104d53bf8f7a4c2ad3c77f3fe90a3e4e1ff69f1",
+  "en": "Perfect support interface",
+  "ar": "سطح تلامس مثالي للدعامات",
+  "ckb": "ڕووی بەریەککەوتنی پاڵپشتی بێکەموکوڕی",
+  "kind": "block_line"
+ },
+ {
+  "h": "2d0b1e4be4e1a7b6fd25d9d0a1897e72873b6db128d03994b42d71ceba299692",
+  "en": "Recommended for PAHT-CF, PA6-CF, PET-CF, PA-GF, etc.",
+  "ar": "موصى به لـ PAHT-CF وPA6-CF وPET-CF وPA-GF وغيرها.",
+  "ckb": "پێشنیارکراوە بۆ PAHT-CF، PA6-CF، PET-CF، PA-GF و هتد.",
+  "kind": "block_line"
+ },
+ {
+  "h": "12ecb22ad2ef1e9905c9e40dcc76967a6d8c0675a8ce8c0efb633e25279e2da5",
+  "en": "Comes with High Temperature Reusable Spool",
+  "ar": "يأتي مع بكرة Reusable Spool لدرجات الحرارة العالية",
+  "ckb": "لەگەڵ ماسوورەی Reusable Spool بۆ پلەی گەرمیی بەرز دێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "5aae72c8a642a92d3a2243c47e17c05b00841ffbb43cd12d5ded22c14a7488a3",
+  "en": "ONLY used for support interface",
+  "ar": "يُستخدم فقط لسطح تلامس الدعامات",
+  "ckb": "تەنها بۆ ڕووی بەریەککەوتنی پاڵپشت بەکاردێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "2845a884bdcaff8cefe5143e373d28a48e6d23b8d33662d5fac58b6ecd31b501",
+  "en": "Not used for printing models alone",
+  "ar": "لا يُستخدم لطباعة النماذج بمفرده",
+  "ckb": "بە تەنها بۆ چاپکردنی مۆدێل بەکارناهێنرێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "9bdebc2d7a886160e30f23e7dd9bd5494db62f11430daf565c96894a559483c4",
+  "en": "Dry out before use",
+  "ar": "جفّفه قبل الاستخدام",
+  "ckb": "پێش بەکارهێنان وشکی بکەرەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "2d18c367f047dc3111f15cb7685d20702b0a5a42484dd44342c0261dcc4fc2d9",
+  "en": "Bambu Support for PA/PET has been discontinued.",
+  "ar": "تم إيقاف إنتاج Bambu Support for PA/PET.",
+  "ckb": "بەرهەمهێنانی Bambu Support for PA/PET ڕاگیراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "885f98d4aa5560ac08592f3cee12c0d99924a4ef25d8c3fb2914b1c0301fc0f9",
+  "en": "Note: Key settings such as interface layers, Z distance, and support structures can significantly affect print results. Always consult the Wiki before printing.",
+  "ar": "ملاحظة: يمكن أن تؤثر الإعدادات الأساسية، مثل طبقات سطح التلامس ومسافة Z وهياكل الدعامات، تأثيرًا كبيرًا في نتائج الطباعة. راجع الويكي دائمًا قبل الطباعة.",
+  "ckb": "تێبینی: ڕێکخستنە سەرەکییەکانی وەک چینەکانی ڕووی بەریەککەوتن، دووریی Z و پێکهاتەکانی پاڵپشت دەتوانن کاریگەرییەکی گەورەیان لەسەر ئەنجامی چاپ هەبێت. هەمیشە پێش چاپکردن سەیری ویکی بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "21c10cd5f14070097e77a1914eb54bf15e426ec459056f0940d583f407345495",
+  "en": "Not compatible with A Series Printers, AMS lite, Cool Plate SuperTack, and Bambu Liquid Glue.",
+  "ar": "غير متوافق مع طابعات A Series وAMS lite وCool Plate SuperTack وBambu Liquid Glue.",
+  "ckb": "لەگەڵ چاپکەرەکانی A Series، AMS lite، Cool Plate SuperTack و Bambu Liquid Glue گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "6a5b8e3e4478fc09f1198b28a35f38abe93ba9e2fd14f1e8a52ef7dbab7b4735",
+  "en": "As this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing. For more details, please refer to: Filament drying instructions on WIKI.",
+  "ar": "لأن هذا الفلامنت شديد امتصاص الرطوبة، يرجى وضع أي فلامنت غير مستخدم فورًا في وعاء محكم الإغلاق مع مادة مجففة، وتجفيفه جيدًا قبل الطباعة. لمزيد من التفاصيل، يرجى الرجوع إلى: تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "لەبەر ئەوەی ئەم فیلامێنتە شێ بە زۆری هەڵدەمژێت، تکایە هەر فیلامێنتێکی بەکارنەهاتوو دەستبەجێ لە دەفرێکی داخراو لەگەڵ ماددەی وشککەرەوە دابنێ، و پێش چاپکردن بە تەواوی وشکی بکەرەوە. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "fd842626ed8f75a512ff4144dc3856bc312018b69e1c7fc3444cd08c675684ca",
+  "en": "3.Lidar Calibration Notice",
+  "ar": "3. تنبيه بشأن معايرة Lidar",
+  "ckb": "3. ئاگاداری دەربارەی کالیبرەکردنی Lidar",
+  "kind": "faq_q"
+ },
+ {
+  "h": "dd273b1d74b3aaf0b1852245c1965a824d0f299d930e8ae38ba662ce27fbbdf5",
+  "en": "Due to the transparent properties of the filament, Lidar Extrusion Calibration can be affected when printing Transparent PC.",
+  "ar": "بسبب خصائص الشفافية في هذا الفلامنت، قد تتأثر معايرة البثق بواسطة Lidar عند طباعة Transparent PC.",
+  "ckb": "بەهۆی تایبەتمەندیی ڕوونیی فیلامێنتەکە، کاتێک Transparent PC چاپ دەکرێت، لەوانەیە کالیبرەکردنی پاڵنان بە Lidar کاریگەری لەسەر بێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "65b63a9a7eaaef27a2623380b68b8525817277d976d0037d631991a863f353c5",
+  "en": "Exceptional Thermal Resistance",
+  "ar": "مقاومة حرارية استثنائية",
+  "ckb": "بەرگەی گەرمیی نایاب",
+  "kind": "block_line"
+ },
+ {
+  "h": "9043a78fbd24db898d40887083e600ee2220457671c4b530c81dcd327d7ae337",
+  "en": "Excellent Mechanical Properties",
+  "ar": "خصائص ميكانيكية ممتازة",
+  "ckb": "تایبەتمەندیی میکانیکیی زۆر باش",
+  "kind": "block_line"
+ },
+ {
+  "h": "2116faac4fca8a20c96c16625d303dcd4d31a6e81f47482ed18ae928df094b21",
+  "en": "High Impact Strength and Durability",
+  "ar": "مقاومة عالية للصدمات ومتانة",
+  "ckb": "بەرگەی لێدانی بەرز و بەرگەگری",
+  "kind": "block_line"
+ },
+ {
+  "h": "a9f2b1698de2d2e276cd0bb809be42c6d8f6de18f726a3ff1d68b96dae6134ce",
+  "en": "Suitable for Engineering Purposes",
+  "ar": "مناسب للأغراض الهندسية",
+  "ckb": "گونجاوە بۆ مەبەستە ئەندازیارییەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "31d07448d4b3d725d47a05b2ef0e188d9283a5eba1eec73b9c6fbae2d8e31954",
+  "en": "Tough and Durable",
+  "ar": "متين ويدوم طويلًا",
+  "ckb": "پتەو و بەرگەگر",
+  "kind": "block_line"
+ },
+ {
+  "h": "c5e89a38e67235287a647bcd5415ae72a92094d689d7963460c3e34a7c3af3ab",
+  "en": "Good Heat & Freezing Resistance",
+  "ar": "مقاومة جيدة للحرارة والتجمّد",
+  "ckb": "بەرگەی باش بۆ گەرمی و بەستن",
+  "kind": "block_line"
+ },
+ {
+  "h": "36c5d5f677b0753ab94c9387b6af7910c527d2117f5a810d2e16b8070619c571",
+  "en": "Strong & Durable",
+  "ar": "قوي ومتين",
+  "ckb": "بەهێز و بەرگەگر",
+  "kind": "block_title"
+ },
+ {
+  "h": "8aefd5c9afdb2c7391ed8ea6fd6f07180f90d60457e8c14afb7fe2d5d0f35546",
+  "en": "As one of the most widely used filaments, Bambu ABS comes with excellent mechanical properties that make it stronger than normal PLA and PETG. It is ideal for creating functional parts, prototypes, and standard engineering components, ensuring long life and reliability.",
+  "ar": "بصفته أحد أكثر أنواع الفلامنت استخدامًا، يتميّز Bambu ABS بخصائص ميكانيكية ممتازة تجعله أقوى من PLA وPETG العاديين. وهو مثالي لصنع القطع الوظيفية والنماذج الأولية والمكوّنات الهندسية القياسية، مع ضمان عمر طويل وموثوقية عالية.",
+  "ckb": "وەک یەکێک لە بەکارهاتووترین فیلامێنتەکان، Bambu ABS تایبەتمەندیی میکانیکیی نایابی هەیە کە لە جۆرە ئاساییەکانی PLA و PETG بەهێزتری دەکات. گونجاوە بۆ دروستکردنی پارچەی کارەکی، نموونەی سەرەتایی و پێکهاتە ئەندازیارییە ستانداردەکان، و تەمەنی درێژ و متمانەپێکراوی مسۆگەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "52152f0f4e2309bb1b8fc94ab6c8e692916eb9b90ce3e2435ba6f68fe906ff55",
+  "en": "Impressive Heat Resistance",
+  "ar": "مقاومة مبهرة للحرارة",
+  "ckb": "بەرگەی گەرمیی سەرنجڕاکێش",
+  "kind": "block_title"
+ },
+ {
+  "h": "31be80bcf29157624efbc2538b61333a1acf521a5fa4f9c39551045e4e01c195",
+  "en": "Bambu ABS filament offers exceptional heat resistance (Heat Deflection Temperature: 87 °C) coupled with commendable mechanical properties. This makes it an outstanding choice for everyday functional parts that require high-temperature resistance.",
+  "ar": "يوفّر فلامنت Bambu ABS مقاومة استثنائية للحرارة (درجة حرارة الانحراف الحراري: 87 °C) إلى جانب خصائص ميكانيكية جديرة بالثناء. وهذا يجعله خيارًا متميزًا للقطع الوظيفية اليومية التي تتطلب مقاومة لدرجات الحرارة العالية.",
+  "ckb": "فیلامێنتی Bambu ABS بەرگەی گەرمیی نایاب (پلەی گەرمیی لاربوونەوە: 87 °C) لەگەڵ تایبەتمەندیی میکانیکیی شایستەی ستایش پێشکەش دەکات. ئەمەش دەیکاتە هەڵبژاردەیەکی نایاب بۆ پارچە کارەکییە ڕۆژانەکان کە پێویستیان بە بەرگەی پلەی گەرمیی بەرز هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "56fb2e48f1f451f1b28b2f94553c5669b943c600121d11870b7b3b75785402d6",
+  "en": "Water-Resistant",
+  "ar": "مقاوم للماء",
+  "ckb": "بەرگەگر بەرامبەر ئاو",
+  "kind": "block_title"
+ },
+ {
+  "h": "f58025ea19ecefa65abff4512ebfcd16ae0354373009d42eedde1d8c87d4cdc2",
+  "en": "Boasting excellent water-resistant performance, Bambu ABS ensures relatively long-lasting durability when used in a wet environment.",
+  "ar": "بفضل أدائه الممتاز في مقاومة الماء، يضمن Bambu ABS متانة تدوم طويلًا نسبيًا عند استخدامه في بيئة رطبة.",
+  "ckb": "بە هۆی بەرگەی زۆر باشی بەرامبەر ئاو، فیلامێنتی Bambu ABS بەرگەگرییەکی تا ڕادەیەک درێژخایەن مسۆگەر دەکات کاتێک لە ژینگەیەکی تەڕدا بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6a9862fd46ae369cdc095cf5d06fc7f55acab6f44af44d245bdf1a539ab4d247",
+  "en": "Tough with High Impact Resistance",
+  "ar": "متين بمقاومة عالية للصدمات",
+  "ckb": "پتەو بە بەرگەی لێدانی بەرز",
+  "kind": "block_title"
+ },
+ {
+  "h": "bc2672e3ef520fa845466a68e2e2df4eb0b510cdb79dea8473f808cda78bcdaf",
+  "en": "Bambu ABS is exceptionally robust, and its prints can withstand multiple impacts, collisions, and falls. It exhibits good impact resistance even at low temperatures.",
+  "ar": "يتميّز Bambu ABS بمتانة استثنائية، إذ تتحمّل مطبوعاته الصدمات والاصطدامات والسقوط المتكرر. كما يُظهر مقاومة جيدة للصدمات حتى في درجات الحرارة المنخفضة.",
+  "ckb": "فیلامێنتی Bambu ABS زۆر پتەوە، و چاپکراوەکانی بەرگەی چەندین لێدان، پێکدادان و کەوتن دەگرن. تەنانەت لە پلەی گەرمیی نزمیشدا بەرگەی لێدانی باشی هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "02e90c42d5d610e5cfbe886c7971a90724711cd5b125db4627e8e3bcd5ca55cb",
+  "en": "Not compatible with Cool Plate SuperTack and AMS lite.",
+  "ar": "غير متوافق مع Cool Plate SuperTack وAMS lite.",
+  "ckb": "لەگەڵ Cool Plate SuperTack و AMS lite گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "6c02198e1cc5cf73b92f8b5c25885cce84741f186ae1407fdef6d319f6fe2aac",
+  "en": "2.Ventilation & Odor Notice",
+  "ar": "2. تنبيه بشأن التهوية والرائحة",
+  "ckb": "2. ئاگاداری دەربارەی هەواگۆڕکێ و بۆن",
+  "kind": "faq_q"
+ },
+ {
+  "h": "95767dfaa3551dc5e478d81113bf53ecc17e146d7db9a6003eff6fb69f15a95d",
+  "en": "Pungent and unpleasant odors may be released during printing. Make sure your printer is placed in a well-ventilated area.",
+  "ar": "قد تنبعث روائح نفّاذة وكريهة أثناء الطباعة. تأكّد من وضع طابعتك في مكان جيد التهوية.",
+  "ckb": "لەوانەیە لە کاتی چاپدا بۆنی تیژ و ناخۆش دەربچێت. دڵنیابەرەوە کە چاپکەرەکەت لە شوێنێکی هەواگۆڕکێی باشدا دانراوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "02fa8bd9d6552bd227c2f93178492c466dab87beb13d122d855891e95b52b0fa",
+  "en": "3.Drying Recommendations",
+  "ar": "3. توصيات التجفيف",
+  "ckb": "3. پێشنیارەکانی وشککردنەوە",
+  "kind": "faq_q"
+ },
+ {
+  "h": "44a9c59927ed93f99812b92a5a8c1c035952c8f039b61ef140e7c9b2a2c5bc17",
+  "en": "4.Refill Guidelines",
+  "ar": "4. إرشادات عبوة التعبئة بدون بكرة",
+  "ckb": "4. ڕێنماییەکانی پڕکەرەوەی بێ ماسوورە",
+  "kind": "faq_q"
+ },
+ {
+  "h": "23d38ae504ead0cdd2f26c6a4602c8c4cd96392f2dd54493fab45c8a1a07fa0e",
+  "en": "5.Warping Prevention Tips",
+  "ar": "5. نصائح لمنع التقوّس",
+  "ckb": "5. ئامۆژگارییەکان بۆ ڕێگریکردن لە چەمانەوەی لێوار",
+  "kind": "faq_q"
+ },
+ {
+  "h": "ddb7e8f51870d54098e6e6ae7f0e79f1bd4eac9ee6c2448e2c909860f18c39f0",
+  "en": "ABS is prone to warping when printing a large size and/or high infill density model. To avoid warping: 1) Not recommended to print too large size and/or high infill density model. 2) Use enclosure printers and ensure the build plate is properly glued before printing. 3) Set lower printing speed and higher heatbed temperature. For more details please refer to: Common print quality problems and solutions on WIKI.",
+  "ar": "فلامنت ABS معرّض للتقوّس عند طباعة نموذج كبير الحجم و/أو ذي كثافة حشوة داخلية عالية. لتجنّب التقوّس: 1) لا يُوصى بطباعة نماذج كبيرة جدًا و/أو ذات كثافة حشوة داخلية عالية. 2) استخدم طابعات ذات هيكل مغلق، وتأكّد من وضع الغراء على صفيحة الطباعة جيدًا قبل الطباعة. 3) اضبط سرعة طباعة أقل وحرارة أعلى للسرير الساخن. لمزيد من التفاصيل، يرجى الرجوع إلى: مشكلات جودة الطباعة الشائعة وحلولها على الويكي.",
+  "ckb": "فیلامێنتی ABS مەیلی چەمانەوەی لێواری هەیە کاتێک مۆدێلێکی قەبارە گەورە و/یان بە چڕیی پڕکەرەوەی ناوەوەی بەرز چاپ دەکرێت. بۆ ڕێگریکردن لە چەمانەوەی لێوار: 1) چاپکردنی مۆدێلی زۆر گەورە و/یان بە چڕیی پڕکەرەوەی ناوەوەی بەرز پێشنیار ناکرێت. 2) چاپکەری داخراو بەکاربهێنە و دڵنیابەرەوە کە پێش چاپکردن پلێتی چاپ بە باشی چەسپی لێدراوە. 3) خێرایی چاپی نزمتر و پلەی گەرمیی بەرزتری بێدی گەرم دابنێ. بۆ وردەکاریی زیاتر، تکایە سەیری کێشە باوەکانی جۆرایەتیی چاپ و چارەسەرەکانیان لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a4609ad2edd40550c612f72e27cd00fc8f8de3928d95d7393bc717b4295aa31b",
+  "en": "6.Safety Tips",
+  "ar": "6. نصائح السلامة",
+  "ckb": "6. ئامۆژگارییەکانی سەلامەتی",
+  "kind": "faq_q"
+ },
+ {
+  "h": "843b02d00efdeeb47b69238c5d18c81d84258d586cdd896c37b90338af1bc2fa",
+  "en": "We recommend using an enclosed printer. At printing temperatures, this filament may release harmful gases, including styrene, which can cause dizziness or nausea. For extended operation, please wear a protective mask with a vapor filter (such as an activated carbon mask). If individuals with asthma or respiratory conditions, pregnant women, or children are present, please increase ventilation or pause printing with this material.",
+  "ar": "نوصي باستخدام طابعة مغلقة. عند درجات حرارة الطباعة، قد يُطلق هذا الفلامنت غازات ضارة، منها الستايرين، قد تسبّب الدوار أو الغثيان. عند التشغيل لفترات طويلة، يرجى ارتداء كمامة واقية مزوّدة بفلتر للأبخرة (مثل كمامة الكربون المنشّط). وفي حال وجود أشخاص مصابين بالربو أو بأمراض تنفسية، أو نساء حوامل، أو أطفال، يرجى زيادة التهوية أو إيقاف الطباعة بهذه المادة مؤقتًا.",
+  "ckb": "پێشنیار دەکەین چاپکەری داخراو بەکاربهێنیت. لە پلەی گەرمیی چاپدا، ئەم فیلامێنتە لەوانەیە گازی زیانبەخش دەربدات، لەوانە ستایرین، کە دەتوانێت ببێتە هۆی سەرگێژبوون یان دڵتێکەڵهاتن. بۆ کارکردنی درێژخایەن، تکایە دەمامکی پارێزەر لەگەڵ فلتەری هەڵم بپۆشە (وەک دەمامکی کاربۆنی چالاککراو). ئەگەر کەسانی تووشبوو بە ڕەبۆ یان نەخۆشیی کۆئەندامی هەناسە، ئافرەتانی دووگیان، یان منداڵان ئامادە بوون، تکایە هەواگۆڕکێ زیاد بکە یان چاپکردن بەم کەرەستەیە ڕابگرە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a6974acb236b9a28cc7cc0b556180681de9db4aff1f7785fe7f73b7ba3dd015a",
+  "en": "Paint the World in Gentle Tones",
+  "ar": "لوّن العالم بدرجات هادئة",
+  "ckb": "جیهان بە ڕەنگی نەرم و هێمن ڕەنگ بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "b972ce5cdc0fbcbffcfe7f8c979a339f8a3c61a48969afd550b7c83bfcf82064",
+  "en": "Elegant Matte Finish",
+  "ar": "تشطيب مطفي أنيق",
+  "ckb": "ڕووکاری ماتی جوان",
+  "kind": "block_title"
+ },
+ {
+  "h": "2ce39b6cd72a6a58e8760948782de83642f03596ff1abee720d17498f0a1fa84",
+  "en": "Bambu PLA Matte significantly reduces visible layer lines, offering a smooth, non-glossy appearance that makes your prints stand out. Its sleek, refined look is perfect for design projects, architectural models, and display pieces.",
+  "ar": "يقلّل Bambu PLA Matte خطوط الطبقات الظاهرة بشكل كبير، ويمنح مظهرًا أملس غير لامع يجعل مطبوعاتك مميّزة. ومظهره الأنيق والراقي مثالي لمشاريع التصميم والنماذج المعمارية وقطع العرض.",
+  "ckb": "فیلامێنتی Bambu PLA Matte بە شێوەیەکی بەرچاو هێڵە دیارەکانی چین کەم دەکاتەوە و ڕووکارێکی لووس و بێ بریسکە دەبەخشێت کە چاپکراوەکانت جیاواز دەکات. شێوە ڕێک و ناسکەکەی گونجاوە بۆ پڕۆژەکانی دیزاین، مۆدێلی تەلارسازی و پارچەی نمایش.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b4d281144dfdd23ea09c140c5bfdeb4f2cafb149b0697bef534190dfe4fec2f5",
+  "en": "A Palette of Soft, Subtle Colors",
+  "ar": "مجموعة من الألوان الناعمة والهادئة",
+  "ckb": "کۆمەڵێک ڕەنگی نەرم و هێمن",
+  "kind": "block_title"
+ },
+ {
+  "h": "0bd279243d5c1ede29b190235bf99c735a8afd249f239776e31bcc418f659a92",
+  "en": "Select from a curated range of elegant, muted colors that beautifully complement the matte finish, ideal for art, fashion designs, and décor projects.",
+  "ar": "اختر من تشكيلة منتقاة من الألوان الأنيقة الهادئة التي تكمّل التشطيب المطفي بشكل جميل، وهي مثالية للفن وتصاميم الأزياء ومشاريع الديكور.",
+  "ckb": "لە کۆمەڵێکی هەڵبژێردراو لە ڕەنگە جوان و کاڵەکان هەڵبژێرە کە بە جوانی ڕووکارە ماتەکە تەواو دەکەن، گونجاون بۆ هونەر، دیزاینی جلوبەرگ و پڕۆژەکانی ڕازاندنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a5442ad68caf1d556f9741dd8a759ed4c067545f9760bd0d598f16731bd55a35",
+  "en": "Easy to Print, High Quality",
+  "ar": "سهل الطباعة وعالي الجودة",
+  "ckb": "چاپکردنی ئاسان، جۆرایەتیی بەرز",
+  "kind": "block_title"
+ },
+ {
+  "h": "2c014b245f783d9951e6673522bbe8ca319e8e88a43e6494be315754283e8ab4",
+  "en": "Bambu PLA Matte delivers premium results at speeds of up to 270 mm/s* without the need for extensive adjustments.",
+  "ar": "يقدّم Bambu PLA Matte نتائج فاخرة بسرعات تصل إلى 270 mm/s* دون الحاجة إلى تعديلات كثيرة.",
+  "ckb": "فیلامێنتی Bambu PLA Matte ئەنجامی ئاستبەرز بە خێرایی تا 270 mm/s* پێشکەش دەکات بەبێ پێویستی بە ڕێکخستنی زۆر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "462cb2689b376341fd03c78b71f6044494ba2f24e36c8629f18a6fc6f9b05de7",
+  "en": "PLA Matte is certified to UL GREENGUARD (UL 2904), the recognized standard for 3D printer emissions. The particles and VOCs released measure below the levels of an average kitchen, living room, or office—cleaner than the air you're already breathing.",
+  "ar": "حصل فلامنت PLA Matte على شهادة UL GREENGUARD (UL 2904)، وهي المعيار المعترف به لانبعاثات طابعات 3D. وتقلّ الجسيمات والمركبات العضوية المتطايرة (VOCs) المنبعثة عن مستوياتها في مطبخ أو غرفة معيشة أو مكتب عادي — أي أنها أنظف من الهواء الذي تتنفّسه أصلًا.",
+  "ckb": "فیلامێنتی PLA Matte بڕوانامەی UL GREENGUARD (UL 2904) وەرگرتووە، کە ستانداردی دانپێدانراوە بۆ دەردانی چاپکەرەکانی 3D. ئەو گەردیلە و پێکهاتە ئۆرگانییە بەهەڵمبووانەی (VOCs) کە دەردەدرێن لە ئاستی چێشتخانە، ژووری دانیشتن یان نووسینگەیەکی ئاسایی کەمترن — پاکتر لەو هەوایەی کە ئێستا هەناسەی پێدەدەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "53fb2d23d7d2c447bb037853948992e6c5b4239f8bf58ddee1c666815c01413e",
+  "en": "4. Safety Tips",
+  "ar": "4. نصائح السلامة",
+  "ckb": "4. ئامۆژگارییەکانی سەلامەتی",
+  "kind": "faq_q"
+ },
+ {
+  "h": "788fe1a668691797f805b290901e8b6dfaa020c6f2d6ece1cf8d7f2bc7402607",
+  "en": "Matte Surface Texture",
+  "ar": "ملمس سطح مطفي",
+  "ckb": "هەستی ڕووکاری مات",
+  "kind": "block_line"
+ },
+ {
+  "h": "967289b73e47403ecab3ed09d3b25c5b12ffed1a2f2c517c2cc59a5cbdf17de3",
+  "en": "Special Sparkling Look",
+  "ar": "مظهر متلألئ مميّز",
+  "ckb": "ڕووخسارێکی درەوشاوەی تایبەت",
+  "kind": "block_line"
+ },
+ {
+  "h": "680905d7b15486394c62126e867dd469ac4f44e6d397d83fb8dad2dc691909c4",
+  "en": "Display of PLA Sparkle Prints",
+  "ar": "عرض لمطبوعات PLA Sparkle",
+  "ckb": "نمایشی چاپکراوەکانی PLA Sparkle",
+  "kind": "block_title"
+ },
+ {
+  "h": "684c63c4fdc2b8210a131d50f77f2f9ef3f5b08a860083dded19c9acf94ad175",
+  "en": "Bambu PLA Sparkle is a next-level aesthetic filament that combines strength and sparkle. With metal particles included in its composition, Bambu PLA Sparkle adds a special sparkling look to your prints that sets them apart from the rest.",
+  "ar": "يُعدّ Bambu PLA Sparkle فلامنتًا جماليًا من مستوى أعلى يجمع بين المتانة والتلألؤ. وبفضل جزيئات المعدن الداخلة في تركيبه، يضيف Bambu PLA Sparkle مظهرًا متلألئًا مميّزًا إلى مطبوعاتك يميّزها عن غيرها.",
+  "ckb": "فیلامێنتی Bambu PLA Sparkle فیلامێنتێکی جوانکاریی ئاستبەرزە کە بەهێزی و درەوشانەوە پێکەوە کۆدەکاتەوە. بە هۆی ئەو گەردیلە کانزاییانەی لە پێکهاتەکەیدان، Bambu PLA Sparkle ڕووخسارێکی درەوشاوەی تایبەت دەبەخشێتە چاپکراوەکانت کە لە هەموو ئەوانی تر جیایان دەکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "21b506cd7c00b374884d5eb6462d129b5aae9fbef445d1df7e1fa3af327ed1dd",
+  "en": "However, it is not recommended to use a 0.2 mm nozzle for printing as clogging may occur. Take your 3D printing projects to new heights with Bambu PLA Sparkle!",
+  "ar": "ومع ذلك، لا يُوصى باستخدام نوزل 0.2 mm للطباعة لأن الانسداد قد يحدث. ارتقِ بمشاريع الطباعة 3D إلى آفاق جديدة مع Bambu PLA Sparkle!",
+  "ckb": "لەگەڵ ئەوەشدا، بەکارهێنانی نۆزڵی 0.2 mm بۆ چاپکردن پێشنیار ناکرێت چونکە لەوانەیە گیران ڕووبدات. بە Bambu PLA Sparkle، پڕۆژەکانت لە بواری چاپی 3D بگەیەنە ئاستێکی نوێ!",
+  "kind": "block_line"
+ },
+ {
+  "h": "131c35923f1bfb66c726603b6cf76e8792ec57ec64e2e812403196cf46e18c79",
+  "en": "Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm.",
+  "ar": "غير متوافق مع رأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm.",
+  "ckb": "لەگەڵ سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "29d1b83c592ba9cd7915d24614f9600d86c9bf2f7e3b9f3a581732075ecb8671",
+  "en": "3.Safety Tips",
+  "ar": "3. نصائح السلامة",
+  "ckb": "3. ئامۆژگارییەکانی سەلامەتی",
+  "kind": "faq_q"
+ },
+ {
+  "h": "fbcae853de9aa931032b8b51b2a9f612645cefd7aeaf315c7d8eebaf6b7a35b4",
+  "en": "Relatively High Impact Strength",
+  "ar": "مقاومة صدمات عالية نسبيًا",
+  "ckb": "بەرگەی لێدانی تا ڕادەیەک بەرز",
+  "kind": "block_line"
+ },
+ {
+  "h": "ca2dd38225a2f133f7c0c2c6961aeb6c647dd72f19a84ec3632d77d9078cc8e7",
+  "en": "Comes with Basic Reusable Spool",
+  "ar": "يأتي مع بكرة Reusable Spool الأساسية",
+  "ckb": "لەگەڵ ماسوورەی بنەڕەتیی Reusable Spool دێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "0ddde91300adf10d16e59e8295eaab6886153dd676468eb77861efd16767faf9",
+  "en": "Metal Surface Texture & Metallic Shine",
+  "ar": "ملمس سطح معدني ولمعان معدني",
+  "ckb": "هەستی ڕووکاری کانزایی و بریسکەی کانزایی",
+  "kind": "block_line"
+ },
+ {
+  "h": "d629f6a17cb1d12e7f85f81722d5830e5fca8b9bd59e08a6346951372aebfe12",
+  "en": "No Metal particle infill",
+  "ar": "بلا حشوة من جزيئات المعدن",
+  "ckb": "بێ پڕکەرەوەی گەردیلەی کانزا",
+  "kind": "block_line"
+ },
+ {
+  "h": "418917fdbc6773d16c01c802c7923ae020a1d92f469ab9871d7a2912da627068",
+  "en": "Relatively high impact strength",
+  "ar": "مقاومة صدمات عالية نسبيًا",
+  "ckb": "بەرگەی لێدانی تا ڕادەیەک بەرز",
+  "kind": "block_line"
+ },
+ {
+  "h": "6ee731e8c8224e760accd638e35d6effbe36b6c3de12075052b00458f7e6e481",
+  "en": "Bambu PLA Metal is a metallic-textured filament designed to enhance the aesthetic of your prints. It is designed to mimic the surface texture of metal, but it does not contain actual metal fillers.",
+  "ar": "يُعدّ Bambu PLA Metal فلامنتًا بملمس معدني صُمّم لتعزيز جمال مطبوعاتك. وهو مصمّم لمحاكاة ملمس سطح المعدن، لكنه لا يحتوي على مواد مالئة معدنية حقيقية.",
+  "ckb": "فیلامێنتی Bambu PLA Metal فیلامێنتێکی خاوەن هەستی کانزاییە کە بۆ زیادکردنی جوانیی چاپکراوەکانت دیزاین کراوە. بۆ لاساییکردنەوەی هەستی ڕووکاری کانزا دیزاین کراوە، بەڵام هیچ پڕکەرەوەیەکی ڕاستەقینەی کانزای تێدا نییە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "23afde0bc45db713c170fea366b5a73200845ac5bd22ae5ab6a875ff90d1c1be",
+  "en": "With its advanced metallic shine, this filament offers a professional and high-end finish and a touch of sophistication to your prints while retaining almost the same comprehensive performance of regular PLA.",
+  "ar": "بفضل لمعانه المعدني المتطوّر، يمنح هذا الفلامنت مطبوعاتك تشطيبًا احترافيًا فاخرًا ولمسة من الرقي، مع الحفاظ على الأداء الشامل نفسه تقريبًا لفلامنت PLA العادي.",
+  "ckb": "بە بریسکەی کانزاییی پێشکەوتووی، ئەم فیلامێنتە ڕووکارێکی پیشەگەرانە و ئاستبەرز و هەستێکی ناسک دەبەخشێتە چاپکراوەکانت، لە هەمان کاتدا نزیکەی هەمان کارایی گشتیی فیلامێنتی ئاسایی PLA دەپارێزێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e00f96875bd4cd571c16c8435c11f8bfab80dbcd4507249d004ab1c813d97515",
+  "en": "Dry before use to ensure the best print quality and consistent finish. For more details, please refer to: Filament drying instructions on WIKI.",
+  "ar": "جفّفه قبل الاستخدام لضمان أفضل جودة طباعة وتشطيب متجانس. لمزيد من التفاصيل، يرجى الرجوع إلى: تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "پێش بەکارهێنان وشکی بکەرەوە بۆ دڵنیابوون لە باشترین جۆرایەتیی چاپ و ڕووکارێکی یەکدەست. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "cb34eaabcd2701e065931fdb58e3802d30b405a0a33f36189c950639177efcb5",
+  "en": "Natural Stone-like Texture",
+  "ar": "ملمس طبيعي يشبه الحجر",
+  "ckb": "هەستی سروشتیی وەک بەرد",
+  "kind": "block_line"
+ },
+ {
+  "h": "29fb8eda12b3daa235eaff6432d002547939e5c6a7213f047f4c784dadd7a707",
+  "en": "Delicate Finish",
+  "ar": "تشطيب ناعم ورقيق",
+  "ckb": "ڕووکاری ناسک",
+  "kind": "block_line"
+ },
+ {
+  "h": "ae27dfb9694e1af424052b9a4b5811c4ccbe66beffae17ce9c61475788f1d1e8",
+  "en": "Mimics the Appearance of Natural Stone",
+  "ar": "يحاكي مظهر الحجر الطبيعي",
+  "ckb": "لاسایی شێوەی بەردی سروشتی دەکاتەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "c5611d8f24e8a1d8d8362afdad5c40928b17c412d536dfa2cc4d1a1ba68fa220",
+  "en": "With inorganic particles in its composition, it offers a vivid stone-like texture that resembles marble, granite, or bricks. It adds a touch of nature to your prints and provides a stunning finish for your projects.",
+  "ar": "بفضل الجزيئات غير العضوية في تركيبه، يوفّر ملمسًا حيًّا شبيهًا بالحجر يحاكي الرخام أو الغرانيت أو الطوب. ويضيف لمسة من الطبيعة إلى مطبوعاتك ويمنح مشاريعك تشطيبًا مذهلًا.",
+  "ckb": "بە هۆی گەردیلە نائۆرگانییەکانی ناو پێکهاتەکەی، هەستێکی زیندووی وەک بەرد دەبەخشێت کە لە مەڕمەڕ، گرانیت یان خشت دەچێت. هەستێکی سروشت دەبەخشێتە چاپکراوەکانت و ڕووکارێکی سەرسوڕهێنەر بە پڕۆژەکانت دەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b1861158c3ab67db1c482b8c801d98979bde4edad7120daa6be0a55dfc3c4d77",
+  "en": "Stiff Enough to Resist Bending",
+  "ar": "صلب بما يكفي لمقاومة الانحناء",
+  "ckb": "ئەوەندە ڕەقە کە بەرگەی چەمانەوە دەگرێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "4adb6df2a78f9091ba53d306468495494f1d07938227809b8dcbdf4c0b47661f",
+  "en": "High Accuracy for Assembly Parts",
+  "ar": "دقة عالية لقطع التجميع",
+  "ckb": "وردیی بەرز بۆ پارچەکانی پێکەوەنان",
+  "kind": "block_line"
+ },
+ {
+  "h": "7b5d876d122fe85f7a99a2c37b19f6b24abbaa477ea2ba528816f4d2316e0cc0",
+  "en": "Ultimate Choice for Smooth Finish",
+  "ar": "الخيار الأمثل لتشطيب أملس",
+  "ckb": "باشترین هەڵبژاردە بۆ ڕووکاری لووس",
+  "kind": "block_line"
+ },
+ {
+  "h": "de7c0e9ea888708c27535ac7674b9e8c93997568522046c34ac094ef8025088a",
+  "en": "With a stiffness of 3950 MPa, Bambu PLA-CF goes beyond decorative prints. Its high strength and rigidity make it ideal for functional and load-bearing parts that resist bending.",
+  "ar": "بصلابة تبلغ 3950 MPa، يتجاوز Bambu PLA-CF حدود المطبوعات الزخرفية. فمتانته وصلابته العاليتان تجعلانه مثاليًا للقطع الوظيفية والحاملة للأحمال التي تقاوم الانحناء.",
+  "ckb": "بە سەختیی 3950 MPa، فیلامێنتی Bambu PLA-CF لە چاپکراوی ڕازاندنەوە تێدەپەڕێت. بەهێزی و ڕەقیی بەرزی دەیکاتە گونجاوترین بۆ پارچە کارەکییەکان و ئەو پارچانەی بار هەڵدەگرن و بەرگەی چەمانەوە دەگرن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2795b64009ab9541aa1b55a2d72a8720121b3636bb898ff1a0431cd29a6f4d46",
+  "en": "For better results, please orient your model according to the load-bearing direction to avoid receiving force on the layer direction.The XY axis offers better strength for load-bearing parts.",
+  "ar": "للحصول على نتائج أفضل، يرجى توجيه نموذجك وفق اتجاه تحمّل الحمل لتجنّب تعرّض اتجاه الطبقات للقوة. ويوفّر محور XY متانة أفضل للقطع الحاملة للأحمال.",
+  "ckb": "بۆ ئەنجامی باشتر، تکایە ئاراستەی مۆدێلەکەت بەپێی ئاراستەی هەڵگرتنی بار دابنێ بۆ ئەوەی هێز نەکەوێتە سەر ئاراستەی چینەکان. تەوەری XY بەهێزیی باشتر بۆ ئەو پارچانە دابین دەکات کە بار هەڵدەگرن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "57f830795bb55843fb0b63aa736ecf57747d824532a45331c1c9029846652e6a",
+  "en": "Thanks to its low shrinkage and excellent warping resistance, PLA-CF holds its shape and dimensions true to your design. Whether you're scaling up parts or creating components for assembly, you can rely on consistent precision — what you measure is what you get.",
+  "ar": "بفضل انكماشه المنخفض ومقاومته الممتازة للتقوّس، يحافظ PLA-CF على شكله وأبعاده مطابقة لتصميمك. سواء كنت تكبّر القطع أو تصنع مكوّنات للتجميع، يمكنك الاعتماد على دقة ثابتة — فما تقيسه هو ما تحصل عليه.",
+  "ckb": "بە هۆی کرژبوونەوەی کەم و بەرگەی نایابی بەرامبەر چەمانەوەی لێوار، فیلامێنتی PLA-CF شێوە و ڕەهەندەکانی وەک دیزاینەکەت دەپارێزێت. جا پارچەکان گەورە بکەیت یان پێکهاتە بۆ پێکەوەنان دروست بکەیت، دەتوانیت پشت بە وردییەکی جێگیر ببەستیت — ئەوەی دەیپێویت هەمان ئەوەیە کە وەریدەگریت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "473b3a0e1e7428ba2dfe2e1e5beb32e0ab21a9c060e69715c476cc0a34aa3fc1",
+  "en": "Tired of layer lines on your prints? Try PLA-CF! The addition of carbon fiber effectively conceals layer lines, resulting in a smooth, refined finish. Depending on your model’s design, PLA-CF can beautifully replicate textures like fabric, matte surfaces, or even clay.",
+  "ar": "هل سئمت من خطوط الطبقات على مطبوعاتك؟ جرّب PLA-CF! تُخفي إضافة ألياف الكربون خطوط الطبقات بفعالية، لتحصل على تشطيب أملس وراقٍ. وبحسب تصميم نموذجك، يستطيع PLA-CF محاكاة ملمس القماش أو الأسطح المطفية أو حتى الطين بشكل جميل.",
+  "ckb": "لە هێڵەکانی چین لەسەر چاپکراوەکانت بێزار بوویت؟ PLA-CF تاقی بکەرەوە! زیادکردنی ڕیشاڵی کاربۆن بە کارایی هێڵەکانی چین دەشارێتەوە، و ڕووکارێکی لووس و ناسک دەدات. بەپێی دیزاینی مۆدێلەکەت، PLA-CF دەتوانێت بە جوانی لاسایی هەستی قوماش، ڕووکاری مات یان تەنانەت قوڕ بکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d5fa65a65e507c858d1abc00f30643b470842a058b5d345407bde8ce90dcd273",
+  "en": "This product is a carbon fiber reinforced filament that may produce fine fiber debris during use, post-processing, or contact with rough or fractured surfaces, posing a risk of mechanical skin punctures or foreign body irritation. To ensure safety, please avoid rubbing or touching rough edges and cross-sections with bare hands; it is highly recommended to wear gloves when loading or unloading the filament, as well as during cutting, sanding, or other post-processing operations, while using additional protective equipment as required by your specific working conditions.",
+  "ar": "هذا المنتج فلامنت مقوّى بألياف الكربون، وقد يُنتج بقايا ألياف دقيقة أثناء الاستخدام أو المعالجة اللاحقة أو عند ملامسة الأسطح الخشنة أو المكسورة، ما يشكّل خطر حدوث وخز ميكانيكي في الجلد أو تهيّج بسبب الأجسام الغريبة. ولضمان السلامة، يرجى تجنّب فرك الحواف الخشنة والمقاطع العرضية أو لمسها باليدين العاريتين؛ ويوصى بشدة بارتداء القفازات عند تحميل الفلامنت أو إخراجه، وكذلك أثناء القص أو الصنفرة أو غيرها من عمليات المعالجة اللاحقة، مع استخدام معدات حماية إضافية حسب ما تتطلبه ظروف عملك الخاصة.",
+  "ckb": "ئەم بەرهەمە فیلامێنتێکی بەهێزکراو بە ڕیشاڵی کاربۆنە کە لەوانەیە لە کاتی بەکارهێنان، چارەسەرکردنی دوای چاپ، یان بەرکەوتن لەگەڵ ڕووکاری زبر یان شکاو، پاشماوەی ڕیشاڵی ورد دروست بکات، کە مەترسیی کونبوونی میکانیکیی پێست یان هەڵچوونی پێست بەهۆی تەنی بیانی هەیە. بۆ دڵنیابوون لە سەلامەتی، تکایە خۆت بپارێزە لە ساوین یان دەستلێدانی لێوارە زبرەکان و بڕگە بڕاوەکان بە دەستی ڕووت؛ زۆر پێشنیار دەکرێت لە کاتی بارکردن یان دەرهێنانی فیلامێنت، هەروەها لە کاتی بڕین، سمبادەکردن یان کارەکانی تری چارەسەرکردنی دوای چاپ، دەستکێش لەبەر بکەیت، و بەپێی پێویستیی بارودۆخی کارەکەت ئامرازی پاراستنی زیادە بەکاربهێنیت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "aeaf90c447d4c53496d3e18c3fa06a32eb699b9d77d0e2f7f471ff7c9a9744f4",
+  "en": "5.Safety Tips",
+  "ar": "5. نصائح السلامة",
+  "ckb": "5. ئامۆژگارییەکانی سەلامەتی",
+  "kind": "faq_q"
+ },
+ {
+  "h": "4d0de081bba8bc9cea4b0bda9049bc95a7ee2bd449fc6889fcea9b3c3228d4db",
+  "en": "Please be aware that the filament surface and ends may contain hard microscopic splinters invisible to the naked eye.",
+  "ar": "يرجى الانتباه إلى أن سطح الفلامنت وأطرافه قد تحتوي على شظايا مجهرية صلبة لا تُرى بالعين المجردة.",
+  "ckb": "تکایە ئاگاداربە کە ڕووکار و سەرەکانی فیلامێنتەکە لەوانەیە وردە تراشەی ڕەقی مایکرۆسکۆپییان تێدابێت کە بە چاوی ڕووت نابینرێن.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a5e34c3e23c7910606b1f18c903724749cd996b99e707175020f25d1a687b657",
+  "en": "When handling filament, removing supports, or sanding printed parts, please wear puncture- and cut-resistant gloves and safety goggles.",
+  "ar": "عند التعامل مع الفلامنت أو إزالة الدعامات أو صنفرة القطع المطبوعة، يرجى ارتداء قفازات مقاومة للوخز والجرح ونظارات أمان.",
+  "ckb": "لە کاتی مامەڵەکردن لەگەڵ فیلامێنت، لابردنی پاڵپشتەکان، یان سمبادەکردنی پارچە چاپکراوەکان، تکایە دەستکێشی بەرگەگر لە کونبوون و بڕین و چاویلکەی سەلامەتی بپۆشە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "fdccf4090dc7ef092099f57b7f84ffe30fd140a1dc3eeadeee6420e6a34156dc",
+  "en": "Carbon Fiber Texture & Minimized Layer Lines",
+  "ar": "ملمس ألياف الكربون وخطوط طبقات بالحد الأدنى",
+  "ckb": "هەستی ڕیشاڵی کاربۆن و کەمترین هێڵی چین",
+  "kind": "block_line"
+ },
+ {
+  "h": "55b97908ad1d270daf63696c365b20780b5fb0e6ce422b16d2122d95700392cb",
+  "en": "Improved Mechanical Properties",
+  "ar": "خصائص ميكانيكية محسّنة",
+  "ckb": "تایبەتمەندیی میکانیکیی باشترکراو",
+  "kind": "block_line"
+ },
+ {
+  "h": "843ac3644e81b1743612e2b1528d4744530563b097a18af895ce32f1be164428",
+  "en": "Stabilized Printing Dimension",
+  "ar": "ثبات أبعاد الطباعة",
+  "ckb": "جێگیریی ڕەهەندەکانی چاپ",
+  "kind": "block_line"
+ },
+ {
+  "h": "1ad877b0b5b93878d6132d4ccd363d7a0d8ed0041eb1be0a5b136d97f481b2d2",
+  "en": "Stainless Steel Nozzle NOT Recommended",
+  "ar": "نوزل الفولاذ المقاوم للصدأ غير موصى به",
+  "ckb": "نۆزڵی پۆڵای زەنگنەگر پێشنیار ناکرێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "b2307118cb50a228bc2db4e73ddd76e793a62dc2a9b761a458d505d7cc10da8f",
+  "en": "Dry before Use for the Highest Print Quality",
+  "ar": "جفّفه قبل الاستخدام للحصول على أعلى جودة طباعة",
+  "ckb": "پێش بەکارهێنان وشکی بکەرەوە بۆ بەرزترین جۆرایەتیی چاپ",
+  "kind": "block_line"
+ },
+ {
+  "h": "0e49d5e8ad10f8113cc474d8778872e91189d37bf4a8a46db06157fe63dea7aa",
+  "en": "Low Moisture Absorption",
+  "ar": "امتصاص منخفض للرطوبة",
+  "ckb": "هەڵمژینی کەمی شێ",
+  "kind": "block_line"
+ },
+ {
+  "h": "38862a5579f0010468a91423bd8db30371ec5a2fe317b4f81284a4c9a2ba09bb",
+  "en": "Exceptional Mechanical Properties & Layer Adhesion",
+  "ar": "خصائص ميكانيكية والتصاق طبقات استثنائيان",
+  "ckb": "تایبەتمەندیی میکانیکی و لکانی چینی نایاب",
+  "kind": "block_line"
+ },
+ {
+  "h": "2a2a3a7cb043ab8d549d0b771ed9b93a8a1464d486736842fb7ca788e8a141fc",
+  "en": "High Tensile Strength",
+  "ar": "مقاومة شد عالية",
+  "ckb": "بەرگەی ڕاکێشانی بەرز",
+  "kind": "block_line"
+ },
+ {
+  "h": "904aa0d9bc535ce9119f5d2fbdfec978e8fc4fdfb673b0ad69483a2a1b80ceb4",
+  "en": "Low water absorption",
+  "ar": "امتصاص منخفض للماء",
+  "ckb": "هەڵمژینی کەمی ئاو",
+  "kind": "block_title"
+ },
+ {
+  "h": "15a692c6e6bcc4593e086a85dd7edba49f45acf0b93583b9e5420796e86754c4",
+  "en": "With a 50% lower water absorption rate compared to normal PA-CF,",
+  "ar": "بمعدل امتصاص للماء أقل بنسبة 50% مقارنةً بفلامنت PA-CF العادي،",
+  "ckb": "بە ڕێژەی هەڵمژینی ئاوی 50% کەمتر بە بەراورد لەگەڵ جۆری ئاسایی PA-CF،",
+  "kind": "block_line"
+ },
+ {
+  "h": "25cb37366fc92fb38c253b8aff0f4f2c42d8835398ef1a1e7c7b12cc9143504d",
+  "en": "Bambu PAHT-CF maintains excellent mechanical properties and dimensional stability even when exposed to high humidity.",
+  "ar": "يحافظ Bambu PAHT-CF على خصائص ميكانيكية ممتازة وثبات في الأبعاد حتى عند تعرّضه لرطوبة عالية.",
+  "ckb": "فیلامێنتی Bambu PAHT-CF تایبەتمەندیی میکانیکیی نایاب و جێگیریی ڕەهەندەکانی دەپارێزێت تەنانەت کاتێک بەر شێی بەرز دەکەوێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7ea018e46ab4632608daf8f68917f2c79e5fccb09c6b48a758b2175bb3caf735",
+  "en": "Deflection from Dry to Wet",
+  "ar": "الانحراف بين الحالة الجافة والرطبة",
+  "ckb": "لاربوونەوە لە باری وشکەوە بۆ باری تەڕ",
+  "kind": "block_line"
+ },
+ {
+  "h": "aa107371cac3325c66c189e0f2cb169fe7324b1ebf08a0fc9cba0750a8b826d5",
+  "en": "Mechanical Properties Comparison",
+  "ar": "مقارنة الخصائص الميكانيكية",
+  "ckb": "بەراوردکردنی تایبەتمەندییە میکانیکییەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "e1db041aa1340982478975d332104213c9ec14d70a9315018c3f085169e4ec1f",
+  "en": "*Both PA-CF and PAHT-CF need to be dried at 80 °C for 12 hours before printing.",
+  "ar": "*يجب تجفيف كلٍّ من PA-CF وPAHT-CF عند 80 °C لمدة 12 ساعة قبل الطباعة.",
+  "ckb": "*پێویستە هەردوو PA-CF و PAHT-CF پێش چاپکردن بۆ ماوەی 12 کاتژمێر لە 80 °C وشک بکرێنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7f751cc88ff8e14d2f0c68781374662f55a6b128be9747001479228449e09f75",
+  "en": "Exceptional Z-bonding",
+  "ar": "التصاق استثنائي بين الطبقات على محور Z",
+  "ckb": "لکانی نایابی چینەکان لە تەوەری Z",
+  "kind": "block_title"
+ },
+ {
+  "h": "1e428afb9230e4d2db3ad6f0912a8a7e48aaaed15813013e865418f8e0f02cc8",
+  "en": "Bambu PAHT-CF shows much higher adhesion in Z layers compared to normal PA-CF, bringing it the ability to withstand high levels of impact or stress without breaking or deforming.",
+  "ar": "يُظهر Bambu PAHT-CF التصاقًا أعلى بكثير بين طبقات محور Z مقارنةً بفلامنت PA-CF العادي، ما يمنحه القدرة على تحمّل مستويات عالية من الصدمات أو الإجهاد دون أن ينكسر أو يتشوّه.",
+  "ckb": "فیلامێنتی Bambu PAHT-CF لکانێکی زۆر بەرزتر لە نێوان چینەکانی تەوەری Z نیشان دەدات بە بەراورد لەگەڵ جۆری ئاسایی PA-CF، کە توانای بەرگەگرتنی ئاستی بەرزی لێدان یان فشار بەبێ شکان یان شێوە تێکچوون پێدەبەخشێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "614e3373483f2325e845b5a79d6d1a073642810ce25a69febe86cc765510532c",
+  "en": "Z-layer Performance",
+  "ar": "أداء طبقات محور Z",
+  "ckb": "کارایی چینەکانی تەوەری Z",
+  "kind": "block_title"
+ },
+ {
+  "h": "0bb8ac8854bfdf22b0ccc4e126bcff52fa4f3b1a605773664086ee13237837f5",
+  "en": "High tensile strength",
+  "ar": "مقاومة شد عالية",
+  "ckb": "بەرگەی ڕاکێشانی بەرز",
+  "kind": "block_title"
+ },
+ {
+  "h": "02ff005316df3071cc72da1ab3234048c874a177fa03fd19aa13db0c5352b99c",
+  "en": "Bambu PAHT-CF is designed to meet the demands of various industrial and engineering applications where high strength and durability are required.",
+  "ar": "صُمّم Bambu PAHT-CF لتلبية متطلبات مختلف التطبيقات الصناعية والهندسية التي تُطلب فيها قوة ومتانة عاليتان.",
+  "ckb": "فیلامێنتی Bambu PAHT-CF بۆ وەڵامدانەوەی پێداویستییەکانی بەکارهێنانە پیشەسازی و ئەندازیارییە جۆراوجۆرەکان دیزاین کراوە کە بەهێزی و بەرگەگریی بەرزیان پێویستە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ae14306f3168c962d65c1881da59399da8c7f6d4698b89f1341ab8d46f5d4fd0",
+  "en": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, and Bambu Liquid Glue.",
+  "ar": "غير متوافق مع Cool Plate SuperTack، ورأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm، وBambu Liquid Glue.",
+  "ckb": "لەگەڵ Cool Plate SuperTack، سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm و Bambu Liquid Glue گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "19c6eeeb6b7fb4dd4a447eaea223545162b9eb251e5231180c87aa99ee00161e",
+  "en": "PAHT-CF is highly sensitive to humidity. To achieve optimal printing performance, it is recommended to further dry before use and after storage. For more details, please refer to: Filament drying instructions on WIKI.",
+  "ar": "فلامنت PAHT-CF شديد الحساسية للرطوبة. لتحقيق أفضل أداء في الطباعة، يُوصى بتجفيفه مجددًا قبل الاستخدام وبعد التخزين. لمزيد من التفاصيل، يرجى الرجوع إلى: تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "فیلامێنتی PAHT-CF زۆر هەستیارە بە شێ. بۆ گەیشتن بە باشترین کارایی چاپ، پێشنیار دەکرێت پێش بەکارهێنان و دوای هەڵگرتن جارێکی تر وشک بکرێتەوە. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "5501bdae2325b2c57dc0fcba722b6f5743dbbd0cc02861c5efe0117b1b70cdc6",
+  "en": "3.Usage Guide",
+  "ar": "3. إرشادات الاستخدام",
+  "ckb": "3. ڕێبەری بەکارهێنان",
+  "kind": "faq_q"
+ },
+ {
+  "h": "e70f878cf0a6da513cf9a5216e76b770a6b3441d76a522e4722fbe453e167ea1",
+  "en": "Bambu PAHT-CF has high thermal insulation requirements during the printing process, making it unsuitable for use with open-frame printers.",
+  "ar": "يتطلب Bambu PAHT-CF عزلًا حراريًا عاليًا أثناء عملية الطباعة، ما يجعله غير مناسب للاستخدام مع الطابعات ذات الإطار المفتوح.",
+  "ckb": "فیلامێنتی Bambu PAHT-CF لە کاتی پرۆسەی چاپدا پێویستی بە دابڕینی گەرمیی بەرز هەیە، بۆیە گونجاو نییە بۆ بەکارهێنان لەگەڵ چاپکەرە چوارچێوە کراوەکان.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "8e8abc88c97a5c2ed2f5b82941a541b11f99338c39a3b66882285cd06c2ec739",
+  "en": "When printing a model with support, we recommend removing the support structures within 2 hours after printing to prevent them from sticking after absorbing moisture. If sticking occurs, dry the model to ease the removal.",
+  "ar": "عند طباعة نموذج بدعامات، نوصي بإزالة هياكل الدعامات خلال 2 ساعة من انتهاء الطباعة، لمنع التصاقها بعد امتصاص الرطوبة. وإذا حدث الالتصاق، فجفّف النموذج لتسهيل الإزالة.",
+  "ckb": "کاتێک مۆدێلێک بە پاڵپشتەوە چاپ دەکەیت، پێشنیار دەکەین پێکهاتەکانی پاڵپشت لە ماوەی 2 کاتژمێر دوای چاپکردن لاببەیت، بۆ ئەوەی دوای هەڵمژینی شێ نەلکێن. ئەگەر لکان ڕوویدا، مۆدێلەکە وشک بکەرەوە بۆ ئاسانکردنی لابردنەکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "34a2fa8bb2eca614b2d5ccf285bfb24db2c48225111f17984469ceab92c12a71",
+  "en": "For better print results, please refer to printing tips on WIKI.",
+  "ar": "للحصول على نتائج طباعة أفضل، يرجى الرجوع إلى نصائح الطباعة على الويكي.",
+  "ckb": "بۆ ئەنجامی چاپی باشتر، تکایە سەیری ئامۆژگارییەکانی چاپ لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "8759386de1bfe9f41e16df9452fbee219bfab3457a2d0b31633afff6531e67b3",
+  "en": "1. Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.",
+  "ar": "1. يرجى حفظ الفلامنت في مكان بارد ومظلم وجاف بعيدًا عن أشعة الشمس المباشرة ودرجات الحرارة العالية.",
+  "ckb": "1. تکایە فیلامێنتەکە لە شوێنێکی فێنک و تاریک و وشکدا هەڵبگرە، دوور لە تیشکی ڕاستەوخۆی خۆر و پلەی گەرمیی بەرز.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "892effe97cc326ab36c4adacd91c6164a1d4757ef4e12bccf41dd1035300227c",
+  "en": "2. Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.",
+  "ar": "2. يرجى حفظ الفلامنت وأي قطع مكسورة منه بعيدًا عن متناول الرضّع والأطفال والحيوانات الأليفة لمنع البلع أو الاختناق.",
+  "ckb": "2. تکایە فیلامێنت و هەر پارچەیەکی شکاوی لە دەستڕەسی ساوایان و منداڵان و ئاژەڵە ماڵییەکان دوور بخەرەوە بۆ ڕێگریکردن لە قووتدان یان خنکان.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "f46ddfe84de7eff8ae4442a1298044e0543d96fcd22e089688b4582592c10c8c",
+  "en": "3. For opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings.",
+  "ar": "3. للفلامنت المفتوح، نوصي بتجفيفه قبل الاستخدام وفق إعدادات الحرارة والمدة الموصى بها في الويكي.",
+  "ckb": "3. بۆ فیلامێنتی کراوە، پێشنیار دەکەین پێش بەکارهێنان وشک بکرێتەوە بەپێی ڕێکخستنەکانی پلەی گەرمی و کاتی پێشنیارکراو لە ویکی.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "440469fdb089e4cf8d93242d66cbd56040957ee14ae2a723b174d7c874fbc00e",
+  "en": "4. Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.",
+  "ar": "4. يرجى طباعة هذا الفلامنت في مكان جيد التهوية، أو تركيب نظام فعّال لتنقية الهواء أو الشفط.",
+  "ckb": "4. تکایە ئەم فیلامێنتە لە شوێنێکی هەواگۆڕکێی باشدا چاپ بکە، یان سیستەمێکی کارای پاڵاوتنی هەوا یان دەرکردنی هەوا دابمەزرێنە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "047beb3786a226957b4d2380c4a8eead0c35ea5246b6a7d42adab401091c3f42",
+  "en": "5. As this filament is not food-grade, please avoid using finished prints for food storage or contact.",
+  "ar": "5. لأن هذا الفلامنت غير آمن للاستخدام الغذائي، يرجى تجنّب استخدام المطبوعات لتخزين الطعام أو ملامسته.",
+  "ckb": "5. لەبەر ئەوەی ئەم فیلامێنتە گونجاو نییە بۆ خۆراک، تکایە چاپکراوەکان بۆ هەڵگرتنی خۆراک یان بەرکەوتن لەگەڵی بەکارمەهێنە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "80f7fe6840dbcb9fe6ae1cc36daeadeb88966cd6fb897f4531dadc23115c46e2",
+  "en": "6. As this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing.",
+  "ar": "6. لأن هذا الفلامنت شديد امتصاص الرطوبة، يرجى وضع أي فلامنت غير مستخدم فورًا في وعاء محكم الإغلاق مع مادة مجففة، وتجفيفه جيدًا قبل الطباعة.",
+  "ckb": "6. لەبەر ئەوەی ئەم فیلامێنتە شێ بە زۆری هەڵدەمژێت، تکایە هەر فیلامێنتێکی بەکارنەهاتوو دەستبەجێ لە دەفرێکی داخراو لەگەڵ ماددەی وشککەرەوە دابنێ، و پێش چاپکردن بە تەواوی وشکی بکەرەوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "33ff1cb04099c41d9f7727dc6dd31f5d2b46af0d836c8f0cad88c75b7e2793d6",
+  "en": "7. Please be aware that the filament surface and ends may contain hard microscopic splinters invisible to the naked eye. When handling filament, removing supports, or sanding printed parts, please wear puncture- and cut-resistant gloves and safety goggles.",
+  "ar": "7. يرجى الانتباه إلى أن سطح الفلامنت وأطرافه قد تحتوي على شظايا مجهرية صلبة لا تُرى بالعين المجردة. عند التعامل مع الفلامنت أو إزالة الدعامات أو صنفرة القطع المطبوعة، يرجى ارتداء قفازات مقاومة للوخز والجرح ونظارات أمان.",
+  "ckb": "7. تکایە ئاگاداربە کە ڕووکار و سەرەکانی فیلامێنتەکە لەوانەیە وردە تراشەی ڕەقی مایکرۆسکۆپییان تێدابێت کە بە چاوی ڕووت نابینرێن. لە کاتی مامەڵەکردن لەگەڵ فیلامێنت، لابردنی پاڵپشتەکان، یان سمبادەکردنی پارچە چاپکراوەکان، تکایە دەستکێشی بەرگەگر لە کونبوون و بڕین و چاویلکەی سەلامەتی بپۆشە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "d79d0dc84983622cf07c828bcef1b94f261536f9bac05bb10fda2fbdfc453f28",
+  "en": "0.6 mm Nozzle Recommended",
+  "ar": "يُوصى بنوزل 0.6 mm",
+  "ckb": "نۆزڵی 0.6 mm پێشنیار دەکرێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "bfe41d0a727888b7bb3abfeca7b2f56e01c90d6427eb9a4aaf5388f11efbb0ff",
+  "en": "Note: PAHT-CF is an upgraded version of PA-CF (PA-CF was discontinued).",
+  "ar": "ملاحظة: PAHT-CF نسخة مطوّرة من PA-CF (تم إيقاف إنتاج PA-CF).",
+  "ckb": "تێبینی: PAHT-CF وەک وەشانی نوێکراوەی PA-CF هاتووە (بەرهەمهێنانی PA-CF ڕاگیراوە).",
+  "kind": "block_line"
+ },
+ {
+  "h": "3b316fdefce7e72b1744c1853217639bf2285b7ef77b0958ac264b0febabf4c2",
+  "en": "Enhanced Strength and Stiffness",
+  "ar": "قوة وصلابة محسّنتان",
+  "ckb": "بەهێزی و سەختیی باشترکراو",
+  "kind": "block_line"
+ },
+ {
+  "h": "0635becfb7c1508eb1445f3870d691f985d54642ab0157d04157f37c357d4e27",
+  "en": "Ready for Outdoor Use",
+  "ar": "جاهز للاستخدام الخارجي",
+  "ckb": "ئامادەیە بۆ بەکارهێنانی دەرەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "32193968d6bf44127cf446914619cf08c318b36ddb208d5f0c9a88b6a2d25bd4",
+  "en": "Carbon Fiber Finish with a Glossier Look",
+  "ar": "تشطيب بألياف الكربون بمظهر أكثر لمعانًا",
+  "ckb": "ڕووکاری ڕیشاڵی کاربۆن بە شێوەیەکی بریسکەدارتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "90cb85c7d91c07ac8b807b7149c723b287d235731fb87290cf7cae02b458b400",
+  "en": "With the addition of carbon fiber, Bambu PETG-CF overcomes the low stiffness of regular PETG and delivers improved strength and toughness, making it a solid choice for structural and load-bearing parts.",
+  "ar": "بإضافة ألياف الكربون، يتغلّب Bambu PETG-CF على الصلابة المنخفضة لفلامنت PETG العادي، ويقدّم قوة ومتانة محسّنتين، ما يجعله خيارًا متينًا للقطع الإنشائية والحاملة للأحمال.",
+  "ckb": "بە زیادکردنی ڕیشاڵی کاربۆن، فیلامێنتی Bambu PETG-CF سەختیی کەمی فیلامێنتی ئاسایی PETG چارەسەر دەکات و بەهێزی و پتەویی باشتر پێشکەش دەکات، بۆیە هەڵبژاردەیەکی پتەوە بۆ پارچە پێکهاتەییەکان و ئەو پارچانەی بار هەڵدەگرن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "38580ed1ff4cdbfabe68af03563d19f8d2ee8ab4da8237976844135bd7b0fdbb",
+  "en": "Thanks to its enhanced resistance to heat and moisture, Bambu PETG-CF is ideal for outdoor applications. Feel free to create durable tools for your garden or any outdoor environment.",
+  "ar": "بفضل مقاومته المحسّنة للحرارة والرطوبة، يُعدّ Bambu PETG-CF مثاليًا للاستخدامات الخارجية. اصنع بحرية أدوات متينة لحديقتك أو لأي بيئة خارجية.",
+  "ckb": "بە هۆی بەرگەی باشترکراوی بەرامبەر گەرمی و شێ، فیلامێنتی Bambu PETG-CF گونجاوترینە بۆ بەکارهێنانی دەرەوە. بە ئازادی ئامرازی بەرگەگر بۆ باخچەکەت یان هەر ژینگەیەکی دەرەوە دروست بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fb695d5201f49bc955b681dc74d93bb0ec2d8cfe2ae0cf99137e03e73c36cfe8",
+  "en": "Bambu PETG-CF features a carbon fiber texture that conceals layer lines, while its surface finish is glossier than that of PLA-CF, making it as attractive as it is functional.",
+  "ar": "يتميّز Bambu PETG-CF بملمس ألياف الكربون الذي يُخفي خطوط الطبقات، بينما يكون تشطيب سطحه أكثر لمعانًا من PLA-CF، ما يجعله جذابًا بقدر ما هو عملي.",
+  "ckb": "فیلامێنتی Bambu PETG-CF هەستی ڕیشاڵی کاربۆنی هەیە کە هێڵەکانی چین دەشارێتەوە، لە کاتێکدا ڕووکارەکەی لە هی PLA-CF بریسکەدارترە، بۆیە هەر ئەوەندەی بەسوودە ئەوەندەش سەرنجڕاکێشە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a088069958c3a9e4505ca2251ad06f26ce849b7644201409fa697ab691c70871",
+  "en": "Not compatible with AMS lite, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+  "ar": "غير متوافق مع AMS lite ورأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm.",
+  "ckb": "لەگەڵ AMS lite و سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "61ac5a24a7c5f79ae7a12e55baea226a32706cb8dede9cb919a906592f6af8d8",
+  "en": "5.Nozzle Recommendation",
+  "ar": "5. النوزل الموصى به",
+  "ckb": "5. نۆزڵی پێشنیارکراو",
+  "kind": "faq_q"
+ },
+ {
+  "h": "21b96e5f479ef4556c8596acf5de61b2e90be68b4426ba31eaa1c1532d440f30",
+  "en": "Due to the addition of carbon fiber, PETG-CF requires a more wear-resistant hardened steel nozzle. While a 0.4 mm hardened steel nozzle can be used, a 0.6 mm hardened steel nozzle is recommended to further reduce the risk of clogging.",
+  "ar": "بسبب إضافة ألياف الكربون، يتطلب PETG-CF نوزلًا من الفولاذ المقسّى أكثر مقاومة للتآكل بالاحتكاك. ورغم إمكانية استخدام نوزل من الفولاذ المقسّى 0.4 mm، يُوصى بنوزل من الفولاذ المقسّى 0.6 mm لتقليل خطر الانسداد أكثر.",
+  "ckb": "بەهۆی زیادکردنی ڕیشاڵی کاربۆن، PETG-CF پێویستی بە نۆزڵی پۆڵای ڕەقکراوی بەرگەگرتر لە سووان هەیە. هەرچەندە دەتوانرێت نۆزڵی پۆڵای ڕەقکراوی 0.4 mm بەکاربهێنرێت، بەڵام نۆزڵی پۆڵای ڕەقکراوی 0.6 mm پێشنیار دەکرێت بۆ کەمکردنەوەی زیاتری مەترسیی گیران.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "11ce7bb60b52cb71fe8a00365703bfb5adcf79d57ca52a288c6b669fda7bbf17",
+  "en": "6.Z-Axis Strength",
+  "ar": "6. المتانة على محور Z",
+  "ckb": "6. بەهێزی لە تەوەری Z",
+  "kind": "faq_q"
+ },
+ {
+  "h": "f4645f49960eaf3746d9826dbdbf61628f02b4d6873b809297bd746674eb0b56",
+  "en": "For stronger Z-axis adhesion, increase the infill density. Avoid using an open-frame printer and refrain from setting the cooling fan speed too high, as overcooling can weaken layer bonding.",
+  "ar": "للحصول على التصاق أقوى على محور Z، زِد كثافة الحشوة الداخلية. وتجنّب استخدام طابعة ذات إطار مفتوح، وامتنع عن ضبط سرعة مروحة التبريد على قيمة عالية جدًا، لأن التبريد المفرط قد يُضعف التصاق الطبقات.",
+  "ckb": "بۆ لکانی بەهێزتر لە تەوەری Z، چڕیی پڕکەرەوەی ناوەوە زیاد بکە. خۆت لە بەکارهێنانی چاپکەری چوارچێوە کراوە بپارێزە و خێرایی پانکەی ساردکەرەوە زۆر بەرز دامەنێ، چونکە ساردکردنەوەی زیادە دەتوانێت لکانی چینەکان لاواز بکات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "18671921d6765aa9f94fa5036ca475e16743627e5f335a07e20ebb8cc78e96b8",
+  "en": "7.Surface Finish",
+  "ar": "7. تشطيب السطح",
+  "ckb": "7. جۆرایەتیی ڕووکار",
+  "kind": "faq_q"
+ },
+ {
+  "h": "19186f5acbc2c5b40b4acc24a4d1f9affede1ebf0368a87a8f20924010537132",
+  "en": "For a shinier appearance, use lower printing speeds and slightly higher nozzle temperatures.",
+  "ar": "للحصول على مظهر أكثر لمعانًا، استخدم سرعات طباعة أقل وحرارة نوزل أعلى قليلًا.",
+  "ckb": "بۆ شێوەیەکی بریسکەدارتر، خێرایی چاپی نزمتر و پلەی گەرمیی نۆزڵی کەمێک بەرزتر بەکاربهێنە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a99487fa9090d1934f5d54c3bc3e376eec63f21c283426cd4dd9db6bff551fc1",
+  "en": "Less Clumping and Stringing",
+  "ar": "تكتّل وتخييط أقل",
+  "ckb": "کۆبوونەوە و دەزووبەستنی کەمتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "949fe756a42eef8f943ad152dc8578106e04cf20903e08dcf3ce82f5c7350010",
+  "en": "Premium Print Surface",
+  "ar": "سطح طباعة فاخر",
+  "ckb": "ڕووکاری چاپی ئاستبەرز",
+  "kind": "block_line"
+ },
+ {
+  "h": "05f178e90dda31c94922d532769f983e4b8f33e9a7a288f609ced03efc3c4930",
+  "en": "Improved Mechanical Properties & High Flexibility",
+  "ar": "خصائص ميكانيكية محسّنة ومرونة عالية",
+  "ckb": "تایبەتمەندیی میکانیکیی باشترکراو و نەرمونیانیی بەرز",
+  "kind": "block_line"
+ },
+ {
+  "h": "65fee565a167beca241942df5032b1654ce0fbe2d12ffc58d1a20f887dadd49d",
+  "en": "Quick Walkthrough",
+  "ar": "شرح سريع للخطوات",
+  "ckb": "ڕێنماییی خێرای هەنگاوەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "c02882995fb8d55ab77347fe5b23e9658bbc2174ac73f0168b3213775e74c232",
+  "en": "#1 Get your printer ready",
+  "ar": "#1 جهّز طابعتك",
+  "ckb": "#1 چاپکەرەکەت ئامادە بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "acaaf1a8335e83de21163aa48748b1cc4556c01174cd5814ac02f08532ab8574",
+  "en": "Content Block-4",
+  "ar": "Content Block-4",
+  "ckb": "Content Block-4",
+  "kind": "block_title",
+  "keep": true
+ },
+ {
+  "h": "4cb214e5a9d1a4e16c565d006fcafc8be298187a255c0413847e42ab87a91f6d",
+  "en": "#2 Generate STL files and print",
+  "ar": "#2 أنشئ ملفات STL واطبع",
+  "ckb": "#2 فایلەکانی STL دروست بکە و چاپ بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "b2bf4f55ec5f70a15aa1f3562b7b0741e69736507f3caac470918e009a9cec35",
+  "en": "Content Block-5",
+  "ar": "Content Block-5",
+  "ckb": "Content Block-5",
+  "kind": "block_title",
+  "keep": true
+ },
+ {
+  "h": "6640f2a5161fb437f907ca49ce7b2870ef51f7688493e76d292c35af7b887d14",
+  "en": "#3 Get the lithophane printed and lighten it up",
+  "ar": "#3 اطبع الليثوفان وأضئه",
+  "ckb": "#3 لیتۆفەینەکە چاپ بکە و ڕووناکی بکەرەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "ed1a8efac1ca9d2e17b5b3936522fd80d907d8ecce5ce3c62d8cfe869c13d6e8",
+  "en": "1.Usage Tips",
+  "ar": "1. نصائح الاستخدام",
+  "ckb": "1. ئامۆژگارییەکانی بەکارهێنان",
+  "kind": "faq_q"
+ },
+ {
+  "h": "c5cc51325cb849815d8413d03f2948b69ce6de8b07c8fa5e4fa806725e2b7db2",
+  "en": "Smaller nozzle sizes and lower layer heights are essential to achieve better printing results. We suggest using 0.2mm or 0.4mm nozzle sizes and layer heights between 0.08mm and 0.12mm. Check CMYK Lithophane Printing Guide on Wiki.",
+  "ar": "تُعدّ أحجام النوزل الأصغر وارتفاعات الطبقة الأقل ضرورية لتحقيق نتائج طباعة أفضل. نقترح استخدام نوزل بحجم 0.2mm أو 0.4mm وارتفاعات طبقة بين 0.08mm و0.12mm. راجع دليل طباعة ليثوفان CMYK على الويكي.",
+  "ckb": "قەبارەی بچووکتری نۆزڵ و بەرزیی کەمتری چین پێویستن بۆ گەیشتن بە ئەنجامی چاپی باشتر. پێشنیار دەکەین نۆزڵی 0.2mm یان 0.4mm و بەرزیی چینی نێوان 0.08mm و 0.12mm بەکاربهێنیت. سەیری ڕێبەری چاپکردنی لیتۆفەینی CMYK لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "b3ec90a219660b5678f064f53a73398ff21ee7952d36c5db27fa1baa925f64be",
+  "en": "Due to the limitations of printing layers and resolution, there may be some color deviation between the actual image and the lithophane prints.",
+  "ar": "بسبب محدودية طبقات الطباعة والدقة، قد يظهر بعض الاختلاف في الألوان بين الصورة الفعلية ومطبوعات الليثوفان.",
+  "ckb": "بەهۆی سنووردارێتیی چینەکانی چاپ و ڕوونی، لەوانەیە هەندێک جیاوازیی ڕەنگ لە نێوان وێنە ڕاستەقینەکە و چاپکراوەکانی لیتۆفەیندا هەبێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "9ec0743512838f926f69b024a001952a7e2d8af77f411fa0be439233c59c690b",
+  "en": "To prevent warping, the recommended heated bed temperature is between 45-50℃.",
+  "ar": "لمنع التقوّس، تتراوح حرارة السرير الساخن الموصى بها بين 45-50℃.",
+  "ckb": "بۆ ڕێگریکردن لە چەمانەوەی لێوار، پلەی گەرمیی پێشنیارکراو بۆ بێدی گەرم لە نێوان 45-50℃ دەبێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "4c9acec455620e6a958437f49cdda016192d620a7215a5fa9e6cde8f40bb99d6",
+  "en": "2.Acknowledgement",
+  "ar": "2. شكر وتقدير",
+  "ckb": "2. سوپاس و پێزانین",
+  "kind": "faq_q"
+ },
+ {
+  "h": "551b39b5f883f635dcf5ff1cec5250daa56912bd78c12ac2e12ad80858c05f48",
+  "en": "We would like to send our sincere thanks to Lithophane Maker, who made great contributions to the lithophane printing groups. It has never been easier to create stunning color lithophanes that will leave a lasting impression with their amazing image-to-stl generator.",
+  "ar": "نودّ أن نتوجّه بخالص الشكر إلى Lithophane Maker، الذي قدّم مساهمات كبيرة لمجتمعات طباعة الليثوفان. فلم يكن إنشاء ليثوفانات ملوّنة مذهلة تترك انطباعًا دائمًا أسهل من أي وقت مضى، بفضل أداة تحويل الصور إلى STL الرائعة لديهم.",
+  "ckb": "دەمانەوێت سوپاسی دڵسۆزانەمان ئاراستەی Lithophane Maker بکەین، کە بەشدارییەکی گەورەی لە کۆمەڵەکانی چاپی لیتۆفەیندا کردووە. هەرگیز دروستکردنی لیتۆفەینی ڕەنگاوڕەنگی سەرسوڕهێنەر کە کاریگەرییەکی هەمیشەیی بەجێدەهێڵن ئەوەندە ئاسان نەبووە، بە هۆی ئامرازە نایابەکەیان بۆ گۆڕینی وێنە بۆ STL.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "be8d7a44c5da59db258bef4151131c61fdea18aa89b6385c6afe851ee390325b",
+  "en": "Bambu PET-CF is a blend of tough PET and carbon fiber. Carbon fiber improves hardness and mechanical strength, while still help maintain the low warping and shrinkage of ordinary PET. Bambu PET-CF has excellent high temperature resistance and a soft glow appearance. Its excellent strength, heat resistance, dimensional stability and low moisture absorption make Bambu PET-CF an ideal choice for load-bearing structures or prints used in high temperature and humid environments.",
+  "ar": "يُعدّ Bambu PET-CF مزيجًا من PET المتين وألياف الكربون. تحسّن ألياف الكربون الصلادة والقوة الميكانيكية، مع المساعدة في الحفاظ على انخفاض التقوّس والانكماش الذي يتميّز به PET العادي. ويتمتّع Bambu PET-CF بمقاومة ممتازة لدرجات الحرارة العالية ومظهر ذي لمعان ناعم. وتجعل قوته الممتازة ومقاومته للحرارة وثبات أبعاده وامتصاصه المنخفض للرطوبة من Bambu PET-CF خيارًا مثاليًا للهياكل الحاملة للأحمال أو للمطبوعات المستخدمة في بيئات ذات حرارة عالية ورطوبة.",
+  "ckb": "فیلامێنتی Bambu PET-CF تێکەڵەیەکە لە جۆری پتەوی PET و ڕیشاڵی کاربۆن. ڕیشاڵی کاربۆن ڕەقی و بەهێزیی میکانیکی باشتر دەکات، لە هەمان کاتدا یارمەتی دەدات چەمانەوەی لێوار و کرژبوونەوەی کەمی جۆری ئاسایی PET بپارێزرێت. فیلامێنتی Bambu PET-CF بەرگەی زۆر باشی بەرامبەر پلەی گەرمیی بەرز و ڕووخسارێکی درەوشانەوەی نەرمی هەیە. بەهێزیی نایاب، بەرگەی گەرمی، جێگیریی ڕەهەندەکان و هەڵمژینی کەمی شێ، Bambu PET-CF دەکەنە هەڵبژاردەیەکی نموونەیی بۆ پێکهاتە هەڵگرەکانی بار یان ئەو چاپکراوانەی لە ژینگەی پلەی گەرمیی بەرز و شێداردا بەکاردێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2d129b72df2f83679658b4d98379a43d4c9f89e4bb06531087da0970f05fedea",
+  "en": "Low moisture absorption",
+  "ar": "امتصاص منخفض للرطوبة",
+  "ckb": "هەڵمژینی کەمی شێ",
+  "kind": "block_title"
+ },
+ {
+  "h": "079e2d428444a09204afd05841bcc3eccf754f27cfa01bd6faa8e535d0d63f2f",
+  "en": "In saturated water absorption conditions, the strength and stiffness of PET-CF have small losses, making it suitable for prints used in high humidity environments.",
+  "ar": "في ظروف التشبّع بالماء، لا تنخفض قوة PET-CF وصلابته إلا قليلًا، ما يجعله مناسبًا للمطبوعات المستخدمة في البيئات عالية الرطوبة.",
+  "ckb": "لە بارودۆخی تێربوون بە ئاودا، بەهێزی و سەختیی PET-CF تەنها کەمێک کەم دەبنەوە، بۆیە گونجاوە بۆ ئەو چاپکراوانەی لە ژینگەی شێی بەرزدا بەکاردێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9a890977bfb8106e583a816fe6cfe37a87d28040ca5dab2ca589d3931dbdba05",
+  "en": "High dimensional stability",
+  "ar": "ثبات عالٍ في الأبعاد",
+  "ckb": "جێگیریی بەرزی ڕەهەندەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "7e5436390c196107d2c0805a450c3f82d1c2b5442938b2d00fd4b5b301c504f3",
+  "en": "Due to the creep and warping resistance of PET-CF, prints can achieve excellent matching accuracy.",
+  "ar": "بفضل مقاومة PET-CF للزحف والتقوّس، يمكن للمطبوعات تحقيق دقة تطابق ممتازة.",
+  "ckb": "بە هۆی بەرگەی PET-CF بەرامبەر خزانی هێواش (creep) و چەمانەوەی لێوار، چاپکراوەکان دەتوانن بگەنە وردیی گونجاندنی نایاب.",
+  "kind": "block_line"
+ },
+ {
+  "h": "aea5f49a5e113328d82fd7bb4b962af770bee0af186ce94b968f77838bdef176",
+  "en": "*Specimens size (L*W*H): 240*8*15 mm³, Infill density: 60%",
+  "ar": "*أبعاد العيّنات (الطول*العرض*الارتفاع): 240*8*15 mm³، كثافة الحشوة الداخلية: 60%",
+  "ckb": "*قەبارەی نموونەکان (درێژی*پانی*بەرزی): 240*8*15 mm³، چڕیی پڕکەرەوەی ناوەوە: 60%",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e79270dbfebd52823abfea31d222297fb11104c94e96d65a975cf15f7d6ac78",
+  "en": "Exceptional thermal resistance",
+  "ar": "مقاومة حرارية استثنائية",
+  "ckb": "بەرگەی گەرمیی نایاب",
+  "kind": "block_title"
+ },
+ {
+  "h": "bedef9bdbcb4f03d8a36b426c6ce8aaf69e5bf5151248a8a3f7f92d9cdafaeba",
+  "en": "Specimen size (L*W*H): 95*10*4 mm³",
+  "ar": "أبعاد العيّنة (الطول*العرض*الارتفاع): 95*10*4 mm³",
+  "ckb": "قەبارەی نموونە (درێژی*پانی*بەرزی): 95*10*4 mm³",
+  "kind": "block_line"
+ },
+ {
+  "h": "a3cb4fb58eda5eb4a653cca0d3145284d664d865b15ec5c27eff62a97e597720",
+  "en": "Test conditions: Specimens were put in an oven at 70 °C and 150 °C respectively for 0.5 hour.",
+  "ar": "ظروف الاختبار: وُضعت العيّنات في فرن عند 70 °C و150 °C على التوالي لمدة 0.5 ساعة.",
+  "ckb": "مەرجەکانی تاقیکردنەوە: نموونەکان بە ڕیز لە 70 °C و 150 °C بۆ ماوەی 0.5 کاتژمێر خرانە ناو فڕنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f2596d9220d9ee2c1d3b64ed1120b7dabd5d8267394adb156f6f3a8e1c57baf5",
+  "en": "As a crystalline material, PLA will significantly deform only after the temperature exceeds its melting point (around 155°C).",
+  "ar": "بصفته مادة بلّورية، لا يتشوّه PLA بشكل ملحوظ إلا بعد أن تتجاوز درجة الحرارة نقطة انصهاره (نحو 155°C).",
+  "ckb": "وەک کەرەستەیەکی کریستاڵی، PLA تەنها دوای ئەوەی پلەی گەرمی لە خاڵی توانەوەی تێدەپەڕێت (نزیکەی 155°C) بە شێوەیەکی بەرچاو شێوەی دەگۆڕێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bc3e047709927795f8ca25524ea222ecc0deee8f23d9b4766faa7f6fcbda09bc",
+  "en": "Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm, Bambu Liquid Glue.",
+  "ar": "غير متوافق مع رأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm، وBambu Liquid Glue.",
+  "ckb": "لەگەڵ سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm و Bambu Liquid Glue گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "591f6ed05587c85b7aa9499ca77704a0e4c3b2f6ab92318c9fc012b69354addd",
+  "en": "PET-CF is highly sensitive to humidity. Store in a dry environment after use. For more details, please refer to Filament drying instructions on WIKI.",
+  "ar": "فلامنت PET-CF شديد الحساسية للرطوبة. احفظه في مكان جاف بعد الاستخدام. لمزيد من التفاصيل، يرجى الرجوع إلى تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "فیلامێنتی PET-CF زۆر هەستیارە بە شێ. دوای بەکارهێنان لە شوێنێکی وشکدا هەڵیبگرە. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "2f3fe7e8b5a265bd52f2ca0d3fae3d4d9fb3455b2f4e3d2ba3568c90ab2b7b34",
+  "en": "3.Storage Recommendations",
+  "ar": "3. توصيات التخزين",
+  "ckb": "3. پێشنیارەکانی هەڵگرتن",
+  "kind": "faq_q"
+ },
+ {
+  "h": "aac0ab0f55f4df31f293ee62d715c36f251d65c5850c5983db547fa5f1fbc686",
+  "en": "To prevent the material from absorbing moisture, it is recommended to use an airtight storage container with desiccant during printing. For more details, please refer to the Printing tips for Engineering materials on WIKI.",
+  "ar": "لمنع المادة من امتصاص الرطوبة، يُوصى باستخدام حاوية تخزين محكمة الإغلاق مع مادة مجففة أثناء الطباعة. لمزيد من التفاصيل، يرجى الرجوع إلى نصائح طباعة المواد الهندسية على الويكي.",
+  "ckb": "بۆ ڕێگریکردن لە هەڵمژینی شێ لەلایەن کەرەستەکەوە، پێشنیار دەکرێت لە کاتی چاپکردندا دەفرێکی هەڵگرتنی هەواگیر لەگەڵ ماددەی وشککەرەوە بەکاربهێنرێت. بۆ وردەکاریی زیاتر، تکایە سەیری ئامۆژگارییەکانی چاپکردنی کەرەستە ئەندازیارییەکان لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "4293dbaea9b28a2687b5ab5e03b1fc48c44cd106007b79e7b64b4775bc815677",
+  "en": "Very Low Moisture Absorption",
+  "ar": "امتصاص منخفض جدًا للرطوبة",
+  "ckb": "هەڵمژینی زۆر کەمی شێ",
+  "kind": "block_line"
+ },
+ {
+  "h": "abccd90dbb147ec5d82d79d802e3ecbcfc81e56f61ca59635c289547932020fb",
+  "en": "Exceptional Mechanical Properties",
+  "ar": "خصائص ميكانيكية استثنائية",
+  "ckb": "تایبەتمەندیی میکانیکیی نایاب",
+  "kind": "block_line"
+ },
+ {
+  "h": "8390f91bd69fb057e76f56a644ee8cae5057af84a0ca71f8d60a98842f01f4f9",
+  "en": "High Dimensional Stability",
+  "ar": "ثبات عالٍ في الأبعاد",
+  "ckb": "جێگیریی بەرزی ڕەهەندەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "d57844c10e107cafdc43b812303569b976f15a943e1dcdd831b13f05cedba1f9",
+  "en": "Soft Bicolor Gradient",
+  "ar": "تدرّج ناعم بين لونين",
+  "ckb": "ڕەنگی پلەپلەی نەرمی دوو ڕەنگ",
+  "kind": "block_line"
+ },
+ {
+  "h": "78bb1572a9bda2d8cab77e70be68d6dfb55c96344948c543ef08ef93c4a860ca",
+  "en": "Good Layer Adhesion",
+  "ar": "التصاق جيد بين الطبقات",
+  "ckb": "لکانی باشی چینەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "d96ca13d68c4f241269dd1b4f7059848be268443e177c1df22177f1b1c76a37f",
+  "en": "Soft Bicolor Gradient Appearance",
+  "ar": "مظهر متدرّج ناعم بلونين",
+  "ckb": "ڕووخساری ڕەنگی پلەپلەی نەرمی دوو ڕەنگ",
+  "kind": "block_title"
+ },
+ {
+  "h": "2ab6c552335b56aa0c22502eaeffd2f1738913bd16d4afe6c146734f6534f1bc",
+  "en": "The soft transition between two colors creates a vibrant and stunning visual effect on printed models.",
+  "ar": "يخلق الانتقال الناعم بين لونين تأثيرًا بصريًا نابضًا بالحياة ومذهلًا على النماذج المطبوعة.",
+  "ckb": "گواستنەوەی نەرم لە نێوان دوو ڕەنگدا کاریگەرییەکی بینراوی زیندوو و سەرسوڕهێنەر لەسەر مۆدێلە چاپکراوەکان دروست دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "dd9c391de66e414702ce75d5b465cbfcb807a70fb7af9ff8e8ed7e7eae78ed6e",
+  "en": "Display of Gradient Prints",
+  "ar": "عرض لمطبوعات متدرّجة الألوان",
+  "ckb": "نمایشی چاپکراوەکانی ڕەنگی پلەپلە",
+  "kind": "block_title"
+ },
+ {
+  "h": "24bf7130c3ebf0443cdd06a8a9f79f489f97084b34d373b380a71fdfa0250067",
+  "en": "Gradient colors make it ideal for printing pretty toys or decorations.",
+  "ar": "تجعله الألوان المتدرّجة مثاليًا لطباعة الألعاب الجميلة أو الزينة.",
+  "ckb": "ڕەنگە پلەپلەکان دەیکەنە گونجاوترین بۆ چاپکردنی یاریی جوان یان کەرەستەی ڕازاندنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "90d69e457b6984553465aa45286e10ad641ca562fa46b872e2533f7e96fa0252",
+  "en": "High Printing Speed with Delicate Finish",
+  "ar": "سرعة طباعة عالية مع تشطيب ناعم",
+  "ckb": "خێرایی چاپی بەرز لەگەڵ ڕووکاری ناسک",
+  "kind": "block_title"
+ },
+ {
+  "h": "9e007129e4b20d18bc205e1b35de2a657c2484ab6f2d13bcbe05d3e3eb897026",
+  "en": "Up to 300mm/s (with 0.4mm nozzle) printing speed while maintaining delicate and refined finish.",
+  "ar": "سرعة طباعة تصل إلى 300mm/s (مع نوزل 0.4mm) مع الحفاظ على تشطيب ناعم وراقٍ.",
+  "ckb": "خێرایی چاپ تا 300mm/s (لەگەڵ نۆزڵی 0.4mm) لە کاتێکدا ڕووکارێکی ناسک و ڕێکوپێک دەپارێزرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "206c4d92d55d7bce65149c5baa8e059c946492996506923c1e07b92cbe0ee296",
+  "en": "8 ~ 10 Meters Gradient Length",
+  "ar": "طول التدرّج 8 ~ 10 أمتار",
+  "ckb": "درێژیی ڕەنگی پلەپلە 8 ~ 10 مەتر",
+  "kind": "block_title"
+ },
+ {
+  "h": "ee5ec2d21ff271d7be65b7b85f87bcd6e2b8cf3e5975d62f6a62048a6c42bbb6",
+  "en": "Smaller models with less filament consumption will have a less noticeable gradient looks, while larger models with more filament consumption comes with a noticeable gradient looks.",
+  "ar": "النماذج الأصغر التي تستهلك فلامنت أقل يكون مظهر التدرّج فيها أقل وضوحًا، بينما تُظهر النماذج الأكبر التي تستهلك فلامنت أكثر تدرّجًا واضحًا.",
+  "ckb": "مۆدێلە بچووکترەکان کە فیلامێنتی کەمتر بەکاردەهێنن ڕەنگی پلەپلەیان کەمتر دیار دەبێت، لە کاتێکدا مۆدێلە گەورەترەکان کە فیلامێنتی زیاتر بەکاردەهێنن ڕەنگی پلەپلەیان ڕوونتر دیارە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "651b24495b640b6b8ea9bf9c5078f31a5738c1d7be7fe4902b30aa663567a35a",
+  "en": "Consumption: 14.8 m/45.09 g",
+  "ar": "الاستهلاك: 14.8 m/45.09 g",
+  "ckb": "بڕی بەکارهاتوو: 14.8 m/45.09 g",
+  "kind": "block_line"
+ },
+ {
+  "h": "1948061940aa73c499e388ff1f2683f3129dc00d5e715e098dcdddd2fb793971",
+  "en": "Consumption: 54.3 m/164.56 g",
+  "ar": "الاستهلاك: 54.3 m/164.56 g",
+  "ckb": "بڕی بەکارهاتوو: 54.3 m/164.56 g",
+  "kind": "block_line"
+ },
+ {
+  "h": "590f0e13a046fa8d12c1f9911993a51bd7499626c4a3590a224fdaa79e197da0",
+  "en": "Excellent Layer Adhesion",
+  "ar": "التصاق ممتاز بين الطبقات",
+  "ckb": "لکانی نایابی چینەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "a532dbcca8eccad10ba5ab7820b6690926664c4de5469d202c98e856865cd0e5",
+  "en": "As new color options in the PLA Basic series, the gradient filament retains similar performance to PLA Basic while providing even stronger layer adhesion and toughness, reducing the risk of printed parts breaking.",
+  "ar": "بصفته خيارات ألوان جديدة في سلسلة منتجات PLA Basic، يحتفظ الفلامنت المتدرّج بأداء مماثل لـ PLA Basic، مع التصاق أقوى بين الطبقات ومتانة أعلى، ما يقلّل خطر انكسار القطع المطبوعة.",
+  "ckb": "وەک هەڵبژاردەی ڕەنگی نوێ لە زنجیرە بەرهەمی PLA Basic، فیلامێنتە پلەپلەکە کاراییەکی هاوشێوەی PLA Basic دەپارێزێت لە کاتێکدا لکانی چینەکان و پتەویی بەهێزتر دابین دەکات، کە مەترسیی شکانی پارچە چاپکراوەکان کەم دەکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8c14a55254e3e985de1b59842fcd3a7901cd6927b32185ac6fc6c880fe63ea78",
+  "en": "3.Printing Setting",
+  "ar": "3. إعدادات الطباعة",
+  "ckb": "3. ڕێکخستنی چاپ",
+  "kind": "faq_q"
+ },
+ {
+  "h": "d13baef2b55e03f143fc4d85d8948e1f328486712522a101561a6f7e0d6b97aa",
+  "en": "PLA Basic Gradient is a new color option of PLA Basic series, please use the default PLA Basic setting for printing. To obtain higher printing quality, please set lower printing speed (layers speed and acceleration).",
+  "ar": "يُعدّ PLA Basic Gradient خيار لون جديدًا ضمن سلسلة منتجات PLA Basic، لذا يرجى استخدام إعدادات PLA Basic الافتراضية للطباعة. وللحصول على جودة طباعة أعلى، يرجى ضبط سرعة طباعة أقل (سرعة الطبقات والتسارع).",
+  "ckb": "فیلامێنتی PLA Basic Gradient وەک هەڵبژاردەیەکی ڕەنگی نوێی زنجیرە بەرهەمی PLA Basic هاتووە، بۆیە تکایە ڕێکخستنی بنەڕەتیی PLA Basic بۆ چاپکردن بەکاربهێنە. بۆ بەدەستهێنانی جۆرایەتیی چاپی بەرزتر، تکایە خێرایی چاپی نزمتر دابنێ (خێرایی چینەکان و خێرابوون).",
+  "kind": "faq_a"
+ }
+]

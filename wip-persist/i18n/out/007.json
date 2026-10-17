@@ -1,0 +1,1754 @@
+[
+ {
+  "h": "6cf4d46a34e5e496e217cc8d4510f12f02cdfe1a7e39fd06eda75aba5831b7fa",
+  "en": "Learn more about the Front Door Mounting Kit on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على طقم تركيب الباب الأمامي (Front Door Mounting Kit) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کیتی دامەزراندنی دەرگای پێشەوە (Front Door Mounting Kit) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "dc17998bdca6d27e943a10e03d44c7c1b1938109c8533a7f741b4c1679b00dbc",
+  "en": "Upper Door Hinge",
+  "ar": "مفصّلة الباب العلوية",
+  "ckb": "لۆلای سەرەوەی دەرگا",
+  "kind": "box_item"
+ },
+ {
+  "h": "f72e8a571256e433b2106c04466fc86b4193659e55c25c2ba95d5313f62dc9d8",
+  "en": "Lower Door Hinge",
+  "ar": "مفصّلة الباب السفلية",
+  "ckb": "لۆلای خوارەوەی دەرگا",
+  "kind": "box_item"
+ },
+ {
+  "h": "899df3d9e6ba9c3e12b3b00475635e63c43c116969c929dd84f5a571634453b2",
+  "en": "Left Front Door Silicone",
+  "ar": "سيليكون الباب الأمامي الأيسر",
+  "ckb": "سیلیکۆنی دەرگای پێشەوەی لای چەپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "9c1f2a2781d77bc4448b091c8fd2f4e5a9fedd0d5e1682d5c0475d9470fd5f6d",
+  "en": "Right Front Door Silicone",
+  "ar": "سيليكون الباب الأمامي الأيمن",
+  "ckb": "سیلیکۆنی دەرگای پێشەوەی لای ڕاست",
+  "kind": "box_item"
+ },
+ {
+  "h": "4a1fcf2843c5c34dd17fc50342a1f558d6bb711a7f1e9fea5cfe2db047f52537",
+  "en": "Front Door Magnet",
+  "ar": "مغناطيس الباب الأمامي",
+  "ckb": "موگناتیسی دەرگای پێشەوە",
+  "kind": "box_item"
+ },
+ {
+  "h": "268fa785d3aa7784bd93b21c92aa43d73eb74b4b1b413afdd00c27fc144e8a17",
+  "en": "M2.5-4 Screw",
+  "ar": "برغي M2.5-4",
+  "ckb": "بورغیی M2.5-4",
+  "kind": "box_item"
+ },
+ {
+  "h": "6957a646652f2cc4f854d7a71336c1a9fa05a2293ae5755cfaf408950edffa67",
+  "en": "Learn more about Glass Cover Plate on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوح الغطاء الزجاجي (Glass Cover Plate) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پلێتی قەپاغی شووشە (Glass Cover Plate) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "df2c4d210748132f5674efb21235f77d7f8c5165c0b9f1acf307dad6cbc33574",
+  "en": "Learn more about the Rear Panel on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على اللوح الخلفي في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پانێڵی پشتەوە لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "a70adec3898075707ad261875d73342f06ae6b7472b3a749875444b30ec37533",
+  "en": "Dark gray",
+  "ar": "رمادي داكن",
+  "ckb": "خۆڵەمێشیی تۆخ",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "8c0f0efe1198ee2f033b8d4ad3ddfb8a3fe7034c5eaa6a197884bfd699fd10c3",
+  "en": "ST3-6 Screw",
+  "ar": "برغي ST3-6",
+  "ckb": "بورغیی ST3-6",
+  "kind": "box_item"
+ },
+ {
+  "h": "8a7f91b24e416ab6c0c0131742d2b1916c4192039dd856ea0d9f2b3be76ee3f7",
+  "en": "Learn more about H2D and H2C Part Cooling Fan on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مروحة تبريد القطعة المطبوعة لطابعتي H2D and H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پانکەی ساردکردنەوەی پارچەی چاپکراو بۆ H2D and H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "a60b4ef8d2c53439e56e4cf546b34a5fd4321fc2fa1cb42b7031212d2b037fbf",
+  "en": "Learn more about H2S Part Cooling Fan on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مروحة تبريد القطعة المطبوعة لطابعة H2S في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پانکەی ساردکردنەوەی پارچەی چاپکراو بۆ H2S لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "96da41b2c26cb7b45b75f93a7b10dee81923a935fc6620948296c4f33d28035a",
+  "en": "Part Cooling Fan",
+  "ar": "مروحة تبريد القطعة المطبوعة",
+  "ckb": "پانکەی ساردکردنەوەی پارچەی چاپکراو",
+  "kind": "box_item"
+ },
+ {
+  "h": "d1dbb361e60e94c6090fed34730c6e77f0e68088fb19707e0764fd534806c78f",
+  "en": "BT3-20 Screw",
+  "ar": "برغي BT3-20",
+  "ckb": "بورغیی BT3-20",
+  "kind": "box_item"
+ },
+ {
+  "h": "a6e8858f8889bc57b356ffcd5189833968ac98336770b7deaecc89f2512d03df",
+  "en": "BT2-6.5 Screw",
+  "ar": "برغي BT2-6.5",
+  "ckb": "بورغیی BT2-6.5",
+  "kind": "box_item"
+ },
+ {
+  "h": "157cca20ce69844b6abef57f632e819d8db96a7535908e75bbb15363fd7f9eb9",
+  "en": "Learn more about the Automatic Top Vent Kit on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على طقم فتحة التهوية العلوية التلقائية (Automatic Top Vent Kit) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کیتی کونی هەواگۆڕکێی سەرەوەی خۆکار (Automatic Top Vent Kit) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "9a1e72f52f2818675ee3b39173c4469bbf5a4c6de5cfbbe7210779c569148373",
+  "en": "Air Intake Cover Plate",
+  "ar": "لوح غطاء مدخل الهواء",
+  "ckb": "پلێتی قەپاغی چوونەژوورەوەی هەوا",
+  "kind": "box_item"
+ },
+ {
+  "h": "e52764211775ace665d88a34f352705b864552be373b34236e008e179462591c",
+  "en": "Air Intake Swing Rod",
+  "ar": "ذراع التأرجح لمدخل الهواء",
+  "ckb": "میلی جووڵاوی چوونەژوورەوەی هەوا",
+  "kind": "box_item"
+ },
+ {
+  "h": "dbf9d0037e3aa650bc8c2ac7169231056aaf57885f0b9edf2a79b001ac37d22f",
+  "en": "Learn more about H2D and H2C Front Cover on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الغطاء الأمامي لطابعتي H2D and H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی پێشەوە بۆ H2D and H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "4d00ca8ee446ea782773e772b4ee9b7a0a23f16181f3307b7ca81109a61a3ce0",
+  "en": "Learn more about H2S Front Cover on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الغطاء الأمامي لطابعة H2S في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی پێشەوە بۆ H2S لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "31117a90c8ad262b39eaec540672b8ec2f3ada4790d476fe2d7f78d63be7111a",
+  "en": "BT2-12 Screw",
+  "ar": "برغي BT2-12",
+  "ckb": "بورغیی BT2-12",
+  "kind": "box_item"
+ },
+ {
+  "h": "4987992e1584603e91a7cce3f889b89570511a194fb18792107e6fcf7b2dc3e6",
+  "en": "Screen Hinge",
+  "ar": "مفصّلة الشاشة",
+  "ckb": "لۆلای شاشە",
+  "kind": "box_item"
+ },
+ {
+  "h": "f69a7bb2616accc807dc9efb2c1eb2fb56368a16aac0dbaba6d5f13e13f6e347",
+  "en": "Learn more about the Enclosure Plastic Bottom Ring on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الحلقة البلاستيكية السفلية للهيكل المغلق (Enclosure Plastic Bottom Ring) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی ئەڵقەی پلاستیکیی خوارەوەی ژووری داخراو (Enclosure Plastic Bottom Ring) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "f36eb8437ac0b36bb3405df5952aad87695bba420263a5abb0bcddd963e88f89",
+  "en": "Shock-absorbing foam",
+  "ar": "إسفنج ماص للصدمات",
+  "ckb": "ئیسفەنجی کەمکەرەوەی لێدان",
+  "kind": "box_item"
+ },
+ {
+  "h": "37d860c29c3e5dd77b874f4898bb4b21ff4956bf6a37c164b7fae1720e034f40",
+  "en": "Front door silicone (to be attached to the bottom of the front door)",
+  "ar": "سيليكون الباب الأمامي (يُثبَّت في الجزء السفلي من الباب الأمامي)",
+  "ckb": "سیلیکۆنی دەرگای پێشەوە (دەلکێنرێت بە بەشی خوارەوەی دەرگای پێشەوەوە)",
+  "kind": "box_item"
+ },
+ {
+  "h": "d8b1589a36919ebadf00cd87791bc4d8077bd39285cc44882d7655010dd444e8",
+  "en": "Learn more about the Chamber Exhaust Fan on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مروحة شفط هواء الحجرة (Chamber Exhaust Fan) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پانکەی دەرکردنی هەوای ژووری چاپ (Chamber Exhaust Fan) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "ad6668e2be8b8cbeb07df716047c34d056e27bd43fdfa9c91c220277390444a9",
+  "en": "Soft Screw",
+  "ar": "برغي ليّن",
+  "ckb": "بورغیی نەرم",
+  "kind": "box_item",
+  "needs_review": true
+ },
+ {
+  "h": "814a19b27523c7f7772ca0f97089ade0086712d6beac020ba97a6bed5d6cca94",
+  "en": "Learn more about the Air Filter on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على فلتر الهواء في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی فلتەری هەوا لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "83336f855a8e109c23624087bf3d539795fcf4b678280a3431cc6460dab9c914",
+  "en": "Learn more about Toolhead Sensor FPC Cable on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على كابل FPC لحساس رأس الطباعة في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کێبڵی FPC بۆ هەستەوەری سەری چاپ لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "67481f356eae75d10070514a26a534761eff515dff1a9fe9ad12d238f667fc5e",
+  "en": "Extruder Hall Sensor Board",
+  "ar": "لوحة حساس Hall الخاصة بالدافع",
+  "ckb": "بۆردی هەستەوەری Hall بۆ پاڵنەر",
+  "kind": "box_item"
+ },
+ {
+  "h": "91ee0f96ff94c32c66d175c61fefb6507bf9f29df97f29d716b6e5bf52531a25",
+  "en": "FPC Cable",
+  "ar": "كابل FPC",
+  "ckb": "کێبڵی FPC",
+  "kind": "box_item"
+ },
+ {
+  "h": "07a3f970afae27b0336ed5919099960b4cae34a4b801c17f69c3c2e5b43a97d8",
+  "en": "ST2-3.5 Screw",
+  "ar": "برغي ST2-3.5",
+  "ckb": "بورغیی ST2-3.5",
+  "kind": "box_item"
+ },
+ {
+  "h": "7e9fe250ddbda73deccfe868ccc3a95c4010cbf0db452fd94cbe0f08c63be0ea",
+  "en": "Learn more about the Activated Carbon Air Filter Cover on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على غطاء فلتر الهواء بالكربون المنشّط في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی فلتەری هەوای کاربۆنی چالاککراو لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "163f20465c169d7b7280b3f34e6085e3f37dc09c456206abc7414f695839c7a9",
+  "en": "Cardboard, Activated carbon",
+  "ar": "كرتون، كربون منشّط",
+  "ckb": "کارتۆن، کاربۆنی چالاککراو",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "9e1467f7e68a7c341145c8ffb9f6e97b2d95edb2149b445c83a41f07b93a58ca",
+  "en": "Activated Carbon Air Filter Cover",
+  "ar": "غطاء فلتر الهواء بالكربون المنشّط",
+  "ckb": "قەپاغی فلتەری هەوای کاربۆنی چالاککراو",
+  "kind": "box_item"
+ },
+ {
+  "h": "25a9e07d202db45ab0efd154d5d7ab5650f105346ab1f0f08d32742b8914bb16",
+  "en": "Learn more about 3513 Extruder Servo Motor on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على محرك سيرفو الدافع (3513 Extruder Servo Motor) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بزوێنەری سێرڤۆی پاڵنەر (3513 Extruder Servo Motor) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "6ad79c5717ee9d59bc6b2bfc749c3b5935a207ce717f177262e14255abe0b020",
+  "en": "Learn more about the Active Chamber Exhaust on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الشفط النشط لهواء الحجرة (Active Chamber Exhaust) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی دەرکردنی چالاکی هەوای ژووری چاپ (Active Chamber Exhaust) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "5c82a6f144c6e4b44189f3e5edf1bb93be490714adc4140df5e6474b15181e4c",
+  "en": "Learn more about H2D and H2C MC Board on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوحة MC Board لطابعتي H2D and H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی MC Board بۆ H2D and H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "20971f9a1604b967c956d0d95217e01f09e24f2a3d94e345a98a9a39ed562c10",
+  "en": "Learn more about H2S MC Board on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوحة MC Board لطابعة H2S في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی MC Board بۆ H2S لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "57fa2e2c6c9e3d99a4455580025838f040e360eeedd991e3bbb2a001190a3aa1",
+  "en": "Learn more about Purge Chute on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مجرى الطرد (Purge Chute) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی جۆگەی فیلامێنتی دەرکراو (Purge Chute) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "ab16c6a843ec0c7547825009567279f38d99be00239db8dbbf6251f4f5223457",
+  "en": "Learn more about the 4pin Interface Board on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوحة الواجهة (4pin Interface Board) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی ڕووکار (4pin Interface Board) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "25a74f2efcd4ab577ced17a6f63c02ece885a1446e8a13cb5438948c8e3c1019",
+  "en": "Learn more about the Power Safety Key Unit on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على وحدة مفتاح أمان الطاقة (Power Safety Key Unit) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی یەکەی کلیلی سەلامەتیی وزە (Power Safety Key Unit) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "1099f83ab56564c313d6077f0af82da47da1b64af96404cd6c3d9141ae0019cb",
+  "en": "Power Safety Key Switch",
+  "ar": "قاطع مفتاح أمان الطاقة",
+  "ckb": "سویچی کلیلی سەلامەتیی وزە",
+  "kind": "box_item"
+ },
+ {
+  "h": "7716f397c86cd1cfb1c0e0b45e0b40ce7b78142dd1f10ab0a0c638b4e125b71b",
+  "en": "Power Safety Key",
+  "ar": "مفتاح أمان الطاقة",
+  "ckb": "کلیلی سەلامەتیی وزە",
+  "kind": "box_item"
+ },
+ {
+  "h": "00061d8a19aced67cf0a14a28891b3d973e6e306d2a087fe601bb5fccfe3e711",
+  "en": "BT2.3-7 Screw",
+  "ar": "برغي BT2.3-7",
+  "ckb": "بورغیی BT2.3-7",
+  "kind": "box_item"
+ },
+ {
+  "h": "71f1defe3eaa943f250b5702f297fe8c49a5d4c89febf4b8c54fced97aa9813f",
+  "en": "Learn more about Hall Effect Sensor on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حساس تأثير Hall (Hall Effect Sensor) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هەستەوەری کاریگەریی Hall (Hall Effect Sensor) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "4510c0324fa12639cc2d66e46d62dacd9293c77641cdb5ba4fc7f67782ce1b5c",
+  "en": "Digital Hall Effect Sensor",
+  "ar": "حساس Hall الرقمي (Digital Hall Effect Sensor)",
+  "ckb": "هەستەوەری دیجیتاڵیی Hall (Digital Hall Effect Sensor)",
+  "kind": "box_item"
+ },
+ {
+  "h": "cb8a9905c9735db7f12a28208ace06c06884520fda5a91a81d35bace36f46662",
+  "en": "Analog Hall Effect Sensor",
+  "ar": "حساس Hall التناظري (Analog Hall Effect Sensor)",
+  "ckb": "هەستەوەری ئەنالۆگیی Hall (Analog Hall Effect Sensor)",
+  "kind": "box_item"
+ },
+ {
+  "h": "bb714f300af393a2029ae2e4fd7d4b6828b8f732997ac63cdd524c1247867fc3",
+  "en": "M2-2.5 Screw",
+  "ar": "برغي M2-2.5",
+  "ckb": "بورغیی M2-2.5",
+  "kind": "box_item"
+ },
+ {
+  "h": "774a9796570c5d57888e17d37d9d5b03d1a59b79b53806f3b3c76d9635667d3c",
+  "en": "Learn more about the Flow Blocker on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حاجز التدفق (Flow Blocker) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بەربەستی ڕۆیشتن (Flow Blocker) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "4df2c847d213e7bcbfb4a621408adb54c9365b61b6b1519077252d3e6d102c0c",
+  "en": "Plastic, Metal, Silicone",
+  "ar": "بلاستيك، معدن، سيليكون",
+  "ckb": "پلاستیک، کانزا، سیلیکۆن",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "564b90625ab45cb76c2a57a27b5a4194a07bb403ffa727fb10c9f29ac367109a",
+  "en": "Flow Blocker",
+  "ar": "حاجز التدفق (Flow Blocker)",
+  "ckb": "بەربەستی ڕۆیشتن (Flow Blocker)",
+  "kind": "box_item"
+ },
+ {
+  "h": "73a0ec6df0c299bd808e75e7847f54a31b96c4db4d30debf68f51ee2dcb2e06a",
+  "en": "MG2.5-8 Screw",
+  "ar": "برغي MG2.5-8",
+  "ckb": "بورغیی MG2.5-8",
+  "kind": "box_item"
+ },
+ {
+  "h": "82361d26a95e618a7c690c2d20ea53998dc91eb1ac907e359590bff13bbcd788",
+  "en": "Learn more about Nozzle Lifting Rail on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على سكة رفع النوزل (Nozzle Lifting Rail) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی ڕێڕەوی بەرزکردنەوەی نۆزڵ (Nozzle Lifting Rail) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "bb05f97eeece4f79f3c382d356584bd18340b684bfb0133022718cff89fa4753",
+  "en": "Lifting rail",
+  "ar": "سكة الرفع",
+  "ckb": "ڕێڕەوی بەرزکردنەوە",
+  "kind": "box_item"
+ },
+ {
+  "h": "a180326a2450d16432f0f48af93485b796823855217942201ec5185ce07c1bf4",
+  "en": "Lifting slider",
+  "ar": "منزلق الرفع",
+  "ckb": "خلیسکێنەری بەرزکردنەوە",
+  "kind": "box_item"
+ },
+ {
+  "h": "12b39f8354eabafff139fa89e9d9ffd292a96e6c3f6a35fcc54506f04cc81f03",
+  "en": "M2-4.5 Screw",
+  "ar": "برغي M2-4.5",
+  "ckb": "بورغیی M2-4.5",
+  "kind": "box_item"
+ },
+ {
+  "h": "7f012d547c02a01d11f5dc9c4b9df93078161b3a8c1392c8d9cd95b45ae997ee",
+  "en": "Learn more about the USB Port Board on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوحة منفذ USB (USB Port Board) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی دەرچەی USB (USB Port Board) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "97a17bd49d980630a07de03187ad879cdc5f6194e09a60ca9ccd0562fb0f52c3",
+  "en": "USB Port Board Cable",
+  "ar": "كابل لوحة منفذ USB (USB Port Board)",
+  "ckb": "کێبڵی بۆردی دەرچەی USB (USB Port Board)",
+  "kind": "box_item"
+ },
+ {
+  "h": "7f0c1a42d0225c48fbaa6ba8f19f92460d5b6e67c0c5ae4b01448513b239b026",
+  "en": "Learn more about the Switching Power Supply on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مزوّد الطاقة التبديلي (Switching Power Supply) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی دابینکەری وزەی سویچینگ (Switching Power Supply) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "060d715d8441ef6033e56b4cf197327d7b41f46822477cbc965d58942e0e3e6a",
+  "en": "BT3-6 Screw",
+  "ar": "برغي BT3-6",
+  "ckb": "بورغیی BT3-6",
+  "kind": "box_item"
+ },
+ {
+  "h": "108a1f61ab15e0f3f22be7a66320a777995e63a83b21b3b34af31cb85a0161bc",
+  "en": "Learn more about the Touchscreen on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على شاشة اللمس في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی شاشەی دەستلێدان لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "702dbb364302d554f32c1c77bde14b54c575f1cd7887ca887e8ec1589ed8ab18",
+  "en": "Learn more about H2D Toolhead Front Cover on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الغطاء الأمامي لرأس الطباعة لطابعة H2D في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی پێشەوەی سەری چاپ بۆ H2D لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "bcbaeabc0d3bd7801b76b15307a9f2bad6577431a9611288f5e80cd6ad619dd9",
+  "en": "Learn more about H2S Toolhead Front Cover on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الغطاء الأمامي لرأس الطباعة لطابعة H2S في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی پێشەوەی سەری چاپ بۆ H2S لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "15a236c6ff7cc43c7574d43c34951cb68ad033981aa1dbc624e11a57dce900ce",
+  "en": "Toolhead Front Cover",
+  "ar": "الغطاء الأمامي لرأس الطباعة",
+  "ckb": "قەپاغی پێشەوەی سەری چاپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "1018b58a732c83b20b273592ba78a007fed360a5e8f3d545fca3ee2079f2e11d",
+  "en": "Learn more about H2D Extruder Connection Board on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوحة توصيل الدافع لطابعة H2D في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی پەیوەندیی پاڵنەر بۆ H2D لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "27783984d7421b233ad5d127cd976d14364ea0f2af827829906141ec9ebe3be0",
+  "en": "Learn more about H2C Extruder Connection Board on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوحة توصيل الدافع لطابعة H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی پەیوەندیی پاڵنەر بۆ H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "97bc91671db21a1b758518c14de0d1627d480c86f554d873ad5807cc9ddeb683",
+  "en": "H2D Extruder Connection Board",
+  "ar": "لوحة توصيل الدافع لطابعة H2D",
+  "ckb": "بۆردی پەیوەندیی پاڵنەر بۆ H2D",
+  "kind": "box_item"
+ },
+ {
+  "h": "b0901b8c46658a566e9c7d100932ddfc07d6880d909f57aae669c259854676ff",
+  "en": "M1.6-4 Screw",
+  "ar": "برغي M1.6-4",
+  "ckb": "بورغیی M1.6-4",
+  "kind": "box_item"
+ },
+ {
+  "h": "87b98385afcbc30b8796fb54459d135c432b1bdb44002b2f3525e1aa178c3436",
+  "en": "Extruder Connection Board",
+  "ar": "لوحة توصيل الدافع",
+  "ckb": "بۆردی پەیوەندیی پاڵنەر",
+  "kind": "box_item"
+ },
+ {
+  "h": "caabca575e786a6afeba15c17f1bf1e1ab245782cdc1e9556f6ac61a8f6320b0",
+  "en": "M1.6x4 Screw",
+  "ar": "برغي M1.6x4",
+  "ckb": "بورغیی M1.6x4",
+  "kind": "box_item"
+ },
+ {
+  "h": "a45db515340e183751c2bf5deae1cd7506b0d9b1baa3ff2f079505e58072c99b",
+  "en": "Thermal Silicone Pad",
+  "ar": "وسادة سيليكون حرارية",
+  "ckb": "پەدی سیلیکۆنی گەیاندنی گەرمی",
+  "kind": "box_item"
+ },
+ {
+  "h": "0c0b150d34b32ccb683cfec30aa51c852cac5bbf4e23cd61bff3331a150fa88e",
+  "en": "Learn more about TH Board FPC Cable on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على كابل FPC للوحة TH Board في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کێبڵی FPC بۆ بۆردی TH Board لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "4a47101623aabc7a006445b11d384b5c9deb8194b0f3ca534a8546668780bc1a",
+  "en": "Learn more about Start/Pause Button on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على زر البدء/الإيقاف المؤقت (Start/Pause Button) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی دوگمەی دەستپێکردن/ڕاگرتنی کاتی (Start/Pause Button) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "46c9d5dca8516fdfe538fc299a7945534fcc6b558a24d10305ce05e32f1990e0",
+  "en": "Learn more about the Birds Eye Camera on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على كاميرا المنظر العلوي (Birds Eye Camera) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کامێرای دیمەنی سەرەوە (Birds Eye Camera) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "c977e846ebc563a18002a0ee7c21bda051063c1cd8f64be951e21d280a67a2ce",
+  "en": "Learn more about the Top Chamber LED Cover on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على غطاء الإضاءة العلوية للحجرة (Top Chamber LED Cover) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی ڕووناکیی سەرەوەی ژووری چاپ (Top Chamber LED Cover) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "f388df048a90e275f992c4c6cf1dd27c413deac750f64dc6f34c214a8fefeee3",
+  "en": "Learn more about AP Board Cover on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على غطاء لوحة AP Board في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی بۆردی AP Board لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "731e4703f9cb7c9720acee75f3579f27cfa53d1cf93c75936e098fb4809701b7",
+  "en": "AP Board Cover",
+  "ar": "غطاء لوحة AP Board",
+  "ckb": "قەپاغی بۆردی AP Board",
+  "kind": "box_item"
+ },
+ {
+  "h": "a82347cc931d7851e03241e57b991615cfd56f5d672f580fa4986e85d026ee53",
+  "en": "Cable Tray Cover",
+  "ar": "غطاء مجرى الكابلات",
+  "ckb": "قەپاغی جۆگەی کێبڵەکان",
+  "kind": "box_item"
+ },
+ {
+  "h": "35233dbdbd954c9deb183b4b7f7d638b7b9920126bb639db7f1b3833dd9f8c05",
+  "en": "Learn more about AC Board Cover on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على غطاء لوحة AC Board في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی بۆردی AC Board لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "480c5c09d2790444e3c31d224815bb9cf91358782b2c30e7884f546b0d517900",
+  "en": "AC Board Cover",
+  "ar": "غطاء لوحة AC Board",
+  "ckb": "قەپاغی بۆردی AC Board",
+  "kind": "box_item"
+ },
+ {
+  "h": "b648d260dd6a708c2be570ccac98bf7eb9f0cb8e96f03da9d73a3143916f3e8e",
+  "en": "Learn more about Live View Camera on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على كاميرا المشاهدة المباشرة (Live View Camera) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کامێرای بینینی ڕاستەوخۆ (Live View Camera) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "ac2b25b51a72c445ebda5ef4019e7b53c4cd89e27e951101973d740774c095ed",
+  "en": "Live View Camera Cable",
+  "ar": "كابل كاميرا المشاهدة المباشرة",
+  "ckb": "کێبڵی کامێرای بینینی ڕاستەوخۆ",
+  "kind": "box_item"
+ },
+ {
+  "h": "9acd80f36e9e7f01101a82526a15163679b551c2371a40e03434d64457e0d749",
+  "en": "Privacy Cover",
+  "ar": "غطاء الخصوصية",
+  "ckb": "قەپاغی پاراستنی تایبەتێتی",
+  "kind": "box_item"
+ },
+ {
+  "h": "09d1ca87427bde6b76286fd215a4822bee00c895c7426a78856fc57b1486781d",
+  "en": "Learn more about Z-Axis Tensioner on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على شدّاد المحور Z في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی توندکەرەوەی تەوەری Z لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "7baea026912cacccccfdfa98cdb978e2a275c64221c24ff6b181f0072f8a0590",
+  "en": "Learn more about the H2 Safety Key on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مفتاح الأمان (H2 Safety Key) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کلیلی سەلامەتی (H2 Safety Key) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "2691a471655d1ec329621d54acfb15d85a6ef07f39244fae598571a03d410fd9",
+  "en": "Learn more about MC AP Cable Pack (2-in-1) on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حزمة كابلات MC وAP (2-in-1) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پاکەتی کێبڵەکانی MC و AP (2-in-1) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "4acbf724163d318ab69506538175def63f64d4b059276715654766e4f73b7efe",
+  "en": "AP to MC Communication Cable",
+  "ar": "كابل الاتصال من AP إلى MC",
+  "ckb": "کێبڵی پەیوەندی لە AP بۆ MC",
+  "kind": "box_item"
+ },
+ {
+  "h": "268e8da97a1d2e5528c6ac11957042d1e96083c51341364cfcb97352d0fa28dd",
+  "en": "MC to AP Power Cable",
+  "ar": "كابل الطاقة من MC إلى AP",
+  "ckb": "کێبڵی کارەبا لە MC بۆ AP",
+  "kind": "box_item"
+ },
+ {
+  "h": "e075ab9095b2d686e39dcf08587b0c9ba6b3ed2eef4a37282c57baa9f8d7594c",
+  "en": "Learn more about Power Socket on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مقبس الطاقة (Power Socket) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پریزی کارەبا (Power Socket) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "e562c2eb141cfdec85615d1abe3291aa8adc3380846b8293b3e7558f85ca3c25",
+  "en": "ST3-8 Screw",
+  "ar": "برغي ST3-8",
+  "ckb": "بورغیی ST3-8",
+  "kind": "box_item"
+ },
+ {
+  "h": "ae77347e8e7a4936bd96eed395bc1f1bcbef75bd30ce534676a0d9e533b66a34",
+  "en": "ST3.5-6 Screw",
+  "ar": "برغي ST3.5-6",
+  "ckb": "بورغیی ST3.5-6",
+  "kind": "box_item"
+ },
+ {
+  "h": "911efa2e4ea69502eb330f01e614691555884955c891f9c7d8b7b386baa8b308",
+  "en": "Learn more about Emergency Stop Button on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على زر الإيقاف الطارئ (Emergency Stop Button) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی دوگمەی وەستانی خێرا (Emergency Stop Button) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "26d0ff0004d8bd64f0b3465c01c923963e8f5492e5ff57a64bf35ce0d67e156d",
+  "en": "Red, Orange",
+  "ar": "أحمر، برتقالي",
+  "ckb": "سوور، پرتەقاڵی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "0e11b5ff3dc27b7d76a95f66ab74dd372013be88b1a33e6471d7244aa56f96a2",
+  "en": "Learn more about Tube Organizer on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على منظّم الأنابيب (Tube Organizer) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی ڕێکخەری بۆرییەکان (Tube Organizer) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "41e0894c8159970202c12e6efd6fe835ae01888f2918586bb0efbc83c8205de2",
+  "en": "Cable Chain Clip Silicone Plug",
+  "ar": "سدادة سيليكون لمشبك سلسلة الكابلات",
+  "ckb": "داخەری سیلیکۆنی گیرەی زنجیری کێبڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "fb77c8d2fa81ce93c69f5021c3c1e0caf323397dc09c6146b601aef5bd9b90a4",
+  "en": "Learn more about MC Board Fan on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مروحة لوحة MC Board في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پانکەی بۆردی MC Board لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "d72edfa8f0bbff689dcb11589c9311ae0b8cd584becf9065f3fa7581ae4a7add",
+  "en": "MC Board Fan",
+  "ar": "مروحة لوحة MC Board",
+  "ckb": "پانکەی بۆردی MC Board",
+  "kind": "box_item"
+ },
+ {
+  "h": "c179a5154ae49949baf688ce4a92da9bd64789ede3e509ddfdb12709047e32b4",
+  "en": "Learn more about Auxiliary Part Cooling Fan on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مروحة التبريد المساعدة (Auxiliary Part Cooling Fan) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پانکەی ساردکردنەوەی یاریدەدەر (Auxiliary Part Cooling Fan) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "d3e0477677e4d3bfb0df475529acc757fa0a84ce76ff8ce5f0290107e4f23376",
+  "en": "BTG3-14.5 Screw",
+  "ar": "برغي BTG3-14.5",
+  "ckb": "بورغیی BTG3-14.5",
+  "kind": "box_item"
+ },
+ {
+  "h": "68c8ba333766c4562d40ea28b90b1d2e53c3b26d89f7f2b832aa583b409cf2cc",
+  "en": "Learn more about H2D and H2C Cable Chain on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على سلسلة الكابلات لطابعتي H2D and H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی زنجیری کێبڵ بۆ H2D and H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "ef57ab51a9ab90a76b340b26095102d77fbd2cc27ea61974a0fec0381e8b72d3",
+  "en": "Learn more about H2S Cable Chain on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على سلسلة الكابلات لطابعة H2S في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی زنجیری کێبڵ بۆ H2S لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "443628f74e5d3d70587bb891dac3a516f02ab65903c06f8fa5dba60774c46bf9",
+  "en": "Cable Chain",
+  "ar": "سلسلة الكابلات",
+  "ckb": "زنجیری کێبڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "b372c86ddaf328d34c805eb1233bf8cf4fddb83c3dcab10a47302c199572739f",
+  "en": "Cable Chain Base",
+  "ar": "قاعدة سلسلة الكابلات",
+  "ckb": "بنکەی زنجیری کێبڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "2389fd66c5bae1c0cc87b0fbf08531953216df3e8646af8a63987fffcbe0c32f",
+  "en": "Cable Chain Clip",
+  "ar": "مشبك سلسلة الكابلات",
+  "ckb": "گیرەی زنجیری کێبڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "59141bc09c0d8e5f4f1b472a82f3571fc57e08675873813a2a3470c8a8bbaf0f",
+  "en": "Cable Chain Base Clip",
+  "ar": "مشبك قاعدة سلسلة الكابلات",
+  "ckb": "گیرەی بنکەی زنجیری کێبڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "3f7102793b2e288a79d6d60d713e9a0f39863dc33d1c0c7fb56af39a22ad4fb0",
+  "en": "Learn more about WiFi Antenna on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على هوائي WiFi في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی ئەنتێنای WiFi لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "ea44e4a520ca5c98eb75bb16c4e6b01594f4676d7b7faa7aca50ecc5031f9127",
+  "en": "Learn more about the H2 Status Indicator on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مؤشر الحالة (H2 Status Indicator) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی نیشاندەری دۆخ (H2 Status Indicator) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "32cd93415f7742382b7c6f7373bdd2975bd0cd0d5ea66146e05aac78365aac13",
+  "en": "Learn more about H2D/H2C Enclosure Top Fame on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الإطار العلوي للهيكل المغلق لطابعتي H2D/H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی چوارچێوەی سەرەوەی ژووری داخراو بۆ H2D/H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "98d47adc99bab313b17062019f079f4e8bc31d91b7517cbeaf5a2bd939358b0d",
+  "en": "Learn more about H2S Enclosure Top Fame on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الإطار العلوي للهيكل المغلق لطابعة H2S في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی چوارچێوەی سەرەوەی ژووری داخراو بۆ H2S لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "daa511b47d911448b0a10ea8f04544e118afaf913e7fb7a513a75b802de14b43",
+  "en": "Enclosure Top Fame",
+  "ar": "الإطار العلوي للهيكل المغلق",
+  "ckb": "چوارچێوەی سەرەوەی ژووری داخراو",
+  "kind": "box_item"
+ },
+ {
+  "h": "fc83bec1be5f6821d093e0c87ef662a04fd59b8c74533120dcbac51907c04d74",
+  "en": "M3-10 Screw",
+  "ar": "برغي M3-10",
+  "ckb": "بورغیی M3-10",
+  "kind": "box_item"
+ },
+ {
+  "h": "70459fbe28c1b32598859788c63a41dcc59517ad803685c156239febd1c0c91d",
+  "en": "Cable Management Clip",
+  "ar": "مشبك تنظيم الكابلات",
+  "ckb": "گیرەی ڕێکخستنی کێبڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "0d7b89bdb5a5916235aafb83a314fe334e14af39cefb2e2910e146f829f932d9",
+  "en": "Tape",
+  "ar": "شريط لاصق",
+  "ckb": "شریتی چەسپدار",
+  "kind": "box_item"
+ },
+ {
+  "h": "c21ffb04a118b7844a442fa3838325f4c0cb33318cbacf86c5836f322983b4a8",
+  "en": "Cable Tie",
+  "ar": "رباط كابلات",
+  "ckb": "بەندی کێبڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "cf791d86ef4d48f81044cb0248cc4e89b074f85e9713b2e871092c94cf2c0fea",
+  "en": "Filament Tube Bracket",
+  "ar": "دعامة تثبيت أنبوب الفلامنت",
+  "ckb": "پایەی جێگیرکردنی بۆریی فیلامێنت",
+  "kind": "box_item"
+ },
+ {
+  "h": "0e7ee51c058162c55bb065d9f3234c48a7d1b13f2eeaddb7383127cd2bdd6d02",
+  "en": "Learn more about Laser Air Assist Tube Connector on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على موصل أنبوب نفخ الهواء المساعد لليزر (Laser Air Assist Tube Connector) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی گەیەنەری بۆریی هەوای یاریدەدەری لەیزەر (Laser Air Assist Tube Connector) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "8b64bd7b3a5e11e420b9bbc1ffe3d7e5201b8610c41bc184333c3480c8296643",
+  "en": "Silicone, Plastic",
+  "ar": "سيليكون، بلاستيك",
+  "ckb": "سیلیکۆن، پلاستیک",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "557ed347f13cdeb376f0d3e940a316aaeeae96b0065d9511eef443ea99df3665",
+  "en": "Tube",
+  "ar": "أنبوب",
+  "ckb": "بۆری",
+  "kind": "box_item"
+ },
+ {
+  "h": "2827a4f605d4223f52112d9b02b12865387d0dfaa37163db39a6bafacb452f1c",
+  "en": "Learn more about Chamber Heat Circulation Fan on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مروحة تدوير حرارة الحجرة (Chamber Heat Circulation Fan) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پانکەی سووڕاندنەوەی گەرمیی ژووری چاپ (Chamber Heat Circulation Fan) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "3a7d1330896961e8472c20f1a863de090f52ccb683a6c40b1fa393631cd18a43",
+  "en": "BT4-32 Screw",
+  "ar": "برغي BT4-32",
+  "ckb": "بورغیی BT4-32",
+  "kind": "box_item"
+ },
+ {
+  "h": "d413091b0fd4babc1b980a1ff3ba1e427c3d5451ed95126e1ebdefd5f9e987d6",
+  "en": "Double-Sided Tape",
+  "ar": "شريط لاصق على الوجهين",
+  "ckb": "شریتی چەسپداری دوو ڕوو",
+  "kind": "box_item"
+ },
+ {
+  "h": "948a80a02716d345aa0c0d59f150e490aa884c35219c8f5ef4340e55f550fe1b",
+  "en": "Learn more about the Nozzle Offset Calibration Sensor on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حساس معايرة إزاحة النوزل (Nozzle Offset Calibration Sensor) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هەستەوەری کالیبرەکردنی لادانی نۆزڵ (Nozzle Offset Calibration Sensor) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "fa3f8002dbd0a1a7215b90f97d20daa3146f236b443332bf7643c7e38fc40fc5",
+  "en": "Nozzle Offset Calibration Sensor cable",
+  "ar": "كابل حساس معايرة إزاحة النوزل (Nozzle Offset Calibration Sensor)",
+  "ckb": "کێبڵی هەستەوەری کالیبرەکردنی لادانی نۆزڵ (Nozzle Offset Calibration Sensor)",
+  "kind": "box_item"
+ },
+ {
+  "h": "5346e513c3b43eaace6ff4b44a50d29875c2a744f8d11a3a6bdc87b5db5a4cbb",
+  "en": "Learn more about the Hotend Heating Assembly on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مجموعة تسخين رأس الصهر في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "14c6c835f27a6c561383e442f8fd8e11774b2ca2b6335e710f0f07c7d565088e",
+  "en": "Metal, Ceramic",
+  "ar": "معدن، سيراميك",
+  "ckb": "لە کانزا و سیرامیک",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "cffe084571a2e22672f64ef31eb968a347a296edc3efaace81343a21436257d2",
+  "en": "Hotend Heating Assembly - Left",
+  "ar": "مجموعة تسخين رأس الصهر - الجهة اليسرى",
+  "ckb": "کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە - لای چەپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "e8b07cbe37805d199de97b8539ee932466244e5d01e979e5f436fa77789e32a5",
+  "en": "Baffle Plate",
+  "ar": "لوح الحاجز",
+  "ckb": "پلێتی بەربەست",
+  "kind": "box_item"
+ },
+ {
+  "h": "a5cfc3a71cce022b91c8aa130fc4a77cba3111af2054300c8a8ac32e5492a76e",
+  "en": "Hotend Heating Assembly - Right",
+  "ar": "مجموعة تسخين رأس الصهر - الجهة اليمنى",
+  "ckb": "کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە - لای ڕاست",
+  "kind": "box_item"
+ },
+ {
+  "h": "473983192c3e74c5bb2e30d1a360c7a602268785ab14a090d70412de1e002b1c",
+  "en": "Learn more about the H2D and H2C Filament Buffer on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على موازن الفلامنت (Filament Buffer) لطابعتي H2D and H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هاوسەنگکەری فیلامێنت (Filament Buffer) بۆ H2D and H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "a2888eb4809357d87f31a4dc732662304a4f4fe91ce4aacb17055e791401db7d",
+  "en": "Learn more about the H2S Filament Buffer on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على موازن الفلامنت (Filament Buffer) لطابعة H2S في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هاوسەنگکەری فیلامێنت (Filament Buffer) بۆ H2S لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "6226ab76b828e746091f7ed9db166536e64bb2abddba5a22352dedaa8f55137e",
+  "en": "Black, Orange",
+  "ar": "أسود، برتقالي",
+  "ckb": "ڕەش، پرتەقاڵی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "acddfa84c8cbfcf2f3b888e5c67bc6407d87fb6dd8b03c2247c0959268c44c32",
+  "en": "Learn more about Spool Holder and its Bracket on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حامل البكرة ودعامته (Spool Holder and its Bracket) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هەڵگری ماسوورە و پایەکەی (Spool Holder and its Bracket) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "f790334e80c3b6ca27894b37a3ae70588d184e7eae31d9ed0bae2dbcb6595e90",
+  "en": "Bracket",
+  "ar": "دعامة تثبيت",
+  "ckb": "پایەی جێگیرکردن",
+  "kind": "box_item"
+ },
+ {
+  "h": "0642aa0b2dec4a498fa2ca0f094ebb8368725e952aad0e9c1ef0e4b42525c2db",
+  "en": "ST3-12 Screw",
+  "ar": "برغي ST3-12",
+  "ckb": "بورغیی ST3-12",
+  "kind": "box_item"
+ },
+ {
+  "h": "a6a5e936dc204b7c8da761c007b7aadcf537eece79ca578cc577f9d6956de689",
+  "en": "Learn more about Air Pump Filter on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على فلتر مضخة الهواء (Air Pump Filter) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی فلتەری پەمپی هەوا (Air Pump Filter) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "38ba2144543153b75b3c21ce72bc9d3cc2aa5b2b433877b0611d91fdf890d79b",
+  "en": "Cotton",
+  "ar": "قطن",
+  "ckb": "لۆکە",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "a7116fbd2959b66735c393fa5581c2375e6c64b258f112a7463043a6db3c1871",
+  "en": "Learn more about the Filament Cutter Lever on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على ذراع قاطع الفلامنت (Filament Cutter Lever) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی لیڤەری بڕەری فیلامێنت (Filament Cutter Lever) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "f092d688a8891c9aa93a1f130e7c310275e5aff5ca53b1954f1bc273108823d1",
+  "en": "Filament Cutter Lever - Left",
+  "ar": "ذراع قاطع الفلامنت (Filament Cutter Lever) - الجهة اليسرى",
+  "ckb": "لیڤەری بڕەری فیلامێنت (Filament Cutter Lever) - لای چەپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "990f285c49281edb2754d1ff7b230f89e5bc7e1c5ab5977a62af85d7135daf29",
+  "en": "Filament Cutter Lever - Right",
+  "ar": "ذراع قاطع الفلامنت (Filament Cutter Lever) - الجهة اليمنى",
+  "ckb": "لیڤەری بڕەری فیلامێنت (Filament Cutter Lever) - لای ڕاست",
+  "kind": "box_item"
+ },
+ {
+  "h": "45d61522909bd2c48f6566f418c114c39b2fc09cf2349df0b68775bd31d58ec4",
+  "en": "Learn more about the Weeding Tool on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على أداة إزالة الزوائد (Weeding Tool) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی ئامرازی لابردنی زیادەکان (Weeding Tool) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "844639798cb0a981e481330528484af9b717b3e063bfe69d5c125acfa1ca6de2",
+  "en": "For easier handling, you can DIY a handle for this tool. The model Ergonomic Weeding Tool with Base is available on MakerWorld with downloadable files and detailed information.",
+  "ar": "لتسهيل الإمساك بالأداة، يمكنك صنع مقبض لها بنفسك (DIY). النموذج Ergonomic Weeding Tool with Base موجود على MakerWorld مع ملفات قابلة للتنزيل ومعلومات تفصيلية.",
+  "ckb": "بۆ ئەوەی ئامرازەکە ئاسانتر بە دەستەوە بگیرێت، دەتوانیت خۆت دەسکێکی بۆ دروست بکەیت (DIY). مۆدێلی Ergonomic Weeding Tool with Base لە MakerWorld هەیە، لەگەڵ فایلی شیاوی داگرتن و زانیاریی ورد.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "b243dd03caa0a765af350f05cd98a3aa658bf20a8e7c8a47c90c12084a6f33bc",
+  "en": "Ergonomic Weeding Tool with Base",
+  "ar": "Ergonomic Weeding Tool with Base",
+  "ckb": "Ergonomic Weeding Tool with Base",
+  "kind": "doc_title",
+  "keep": true
+ },
+ {
+  "h": "de4723fbfed0db95cb46967a73a7a17cdbc63d1771f98cb8de7366990a1eba47",
+  "en": "Learn more about the Pen Holder on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حامل القلم (Pen Holder) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هەڵگری قەڵەم (Pen Holder) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "55ac94337dc534a0389f68c9844e6f69bce0794bdb54020f038ba584e443d2e8",
+  "en": "Gold, White, Black",
+  "ar": "ذهبي، أبيض، أسود",
+  "ckb": "زێڕین، سپی، ڕەش",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "4cdc8c5eea2a678b231cae7bad9c7aae0df0f128241f11f59b6b173afb2be726",
+  "en": "Learn more about the H2D and H2C AP Board on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوحة AP Board لطابعتي H2D and H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی AP Board بۆ H2D and H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "ce09402b02d1c62951abd64b1c7fa560c0293ee58f176ea620088c6311037826",
+  "en": "Learn more about the H2S AP Board on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوحة AP Board لطابعة H2S في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی AP Board بۆ H2S لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "9ea1b7bb8cd97121fec268dc99543882c02ecf1ead8a2324d53c4c8f3a624f3f",
+  "en": "AP Board",
+  "ar": "لوحة AP Board",
+  "ckb": "بۆردی AP Board",
+  "kind": "box_item"
+ },
+ {
+  "h": "027c7059c8268a3ec4bb322bdf818634962912b85732e7418e4ab2575274f991",
+  "en": "AP Board Grounding Cable",
+  "ar": "كابل التأريض للوحة AP Board",
+  "ckb": "کێبڵی ئەرتی بۆردی AP Board",
+  "kind": "box_item"
+ },
+ {
+  "h": "0af661d871ac549a482737cc620452b6df1ad739670f72569eb3d1292b9e4d6a",
+  "en": "AP Board - LV",
+  "ar": "لوحة AP Board - LV",
+  "ckb": "بۆردی AP Board - LV",
+  "kind": "box_item"
+ },
+ {
+  "h": "3be5d2783c28c08723facb8134f5f57829b6d17c4be5442b9dadebddb522750a",
+  "en": "Learn more about the AC Board on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوحة AC Board في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی AC Board لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "27aa97ac9f163a549c13ffc71b96f69f71be5153f510d926614e0f722195965b",
+  "en": "Learn more about the Extruder Switch Cam on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على كامة تبديل الدافع (Extruder Switch Cam) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کامی گۆڕینی پاڵنەر (Extruder Switch Cam) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "d3ff27dddcc48d2b046be0502f9f18b7762e89a92b0b134aa36079eec8d9e380",
+  "en": "Learn more about the Blade Holder on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حامل الشفرة (Blade Holder) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هەڵگری تیغ (Blade Holder) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "4a7c1dc07c2187d739ab105836e62ac6423730245959e9c693f77c6002c6b2fd",
+  "en": "Learn more about the Top Chamber LED on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الإضاءة العلوية للحجرة (Top Chamber LED) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی ڕووناکیی سەرەوەی ژووری چاپ (Top Chamber LED) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "7bb20573dfa3c7bc8d09a916ac55c269f4ae85392fc6ef4bddd38f46f2f62ad5",
+  "en": "Top Chamber LED - Left",
+  "ar": "الإضاءة العلوية للحجرة (Top Chamber LED) - الجهة اليسرى",
+  "ckb": "ڕووناکیی سەرەوەی ژووری چاپ (Top Chamber LED) - لای چەپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "ab6231fb40b4abac94dfb083073a48ce53540824508aaec8c66dc14f967c9d4c",
+  "en": "Silicone Rubber",
+  "ar": "مطاط سيليكوني",
+  "ckb": "لاستیکی سیلیکۆن",
+  "kind": "box_item"
+ },
+ {
+  "h": "c75e79e391be1835533ff80bac4fd4bd207f80ab7b03d542ebbc1151363d181b",
+  "en": "Top Chamber LED - Right",
+  "ar": "الإضاءة العلوية للحجرة (Top Chamber LED) - الجهة اليمنى",
+  "ckb": "ڕووناکیی سەرەوەی ژووری چاپ (Top Chamber LED) - لای ڕاست",
+  "kind": "box_item"
+ },
+ {
+  "h": "1c392dae732548a309fbf59454ce16b694e1420fef271c694a1f6245ed0c483d",
+  "en": "Learn more about the Laser Air Assist Tube Coupler on Bambu Lab Wiki (40 W) / Bambu Lab Wiki (10 W).",
+  "ar": "تعرّف أكثر على وصلة أنبوب نفخ الهواء المساعد لليزر (Laser Air Assist Tube Coupler) في ويكي Bambu Lab (40 W) / ويكي Bambu Lab (10 W).",
+  "ckb": "زیاتر دەربارەی گەیەنەری بۆریی هەوای یاریدەدەری لەیزەر (Laser Air Assist Tube Coupler) لە ویکی Bambu Lab (40 W) / ویکی Bambu Lab (10 W) بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "1efc67b0c72bb3dc1a486b68d59c19376d22691cc3a9153f7c0e679e9f841fbb",
+  "en": "Learn more about the Filament Cutter Stopper on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مصدّ قاطع الفلامنت (Filament Cutter Stopper) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی وەستێنەری بڕەری فیلامێنت (Filament Cutter Stopper) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "66177263256fee00945aa757a21787cf2386910c6c446a800634fbbf49148b67",
+  "en": "Filament Cutter Stopper - Left",
+  "ar": "مصدّ قاطع الفلامنت (Filament Cutter Stopper) - الجهة اليسرى",
+  "ckb": "وەستێنەری بڕەری فیلامێنت (Filament Cutter Stopper) - لای چەپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "6101b58516a1b1d4de586fe5ed025056ce8aeec4e4c208d0ac1bf88383e877a2",
+  "en": "Filament Cutter Stopper - Right",
+  "ar": "مصدّ قاطع الفلامنت (Filament Cutter Stopper) - الجهة اليمنى",
+  "ckb": "وەستێنەری بڕەری فیلامێنت (Filament Cutter Stopper) - لای ڕاست",
+  "kind": "box_item"
+ },
+ {
+  "h": "23e01e987a0bb480ba5b36d41aa9c3318cff08d09818af7f791fb63f0aa9e63c",
+  "en": "Learn more about the 10 W Laser Air Assist Nozzle and Laser Lens on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على نوزل نفخ الهواء المساعد وعدسة الليزر (10 W Laser Air Assist Nozzle and Laser Lens) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی نۆزڵی هەوای یاریدەدەر و هاوێنەی لەیزەر (10 W Laser Air Assist Nozzle and Laser Lens) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "314e6d5dc125b5d824ead369ea0f3d9824ca0b28fe96b744243669441e3205ce",
+  "en": "Laser Lens",
+  "ar": "عدسة الليزر",
+  "ckb": "هاوێنەی لەیزەر",
+  "kind": "box_item"
+ },
+ {
+  "h": "e31c84b246f56bce249f68d03b5d59d4566cb31323b68b75c5aa69117ccf31e5",
+  "en": "Air Nozzle",
+  "ar": "نوزل الهواء",
+  "ckb": "نۆزڵی هەوا",
+  "kind": "box_item"
+ },
+ {
+  "h": "c0d7f2cbc8af6866c456319b08e92eae3214076bb922d7a4480b46b32bee636d",
+  "en": "Learn more about the Brush on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الفرشاة في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی فڵچەکە لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "1258b07885c3bb11b556c60f84e64ab62514acfd21d2c08a7e8ad2fe3061f7a0",
+  "en": "Learn more about the Laser Slats Pack on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على عبوة شرائح الليزر (Laser Slats Pack) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پاکەتی تەختەکانی لەیزەر (Laser Slats Pack) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "b47d5efbe90d6b61ba44be5999c6339b20d78f86e5955cb824e69518e6c4f3ee",
+  "en": "Learn more on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر في ويكي Bambu Lab.",
+  "ckb": "زیاتر لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "03694e16b3651489bb54110bdad33a14647507860997f8f7edaf3c360c8be94b",
+  "en": "Silicone Plug",
+  "ar": "سدادة سيليكون",
+  "ckb": "داخەری سیلیکۆن",
+  "kind": "box_item"
+ },
+ {
+  "h": "f766fe47f90b1e0bfff5802c4d033958c20de2168642580d53e56500c0e851e9",
+  "en": "Heatbed",
+  "ar": "السرير الساخن",
+  "ckb": "بێدی گەرم",
+  "kind": "box_item"
+ },
+ {
+  "h": "81a806fe24cfee289fe22365bd3c55c486c6ba363f15a6623355a09f0ce0934e",
+  "en": "Silicone Plugs",
+  "ar": "سدادات سيليكون",
+  "ckb": "داخەرە سیلیکۆنییەکان",
+  "kind": "box_item"
+ },
+ {
+  "h": "042bb84f27ed39f26e54ff72678496f302be9234a809fc18fc919fc7bff9fbf2",
+  "en": "Heatbed - LV",
+  "ar": "السرير الساخن - LV",
+  "ckb": "بێدی گەرم - LV",
+  "kind": "box_item"
+ },
+ {
+  "h": "098c8a8119afa364c49ae2e17917cc0bd6d5a20135bf3db731f924d02eb5d5d1",
+  "en": "Silicone Pad - left",
+  "ar": "وسادة سيليكون - الجهة اليسرى",
+  "ckb": "پەدی سیلیکۆن - لای چەپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "2abfb6c31c87f296615ed87aefbacc732387c569a85d91e9c24cf67e4626614b",
+  "en": "Silicone Pad - right",
+  "ar": "وسادة سيليكون - الجهة اليمنى",
+  "ckb": "پەدی سیلیکۆن - لای ڕاست",
+  "kind": "box_item"
+ },
+ {
+  "h": "1ba85ba4975b7a596f30c4a1c1d6847fe9fdfd62348eb225f77ce653e0ef099a",
+  "en": "M2x5 Screw",
+  "ar": "برغي M2x5",
+  "ckb": "بورغیی M2x5",
+  "kind": "box_item"
+ },
+ {
+  "h": "7480fdd947dbb79a59f49abf42fe17178411e1e6d979e32b73cab8f81757244f",
+  "en": "STW3.5x6 Screw",
+  "ar": "برغي STW3.5x6",
+  "ckb": "بورغیی STW3.5x6",
+  "kind": "box_item"
+ },
+ {
+  "h": "22d16e6b01f02a0092fe0b38c37deaee7d64ffdb731ffe8b44ed031b018cb55a",
+  "en": "Learn more about the Laser Platform Homing Area Marker on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على علامة منطقة العودة إلى نقطة الأصل لمنصة الليزر (Laser Platform Homing Area Marker) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی نیشانەی ناوچەی گەڕانەوە بۆ خاڵی سەرەتای سەکۆی لەیزەر (Laser Platform Homing Area Marker) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "364b2cc76c0f1c63f35d9b3e0461a57ad086a8c6c49aa9d62c0e4173778b3a57",
+  "en": "Heatbed calibration sticker",
+  "ar": "ملصق معايرة السرير الساخن",
+  "ckb": "ستیکەری کالیبرەکردنی بێدی گەرم",
+  "kind": "box_item"
+ },
+ {
+  "h": "c5862041bfff45953a3b6b7e6f49a5770a80fb1757e0821ac2493de831ac1848",
+  "en": "Laser Platform calibration sticker",
+  "ar": "ملصق معايرة منصة الليزر",
+  "ckb": "ستیکەری کالیبرەکردنی سەکۆی لەیزەر",
+  "kind": "box_item"
+ },
+ {
+  "h": "82b3078f8013efcb4467a185a66c8cb47e38b1088a0202f1ebb9fbfa4f15aef4",
+  "en": "Cutting Platform calibration sticker",
+  "ar": "ملصق معايرة منصة القص (Cutting Platform)",
+  "ckb": "ستیکەری کالیبرەکردنی سەکۆی بڕین (Cutting Platform)",
+  "kind": "box_item"
+ },
+ {
+  "h": "71a23c33d4995007cb163b16cd23e2029f2179bdbb6c7f24f50a83de1f2ee22e",
+  "en": "Nozzle Wiper steel sheet",
+  "ar": "صفيحة فولاذية لماسحة النوزل",
+  "ckb": "پلێتی پۆڵای سڕەری نۆزڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "c1656c28aed4464c348421a81cf79f2125c6cd0f934e8e5f4863977f797b161a",
+  "en": "BT2-5 screw",
+  "ar": "برغي BT2-5",
+  "ckb": "بورغیی BT2-5",
+  "kind": "box_item"
+ },
+ {
+  "h": "6c1e91446f8110906b03c339491f836664a8ae0b275aab7302f89033613bd704",
+  "en": "Learn more about the Side Glass on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الزجاج الجانبي (Side Glass) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی شووشەی لاتەنیشت (Side Glass) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "43b93ba544e884ad936a64665bdc9169da7a40197a3d8bc6bacff2fca16d4e4a",
+  "en": "Side Glass Left - Glass / Side Glass Right - Glass",
+  "ar": "الزجاج الجانبي الأيسر (Side Glass Left) - زجاج / الزجاج الجانبي الأيمن (Side Glass Right) - زجاج",
+  "ckb": "شووشەی لای چەپ (Side Glass Left) - شووشە / شووشەی لای ڕاست (Side Glass Right) - شووشە",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "f21c5e4adea1b405c57235c2a24b0738ce6c37c0caed6e40108aaf355eb68519",
+  "en": "Side Glass - Left",
+  "ar": "الزجاج الجانبي (Side Glass) - الجهة اليسرى",
+  "ckb": "شووشەی لاتەنیشت (Side Glass) - لای چەپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "766cec92f59f92b7685a8726fc0b5343b855d6ca3fc3f9257a4f9d6b6270eff3",
+  "en": "Side Glass - Right",
+  "ar": "الزجاج الجانبي (Side Glass) - الجهة اليمنى",
+  "ckb": "شووشەی لاتەنیشت (Side Glass) - لای ڕاست",
+  "kind": "box_item"
+ },
+ {
+  "h": "59371793944a362e778ed09a080f9b944813c778ef8f3c520e0e408977593614",
+  "en": "Learn more about the Quick-release Lever Unit on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على وحدة ذراع التحرير السريع (Quick-release Lever Unit) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی یەکەی لیڤەری کردنەوەی خێرا (Quick-release Lever Unit) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "45c2973c5bdee8ee13e5bb52421982a8b3876b749fb4df4fb8afdd5252213778",
+  "en": "Gray, Silver",
+  "ar": "رمادي، فضي",
+  "ckb": "خۆڵەمێشی، زیوی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "bcf057618e03ffa76cb77982edeb81e8ee18255f82f50762650e1b5a9b2e501d",
+  "en": "Wrench",
+  "ar": "مفتاح ربط",
+  "ckb": "ئاچار",
+  "kind": "box_item"
+ },
+ {
+  "h": "76a6cbfae06e86ce3f177b3c365bd045fe0b1a0b5f165ff1ee578328698eec25",
+  "en": "Locking block (with 2 pcs spring)",
+  "ar": "كتلة القفل (مع نابض عدد 2)",
+  "ckb": "بلۆکی قفڵکردن (لەگەڵ 2 دانە فەنەر)",
+  "kind": "box_item"
+ },
+ {
+  "h": "7dd4f00d2d355ec00a2e9475c6b03767068ade8672135b750c112f32999d453d",
+  "en": "Wrench shaft",
+  "ar": "عمود مفتاح الربط",
+  "ckb": "میلی ئاچارەکە",
+  "kind": "box_item"
+ },
+ {
+  "h": "6daba9d9ea561eaea3a89f1cb380506ff872cadc457dc0b5db42839c5bdc658c",
+  "en": "MG4-22 Screw",
+  "ar": "برغي MG4-22",
+  "ckb": "بورغیی MG4-22",
+  "kind": "box_item"
+ },
+ {
+  "h": "6f0dc20526022cfe7c2ab225b2ea6a23bdbe814ed90bb0689220c76518eb21b2",
+  "en": "Learn more about the Inner Lining Upper Cover - Right on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الغطاء العلوي الأيمن للبطانة الداخلية (Inner Lining Upper Cover - Right) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی سەرەوەی لای ڕاستی ڕووپۆشی ناوەوە (Inner Lining Upper Cover - Right) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "4e7c7b05acda67ef4feb3443e012a5a4dba53db488b78d470d70ac83325c0cef",
+  "en": "Learn more about the Laser Status Indicator on Bambu Lab Wiki (10 W) / Bambu Lab Wiki (40 W).",
+  "ar": "تعرّف أكثر على مؤشر حالة الليزر (Laser Status Indicator) في ويكي Bambu Lab (10 W) / ويكي Bambu Lab (40 W).",
+  "ckb": "زیاتر دەربارەی نیشاندەری دۆخی لەیزەر (Laser Status Indicator) لە ویکی Bambu Lab (10 W) / ویکی Bambu Lab (40 W) بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "90cd382202ca40c0a56ed02850e3d6ed9bf7d0834db6a3137b6d1e482256ca05",
+  "en": "Black, White, Yellow",
+  "ar": "أسود، أبيض، أصفر",
+  "ckb": "ڕەش، سپی، زەرد",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "f4f4d20f1f9a3582047f05036bb93b80a0bfece20ba6ec5309c7f6ce5127e6aa",
+  "en": "LED light strip",
+  "ar": "شريط إضاءة LED",
+  "ckb": "شریتی ڕووناکیی LED",
+  "kind": "box_item"
+ },
+ {
+  "h": "bd47c02896fa5f6059a270c4ff6f425d04c19761ec5fb51f9d14c8ec9b436957",
+  "en": "Lampshade",
+  "ar": "غطاء المصباح",
+  "ckb": "سەرپۆشی چرا",
+  "kind": "box_item"
+ },
+ {
+  "h": "0fec0efe88610ac2b844428356a831940af73d1d6e70c7b35fbbe25465e842c6",
+  "en": "Learn more about the Inner Lining - Left on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على البطانة الداخلية اليسرى (Inner Lining - Left) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی ڕووپۆشی ناوەوەی لای چەپ (Inner Lining - Left) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "99bce68c270d2c3a9b96aed0a274ff988c33276c818f185290216746bc0da5b5",
+  "en": "BT3-12 Screw",
+  "ar": "برغي BT3-12",
+  "ckb": "بورغیی BT3-12",
+  "kind": "box_item"
+ },
+ {
+  "h": "930071878d117513a8140d3ecd5118dcada5e100f41bc1515056c955fc0cc37f",
+  "en": "Cable Holder",
+  "ar": "حامل الكابل",
+  "ckb": "هەڵگری کێبڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "129aa2ce0320aeac0b41e8de81ff9a9a2e7c0a52a4289c83641dd00fb003ffa1",
+  "en": "Heated Bed Cable Holder",
+  "ar": "حامل كابل السرير الساخن",
+  "ckb": "هەڵگری کێبڵی بێدی گەرم",
+  "kind": "box_item"
+ },
+ {
+  "h": "a5cce06d1003b8e54584604b2711a55cc6117a18853dfdb7c952392260b5b4aa",
+  "en": "Learn more about the Nozzle Eddy Sensor - Right for H2D on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حساس التيار الدوّامي الأيمن للنوزل (Nozzle Eddy Sensor - Right) لطابعة H2D في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هەستەوەری جەریانی ئێدیی نۆزڵی لای ڕاست (Nozzle Eddy Sensor - Right) بۆ H2D لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "61116257fbee23c7e9b07dfa0dae944cfbc4ef68a94fb337e22485895fb12a0a",
+  "en": "Learn more about the Nozzle Eddy Sensor - Right for H2C on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حساس التيار الدوّامي الأيمن للنوزل (Nozzle Eddy Sensor - Right) لطابعة H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هەستەوەری جەریانی ئێدیی نۆزڵی لای ڕاست (Nozzle Eddy Sensor - Right) بۆ H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "8e5510cb474487d85f82426c7ac40bdcee36aeece00d97a2b91107f6537b68c4",
+  "en": "Learn more about the Nozzle Eddy Sensor - Left on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على حساس التيار الدوّامي الأيسر للنوزل (Nozzle Eddy Sensor - Left) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی هەستەوەری جەریانی ئێدیی نۆزڵی لای چەپ (Nozzle Eddy Sensor - Left) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "ed91da01ed8f1f949ac1bb7345da197eee28e4209991d67cd342084ff71cc5f0",
+  "en": "Nozzle Eddy Sensor - Right",
+  "ar": "حساس التيار الدوّامي للنوزل (Nozzle Eddy Sensor) - الجهة اليمنى",
+  "ckb": "هەستەوەری جەریانی ئێدیی نۆزڵ (Nozzle Eddy Sensor) - لای ڕاست",
+  "kind": "box_item"
+ },
+ {
+  "h": "da99dcc1d4a05cd1abb91ef4f6e177c5d07b6db5c608bf7f6bf255a7fee3713a",
+  "en": "Nozzle Eddy Sensor - Left",
+  "ar": "حساس التيار الدوّامي للنوزل (Nozzle Eddy Sensor) - الجهة اليسرى",
+  "ckb": "هەستەوەری جەریانی ئێدیی نۆزڵ (Nozzle Eddy Sensor) - لای چەپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "8a07347ad4a1a9ce8af82e829014f1eb15d9b60a4da18603761297a006882d55",
+  "en": "Learn more about the Side Panel with Glass Window on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على اللوح الجانبي بنافذة زجاجية (Side Panel with Glass Window) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پانێڵی لاتەنیشت بە پەنجەرەی شووشەوە (Side Panel with Glass Window) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "e1e9ac7a22a978c85f8fd2cf57fb162423c3bdf46b5ae82c50494e8089b44d30",
+  "en": "Left Side Panel with Glass Window",
+  "ar": "اللوح الجانبي الأيسر بنافذة زجاجية (Left Side Panel with Glass Window)",
+  "ckb": "پانێڵی لای چەپ بە پەنجەرەی شووشەوە (Left Side Panel with Glass Window)",
+  "kind": "box_item"
+ },
+ {
+  "h": "6f61ba763207c182117dd5f78527f38ef31d6c169b33fcd914b9072797d628ba",
+  "en": "ST3-3 Screw",
+  "ar": "برغي ST3-3",
+  "ckb": "بورغیی ST3-3",
+  "kind": "box_item"
+ },
+ {
+  "h": "24c40e06680cfe730f71011b757cdeed4b14938d96d653bc2b559a2fe513373a",
+  "en": "Right Side Panel with Glass Window",
+  "ar": "اللوح الجانبي الأيمن بنافذة زجاجية (Right Side Panel with Glass Window)",
+  "ckb": "پانێڵی لای ڕاست بە پەنجەرەی شووشەوە (Right Side Panel with Glass Window)",
+  "kind": "box_item"
+ },
+ {
+  "h": "8084b817e3dde7c66f507d7891f7b4c213b74867a19a9992b5751df184bdcf51",
+  "en": "Left Side Panel",
+  "ar": "اللوح الجانبي الأيسر",
+  "ckb": "پانێڵی لای چەپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "e2164ef3b3c826fa5fec5324a98bbe6f97bc7e98e39798ad5796a348504be711",
+  "en": "Silicone Mat",
+  "ar": "حصيرة سيليكون",
+  "ckb": "ڕایەخی سیلیکۆن",
+  "kind": "box_item"
+ },
+ {
+  "h": "79e5384ed825cc7caf01ba5916574fb1acc6575f2a4d39894b05e572650bed35",
+  "en": "Right Side Panel",
+  "ar": "اللوح الجانبي الأيمن",
+  "ckb": "پانێڵی لای ڕاست",
+  "kind": "box_item"
+ },
+ {
+  "h": "b10d3cb68bdc075974aa21e0ef1278ba4e4b8a72a75566cb4edce422777a72e1",
+  "en": "Learn more about the Chamber Heater Unit on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على وحدة تسخين الحجرة في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی یەکەی گەرمکەرەوەی ژووری چاپ لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "414b6b837e5e99dd8c1e748e5906e8e70c4f9666981e07f2e53b2c6eda48b0b4",
+  "en": "Chamber Heater Unit",
+  "ar": "وحدة تسخين الحجرة",
+  "ckb": "یەکەی گەرمکەرەوەی ژووری چاپ",
+  "kind": "box_item"
+ },
+ {
+  "h": "a0d4d22f4356a1b4593e0608d9d53a77ef6a9fe552ce671b587730ab528d7da2",
+  "en": "Learn more about the Side Panel with Laser Safety Window on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على اللوح الجانبي بنافذة أمان الليزر (Side Panel with Laser Safety Window) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پانێڵی لاتەنیشت بە پەنجەرەی سەلامەتیی لەیزەرەوە (Side Panel with Laser Safety Window) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "fbb1cf9e9fc27829d8d18465f5dcdd90a3ddc8f822aa379a0060a8e1981e78f9",
+  "en": "Learn more about the Top Laser Protection Plate on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على لوح الحماية العلوي من الليزر في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پلێتی سەرەوەی پارێزەری لەیزەر لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "70bd3005bdd31f7c8cbf44f13a7113f81f9b87783a8b0dc3f8cf1ccd26363984",
+  "en": "Learn more about the Front Laser Safety Window on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على نافذة أمان الليزر الأمامية (Front Laser Safety Window) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی پەنجەرەی پێشەوەی سەلامەتیی لەیزەر (Front Laser Safety Window) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "0afd6c59d77b6fa758672792cff3d871e9057f70ceebf78119e18dd80c9890e7",
+  "en": "Acrylic, Plastic",
+  "ar": "أكريليك، بلاستيك",
+  "ckb": "لە ئاکریلیک و پلاستیک",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "e4e93db58ab064a573509ac458126560073c0c6b8713dd274c9dddced9240728",
+  "en": "Gray, Green",
+  "ar": "رمادي، أخضر",
+  "ckb": "خۆڵەمێشی، سەوز",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "872d622708c3963c0233a8ae7621c2c87ff162a760e39b6c695ff4ab25981b24",
+  "en": "Left Side Panel with Laser Safety Window",
+  "ar": "اللوح الجانبي الأيسر بنافذة أمان الليزر (Laser Safety Window)",
+  "ckb": "پانێڵی لای چەپ بە پەنجەرەی سەلامەتیی لەیزەرەوە (Laser Safety Window)",
+  "kind": "box_item"
+ },
+ {
+  "h": "54856b51b9ae7918cf548749860fc891bd7be9b17ab8fb0b66fd06e7030f645e",
+  "en": "Right Side Panel with Laser Safety Window",
+  "ar": "اللوح الجانبي الأيمن بنافذة أمان الليزر (Laser Safety Window)",
+  "ckb": "پانێڵی لای ڕاست بە پەنجەرەی سەلامەتیی لەیزەرەوە (Laser Safety Window)",
+  "kind": "box_item"
+ },
+ {
+  "h": "66a29d0a9b70b8f3145a4cf17d9a384d6bd2528704bd673f45de89a87b3e5db7",
+  "en": "Top Laser Protection Plate",
+  "ar": "لوح الحماية العلوي من الليزر",
+  "ckb": "پلێتی سەرەوەی پارێزەری لەیزەر",
+  "kind": "box_item"
+ },
+ {
+  "h": "cfe85eb98aa1ae164393664e9f3cff89d01f48a94596b1a224fafe8a6a46ffe5",
+  "en": "Front Laser Safety Window",
+  "ar": "نافذة أمان الليزر الأمامية (Front Laser Safety Window)",
+  "ckb": "پەنجەرەی پێشەوەی سەلامەتیی لەیزەر (Front Laser Safety Window)",
+  "kind": "box_item"
+ },
+ {
+  "h": "b68f9ed27aba812ee3ccf5e10d87d62fb59dc8de8288423e47eb4f9544abbf80",
+  "en": "Door Hinge Silicone Pad (Pre-installed on the Front Door)*2*3",
+  "ar": "وسادة سيليكون لمفصّلة الباب (مركّبة مسبقًا على الباب الأمامي)*2*3",
+  "ckb": "پەدی سیلیکۆنی لۆلای دەرگا (پێشتر لەسەر دەرگای پێشەوە دانراوە)*2*3",
+  "kind": "box_item"
+ },
+ {
+  "h": "51901221675cb546da6ce3ddc8bab567b3895d50166dc39539243b82120950ad",
+  "en": "Learn more about the Cutting Platform on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على منصة القص (Cutting Platform) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی سەکۆی بڕین (Cutting Platform) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "2c5f9a612527b76651355658cd90f3f318568e4be08b2be9aecba944902d2553",
+  "en": "Learn more about the Laser Base on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على قاعدة الليزر (Laser Base) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بنکەی لەیزەر (Laser Base) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "a606af5736fa020decefdabab959dc50c91d51c954284691896c038c95393309",
+  "en": "Support strips",
+  "ar": "شرائط الدعم",
+  "ckb": "شریتەکانی پاڵپشت",
+  "kind": "box_item"
+ },
+ {
+  "h": "f19bc89289d681562fa40d99b848fd12fcf744b4da1c21b5588446f07209e233",
+  "en": "Learn more about the H2D and H2C Tool Head with X-Axis Assembly on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على رأس الطباعة مع مجموعة المحور X لطابعتي H2D and H2C في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی سەری چاپ لەگەڵ کۆمەڵەی تەوەری X بۆ H2D and H2C لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "36dbe8a5a475a803cdb3168285d268388b52ff6f1b7bb7d37bc5373475cd2427",
+  "en": "Learn more about the H2S Tool Head with X-Axis Assembly on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على رأس الطباعة مع مجموعة المحور X لطابعة H2S في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی سەری چاپ لەگەڵ کۆمەڵەی تەوەری X بۆ H2S لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "9d859f3c9387043cc6fe8faec0f08b291cd751fd083d3a76dfcdde19ab48a63b",
+  "en": "H2D Tool Head with X-Axis Assembly",
+  "ar": "رأس الطباعة مع مجموعة المحور X لطابعة H2D",
+  "ckb": "سەری چاپ لەگەڵ کۆمەڵەی تەوەری X بۆ H2D",
+  "kind": "box_item"
+ },
+ {
+  "h": "53dc824381e704c95ba3f7db48075df24269345aa4b46471299aef7c8193c0f8",
+  "en": "H2S Tool Head with X-Axis Assembly",
+  "ar": "رأس الطباعة مع مجموعة المحور X لطابعة H2S",
+  "ckb": "سەری چاپ لەگەڵ کۆمەڵەی تەوەری X بۆ H2S",
+  "kind": "box_item"
+ },
+ {
+  "h": "02a047a2f9c3c2333f5276a20287f0d6367b76d997840249dd866111f833d170",
+  "en": "Toolhead with X-Axis Assembly",
+  "ar": "رأس الطباعة مع مجموعة المحور X",
+  "ckb": "سەری چاپ لەگەڵ کۆمەڵەی تەوەری X",
+  "kind": "box_item"
+ },
+ {
+  "h": "aae786d21630db111690d5121a63a1d4ae722f527c3f6dc060799b53c866b482",
+  "en": "H1.5 Hex Wrench*1（short）",
+  "ar": "مفتاح سداسي H1.5 *1 (قصير)",
+  "ckb": "کلیلی شەشپاڵووی H1.5 *1 (کورت)",
+  "kind": "box_item"
+ },
+ {
+  "h": "5669244f7dcfe00b24e5ca2fac75c14b1c073073b72408c88212e375fee9b8c2",
+  "en": "BT3x5 Screw",
+  "ar": "برغي BT3x5",
+  "ckb": "بورغیی BT3x5",
+  "kind": "box_item"
+ },
+ {
+  "h": "ab690b628ca39303673df7e198d7ca5fa303f635abdd5d6fa55f0d2515e15d91",
+  "en": "Learn more about the Smoke Ventilation Pipe 2m on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على أنبوب تهوية الدخان (Smoke Ventilation Pipe 2m) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆریی هەواگۆڕکێی دووکەڵ (Smoke Ventilation Pipe 2m) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "eea42b6754cce0c3b9114f29a40603660e98ff71bb22af8aa5514d23a05aec25",
+  "en": "Silver, Black",
+  "ar": "فضي، أسود",
+  "ckb": "زیوی، ڕەش",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "d7db19b2fe7e11411b7d9b9adae91c4c27390ca177cec07ec8f18cef1c26cd92",
+  "en": "Smoke Ventilation Pipe Clamp",
+  "ar": "مشبك أنبوب تهوية الدخان",
+  "ckb": "گیرەی بۆریی هەواگۆڕکێی دووکەڵ",
+  "kind": "box_item"
+ },
+ {
+  "h": "f4bb2210a93e3a44d8832035f3f07d9dc87539c997ead7ca273f4228ff573e65",
+  "en": "Learn more about the Smoke Ventilation Pipe Adapter on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على محوّل أنبوب تهوية الدخان (Smoke Ventilation Pipe Adapter) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی ئەداپتەری بۆریی هەواگۆڕکێی دووکەڵ (Smoke Ventilation Pipe Adapter) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "c6059e42978f813d6f8109b3291738aa792743cebc2ff74352cc52f20882621b",
+  "en": "Learn more about the AMS 2 Pro Top Lid on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الغطاء العلوي (AMS 2 Pro Top Lid) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی قەپاغی سەرەوە (AMS 2 Pro Top Lid) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "59f85bd8a52ce0028065c18cfb978bae6b26cc38d8739e53789af36e8ffb1885",
+  "en": "Top Cover Base",
+  "ar": "قاعدة الغطاء العلوي",
+  "ckb": "بنکەی قەپاغی سەرەوە",
+  "kind": "box_item"
+ },
+ {
+  "h": "0d1fc7990b251c6b854e02a6a568cf09ef275046be9092afacd725b38e6a9a12",
+  "en": "Top Cover Shaft",
+  "ar": "عمود الغطاء العلوي",
+  "ckb": "میلی قەپاغی سەرەوە",
+  "kind": "box_item"
+ },
+ {
+  "h": "5f44e9aee052e7c78313bc1fe3553e4c3df7542bafcfba2eefa101ba75dde92c",
+  "en": "Top Cover Damping Pad",
+  "ar": "وسادة تخميد الغطاء العلوي",
+  "ckb": "پەدی کپکەرەوەی قەپاغی سەرەوە",
+  "kind": "box_item"
+ },
+ {
+  "h": "aa7fd8dab2fabc1cf9c6276e119c7e5724b74f6834f827520a1e657387ec352f",
+  "en": "Learn more about the AMS 2 Pro Bottom Cover Unit on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على وحدة الغطاء السفلي (AMS 2 Pro Bottom Cover Unit) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی یەکەی قەپاغی خوارەوە (AMS 2 Pro Bottom Cover Unit) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "467086a61ae3b07718d4bb82fda8298696132ac71aafb30e7dce7d1c3e71e663",
+  "en": "Damping Pad",
+  "ar": "وسادة تخميد",
+  "ckb": "پەدی کپکەرەوە",
+  "kind": "box_item"
+ },
+ {
+  "h": "1e2094648e2547e1192cc87988add92e6a9c6f383d240ee830ae48e8cb0d8c62",
+  "en": "Learn more about the AMS 2 Pro Main Frame on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على الإطار الرئيسي (AMS 2 Pro Main Frame) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی چوارچێوەی سەرەکی (AMS 2 Pro Main Frame) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "c232d8a763aa77fec72e0a1d9b866fca893e756bdcaa765289596d0e6b98b9e2",
+  "en": "Learn more about the AMS 2 Pro Driven Support Shaft Assembly on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مجموعة عمود الإسناد المُدار (AMS 2 Pro Driven Support Shaft Assembly) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کۆمەڵەی میلی پاڵپشتی بزوێنراو (AMS 2 Pro Driven Support Shaft Assembly) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "d027cb7ff51b049e89b7c86add460861e93ce12f4bf17220186bbcee4fbfc1ef",
+  "en": "693ZZ Bearing",
+  "ar": "محمل 693ZZ",
+  "ckb": "بێرینگی 693ZZ",
+  "kind": "box_item"
+ },
+ {
+  "h": "421cb6c80393e178d5703b53f86dd82b933fab4a50dae317f9f106c4f96e7c89",
+  "en": "Learn more about the AMS 2 Pro Active Support Shaft Assembly on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على مجموعة عمود الإسناد النشط (AMS 2 Pro Active Support Shaft Assembly) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی کۆمەڵەی میلی پاڵپشتی چالاک (AMS 2 Pro Active Support Shaft Assembly) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "cf912e4fbc57fc104fab4a372d3e3b292badca7850ad539adf410f581eb3e171",
+  "en": "Learn more about the AMS 2 Pro Mainboard on Bambu Lab Wiki.",
+  "ar": "تعرّف أكثر على اللوحة الأم (AMS 2 Pro Mainboard) في ويكي Bambu Lab.",
+  "ckb": "زیاتر دەربارەی بۆردی سەرەکی (AMS 2 Pro Mainboard) لە ویکی Bambu Lab بزانە.",
+  "kind": "usage_body"
+ }
+]

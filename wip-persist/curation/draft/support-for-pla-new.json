@@ -1,0 +1,587 @@
+{
+  "handle": "support-for-pla-new",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T13:59:44Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 3 pages read (pdfplumber tables and the pdftotext layout layer, page by page): Basic Info, Specifications, Recommended Printing Settings, Physical Properties, Mechanical Properties (every row \"N/A\"), Other Physical and Chemical Properties, Disclaimer. No composition, filament length or hardness is given."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/b7f580064c0142be919de0225299a008/SDS20250928S02_Bambu_Support_for_PLA.pdf",
+      "title": "Bambu Support for PLA Safety Data Sheet SDS20250928S02",
+      "retrieved_at": "2026-10-16T08:25:25Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 19 pages read (p.4 viewed as an image to confirm the composition table; p.18 sample photo shows white filament labelled \"Bambu Support for PLA\"). Section 3 gives the composition (PETG 50-60 %, PET 20-30 %, additive 10-20 %); section 9 says \"No data available.\" for melting point, density and every other physical datum; section 2 \"Not classified.\"; section 14 \"Not hazardous goods\"."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle (row \"Support for PLA, Support for PLA/PETG\") and AMS (row \"Support for PLA, Support for PLA/PETG\") tables read; the glue, build-plate, chamber and storage/drying tables have no row for this filament."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "compat.*"
+      ],
+      "note": "Important notes, Filament Overview (row \"Support for PLA\"), Hardware Compatibility (no row for Support for PLA), 2.1 drying table (row \"Support for PLA\"), 4.2 storage. No material, mechanical or thermal numbers for this filament."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"Support for PLA\": drying before use \"Recommended\", desiccant during use \"Not required but recommended\", heatbed 65-75 ℃ 12 h, forced-air oven 55 ℃ 8 h, AMS 2 Pro 60 ℃ 12 h, AMS HT 60 ℃ 12 h. 1.3 (static drying mode not suitable) does not name Support for PLA."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/support-for-pla-new",
+      "title": "Bambu Lab US store product page: Support for PLA (New Version)",
+      "retrieved_at": "2026-10-16T07:04:39Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, the page-builder description (banner, four feature blocks, RFID block, Download, Printing Tips). No spec table and no What's in the Box list on this page."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PETG, PET",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "sds",
+      "source_url": "https://store.bblcdn.com/s7/default/b7f580064c0142be919de0225299a008/SDS20250928S02_Bambu_Support_for_PLA.pdf",
+      "source_title": "Bambu Support for PLA Safety Data Sheet SDS20250928S02",
+      "locator": "p.4, Section 3 Composition / Information on Ingredients › table",
+      "quote": "PETG 50-60 25640-14-6 607-767-6 None None; PET 20-30 25038-59-9 607-507-1 None None; Additive 10-20 N/A N/A None None",
+      "test_method": "",
+      "test_condition": "Composition by weight (SDS section 3, \"Preparation\"): PETG 50-60 %, PET 20-30 %, additive 10-20 %",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:25Z",
+      "note": "Page 4 viewed as an image to confirm the table rows (PETG CAS 25640-14-6, PET CAS 25038-59-9, additive without CAS). The TDS states no composition; the store page states no material."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.05mm\"); the tolerance ± 0.05 mm comes from the store page only and is already written by the page layer."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "578872019709923334",
+        "value_text": "0.5 kg"
+      },
+      "value": 500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 0.5 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "Scoped to the store page's only Size value \"0.5 kg\"; agrees with the store page row (option Size › 0.5 kg, 500 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.33,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.33 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\", tested by Bambu Lab on standard samples)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "The SDS (p.9, section 9) says \"Density : No data available.\" The store page states no density."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 190,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 190 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\", tested by Bambu Lab on standard samples)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "The SDS (p.9, section 9) says \"Melting Point : No data available.\""
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 220,
+        "max": 230
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 220 - 230 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "The material-table wiki (2. Nozzle) gives 190 - 240 (nozzle temperature /℃, ±10 °C) in a row shared by \"Support for PLA, Support for PLA/PETG\"; the product's own TDS range is kept. The store page states no nozzle temperature."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Cool Plate SuperTack, Textured PEI Plate / Smooth PEI Plate; bed surface preparation: Bambu Liquid Glue / Glue Stick",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "The material-table wiki's build-plate tables have no row for this filament; no other source gives a bed temperature."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 200 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 200 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "Kept as text: the TDS gives only an upper bound."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate SuperTack",
+        "Textured PEI Plate",
+        "Smooth PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate SuperTack, Textured PEI Plate / Smooth PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: Bambu Liquid Glue / Glue Stick",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "The store Printing Tips (1.Accessory Compatibility) say \"Compatible with all printers, AMS, build plate, and nozzles.\"; the material-table wiki's build-plate tables have no row for this filament."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C, 8 h X1 Series Printer Heatbed: 65 - 75 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h, before printing. The same row gives X1 Series printer heatbed: 65 - 75 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "Every cached source agrees for the oven: the support wiki (2.1 Filament Drying, row \"Support for PLA\": convection oven 55℃, 8h) and the drying wiki (Appendix I, row \"Support for PLA\": forced-air oven 55 ℃, 8 h). Not stored (one value per key): heatbed 65-75 ℃, 12 h (TDS line 2, support wiki, drying wiki) and AMS 2 Pro / AMS HT 60 ℃, 12 h (support wiki 2.1, drying wiki Appendix I)."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C, 8 h X1 Series Printer Heatbed: 65 - 75 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 55 °C, before printing. The same row gives 12 h on an X1 Series printer heatbed at 65 - 75 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "note": "The support wiki (2.1, convection oven 55℃, 8h) and the drying wiki (Appendix I, forced-air oven 55 ℃, 8 h) agree. The heatbed and AMS 2 Pro / AMS HT alternatives take 12 h (not stored)."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "AMS series",
+      "target_family": "ams_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table › row \"Support for PLA, Support for PLA/PETG\" › AMS / AMS lite Compatibility",
+      "quote": "Support for PLA, Support for PLA/PETG | Compatible | Compatible | Compatible |",
+      "note": "The store page says the same (Product Features › Cautions for Use › bullet 3: \"All AMS Series Compatible\"; Printing Tips › 1.Accessory Compatibility: \"Compatible with all printers, AMS, build plate, and nozzles.\"). The row is shared by Support for PLA and Support for PLA/PETG."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "All printers",
+      "target_family": "all_bambu_printers",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table › row \"Support for PLA, Support for PLA/PETG\" › Open-frame printer, Enclosed printer",
+      "quote": "Support for PLA, Support for PLA/PETG | Compatible | Compatible | Compatible |",
+      "note": "\"Compatible\" for open-frame (A Series, P1P, etc.) and enclosed (H2 Series, X2D, P2S, X1 Series, P1S, etc.) printers. The TDS (p.1, Basic Info) says \"fully compatible with all Bambu Lab PLA filaments and Bambu Lab printers\"; the store Printing Tips (1.Accessory Compatibility) say \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2, 0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "note": "A nozzle size list, not a store product: no target handle is named. The material-table wiki (2. Nozzle, row \"Support for PLA, Support for PLA/PETG\") gives \"Compatible\" for the 0.2, 0.4, 0.6 and 0.8 mm nozzles and \"Not Required\" for hardened steel."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High-flow nozzles (0.4, 0.6, 0.8 mm)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"Support for PLA, Support for PLA/PETG\" › 0.4 mm, 0.6 mm, 0.8 mm High flow nozzle",
+      "quote": "Support for PLA, Support for PLA/PETG | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 240 |",
+      "note": "The row is shared by Support for PLA and Support for PLA/PETG. Hardened steel nozzles \"Not Required\". Its temperature column (190 - 240, ±10 °C) is wider than this product's TDS (220 - 230 °C)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate SuperTack, Textured PEI Plate / Smooth PEI Plate",
+      "note": "Bed surface preparation: Bambu Liquid Glue / Glue Stick (TDS p.1)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate SuperTack, Textured PEI Plate / Smooth PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate SuperTack, Textured PEI Plate / Smooth PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Liquid Glue",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Surface Preparation",
+      "quote": "Bed Surface Preparation Bambu Liquid Glue / Glue Stick",
+      "condition": "Recommended bed surface preparation (either glue)",
+      "note": "A recommended printing setting, so recorded as compatible_with rather than requires; the TDS names liquid glue or a glue stick."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Glue Stick",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Surface Preparation",
+      "quote": "Bed Surface Preparation Bambu Liquid Glue / Glue Stick",
+      "condition": "Recommended bed surface preparation (either glue)",
+      "note": "A recommended printing setting, so recorded as compatible_with rather than requires; the TDS names liquid glue or a glue stick."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "1. Basic Information of Support Filaments › Filament Overview › row \"Support for PLA\" › Compatible Model Filament",
+      "quote": "Support for PLA | PLA(not compatible with PLA Aero) | Low moisture sensitivity; minimal drying or humidity control required. |",
+      "condition": "As the support interface material for a model printed in this filament",
+      "note": "A material family, not one store product: no target handle is named. The TDS (p.1, Basic Info) says \"fully compatible with all Bambu Lab PLA filaments\"; the store page says the filament is \"specifically designed for PLA filaments\" (feature block \"Effortless Removal\")."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Aero",
+      "target_source_handle": "pla-aero",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "1. Basic Information of Support Filaments › Filament Overview › row \"Support for PLA\" › Compatible Model Filament",
+      "quote": "Support for PLA | PLA(not compatible with PLA Aero) | Low moisture sensitivity; minimal drying or humidity control required. |",
+      "condition": "As the support interface material for a model printed in this filament",
+      "conflict": "The TDS (p.1, Basic Info) says \"fully compatible with all Bambu Lab PLA filaments\"; the support wiki excludes PLA Aero. The narrower statement is recorded; left to review.",
+      "note": "The store page does not mention PLA Aero."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA",
+      "retrieved_at": "2026-10-16T08:25:24Z",
+      "sha256": "4e070b33f2d0ff9c6169519635e7c2d508fd0760e2379dfc5cbd525ee89bdf2d"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/b7f580064c0142be919de0225299a008/SDS20250928S02_Bambu_Support_for_PLA.pdf",
+      "title": "Bambu Support for PLA Safety Data Sheet SDS20250928S02",
+      "retrieved_at": "2026-10-16T08:25:25Z",
+      "sha256": "2674b90ef39c26b9a172bebf2a52ff14e51907ac30c56d6533bb80638b1270dd"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "sha256": "279858daaace7d8123091b076c9031bb93306f439696bee26e56b53a7dcf5362"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.tensile_strength",
+    "mechanical.elongation_at_break",
+    "mechanical.flexural_strength",
+    "mechanical.flexural_modulus",
+    "mechanical.impact_strength",
+    "mechanical.hardness",
+    "thermal.heat_deflection_temp",
+    "thermal.vicat_softening",
+    "thermal.glass_transition"
+  ],
+  "notes": [
+    "No hex: the store page links no hex-code document for this filament and none is cached, so its colour value \"White (65104)\" has no published hex.",
+    "not_published: the TDS states \"N/A\" for glass transition, Vicat softening, heat deflection (1.8 and 0.45 MPa) and every mechanical row (Young's modulus, tensile strength, breaking elongation, bending modulus, bending strength, impact strength; X-Y and Z); the SDS section 9 says \"No data available.\". Filament length and hardness are stated nowhere.",
+    "Document dates: the TDS (V1.0; PDF created 2025-03-17) predates the SDS (SDS20250928S02, 2025-09-28); both are the documents this page's Download block links for \"Support for PLA (New Version)\", so both are used. The TDS states no composition, so it does not contradict the SDS.",
+    "TDS facts with no registry key are not stored: melt index 13.6 ± 1.2 g/10 min (210 °C, 2.16 kg), crystallization temperature N/A, saturated water absorption rate 0.43% (25 °C, 55% RH), spool material ABS (temperature resistance 70 °C), spool size 200 × 67 mm, printing and storage humidity < 20% RH (sealed, with desiccant), retraction length 0.6 - 1.0 mm, retraction speed 20 - 40 mm/s, chamber temperature 25 - 45 °C (thermal.chamber_temp is the printer chamber key), max overhang angle 55°, max bridging length 30 mm, support \"Turn On\", odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products.",
+    "material.spool_type is neither stored nor listed as not_published: the TDS gives the spool material (ABS, 70 °C) and the store Type value is \"Filament with spool\", but no source names a spool type.",
+    "SDS facts with no registry key are not stored: model \"S02-xx\", CLP \"Not classified.\", no hazard pictogram, \"Not hazardous goods\" for IMDG, DOT, ADR/RID and ICAO-TI/IATA transport, SVHC \"Not listed\".",
+    "Moisture wording differs between official sources (no stored key): the support wiki overview says \"Low moisture sensitivity; minimal drying or humidity control required.\" and 2.1 \"Pre-print Drying: No special requirements\", while its Important note 3 calls Support for PLA \"highly hygroscopic\"; the drying wiki Appendix I says \"Recommended\"; the store Printing Tips (4.Safety Tips) say \"As this filament is highly moisture-absorbent\".",
+    "Store page copy to review: its Printing Tips › 4.Safety Tips carry a sub-bullet \"As this filament contains highly hygroscopic wood fibers…\", which neither the TDS nor the SDS composition supports (apparent template text from another filament).",
+    "Marketing prose is not used for numbers: the \"0mm top interface spacing and 0mm Z-distance settings\" footnote (feature block 2) and the percentage comparison with the predecessor (feature block 3) are not stored.",
+    "Not cached, so not read: the store page's \"Filament RoHS\" certificate (https://store.bblcdn.com/s2/default/2c70364d5ac142568d2a6bc1fc2cd088/Bambu_Support_For_PLA_RoHS.pdf; safety.certifications is left to review and not listed as not_published) and the wiki page https://wiki.bambulab.com/en/software/bambu-studio/support (slicer support settings) linked from the Printing Tips.",
+    "material.diameter_tolerance (± 0.05 mm) comes from the store page only (Product Features › bullet 5) and is written by the page layer (verified, official_page); it is not repeated here."
+  ]
+}

@@ -1,0 +1,2289 @@
+{
+  "handle": "bambu-engineering-plate",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T18:24:14Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "keys": [
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "product.*",
+        "package.*",
+        "thermal.*",
+        "compat.statement",
+        "safety.*",
+        "contents.pieces",
+        "variant.note"
+      ],
+      "note": "P0 corpus copy parsed with extractPage + buildImportPayload (the runner's path, manifest row applied): \"Product Specifications\" table (6 rows), Product Features, description sections (One Build Plate for All Filaments, Durable Smooth Surface Coating, Smooth & Natural Surface Finish, Considerations, Recommended Settings table), the 18 variant descriptions"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "keys": [
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "product.*",
+        "thermal.*",
+        "compat.statement",
+        "safety.*"
+      ],
+      "note": "cached HTML (3 tables and the per-plate tabs the text export omits): Build Plate Dimensions table, Important Notice (plate generations), Engineering Plate tab (description, Note, Features, FAQs), wipe zone and gluing appendix. The Engineering Plate tab has no size table, weight, colour or certification"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "thermal.*",
+        "part.*",
+        "safety.*"
+      ],
+      "note": "cached HTML (6 tables): the build-plate table (Engineering Plate column), the glue/bed-temperature table and notes; the rest is filament and nozzle data, not attributed to this plate"
+    }
+  ],
+  "specs": [
+    {
+      "key": "part.material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Polyester powder + manganese steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 1 (Material)",
+      "quote": "Material | Polyester powder + manganese steel",
+      "store_page_check": "agrees word for word with the deterministic part.material row (same cell); no conflict"
+    },
+    {
+      "key": "part.max_temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 120,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 2 (Surface Temperature Resistance)",
+      "quote": "Surface Temperature Resistance | Up to 120℃",
+      "store_page_check": "same cell the deterministic parse keeps as x.surface_temperature_resistance (\"Up to 120℃\", unverified, label not in the registry); this row types it under the registry key, value agrees. The filament-guide Engineering Plate column tops out at the same 120 ℃ (PC, PA, PPA, PPS rows \"100 - 120 ℃\")",
+      "note": "\"Up to\" is the published upper bound of the plate surface; stored as the maximum."
+    },
+    {
+      "key": "physical.thickness",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.5,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 3 (Thickness)",
+      "quote": "Thickness | 0.5mm",
+      "store_page_check": "agrees with the deterministic physical.thickness row (0.5 mm, verified); no conflict"
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "737888343593549825",
+        "id": "ov_0aaaa35382590dee9d796e4d",
+        "value_text": "A2L"
+      },
+      "value": "330*320 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 4 (Usable Print Size) › segment 3",
+      "quote": "H2C/A2L - 330*320mm",
+      "store_page_check": "the segment of the deterministic product-scope printing.usable_print_size cell for this printer value; values agree. The wiki \"Build Plate Dimensions\" table gives the same size for this model"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "737888343593549825",
+        "id": "ov_0aaaa35382590dee9d796e4d",
+        "value_text": "A2L"
+      },
+      "value": 330,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "store_page_check": "no deterministic product.length row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (H2C/A2L - 330*320mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "737888343593549825",
+        "id": "ov_0aaaa35382590dee9d796e4d",
+        "value_text": "A2L"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "store_page_check": "no deterministic product.width row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (H2C/A2L - 330*320mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "737888343593549825",
+        "id": "ov_0aaaa35382590dee9d796e4d",
+        "value_text": "A2L"
+      },
+      "value": 393,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 3",
+      "quote": "H2C/A2L - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.length row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "737888343593549825",
+        "id": "ov_0aaaa35382590dee9d796e4d",
+        "value_text": "A2L"
+      },
+      "value": 380,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 3",
+      "quote": "H2C/A2L - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.width row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "737888343593549825",
+        "id": "ov_0aaaa35382590dee9d796e4d",
+        "value_text": "A2L"
+      },
+      "value": 15,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 3",
+      "quote": "H2C/A2L - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.height row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "737888343593549825",
+        "id": "ov_0aaaa35382590dee9d796e4d",
+        "value_text": "A2L"
+      },
+      "value": 780,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 6 (Packaging Weight) › segment 3",
+      "quote": "H2C/A2L - 0.78kg",
+      "store_page_check": "the deterministic package.weight row is product scope, a string of all three segments in grams, unverified; this segment agrees with it",
+      "note": "Published in kg; stored in grams by the registry unit (the runner's weight rule keeps the published text). The table does not give a separate weight for the \"Engineering Plate + Glues\" option."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720442376270401537",
+        "id": "ov_ae6f9e0fb8ce0814cc3ee436",
+        "value_text": "X2D"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 4 (Usable Print Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm",
+      "store_page_check": "the segment of the deterministic product-scope printing.usable_print_size cell for this printer value; values agree. The wiki \"Build Plate Dimensions\" table gives the same size for this model"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720442376270401537",
+        "id": "ov_ae6f9e0fb8ce0814cc3ee436",
+        "value_text": "X2D"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.length row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720442376270401537",
+        "id": "ov_ae6f9e0fb8ce0814cc3ee436",
+        "value_text": "X2D"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.width row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720442376270401537",
+        "id": "ov_ae6f9e0fb8ce0814cc3ee436",
+        "value_text": "X2D"
+      },
+      "value": 315,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.length row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720442376270401537",
+        "id": "ov_ae6f9e0fb8ce0814cc3ee436",
+        "value_text": "X2D"
+      },
+      "value": 295,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.width row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720442376270401537",
+        "id": "ov_ae6f9e0fb8ce0814cc3ee436",
+        "value_text": "X2D"
+      },
+      "value": 15,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.height row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720442376270401537",
+        "id": "ov_ae6f9e0fb8ce0814cc3ee436",
+        "value_text": "X2D"
+      },
+      "value": 500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 6 (Packaging Weight) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 0.50kg",
+      "store_page_check": "the deterministic package.weight row is product scope, a string of all three segments in grams, unverified; this segment agrees with it",
+      "note": "Published in kg; stored in grams by the registry unit (the runner's weight rule keeps the published text). The table does not give a separate weight for the \"Engineering Plate + Glues\" option."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657367793914449921",
+        "id": "ov_d776102c603ee6e290cd609c",
+        "value_text": "P2S"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 4 (Usable Print Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm",
+      "store_page_check": "the segment of the deterministic product-scope printing.usable_print_size cell for this printer value; values agree. The wiki \"Build Plate Dimensions\" table gives the same size for this model"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657367793914449921",
+        "id": "ov_d776102c603ee6e290cd609c",
+        "value_text": "P2S"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.length row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657367793914449921",
+        "id": "ov_d776102c603ee6e290cd609c",
+        "value_text": "P2S"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.width row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657367793914449921",
+        "id": "ov_d776102c603ee6e290cd609c",
+        "value_text": "P2S"
+      },
+      "value": 315,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.length row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657367793914449921",
+        "id": "ov_d776102c603ee6e290cd609c",
+        "value_text": "P2S"
+      },
+      "value": 295,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.width row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657367793914449921",
+        "id": "ov_d776102c603ee6e290cd609c",
+        "value_text": "P2S"
+      },
+      "value": 15,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.height row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657367793914449921",
+        "id": "ov_d776102c603ee6e290cd609c",
+        "value_text": "P2S"
+      },
+      "value": 500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 6 (Packaging Weight) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 0.50kg",
+      "store_page_check": "the deterministic package.weight row is product scope, a string of all three segments in grams, unverified; this segment agrees with it",
+      "note": "Published in kg; stored in grams by the registry unit (the runner's weight rule keeps the published text). The table does not give a separate weight for the \"Engineering Plate + Glues\" option."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667303749711458305",
+        "id": "ov_5276e44079ec1e243472fb4e",
+        "value_text": "H2C"
+      },
+      "value": "330*320 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 4 (Usable Print Size) › segment 3",
+      "quote": "H2C/A2L - 330*320mm",
+      "store_page_check": "the segment of the deterministic product-scope printing.usable_print_size cell for this printer value; values agree. The wiki \"Build Plate Dimensions\" table gives the same size for this model"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667303749711458305",
+        "id": "ov_5276e44079ec1e243472fb4e",
+        "value_text": "H2C"
+      },
+      "value": 330,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "store_page_check": "no deterministic product.length row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (H2C/A2L - 330*320mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667303749711458305",
+        "id": "ov_5276e44079ec1e243472fb4e",
+        "value_text": "H2C"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "store_page_check": "no deterministic product.width row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (H2C/A2L - 330*320mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667303749711458305",
+        "id": "ov_5276e44079ec1e243472fb4e",
+        "value_text": "H2C"
+      },
+      "value": 393,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 3",
+      "quote": "H2C/A2L - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.length row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667303749711458305",
+        "id": "ov_5276e44079ec1e243472fb4e",
+        "value_text": "H2C"
+      },
+      "value": 380,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 3",
+      "quote": "H2C/A2L - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.width row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667303749711458305",
+        "id": "ov_5276e44079ec1e243472fb4e",
+        "value_text": "H2C"
+      },
+      "value": 15,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 3",
+      "quote": "H2C/A2L - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.height row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667303749711458305",
+        "id": "ov_5276e44079ec1e243472fb4e",
+        "value_text": "H2C"
+      },
+      "value": 780,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 6 (Packaging Weight) › segment 3",
+      "quote": "H2C/A2L - 0.78kg",
+      "store_page_check": "the deterministic package.weight row is product scope, a string of all three segments in grams, unverified; this segment agrees with it",
+      "note": "Published in kg; stored in grams by the registry unit (the runner's weight rule keeps the published text). The table does not give a separate weight for the \"Engineering Plate + Glues\" option."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086657",
+        "id": "ov_c21ed23da6f16b769d3d3590",
+        "value_text": "H2S"
+      },
+      "value": "350*320 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 4 (Usable Print Size) › segment 2",
+      "quote": "H2D/H2S - 350*320mm",
+      "store_page_check": "the segment of the deterministic product-scope printing.usable_print_size cell for this printer value; values agree. The wiki \"Build Plate Dimensions\" table gives the same size for this model"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086657",
+        "id": "ov_c21ed23da6f16b769d3d3590",
+        "value_text": "H2S"
+      },
+      "value": 350,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "store_page_check": "no deterministic product.length row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (H2D/H2S - 350*320mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086657",
+        "id": "ov_c21ed23da6f16b769d3d3590",
+        "value_text": "H2S"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "store_page_check": "no deterministic product.width row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (H2D/H2S - 350*320mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086657",
+        "id": "ov_c21ed23da6f16b769d3d3590",
+        "value_text": "H2S"
+      },
+      "value": 393,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 2",
+      "quote": "H2D/H2S - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.length row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086657",
+        "id": "ov_c21ed23da6f16b769d3d3590",
+        "value_text": "H2S"
+      },
+      "value": 380,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 2",
+      "quote": "H2D/H2S - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.width row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086657",
+        "id": "ov_c21ed23da6f16b769d3d3590",
+        "value_text": "H2S"
+      },
+      "value": 15,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 2",
+      "quote": "H2D/H2S - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.height row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086657",
+        "id": "ov_c21ed23da6f16b769d3d3590",
+        "value_text": "H2S"
+      },
+      "value": 780,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 6 (Packaging Weight) › segment 2",
+      "quote": "H2D/H2S - 0.78kg",
+      "store_page_check": "the deterministic package.weight row is product scope, a string of all three segments in grams, unverified; this segment agrees with it",
+      "note": "Published in kg; stored in grams by the registry unit (the runner's weight rule keeps the published text). The table does not give a separate weight for the \"Engineering Plate + Glues\" option."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086658",
+        "id": "ov_0a5aeaab47f9de79e453ec50",
+        "value_text": "H2D"
+      },
+      "value": "350*320 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 4 (Usable Print Size) › segment 2",
+      "quote": "H2D/H2S - 350*320mm",
+      "store_page_check": "the segment of the deterministic product-scope printing.usable_print_size cell for this printer value; values agree. The wiki \"Build Plate Dimensions\" table gives the same size for this model"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086658",
+        "id": "ov_0a5aeaab47f9de79e453ec50",
+        "value_text": "H2D"
+      },
+      "value": 350,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "store_page_check": "no deterministic product.length row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (H2D/H2S - 350*320mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086658",
+        "id": "ov_0a5aeaab47f9de79e453ec50",
+        "value_text": "H2D"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "store_page_check": "no deterministic product.width row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (H2D/H2S - 350*320mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086658",
+        "id": "ov_0a5aeaab47f9de79e453ec50",
+        "value_text": "H2D"
+      },
+      "value": 393,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 2",
+      "quote": "H2D/H2S - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.length row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086658",
+        "id": "ov_0a5aeaab47f9de79e453ec50",
+        "value_text": "H2D"
+      },
+      "value": 380,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 2",
+      "quote": "H2D/H2S - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.width row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086658",
+        "id": "ov_0a5aeaab47f9de79e453ec50",
+        "value_text": "H2D"
+      },
+      "value": 15,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 2",
+      "quote": "H2D/H2S - 393mm*380mm*15mm",
+      "store_page_check": "the deterministic package.height row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086658",
+        "id": "ov_0a5aeaab47f9de79e453ec50",
+        "value_text": "H2D"
+      },
+      "value": 780,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 6 (Packaging Weight) › segment 2",
+      "quote": "H2D/H2S - 0.78kg",
+      "store_page_check": "the deterministic package.weight row is product scope, a string of all three segments in grams, unverified; this segment agrees with it",
+      "note": "Published in kg; stored in grams by the registry unit (the runner's weight rule keeps the published text). The table does not give a separate weight for the \"Engineering Plate + Glues\" option."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773314",
+        "id": "ov_af94e3ac298796716d46e961",
+        "value_text": "A1"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 4 (Usable Print Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm",
+      "store_page_check": "the segment of the deterministic product-scope printing.usable_print_size cell for this printer value; values agree. The wiki \"Build Plate Dimensions\" table gives the same size for this model"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773314",
+        "id": "ov_af94e3ac298796716d46e961",
+        "value_text": "A1"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.length row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773314",
+        "id": "ov_af94e3ac298796716d46e961",
+        "value_text": "A1"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.width row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773314",
+        "id": "ov_af94e3ac298796716d46e961",
+        "value_text": "A1"
+      },
+      "value": 315,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.length row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773314",
+        "id": "ov_af94e3ac298796716d46e961",
+        "value_text": "A1"
+      },
+      "value": 295,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.width row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773314",
+        "id": "ov_af94e3ac298796716d46e961",
+        "value_text": "A1"
+      },
+      "value": 15,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.height row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773314",
+        "id": "ov_af94e3ac298796716d46e961",
+        "value_text": "A1"
+      },
+      "value": 500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 6 (Packaging Weight) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 0.50kg",
+      "store_page_check": "the deterministic package.weight row is product scope, a string of all three segments in grams, unverified; this segment agrees with it",
+      "note": "Published in kg; stored in grams by the registry unit (the runner's weight rule keeps the published text). The table does not give a separate weight for the \"Engineering Plate + Glues\" option."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773313",
+        "id": "ov_ec489a4022dd0c6a6558a098",
+        "value_text": "P1 Series"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 4 (Usable Print Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm",
+      "store_page_check": "the segment of the deterministic product-scope printing.usable_print_size cell for this printer value; values agree. The wiki \"Build Plate Dimensions\" table gives the same size for this model",
+      "note": "P1 Series covers the segment's P1P/P1S; X1C is named in the segment."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773313",
+        "id": "ov_ec489a4022dd0c6a6558a098",
+        "value_text": "P1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.length row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773313",
+        "id": "ov_ec489a4022dd0c6a6558a098",
+        "value_text": "P1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.width row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773313",
+        "id": "ov_ec489a4022dd0c6a6558a098",
+        "value_text": "P1 Series"
+      },
+      "value": 315,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.length row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773313",
+        "id": "ov_ec489a4022dd0c6a6558a098",
+        "value_text": "P1 Series"
+      },
+      "value": 295,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.width row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773313",
+        "id": "ov_ec489a4022dd0c6a6558a098",
+        "value_text": "P1 Series"
+      },
+      "value": 15,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.height row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773313",
+        "id": "ov_ec489a4022dd0c6a6558a098",
+        "value_text": "P1 Series"
+      },
+      "value": 500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 6 (Packaging Weight) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 0.50kg",
+      "store_page_check": "the deterministic package.weight row is product scope, a string of all three segments in grams, unverified; this segment agrees with it",
+      "note": "Published in kg; stored in grams by the registry unit (the runner's weight rule keeps the published text). The table does not give a separate weight for the \"Engineering Plate + Glues\" option."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773315",
+        "id": "ov_009fa7c2ef8af35d0bed251b",
+        "value_text": "X1C"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 4 (Usable Print Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm",
+      "store_page_check": "the segment of the deterministic product-scope printing.usable_print_size cell for this printer value; values agree. The wiki \"Build Plate Dimensions\" table gives the same size for this model",
+      "note": "P1 Series covers the segment's P1P/P1S; X1C is named in the segment."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773315",
+        "id": "ov_009fa7c2ef8af35d0bed251b",
+        "value_text": "X1C"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.length row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file. Wiki names \"X1 Series\" for the X1C value."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773315",
+        "id": "ov_009fa7c2ef8af35d0bed251b",
+        "value_text": "X1C"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate › \"Build Plate Dimensions\" table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "store_page_check": "no deterministic product.width row; the store page publishes the same two numbers for this printer as \"Usable Print Size\" (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm); numbers agree",
+      "note": "The wiki table is the general Bambu build-plate size table (\"The build plate dimensions for each model are as follows\"); first number stored as length, second as width, the package convention of this file. Wiki names \"X1 Series\" for the X1C value."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773315",
+        "id": "ov_009fa7c2ef8af35d0bed251b",
+        "value_text": "X1C"
+      },
+      "value": 315,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.length row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773315",
+        "id": "ov_009fa7c2ef8af35d0bed251b",
+        "value_text": "X1C"
+      },
+      "value": 295,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.width row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773315",
+        "id": "ov_009fa7c2ef8af35d0bed251b",
+        "value_text": "X1C"
+      },
+      "value": 15,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 5 (Packaging Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm",
+      "store_page_check": "the deterministic package.height row is product scope, a string of all three segments, unverified; this segment agrees with it",
+      "note": "Plate packaging as the store table gives it; the table does not give a separate box for the \"Engineering Plate + Glues\" option. Region-free: the §C.6 region rule applies package measures of machines only."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773315",
+        "id": "ov_009fa7c2ef8af35d0bed251b",
+        "value_text": "X1C"
+      },
+      "value": 500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "retrieved_at": "2026-10-16T07:09:36Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Product Specifications › row 6 (Packaging Weight) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 0.50kg",
+      "store_page_check": "the deterministic package.weight row is product scope, a string of all three segments in grams, unverified; this segment agrees with it",
+      "note": "Published in kg; stored in grams by the registry unit (the runner's weight rule keeps the published text). The table does not give a separate weight for the \"Engineering Plate + Glues\" option."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PLA Metal / Wood / Marble",
+        "PLA-CF",
+        "PVA",
+        "TPU",
+        "PETG / PETG HF / PETG Translucent",
+        "PETG-CF",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "PA-CF/GF, PA6-CF/GF, PAHT-CF/GF",
+        "PET-CF/GF",
+        "PPA-CF/GF",
+        "PPS",
+        "PPS-CF/GF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\", every row",
+      "quote": "Material | Bambu Cool Plate / PLA Plate | Bambu Engineering Plate | Bambu Smooth PEI / High-Temperature Plate | Bambu Textured PEI Plate",
+      "store_page_check": "no deterministic row. The store page agrees in substance: feature bullet \"Compatible with all filament types\" and its \"Recommended Settings\" table (PLA/PLA-CF/PLA-GF, PETG/PETG-CF, ABS, ASA, TPU, PVA, PC/PC-CF, PA/PA-CF/PAHT-CF, PET-CF, all with glue). Its heatbed ranges differ from the wiki for PLA, TPU, PC, PA and PET-CF (see conflicts); not stored as specs",
+      "note": "Every row of the column gives a bed temperature (none is \"Not recommended\"); glue is required on this plate for every filament (store: \"Glue must be applied before printing any material on the Engineering Plate\")."
+    },
+    {
+      "key": "part.surface_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Smooth",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate Types › Engineering Plate tab › Features › \"Smooth and Natural Surface Finish\"",
+      "quote": "The smooth base coating of the Engineering Plate provides printed models with a flat and refined bottom surface",
+      "store_page_check": "agrees with the store section \"Smooth & Natural Surface Finish\" (\"The smooth base coating can impart a smooth & flat texture to the bottom surface\")",
+      "note": "Prose, not a table: unverified. The same tab says \"fine and uniform surface texture\" and \"smoother, nearly glossy bottom finish\"."
+    },
+    {
+      "key": "part.surface_treatment",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Corrosion-resistant reinforced coating",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "locator": "Build Plate Types › Engineering Plate tab › first paragraph",
+      "quote": "The Engineering Plate is manufactured using a corrosion-resistant reinforced coating process",
+      "store_page_check": "no deterministic row; the store section \"Durable Smooth Surface Coating\" speaks of the refreshed coating's corrosion resistance; consistent",
+      "note": "Prose, not a table: unverified."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "737888343593549825",
+        "id": "ov_0aaaa35382590dee9d796e4d",
+        "value_text": "A2L"
+      },
+      "target_label": "A2L",
+      "target_kind": "printer",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "option Printer Model › A2L",
+      "quote": "Printer Model: A2L",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Dimensions table › row 2",
+        "quote": "330*320 mm | H2C / A2L"
+      },
+      "target_source_handle": "a2l"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720442376270401537",
+        "id": "ov_ae6f9e0fb8ce0814cc3ee436",
+        "value_text": "X2D"
+      },
+      "target_label": "X2D",
+      "target_kind": "printer",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "option Printer Model › X2D",
+      "quote": "Printer Model: X2D",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Dimensions table › row 3",
+        "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1"
+      },
+      "target_source_handle": "x2d"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657367793914449921",
+        "id": "ov_d776102c603ee6e290cd609c",
+        "value_text": "P2S"
+      },
+      "target_label": "P2S",
+      "target_kind": "printer",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "option Printer Model › P2S",
+      "quote": "Printer Model: P2S",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Dimensions table › row 3",
+        "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1"
+      },
+      "target_source_handle": "p2s"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667303749711458305",
+        "id": "ov_5276e44079ec1e243472fb4e",
+        "value_text": "H2C"
+      },
+      "target_label": "H2C",
+      "target_kind": "printer",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "option Printer Model › H2C",
+      "quote": "Printer Model: H2C",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Dimensions table › row 2",
+        "quote": "330*320 mm | H2C / A2L"
+      },
+      "target_source_handle": "h2c"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086657",
+        "id": "ov_c21ed23da6f16b769d3d3590",
+        "value_text": "H2S"
+      },
+      "target_label": "H2S",
+      "target_kind": "printer",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "option Printer Model › H2S",
+      "quote": "Printer Model: H2S",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Dimensions table › row 1",
+        "quote": "350*320 mm | H2D / H2S"
+      },
+      "target_source_handle": "h2s"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657379511494086658",
+        "id": "ov_0a5aeaab47f9de79e453ec50",
+        "value_text": "H2D"
+      },
+      "target_label": "H2D",
+      "target_kind": "printer",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "option Printer Model › H2D",
+      "quote": "Printer Model: H2D",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Dimensions table › row 1",
+        "quote": "350*320 mm | H2D / H2S"
+      },
+      "target_source_handle": "h2d"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773314",
+        "id": "ov_af94e3ac298796716d46e961",
+        "value_text": "A1"
+      },
+      "target_label": "A1",
+      "target_kind": "printer",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "option Printer Model › A1",
+      "quote": "Printer Model: A1",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Dimensions table › row 3",
+        "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1"
+      },
+      "target_source_handle": "a1"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773313",
+        "id": "ov_ec489a4022dd0c6a6558a098",
+        "value_text": "P1 Series"
+      },
+      "target_label": "P1 Series",
+      "target_kind": "family",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "option Printer Model › P1 Series",
+      "quote": "Printer Model: P1 Series",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Dimensions table › row 3",
+        "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1"
+      },
+      "target_family": "p1_series",
+      "note": "The store segment names P1P/P1S; the store has p1s and refurbished-p1s."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657433329381773315",
+        "id": "ov_009fa7c2ef8af35d0bed251b",
+        "value_text": "X1C"
+      },
+      "target_label": "X1C",
+      "target_kind": "printer",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "option Printer Model › X1C",
+      "quote": "Printer Model: X1C",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Dimensions table › row 3",
+        "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1"
+      },
+      "note": "No new X1C product in the manifest; refurbished-x1c is the only X1C listing."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PLA",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PLA\"",
+      "quote": "PLA | 35 - 45 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃ | 45 - 65 ℃ | If bed > 45 ℃, Recommended",
+      "condition": "glue required"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PLA Metal / Wood / Marble",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PLA Metal / Wood / Marble\"",
+      "quote": "PLA Metal / Wood / Marble | 35 - 45 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃ | 45 - 65 ℃ | If bed > 45 ℃, Recommended",
+      "condition": "glue required"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PLA-CF",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PLA-CF\"",
+      "quote": "PLA-CF | 45 - 65 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃ | 45 - 65 ℃ | If bed > 45 ℃, Recommended",
+      "condition": "glue required"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PVA",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PVA\"",
+      "quote": "PVA | 35 - 45 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃ | 45 - 65 ℃ | If bed > 45 ℃, Recommended",
+      "condition": "glue required"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "TPU",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"TPU\"",
+      "quote": "TPU | Not recommended | 30 - 35 ℃ | 35 - 45 ℃ | 35 - 45 ℃ | If bed > 45 ℃, Recommended",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PETG / PETG HF / PETG Translucent",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PETG / PETG HF / PETG Translucent\"",
+      "quote": "PETG / PETG HF / PETG Translucent | Not recommended | 60 - 80 ℃ | 60 - 80 ℃ | 60 - 80 ℃ | If bed > 70 ℃, Recommended",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PETG-CF",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PETG-CF\"",
+      "quote": "PETG-CF | Not recommended | 60 - 80 ℃ | 60 - 80 ℃ | 60 - 80 ℃ | If bed > 70 ℃, Recommended",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "ABS",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"ABS\"",
+      "quote": "ABS | Not recommended | 90 - 100 ℃ | 90 - 100 ℃ | 90 - 100 ℃ | NO",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "ASA",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"ASA\"",
+      "quote": "ASA | Not recommended | 90 - 100 ℃ | 90 - 100 ℃ | 90 - 100 ℃ | NO",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PC",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PC\"",
+      "quote": "PC | Not recommended | 100 - 120 ℃ | 100 - 120 ℃ | 100 - 120 ℃ | NO",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PA",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PA\"",
+      "quote": "PA | Not recommended | 100 - 120 ℃ | 100 - 120 ℃ | 100 - 120 ℃ | NO",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PA-CF/GF, PA6-CF/GF, PAHT-CF/GF",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PA-CF/GF, PA6-CF/GF, PAHT-CF/GF\"",
+      "quote": "PA-CF/GF, PA6-CF/GF PAHT-CF/GF | Not recommended | 100 - 120 ℃ | 100 - 120 ℃ | 100 - 120 ℃ | NO",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PET-CF/GF",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PET-CF/GF\"",
+      "quote": "PET-CF/GF | Not recommended | 80 - 120 ℃ | 100 - 120 ℃ | 100 - 120 ℃ | NO",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PPA-CF/GF",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PPA-CF/GF\"",
+      "quote": "PPA-CF/GF | Not recommended | 100 - 120 ℃ | 100 - 120 ℃ | 100 - 120 ℃ | NO",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PPS",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PPS\"",
+      "quote": "PPS | Not recommended | 100 - 120 ℃ | 100 - 120 ℃ | 100 - 120 ℃ | NO",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "PPS-CF/GF",
+      "target_kind": "material",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate table (wiki table 5), column \"Bambu Engineering Plate\" › row \"PPS-CF/GF\"",
+      "quote": "PPS-CF/GF | Not recommended | 100 - 120 ℃ | 100 - 120 ℃ | 100 - 120 ℃ | NO",
+      "condition": "glue stick or liquid glue applied (store: glue before printing any material)"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "Glue Stick or Liquid Glue",
+      "target_kind": "other",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Product Features › \"Important\"",
+      "quote": "Glue must be applied before printing any material on the Engineering Plate.",
+      "corroboration": {
+        "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+        "locator": "Build Plate Types › Engineering Plate tab › Note 1",
+        "quote": "Before printing with any filament, apply glue on the Engineering Plate. Depending on the specific material and conditions, choose either a glue stick or liquid adhesive."
+      },
+      "note": "Either glue satisfies the requirement (store \"Recommended Settings\": \"Glue Stick/Liquid Glue\" on every row), so this is one requirement, not two."
+    },
+    {
+      "relation": "recommended_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "Glue Stick",
+      "target_kind": "part",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "description › \"Considerations\" › item 6",
+      "quote": "Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates"
+    },
+    {
+      "relation": "includes",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "762106616546942979",
+        "id": "ov_45adc623c6abd9456b21a408",
+        "value_text": "Engineering Plate + Glues"
+      },
+      "target_label": "Glue Stick",
+      "target_kind": "part",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "variant description of every \"Engineering Plate + Glues\" variant (e.g. sku 762106616546942981)",
+      "quote": "Includes Glue Stick (1 pc) and Liquid Glue (1 pc)"
+    },
+    {
+      "relation": "recommended_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "Liquid Glue",
+      "target_kind": "part",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "description › \"Considerations\" › item 6",
+      "quote": "Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates"
+    },
+    {
+      "relation": "includes",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "762106616546942979",
+        "id": "ov_45adc623c6abd9456b21a408",
+        "value_text": "Engineering Plate + Glues"
+      },
+      "target_label": "Liquid Glue",
+      "target_kind": "part",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "variant description of every \"Engineering Plate + Glues\" variant (e.g. sku 762106616546942981)",
+      "quote": "Includes Glue Stick (1 pc) and Liquid Glue (1 pc)"
+    }
+  ],
+  "in_the_box": [
+    {
+      "text": "Glue Stick",
+      "qty": 1,
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "762106616546942979",
+        "id": "ov_45adc623c6abd9456b21a408",
+        "value_text": "Engineering Plate + Glues"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "locator": "variant description of every \"Engineering Plate + Glues\" variant (9 of 9 identical)",
+      "quote": "Includes Glue Stick (1 pc) and Liquid Glue (1 pc)",
+      "note": "The only official contents statement on the page (no \"In the Box\" section); it lists the glues the option adds, not the plate itself."
+    },
+    {
+      "text": "Liquid Glue",
+      "qty": 1,
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "762106616546942979",
+        "id": "ov_45adc623c6abd9456b21a408",
+        "value_text": "Engineering Plate + Glues"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+      "locator": "variant description of every \"Engineering Plate + Glues\" variant (9 of 9 identical)",
+      "quote": "Includes Glue Stick (1 pc) and Liquid Glue (1 pc)",
+      "note": "The only official contents statement on the page (no \"In the Box\" section); it lists the glues the option adds, not the plate itself."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates",
+      "note": "not linked by the store page; the Bambu build-plate overview with the Engineering Plate tab"
+    },
+    {
+      "kind": "guide",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "note": "not linked by the store page; the plate/filament bed-temperature table has an Engineering Plate column"
+    }
+  ],
+  "not_published": [
+    "product.net_weight",
+    "part.color",
+    "safety.certifications"
+  ],
+  "conflicts": [
+    {
+      "key": "(no registry key for plate bed temperatures)",
+      "scope": "product",
+      "store_page": "Recommended Settings: PLA/PLA-CF/PLA-GF 45~60℃; TPU 35~45℃; PVA 45~60℃; PC/PC-CF 90~110℃; PA/PA-CF/PAHT-CF 90~110℃; PET-CF 80~100℃",
+      "wiki": "Engineering Plate column: PLA, PLA-CF, PVA 45 - 65 ℃; TPU 30 - 35 ℃; PC 100 - 120 ℃; PA, PA-CF/GF, PAHT-CF/GF 100 - 120 ℃; PET-CF/GF 80 - 120 ℃",
+      "note": "PETG/PETG-CF 60-80 and ABS/ASA 90-100 agree. Neither table is stored as a spec (print_settings.bed_temp applies to filament only); recorded for the reviewer."
+    },
+    {
+      "key": "part.max_temperature",
+      "scope": "product",
+      "store_page": "x.surface_temperature_resistance \"Up to 120℃\" (unverified, unknown label)",
+      "curated": "120 °C under part.max_temperature",
+      "note": "Not a value conflict: the same cell under a registry key. The merge keeps both rows (different keys); the x.* row could be dropped by the reviewer."
+    }
+  ],
+  "notes": [
+    "Region: none. The plate is not a machine, so the §C.6 region rule does not apply to its package rows; the store table carries no voltage.",
+    "The deterministic store-page rows for package.length/width/height/weight are product scope strings of the three size classes (unverified); this file splits them per Printer Model value with numbers, so they are added beside them, not merged into them.",
+    "product.length/width come from the wiki general \"Build Plate Dimensions\" table; the store page labels the same numbers \"Usable Print Size\". product.height is not written: the plate thickness (0.5 mm) is physical.thickness.",
+    "Store bullet \"Compatible with all filament types\" and the wiki \"Compatible with All Filaments\" are prose; the stored list is the wiki table column.",
+    "Wiki filament guide: \"The old Engineering Plates are not recommended for printing PLA. All engineering plates currently sold are the new version and can be used with glue.\"",
+    "The store page links https://wiki.bambulab.com/en/general/how-to-use-bbl-liquid-glue (already a deterministic document row); it was not in the cache and was not read.",
+    "Manufacturer warranty sentences on the page stay owner-only (deterministic manufacturer_terms.warranty_note); nothing of them here.",
+    "No hex: not a filament."
+  ]
+}

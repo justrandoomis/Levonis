@@ -1,0 +1,1755 @@
+[
+ {
+  "h": "3f3a915fb22661ff4938a2d557bdb8cfb57414337c9b44893f283cb7d2dc84e2",
+  "en": "M1 (mm) Nominal Diameter",
+  "ar": "القطر الاسمي M1 (mm)",
+  "ckb": "تیرەی ناوزەد M1 (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "cb4126da484cc8c48cc5bcaae2b8a1af917f795302990613cf2508a49f632e63",
+  "en": "M2 (mm) Nominal Diameter",
+  "ar": "القطر الاسمي M2 (mm)",
+  "ckb": "تیرەی ناوزەد M2 (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5edd8de78f877dbf954833d041796f84668ffb026ab5a8b75434dee45b25a514",
+  "en": "Robotics: Connect motors and drive components for flexible movement.",
+  "ar": "الروبوتات: لربط المحركات ومكوّنات نقل الحركة من أجل حركة مرنة.",
+  "ckb": "ڕۆبۆتەکان: بۆ بەستنەوەی بزوێنەرەکان و پێکهاتەکانی گواستنەوەی جووڵە بۆ جووڵەیەکی نەرمونیان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "794bb0a1018fd9e2e6308c3e03e18a4720650cc45676b1a04df9a7216c6ad54f",
+  "en": "3D Printers: Ensure smooth movement and accurate positioning of the print head.",
+  "ar": "طابعات 3D: تضمن حركة سلسة وتموضعًا دقيقًا لرأس الطباعة.",
+  "ckb": "چاپکەرەکانی 3D: جووڵەی نەرم و جێگیرکردنی وردی سەری چاپ دەستەبەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a2e54f7f1c81e67c45e1b72d6fe91681530f25bcd078a8dc019d10849bc44e7e",
+  "en": "DIY Vehicles: Connect motors and wheels in an electric scooter or go-kart.",
+  "ar": "مركبات DIY: لربط المحركات والعجلات في سكوتر كهربائي أو عربة كارت (go-kart).",
+  "ckb": "ئۆتۆمبێلەکانی DIY: بۆ بەستنەوەی بزوێنەر و تایەکان لە سکووتەرێکی کارەبایی یان ئۆتۆمبێلێکی گۆکارتدا (go-kart).",
+  "kind": "block_line"
+ },
+ {
+  "h": "146a3920a045e87ca0819ab78ce7e22d52dd2bd624916bd170644fde1da979cf",
+  "en": "Mechanical Art Installations: Add motion to artwork and engage audiences.",
+  "ar": "الأعمال الفنية الميكانيكية: أضف الحركة إلى الأعمال الفنية واجذب انتباه الجمهور.",
+  "ckb": "دامەزراوە هونەرییە میکانیکییەکان: جووڵە بخەرە ناو کارە هونەرییەکانەوە و سەرنجی بینەران ڕابکێشە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "69e7dce9ffe7c225a700e0454708d78539bcf274037c8377c39a3b991e894649",
+  "en": "Connector Type",
+  "ar": "نوع الموصل",
+  "ckb": "جۆری گەیەنەر",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ce8176aac0ebdb05869bfce14495c4ae23910162e464f7003944c3b47c5f2644",
+  "en": "DC Plug (mm)",
+  "ar": "قابس DC (mm)",
+  "ckb": "فیشی DC (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0822213a0867e94e1df630d032d67aaf866a951c763280cfe2c94aa63690c189",
+  "en": "Input Voltage （Volts）",
+  "ar": "جهد الدخل (فولت)",
+  "ckb": "ڤۆڵتیەی چوونەژوورەوە (ڤۆڵت)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "97eb779226964d8f41895dd22f78c2dbcde0a18770cc3e00fabdf8dec9157210",
+  "en": "Amperage Current （Amps）",
+  "ar": "شدة التيار (أمبير)",
+  "ckb": "بڕی تەزوو (ئەمپێر)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "7d04001a5fd63fc4f3a61179865a1f6a3d888b359e58f48ae406d816a0fc65ca",
+  "en": "Barrel Connector",
+  "ar": "موصل أسطواني (Barrel)",
+  "ckb": "گەیەنەری لوولەیی (Barrel)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ad4bca9ea9cdaa7ba409965d5ccc317651dc9ff48ab54f255285c06048d3de39",
+  "en": "The 12V 2A adapter is suitable for the Magnetic Levitation DIY Kit.",
+  "ar": "محوّل 12V 2A هذا مناسب لطقم Magnetic Levitation DIY Kit.",
+  "ckb": "ئەداپتەری 12V 2A گونجاوە بۆ کیتی Magnetic Levitation DIY Kit.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4769b81ba59dc6b43699c55b695af11b30da68180d74ae3e09195b1fe2d127e4",
+  "en": "Supports any device that requires 12V or 24V with a power output of up to 2A.",
+  "ar": "يدعم أي جهاز يتطلب 12V أو 24V بقدرة خرج تصل إلى 2A.",
+  "ckb": "پشتگیریی هەر ئامێرێک دەکات کە پێویستی بە 12V یان 24V هەیە بە وزەی دەرچوونی تا 2A.",
+  "kind": "block_line"
+ },
+ {
+  "h": "464eb97f45792f1a154a37c1bda096d80ec2df2f0f7e7c89ddb36d529d6d6551",
+  "en": "The adapter's maximum output of 2A ensures it can supply up to, but not exceeding, 2A. For example, if your device requires 1.5A, it will receive 1.5A. However, if your device demands more than 2A, the adapter will be limited to supplying only 2A, which may not be sufficient for your device's needs.",
+  "ar": "أقصى خرج للمحوّل هو 2A، ما يعني أنه يستطيع توفير تيار يصل إلى 2A دون أن يتجاوزه. فمثلًا، إذا كان جهازك يتطلب 1.5A فسيحصل على 1.5A. أما إذا كان جهازك يحتاج إلى أكثر من 2A، فسيقتصر المحوّل على توفير 2A فقط، وقد لا يكون ذلك كافيًا لتلبية احتياجات جهازك.",
+  "ckb": "زۆرترین دەرچوونی ئەداپتەرەکە بریتییە لە 2A، واتە دەتوانێت تا 2A دابین بکات بەبێ ئەوەی لێی تێپەڕێت. بۆ نموونە، ئەگەر ئامێرەکەت پێویستی بە 1.5A هەبێت، 1.5A وەردەگرێت. بەڵام ئەگەر ئامێرەکەت زیاتر لە 2A داوا بکات، ئەداپتەرەکە تەنها 2A دابین دەکات، کە لەوانەیە بۆ پێداویستییەکانی ئامێرەکەت بەس نەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "14ae94b1b3641abf6537bb077b902c9bc7fab1cea8f3213c18895a92df92e82a",
+  "en": "This fully threaded rod is made from high-quality carbon steel, and is available in M3x16mm and M3x30mm sizes. It's durable and great for various DIY projects. Primarily used to connect nuts and secure components, it serves as an essential fixture in U-bolts, hangers, and other applications. Additionally, it pairs perfectly with M3 Aluminum Rod End Ball Joints, offering an effective solution for connections and flexible movement.",
+  "ar": "هذا القضيب الملولب بالكامل مصنوع من فولاذ كربوني عالي الجودة، ويأتي بمقاسَي M3x16mm وM3x30mm. وهو متين ومناسب لمختلف مشاريع DIY. يُستخدم أساسًا لربط الصواميل وتثبيت المكوّنات، ويُعدّ عنصر تثبيت أساسيًا في البراغي على شكل U والعلّاقات وغيرها من الاستخدامات. كما أنه يتكامل تمامًا مع مفاصل M3 Aluminum Rod End Ball Joint، ليقدّم حلًا فعّالًا للوصلات والحركة المرنة.",
+  "ckb": "ئەم میلە کە بە تەواوی پێچدارە، لە پۆڵای کاربۆنیی جۆرایەتی بەرز دروستکراوە، و بە دوو قەبارەی M3x16mm و M3x30mm دێت. بەرگەگرە و بۆ پڕۆژە جۆراوجۆرەکانی DIY زۆر گونجاوە. بە شێوەیەکی سەرەکی بۆ بەستنەوەی سامۆڵەکان و جێگیرکردنی پێکهاتەکان بەکاردێت، و وەک پارچەیەکی جێگیرکەری بنەڕەتی لە بۆڵتی شێوە U، هەڵواسەرەکان و بەکارهێنانەکانی تردا کار دەکات. هەروەها بە تەواوی لەگەڵ جومگەکانی M3 Aluminum Rod End Ball Joint دەگونجێت، و چارەسەرێکی کاریگەر بۆ پەیوەندییەکان و جووڵەی نەرمونیان پێشکەش دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2d5b436da7905f1a058a1803871aa8bf8d2cb7c2945a96d70f33e6b4956338ae",
+  "en": "Tightening Connections: Used to fasten two or more components together, providing a stable connection.",
+  "ar": "إحكام الوصلات: يُستخدم لتثبيت مكوّنين أو أكثر معًا، ما يوفّر وصلة مستقرة.",
+  "ckb": "توندکردنی پەیوەندییەکان: بۆ بەستنەوەی دوو پێکهاتە یان زیاتر بە یەکەوە بەکاردێت، و پەیوەندییەکی جێگیر دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "931b82676c69cf84eda285a9d5e3793db407c18ad7b7c86efc6b83241b3701b5",
+  "en": "Adjustment Devices: Can be used to adjust positions or heights, commonly found in brackets or mechanical structures.",
+  "ar": "أدوات الضبط: يمكن استخدامه لضبط المواضع أو الارتفاعات، وهو شائع في دعامات التثبيت أو الهياكل الميكانيكية.",
+  "ckb": "ئامێرەکانی ڕێکخستن: دەتوانرێت بۆ ڕێکخستنی شوێن یان بەرزی بەکاربهێنرێت، و زۆرجار لە پایەکانی جێگیرکردن یان پێکهاتە میکانیکییەکاندا دەبینرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c0d0752776efe7cab70accc1bd8f748cab4bafb4331e7c619a2e22805ecc328f",
+  "en": "Easy Attachments for Motive Designs: It works great with M3 aluminum rod-end ball joints, allowing for easy attachment and movement. By installing the ball head on top of the fully-thread rod, you can easily achieve design like robotic arms, brackets, and other motive designs.",
+  "ar": "تركيب سهل للتصاميم المتحركة: يعمل بشكل ممتاز مع مفاصل الكرة الألمنيوم M3 ذات الطرف القضيبي، ما يتيح تركيبًا وحركة سهلين. وبتركيب الرأس الكروي أعلى القضيب الملولب بالكامل، يمكنك بسهولة إنجاز تصاميم مثل الأذرع الروبوتية ودعامات التثبيت وغيرها من التصاميم المتحركة.",
+  "ckb": "پەیوەستکردنی ئاسان بۆ دیزاینە جووڵاوەکان: زۆر باش لەگەڵ جومگە تۆپەڵەییە ئەلەمنیۆمەکانی M3 کار دەکات، و پەیوەستکردن و جووڵەی ئاسان ڕێگەپێدەدات. بە دامەزراندنی سەرە تۆپەڵەییەکە لەسەر میلە تەواو پێچدارەکە، دەتوانیت بە ئاسانی دیزاینی وەک باڵی ڕۆبۆتی، پایەی جێگیرکردن و دیزاینە جووڵاوەکانی تر دروست بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6fe3bcc519d033af983233265310f472d6e058422f611b5ba4b6131848e144cf",
+  "en": "High-Quality Aluminum Alloy:Made from durable aluminum alloy, offering excellent corrosion resistance, wear protection, and a lightweight design.",
+  "ar": "سبيكة ألمنيوم عالية الجودة: مصنوع من سبيكة ألمنيوم متينة توفّر مقاومة ممتازة للتآكل وحماية من الاهتراء وتصميمًا خفيف الوزن.",
+  "ckb": "ئاوێتەی ئەلەمنیۆمی جۆرایەتی بەرز: لە ئاوێتەی ئەلەمنیۆمی بەرگەگر دروستکراوە، و بەرگەیەکی نایاب لە بەرامبەر داخوران، پاراستن لە سووان و دیزاینێکی سووک پێشکەش دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e770ae987c67bc08f278989f1e1f06dad4cb71e25b898868920e43abc02e3d9f",
+  "en": "Smooth & Precise Movement:The ball joint ensures smooth articulation, making it ideal for RC car suspensions, steering systems, and other pivot-based mechanisms.",
+  "ar": "حركة سلسة ودقيقة: يضمن المفصل الكروي حركة مفصلية سلسة، ما يجعله مثاليًا لأنظمة تعليق سيارات RC وأنظمة التوجيه وغيرها من الآليات القائمة على المحاور.",
+  "ckb": "جووڵەی نەرم و ورد: جومگە تۆپەڵەییەکە جووڵەی جومگەیی نەرم دەستەبەر دەکات، بۆیە گونجاوترینە بۆ سیستەمی سووسپێنشنی ئۆتۆمبێلی RC، سیستەمەکانی ئاراستەکردن و میکانیزمەکانی تری سەر تەوەرە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0945fbea70fd303f3b165242e3d485ecdab498a48452cc4d977882621c536468",
+  "en": "Flexible & Practical Applications:Compatible with fully threaded rods, making assembly easy and secure. Ideal for RC car upgrades, robotics, and custom 3D-printed projects requiring reliable pivoting components.",
+  "ar": "استخدامات مرنة وعملية: متوافق مع القضبان الملولبة بالكامل، ما يجعل التجميع سهلًا وآمنًا. مثالي لترقيات سيارات RC والروبوتات والمشاريع المخصّصة المطبوعة (3D-printed) التي تتطلب مكوّنات محورية موثوقة.",
+  "ckb": "بەکارهێنانی نەرمونیان و کرداری: گونجاوە لەگەڵ میلە تەواو پێچدارەکان، و پێکەوەنان ئاسان و پارێزراو دەکات. گونجاوترینە بۆ نوێکردنەوەی ئۆتۆمبێلی RC، ڕۆبۆتیک و پڕۆژە چاپکراوە تایبەتەکان (3D-printed) کە پێویستیان بە پێکهاتەی سووڕانەوەی متمانەپێکراو هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5c16b50b95484f6128c5896d1613f5b88c4b27380a78da65e3532c7d43e30a86",
+  "en": "Important Notices",
+  "ar": "تنبيهات مهمة",
+  "ckb": "ئاگادارییە گرنگەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "436f39b06a999e2765506d8b35085c89254b5fcc963b8fa7912c0085ae03593a",
+  "en": "Torque limit: Do not overtighten the M3 screws when installing the ball joint to prevent stripping the aluminum threads.",
+  "ar": "حدّ عزم الربط: لا تُفرط في شدّ براغي M3 عند تركيب المفصل الكروي لتجنّب تلف أسنان اللولب في الألمنيوم.",
+  "ckb": "سنووری تۆرک: لە کاتی دامەزراندنی جومگە تۆپەڵەییەکەدا بورغییەکانی M3 زیاد لە پێویست توند مەکە، بۆ ئەوەی پێچەکانی ئەلەمنیۆمەکە تێک نەچن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8569d66a328d499f4402868e1ff7f38334e16b0231dc12a8347d6382abcb3e44",
+  "en": "Choking hazard: This product contains small parts. Keep out of reach of children to avoid accidental ingestion.",
+  "ar": "خطر الاختناق: يحتوي هذا المنتج على قطع صغيرة. يُحفظ بعيدًا عن متناول الأطفال لتجنّب ابتلاعها عن طريق الخطأ.",
+  "ckb": "مەترسیی خنکان: ئەم بەرهەمە پارچەی بچووکی تێدایە. لە دەستڕەسی منداڵان دووری بخەرەوە بۆ ئەوەی بە هەڵە قووت نەدرێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4ff244e649610e928c4ffab9329c0bb06d52cb6139804210d253ba7c457c174e",
+  "en": "Always disconnect power before installation.",
+  "ar": "افصل الطاقة دائمًا قبل التركيب.",
+  "ckb": "هەمیشە پێش دامەزراندن وزە بپچڕێنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5d62d382165b16b84c1595d70595c447adf4920ce8b587d45b55d4cfff5ff85b",
+  "en": "Do not connect to power adapters exceeding 24V to prevent potential damage or safety risks.",
+  "ar": "لا توصله بمحوّلات طاقة يتجاوز جهدها 24V لتجنّب أي تلف محتمل أو مخاطر على السلامة.",
+  "ckb": "مەیبەستە بە ئەداپتەری وزەیەکەوە کە لە 24V زیاتر بێت، بۆ ڕێگریکردن لە زیانی ئەگەری یان مەترسیی سەلامەتی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2ca8f658f124522f4d3e08af9e5c0fd9ca66dc9cfa7b3914a4a32e1dc3e1b323",
+  "en": "Keep out of reach of children. This product is not a toy and should be handled responsibly.",
+  "ar": "يُحفظ بعيدًا عن متناول الأطفال. هذا المنتج ليس لعبة ويجب التعامل معه بمسؤولية.",
+  "ckb": "لە دەستڕەسی منداڵان دووری بخەرەوە. ئەم بەرهەمە یاری نییە و دەبێت بە بەرپرسیارێتییەوە مامەڵەی لەگەڵ بکرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "59b5ef0e948e9f58d0776c3584502076fa5aab5337c723cac671401cdd754d38",
+  "en": "The SH1.0 to SH1.0 Connector Adapter Board facilitates seamless SH1.0 connection, delivering reliable signal and power transmission for compact devices and modular systems. It can also be paired with a Wire Pair with SH1.0 connectors, serving as an extension kit for enhanced SH1.0 connection capabilities.",
+  "ar": "تسهّل لوحة SH1.0 to SH1.0 Connector Adapter Board التوصيل السلس عبر SH1.0، وتوفّر نقلًا موثوقًا للإشارة والطاقة للأجهزة صغيرة الحجم والأنظمة المعيارية. ويمكن أيضًا استخدامها مع موصلات Wire Pair with SH1.0 لتعمل كطقم تمديد يعزّز إمكانات توصيل SH1.0.",
+  "ckb": "بۆردی SH1.0 to SH1.0 Connector Adapter Board پەیوەستکردنی بێ کێشەی SH1.0 ئاسان دەکات، و گواستنەوەی متمانەپێکراوی سیگناڵ و وزە بۆ ئامێرە بچووکەکان و سیستەمە مۆدیولارەکان دابین دەکات. هەروەها دەتوانرێت لەگەڵ گەیەنەرەکانی Wire Pair with SH1.0 بەکاربهێنرێت، وەک کیتی درێژکردنەوە بۆ باشترکردنی توانای پەیوەستکردنی SH1.0.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c15ecff9cdff82e1fc235357f32a452b4361753e26024998b701316f97da2ea9",
+  "en": "Operating Current (A)",
+  "ar": "تيار التشغيل (A)",
+  "ckb": "تەزووی کارکردن (A)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "290e55882f59cef4472ea6e88eeccdb056d75d9f6538d70f721d4179ddaa8dac",
+  "en": "Operating Voltage (V)",
+  "ar": "جهد التشغيل (V)",
+  "ckb": "ڤۆڵتیەی کارکردن (V)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "3627e06931ee137689b3019174cca7fc2d465242e7d408b8f352b8ffe85961ae",
+  "en": "Product Dimensions (mm)",
+  "ar": "أبعاد المنتج (mm)",
+  "ckb": "ڕەهەندەکانی بەرهەم (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "c80f10c7053dcc5d352fdb16fbacda1edff43a00fbb408be14401905bd912ae7",
+  "en": "SH1.0 to SH1.0",
+  "ar": "من SH1.0 إلى SH1.0",
+  "ckb": "لە SH1.0 بۆ SH1.0",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0d74cf218775f3a17cf20bfef12d95b8af9a5f8e1e810036ec21aef107f4b573",
+  "en": "Embedded system development: Ideal for prototyping and integrating components in embedded system projects.",
+  "ar": "تطوير الأنظمة المضمّنة: مثالي لبناء النماذج الأولية ودمج المكوّنات في مشاريع الأنظمة المضمّنة.",
+  "ckb": "پەرەپێدانی سیستەمی ئێمبێدد: گونجاوترینە بۆ دروستکردنی نموونەی سەرەتایی و تێکەڵکردنی پێکهاتەکان لە پڕۆژەکانی سیستەمی ئێمبێدددا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "40c5ad77668371d7e7aac04ee80523e16854f1aa79373186b5935cb080e068f0",
+  "en": "Circuit debugging and testing: Simplifies troubleshooting and ensures reliable circuit performance during testing.",
+  "ar": "تصحيح الدوائر واختبارها: يبسّط استكشاف الأخطاء وإصلاحها ويضمن أداءً موثوقًا للدائرة أثناء الاختبار.",
+  "ckb": "دیباگکردن و تاقیکردنەوەی بازنە: چارەسەرکردنی کێشەکان ئاسان دەکات و کارکردنی متمانەپێکراوی بازنە لە کاتی تاقیکردنەوەدا دەستەبەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "add9624638c1196c6d25e0208baffde9b0edfe98023047a669d91ce5cc53dd63",
+  "en": "Modular device interconnections: Enables seamless connectivity between modular devices for efficient integration.",
+  "ar": "الربط بين الأجهزة المعيارية: يتيح اتصالًا سلسًا بين الأجهزة المعيارية لتحقيق دمج فعّال.",
+  "ckb": "پەیوەستکردنی ئامێرە مۆدیولارەکان بە یەکەوە: پەیوەندیی بێ کێشە لە نێوان ئامێرە مۆدیولارەکاندا ڕێگەپێدەدات بۆ تێکەڵکردنێکی کاریگەر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bb4a5218766edb66a0a15e197a089c89f827c1c85b3bc8aa7f8c000c013d3022",
+  "en": "Signal and power transmission for compact devices: Ensures stable signal and power flow in space-constrained device setups.",
+  "ar": "نقل الإشارة والطاقة للأجهزة صغيرة الحجم: يضمن تدفقًا مستقرًا للإشارة والطاقة في تجهيزات الأجهزة ذات المساحة المحدودة.",
+  "ckb": "گواستنەوەی سیگناڵ و وزە بۆ ئامێرە بچووکەکان: ڕۆیشتنی جێگیری سیگناڵ و وزە لە ئامێرەکانی شوێنی تەسکدا دەستەبەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "74658662cafd543fb5a851749555f87b1598bb9a3e4d18525ee3dea5db9190cc",
+  "en": "Pin alignment: Ensure correct pin alignment when connecting cables. Reversing the polarity may cause short circuits and damage connected devices.",
+  "ar": "محاذاة الدبابيس: تأكّد من محاذاة الدبابيس بشكل صحيح عند توصيل الكابلات. فقد يؤدي عكس القطبية إلى حدوث دائرة قصر وتلف الأجهزة الموصولة.",
+  "ckb": "ڕێکخستنی پینەکان: لە کاتی بەستنەوەی کێبڵەکاندا دڵنیابە لە ڕێکبوونی دروستی پینەکان. هەڵگەڕاندنەوەی جەمسەرەکان لەوانەیە ببێتە هۆی کورتە بازنە و زیان گەیاندن بە ئامێرە پەیوەستکراوەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "86040aa5a595bed479ff4c11148ab6b0907a02dc9837f8e873bd24613ee8eaed",
+  "en": "The SH1.0 to PH2.0 Power Adapter Board enables fast and reliable connections between SH1.0 and PH2.0 interfaces, ensuring stable power delivery for embedded devices and modular systems. It can be paired with a USB-A Power Cable with PH2.0 Connector to supply power to SH1.0-compatible devices, such as the 030 Micro DC Motor with SH1.0 interface.",
+  "ar": "تتيح لوحة SH1.0 to PH2.0 Power Adapter Board توصيلات سريعة وموثوقة بين منافذ SH1.0 وPH2.0، وتضمن إمدادًا مستقرًا بالطاقة للأجهزة المضمّنة والأنظمة المعيارية. ويمكن استخدامها مع كابل USB-A Power Cable with PH2.0 Connector لتزويد الأجهزة المتوافقة (SH1.0-compatible) بالطاقة، مثل محرك 030 Micro DC Motor بمنفذ SH1.0.",
+  "ckb": "بۆردی SH1.0 to PH2.0 Power Adapter Board پەیوەستکردنی خێرا و متمانەپێکراو لە نێوان دەرچەکانی SH1.0 و PH2.0 ڕێگەپێدەدات، و دابینکردنی جێگیری وزە بۆ ئامێرە ئێمبێددەکان و سیستەمە مۆدیولارەکان دەستەبەر دەکات. دەتوانرێت لەگەڵ کێبڵی USB-A Power Cable with PH2.0 Connector بەکاربهێنرێت بۆ دابینکردنی وزە بۆ ئامێرە گونجاوەکان (SH1.0-compatible)، وەک بزوێنەری 030 Micro DC Motor بە دەرچەی SH1.0.",
+  "kind": "block_line"
+ },
+ {
+  "h": "eb8b4b64e39da84b999317b0f25172cd9631030a1034f9b72ee42b06c47a5158",
+  "en": "SH1.0 to PH2.0",
+  "ar": "من SH1.0 إلى PH2.0",
+  "ckb": "لە SH1.0 بۆ PH2.0",
+  "kind": "block_cell"
+ },
+ {
+  "h": "3647b48a852205f25924a3bdcda7884efba449c78640f0c4017642241d125fc4",
+  "en": "Embedded system development: Ideal for prototyping and integrating components in embedded system projects",
+  "ar": "تطوير الأنظمة المضمّنة: مثالي لبناء النماذج الأولية ودمج المكوّنات في مشاريع الأنظمة المضمّنة",
+  "ckb": "پەرەپێدانی سیستەمی ئێمبێدد: گونجاوترینە بۆ دروستکردنی نموونەی سەرەتایی و تێکەڵکردنی پێکهاتەکان لە پڕۆژەکانی سیستەمی ئێمبێدددا",
+  "kind": "block_line"
+ },
+ {
+  "h": "1664fdc8ccd79d868d693841023130bc872b7298719b8e472efd1cd1f02e3e85",
+  "en": "Circuit debugging and testing: Simplifies troubleshooting and ensures reliable circuit performance during testing",
+  "ar": "تصحيح الدوائر واختبارها: يبسّط استكشاف الأخطاء وإصلاحها ويضمن أداءً موثوقًا للدائرة أثناء الاختبار",
+  "ckb": "دیباگکردن و تاقیکردنەوەی بازنە: چارەسەرکردنی کێشەکان ئاسان دەکات و کارکردنی متمانەپێکراوی بازنە لە کاتی تاقیکردنەوەدا دەستەبەر دەکات",
+  "kind": "block_line"
+ },
+ {
+  "h": "31a0b8e6e5a3adda3e11dba66ef7a5cf733c8d17f3dbfe5721e2fa40710e0403",
+  "en": "Modular device interconnections: Enables seamless connectivity between modular devices for efficient integration",
+  "ar": "الربط بين الأجهزة المعيارية: يتيح اتصالًا سلسًا بين الأجهزة المعيارية لتحقيق دمج فعّال",
+  "ckb": "پەیوەستکردنی ئامێرە مۆدیولارەکان بە یەکەوە: پەیوەندیی بێ کێشە لە نێوان ئامێرە مۆدیولارەکاندا ڕێگەپێدەدات بۆ تێکەڵکردنێکی کاریگەر",
+  "kind": "block_line"
+ },
+ {
+  "h": "146c2b16544771b657f06e8dc3e11ee5d98b4af88806e799f453aeab886ff482",
+  "en": "Signal and power transmission for compact devices: Ensures stable signal and power flow in space-constrained device setups",
+  "ar": "نقل الإشارة والطاقة للأجهزة صغيرة الحجم: يضمن تدفقًا مستقرًا للإشارة والطاقة في تجهيزات الأجهزة ذات المساحة المحدودة",
+  "ckb": "گواستنەوەی سیگناڵ و وزە بۆ ئامێرە بچووکەکان: ڕۆیشتنی جێگیری سیگناڵ و وزە لە ئامێرەکانی شوێنی تەسکدا دەستەبەر دەکات",
+  "kind": "block_line"
+ },
+ {
+  "h": "082c56adabb70f2e4cff32d7ed0a52feef4b24647669893b11c7c90c16a2200e",
+  "en": "To download the model files please visit the Foldable Key Phone Stand on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Foldable Key Phone Stand على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Foldable Key Phone Stand لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ceda3a2735dd31a1b91d946a8c85662e8e3b89518fdf75f0e36f6f4cb7eadfc9",
+  "en": "To download the model files please visit the 360˚ Rotating Marble Run - Enclosed with Lights on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة 360˚ Rotating Marble Run - Enclosed with Lights على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی 360˚ Rotating Marble Run - Enclosed with Lights لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0f61c0988e08d11d4cbafb528f5fb64f22161e5c871cbc59d82501d7ef53bf5d",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Wankel engine - motorized. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من Wankel engine - motorized. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Wankel engine - motorized بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d45b8f4255fcafdde7a169471c3575db2654aa28e08c67da7c4c1c76d8fed34c",
+  "en": "To download the model files please visit the Wankel engine - motorized on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Wankel engine - motorized على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Wankel engine - motorized لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d4dceceead6f268b64b51a086251583f7007baa0442140a8cf4295301284373e",
+  "en": "Power Safety",
+  "ar": "السلامة الكهربائية",
+  "ckb": "سەلامەتیی کارەبا",
+  "kind": "block_line"
+ },
+ {
+  "h": "cbf199f36ebca57df34577d3db0ca4274ab3c6245325bdd72c5ab8e7318aa3fc",
+  "en": "1. Always disconnect the power supply before starting any installation to prevent electric shock or short circuits.",
+  "ar": "1. افصل مصدر الطاقة دائمًا قبل البدء بأي عملية تركيب لتجنّب الصدمة الكهربائية أو حدوث دائرة قصر.",
+  "ckb": "1. هەمیشە پێش دەستکردن بە هەر دامەزراندنێک دابینکەری وزە بپچڕێنە، بۆ ڕێگریکردن لە کارەبالێدان یان کورتە بازنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3cdd0b7797de42296afcc857ec09695781a09b28fd6d1e1778c8c27d80959e90",
+  "en": "2. Ensure you are using the correct voltage as specified on the product to avoid damage, overheating, or potential fire hazards.",
+  "ar": "2. تأكّد من استخدام الجهد الكهربائي الصحيح المحدّد على المنتج لتجنّب التلف أو ارتفاع الحرارة المفرط أو مخاطر الحريق المحتملة.",
+  "ckb": "2. دڵنیابە لەوەی ڤۆڵتیەی دروست بەکاردەهێنیت وەک لەسەر بەرهەمەکە دیاریکراوە، بۆ ڕێگریکردن لە زیان، گەرمبوونی زیادە یان مەترسیی ئەگەریی ئاگرگرتن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9f3b65d35380d1d23e870075b3468f6e97e9cac8c856fbd14ece52cb360abdf6",
+  "en": "3. Total connected length must not exceed 3 meters with the included adapter, as doing so triggers overload protection and will result in an abnormal power supply.",
+  "ar": "3. يجب ألا يتجاوز الطول الإجمالي الموصول 3 أمتار مع المحوّل المرفق، إذ يؤدي تجاوزه إلى تفعيل الحماية من الحمل الزائد وسينتج عنه إمداد غير طبيعي بالطاقة.",
+  "ckb": "3. نابێت کۆی درێژیی پەیوەستکراو بە ئەداپتەری لەگەڵداهاتووەوە لە 3 مەتر زیاتر بێت، چونکە ئەوە پاراستنی بارگرانیی زیادە چالاک دەکات و دەبێتە هۆی دابینکردنی نائاسایی وزە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "997f48c240a6cc3a488ca11c7ea6dedd835a7182f4da184cf0a495cb04d5f6b2",
+  "en": "Cutting & Bending",
+  "ar": "القص والثني",
+  "ckb": "بڕین و چەماندنەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "280760e39cd619555574e9264f7a6bfa6b632befbd036ae14f2da8319719073a",
+  "en": "1. Cut only along the predefined cut marks to maintain electrical continuity and proper function. Cutting in the wrong place may lead to circuit failure.",
+  "ar": "1. قُصّ فقط على امتداد علامات القص المحدّدة مسبقًا للحفاظ على الاستمرارية الكهربائية والعمل السليم. فالقص في المكان الخطأ قد يؤدي إلى تعطّل الدائرة.",
+  "ckb": "1. تەنها بە درێژایی نیشانەکانی بڕینی پێشوەختە دیاریکراو ببڕە بۆ پاراستنی بەردەوامیی کارەبایی و کارکردنی دروست. بڕین لە شوێنی هەڵەدا لەوانەیە ببێتە هۆی تێکچوونی بازنەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3cf0e7eaf7919190087e2903b86e48fb950dc57322727ce3a8038b76fbf95e26",
+  "en": "2. Avoid bending or twisting the lamp strip over very short distances, as this can damage internal wiring and compromise durability.",
+  "ar": "2. تجنّب ثني شريط الإضاءة أو لفّه على مسافات قصيرة جدًا، إذ قد يؤدي ذلك إلى تلف الأسلاك الداخلية والإضرار بمتانته.",
+  "ckb": "2. خۆت بپارێزە لە چەماندنەوە یان بادانی شریتی ڕووناکییەکە لە ماوەی زۆر کورتدا، چونکە ئەمە دەتوانێت زیان بە وایەرە ناوەکییەکان بگەیەنێت و بەرگەگرییەکەی لاواز بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a60085b0e31ef64d8fd15a75ea28c44266cb8c54354e80048d5c6c338db9bb6e",
+  "en": "3. If bending is required, do so gradually and within the recommended bending radius to prevent breakage.",
+  "ar": "3. إذا لزم الثني، فاثنِه تدريجيًا وضمن نصف قطر الثني الموصى به لتجنّب الكسر.",
+  "ckb": "3. ئەگەر چەماندنەوە پێویست بوو، بە هێواشی و لە ناو نیوەتیرەی چەماندنەوەی پێشنیارکراودا بیچەمێنەوە بۆ ڕێگریکردن لە شکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2dc0dfa8e595dcca90294bf5fd089624646a028c40c1248003adddca87746238",
+  "en": "Soldering & Heat Protection",
+  "ar": "اللحام والحماية من الحرارة",
+  "ckb": "لەحیمکردن و پاراستن لە گەرمی",
+  "kind": "block_line"
+ },
+ {
+  "h": "0cbd48111edc0a962429aaae01807016796ffe897cbb8a22ccbedb14cfc3f623",
+  "en": "1. Use a soldering iron with appropriate temperature control when attaching wiring heads to avoid overheating components.",
+  "ar": "1. استخدم كاوية لحام مزوّدة بتحكم مناسب في درجة الحرارة عند تثبيت أطراف الأسلاك لتجنّب ارتفاع حرارة المكوّنات بشكل مفرط.",
+  "ckb": "1. لە کاتی پەیوەستکردنی سەری وایەرەکاندا ئامێرێکی لەحیمکردن بەکاربهێنە کە کۆنترۆڵی گونجاوی پلەی گەرمی هەبێت، بۆ ڕێگریکردن لە گەرمبوونی زیادەی پێکهاتەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8a1e2b769e4d2ce30172c769467facdbdc801e9051882e819bbd451528a94a74",
+  "en": "2. Keep the luminescent colloid (LEDs and surrounding encapsulation) away from excessive heat, as high temperatures can cause burns, discoloration, or reduced lifespan.",
+  "ar": "2. أبعِد الغلاف الغروي المضيء (مصابيح LED والتغليف المحيط بها) عن الحرارة المفرطة، إذ قد تسبّب درجات الحرارة العالية احتراقًا أو تغيّرًا في اللون أو قِصرًا في العمر الافتراضي.",
+  "ckb": "2. کۆلۆیدی ڕووناککەرەوە (گڵۆپەکانی LED و بەرگی دەوروبەریان) لە گەرمیی زیادە دوور بخەرەوە، چونکە پلەی گەرمیی بەرز دەتوانێت ببێتە هۆی سووتان، گۆڕانی ڕەنگ یان کەمبوونەوەی تەمەنی بەکارهێنان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d588a0a443b61745c83a7264a1b178ac006de37d004a8e22457e9b75e8105008",
+  "en": "Operational Integrity",
+  "ar": "سلامة التشغيل",
+  "ckb": "ڕێکوپێکیی کارکردن",
+  "kind": "block_line"
+ },
+ {
+  "h": "dbf708911c7b806b6cddc3c8a201ca06ad664123602ca01049afd467c0e0c222",
+  "en": "1. Follow the manufacturer’s guidelines for installation and usage to ensure the strip functions correctly and lasts as intended.",
+  "ar": "1. اتبع إرشادات الشركة المصنّعة للتركيب والاستخدام لضمان عمل الشريط بشكل صحيح ودوامه للمدة المتوقعة.",
+  "ckb": "1. ڕێنماییەکانی کۆمپانیای بەرهەمهێنەر بۆ دامەزراندن و بەکارهێنان پەیڕەو بکە بۆ دڵنیابوون لەوەی شریتەکە بە دروستی کار دەکات و بەو ماوەیەی چاوەڕوان دەکرێت بەردەوام دەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2d6ecd5f935f6562da08bf2be6180e6ec90b8c6d381dbe98e7586ef264b8848b",
+  "en": "2. Improper handling, excessive bending, or exposure to incompatible environmental conditions may compromise the product’s performance and safety.",
+  "ar": "2. قد يؤدي سوء الاستخدام أو الثني المفرط أو التعرّض لظروف بيئية غير ملائمة إلى الإضرار بأداء المنتج وسلامته.",
+  "ckb": "2. مامەڵەی نادروست، چەماندنەوەی زیادە یان ڕووبەڕووبوونەوەی بارودۆخی ژینگەیی نەگونجاو لەوانەیە کارایی و سەلامەتیی بەرهەمەکە لاواز بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "721b291fbbefbfbfd428dbe36032cee684ad64cc6e8b7d9b7af3fa11a17a3be4",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional P1S/X1 Door Hinge 180/270° - V3 Adjustable. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من P1S/X1 Door Hinge 180/270° - V3 Adjustable. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی P1S/X1 Door Hinge 180/270° - V3 Adjustable بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "59fb975fc5f332edb2b7ab0b451a31377ba5ee94696bfbe9481b2da283f12922",
+  "en": "To download the model files please visit the P1S/X1 Door Hinge 180/270° - V3 Adjustableon MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة P1S/X1 Door Hinge 180/270° - V3 Adjustable على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی P1S/X1 Door Hinge 180/270° - V3 Adjustable لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b302d63c2dea35a065d4c983998cff2a5c83137e0bac9266d4a39ceb7e3c2cf3",
+  "en": "If it is used with the Motion-Activated Sound and Light Props Kit-01 & 02，you need to adjust the number of control light beads to 128 in the APP.",
+  "ar": "عند استخدامه مع Motion-Activated Sound and Light Props Kit-01 & 02، يجب ضبط عدد حبات الإضاءة المتحكَّم بها على 128 في التطبيق.",
+  "ckb": "ئەگەر لەگەڵ Motion-Activated Sound and Light Props Kit-01 & 02 بەکاربهێنرێت، پێویستە لە ئەپەکەدا ژمارەی دەنکە ڕووناکییە کۆنترۆڵکراوەکان بکەیت بە 128.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1ebbb4109f404d4dd8c9b7fd7fa155253a6a552f910d3403eeb686dd173596aa",
+  "en": "Always disconnect the power supply before starting any installation to prevent electric shock or short circuits.",
+  "ar": "افصل مصدر الطاقة دائمًا قبل البدء بأي عملية تركيب لتجنّب الصدمة الكهربائية أو حدوث دائرة قصر.",
+  "ckb": "هەمیشە پێش دەستکردن بە هەر دامەزراندنێک دابینکەری وزە بپچڕێنە، بۆ ڕێگریکردن لە کارەبالێدان یان کورتە بازنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9dd8281797fe4c1d7bfff8d39f2812c0d42143e0c384115d82086fed0958943c",
+  "en": "Ensure the input voltage matches the specified DC 3.7v-4.2v to prevent damage or reduced lifespan.",
+  "ar": "تأكّد من أن جهد الدخل يطابق القيمة المحدّدة DC 3.7v-4.2v لتجنّب التلف أو قِصر العمر الافتراضي.",
+  "ckb": "دڵنیابە لەوەی ڤۆڵتیەی چوونەژوورەوە لەگەڵ بڕی دیاریکراوی DC 3.7v-4.2v یەکدەگرێتەوە، بۆ ڕێگریکردن لە زیان یان کەمبوونەوەی تەمەنی بەکارهێنان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "016ad7a786b9c27537d4a40991c66a474cdb6bc3c04f9844b1daf245cf5e3f85",
+  "en": "Do not exceed the recommended operating current to ensure optimal performance and product longevity.",
+  "ar": "لا تتجاوز تيار التشغيل الموصى به لضمان الأداء الأمثل وإطالة عمر المنتج.",
+  "ckb": "لە تەزووی کارکردنی پێشنیارکراو تێمەپەڕە بۆ دڵنیابوون لە باشترین کارایی و درێژبوونەوەی تەمەنی بەرهەمەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0dbbc9e6e6142967a8ba6f050d115d1aa283c8b9774bf2c2f0fa6c6309bad7c8",
+  "en": "Keep away from moisture and excessive heat sources.",
+  "ar": "أبعِده عن الرطوبة ومصادر الحرارة المفرطة.",
+  "ckb": "لە شێ و سەرچاوەکانی گەرمیی زیادە دووری بخەرەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "acee96b96bcccf726e75967046348ea3cabf3b854d987b558c72aba55c81e499",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional SnapaTrack. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من SnapaTrack. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی SnapaTrack بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "848faa4d933b4db16cd1c917759c7ec2b288cb099b20a77460fe1259bf31cc40",
+  "en": "To download the model files, please visit the SnapaTrack on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة SnapaTrack على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی SnapaTrack لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3e67cf9ef3d87f6b950bf1a6d7663e54c39b98b8e8aeab931c9065434ea18e7e",
+  "en": "After a while, your vehicle may have difficulty climbing the bridge. First wash the O-rings in warm soapy water. The O-rings are dust magnets and will need to be cleaned every now and again.",
+  "ar": "بعد فترة من الاستخدام، قد تواجه مركبتك صعوبة في صعود الجسر. اغسل أولًا الحلقات المطاطية (O-rings) بماء دافئ وصابون. فهذه الحلقات تجذب الغبار بشدة وستحتاج إلى تنظيفها من حين لآخر.",
+  "ckb": "دوای ماوەیەک، لەوانەیە ئۆتۆمبێلەکەت بە زەحمەت بەسەر پردەکەدا سەربکەوێت. سەرەتا ئەڵقە لاستیکییەکان (O-rings) بە ئاوی شلەتێن و سابوون بشۆ. ئەڵقە لاستیکییەکان تۆز زۆر بۆ لای خۆیان ڕادەکێشن و پێویستە جار جار پاک بکرێنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fa79169677bf909a2ce3d91e2bf9ddd5ac83af44c8d84a0b5ba27db62e932576",
+  "en": "Turning the lights off will help the batteries last longer.",
+  "ar": "إطفاء الأضواء يساعد على إطالة عمر البطاريات.",
+  "ckb": "کوژاندنەوەی ڕووناکییەکان یارمەتی دەدات باترییەکان ماوەیەکی درێژتر بمێننەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "908c94f7cda8da019d8c86fb867eff3510b326d64dff3c5b9ddbec243d52a13e",
+  "en": "If the wheels spin in the wrong direction, simply rotate the motor.",
+  "ar": "إذا دارت العجلات في الاتجاه الخطأ، فما عليك سوى تدوير المحرك.",
+  "ckb": "ئەگەر تایەکان بە ئاراستەی هەڵەدا سووڕانەوە، تەنها بزوێنەرەکە بسووڕێنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "188424743229d90516f82195feeae337ad3f3a52b143bcf4692d5a7a47613b23",
+  "en": "Each kit contains all the parts you need to complete one car model.",
+  "ar": "يحتوي كل طقم على جميع القطع التي تحتاجها لإكمال نموذج سيارة واحد.",
+  "ckb": "هەر کیتێک هەموو ئەو پارچانەی تێدایە کە بۆ تەواوکردنی یەک مۆدێلی ئۆتۆمبێل پێویستتە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4d70e9cf6046dbe553ad2b6eb1fcc0cc24ee5d4919bf2969079fe043fd24c943",
+  "en": "Bicycle Saddle",
+  "ar": "Bicycle Saddle",
+  "ckb": "Bicycle Saddle",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "7c9fd7e4a2e97a353382cd8342d3a5bfd9ddc8196f3346714c3be413dd619f39",
+  "en": "@Makerworld",
+  "ar": "@Makerworld",
+  "ckb": "@Makerworld",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "d8bca59957c35f8fbfac58901049264e5f70de2fd3b412afab8bf20897fde9c7",
+  "en": "High-Strength Chromoly Steel: Durable and bend-resistant construction built for challenging terrains.",
+  "ar": "فولاذ كرومولي عالي المتانة: بنية متينة ومقاومة للانحناء مصمّمة للتضاريس الصعبة.",
+  "ckb": "پۆڵای کرۆمۆلی بە بەهێزیی بەرز: پێکهاتەیەکی بەرگەگر و بەرگری چەمانەوە کە بۆ ناوچە سەختەکان دروستکراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "00fff53abc044feabbdffd4dbfd74567df030ac6e46f236a0ed9faa40b09648b",
+  "en": "Universal Tool-Free Installation: Seamlessly fits 3D-printed and traditional saddles with a secure clamping system.",
+  "ar": "تركيب عام دون أدوات: يناسب بسلاسة المقاعد المطبوعة (3D-printed) والتقليدية بفضل نظام تثبيت محكم.",
+  "ckb": "دامەزراندنی گشتگیر بەبێ ئامراز: بە ئاسانی لەگەڵ زینە چاپکراوەکان (3D-printed) و زینە ئاساییەکان دەگونجێت بە سیستەمێکی گیرکردنی پتەو.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2dbbe40e2dacad47ec772936e5c79b45cb547bb833acc8c28e47b6d545ebc155",
+  "en": "All-Weather Corrosion Defense: Electroplated coating resists rain, sweat, and abrasion for urban or off-road use.",
+  "ar": "حماية من التآكل في جميع الأحوال الجوية: طلاء كهربائي يقاوم المطر والعرق والاحتكاك للاستخدام في المدينة أو على الطرق الوعرة.",
+  "ckb": "پاراستن لە داخوران لە هەموو کەشوهەوایەکدا: ڕووپۆشی کارەبایی بەرگەی باران، ئارەقە و ڕووشان دەگرێت بۆ بەکارهێنان لە شار یان لە ڕێگا ناهەموارەکاندا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "401b6f63404c2444c968d6c2ce3a7cd7efa77796451767548ad9991454d7b558",
+  "en": "Whaleberry",
+  "ar": "Whaleberry",
+  "ckb": "Whaleberry",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "be229aeacb4c2b588c9914e39212a81e43df75348dff230bd1441426e0af7204",
+  "en": "@CloudBerry",
+  "ar": "@CloudBerry",
+  "ckb": "@CloudBerry",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "05a6a71f448d5a0c42fb15514750b719129100c3ad62725dcd06114619d4c7af",
+  "en": "Dual-Color Style Options: Classic Black/White and Reflective Black/White variants to adapt to different styling scenarios.",
+  "ar": "خيارات تصميم ثنائية اللون: إصدارا Classic Black/White وReflective Black/White لتناسب أساليب التنسيق المختلفة.",
+  "ckb": "هەڵبژاردەی شێوازی دوو ڕەنگ: جۆرەکانی Classic Black/White و Reflective Black/White بۆ گونجان لەگەڵ شێوازە جیاوازەکانی ڕێکخستنی جلوبەرگ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5762cf86f101a9d6c98eeae5d8056648164a55ccd88f3d05d65687307ca3810e",
+  "en": "Anti-Slip Durable Weave: Cross-woven high-density polyester fibers with heat-sealed reinforced tips ensure secure fastening without loosening.",
+  "ar": "نسيج متين مانع للانزلاق: ألياف بوليستر عالية الكثافة منسوجة بشكل متقاطع مع أطراف مقوّاة ومختومة حراريًا تضمن ربطًا محكمًا دون أن ينحلّ.",
+  "ckb": "چنینی بەرگەگری دژە خلیسکان: ڕیشاڵی پۆلیستەری چڕیی بەرز بە چنینی خاچی و سەرە بەهێزکراوەکانی بە گەرمی داخراو، بەستنێکی پتەو بەبێ شلبوونەوە دەستەبەر دەکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "10f6b27862237255baa16f8e51f52dc6ff38f8e60cb39217cbac97324bd21a01",
+  "en": "Universal Fit Design: 100cm length compatible with various shoe eyelet systems, making lacing and adjustment effortless.",
+  "ar": "تصميم يناسب الجميع: طول 100cm متوافق مع مختلف أنظمة ثقوب الأحذية، ما يجعل الربط والضبط في غاية السهولة.",
+  "ckb": "دیزاینی گونجاو بۆ هەموو: درێژیی 100cm لەگەڵ سیستەمە جیاوازەکانی کونی پێڵاو گونجاوە، و بەستن و ڕێکخستن زۆر ئاسان دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b76e637f3cbd3a7084f9187357f3f9fe203623bc6d82b6857a97d3cf041e2831",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional The Limit of Possibility (no electronics). To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من The Limit of Possibility (no electronics). ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی The Limit of Possibility (no electronics) بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b71043e922d3726e57f0ff57942097cffd630f58dfab46cff3c7580a48e3b25f",
+  "en": "To download the model files please visit the The Limit of Possibility (no electronics) on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة The Limit of Possibility (no electronics) على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی The Limit of Possibility (no electronics) لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9228426dc2382e1a77c1630543f44042fe63606cedf1481265a73455090b0b65",
+  "en": "Bambu Lab Stickers are crafted for creators, designers, and 3D printing enthusiasts, offering a fun and easy way to personalize your gear. Made from high-quality PVC, these stickers are durable and can be applied to a variety of surfaces, like 3D printers, models, laptops, and more. They’re lightweight, easy to use, and can be removed without leaving any residue, allowing you to add a touch of personality to your projects and tools.",
+  "ar": "صُمّمت ملصقات Bambu Lab Stickers للصنّاع والمصمّمين وهواة الطباعة 3D، لتمنحك طريقة ممتعة وسهلة لإضفاء طابعك الشخصي على أدواتك. وهي مصنوعة من PVC عالي الجودة، ما يجعلها متينة وقابلة للّصق على أسطح متنوعة مثل طابعات 3D والنماذج والحواسيب المحمولة وغيرها. كما أنها خفيفة الوزن وسهلة الاستخدام، ويمكن إزالتها دون ترك أي بقايا، لتضيف لمسة شخصية إلى مشاريعك وأدواتك.",
+  "ckb": "ستیکەرەکانی Bambu Lab Stickers بۆ دروستکەران، دیزاینەران و حەزلێکەرانی چاپی 3D دروستکراون، و ڕێگایەکی خۆش و ئاسان پێشکەش دەکەن بۆ تایبەتکردنی کەلوپەلەکانت بە خۆت. لە کەرەستەی PVC بە جۆرایەتیی بەرز دروستکراون، بەرگەگرن و دەتوانرێت لەسەر ڕووی جۆراوجۆر بلکێنرێن، وەک چاپکەرەکانی 3D، مۆدێلەکان، لاپتۆپەکان و زیاتر. سووکن، بەکارهێنانیان ئاسانە و دەتوانرێت بەبێ بەجێهێشتنی هیچ پاشماوەیەک لاببرێن، بۆ ئەوەی تامێکی کەسایەتی بە پڕۆژە و ئامرازەکانت ببەخشیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "65a9e0fc0baf432b9f65bf4af03b9a9c82cb0ed4d341d55d1a3571bb7ee23c91",
+  "en": "1:16 scale Formula One Model Car, F1",
+  "ar": "1:16 scale Formula One Model Car, F1",
+  "ckb": "1:16 scale Formula One Model Car, F1",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "cee108d3e9e2389999ac2e1077f14227d920597731504b11ca05bfa0b3cfd885",
+  "en": "@NotKuro",
+  "ar": "@NotKuro",
+  "ckb": "@NotKuro",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "840e28b3e14dbf73b506410956ee1a3ac5b25e7a992a43f9941ee7cff5a369e6",
+  "en": "Lightweight and easy to use",
+  "ar": "خفيفة الوزن وسهلة الاستخدام",
+  "ckb": "سووک و بەکارهێنانی ئاسان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "c76a363ee307b378da549083243bda33a9b21bf0fe7f035184fea592f8617e0f",
+  "en": "Waterproof and scuff-resistant",
+  "ar": "مقاومة للماء والخدوش",
+  "ckb": "دژە ئاو و دژە خشان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "05e8f1a6e9d71614fbf0b2c7ba91b4519be0e614372dce49e642196b0565f497",
+  "en": "High quality PET",
+  "ar": "مادة PET عالية الجودة",
+  "ckb": "کەرەستەی PET بە جۆرایەتیی بەرز",
+  "kind": "block_cell"
+ },
+ {
+  "h": "20bd75317753a6e1765ca19a3f8386b40c5580ccfea71616043c57884e89e149",
+  "en": "1:16 scale Formula One Model Car, F1 - ZH111",
+  "ar": "1:16 scale Formula One Model Car, F1 - ZH111",
+  "ckb": "1:16 scale Formula One Model Car, F1 - ZH111",
+  "kind": "block_title",
+  "keep": true
+ },
+ {
+  "h": "53cc5c614068e653998311a674c57731f5fd505252572dac4a9bcc82c60a7f8b",
+  "en": "BT3x8 SHCS Self Tapping Screw (20PCS) - AA108",
+  "ar": "برغي ذاتي اللولبة BT3x8 من نوع SHCS (20PCS) - AA108",
+  "ckb": "بورغیی خۆپێچی BT3x8 جۆری SHCS (20PCS) - AA108",
+  "kind": "block_cell"
+ },
+ {
+  "h": "c34b2ed8a3e4ac2e512955c10369791f8e25895678c8c98399633487d2854626",
+  "en": "BT2.5x8 SHCS Self Tapping Screw (20PCS) - AA101",
+  "ar": "برغي ذاتي اللولبة BT2.5x8 من نوع SHCS (20PCS) - AA101",
+  "ckb": "بورغیی خۆپێچی BT2.5x8 جۆری SHCS (20PCS) - AA101",
+  "kind": "block_cell"
+ },
+ {
+  "h": "585a4b1b0f9d35ea3961561c17b499f772260f9dd86f319dce491636b78d49b5",
+  "en": "MOCA Mobile Phone Cage Kit is a modular filming kit designed for efficient content creation. Featuring a NATO rail system and 1/4\" standard mounts, it supports quick attachment of accessories like LED lights and microphones. Adaptable for handheld, vertical, and tripod shooting modes. Customizable via 3D printing with color options and pro-grade materials for both daily use and demanding outdoor scenarios.",
+  "ar": "طقم MOCA Mobile Phone Cage Kit هو طقم تصوير معياري مصمّم لإنشاء المحتوى بكفاءة. يتميز بنظام سكك NATO وقواعد تثبيت قياسية بمقاس 1/4\"، ويدعم التركيب السريع لملحقات مثل أضواء LED والميكروفونات. ويتكيّف مع أوضاع التصوير باليد والعمودي وعلى الحامل الثلاثي. ويمكن تخصيصه عبر الطباعة 3D مع خيارات للألوان ومواد احترافية، للاستخدام اليومي وللظروف الخارجية الصعبة على حدّ سواء.",
+  "ckb": "کیتی MOCA Mobile Phone Cage Kit کیتێکی مۆدیولاری وێنەگرتنە کە بۆ دروستکردنی ناوەڕۆک بە کارایی دیزاین کراوە. سیستەمی ڕێڕەوی NATO و شوێنی بەستنی ستاندارد بە قەبارەی 1/4\" تێدایە، و پشتگیریی پەیوەستکردنی خێرای پێداویستییەکانی وەک گڵۆپی LED و مایکرۆفۆن دەکات. بۆ دۆخەکانی وێنەگرتنی بە دەست، ستوونی و لەسەر سێپێ دەگونجێت. دەتوانرێت لە ڕێگەی چاپی 3D بە هەڵبژاردەی ڕەنگ و کەرەستەی ئاستی پیشەگەرانە بە دڵی خۆت ڕێکبخرێت، هەم بۆ بەکارهێنانی ڕۆژانە و هەم بۆ بارودۆخی سەختی دەرەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5025999a8bc731c05088cedfc57bd9294a3cafb0c5de1e553dd93c190bc04e01",
+  "en": "Anti-Shake Ergonomic Grip: Textured rubber handles with 15° angled design reduce wrist fatigue and minimize shake during handheld filming.",
+  "ar": "مقبض مريح مانع للاهتزاز: مقابض مطاطية محبّبة بتصميم مائل بزاوية 15° تخفّف إجهاد المعصم وتقلّل الاهتزاز أثناء التصوير باليد.",
+  "ckb": "دەسکی ئەرگۆنۆمی دژە لەرزین: دەسکە لاستیکییە زبرەکان بە دیزاینی لاری 15° ماندووبوونی مەچەک کەم دەکەنەوە و لەرزین لە کاتی وێنەگرتنی بە دەستدا بۆ کەمترین ئاست دادەبەزێنن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6e23236dc52d9f602ce84a2b8fb6388973e76e48cc95412928109be0de0a9c2e",
+  "en": "Tool-Free NATO Rail System: Dual-side quick-release rails (1/4\" mounts) hold accessories like LED panels (≤500g) without screws – swap in 3 seconds.",
+  "ar": "نظام سكك NATO دون أدوات: سكك للتحرير السريع على الجانبين (قواعد تثبيت 1/4\") تحمل ملحقات مثل ألواح LED (≤500g) دون براغٍ – والتبديل في 3 ثوانٍ.",
+  "ckb": "سیستەمی ڕێڕەوی NATO بەبێ ئامراز: ڕێڕەوەکانی کردنەوەی خێرا لە هەردوو لا (شوێنی بەستنی 1/4\") پێداویستییەکانی وەک پانێڵی LED (≤500g) بەبێ بورغی ڕادەگرن – گۆڕین لە 3 چرکەدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9b4b75f9b7ca6bc140d14cefff9ce82c11f62cfa6cb98fde4281370a8e964a42",
+  "en": "360° Multi-Scene Adapter 360°: Rotatable clamp supports vertical shooting, tripod mounting, and overhead angles with a 90° locking mechanism.",
+  "ar": "محوّل 360° متعدد المشاهد بدوران 360°: مشبك قابل للتدوير يدعم التصوير العمودي والتركيب على الحامل الثلاثي والزوايا العلوية، مع آلية قفل بزاوية 90°.",
+  "ckb": "ئەداپتەری فرە دیمەن 360° بە سووڕانەوەی 360°: گیرەیەکی سووڕاوە پشتگیریی وێنەگرتنی ستوونی، بەستن لەسەر سێپێ و گۆشەی سەرەوە دەکات بە میکانیزمی قفڵکردنی 90°.",
+  "kind": "block_line"
+ },
+ {
+  "h": "35c84a5aaa32cb799847775e5375accf914c9ddc5b53d7d625660398fca9c92f",
+  "en": "thrutheframe",
+  "ar": "thrutheframe",
+  "ckb": "thrutheframe",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "7fede96825a701d15f5992b662fc9968f66c4ed66e1dd5564f7af839d1c78ad9",
+  "en": "MOCA Plus Mobile Phone Cage Kit",
+  "ar": "MOCA Plus Mobile Phone Cage Kit",
+  "ckb": "MOCA Plus Mobile Phone Cage Kit",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "a4f0da5d2843e2a623cc9342cce984ac6cc967c26e00fecb0e1ffb9c7a5263d8",
+  "en": "MOCA Plus Mobile Phone Cage",
+  "ar": "MOCA Plus Mobile Phone Cage",
+  "ckb": "MOCA Plus Mobile Phone Cage",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "e8b63535ff9fa66f1b8417ab555a7a0a03f0fdf5822f844ceaeca669f7c42d39",
+  "en": "Bambu Transparent PVC Sheet offers a clear, glass-like finish. Its transparency and durable design make it perfect for transparent sections in your projects such as model car windows or photo frames.",
+  "ar": "يوفّر لوح Bambu Transparent PVC Sheet تشطيبًا شفافًا يشبه الزجاج. وتجعله شفافيته وتصميمه المتين مثاليًا للأجزاء الشفافة في مشاريعك، مثل نوافذ مجسّمات السيارات أو إطارات الصور.",
+  "ckb": "پەڕەی Bambu Transparent PVC Sheet ڕووکارێکی ڕوون و وەک شووشە پێشکەش دەکات. ڕوونی و دیزاینە بەرگەگرەکەی وای لێدەکەن بۆ بەشە ڕوونەکانی پڕۆژەکانت گونجاوترین بێت، وەک پەنجەرەی مۆدێلی ئۆتۆمبێل یان چوارچێوەی وێنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3496fdb3b2b42a87bba8d1e8328b01a79e9fc658d0e3def6818b79b8ccfcc5bc",
+  "en": "Multi-Purpose Use: Ideal for photo frames, model car windows, DIY crafts, and creative projects.",
+  "ar": "استخدامات متعددة: مثالي لإطارات الصور ونوافذ مجسّمات السيارات والأعمال اليدوية DIY والمشاريع الإبداعية.",
+  "ckb": "بەکارهێنانی فرە مەبەست: گونجاوترینە بۆ چوارچێوەی وێنە، پەنجەرەی مۆدێلی ئۆتۆمبێل، کاری دەستیی DIY و پڕۆژە داهێنەرانەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a5438f812b48f86d4a91a3bb72600bfce0846669374e7ffb74c9812e08272c46",
+  "en": "Doodle-Friendly Surface: Draw, paint, or write effortlessly with markers, acrylics, or pens (erasable with alcohol).",
+  "ar": "سطح مناسب للرسم الحر: ارسم أو لوّن أو اكتب بسهولة باستخدام أقلام التحديد أو ألوان الأكريليك أو الأقلام (قابل للمسح بالكحول).",
+  "ckb": "ڕووکاری گونجاو بۆ ڕەسمکێشان: بە ئاسانی بە مارکەر، ڕەنگی ئاکریلیک یان پێنووس ڕەسم بکێشە، ڕەنگ بکە یان بنووسە (بە ئەلکهول دەسڕدرێتەوە).",
+  "kind": "block_line"
+ },
+ {
+  "h": "d9c653fdd574a96eee03dd4d3dce33d9989dc489677fe2e99ed425e6ae3bd72e",
+  "en": "The PVC Sheet is not compatible with the H2D blade cutting, as it can damage the blade. Instead, it is recommended to use scissors for cutting it.",
+  "ar": "لوح PVC غير متوافق مع القص بالشفرة في H2D، إذ قد يُتلف الشفرة. ويُنصح بدلًا من ذلك باستخدام المقص لقصّه.",
+  "ckb": "پەڕەی PVC لەگەڵ بڕینی بە تیغی H2D گونجاو نییە، چونکە دەتوانێت زیان بە تیغەکە بگەیەنێت. لە جیاتی ئەوە، پێشنیار دەکرێت مقەست بۆ بڕینی بەکاربهێنرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ac93fba46cca51ec29013836dd291da6cd9cc5d7f035b17a837733803fd28a00",
+  "en": "Clear, glass-like finish",
+  "ar": "تشطيب شفاف يشبه الزجاج",
+  "ckb": "ڕووکارێکی ڕوون وەک شووشە",
+  "kind": "block_line"
+ },
+ {
+  "h": "d075af2c02cd0d61afffc35d7b4f467e9e9ff176372b23b09372bb1bc999384a",
+  "en": "Ideal for creating transparent sections in projects",
+  "ar": "مثالي لإنشاء أجزاء شفافة في المشاريع",
+  "ckb": "گونجاوترینە بۆ دروستکردنی بەشی ڕوون لە پڕۆژەکاندا",
+  "kind": "block_line"
+ },
+ {
+  "h": "cd748977174c349f79917591ebdf89961f2777073a1d3a5bf9df051ad7c23652",
+  "en": "*Solid Model: 3D digital models used to represent the actual dimensions and structural features.",
+  "ar": "*نموذج مجسّم: نماذج رقمية 3D تُستخدم لتمثيل الأبعاد الفعلية والخصائص الهيكلية.",
+  "ckb": "*مۆدێلی جەستەیی: مۆدێلی دیجیتاڵیی 3D کە بۆ نیشاندانی ڕەهەندە ڕاستەقینەکان و تایبەتمەندییە پێکهاتەییەکان بەکاردێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bc65549d64f64530a520491f8f097b235dbb0ec8e1ca5fe27042b628578b9d3c",
+  "en": "*Application Instruction: Guide to assembling modules that support extended application cases.",
+  "ar": "*تعليمات الاستخدام: دليل لتجميع الوحدات التي تدعم حالات استخدام موسّعة.",
+  "ckb": "*ڕێنماییەکانی بەکارهێنان: ڕێبەرێک بۆ پێکەوەنانی ئەو مۆدیولانەی پشتگیریی نموونە بەکارهێنانی فراوانتر دەکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f3a30e9d588b7c985b0cc14f3c10c59788fd7af7bc76455ba64808046a993109",
+  "en": "Lubrication: Apply appropriate plastic-safe lubricating grease to the gears before use to reduce wear and extend lifespan.",
+  "ar": "التشحيم: ضع شحم تشحيم مناسبًا وآمنًا على البلاستيك على التروس قبل الاستخدام لتقليل الاهتراء وإطالة العمر الافتراضي.",
+  "ckb": "چەورکردن: پێش بەکارهێنان گریسێکی گونجاو کە بۆ پلاستیک بێ زیان بێت لە چەرخە ددانەدارەکان بدە بۆ کەمکردنەوەی سووان و درێژکردنەوەی تەمەنی بەکارهێنان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ea570577324c5b803b3b38e847bcff6fa51af9ffc6ec232fafe773b07f23f515",
+  "en": "Load limit: Avoid operating the gears under excessive load or high speeds beyond their designed limits, which may cause the plastic teeth to strip.",
+  "ar": "حدّ الحمل: تجنّب تشغيل التروس تحت حمل مفرط أو بسرعات عالية تتجاوز حدود تصميمها، فقد يؤدي ذلك إلى تلف الأسنان البلاستيكية.",
+  "ckb": "سنووری بار: خۆت بپارێزە لە کارپێکردنی چەرخە ددانەدارەکان بە باری زیادە یان خێرایی بەرز کە لە سنووری دیزاینەکەیان تێپەڕێت، چونکە لەوانەیە ددانە پلاستیکییەکان تێکبچن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7718f0c9ef675dcf4926cd3c5530ccac7b26c4e1df1884fa50b5553033154c0a",
+  "en": "*User's Manual: Includes product function description and configuration guidelines.",
+  "ar": "*دليل الاستخدام: يتضمن وصف وظائف المنتج وإرشادات الإعداد.",
+  "ckb": "*ڕێبەری بەکارهێنان: وەسفی ئەرکەکانی بەرهەم و ڕێنماییەکانی ڕێکخستن لەخۆدەگرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bdfe0994ca3bcf76a8ec5cdcc5091614083cc6a3f4784a960a1eaca7f75a52d4",
+  "en": "Voltage limit: Ensure the voltage does not exceed the rated voltage. Overvoltage will instantly destroy the LED chip.",
+  "ar": "حدّ الجهد: تأكّد من ألا يتجاوز الجهد قيمة الجهد المقدّر. فالجهد الزائد سيُتلف شريحة LED على الفور.",
+  "ckb": "سنووری ڤۆڵتیە: دڵنیابە لەوەی ڤۆڵتیەکە لە ڤۆڵتیەی دیاریکراو تێناپەڕێت. ڤۆڵتیەی زیادە دەستبەجێ چیپی LED تێکدەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "31fd52433e0285157cd6bf077766091e820715a74c9f3f86a0bb3cf202631120",
+  "en": "*Specifications: Essential electrical and physical parameters required for proper operation.",
+  "ar": "*المواصفات: المعاملات الكهربائية والفيزيائية الأساسية اللازمة للتشغيل السليم.",
+  "ckb": "*تایبەتمەندییەکان: پێوەرە سەرەکییە کارەبایی و فیزیکییەکان کە بۆ کارکردنی دروست پێویستن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "492b218dd8186fc15be3913927f4fdf8f06a34457ab3ff837eaa1ddb347b6060",
+  "en": "The product comes with a 100mm Wire with 3Pin SH1.0 Connectors.",
+  "ar": "يأتي المنتج مع سلك 100mm Wire with 3Pin SH1.0 Connectors.",
+  "ckb": "بەرهەمەکە لەگەڵ وایەری 100mm Wire with 3Pin SH1.0 Connectors دێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f923a8d3748f71c5577a3ff1c3b552bc4996540d59e637a90b81656c89c346eb",
+  "en": "Chemical exposure: Keep the tires away from corrosive chemicals (such as solvents or strong acids) to prevent material degradation.",
+  "ar": "التعرّض للمواد الكيميائية: أبعِد الإطارات عن المواد الكيميائية المسبّبة للتآكل (مثل المذيبات أو الأحماض القوية) لمنع تدهور المادة.",
+  "ckb": "ڕووبەڕووبوونەوەی ماددە کیمیاییەکان: تایەکان لە ماددە کیمیاییە داخورێنەرەکان (وەک توێنەرەوەکان یان ترشە بەهێزەکان) دوور بخەرەوە بۆ ڕێگریکردن لە تێکچوونی کەرەستەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d604b5fc6936509660281143dcc124fd903457363ae094d541e1c3772bd75766",
+  "en": "What Is CyberBrick™?",
+  "ar": "ما هو CyberBrick™؟",
+  "ckb": "سیستەمی CyberBrick™ چییە؟",
+  "kind": "block_title"
+ },
+ {
+  "h": "f27dd572024946735e43f8d1e6e16a365abef765afca5ba9c813bf1d7b492a25",
+  "en": "1. Assemble",
+  "ar": "1. التجميع",
+  "ckb": "1. پێکەوەنان",
+  "kind": "block_title"
+ },
+ {
+  "h": "17853cf2df4ac3a5a85ef519a55f82dcb797c21e735b69e9b100c1d63f624744",
+  "en": "Just follow the step-by-step guide, no expertise needed! Snap, click, and feel your ride materialize right in your hands. Stuck? The MakerWorld community's got your back.",
+  "ar": "ما عليك سوى اتباع الدليل خطوة بخطوة، دون الحاجة إلى أي خبرة! ركّب القطع وثبّتها بنقرة، وشاهد مركبتك تتشكّل بين يديك. هل واجهتك مشكلة؟ مجتمع MakerWorld جاهز لمساعدتك.",
+  "ckb": "تەنها ڕێبەرە هەنگاو بە هەنگاوەکە پەیڕەو بکە، هیچ شارەزاییەک پێویست نییە! پارچەکان بە یەکەوە ببەستە و جێگیریان بکە، و هەست بکە چۆن ئۆتۆمبێلەکەت لە نێو دەستەکانتدا شێوە وەردەگرێت. گیرت خوارد؟ کۆمەڵگەی MakerWorld پشتیوانتە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "18b6701de5532049c1d2973721fc42271a4648c8df4db0a74d5d244e07f8b076",
+  "en": "2. Sync",
+  "ar": "2. المزامنة",
+  "ckb": "2. هاوکاتکردن",
+  "kind": "block_title"
+ },
+ {
+  "h": "0af84a1b9366a302b4e587eeeca963799e2f56f66d20e1ffa6bb5f0112aea8d7",
+  "en": "Skip the setup hassle! Browse, download, sync, and start playing right away. Need help? Jump into the community!",
+  "ar": "تخلّص من عناء الإعداد! تصفّح ونزّل وزامن وابدأ اللعب فورًا. تحتاج إلى مساعدة؟ انضم إلى المجتمع!",
+  "ckb": "ماندووبوونی ڕێکخستن وەلابنێ! بگەڕێ، دایبگرە، هاوکاتی بکە و یەکسەر دەست بە یاری بکە. یارمەتیت پێویستە؟ بچۆ ناو کۆمەڵگەکەوە!",
+  "kind": "block_line"
+ },
+ {
+  "h": "615cf56fce0b495987f37e117abc10d109efe328db3e8647306d681d9ce915e9",
+  "en": "3. Fine Tune",
+  "ar": "3. الضبط الدقيق",
+  "ckb": "3. ڕێکخستنی ورد",
+  "kind": "block_title"
+ },
+ {
+  "h": "f3e8c02157731826010637634fca61f5f3e0ebbd007c5f89827565ba19ff2cf4",
+  "en": "Unleash your imagination with powerful configuration tools on PC and mobile, then share your creations and custom tunes with the MakerWorld community!",
+  "ar": "أطلق العنان لخيالك مع أدوات إعداد قوية على الحاسوب (PC) والهاتف المحمول، ثم شارك إبداعاتك وإعداداتك المخصّصة مع مجتمع MakerWorld!",
+  "ckb": "خەیاڵت ئازاد بکە بە ئامرازی بەهێزی ڕێکخستن لەسەر کۆمپیوتەر (PC) و مۆبایل، پاشان داهێنانەکانت و ڕێکخستنە تایبەتەکانت لەگەڵ کۆمەڵگەی MakerWorld هاوبەش بکە!",
+  "kind": "block_line"
+ },
+ {
+  "h": "2de32a7ce48c4d7cbff90440390494e90e6f090d0388999e27b6b8f0f223161d",
+  "en": "Core Safety Rules",
+  "ar": "قواعد السلامة الأساسية",
+  "ckb": "یاسا سەرەکییەکانی سەلامەتی",
+  "kind": "block_title"
+ },
+ {
+  "h": "2ef7ddd07d6cf22f0b36deaa566b09d450f46506be232baa0b793d352d160292",
+  "en": "This product is intended for users aged 14 and above. Users under the age of 14 must be under direct adult supervision throughout use.",
+  "ar": "هذا المنتج مخصّص للمستخدمين بعمر 14 عامًا فما فوق. ويجب أن يكون المستخدمون دون سن 14 عامًا تحت إشراف مباشر من شخص بالغ طوال فترة الاستخدام.",
+  "ckb": "ئەم بەرهەمە بۆ بەکارهێنەرانی تەمەن 14 ساڵ و سەرووترە. بەکارهێنەرانی خوار تەمەنی 14 ساڵ دەبێت لە ماوەی هەموو بەکارهێنانەکەدا لە ژێر چاودێریی ڕاستەوخۆی کەسێکی گەورەدا بن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8a097302bb4b0053d768effe3c8f2492c79fb51f7195a870fc5e02409e8073c5",
+  "en": "Please use only official tools for any firmware operations.",
+  "ar": "يرجى استخدام الأدوات الرسمية فقط لأي عمليات تخص البرنامج الثابت.",
+  "ckb": "تکایە بۆ هەر کارێکی پەیوەست بە فێرموێرەوە تەنها ئامرازە فەرمییەکان بەکاربهێنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e4628a353d81e161934847d6f68ee633eb0b1905a55235e160a7e93dd22b5d39",
+  "en": "CyberBrick is a modular smart toy ecosystem that combines programmable hardware, 3D printable structures, and dual-level coding environments. It is where 3D printing collides with electronics and coding through simplicity. CyberBrick empowers anyone to build and enjoy a wide range of 3D-printed projects, from R/C toys to productivity tools.",
+  "ar": "منظومة CyberBrick هي بيئة ألعاب ذكية معيارية تجمع بين عتاد قابل للبرمجة وهياكل قابلة للطباعة 3D وبيئات برمجة بمستويين. إنها المكان الذي تلتقي فيه الطباعة 3D بالإلكترونيات والبرمجة ببساطة. وتمكّن CyberBrick أي شخص من بناء طيف واسع من المشاريع المطبوعة (3D-printed) والاستمتاع بها، من ألعاب R/C إلى أدوات الإنتاجية.",
+  "ckb": "سیستەمی CyberBrick ژینگەیەکی یاریی زیرەکی مۆدیولارە کە ڕەقەکاڵای پرۆگرامپێکراو، پێکهاتەی قابیلی چاپی 3D و ژینگەی کۆدنووسینی دوو ئاستی کۆدەکاتەوە. ئەو شوێنەیە کە چاپی 3D بە سادەیی لەگەڵ ئەلیکترۆنیات و کۆدنووسیندا یەکدەگرن. CyberBrick هەموو کەسێک بەتوانا دەکات بۆ دروستکردن و چێژوەرگرتن لە کۆمەڵێکی فراوان لە پڕۆژە چاپکراوەکان (3D-printed)، لە یاریی R/C تا ئامرازەکانی بەرهەمداری.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5e073fb124c5ff4d3c4481a2054d243369944b7e077a095559fc0ddac680c669",
+  "en": "Electronics modules only. 3D printed parts and tools are not included.",
+  "ar": "وحدات إلكترونية فقط. القطع المطبوعة بطابعة 3D والأدوات غير مرفقة.",
+  "ckb": "تەنها مۆدیولە ئەلیکترۆنییەکان. پارچە چاپکراوەکانی 3D و ئامرازەکان لەگەڵدا نین.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fc750966866922083d1da720adf9cf40e25df7b8283f5399592fffbabe672cef",
+  "en": "This charger is equipped with a standard XH2.54 connector and is suitable for charging the 14500 7.4V 800mAh Li-ion Battery. It is widely used in battery-powered applications such as model toys, small robots, and DIY projects.",
+  "ar": "هذا الشاحن مزوّد بموصل XH2.54 قياسي، وهو مناسب لشحن بطارية 14500 7.4V 800mAh Li-ion Battery. ويُستخدم على نطاق واسع في التطبيقات التي تعمل بالبطاريات مثل ألعاب النماذج والروبوتات الصغيرة ومشاريع DIY.",
+  "ckb": "ئەم بارگاویکەرە بە گەیەنەری ستانداردی XH2.54 تەیار کراوە و گونجاوە بۆ بارگاویکردنی باتریی 14500 7.4V 800mAh Li-ion Battery. بە شێوەیەکی بەرفراوان لە بەکارهێنانە باترییدارەکاندا بەکاردێت، وەک یارییە مۆدێلییەکان، ڕۆبۆتە بچووکەکان و پڕۆژەکانی DIY.",
+  "kind": "block_line"
+ },
+ {
+  "h": "41563adef4f55eb19c6ea6e471224254595a73a780971d40bbeeb7df57af6aec",
+  "en": "Output short-circuit and reverse polarity protection.",
+  "ar": "حماية الخرج من دائرة القصر وعكس القطبية.",
+  "ckb": "پاراستنی دەرچوون لە کورتە بازنە و هەڵگەڕانەوەی جەمسەرەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0c8cac806534150a6d3631caa4003c5893fba06401377791fa8d696f7eaeefe2",
+  "en": "LED Indicator Status: Indicator is off when power is connected / Red LED lights up during charging / Red LED turns off when charging is complete",
+  "ar": "حالة مؤشر LED: يكون المؤشر مطفأً عند توصيل الطاقة / يضيء مؤشر LED الأحمر أثناء الشحن / ينطفئ مؤشر LED الأحمر عند اكتمال الشحن",
+  "ckb": "دۆخی نیشاندەری LED: کاتێک وزە پەیوەست دەکرێت نیشاندەرەکە کوژاوەیە / لە کاتی بارگاویکردندا گڵۆپی سووری LED دادەگیرسێت / کاتێک بارگاویکردن تەواو دەبێت گڵۆپی سووری LED دەکوژێتەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "953f871cde57da2c07b3fb0ddc9bc68025797c05102650f87aa19c1426894b0e",
+  "en": "The USB charger for this product only supports standard 5V 1-2A input. Please always use the original charger that meets the voltage/current requirements, or charge directly via a computer USB port. Do not use chargers with output higher than 5V or 2A (such as mobile fast chargers, 9V/12V adapters, etc.), as this may cause device damage, overheating, or even serious fire hazards. Do not cover the device while charging, and keep it away from high temperature, humidity, or flammable environments. Never charge the device unattended.",
+  "ar": "لا يدعم شاحن USB الخاص بهذا المنتج إلا دخلًا قياسيًا 5V 1-2A. يرجى دائمًا استخدام الشاحن الأصلي المطابق لمتطلبات الجهد/التيار، أو الشحن مباشرةً عبر منفذ USB في الحاسوب. لا تستخدم شواحن يزيد خرجها على 5V أو 2A (مثل شواحن الهواتف السريعة ومحوّلات 9V/12V وغيرها)، فقد يؤدي ذلك إلى تلف الجهاز أو ارتفاع حرارته بشكل مفرط أو حتى إلى مخاطر حريق جسيمة. لا تغطِّ الجهاز أثناء الشحن، وأبعِده عن البيئات ذات الحرارة العالية أو الرطوبة أو المواد القابلة للاشتعال. لا تترك الجهاز يُشحن دون مراقبة أبدًا.",
+  "ckb": "بارگاویکەری USB بۆ ئەم بەرهەمە تەنها پشتگیریی چوونەژوورەوەی ستانداردی 5V 1-2A دەکات. تکایە هەمیشە بارگاویکەری ڕەسەن بەکاربهێنە کە لەگەڵ پێداویستییەکانی ڤۆڵتیە/تەزوو دەگونجێت، یان ڕاستەوخۆ لە ڕێگەی دەرچەی USB لە کۆمپیوتەرەوە بارگاوی بکە. بارگاویکەر بە دەرچوونی زیاتر لە 5V یان 2A بەکارمەهێنە (وەک بارگاویکەرە خێراکانی مۆبایل، ئەداپتەرەکانی 9V/12V و هتد)، چونکە لەوانەیە ببێتە هۆی زیان گەیاندن بە ئامێرەکە، گەرمبوونی زیادە یان تەنانەت مەترسیی ئاگرگرتنی جددی. لە کاتی بارگاویکردندا ئامێرەکە دامەپۆشە، و لە ژینگەی پلەی گەرمیی بەرز، شێ یان کەرەستەی گڕگر دووری بخەرەوە. هەرگیز ئامێرەکە بەبێ چاودێری بارگاوی مەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "399bf3807c0b4a0abf611acca5e6e2f892d827b56f622e1daac6b6ce63d03cfe",
+  "en": "The company is not responsible for any device damage, malfunction, fire, or other losses resulting from failure to comply with the above requirements. Please strictly follow the safety instructions for this product.",
+  "ar": "لا تتحمّل الشركة أي مسؤولية عن تلف الجهاز أو تعطّله أو الحريق أو أي خسائر أخرى ناتجة عن عدم الالتزام بالمتطلبات المذكورة أعلاه. يرجى اتباع تعليمات السلامة الخاصة بهذا المنتج بدقة.",
+  "ckb": "کۆمپانیاکە بەرپرسیار نییە لە هیچ زیانێکی ئامێر، تێکچوون، ئاگرگرتن یان زیانەکانی تر کە لە پابەندنەبوون بە پێداویستییەکانی سەرەوە دروست دەبن. تکایە بە وردی ڕێنماییەکانی سەلامەتیی ئەم بەرهەمە پەیڕەو بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "47ae27f1096a76ac1da0821c776ed5697d39b66e873d833d4b49692905771472",
+  "en": "This kit includes a Multi-Function Core Board and a Time-lapse Trigger Expansion Board. Just install the core board onto the expansion board, connect it to your printer with the Bambu Bus cable, and follow the wiki to quickly pair your camera. The core board comes preloaded with the required firmware, so you can start time-lapse photography right away.",
+  "ar": "يتضمن هذا الطقم لوحة Multi-Function Core Board ولوحة Time-lapse Trigger Expansion Board. ما عليك سوى تركيب لوحة النواة على لوحة التوسعة، ثم توصيلها بطابعتك عبر كابل Bambu Bus، واتباع الويكي لإقران كاميرتك بسرعة. تأتي لوحة النواة محمّلة مسبقًا بالبرنامج الثابت المطلوب، لذا يمكنك بدء التصوير بفاصل زمني فورًا.",
+  "ckb": "ئەم کیتە بۆردی Multi-Function Core Board و بۆردی Time-lapse Trigger Expansion Board لەخۆدەگرێت. تەنها بۆردی ناوک لەسەر بۆردی فراوانکردن دابمەزرێنە، بە کێبڵی Bambu Bus بە چاپکەرەکەتەوە بیبەستە، و ڕێنماییەکانی ویکی پەیڕەو بکە بۆ جووتکردنی خێرای کامێراکەت. بۆردی ناوک بە فێرموێری پێویست پێشوەختە بارکراوە، بۆیە دەتوانیت یەکسەر دەست بە وێنەگرتنی کاتی خێراکراو بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "96cde16e61d5e7428502def34e0487b4b98f43d333c1d358c54b95c7b3a899d1",
+  "en": "Includes the product function description and configuration guidelines.",
+  "ar": "يتضمن وصف وظائف المنتج وإرشادات الإعداد.",
+  "ckb": "وەسفی ئەرکەکانی بەرهەم و ڕێنماییەکانی ڕێکخستن لەخۆدەگرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7e4165027f3edbdb77853123a97f717346c5da16e0fa5d23d2e8df1463d71dc3",
+  "en": "3D Files",
+  "ar": "ملفات 3D",
+  "ckb": "فایلەکانی 3D",
+  "kind": "block_line"
+ },
+ {
+  "h": "dc04bba7a40fe5017e6868ce00d77f0f002bc78050fa71b8fe46c9592df6f25c",
+  "en": "Containing product enclosure printing files and 3D models of the hardware kit.",
+  "ar": "تحتوي على ملفات طباعة غلاف المنتج ونماذج 3D لطقم العتاد.",
+  "ckb": "فایلەکانی چاپکردنی بەرگی بەرهەمەکە و مۆدێلی 3D بۆ کیتی ڕەقەکاڵاکە لەخۆدەگرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "42c4241babd564b88232bb2c7b8ced3f24bf0ca3583b6689ae2f2f09556b0777",
+  "en": "Step-by-step visual guide for product assembly.",
+  "ar": "دليل مصوّر خطوة بخطوة لتجميع المنتج.",
+  "ckb": "ڕێبەرێکی وێنەیی هەنگاو بە هەنگاو بۆ پێکەوەنانی بەرهەمەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9c7cd8b6060f381283dee89370bd5250868845d75e1b1d7c46e6055f6f9770bd",
+  "en": "For security and stability, the CyberBrick Multi-Function Core Board only supports firmware updates through official tools. Please use only official tools for any firmware operations. Thank you for your understanding!",
+  "ar": "حرصًا على الأمان والاستقرار، لا تدعم لوحة CyberBrick Multi-Function Core Board تحديثات البرنامج الثابت إلا عبر الأدوات الرسمية. يرجى استخدام الأدوات الرسمية فقط لأي عمليات تخص البرنامج الثابت. شكرًا لتفهّمك!",
+  "ckb": "بۆ ئاسایش و جێگیری، بۆردی CyberBrick Multi-Function Core Board تەنها لە ڕێگەی ئامرازە فەرمییەکانەوە پشتگیریی نوێکردنەوەی فێرموێر دەکات. تکایە بۆ هەر کارێکی پەیوەست بە فێرموێرەوە تەنها ئامرازە فەرمییەکان بەکاربهێنە. سوپاس بۆ تێگەیشتنت!",
+  "kind": "block_line"
+ },
+ {
+  "h": "3da5ee1d5a47ad3eb10cae2d593691e80c0afbf5351236bda900c4590d3fa6c1",
+  "en": "If you have purchased the time-lapse photography shield and are using it together with the Cyberbrick core board, please refer to the wiki to flash the time-lapse photography firmware.",
+  "ar": "إذا كنت قد اشتريت لوحة التوسعة (shield) الخاصة بالتصوير بفاصل زمني وتستخدمها مع لوحة النواة Cyberbrick، فيرجى الرجوع إلى الويكي لتثبيت البرنامج الثابت الخاص بالتصوير بفاصل زمني.",
+  "ckb": "ئەگەر شیڵدی (shield) وێنەگرتنی کاتی خێراکراوت کڕیوە و لەگەڵ بۆردی ناوکی Cyberbrick بەکاری دەهێنیت، تکایە سەیری ویکی بکە بۆ دامەزراندنی فێرموێری وێنەگرتنی کاتی خێراکراو.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1f483b8632c2e2345ad2c0590ca5ab3fe83e4961eee03f2144d86efb6b360f0e",
+  "en": "*Please note that the product does not include the 3D printed parts as shown in the main image. *For P2S Users who don't already have an AMS connected, you will need to purchase the P2S AMS Buffer to use the product",
+  "ar": "*يرجى ملاحظة أن المنتج لا يتضمن القطع المطبوعة بطابعة 3D الظاهرة في الصورة الرئيسية. *بالنسبة لمستخدمي P2S الذين لا تتصل بطابعاتهم وحدة AMS بعد، ستحتاج إلى شراء P2S AMS Buffer لاستخدام المنتج",
+  "ckb": "*تکایە ئاگاداربە کە بەرهەمەکە ئەو پارچە چاپکراوانەی 3D لەخۆ ناگرێت کە لە وێنە سەرەکییەکەدا دیارن. *بۆ بەکارهێنەرانی P2S کە هێشتا هیچ یەکەیەکی AMS بە چاپکەرەکەیانەوە نەبەستراوە، پێویستە P2S AMS Buffer بکڕیت بۆ بەکارهێنانی بەرهەمەکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "192b1f94c538ca4e150ed5313509781a0c037ffa38586ee1c323ecaced8798bb",
+  "en": "*Please note that the product does not include the 3D printed parts as shown in the main image.",
+  "ar": "*يرجى ملاحظة أن المنتج لا يتضمن القطع المطبوعة بطابعة 3D الظاهرة في الصورة الرئيسية.",
+  "ckb": "*تکایە ئاگاداربە کە بەرهەمەکە ئەو پارچە چاپکراوانەی 3D لەخۆ ناگرێت کە لە وێنە سەرەکییەکەدا دیارن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "780e684dc5b7d8ab84c94a38cd4a0af0e37424df87bc792cd7f8fc9344f0f4b2",
+  "en": "*For P2S Users who don't already have an AMS connected, you will need to purchase the P2S AMS Buffer to use the product",
+  "ar": "*بالنسبة لمستخدمي P2S الذين لا تتصل بطابعاتهم وحدة AMS بعد، ستحتاج إلى شراء P2S AMS Buffer لاستخدام المنتج",
+  "ckb": "*بۆ بەکارهێنەرانی P2S کە هێشتا هیچ یەکەیەکی AMS بە چاپکەرەکەیانەوە نەبەستراوە، پێویستە P2S AMS Buffer بکڕیت بۆ بەکارهێنانی بەرهەمەکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "23cd2692ad69555861c6d06584b7bae7e207885421fe684e077db64211dcdfb6",
+  "en": "This product corresponds to the earlier B-ZH090.",
+  "ar": "هذا المنتج يقابل المنتج السابق ذا الرمز B-ZH090.",
+  "ckb": "ئەم بەرهەمە هەمان بەرهەمی پێشووترە بە کۆدی B-ZH090.",
+  "kind": "block_line"
+ },
+ {
+  "h": "dfb909de1afcf0b32fbbddce2abd7253ef0a0757bab1945dd11c2d2a412118c7",
+  "en": "You can pair this product with either the Remote Control Receiver Shield or the Remote Control Transmitter Shield to serve as the receiver or transmitter component in RC projects. Additionally, by combining it with the Time-lapse Expansion Board, you can create a time-lapse photography module for Bambu Lab 3D printers.",
+  "ar": "يمكنك استخدام هذا المنتج مع Remote Control Receiver Shield أو Remote Control Transmitter Shield ليعمل كمكوّن الاستقبال أو الإرسال في مشاريع RC. كما يمكنك، بدمجه مع Time-lapse Expansion Board، إنشاء وحدة تصوير بفاصل زمني لطابعات 3D من Bambu Lab.",
+  "ckb": "دەتوانیت ئەم بەرهەمە لەگەڵ Remote Control Receiver Shield یان Remote Control Transmitter Shield بەکاربهێنیت بۆ ئەوەی وەک پێکهاتەی وەرگر یان نێرەر لە پڕۆژەکانی RC کار بکات. هەروەها بە تێکەڵکردنی لەگەڵ Time-lapse Expansion Board، دەتوانیت مۆدیولێکی وێنەگرتنی کاتی خێراکراو بۆ چاپکەرەکانی 3D لە Bambu Lab دروست بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ff21bc92982c65e3007b8807aeac93ac8ed55f81c617cdc6b8cd23ff4f1772d9",
+  "en": "Time-lapse Photography",
+  "ar": "التصوير بفاصل زمني",
+  "ckb": "وێنەگرتنی کاتی خێراکراو",
+  "kind": "block_title"
+ },
+ {
+  "h": "a5053b1c3cede7af60940b6753ded15fefc0fddfbaa9f35c09a1e01a43627c17",
+  "en": "This versatile controller is specially designed for a wide range of CyberBrick projects, featuring built-in Bluetooth and Wi-Fi. It supports quick connection and disconnection via dual-pin headers, making it easy to switch between different expansion boards. When paired with various expansion modules, it enables applications such as remote control toys, 3D printer time-lapse photography, and many more.",
+  "ar": "صُمّمت وحدة التحكم متعددة الاستخدامات هذه خصيصًا لطيف واسع من مشاريع CyberBrick، وتتميز بتقنيتي Bluetooth وWi-Fi مدمجتين. وتدعم التوصيل والفصل السريعين عبر رؤوس توصيل مزدوجة الدبابيس، ما يسهّل التبديل بين لوحات التوسعة المختلفة. وعند استخدامها مع وحدات توسعة متنوعة، تتيح تطبيقات مثل الألعاب ذات التحكم عن بُعد، والتصوير بفاصل زمني لطابعات 3D، وغير ذلك الكثير.",
+  "ckb": "ئەم کۆنترۆڵەرە فرە بەکارهێنانە بە تایبەتی بۆ کۆمەڵێکی فراوان لە پڕۆژەکانی CyberBrick دیزاین کراوە، و Bluetooth و Wi-Fi لە ناویدا جێگیرکراون. پشتگیریی پەیوەستکردن و جیاکردنەوەی خێرا دەکات لە ڕێگەی سەرە پینە دووانەکانەوە، کە گۆڕین لە نێوان بۆردە جیاوازەکانی فراوانکردندا ئاسان دەکات. کاتێک لەگەڵ مۆدیولە جۆراوجۆرەکانی فراوانکردن بەکاردێت، بەکارهێنانی وەک یاریی کۆنترۆڵی لە دوورەوە، وێنەگرتنی کاتی خێراکراو بۆ چاپکەری 3D و زۆر شتی تر ڕێگەپێدەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5a7d66a8dc2bb4c1ccc7f8452db0006f9489301d9829029bf5b50690a9b49c28",
+  "en": "You can combine this product with a Multi-Function Core Board to form a Cyberbrick receiver module. By pairing the Remote Control Transmitter Shield with another Multi-Function Core Board, you can create a Cyberbrick transmitter module. Connect joysticks and buttons to the transmitter module, and connect motors or servos to the receiver module, and you will have the minimal Cyberbrick remote control car project unit.",
+  "ar": "يمكنك دمج هذا المنتج مع لوحة Multi-Function Core Board لتكوين وحدة استقبال Cyberbrick. وبإقران Remote Control Transmitter Shield مع لوحة Multi-Function Core Board أخرى، يمكنك إنشاء وحدة إرسال Cyberbrick. صِل عصيّ التحكم والأزرار بوحدة الإرسال، وصِل المحركات أو محركات السيرفو بوحدة الاستقبال، لتحصل على أصغر وحدة لمشروع سيارة Cyberbrick ذات تحكم عن بُعد.",
+  "ckb": "دەتوانیت ئەم بەرهەمە لەگەڵ بۆردی Multi-Function Core Board تێکەڵ بکەیت بۆ پێکهێنانی مۆدیولی وەرگری Cyberbrick. بە جووتکردنی Remote Control Transmitter Shield لەگەڵ بۆردێکی تری Multi-Function Core Board، دەتوانیت مۆدیولی نێرەری Cyberbrick دروست بکەیت. جۆیستیک و دوگمەکان بە مۆدیولی نێرەرەوە ببەستە، و بزوێنەر یان سێرڤۆکان بە مۆدیولی وەرگرەوە ببەستە، ئەوکات بچووکترین یەکەی پڕۆژەی ئۆتۆمبێلێکی Cyberbrick بە کۆنترۆڵی لە دوورەوە لە بەردەستتدا دەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0203de13c4ccd667d56a8061e69c8ad55e750e70d985950d9aa76d567c79e251",
+  "en": "This is a Remote Control Receiver Shield specifically designed for Cyberbrick. You can combine it with a Multi-Function Core Board to serve as the signal receiving end for various CyberBrick projects. This shield integrates 2 DC motor ports, 4 servo motor ports, and 2 WS2812 RGB LED ports, enabling coordinated control of the powertrain, steering, and lighting systems-all without the need for soldering.",
+  "ar": "هذه لوحة Remote Control Receiver Shield مصمّمة خصيصًا لمنظومة Cyberbrick. يمكنك دمجها مع لوحة Multi-Function Core Board لتعمل كطرف استقبال الإشارة في مختلف مشاريع CyberBrick. وتضم هذه اللوحة منفذَين (2) لمحركات DC، و4 منافذ لمحركات السيرفو، ومنفذَين (2) لمصابيح WS2812 RGB LED، ما يتيح تحكمًا منسّقًا في أنظمة نقل الحركة والتوجيه والإضاءة، وكل ذلك دون الحاجة إلى اللحام.",
+  "ckb": "ئەم شیڵدە، Remote Control Receiver Shield، بە تایبەتی بۆ Cyberbrick دیزاین کراوە. دەتوانیت لەگەڵ بۆردی Multi-Function Core Board تێکەڵی بکەیت بۆ ئەوەی وەک لایەنی وەرگرتنی سیگناڵ بۆ پڕۆژە جۆراوجۆرەکانی CyberBrick کار بکات. ئەم شیڵدە 2 دەرچەی بزوێنەری DC، 4 دەرچەی بزوێنەری سێرڤۆ و 2 دەرچەی WS2812 RGB LED لە خۆیدا کۆدەکاتەوە، کە کۆنترۆڵی هاوئاهەنگی سیستەمەکانی گواستنەوەی هێز، ئاراستەکردن و ڕووناکی ڕێگەپێدەدات — هەمووی بەبێ پێویستی بە لەحیمکردن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "50f36f6052a380e1e9a48ef7e5d6645f2968765877265a553b144c9598d0876d",
+  "en": "You can combine this product with a Multi-Function Core Board to form a Cyberbrick transmitter module. By pairing a Remote Control Receiver Shield with another Multi-Function Core Board, you can create a Cyberbrick receiver module. Connect joysticks and buttons to the transmitter module, and motors or servos to the receiver module, and you will have a minimal Cyberbrick remote control car project unit.",
+  "ar": "يمكنك دمج هذا المنتج مع لوحة Multi-Function Core Board لتكوين وحدة إرسال Cyberbrick. وبإقران Remote Control Receiver Shield مع لوحة Multi-Function Core Board أخرى، يمكنك إنشاء وحدة استقبال Cyberbrick. صِل عصيّ التحكم والأزرار بوحدة الإرسال، والمحركات أو محركات السيرفو بوحدة الاستقبال، لتحصل على أصغر وحدة لمشروع سيارة Cyberbrick ذات تحكم عن بُعد.",
+  "ckb": "دەتوانیت ئەم بەرهەمە لەگەڵ بۆردی Multi-Function Core Board تێکەڵ بکەیت بۆ پێکهێنانی مۆدیولی نێرەری Cyberbrick. بە جووتکردنی Remote Control Receiver Shield لەگەڵ بۆردێکی تری Multi-Function Core Board، دەتوانیت مۆدیولی وەرگری Cyberbrick دروست بکەیت. جۆیستیک و دوگمەکان بە مۆدیولی نێرەرەوە ببەستە، و بزوێنەر یان سێرڤۆکان بە مۆدیولی وەرگرەوە، ئەوکات بچووکترین یەکەی پڕۆژەی ئۆتۆمبێلێکی Cyberbrick بە کۆنترۆڵی لە دوورەوە لە بەردەستتدا دەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "06f04ca5acc603951383735719bc5fca47337cf33f25d071da9ac2de5cb5c7ec",
+  "en": "Wiring: Strictly follow the wire sequence to avoid damaging the board or connected components.",
+  "ar": "التوصيل: التزم بدقة بترتيب الأسلاك لتجنّب إتلاف اللوحة أو المكوّنات الموصولة.",
+  "ckb": "وایەرکێشان: بە وردی ڕیزبەندیی وایەرەکان پەیڕەو بکە بۆ ئەوەی زیان بە بۆردەکە یان پێکهاتە پەیوەستکراوەکان نەگات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "833f2095473f1f5cc9a347198c1e623eb4772888244ba89e46f6880127d3d229",
+  "en": "Power supply: Ensure the power supply matches the specified voltage requirements to avoid damaging the transmitter shield.",
+  "ar": "مزوّد الطاقة: تأكّد من أن مزوّد الطاقة يطابق متطلبات الجهد المحدّدة لتجنّب إتلاف لوحة الإرسال.",
+  "ckb": "دابینکەری وزە: دڵنیابە لەوەی دابینکەری وزە لەگەڵ پێداویستییە دیاریکراوەکانی ڤۆڵتیە یەکدەگرێتەوە، بۆ ئەوەی زیان بە شیڵدی نێرەر نەگات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2ed83f54cea3f99283ce9c5cdfa9e7a1eb7a3418ab95965cc784b321a89eab8f",
+  "en": "This is a remote control transmitter shield designed for Cyberbrick. You can combine it with the Multi-Function Core Board to serve as the signal transmission end for various CyberBrick projects. The expansion board is equipped with 6 ADC input channels and 4 digital input channels, allowing flexible integration with joysticks, knobs, and custom buttons to meet a wide range of needs—from basic remote control to advanced command programming.",
+  "ar": "هذه لوحة إرسال للتحكم عن بُعد مصمّمة لمنظومة Cyberbrick. يمكنك دمجها مع لوحة Multi-Function Core Board لتعمل كطرف إرسال الإشارة في مختلف مشاريع CyberBrick. وتأتي لوحة التوسعة مزوّدة بعدد 6 قنوات إدخال ADC و4 قنوات إدخال رقمية، ما يتيح دمجًا مرنًا مع عصيّ التحكم والمقابض الدوّارة والأزرار المخصّصة لتلبية طيف واسع من الاحتياجات — من التحكم الأساسي عن بُعد إلى برمجة الأوامر المتقدمة.",
+  "ckb": "ئەمە شیڵدێکی نێرەری کۆنترۆڵی لە دوورەوەیە کە بۆ Cyberbrick دیزاین کراوە. دەتوانیت لەگەڵ بۆردی Multi-Function Core Board تێکەڵی بکەیت بۆ ئەوەی وەک لایەنی ناردنی سیگناڵ بۆ پڕۆژە جۆراوجۆرەکانی CyberBrick کار بکات. بۆردی فراوانکردنەکە 6 کەناڵی چوونەژوورەوەی ADC و 4 کەناڵی چوونەژوورەوەی دیجیتاڵی تێدایە، کە ڕێگە بە تێکەڵکردنی نەرمونیان لەگەڵ جۆیستیک، دوگمەی سووڕاوە و دوگمە تایبەتەکان دەدات بۆ پڕکردنەوەی کۆمەڵێکی فراوان لە پێداویستییەکان — لە کۆنترۆڵی سادەی لە دوورەوە تا پرۆگرامکردنی فەرمانە پێشکەوتووەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0655979a16583d395c642425c849da7b634689ae4c6773d058cbf26f2993a03c",
+  "en": "For example, in a vehicle model, one single-axis joystick module can be used to control the speed of movement, and another to control the steering; or in a tower crane model, a single-axis joystick module can control the lifting of the hook; or in a tracked vehicle model, two single-axis joystick modules can be used to independently control the speed of each track.",
+  "ar": "على سبيل المثال، في نموذج مركبة يمكن استخدام وحدة عصا تحكم أحادية المحور للتحكم في سرعة الحركة وأخرى للتحكم في التوجيه؛ أو في نموذج رافعة برجية يمكن لوحدة عصا تحكم أحادية المحور التحكم في رفع الخطّاف؛ أو في نموذج مركبة مجنزرة يمكن استخدام وحدتي عصا تحكم أحاديتي المحور للتحكم في سرعة كل جنزير على حدة.",
+  "ckb": "بۆ نموونە، لە مۆدێلی ئۆتۆمبێلێکدا، دەتوانرێت مۆدیولێکی جۆیستیکی تاک تەوەر بۆ کۆنترۆڵکردنی خێرایی جووڵە و یەکێکی تر بۆ کۆنترۆڵکردنی ئاراستەکردن بەکاربهێنرێت؛ یان لە مۆدێلی کرێنێکی بورجیدا، مۆدیولێکی جۆیستیکی تاک تەوەر دەتوانێت بەرزکردنەوەی قولاپەکە کۆنترۆڵ بکات؛ یان لە مۆدێلی ئۆتۆمبێلێکی زنجیرەداردا، دەتوانرێت دوو مۆدیولی جۆیستیکی تاک تەوەر بەکاربهێنرێن بۆ کۆنترۆڵکردنی سەربەخۆی خێرایی هەر زنجیرەیەک.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ccad8f072170f5be7af74e2731856a2868bdc4ed4c3359ee1c997919d5d66e34",
+  "en": "Included accessory: The product comes with a 100mm Wire with 3Pin SH1.0 Connectors.",
+  "ar": "الملحق المرفق: يأتي المنتج مع سلك 100mm Wire with 3Pin SH1.0 Connectors.",
+  "ckb": "پێداویستیی لەگەڵدا: بەرهەمەکە لەگەڵ وایەری 100mm Wire with 3Pin SH1.0 Connectors دێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d1d985b39ecd513626903cba1cfa75a41dafd785ea9b54df86f6b0b5317be527",
+  "en": "For example, in vehicle models, one axis is used to control the moving speed, and the other axis is used to control the steering; or in the model of a tower crane, one axis is used to control the rotation, and the other axis is used to control the distance of the trolley car.",
+  "ar": "على سبيل المثال، في نماذج المركبات يُستخدم أحد المحورين للتحكم في سرعة الحركة والمحور الآخر للتحكم في التوجيه؛ أو في نموذج الرافعة البرجية يُستخدم أحد المحورين للتحكم في الدوران والآخر للتحكم في مسافة عربة الرافعة.",
+  "ckb": "بۆ نموونە، لە مۆدێلی ئۆتۆمبێلەکاندا، تەوەرێک بۆ کۆنترۆڵکردنی خێرایی جووڵە و تەوەرەکەی تر بۆ کۆنترۆڵکردنی ئاراستەکردن بەکاردێت؛ یان لە مۆدێلی کرێنێکی بورجیدا، تەوەرێک بۆ کۆنترۆڵکردنی سووڕانەوە و تەوەرەکەی تر بۆ کۆنترۆڵکردنی دووریی عەرەبانەی کرێنەکە بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cc277efd18487722c769e2f67e9d21e45bca73c06b8c268ca6ef5338190c55ec",
+  "en": "Power switch module is a two-position switch that is often used to control power on/off without removing the battery. There are two 2pinXH2.54 connectors on the switch board, which are usually connected in series between the power supply and the expansion board. The switch board can be used to cut off the power supply without removing the battery directly, avoiding the continuous standby state that causes the battery to lose power as well.",
+  "ar": "وحدة مفتاح الطاقة هي مفتاح بوضعين يُستخدم غالبًا للتحكم في تشغيل الطاقة وإيقافها دون نزع البطارية. ويوجد على لوحة المفتاح موصّلان من نوع 2pinXH2.54، يُوصَلان عادةً على التوالي بين مصدر الطاقة ولوحة التوسعة. ويمكن استخدام لوحة المفتاح لقطع الطاقة دون نزع البطارية مباشرةً، ما يتجنّب حالة الاستعداد المستمرة التي تؤدي أيضًا إلى استنزاف البطارية.",
+  "ckb": "مۆدیولی کلیلی وزە کلیلێکی دوو دۆخییە کە زۆرجار بۆ کۆنترۆڵکردنی هەڵکردن/کوژاندنەوەی وزە بەبێ لابردنی باترییەکە بەکاردێت. دوو گەیەنەری 2pinXH2.54 لەسەر بۆردی کلیلەکە هەن، کە بە زۆری بە زنجیرەیی لە نێوان سەرچاوەی وزە و بۆردی فراوانکردندا دەبەسترێن. دەتوانرێت بۆردی کلیلەکە بەکاربهێنرێت بۆ پچڕاندنی وزە بەبێ لابردنی ڕاستەوخۆی باترییەکە، و بەم شێوەیە خۆ لە دۆخی ئامادەباشیی بەردەوام دەپارێزرێت کە ئەویش دەبێتە هۆی بەتاڵبوونی باترییەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1456bbf4c615119e5843a7e0aee6958e85ab9a6688f96cf301ea64617409453f",
+  "en": "Connector handling: Please hold the connector by the plastic housing when plugging and unplugging. Do not pull directly on the wires to avoid detachment.",
+  "ar": "التعامل مع الموصل: يرجى الإمساك بالموصل من غلافه البلاستيكي عند التوصيل والفصل. لا تسحب الأسلاك مباشرةً لتجنّب انفصالها.",
+  "ckb": "مامەڵەکردن لەگەڵ گەیەنەر: تکایە لە کاتی بەستن و دەرهێناندا گەیەنەرەکە لە بەرگە پلاستیکییەکەیەوە بگرە. ڕاستەوخۆ وایەرەکان ڕامەکێشە بۆ ئەوەی جیا نەبنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fa54446cb4fecba9b7b2df0623376b5a13cd23446c76ab7113f0292496e46be2",
+  "en": "Rated current: Do not exceed the rated current capacity of the switch module.",
+  "ar": "التيار المقدّر: لا تتجاوز سعة التيار المقدّرة لوحدة المفتاح.",
+  "ckb": "تەزووی دیاریکراو: لە توانای تەزووی دیاریکراوی مۆدیولی کلیلەکە تێمەپەڕە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "57c1cc707e3d4457232588aa7ee31ec63b60ee231c052d518789239f4cb2d82d",
+  "en": "The product comes with a 100mm Wire with 2Pin XH2.54 Connectors.",
+  "ar": "يأتي المنتج مع سلك 100mm Wire with 2Pin XH2.54 Connectors.",
+  "ckb": "بەرهەمەکە لەگەڵ وایەری 100mm Wire with 2Pin XH2.54 Connectors دێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "abb6c8c6e5037e7f5b7db6e7bf11afe0b65b3bb9d832593ac8f35478e42644af",
+  "en": "Momentary button module is a binary input module. Different signals can be sent by short press, long press, press and lift and other actions. Compared to a three-position rocker switch module, a momentary button module has only two states: pressed and flicked up, and it always returns to flicked up. The momentary button module can be used to switch between various modes in a specified order, trigger and stop some actions in real time. For example, triggering a shot on a model with a shooting mechanism, or switching the mode and color of lights on a model with RGB lights.",
+  "ar": "وحدة الزر اللحظي هي وحدة إدخال ثنائية. ويمكن إرسال إشارات مختلفة عبر الضغط القصير والضغط الطويل والضغط ثم الرفع وغيرها من الحركات. وعلى عكس وحدة المفتاح المتأرجح ثلاثي الأوضاع، لا تملك وحدة الزر اللحظي سوى حالتين: مضغوط ومرفوع، وهي تعود دائمًا إلى وضع الرفع. ويمكن استخدام وحدة الزر اللحظي للتبديل بين أوضاع مختلفة بترتيب محدّد، وتشغيل بعض الحركات وإيقافها في الوقت الفعلي. ومن الأمثلة على ذلك إطلاق قذيفة في نموذج مزوّد بآلية إطلاق، أو تبديل وضع الأضواء ولونها في نموذج مزوّد بإضاءة RGB.",
+  "ckb": "مۆدیولی دوگمەی کاتی مۆدیولێکی چوونەژوورەوەی دووانەییە. دەتوانرێت سیگناڵی جیاواز بنێردرێت بە پەستانی کورت، پەستانی درێژ، پەستان و بەرزکردنەوە و کرداری تر. بە بەراورد لەگەڵ مۆدیولی کلیلی لەنگەری سێ دۆخی، مۆدیولی دوگمەی کاتی تەنها دوو دۆخی هەیە: پەستێنراو و بەرزبووەوە، و هەمیشە دەگەڕێتەوە بۆ دۆخی بەرزبووەوە. دەتوانرێت مۆدیولی دوگمەی کاتی بەکاربهێنرێت بۆ گۆڕین لە نێوان دۆخە جیاوازەکاندا بە ڕیزبەندییەکی دیاریکراو، و دەستپێکردن و ڕاگرتنی هەندێک کردار لە کاتی ڕاستەقینەدا. بۆ نموونە، تەقاندنی گوللەیەک لە مۆدێلێکدا کە میکانیزمی تەقاندنی هەیە، یان گۆڕینی دۆخ و ڕەنگی ڕووناکییەکان لە مۆدێلێکدا کە ڕووناکیی RGB تێدایە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "aeb700ffd8be0bf72b0b9b1d0881ff88feeb3e70374bd4e18b8cca54402facaf",
+  "en": "The product comes with a 100mm Wire with 2Pin SH1.0 Connectors.",
+  "ar": "يأتي المنتج مع سلك 100mm Wire with 2Pin SH1.0 Connectors.",
+  "ckb": "بەرهەمەکە لەگەڵ وایەری 100mm Wire with 2Pin SH1.0 Connectors دێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "09d8da581f7684b50fd7c01e84b16235bd3f391205f0bcb8bce3137bd87052bf",
+  "en": "Used with a Lithium Battery Charger with XH2.54 Connector, the 14500 7.4V 800mAh Li-ion battery enables efficient charging.",
+  "ar": "عند استخدامها مع Lithium Battery Charger with XH2.54 Connector، تتيح بطارية 14500 7.4V 800mAh Li-ion شحنًا فعّالًا.",
+  "ckb": "کاتێک لەگەڵ Lithium Battery Charger with XH2.54 Connector بەکاردێت، باتریی 14500 7.4V 800mAh Li-ion بارگاویکردنێکی کارا ڕێگەپێدەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8df52214cab9b46d3fbd527b0955a47ef53fd8b17ab055746ef74d11739e6e6a",
+  "en": "Used with a Power Switch Module with 2Pin XH2.54 Connector, it is more convenient to switch the battery power.",
+  "ar": "وعند استخدامها مع Power Switch Module with 2Pin XH2.54 Connector، يصبح تشغيل طاقة البطارية وإيقافها أكثر سهولة.",
+  "ckb": "کاتێک لەگەڵ Power Switch Module with 2Pin XH2.54 Connector بەکاردێت، هەڵکردن و کوژاندنەوەی وزەی باترییەکە ئاسانتر دەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bcffa6378ca52016147be29bf496146f398107b0cd66e801aae84a05e1c86cc9",
+  "en": "Short Circuit Protection: The battery has protection for short circuits to prevent damage.",
+  "ar": "الحماية من دائرة القصر: البطارية مزوّدة بحماية من دائرة القصر لمنع التلف.",
+  "ckb": "پاراستن لە کورتە بازنە: باترییەکە پاراستنی لە بەرامبەر کورتە بازنەدا هەیە بۆ ڕێگریکردن لە زیان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c7e05e14f209f0b665788511ae6963ba045554cd80de7d445cf9daee4fcdd33a",
+  "en": "Overcharge and Over-discharge Protection: Protects the battery from damage caused by excessive charging or discharging.",
+  "ar": "الحماية من الشحن الزائد والتفريغ الزائد: تحمي البطارية من التلف الناتج عن الإفراط في الشحن أو التفريغ.",
+  "ckb": "پاراستن لە بارگاویکردنی زیادە و بەتاڵبوونی زیادە: باترییەکە لەو زیانانە دەپارێزێت کە لە بارگاویکردن یان بەتاڵکردنی زیادەوە دروست دەبن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c0737e57b5631cb461d02caa5ff2b7009e9afe9aa1bd77b02c975b0372554683",
+  "en": "L1(mm) Bolt Length",
+  "ar": "طول البرغي L1 (mm)",
+  "ckb": "درێژیی بۆڵت L1 (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9285a31e679a796cb1bae147d3647a77e3a65c908fddff0605df818abadf162a",
+  "en": "L2 (mm) Thread Length",
+  "ar": "طول السنّ L2 (mm)",
+  "ckb": "درێژیی پێچ L2 (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "79e0d1211240b15045e5a3ecf4b9ef5f81d6aab7a9380825b0b958c30e8a4da6",
+  "en": "Made of corrosion-resistant stainless steel, durable and anti-rust",
+  "ar": "مصنوع من فولاذ مقاوم للصدأ ومقاوم للتآكل، متين ولا يصدأ",
+  "ckb": "لە پۆڵای زەنگنەگری بەرگری داخوران دروستکراوە، بەرگەگر و دژە ژەنگ",
+  "kind": "block_line"
+ },
+ {
+  "h": "b89975b0c32cf41d23cab87b6691df2d8094b7a3576750e298a0c4835c7d8527",
+  "en": "Standard 1/4''- 20 UNC coarse thread, suitable for common photography and industrial mounting systems",
+  "ar": "سنّ خشن قياسي 1/4''- 20 UNC، مناسب لأنظمة التثبيت الشائعة في التصوير والصناعة",
+  "ckb": "پێچی زبری ستانداردی 1/4''- 20 UNC، گونجاوە بۆ سیستەمە باوەکانی بەستن لە وێنەگرتن و پیشەسازیدا",
+  "kind": "block_line"
+ },
+ {
+  "h": "24a1cf624b7736d2cc89838d383fec8fa47a0da95c09b345acbd1756f34c0ed7",
+  "en": "Precision-machined hex socket for easy installation with Allen wrench",
+  "ar": "تجويف سداسي مشغول بدقة لسهولة التركيب باستخدام مفتاح ألن",
+  "ckb": "کونی شەشپاڵووی بە وردی دروستکراو بۆ دامەزراندنی ئاسان بە کلیلی ئەلەن",
+  "kind": "block_line"
+ },
+ {
+  "h": "c3727fd8bdd809c295539bc0ae7cb9ecc66dcb1ddf52b3b789c78cdd2609fea6",
+  "en": "With bottom groove diameter for positioning or locking structures",
+  "ar": "مزوّد بقطر مجرى سفلي لهياكل التموضع أو القفل",
+  "ckb": "بە تیرەی شیاری خوارەوە بۆ پێکهاتەکانی جێگیرکردن یان قفڵکردن",
+  "kind": "block_line"
+ },
+ {
+  "h": "4c44766a21f5f428ffc20f6d5c9c93f315290346888957c42cff358514691aa6",
+  "en": "Ideal for camera tripod plates, rig systems, or quick-release systems",
+  "ar": "مثالي لصفائح الحوامل الثلاثية للكاميرات وأنظمة التجهيز (rig) أو أنظمة التحرير السريع",
+  "ckb": "گونجاوترینە بۆ پلێتی سێپێی کامێرا، سیستەمەکانی ڕیگ (rig) یان سیستەمەکانی کردنەوەی خێرا",
+  "kind": "block_line"
+ },
+ {
+  "h": "b863065862dbdf913fa3e447d96c4ce5c5d312b3c72088e54065b1ead8213260",
+  "en": "The quick release plate nut is a small accessory used to securely attach a camera or other equipment to a tripod, gimbal, or quick release plate.",
+  "ar": "صامولة صفيحة التحرير السريع ملحق صغير يُستخدم لتثبيت الكاميرا أو المعدات الأخرى بإحكام على حامل ثلاثي أو مثبّت جيمبال أو صفيحة تحرير سريع.",
+  "ckb": "سامۆڵەی پلێتی کردنەوەی خێرا پێداویستییەکی بچووکە کە بۆ بەستنی پتەوی کامێرا یان ئامێرەکانی تر بە سێپێ، جیمباڵ یان پلێتی کردنەوەی خێراوە بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1a05a186b0d8d3b39d7b6b49d921cdec446deb120bdb5f4140d061c3cdef7efa",
+  "en": "Standard 1/4''-20 UNC coarse thread, suitable for common photography and industrial mounting systems",
+  "ar": "سنّ خشن قياسي 1/4''-20 UNC، مناسب لأنظمة التثبيت الشائعة في التصوير والصناعة",
+  "ckb": "پێچی زبری ستانداردی 1/4''-20 UNC، گونجاوە بۆ سیستەمە باوەکانی بەستن لە وێنەگرتن و پیشەسازیدا",
+  "kind": "block_line"
+ },
+ {
+  "h": "88584439f44f93cd397e5b1f507782d7fa036f2f2cc5b42d8cd131abe1b2cbaf",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional AMS Flipper - for P1S/X1 Series. To complete the project, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من AMS Flipper - for P1S/X1 Series. ولإكمال المشروع، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی AMS Flipper - for P1S/X1 Series بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی پڕۆژەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cc2b7e71ab9ac7af85b21cd3777355ea99a29bf43062c3e7339fdb79b21ac6c7",
+  "en": "To download the model files of the AMS Flipper - for P1S/X1 Series and obtain detailed information, please visit the AMS Flipper - for P1S/X1 Series on MakerWorld.",
+  "ar": "لتنزيل ملفات نموذج AMS Flipper - for P1S/X1 Series والحصول على معلومات مفصّلة، يرجى زيارة صفحة AMS Flipper - for P1S/X1 Series على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێلی AMS Flipper - for P1S/X1 Series و وەرگرتنی زانیاریی ورد، تکایە سەردانی پەڕەی AMS Flipper - for P1S/X1 Series لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9c69f864cf678bdf4a6c780522d5c65526fc4eb36c945b5d7f87a136ae599e6e",
+  "en": "Crafted from premium, rigorously tested polyester, this durable lanyard offers tool-free installation and keeps charging ports accessible. Its versatile design securely holds phones, cameras, USB drives, wallets, ID badges, and custom 3D printed items like ornaments, tags, or protective cases, providing peace of mind for any activity, from hiking to daily commutes.",
+  "ar": "صُنع هذا الحبل المتين من بوليستر فاخر خضع لاختبارات صارمة، ويتيح تركيبًا دون أدوات مع إبقاء منافذ الشحن في متناول اليد. ويحمل تصميمه متعدد الاستخدامات بإحكام الهواتف والكاميرات ووحدات تخزين USB والمحافظ وبطاقات التعريف، إضافةً إلى القطع المخصّصة المطبوعة بطابعة 3D مثل الزينة والبطاقات المعلّقة أو الأغطية الواقية، ليمنحك راحة البال في أي نشاط، من المشي لمسافات طويلة إلى التنقل اليومي.",
+  "ckb": "ئەم بەندە بەرگەگرە لە پۆلیستەری نایاب دروستکراوە کە بە وردی تاقیکراوەتەوە، دامەزراندنی بەبێ ئامراز پێشکەش دەکات و دەرچەکانی بارگاویکردن بە ئاسانی بەردەست دەهێڵێتەوە. دیزاینە فرە بەکارهێنانەکەی بە پتەوی مۆبایل، کامێرا، فلاشی USB، جزدان، باجی ناسنامە و کەلوپەلی تایبەتی چاپکراو بە 3D وەک خشڵ، تاگ یان کەیسی پارێزەر هەڵدەگرێت، و ئاسوودەیی دەروونی بۆ هەر چالاکییەک دابین دەکات، لە شاخەوانییەوە تا هاتوچۆی ڕۆژانە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "eec2523abd798699c6ec2aed530497dcc8031f4d2e2d0932b5fd65a37e2df6b0",
+  "en": "L(mm) Bolt Length",
+  "ar": "طول البرغي L (mm)",
+  "ckb": "درێژیی بۆڵت L (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "97ac9d25caf36cff6570039292d1458dc673c0318b7eb7921721157c9b12d010",
+  "en": "h (mm) Small Step Thickness",
+  "ar": "سماكة الدرجة الصغيرة h (mm)",
+  "ckb": "ئەستووریی پلە بچووکەکە h (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "6dfbbd3496b338c3a3ae49e6ae833f4d835d5c665b2e7ac6a98622466e1846a0",
+  "en": "d (mm) Small Step Diameter",
+  "ar": "قطر الدرجة الصغيرة d (mm)",
+  "ckb": "تیرەی پلە بچووکەکە d (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "fe2b9c30a8ef7f0d9783417d061245b52d9b870895c34388fccfd92a22d63948",
+  "en": "DK (mm) Recessed Inner Diameter",
+  "ar": "القطر الداخلي للتجويف DK (mm)",
+  "ckb": "تیرەی ناوەوەی چاڵەکە DK (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "924f5e41b698020bfa87b2cd55e17c16c998825fb3410d20107505f72a0a8b27",
+  "en": "K（mm） Hole Diameter",
+  "ar": "قطر الثقب K (mm)",
+  "ckb": "تیرەی کون K (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "54373da6380029341b8661c02c37d0b7d048ed772d761de5ca9ecf29ce9d71bf",
+  "en": "Made of high-strength aluminum alloy, lightweight and durable",
+  "ar": "مصنوع من سبيكة ألمنيوم عالية المتانة، خفيف الوزن ومتين",
+  "ckb": "لە ئاوێتەی ئەلەمنیۆمی بەهێزیی بەرز دروستکراوە، سووک و بەرگەگرە",
+  "kind": "block_line"
+ },
+ {
+  "h": "3f504cd11294901d609e9d9fdc7d791dae59decdc1f2a70c9591ac2a8a94dcc8",
+  "en": "Surface treated with precision anodizing to resist corrosion",
+  "ar": "سطح معالَج بأنودة دقيقة لمقاومة التآكل",
+  "ckb": "ڕووەکەی بە ئەنۆدایزکردنی ورد چارەسەر کراوە بۆ بەرگەگرتنی داخوران",
+  "kind": "block_line"
+ },
+ {
+  "h": "2b0d67b485765229faaf1c61ab03ccc68c6fd91ecf89a6581fd25beb278fdaff",
+  "en": "1/4-20 UNC thread, compatible with most photographic and mounting equipment",
+  "ar": "سنّ 1/4-20 UNC، متوافق مع معظم معدات التصوير والتثبيت",
+  "ckb": "پێچی 1/4-20 UNC، گونجاوە لەگەڵ زۆربەی ئامێرەکانی وێنەگرتن و بەستن",
+  "kind": "block_line"
+ },
+ {
+  "h": "82f614a5d034dcabebcb2c66f91733ac09d48161f257e6eeda7400651d4caba2",
+  "en": "Easy to tighten and loosen by hand without tools",
+  "ar": "سهل الشدّ والفكّ باليد دون أدوات",
+  "ckb": "بە ئاسانی بە دەست توند و شل دەکرێتەوە بەبێ ئامراز",
+  "kind": "block_line"
+ },
+ {
+  "h": "3c8aa560b23ea5e84c76d0082d87fc884da31d49ed3de97d10bed36d4756a09e",
+  "en": "Recessed hollow head with 6-hole design for enhanced grip and reduced weight",
+  "ar": "رأس مجوّف غائر بتصميم من 6 ثقوب لقبضة أفضل ووزن أخف",
+  "ckb": "سەرێکی بۆشی چاڵکراو بە دیزاینی 6 کون بۆ گرتنی باشتر و کێشی کەمتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "6089a9ca5a86e9b4d9560f803e953be57c4e54353cb82544b039c9a5dd2d856e",
+  "en": "Ideal for camera tripods, quick release plates, rigs, and other accessories",
+  "ar": "مثالي للحوامل الثلاثية للكاميرات وصفائح التحرير السريع وأنظمة التجهيز (rigs) وغيرها من الملحقات",
+  "ckb": "گونجاوترینە بۆ سێپێی کامێرا، پلێتی کردنەوەی خێرا، ڕیگەکان (rigs) و پێداویستییەکانی تر",
+  "kind": "block_line"
+ },
+ {
+  "h": "9517eeafef662677d8f928c423b064c4b7b12ef7ea5c2405f8c6a5dc8c0c9605",
+  "en": "Nominal Diameter (unc)",
+  "ar": "القطر الاسمي (unc)",
+  "ckb": "تیرەی ناوزەد (unc)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "bdfe0a0c1c2a3746677b21096ed705189d632ce27e74120cbdf9d4c9e40f05cc",
+  "en": "Outer Diameter (mm)",
+  "ar": "القطر الخارجي (mm)",
+  "ckb": "تیرەی دەرەوە (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "596155d3b65cd23298766f2a5c6500558858d24a7b9535ee8907fa1f1cec2631",
+  "en": "Length (mm)",
+  "ar": "الطول (mm)",
+  "ckb": "درێژی (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "8e193bf90eb2ce1b6eb4bf99bd010f524f489525ee4eaa18d55174b78610ed90",
+  "en": "Round threaded brass heat-insert nut with vertical knurling",
+  "ar": "صامولة إدخال حراري دائرية ملولبة من النحاس الأصفر بتخديد عمودي",
+  "ckb": "سامۆڵەی دانانی گەرمیی خڕی پێچداری برنج بە زبرکاریی ستوونی",
+  "kind": "block_line"
+ },
+ {
+  "h": "6e27b237bcc41eb109ad2257ea246522d187216f0c3bf679f3753a8e1d4afbdc",
+  "en": "High thermal conductivity brass for fast and uniform heat transfer",
+  "ar": "نحاس أصفر عالي التوصيل الحراري لنقل الحرارة بسرعة وبشكل متجانس",
+  "ckb": "برنجی گەیاندنی گەرمیی بەرز بۆ گواستنەوەی خێرا و یەکسانی گەرمی",
+  "kind": "block_line"
+ },
+ {
+  "h": "b1ece6662616b0d9582ba42731cc1f52a58c296eb9321b0650a0876c8989f4aa",
+  "en": "The LiPo Battery Fireproof Storage Bag is designed for safely storing and transporting LiPo batteries, providing peace of mind for hobbyists and professionals. Made from premium fiberglass with a heat-insulating aluminum foil lining, it offers excellent fire protection. Weighing only 76.5g and measuring 60*185*75mm, the bag is lightweight, portable, and spacious enough to hold multiple batteries. This reliable and easy-to-use accessory is a must-have for anyone working with LiPo batteries.",
+  "ar": "صُمّمت حقيبة LiPo Battery Fireproof Storage Bag لتخزين بطاريات LiPo ونقلها بأمان، ما يمنح الهواة والمحترفين راحة البال. وهي مصنوعة من ألياف زجاجية فاخرة مع بطانة من رقائق الألمنيوم العازلة للحرارة، لتوفّر حماية ممتازة من الحريق. ولا يتجاوز وزنها 76.5g وأبعادها 60*185*75mm، فهي خفيفة الوزن وسهلة الحمل وواسعة بما يكفي لحمل عدة بطاريات. هذا الملحق الموثوق والسهل الاستخدام ضروري لكل من يتعامل مع بطاريات LiPo.",
+  "ckb": "جانتای LiPo Battery Fireproof Storage Bag بۆ هەڵگرتن و گواستنەوەی سەلامەتی باترییەکانی LiPo دیزاین کراوە، و ئاسوودەیی دەروونی بۆ حەزلێکەران و پیشەگەران دابین دەکات. لە ڕیشاڵی شووشەی نایاب دروستکراوە لەگەڵ ڕووپۆشێکی ناوەوە لە پەڕەی ئەلەمنیۆمی دابڕێنەری گەرمی، و پاراستنێکی نایاب لە ئاگر پێشکەش دەکات. کێشەکەی تەنها 76.5g دەبێت و ڕەهەندەکانی بریتین لە 60*185*75mm؛ جانتاکە سووکە، بە ئاسانی هەڵدەگیرێت و ئەوەندە فراوانە کە چەند باترییەک بگرێت. ئەم پێداویستییە متمانەپێکراو و بەکارهێنان ئاسانە بۆ هەر کەسێک کە لەگەڵ باترییەکانی LiPo کار دەکات پێویستە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f83bd72c676d7382348acbd5fe0ac9e1d3e692082ac1fa887665272f70527395",
+  "en": "Designed specifically for safely storing and transporting Lithium batteries, our LiPo Battery Safe Bag provides peace of mind for hobbyists and professionals alike.",
+  "ar": "صُمّمت حقيبتنا LiPo Battery Safe Bag خصيصًا لتخزين بطاريات الليثيوم ونقلها بأمان، لتمنح الهواة والمحترفين على حدّ سواء راحة البال.",
+  "ckb": "جانتاکەمان LiPo Battery Safe Bag بە تایبەتی بۆ هەڵگرتن و گواستنەوەی سەلامەتی باتریی لیتیۆم دیزاین کراوە، و ئاسوودەیی دەروونی بۆ حەزلێکەران و پیشەگەران وەک یەک دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8897454182591a0574f47720da839f8fd5cacac6d2b41328f6dfc374ae396701",
+  "en": "Constructed from high-quality fiberglass with an interior lined with heat-insulating aluminum foil, this fireproof bag offers superior protection against accidental fires.",
+  "ar": "صُنعت هذه الحقيبة المقاومة للحريق من ألياف زجاجية عالية الجودة مع بطانة داخلية من رقائق الألمنيوم العازلة للحرارة، لتوفّر حماية فائقة من الحرائق العرضية.",
+  "ckb": "ئەم جانتا دژە ئاگرە لە ڕیشاڵی شووشەی جۆرایەتی بەرز دروستکراوە و ناوەوەکەی بە پەڕەی ئەلەمنیۆمی دابڕێنەری گەرمی داپۆشراوە، و پاراستنێکی باڵا لە بەرامبەر ئاگرگرتنی ڕێکەوتدا پێشکەش دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "29fe6e1ef3c699fd434824fb2e122b5a677ed48f73e8b106d1142872d1dde603",
+  "en": "This combination of impact resistance and fire isolation makes the LiPo Battery Safe Bag a must-have for anyone looking to store or transport LiPo batteries securely.",
+  "ar": "ويجعل هذا المزيج من مقاومة الصدمات وعزل الحريق حقيبة LiPo Battery Safe Bag ضرورية لكل من يرغب في تخزين بطاريات LiPo أو نقلها بأمان.",
+  "ckb": "ئەم تێکەڵەیەی بەرگەی لێدان و دابڕاندنی ئاگر وا لە LiPo Battery Safe Bag دەکات کە بۆ هەر کەسێک پێویست بێت کە دەیەوێت باترییەکانی LiPo بە سەلامەتی هەڵبگرێت یان بیانگوازێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "41759d374b2572060e9500071570e31401b8ebee4dc2600a853f38ead517e050",
+  "en": "This product does not support any fast charging protocols.",
+  "ar": "لا يدعم هذا المنتج أي بروتوكولات للشحن السريع.",
+  "ckb": "ئەم بەرهەمە پشتگیریی هیچ پرۆتۆکۆلێکی بارگاویکردنی خێرا ناکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2b1cf546886e8e21c7af7e1f2371484e58cb09195b4b0808e81c55d0c4e9a7dd",
+  "en": "Rated Input Voltage",
+  "ar": "جهد الدخل المقدّر",
+  "ckb": "ڤۆڵتیەی چوونەژوورەوەی دیاریکراو",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5140cb1f4fdf84cae2f7c8f99c9ae78287408ba3e741b36cdc99fe02e9bf84b1",
+  "en": "Rated Input Frequency",
+  "ar": "تردد الدخل المقدّر",
+  "ckb": "لەرەلەری چوونەژوورەوەی دیاریکراو",
+  "kind": "block_cell"
+ },
+ {
+  "h": "181e7e7c1367107d1bd49357bacf4a25b5447bba930e9b1e5bd2106d90f4f067",
+  "en": "Rating Output Power",
+  "ar": "قدرة الخرج المقدّرة",
+  "ckb": "وزەی دەرچوونی دیاریکراو",
+  "kind": "block_cell"
+ },
+ {
+  "h": "d1ff3c7095553943ae19409511c954f58d38db6a173eeda152cc7bfc601c8426",
+  "en": "USB-C Output",
+  "ar": "خرج USB-C",
+  "ckb": "دەرچوونی USB-C",
+  "kind": "block_cell"
+ },
+ {
+  "h": "1da065cb77fb262c333a626ea0f9baea0c16af14ba97b0ae2c3280d94bbc9c80",
+  "en": "USB-A Output",
+  "ar": "خرج USB-A",
+  "ckb": "دەرچوونی USB-A",
+  "kind": "block_cell"
+ },
+ {
+  "h": "6dfdc7ffbf04a432ebb5d59aa912780c9aebfa198c69de46b73a1e3b437126bc",
+  "en": "Ideal for charging smartphones, tablets, wireless earbuds, and other USB-powered devices.Supports simultaneous charging of two devices via USB-A and USB-C ports.Perfect for home, office, or travel use thanks to its compact and portable design.",
+  "ar": "مثالي لشحن الهواتف الذكية والأجهزة اللوحية وسماعات الأذن اللاسلكية وغيرها من الأجهزة التي تعمل عبر USB. يدعم شحن جهازين في آنٍ واحد عبر منفذي USB-A وUSB-C. مثالي للاستخدام في المنزل أو المكتب أو السفر بفضل تصميمه المدمج وسهل الحمل.",
+  "ckb": "گونجاوترینە بۆ بارگاویکردنی مۆبایلی زیرەک، تابلێت، گوێگرەی بێتەل و ئامێرەکانی تری USB. پشتگیریی بارگاویکردنی هاوکاتی دوو ئامێر دەکات لە ڕێگەی دەرچەکانی USB-A و USB-C. بەهۆی دیزاینە بچووک و گوازراوەکەیەوە بۆ بەکارهێنان لە ماڵ، ئۆفیس یان گەشتدا تەواو گونجاوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "280b4dfbf2f1917f17676a194982ae887fe46e1c9f2984a4709c7054f16b64fc",
+  "en": "The charger's maximum total output is 20W, shared between both ports.When only one device is connected, it can receive up to the full 20W.When two devices are connected, the total 20W output is split between them.Please ensure your devices do not require more power than the charger’s rated output to avoid slower charging or compatibility issues.",
+  "ar": "أقصى خرج إجمالي للشاحن هو 20W، ويُوزَّع بين المنفذين. عند توصيل جهاز واحد فقط، يمكنه الحصول على كامل القدرة البالغة 20W. وعند توصيل جهازين، تُقسَّم القدرة الإجمالية البالغة 20W بينهما. يرجى التأكد من أن أجهزتك لا تتطلب قدرة أعلى من القدرة المقدّرة لخرج الشاحن لتجنّب بطء الشحن أو مشكلات التوافق.",
+  "ckb": "زۆرترین کۆی دەرچوونی بارگاویکەرەکە بریتییە لە 20W، کە لە نێوان هەردوو دەرچەکەدا دابەش دەکرێت. کاتێک تەنها یەک ئامێر پەیوەست کرابێت، دەتوانێت تەواوی 20W وەربگرێت. کاتێک دوو ئامێر پەیوەست کرابن، کۆی دەرچوونی 20W لە نێوانیاندا دابەش دەکرێت. تکایە دڵنیابە لەوەی ئامێرەکانت وزەیەکی زیاتر لە دەرچوونی دیاریکراوی بارگاویکەرەکە داوا ناکەن، بۆ ئەوەی بارگاویکردن خاو نەبێتەوە یان کێشەی گونجاوی دروست نەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e3358372b75526c6715bdd991687de094a95cd4c175c0b006f6fc8725abbeda4",
+  "en": "Experience the CyberBrick RC Tank",
+  "ar": "استمتع بتجربة دبابة CyberBrick RC",
+  "ckb": "ئەزموونی تانکی CyberBrick RC بکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "df2504c9afccaf9c03a0f9f7bdf55f775941f1ca67998feb565a79d12110fef0",
+  "en": "Assemble your own CyberBrick Tank, a modular designed for dynamic play. Once built, take command of its impressive capabilities – from precise maneuverability to rapid-fire disc launching. This isn't just a model; it's an interactive experience where every battle is an adventure you craft.",
+  "ar": "جمّع دبابتك الخاصة CyberBrick Tank، المصمّمة بشكل معياري للعب الحركي. وبعد بنائها، تولَّ قيادة قدراتها المذهلة – من المناورة الدقيقة إلى الإطلاق السريع للأقراص. إنها ليست مجرد نموذج؛ بل تجربة تفاعلية تصبح فيها كل معركة مغامرة من صنعك.",
+  "ckb": "تانکەکەی خۆت، CyberBrick Tank، پێکەوە بنێ، کە بە شێوەی مۆدیولار بۆ یاریی چالاک دیزاین کراوە. دوای دروستکردنی، فەرماندەیی توانا سەرنجڕاکێشەکانی بکە – لە مانۆڕی وردەوە تا هاویشتنی خێرای دیسک. ئەمە تەنها مۆدێلێک نییە؛ ئەزموونێکی کارلێککارە کە تێیدا هەر شەڕێک سەرکێشییەکە کە خۆت دروستی دەکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "86c4577c0447332b63028a8245ec0cdad859b1e21be321f2aea68210e2edb42c",
+  "en": "Print Time",
+  "ar": "وقت الطباعة",
+  "ckb": "ماوەی چاپ",
+  "kind": "block_line"
+ },
+ {
+  "h": "f1ab14d3b44e186c63f46a0ce5fc096adf754f9d9b2e60bb301ce5d12887982e",
+  "en": "per car",
+  "ar": "لكل سيارة",
+  "ckb": "بۆ هەر ئۆتۆمبێلێک",
+  "kind": "block_line"
+ },
+ {
+  "h": "0a9066fa6acd2d7a545af769171444d090e5b7940f5dd39e77b9a2c924b5982c",
+  "en": "Filament",
+  "ar": "فلامنت",
+  "ckb": "فیلامێنت",
+  "kind": "block_line"
+ },
+ {
+  "h": "2506204d5d098d80e8426605394e7c5c54d050ce4808dcf42ea8de01e22f8fa7",
+  "en": "Experienced",
+  "ar": "متمرّس",
+  "ckb": "بەئەزموون",
+  "kind": "block_line"
+ },
+ {
+  "h": "c7b120df67a800c88b80ee03fc11dd596c7f05b041b12b1836f5196408fa18a2",
+  "en": "Age Range",
+  "ar": "الفئة العمرية",
+  "ckb": "مەودای تەمەن",
+  "kind": "block_line"
+ },
+ {
+  "h": "1c50993b009c62dd6600bc0113d0424f9e8ffee8f7eddb0cdad9d4aad67eb4f6",
+  "en": "years",
+  "ar": "سنوات",
+  "ckb": "ساڵ",
+  "kind": "block_line"
+ },
+ {
+  "h": "4ade96f97842e9ff8fb93eb1964b634e04e6b34122830c15752d4b6481e56e82",
+  "en": "Precision 360° Maneuverability",
+  "ar": "مناورة دقيقة بزاوية 360°",
+  "ckb": "مانۆڕی وردی 360°",
+  "kind": "block_title"
+ },
+ {
+  "h": "a277434aaf6cf48a26cacaf1c1e3cd83d03e247ce95ea40c41ecfc8c4487a268",
+  "en": "Navigate tight spaces and outflank opponents with ease. The tank pivots on its axis, offering full rotational control without needing forward momentum. Pinpoint positioning is key to victory.",
+  "ar": "تنقّل في المساحات الضيقة والتفّ على خصومك بسهولة. تدور الدبابة حول محورها، ما يمنحك تحكمًا كاملًا بالدوران دون الحاجة إلى اندفاع للأمام. فالتموضع الدقيق هو مفتاح النصر.",
+  "ckb": "بە ئاسانی لە شوێنە تەسکەکاندا بجووڵێ و لە لاوە دەوری ڕکابەرەکانت بدە. تانکەکە لەسەر تەوەرەکەی خۆی دەسووڕێتەوە، و کۆنترۆڵی تەواوی سووڕانەوە پێشکەش دەکات بەبێ پێویستی بە جووڵەی بەرەوپێش. جێگیربوونی ورد کلیلی سەرکەوتنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1a389029541913be88c62bc5e444caf1a56f1e47045198d6509c0dc7a6a2216c",
+  "en": "Firepower on the Move",
+  "ar": "قوة نارية أثناء الحركة",
+  "ckb": "هێزی تەقەکردن لە کاتی جووڵەدا",
+  "kind": "block_title"
+ },
+ {
+  "h": "bc1bf9740cfb1bd08bd14c0b23ae385aab116e96d36b3cb034492a316b88ed2d",
+  "en": "Maintain offensive pressure even while repositioning. The CyberBrick Tank fires 14mm Plastic balls accurately while in motion, keeping targets suppressed as you advance or retreat. Never break your attack rhythm.",
+  "ar": "حافظ على الضغط الهجومي حتى أثناء تغيير موقعك. تطلق دبابة CyberBrick Tank كرات بلاستيكية بقطر 14mm بدقة أثناء الحركة، لتُبقي الأهداف تحت الضغط وأنت تتقدّم أو تتراجع. لا تكسر إيقاع هجومك أبدًا.",
+  "ckb": "تەنانەت لە کاتی گۆڕینی شوێنیشدا فشاری هێرشبەرانە بپارێزە. تانکی CyberBrick Tank لە کاتی جووڵەدا بە وردی تۆپی پلاستیکیی 14mm دەتەقێنێت، و ئامانجەکان لە ژێر فشاردا دەهێڵێتەوە لە کاتێکدا بەرەوپێش دەچیت یان دەکشێیتەوە. هەرگیز ڕیتمی هێرشەکەت مەپچڕێنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cb49321325f8d0c7aa99322dcb82cbb30e882860c435071238cef8297912016c",
+  "en": "Target Acquisition and Engagement",
+  "ar": "تحديد الأهداف والاشتباك معها",
+  "ckb": "دیاریکردنی ئامانج و پێکانی",
+  "kind": "block_title"
+ },
+ {
+  "h": "48a0eec7dc7b4484488cc258de30d1e3f0d8d4084f462e01ccf0d8100e5b8f0b",
+  "en": "Lock onto your objectives and unleash a precise strike. Watch balls fly straight and true, hitting designated targets with satisfying impact. Practice your aim and become a master gunner.",
+  "ar": "ثبّت تصويبك على أهدافك وأطلق ضربة دقيقة. شاهد الكرات تنطلق بخط مستقيم ودقيق لتصيب الأهداف المحدّدة بإصابة مُرضية. تدرّب على التصويب وكن راميًا بارعًا.",
+  "ckb": "نیشانە لە ئامانجەکانت بگرە و لێدانێکی ورد بکە. سەیری تۆپەکان بکە کە ڕاست و بێ لادان دەفڕن و بە لێدانێکی دڵخۆشکەر ئامانجە دیاریکراوەکان دەپێکن. ڕاهێنان لەسەر نیشانەگرتن بکە و ببە بە تەقەکەرێکی شارەزا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c01d0a9a006f9a4271647463b1346057096b21b2fe40050318eb26e3341a3d40",
+  "en": "Rapid-Fire Plastic ball Blaster",
+  "ar": "مطلق كرات بلاستيكية سريع الإطلاق",
+  "ckb": "تەقێنەری خێرای تۆپی پلاستیکی",
+  "kind": "block_title"
+ },
+ {
+  "h": "f36cd65f17c8ab95f443e2688801b3c3e0e12383a6f8a0ff6df072044f262fdb",
+  "en": "Overwhelm your rivals with a relentless barrage of balls. The integrated blaster fires continuously, ensuring a steady stream of projectiles. Keep the pressure on from start to finish.",
+  "ar": "اغمر خصومك بوابل متواصل من الكرات. يطلق المطلق المدمج الكرات بشكل متواصل، ليضمن تدفقًا ثابتًا من المقذوفات. حافظ على الضغط من البداية حتى النهاية.",
+  "ckb": "ڕکابەرەکانت بە باراناوێکی بێ وچانی تۆپ داپڵۆسێنە. تەقێنەرە جێگیرکراوەکە بە بەردەوامی دەتەقێنێت، و ڕۆیشتنێکی نەگۆڕی تۆپ دەستەبەر دەکات. لە سەرەتاوە تا کۆتایی فشارەکە بەردەوام بهێڵە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6256b98ddb4e491615c06c1b314aee1d07215330899219993f621ad114e74eb4",
+  "en": "Custom Battlefield Creation",
+  "ar": "إنشاء ساحة معركة مخصّصة",
+  "ckb": "دروستکردنی گۆڕەپانی شەڕی تایبەت",
+  "kind": "block_title"
+ },
+ {
+  "h": "8cb45791da667f91d7e1ae92ffb71e236a713eeda7b665fc090cc7d9df54c70c",
+  "en": "Design your own tactical arenas with included target and anti-tank obstacle models. Set up challenging scenarios, practice advanced maneuvers, and perfect your strategy. The battlefield is yours to command.",
+  "ar": "صمّم ساحاتك التكتيكية الخاصة باستخدام نماذج الأهداف والعوائق المضادة للدبابات المرفقة. جهّز سيناريوهات مليئة بالتحدي، وتدرّب على المناورات المتقدمة، وأتقن استراتيجيتك. ساحة المعركة تحت قيادتك.",
+  "ckb": "گۆڕەپانە تاکتیکییەکانی خۆت دیزاین بکە بە مۆدێلی ئامانج و ڕێگرە دژە تانکەکانی لەگەڵدا. سیناریۆی پڕ لە ئاستەنگ ئامادە بکە، ڕاهێنان لەسەر مانۆڕی پێشکەوتوو بکە و ستراتیژەکەت تەواو بکە. گۆڕەپانی شەڕ لە ژێر فەرمانی تۆدایە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1bb96870ca7cef2ca68c7b4d041805802d0b9ad3b7ee34b05ea753a1b5c1890d",
+  "en": "DO NOT touch the moving parts while the device is operating to prevent pinching injuries.",
+  "ar": "لا تلمس الأجزاء المتحركة أثناء تشغيل الجهاز لتجنّب إصابات الانحشار.",
+  "ckb": "لە کاتی کارکردنی ئامێرەکەدا دەست لە پارچە جووڵاوەکان مەدە بۆ ڕێگریکردن لە برینداربوون بە گیرکردن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1bcd839b7891d7d612fd9ee1616213fc90b8be23ee1ca009c7b997b43e7e0ea9",
+  "en": "Before use, inspect all 3D-printed parts and sand down any sharp edges or burrs if present. Store the model and small parts in a location out of reach of children and pets to prevent choking hazards.",
+  "ar": "قبل الاستخدام، افحص جميع القطع المطبوعة (3D-printed) وصنفر أي حواف حادة أو زوائد إن وُجدت. احفظ النموذج والقطع الصغيرة في مكان بعيد عن متناول الأطفال والحيوانات الأليفة لتجنّب مخاطر الاختناق.",
+  "ckb": "پێش بەکارهێنان، هەموو پارچە چاپکراوەکان (3D-printed) بپشکنە و ئەگەر لێواری تیژ یان زیادەی هەبوو بە سەمبادە لووسی بکە. مۆدێلەکە و پارچە بچووکەکان لە شوێنێکدا هەڵبگرە کە لە دەستڕەسی منداڵان و ئاژەڵە ماڵییەکان دوور بێت، بۆ ڕێگریکردن لە مەترسیی خنکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "06b6fed8b1bf8045f2a8dfa4ae71c380b063c7c76fab636f6cadb7f51ef6c1ab",
+  "en": "For reference, the official installation data for a single car is listed below.",
+  "ar": "للاطلاع، نورد أدناه بيانات التركيب الرسمية لسيارة واحدة.",
+  "ckb": "بۆ زانیاری، زانیارییە فەرمییەکانی دامەزراندن بۆ یەک ئۆتۆمبێل لە خوارەوە نووسراون.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3e96c73c2721aea218057df9a377c42d55f7a76598f5b52d16ad1912e25dd2a5",
+  "en": "Experience Bumper Car Action Like Never Before",
+  "ar": "عِش متعة سيارات التصادم كما لم تعشها من قبل",
+  "ckb": "ئەزموونی ئۆتۆمبێلی بەریەککەوتن بکە وەک هەرگیز پێشتر نەتکردووە",
+  "kind": "block_title"
+ },
+ {
+  "h": "932928252e920af7970ff11906a1740e063c73c6aee07c13f6b167b58ec52fd2",
+  "en": "This clever RC car ejects the driver's head when hit from the side. With a single-wheel drive and steer system, it moves forward, backward, and turns smoothly — just like the real thing.",
+  "ar": "تقذف سيارة RC الذكية هذه رأس السائق عند اصطدامها من الجانب. وبفضل نظام القيادة والتوجيه بعجلة واحدة، تتحرك إلى الأمام والخلف وتنعطف بسلاسة — تمامًا مثل السيارة الحقيقية.",
+  "ckb": "ئەم ئۆتۆمبێلە زیرەکەی RC کاتێک لە لاوە لێی دەدرێت سەری شۆفێرەکە فڕێ دەداتە دەرەوە. بە سیستەمی لێخوڕین و ئاراستەکردنی یەک تایە، بەرەوپێش و بەرەودوا دەجووڵێت و بە نەرمی دەسووڕێتەوە — ڕێک وەک ئۆتۆمبێلی ڕاستەقینە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ad54f5de0c14b89632a1a5c952d155dd2dcfe6ce7ecfb300e68eff7c91be5e1c",
+  "en": "Perfect for kids and beginners, this remote-controlled car brings the excitement of amusement park bumper battles right to your home. Ideal for makers, gamers, and collectors — unleash your battlefield creativity with CyberBrick!",
+  "ar": "هذه السيارة ذات التحكم عن بُعد مثالية للأطفال والمبتدئين، وتنقل إثارة معارك سيارات التصادم في مدن الملاهي إلى منزلك. مثالية للصنّاع واللاعبين وهواة الجمع — أطلق العنان لإبداعك في ساحة المعركة مع CyberBrick!",
+  "ckb": "ئەم ئۆتۆمبێلە کە بە ڕیمۆت کۆنترۆڵ دەکرێت بۆ منداڵان و تازەکاران تەواو گونجاوە، و هەیەجانی شەڕی ئۆتۆمبێلی بەریەککەوتنی شاری یاری ڕاستەوخۆ دەهێنێتە ماڵەکەت. گونجاوترینە بۆ دروستکەران، یاریزانان و کۆکەرەوان — داهێنانی گۆڕەپانی شەڕت لەگەڵ CyberBrick ئازاد بکە!",
+  "kind": "block_line"
+ },
+ {
+  "h": "257950e09840faff26707ee66b433835ae73b9909c106c7faf3bc9d69093714f",
+  "en": "Agile Maneuverability",
+  "ar": "قدرة مناورة رشيقة",
+  "ckb": "مانۆڕی چالاک و چوست",
+  "kind": "block_title"
+ },
+ {
+  "h": "3de43bb56e00b6e65c51a1749169443266583eaff20ddbd2e94687720a5a967b",
+  "en": "CyberBrick drive system delivers authentic bumper car maneuverability — forward, backward, and smooth turns just like the real one.",
+  "ar": "يوفّر نظام القيادة من CyberBrick قدرة مناورة حقيقية كسيارات التصادم — إلى الأمام والخلف مع انعطافات سلسة تمامًا مثل السيارة الحقيقية.",
+  "ckb": "سیستەمی لێخوڕینی CyberBrick مانۆڕی ڕاستەقینەی ئۆتۆمبێلی بەریەککەوتن پێشکەش دەکات — بەرەوپێش، بەرەودوا و سووڕانەوەی نەرم ڕێک وەک ئۆتۆمبێلی ڕاستەقینە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2fcf5e59d0356a8c52c9a8978eda0cfb2fc657af2d1b054b0ab0f2ca7262d752",
+  "en": "Don't Lose Your Head",
+  "ar": "لا تفقد رأسك",
+  "ckb": "سەرت لەدەست مەدە",
+  "kind": "block_title"
+ },
+ {
+  "h": "2d2bc95de8908e90cc60fa73ed7ba865f000a37e6820ac786b52de966e79b865",
+  "en": "The driver's head ejects when hit from the side — a thrilling mechanic that makes every collision count in your battles.",
+  "ar": "يُقذف رأس السائق عند الاصطدام من الجانب — آلية مثيرة تجعل لكل تصادم أهميته في معاركك.",
+  "ckb": "سەری شۆفێرەکە کاتێک لە لاوە لێی دەدرێت فڕێ دەدرێتە دەرەوە — میکانیزمێکی هەیەجاناوی کە وا دەکات هەر بەریەککەوتنێک لە شەڕەکانتدا گرنگ بێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e7b54a68e3bc9e02c7fe79697c6e915e6956097935da9fde6c33d1a075c4449",
+  "en": "This product is intended for users aged 16 and above. Users under the age of 16 must be under direct adult supervision throughout use.",
+  "ar": "هذا المنتج مخصّص للمستخدمين بعمر 16 عامًا فما فوق. ويجب أن يكون المستخدمون دون سن 16 عامًا تحت إشراف مباشر من شخص بالغ طوال فترة الاستخدام.",
+  "ckb": "ئەم بەرهەمە بۆ بەکارهێنەرانی تەمەن 16 ساڵ و سەرووترە. بەکارهێنەرانی خوار تەمەنی 16 ساڵ دەبێت لە ماوەی هەموو بەکارهێنانەکەدا لە ژێر چاودێریی ڕاستەوخۆی کەسێکی گەورەدا بن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c59f3324952bd5d5e7394f85e70b18f4b8f73762d925a2f96c6355c8f23459c8",
+  "en": "This dynamic, 3D-printed RC racer remixes the classic CyberBrick™ SoccerBot, swapping the ball launcher for an exciting disc shooter. Battle solo or head-to-head, using lightweight or mediumweight discs for strategic play. With a 20-disc capacity and intuitive controls, it’s perfect for fast-paced competitive or cooperative action. Build, customize, and dominate the arena!",
+  "ar": "تعيد سيارة السباق RC الديناميكية هذه، المطبوعة (3D-printed)، تصميم نموذج CyberBrick™ SoccerBot الكلاسيكي، مع استبدال قاذف الكرة بقاذف أقراص مثير. نافس منفردًا أو وجهًا لوجه، باستخدام أقراص خفيفة أو متوسطة الوزن للعب الاستراتيجي. وبسعة 20 قرصًا وأدوات تحكم سهلة، فهي مثالية للمنافسات السريعة أو اللعب التعاوني. ابنِ وخصّص واسيطر على الساحة!",
+  "ckb": "ئەم ئۆتۆمبێلە چالاکەی پێشبڕکێی RC، کە چاپکراوە (3D-printed)، لەسەر بنەمای مۆدێلی کلاسیکی CyberBrick™ SoccerBot دووبارە دیزاین کراوەتەوە، و هاوێژەری تۆپەکەی بە تەقێنەرێکی هەیەجاناویی دیسک گۆڕیوە. بە تەنها یان ڕووبەڕوو شەڕ بکە، بە بەکارهێنانی دیسکی سووک یان مامناوەند بۆ یاریی ستراتیژی. بە توانای گرتنی 20 دیسک و کۆنترۆڵی ئاسان، بۆ کرداری خێرای پێشبڕکێیی یان هاوکاری تەواو گونجاوە. دروستی بکە، بە دڵی خۆت ڕێکی بخە و زاڵ بە بەسەر گۆڕەپانەکەدا!",
+  "kind": "block_line"
+ },
+ {
+  "h": "499ccdce536f699f772fe6bf8ccd081ff57158141ee0572a5b19ba1c31c07479",
+  "en": "Ideal for makers, gamers, and collectors — unleash your battlefield creativity with CyberBrick!",
+  "ar": "مثالية للصنّاع واللاعبين وهواة الجمع — أطلق العنان لإبداعك في ساحة المعركة مع CyberBrick!",
+  "ckb": "گونجاوترینە بۆ دروستکەران، یاریزانان و کۆکەرەوان — داهێنانی گۆڕەپانی شەڕت لەگەڵ CyberBrick ئازاد بکە!",
+  "kind": "block_line"
+ },
+ {
+  "h": "3f3c32dde6fa2f8646596488b4f61fa5f03a1f2c469d1cd0c7bd62f8dd26ba7a",
+  "en": "To download the model files and obtain detailed information, please visit the DodgeBot for CyberBrick on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج والحصول على معلومات مفصّلة، يرجى زيارة صفحة DodgeBot for CyberBrick على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل و وەرگرتنی زانیاریی ورد، تکایە سەردانی پەڕەی DodgeBot for CyberBrick لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c4da79ce5ed5f2ae4edbb9a2a667ff6a7980dca2fef3eb0456764b09e8a58077",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional BLV - AMS / AMS 2 Riser for X1C / P1S v3.1. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من BLV - AMS / AMS 2 Riser for X1C / P1S v3.1. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی BLV - AMS / AMS 2 Riser for X1C / P1S v3.1 بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1889b9a50c819f7f36678c56c4992d837becccb30b05e509c86fbb6c4a5fb3e5",
+  "en": "To download the model files please visit the BLV - AMS / AMS 2 Riser for X1C / P1S v3.1 on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة BLV - AMS / AMS 2 Riser for X1C / P1S v3.1 على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی BLV - AMS / AMS 2 Riser for X1C / P1S v3.1 لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "92e09a2531616dc391e8b851fd831e5a4741eabfe9968cb1f9d170cd4e5c9803",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Flexi Skeleton – Fun and Spooky Articulated Fidget. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من Flexi Skeleton – Fun and Spooky Articulated Fidget. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Flexi Skeleton – Fun and Spooky Articulated Fidget بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9a84aa9e7e09e94558f4be6d172147a76be30676608d6635e3844c33d4018870",
+  "en": "To download the model files please visit the Flexi Skeleton – Fun and Spooky Articulated Fidget on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Flexi Skeleton – Fun and Spooky Articulated Fidget على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Flexi Skeleton – Fun and Spooky Articulated Fidget لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a71daec80c6af7166a41cf09eeb40d22a6a2cab29aab1094e36ea73614d6b8c2",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Helicopter Kit. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من Helicopter Kit. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Helicopter Kit بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7baeb717c185ef88e0d62c5e16f584cea09da0f6251029b6b01c51e14f8c2d44",
+  "en": "To download the model files please visit the Helicopter Kit on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Helicopter Kit على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Helicopter Kit لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fec335a11a30c414873f43b49fa393f5cb5e68e0b985373fa2d45f080f54a572",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional H2D / H2S / H2C Toolbox. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من H2D / H2S / H2C Toolbox. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی H2D / H2S / H2C Toolbox بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "77ae4d93b94ef79f4daec070a73e06fbbf5af59d29df7111642b23c3143dafb4",
+  "en": "To download the model files please visit the H2D / H2S / H2C Toolbox on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة H2D / H2S / H2C Toolbox على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی H2D / H2S / H2C Toolbox لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "74132bcbf126a33c48a426dd4dd6faf2fe2a3a40e20caaa176d4a4189b5a6226",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Retracting Spool Holder. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع نسخة كاملة الوظائف من Retracting Spool Holder. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Retracting Spool Holder بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c87bba7c8dda9288f12a1d6abd2e958c73f01f6c33cd3e43b55775818b091852",
+  "en": "To download the model files please visit the Retracting Spool Holder on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Retracting Spool Holder على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Retracting Spool Holder لە MakerWorld بکە.",
+  "kind": "block_line"
+ }
+]

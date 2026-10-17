@@ -1,0 +1,439 @@
+{
+  "handle": "obxidian-high-flow-hotend",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T15:03:37Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/obxidian-high-flow-hotend",
+      "title": "Bambu Lab US store product page: E3D High Flow ObXidian™ Hotend",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "product.*",
+        "package.*",
+        "part.*",
+        "motion.max_flow",
+        "extrusion.*",
+        "electrical.*",
+        "compat.statement",
+        "variant.note",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T07:07:25Z",
+      "note": "The P0 corpus copy, parsed with the package (extractPage + buildImportPayload, manifest row). Product Specifications: Max. Printing Temp. 300 ℃, Color Black, Packaging Weight 0.045 kg, Packaging Size 60*60*30 mm (all kept by the deterministic layer). In the Box: one item. No product dimensions, net weight, electrical value, filament diameter or filament-compatibility table. \"60% more flow rate\" / \"60% increase in volumetric flow rate\" is a relative marketing claim with no baseline or absolute figure, so no motion.max_flow value is taken."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "product.*",
+        "package.*",
+        "part.*",
+        "motion.max_flow",
+        "extrusion.*",
+        "electrical.*",
+        "compat.statement",
+        "variant.note",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "Read in full from the cached HTML (the cached .txt omits the tab panels). The \"E3D High Flow ObXidian™ Hotend\" panel gives Compatibility, Max. Printing Temp 300 ℃ and Size 0.4mm/ 0.6mm; the compatibility table row gives X1C, P1P, P1S. No dimensions, weight, flow figure, electrical value or In the Box list for this product. The \"Complete hotend\" / \"Nozzle only\" explanation sits in the separate X1/P1 Series Nozzle panel and is not applied to this product's Hotend Type values. The silicone-sock 300°C ratings belong to those separate products."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/accessories/e3d-hotend",
+      "title": "Manually Adjust System to E3D HF ObXidian™ 0.4/0.6mm Preset | Bambu Lab Wiki",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "product.*",
+        "part.*",
+        "motion.max_flow",
+        "extrusion.*",
+        "compat.statement",
+        "printing.layer_height",
+        "printing.supported_filament"
+      ],
+      "retrieved_at": "2026-10-16T08:26:51Z",
+      "note": "Linked from the store page. A preset-tuning guide: per filament and hotend diameter it lists process and filament settings and a pressure-advance K value; none maps to a registry key, and the table lists only the filaments whose settings change, so no filament-compatibility relation is derived from it. It applies to X1C/P1S/P1P and advises against high-temperature materials on the P1P (kept as a note on the P1P relation). No product dimension, weight, temperature or flow figure."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "compat.statement",
+        "printing.layer_height",
+        "extrusion.filament_diameter"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "A general guide for every Bambu nozzle. Its Nozzle table has generic \"0.4 / 0.6 mm High flow nozzle\" columns but never names the E3D ObXidian hotend, so none of its rows is stored for this product. Its nozzle temperatures are per filament, not values of this hotend."
+    }
+  ],
+  "specs": [
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › E3D High Flow ObXidian™ Hotend panel › Max. Printing Temp",
+      "quote": "Purchase link: E3D High Flow ObXidian™ Hotend | Compatibility: X1C / P1 Seires | Max. Printing Temp: 300 ℃ | Size: 0.4mm/ 0.6mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The panel names this product (its purchase link is this handle). Agrees with the store page's Product Specifications (\"Max. Printing Temp. | 300 ℃\"), which the deterministic layer keeps as official_page; this row only raises its rank, no conflict."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "X1C, P1P, P1S",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Nozzle-Printer Compatibility › table › row \"E3D High Flow ObXidian™ Hotend\"",
+      "quote": "E3D High Flow ObXidian™ Hotend | X1C, P1P, P1S",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The Types panel for the same product reads \"Compatibility: X1C / P1 Seires\" (sic). The store page has no compatibility row; its Compatibility option values are \"X1C\" and \"P1 Series\". The E3D preset wiki adds \"these parameters are universally applicable to X1C/P1S/P1P\"."
+    },
+    {
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "609230994900762628",
+        "value_text": "0.4 mm"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › E3D High Flow ObXidian™ Hotend panel › Size",
+      "quote": "Purchase link: E3D High Flow ObXidian™ Hotend | Compatibility: X1C / P1 Seires | Max. Printing Temp: 300 ℃ | Size: 0.4mm/ 0.6mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The panel lists the sizes this product comes in (0.4 mm and 0.6 mm); scoped to the store page's Nozzle Diameter value \"0.4 mm\" by its diameter. Agrees with the store page's option value (official_variant), which keeps its higher rank; no conflict."
+    },
+    {
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "621451644678062081",
+        "value_text": "0.6 mm"
+      },
+      "value": 0.6,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › E3D High Flow ObXidian™ Hotend panel › Size",
+      "quote": "Purchase link: E3D High Flow ObXidian™ Hotend | Compatibility: X1C / P1 Seires | Max. Printing Temp: 300 ℃ | Size: 0.4mm/ 0.6mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The panel lists the sizes this product comes in (0.4 mm and 0.6 mm); scoped to the store page's Nozzle Diameter value \"0.6 mm\" by its diameter. Agrees with the store page's option value (official_variant), which keeps its higher rank; no conflict."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "ObXidian™ hardened nozzle",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › E3D High Flow ObXidian™ Hotend panel › paragraph 1",
+      "quote": "This hotend can provide 60% more flow rate, features the signature ObXidian™ hardened nozzle, and E3DLC™ coating for excellent durability.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "From product prose, so unverified (§C.6). The source names the nozzle \"ObXidian™ hardened\" but never says \"hardened steel\", so no steel grade is stated. The store page description carries the same sentence. Fills the store page's not_found row."
+    },
+    {
+      "key": "part.surface_treatment",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "E3DLC™ coating: a thin, diamond-like layer applied via plasma (non-stick)",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/obxidian-high-flow-hotend",
+      "source_title": "E3D High Flow ObXidian™ Hotend (store page)",
+      "locator": "Description › \"Non-Stick Coating, Reduce the Risk of Nozzle Blobbing\" › paragraph 1",
+      "quote": "The E3DLC™ coating is a thin, diamond-like layer applied via plasma, creating an ultra-smooth surface that significantly reduces plastic build-up on the nozzle.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:25Z",
+      "note": "From product prose, so unverified (§C.6). The nozzles wiki panel names the same coating (\"E3DLC™ coating for excellent durability\"). No number is taken from this prose."
+    },
+    {
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "609230994900762628",
+        "value_text": "0.4 mm"
+      },
+      "value": {
+        "min": 0.1,
+        "max": 0.3
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.4 mm\" › Layer heights",
+      "quote": "0.1 mm to 0.3 mm (25-75% of nozzle diameter), with 0.2 mm being standard.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter, not a specification published for this product; kept unverified. Scoped to this page's Nozzle Diameter value by its diameter. The E3D preset wiki adds that its 0.4 mm process parameters fit only the \"0.2 mm standard\" layer-height setting."
+    },
+    {
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "621451644678062081",
+        "value_text": "0.6 mm"
+      },
+      "value": {
+        "min": 0.15,
+        "max": 0.45
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.6 mm\" › Layer heights",
+      "quote": "0.15 mm to 0.45 mm (25-75% of nozzle diameter), with 0.3-0.4 mm being common.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter, not a specification published for this product; kept unverified. Scoped to this page's Nozzle Diameter value by its diameter. The E3D preset wiki adds that its 0.6 mm process parameters fit only the \"0.3 mm standard\" layer-height setting."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "609230994900762625",
+        "value_text": "X1C"
+      },
+      "target_kind": "family",
+      "target_label": "X1C",
+      "target_family": "model_x1c",
+      "target_source_handle": "refurbished-x1c",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Nozzle-Printer Compatibility › table › row \"E3D High Flow ObXidian™ Hotend\"; Types › E3D High Flow ObXidian™ Hotend panel › Compatibility",
+      "quote": "E3D High Flow ObXidian™ Hotend | X1C, P1P, P1S … Compatibility: X1C / P1 Seires",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The wiki gives the product-level set; the scope follows the store page's Compatibility option value, which already names the printer this version is for (the builder writes the same option-value relation). compat-targets.json label \"X1C\" (family model_x1c: refurbished-x1c and the existing Levonis model X1C)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "609230994900762625",
+        "value_text": "X1C"
+      },
+      "target_kind": "family",
+      "target_label": "X1C",
+      "target_family": "model_x1c",
+      "target_source_handle": "",
+      "target_levonis_model": "X1C",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Nozzle-Printer Compatibility › table › row \"E3D High Flow ObXidian™ Hotend\"; Types › E3D High Flow ObXidian™ Hotend panel › Compatibility",
+      "quote": "E3D High Flow ObXidian™ Hotend | X1C, P1P, P1S … Compatibility: X1C / P1 Seires",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The wiki gives the product-level set; the scope follows the store page's Compatibility option value, which already names the printer this version is for (the builder writes the same option-value relation). The X1C printer is not on the US store; compat-targets.json maps \"X1C\" to the existing Levonis model (levonis_product_id from the step-2 snapshot)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "609230994900762626",
+        "value_text": "P1 Series"
+      },
+      "target_kind": "family",
+      "target_label": "P1S",
+      "target_family": "model_p1s",
+      "target_source_handle": "p1s",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Nozzle-Printer Compatibility › table › row \"E3D High Flow ObXidian™ Hotend\"; Types › E3D High Flow ObXidian™ Hotend panel › Compatibility",
+      "quote": "E3D High Flow ObXidian™ Hotend | X1C, P1P, P1S … Compatibility: X1C / P1 Seires",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The wiki gives the product-level set; the scope follows the store page's Compatibility option value, which already names the printer this version is for (the builder writes the same option-value relation). compat-targets.json label \"P1S\" (family model_p1s: p1s, refurbished-p1s and the existing Levonis model P1S)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "609230994900762626",
+        "value_text": "P1 Series"
+      },
+      "target_kind": "family",
+      "target_label": "P1S",
+      "target_family": "model_p1s",
+      "target_source_handle": "refurbished-p1s",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Nozzle-Printer Compatibility › table › row \"E3D High Flow ObXidian™ Hotend\"; Types › E3D High Flow ObXidian™ Hotend panel › Compatibility",
+      "quote": "E3D High Flow ObXidian™ Hotend | X1C, P1P, P1S … Compatibility: X1C / P1 Seires",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The wiki gives the product-level set; the scope follows the store page's Compatibility option value, which already names the printer this version is for (the builder writes the same option-value relation). compat-targets.json label \"P1S\" (family model_p1s)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "609230994900762626",
+        "value_text": "P1 Series"
+      },
+      "target_kind": "family",
+      "target_label": "P1S",
+      "target_family": "model_p1s",
+      "target_source_handle": "",
+      "target_levonis_model": "P1S",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Nozzle-Printer Compatibility › table › row \"E3D High Flow ObXidian™ Hotend\"; Types › E3D High Flow ObXidian™ Hotend panel › Compatibility",
+      "quote": "E3D High Flow ObXidian™ Hotend | X1C, P1P, P1S … Compatibility: X1C / P1 Seires",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The wiki gives the product-level set; the scope follows the store page's Compatibility option value, which already names the printer this version is for (the builder writes the same option-value relation). compat-targets.json label \"P1S\": the existing Levonis model P1S (levonis_product_id from the step-2 snapshot)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "609230994900762626",
+        "value_text": "P1 Series"
+      },
+      "target_kind": "printer",
+      "target_label": "P1P",
+      "target_source_handle": "",
+      "target_levonis_model": "P1P",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Nozzle-Printer Compatibility › table › row \"E3D High Flow ObXidian™ Hotend\"; Types › E3D High Flow ObXidian™ Hotend panel › Compatibility",
+      "quote": "E3D High Flow ObXidian™ Hotend | X1C, P1P, P1S … Compatibility: X1C / P1 Seires",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The wiki gives the product-level set; the scope follows the store page's Compatibility option value, which already names the printer this version is for (the builder writes the same option-value relation). P1P is not on the US store; compat-targets.json maps it to the existing Levonis model. Caveat from the E3D preset wiki: \"Although the relevant hotends support the extrusion of high-temperature filaments, we do not recommend printing high-temperature materials with the P1P.\""
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/obxidian-high-flow-hotend",
+      "source_title": "E3D High Flow ObXidian™ Hotend (store page)",
+      "retrieved_at": "2026-10-16T07:07:25Z",
+      "locator": "Description › In the Box › paragraph 1",
+      "quote": "- E3D High Flow ObXidian™ Hotend *1",
+      "items": [
+        {
+          "text": "E3D High Flow ObXidian™ Hotend",
+          "qty": 1,
+          "section": ""
+        }
+      ],
+      "note": "The page gives one list for every version (no per-version In the Box). The deterministic layer already writes it as package.contents (verified, official_page)."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/accessories/e3d-hotend",
+      "title": "Manually Adjust System to E3D HF ObXidian™ 0.4/0.6mm Preset",
+      "text": "Manually Adjust System to E3D HF ObXidian™ 0.4/0.6mm Preset",
+      "note": "Linked from the store page with the link text \"in the wiki\"; the builder already records it (same id), so the merge keeps the builder's row and its title \"in the wiki\"."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles",
+      "text": "Introduction to Bambu Nozzles",
+      "note": "Not linked from the store page; the §F nozzles page. Its \"E3D High Flow ObXidian™ Hotend\" panel and its Nozzle-Printer Compatibility row name this product."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "note": "Not linked from the store page; linked from the nozzles wiki (\"Learn more about filament compatibility\"). General filament-by-nozzle guide; it does not name this product."
+    }
+  ],
+  "not_published": [
+    "product.length",
+    "product.width",
+    "product.height",
+    "product.net_weight",
+    "motion.max_flow",
+    "extrusion.filament_diameter"
+  ]
+}

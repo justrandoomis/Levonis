@@ -1,0 +1,1825 @@
+[
+ {
+  "h": "e94b8e248fbc7944ac6670d7539bb6951cfbddfdf0dba7bcdeacc0387d1eb4c2",
+  "en": "This Wind-Up Walking Mechanism is a fun and interactive addition to your 3D-printed models, perfect for bringing characters like cute ghosts and grim reapers to life with just a wind-up. The smooth, burr-free surface ensures safe handling, especially for children. The compact design makes it easy to carry and enjoy anytime, anywhere.",
+  "ar": "تُعدّ آلية المشي الزنبركية هذه (Wind-Up Walking Mechanism) إضافة ممتعة وتفاعلية إلى نماذجك المطبوعة (3D-printed)، وهي مثالية لبثّ الحياة في شخصيات مثل الأشباح اللطيفة وحاصد الأرواح بمجرد تعبئة الزنبرك. ويضمن سطحها الأملس الخالي من النتوءات تعاملًا آمنًا معها، خاصةً للأطفال. كما يجعل تصميمها الصغير حملها والاستمتاع بها سهلًا في أي وقت وأي مكان.",
+  "ckb": "ئەم میکانیزمی ڕۆیشتنە کۆکییە (Wind-Up Walking Mechanism) زیادکراوێکی خۆش و کارلێککارە بۆ مۆدێلە چاپکراوەکانت (3D-printed)، و گونجاوە بۆ زیندووکردنەوەی کارەکتەرەکانی وەک تارمایی خۆشەویست و فریشتەی مەرگ تەنها بە کۆککردنێک. ڕووە لووس و بێ زبرییەکەی دەستلێدانی سەلامەت دەستەبەر دەکات، بە تایبەتی بۆ منداڵان. دیزاینە بچووکەکەشی هەڵگرتن و چێژوەرگرتنی لە هەر کات و شوێنێکدا ئاسان دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7fa59f95f5645c789b9f7639c42ee6110201079484d9b42804cf39ea096fcf87",
+  "en": "Ideal for DIY projects, this mechanism encourages hands-on creativity while adding movement to your models. Simply attach it to the base, wind it up, and watch it walk across any flat surface!",
+  "ar": "هذه الآلية مثالية لمشاريع DIY، إذ تشجّع الإبداع العملي وتضيف الحركة إلى نماذجك. ما عليك سوى تثبيتها على القاعدة، ثم تعبئة الزنبرك، ومشاهدتها تمشي على أي سطح مستوٍ!",
+  "ckb": "ئەم میکانیزمە گونجاوە بۆ پڕۆژەکانی DIY، هانی داهێنانی دەستی دەدات و جووڵە دەخاتە ناو مۆدێلەکانتەوە. تەنها بیبەستە بە بنکەکەوە، کۆکی بکە و سەیری بکە چۆن بەسەر هەر ڕووێکی تەختدا دەڕوات!",
+  "kind": "block_line"
+ },
+ {
+  "h": "db622c0a48614d99c9bfd1bb9849191752ef1ce96c78850d879d6445baba381a",
+  "en": "Note：Be careful not to overwind the mechanism, as this may cause damage.",
+  "ar": "ملاحظة: احرص على عدم الإفراط في تعبئة زنبرك الآلية، فقد يؤدي ذلك إلى تلفها.",
+  "ckb": "تێبینی: ئاگاداربە میکانیزمەکە زیاد لە پێویست کۆک نەکەیت، چونکە لەوانەیە زیانی پێبگات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9764b3ad6c56c1e4fbcb023b302e4fe222a2eb7b762bc432ce263e74900c0f6d",
+  "en": "Simulates Human Gait: The mechanism replicates a natural walking motion, allowing your models to step forward smoothly.",
+  "ar": "يحاكي مشية الإنسان: تكرّر الآلية حركة المشي الطبيعية، ما يتيح لنماذجك التقدّم بخطوات سلسة.",
+  "ckb": "لاسایی ڕۆیشتنی مرۆڤ دەکاتەوە: میکانیزمەکە جووڵەی ڕۆیشتنی سروشتی دووبارە دەکاتەوە، و ڕێگە بە مۆدێلەکانت دەدات بە نەرمی هەنگاو بنێن بۆ پێشەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "dbb2446d4fda878ee4e6489a425112a3c0a832c06a7ee979d1d76e46bc1add5b",
+  "en": "Compact and Lightweight: Easily fits into small models, enabling portable, on-the-go fun.",
+  "ar": "صغير وخفيف الوزن: يُركَّب بسهولة داخل النماذج الصغيرة، ليمنحك متعة محمولة أينما ذهبت.",
+  "ckb": "بچووک و سووک: بە ئاسانی لە ناو مۆدێلە بچووکەکاندا جێدەبێتەوە، بۆ چێژێکی گوازراوە لە هەر شوێنێک بیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d6eb6d02328b8c47376db3731f7ade92155af470ebf18452ea15bc16cf223547",
+  "en": "Customizable for Creativity : Ideal for 3D-printed characters or DIY projects, allowing unique personalization.",
+  "ar": "قابل للتخصيص لإطلاق الإبداع: مثالي للشخصيات المطبوعة (3D-printed) أو مشاريع DIY، ويتيح تخصيصًا فريدًا.",
+  "ckb": "تایبەتکراو بۆ داهێنان: گونجاوە بۆ کارەکتەرە چاپکراوەکان (3D-printed) یان پڕۆژەکانی DIY، و ڕێگە بە تایبەتکردنی بێهاوتا دەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "19b3242b512e201f03a028439eca887f27741261e2bb6c124bfd72daf68e08ae",
+  "en": "Eco-Friendly Material : Made from eco-friendly plastic, it aligns with sustainable practices while providing durability.",
+  "ar": "مادة صديقة للبيئة: مصنوع من بلاستيك صديق للبيئة، ينسجم مع الممارسات المستدامة ويوفّر المتانة في الوقت نفسه.",
+  "ckb": "کەرەستەی دۆستی ژینگە: لە پلاستیکی دۆستی ژینگە دروستکراوە، لەگەڵ ڕێبازە بەردەوامەکان دەگونجێت و هاوکات بەرگەگرییش دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c2b3eb5277f646f526b9536df13de237b8c55b190b6e4221b3ceb619e2e494fa",
+  "en": "Reliable and Durable Built for repeated use, it maintains quality performance with each wind-up.",
+  "ar": "موثوق ومتين، مصمّم للاستخدام المتكرر، ويحافظ على أداء عالي الجودة مع كل تعبئة للزنبرك.",
+  "ckb": "متمانەپێکراو و بەرگەگر، بۆ بەکارهێنانی دووبارە دروستکراوە، و لە هەر کۆککردنێکدا ئەدایەکی بە جۆرایەتی دەپارێزێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1f6a5ffd21f324ea8dd914cfd06dfe953687d1750f45867c1af6f67ebfba0eb4",
+  "en": "Walking Christmas Ghost",
+  "ar": "Walking Christmas Ghost",
+  "ckb": "Walking Christmas Ghost",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "b7bc343e395e382fa925d543dcf24636cd4f6eeb5e8659ebfd8efbf674d82ab6",
+  "en": "Santa Claus is a little busy",
+  "ar": "Santa Claus is a little busy",
+  "ckb": "Santa Claus is a little busy",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "5bf02082965e993c97749dc45ac698765c95a69538c0b64b535a30df2a0b1925",
+  "en": "flowercat",
+  "ar": "flowercat",
+  "ckb": "flowercat",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "387b7cb1e772a9235f3c506c605e7075cdbdfab59d9896c936a824ad6a8ffff3",
+  "en": "Christmas Tree Gnome",
+  "ar": "Christmas Tree Gnome",
+  "ckb": "Christmas Tree Gnome",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "26f46623bf5bc1830b9517b5dd4704460b014ec893fdac7ff7815eb2300bb27d",
+  "en": "Cute Death - Grim Reaper Halloween decoration",
+  "ar": "Cute Death - Grim Reaper Halloween decoration",
+  "ckb": "Cute Death - Grim Reaper Halloween decoration",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "ee9db11dd8be698db0f1c1f51b0ff6d8f5cb285281e37cd112267f56b9bae3f7",
+  "en": "DIY Wizard",
+  "ar": "DIY Wizard",
+  "ckb": "DIY Wizard",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "0e72dabfda7b172989f19415d24e94364c9c238f81f52d39bd07bbc5aa5f5291",
+  "en": "Cute and Simple Ghost",
+  "ar": "Cute and Simple Ghost",
+  "ckb": "Cute and Simple Ghost",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "baf05099b3288bd5b69c676279614acad962998d13f46e1169a4ca45cadc9454",
+  "en": "Chingoo.Jeesoo",
+  "ar": "Chingoo.Jeesoo",
+  "ckb": "Chingoo.Jeesoo",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "8e38f5c2325a1dc77b84ab01f2b09c494057d028f596b4667e7af96c920145d8",
+  "en": "WitchyBoo",
+  "ar": "WitchyBoo",
+  "ckb": "WitchyBoo",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "00baa0ba3ad0b9667a5e6e090f55c5c11e9f2813d39940c3d35074a91f58799e",
+  "en": "Wind-Up Walking KIWI",
+  "ar": "Wind-Up Walking KIWI",
+  "ckb": "Wind-Up Walking KIWI",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "eb160e93e87ca5c76f1307b4569163ad7b219d82fa496eef3ca8d01ad4e1a63e",
+  "en": "Wind-Up Walking Capybara",
+  "ar": "Wind-Up Walking Capybara",
+  "ckb": "Wind-Up Walking Capybara",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "1473541ce0dd9f4cfa7ae379b0da365528e7f824e628548a298cff1ccb07573c",
+  "en": "Wind-Up Walking Pigeon",
+  "ar": "Wind-Up Walking Pigeon",
+  "ckb": "Wind-Up Walking Pigeon",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "6c9307b09eb33c0929a8c60973cce141dd556debe3e6d32ba24329ded50a3c90",
+  "en": "Makerize",
+  "ar": "Makerize",
+  "ckb": "Makerize",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "2ac3343642581e6bb8eb8b67b542dae3a97ce904610b1ba6397043fe8edbebac",
+  "en": "Wind-up Wacky Walking Valentine Walkers - Hearts",
+  "ar": "Wind-up Wacky Walking Valentine Walkers - Hearts",
+  "ckb": "Wind-up Wacky Walking Valentine Walkers - Hearts",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "2b9cb8a0fe7269a695fd6917e3639a387c59c16dc909c7f981378770a2f629e7",
+  "en": "PrinterMcgee",
+  "ar": "PrinterMcgee",
+  "ckb": "PrinterMcgee",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "89ecf2a89b8e3bd680823d4a99b19c7693f4113954ea247528d8a2d4e420d59b",
+  "en": "Wind-Up Walking Present",
+  "ar": "Wind-Up Walking Present",
+  "ckb": "Wind-Up Walking Present",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "da130956c3b9b927122de0fe2670b07d5f34b9bd763cabdac235f46b2efbb9d5",
+  "en": "Walking Valentine Dino",
+  "ar": "Walking Valentine Dino",
+  "ckb": "Walking Valentine Dino",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "268112908d6120be13ffbac04d03e39f4c9cb0dfe543d60a67704bb736cd0ef6",
+  "en": "M&M`s Treat - dropping Chick",
+  "ar": "M&M`s Treat - dropping Chick",
+  "ckb": "M&M`s Treat - dropping Chick",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "2cf531e029a3a2ba7e9731989ccce1a13e43f33d962d297ff5fd09a7b55a166f",
+  "en": "HenryFang",
+  "ar": "HenryFang",
+  "ckb": "HenryFang",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "7f484442d1a2930263261a82fc5f1fb7af422195e2a51a659d4d836574bd6907",
+  "en": "The Magnetic Levitation DIY Kit combines science with creativity, unlocking the unique charm of magnetic levitation technology. It includes a base, a floating module and a power supply, enabling objects to float smoothly in mid-air and creating an enchanting floating effect. With easy assembly and durable construction, the kit transforms complex magnetic levitation technology into an accessible DIY experience, allowing you to easily step into the wonderful world of magnetic levitation and create stunning floating displays.",
+  "ar": "يجمع طقم Magnetic Levitation DIY Kit بين العلم والإبداع، ليكشف السحر الفريد لتقنية الرفع المغناطيسي. يتضمن قاعدة ووحدة عائمة ومزوّد طاقة، ما يتيح للأجسام أن تطفو بسلاسة في الهواء ويخلق تأثير طفو ساحرًا. وبفضل سهولة التجميع والبنية المتينة، يحوّل الطقم تقنية الرفع المغناطيسي المعقّدة إلى تجربة DIY في متناول الجميع، ما يتيح لك دخول عالم الرفع المغناطيسي الرائع بسهولة وصنع معروضات طافية مذهلة.",
+  "ckb": "کیتی Magnetic Levitation DIY Kit زانست و داهێنان پێکەوە کۆدەکاتەوە، و جوانیی تایبەتی تەکنەلۆجیای هەڵواسینی موگناتیسی لە هەوادا ئاشکرا دەکات. بنکەیەک، مۆدیولێکی هەڵواسراو و دابینکەرێکی وزە لەخۆ دەگرێت، کە ڕێگە بە شتەکان دەدات بە نەرمی لە هەوادا ڕابوەستن و کاریگەرییەکی سەرسوڕهێنەری هەڵواسراو دروست دەکات. بە پێکەوەنانی ئاسان و پێکهاتەی بەرگەگر، کیتەکە تەکنەلۆجیای ئاڵۆزی هەڵواسینی موگناتیسی دەگۆڕێت بۆ ئەزموونێکی بەردەستی DIY، و ڕێگەت پێدەدات بە ئاسانی هەنگاو بنێیتە ناو جیهانی سەرسوڕهێنەری هەڵواسینی موگناتیسی و نمایشی هەڵواسراوی سەرنجڕاکێش دروست بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7e6e9e2c33f4b13c063f71521f58564a9da89379d37faea960a2eac960a198b5",
+  "en": "Whether you’re a DIY hobbyist, tech enthusiast, or someone who loves unique decor, this kit lets you bring futuristic charm to any space. Transform collectible figures, mini moon lamps, custom 3D-printed creations, or even small keepsakes into eye-catching desktop centerpieces—there’s no limit to what you can create. The sleek, tech-inspired design adds a modern touch to offices, bedrooms, or workspaces, making it both a fun project and a standout decoration.",
+  "ar": "سواء كنت من هواة DIY أو من عشّاق التقنية أو ممن يحبون الديكور الفريد، يتيح لك هذا الطقم إضفاء سحر مستقبلي على أي مكان. حوّل المجسّمات التي تجمعها، أو مصابيح القمر الصغيرة، أو إبداعاتك المطبوعة (3D-printed)، أو حتى التذكارات الصغيرة، إلى قطع مركزية لافتة للنظر على المكتب، فلا حدود لما يمكنك صنعه. ويضيف التصميم الأنيق المستوحى من التقنية لمسة عصرية إلى المكاتب أو غرف النوم أو أماكن العمل، ليكون مشروعًا ممتعًا وقطعة زينة مميّزة في آنٍ واحد.",
+  "ckb": "جا خولیاداری DIY بیت، حەزلێکەری تەکنەلۆجیا، یان کەسێک کە حەزی لە ڕازاندنەوەی بێهاوتایە، ئەم کیتە ڕێگەت پێدەدات جوانییەکی داهاتوویی بهێنیتە هەر شوێنێک. پەیکەرە کۆکراوەکان، چرای بچووکی مانگ، داهێنانە چاپکراوەکانی خۆت (3D-printed)، یان تەنانەت یادگارییە بچووکەکان بگۆڕە بۆ پارچەی سەرنجڕاکێشی ناوەڕاستی سەر مێز، هیچ سنوورێک نییە بۆ ئەوەی دەتوانیت دروستی بکەیت. دیزاینە شیک و تەکنەلۆجیائاساکەی تامێکی مۆدێرن دەبەخشێتە ئۆفیس، ژووری نووستن یان شوێنی کار، و دەیکاتە هەم پڕۆژەیەکی خۆش و هەم ڕازاندنەوەیەکی دیار.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b031bfb16f89dae0f4e8c950a476425189b88e9d55d2bbf6119d79b26665c3bf",
+  "en": "Floating Meditating LED Reaper",
+  "ar": "Floating Meditating LED Reaper",
+  "ckb": "Floating Meditating LED Reaper",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "3ba287918a6b3b73c5c9e01cce63604e6e0769ef0b97b8442b19f12d1440161d",
+  "en": "@ONI.FORGE",
+  "ar": "@ONI.FORGE",
+  "ckb": "@ONI.FORGE",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "23794d91c53ae875c8e247d72561e35d9d06ee07c70c9e0dbcc977a6d161504a",
+  "en": "NO",
+  "ar": "لا",
+  "ckb": "نەخێر",
+  "kind": "block_cell"
+ },
+ {
+  "h": "421e37054059dca427ca712241b64a18ef832bc0c24adb8b386c3e86a21741bb",
+  "en": "Levitation Pyramid of Time Fragments",
+  "ar": "Levitation Pyramid of Time Fragments",
+  "ckb": "Levitation Pyramid of Time Fragments",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "d49445644875a8a5b5218ae68ebdad1ca2d0c7e24cae8a175c06bef7c3a79b30",
+  "en": "Halloween hat Levitation",
+  "ar": "Halloween hat Levitation",
+  "ckb": "Halloween hat Levitation",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "f3aaa46d01b5213151a615c2b05744612ea1c28f30634c7db136e26c235d73fb",
+  "en": "LLevitating Moon",
+  "ar": "LLevitating Moon",
+  "ckb": "LLevitating Moon",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "72c4b49c21a26b6f5491f6775a5ac7b6add01cca13c2c751fe2b907526bf997a",
+  "en": "@TBone_427120",
+  "ar": "@TBone_427120",
+  "ckb": "@TBone_427120",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "a96e2cdaccf197803576d25577cdcc966b2e55cdfa86c02d2ca47a8d7be00fb9",
+  "en": "Floating Mage Tower - Magnetic Levitation Light",
+  "ar": "Floating Mage Tower - Magnetic Levitation Light",
+  "ckb": "Floating Mage Tower - Magnetic Levitation Light",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "3aef3a2adba927f44a5dbc665acfcd93b93a03c872796e984a0b7715556e8cf6",
+  "en": "Levitation Energy Reactor",
+  "ar": "Levitation Energy Reactor",
+  "ckb": "Levitation Energy Reactor",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "7840368761342f456c30d3d512ae7374f90af52071e754767a192a45e5c015fe",
+  "en": "Magnetic Levitating Soccer Ball",
+  "ar": "Magnetic Levitating Soccer Ball",
+  "ckb": "Magnetic Levitating Soccer Ball",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "8dfb25b4bdfeb1c984992ee8aaddcdb9a50f83a8c3a0f1fd9c9846a764516821",
+  "en": "Minka Skyland - Levitating Island",
+  "ar": "Minka Skyland - Levitating Island",
+  "ckb": "Minka Skyland - Levitating Island",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "ae34f86fdaf7d85f8ae647e42a933b404f29e88aca608a77a72c966aa34c7470",
+  "en": "@entropytamed",
+  "ar": "@entropytamed",
+  "ckb": "@entropytamed",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "cefff9bf622a468c29e2a2c77d35f86f5d5e829a43129769066fe358f909bc1d",
+  "en": "PrintMon Maker Edition",
+  "ar": "PrintMon Maker Edition",
+  "ckb": "PrintMon Maker Edition",
+  "kind": "block_title",
+  "keep": true
+ },
+ {
+  "h": "600e1022265fd1aa9647c19563bfa807c412a4abdac2203f4e0481bca55f1dd5",
+  "en": "The PrintMon Maker Edition includes two bags of steel balls to help balance the weight of your 3D-printed creations, ensuring perfect stability. If your design requires weight adjustments for balance, consider selecting the Magnetic Levitation DIY Kit (PrintMon Maker Edition) .",
+  "ar": "يتضمن إصدار PrintMon Maker Edition كيسين من الكرات الفولاذية للمساعدة على موازنة وزن إبداعاتك المطبوعة (3D-printed)، لضمان ثبات مثالي. وإذا كان تصميمك يتطلب تعديل الوزن لتحقيق التوازن، ففكّر في اختيار Magnetic Levitation DIY Kit (PrintMon Maker Edition).",
+  "ckb": "وەشانی PrintMon Maker Edition دوو کیسە تۆپەڵەی پۆڵای تێدایە بۆ یارمەتیدان لە هاوسەنگکردنی کێشی داهێنانە چاپکراوەکانت (3D-printed)، بۆ دڵنیابوون لە جێگیرییەکی تەواو. ئەگەر دیزاینەکەت پێویستی بە ڕێکخستنی کێش هەیە بۆ هاوسەنگی، بیر لە هەڵبژاردنی Magnetic Levitation DIY Kit (PrintMon Maker Edition) بکەرەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "afd2eb9d0f7104ac23049ca6a661b99235c6dab2c7224bc77750f7670232e410",
+  "en": "LED Light Control (External Touch Switch)",
+  "ar": "التحكم في إضاءة LED (مفتاح لمس خارجي)",
+  "ckb": "کۆنترۆڵی ڕووناکیی LED (کلیلی دەستلێدانی دەرەکی)",
+  "kind": "block_line"
+ },
+ {
+  "h": "4647cf852d561a91bd17e7d76b523aee910a5a1f0190eb021c9f8bf40fdad56a",
+  "en": "3D-Printed Protective Shell",
+  "ar": "غلاف حماية مطبوع (3D-Printed)",
+  "ckb": "بەرگی پارێزەری چاپکراو (3D-Printed)",
+  "kind": "block_line"
+ },
+ {
+  "h": "3c46222e4b54b328bc77e22f69ba0e4baf1f2dd5d564e8dae70178a515ace05d",
+  "en": "Energy Efficient with Low Standby Power.",
+  "ar": "موفّر للطاقة مع استهلاك منخفض في وضع الاستعداد.",
+  "ckb": "وزە پاشەکەوت دەکات و لە دۆخی ئامادەباشیدا وزەیەکی کەم بەکاردەهێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "deaefea5b55145422e0d23eaf919d8273001fea4e1bbbb3d19cfb39a85ca1081",
+  "en": "Quiet & Stable Levitation",
+  "ar": "طفو هادئ ومستقر",
+  "ckb": "مانەوەی بێدەنگ و جێگیر لە هەوادا",
+  "kind": "block_line"
+ },
+ {
+  "h": "df498bc1aa268610663a2427037dc6395ca8be9cf2af307f0669f1c270c6e9ae",
+  "en": "Appropriate Load-bearing (Up to 200g)",
+  "ar": "قدرة تحمّل مناسبة (حتى 200g)",
+  "ckb": "توانای هەڵگرتنی باری گونجاو (تا 200g)",
+  "kind": "block_line"
+ },
+ {
+  "h": "d013f3f82418f19a810f3513f1d62945d6549db78290f68d832be5352587b062",
+  "en": "This product contains all the necessary hardware components for assembling a Catmaw AFV - Model Car For SCX10. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+  "ar": "يحتوي هذا المنتج على جميع مكوّنات العتاد اللازمة لتجميع مجسّم Catmaw AFV - Model Car For SCX10. ولإكمال التجميع والحصول على قطعة تعمل بكامل وظائفها، يحتاج المستخدمون أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "ئەم بەرهەمە هەموو پێکهاتە پێویستەکانی ڕەقەکاڵا لەخۆ دەگرێت بۆ پێکەوەنانی مۆدێلی Catmaw AFV - Model Car For SCX10. بۆ تەواوکردنی پێکەوەنان و بەدەستهێنانی پارچەیەکی بە تەواوی کارا، بەکارهێنەران پێویستە فایلەکانی مۆدێل دابگرن و پارچە ماوەکان بە چاپکەری 3D چاپ بکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6161bb6ed9c89be004512a56cf09ef117d46c5476002303a28f3dfaa87ff25e5",
+  "en": "To download the model files of Catmaw AFV - Model Car For SCX10 and obtain detailed information, please visit the Catmaw AFV - Model Car For SCX10 on MakerWorld.",
+  "ar": "لتنزيل ملفات نموذج Catmaw AFV - Model Car For SCX10 والحصول على معلومات مفصّلة، يرجى زيارة صفحة Catmaw AFV - Model Car For SCX10 على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێلی Catmaw AFV - Model Car For SCX10 و وەرگرتنی زانیاریی ورد، تکایە سەردانی پەڕەی Catmaw AFV - Model Car For SCX10 لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6de315b5a175dfd2e22ff63bd73e519e9ca149acf4410204a6874fdb59ddadb8",
+  "en": "The Motion-Activated Sound and Light Props Kit is a multifunctional toolkit specifically designed for handheld props, combining lighting, sound, and motion-sensing controls to deliver a personalized, immersive experience. Featuring high-brightness LED strips paired with diffused pearl cotton, it offers smooth and natural lighting effects. An integrated speaker cavity ensures clear audio quality, while the built-in IMU motion sensor captures real-time movements, triggering corresponding light and sound effects for actions like turning on/off, swinging, thrusting, or striking.",
+  "ar": "طقم Motion-Activated Sound and Light Props Kit مجموعة أدوات متعددة الوظائف صُمّمت خصيصًا للمجسّمات المحمولة باليد، تجمع بين الإضاءة والصوت والتحكم بالاستشعار الحركي لتقديم تجربة غامرة مخصّصة. وبفضل شرائط LED عالية السطوع مع القطن اللؤلؤي الناشر للضوء، يوفّر تأثيرات إضاءة ناعمة وطبيعية. وتضمن حجرة مكبّر الصوت المدمجة جودة صوت واضحة، بينما يلتقط حساس الحركة IMU المدمج الحركات في الوقت الفعلي، ليُطلق تأثيرات الإضاءة والصوت المقابلة لحركات مثل التشغيل/الإطفاء والتأرجح والطعن والضرب.",
+  "ckb": "کیتی Motion-Activated Sound and Light Props Kit کۆمەڵە ئامرازێکی فرەئەرکە کە بە تایبەتی بۆ کەرەستەی نمایشیی دەستی دیزاین کراوە، و ڕووناکی، دەنگ و کۆنترۆڵی هەستکردن بە جووڵە پێکەوە کۆدەکاتەوە بۆ پێشکەشکردنی ئەزموونێکی تێوەگلێنەری تایبەت. بە شریتی LED بە ڕووناکیی بەرز لەگەڵ لۆکەی مرواریی بڵاوکەرەوەی ڕووناکی، کاریگەریی ڕووناکیی نەرم و سروشتی پێشکەش دەکات. شوێنی بڵندگۆی تێکەڵکراو جۆرایەتیی دەنگی ڕوون دەستەبەر دەکات، لە کاتێکدا هەستەوەری جووڵەی ناوخۆیی IMU جووڵەکان لە کاتی ڕاستەقینەدا تۆمار دەکات و کاریگەرییە گونجاوەکانی ڕووناکی و دەنگ دەخاتە کار بۆ کردارەکانی وەک هەڵکردن/کوژاندنەوە، ڕاوەشاندن، تێهەڵدان یان لێدان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1b01e3edeb9d01256b19f88cebfea628055b2ec0b2040e0722133458dfaa8a47",
+  "en": "The Motion-Activated Sound and Light Props Kit offers two configurations: Kit 01 (Complete Set with LED strips, aluminum alloy tubes, and diffused pearl cotton for large-scale props like the Golden Staff) and Kit 02 (Compact Edition requiring user-provided LED light strip 256RGB 5050LED 815MM, optimized for swords/daggers). Unlike purely aesthetic prop sets that lack hardware, this kit is more than just a prop—it's your creative partner. It supports extensive customization across appearance, lighting effects, and sound effects, compatible with various prop forms such as Golden Staff, Double-Bladed Weapon, and Pixel Lightsaber. Leveraging 3D printing and professional design, it unlocks limitless possibilities for your imagination. With app connectivity, users can easily adjust light colors, flashing frequencies, and even upload custom sound and light effects, creating a one-of-a-kind, personalized prop with ease.",
+  "ar": "يقدّم طقم Motion-Activated Sound and Light Props Kit تكوينين: Kit 01 (مجموعة كاملة تضم شرائط LED وأنابيب من سبيكة الألمنيوم وقطنًا لؤلؤيًا ناشرًا للضوء، للمجسّمات الكبيرة مثل العصا الذهبية) وKit 02 (إصدار مدمج يتطلب أن يوفّر المستخدم بنفسه شريط الإضاءة LED light strip 256RGB 5050LED 815MM، ومُحسَّن للسيوف والخناجر). وعلى عكس أطقم المجسّمات الجمالية البحتة التي تفتقر إلى العتاد، فهذا الطقم أكثر من مجرد مجسّم، إنه شريكك الإبداعي. فهو يدعم تخصيصًا واسعًا للمظهر وتأثيرات الإضاءة والمؤثرات الصوتية، ويتوافق مع أشكال متنوعة من المجسّمات مثل العصا الذهبية والسلاح ذي النصلين والسيف الضوئي البكسلي. وبالاستفادة من الطباعة 3D والتصميم الاحترافي، يفتح آفاقًا لا حدود لها لخيالك. ومع الاتصال بالتطبيق، يمكن للمستخدمين بسهولة ضبط ألوان الإضاءة وترددات الوميض، بل ورفع مؤثرات ضوئية وصوتية مخصّصة، لصنع مجسّم فريد ومخصّص بكل سهولة.",
+  "ckb": "کیتی Motion-Activated Sound and Light Props Kit دوو ڕێکخستن پێشکەش دەکات: Kit 01 (سێتی تەواو لەگەڵ شریتی LED، بۆریی ئاوێتەی ئەلەمنیۆم و لۆکەی مرواریی بڵاوکەرەوەی ڕووناکی، بۆ کەرەستەی نمایشیی گەورەی وەک گۆچانی زێڕین) و Kit 02 (وەشانی بچووککراوە کە پێویستی بە شریتی ڕووناکیی LED light strip 256RGB 5050LED 815MM هەیە و بەکارهێنەر خۆی دابینی دەکات، و بۆ شمشێر و خەنجەر باشترکراوە). بە پێچەوانەی سێتە نمایشییە تەنها جوانکارییەکان کە ڕەقەکاڵایان نییە، ئەم کیتە زیاترە لە تەنها کەرەستەیەکی نمایشی، هاوبەشی داهێنەرانەی تۆیە. پشتگیریی تایبەتکردنی فراوان دەکات لە ڕووخسار، کاریگەرییەکانی ڕووناکی و کاریگەرییە دەنگییەکاندا، و گونجاوە لەگەڵ شێوە جیاوازەکانی کەرەستەی نمایشی وەک گۆچانی زێڕین، چەکی دوو دەم و شمشێری ڕووناکیی پیکسڵی. بە سوودوەرگرتن لە چاپی 3D و دیزاینی پیشەگەرانە، دەرفەتی بێسنوور بۆ خەیاڵت دەکاتەوە. بە پەیوەندیکردن بە ئەپەکەوە، بەکارهێنەران دەتوانن بە ئاسانی ڕەنگەکانی ڕووناکی و لەرەی ترووسکەدان ڕێکبخەن، و تەنانەت کاریگەریی ڕووناکی و دەنگی تایبەتیش بار بکەن، بۆ دروستکردنی کەرەستەیەکی نمایشیی بێهاوتا و تایبەت بە ئاسانی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "680ba5e813103594dbccc1b5db21b34cf2108b7d4db51ce49ba444245b2482bf",
+  "en": "Compatible Kit",
+  "ar": "الطقم المتوافق",
+  "ckb": "کیتە گونجاوەکە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ca39eb8336c3a0d3161beb1870046ad52f33972f0ff9054e50669f5be8b015d5",
+  "en": "1:1 Ruyi Jingu Bang Wukong Staff Weapon",
+  "ar": "1:1 Ruyi Jingu Bang Wukong Staff Weapon",
+  "ckb": "1:1 Ruyi Jingu Bang Wukong Staff Weapon",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "d8f00e12bac1b84c3d30c0991d52641bcaa02966332f5c987a504ea77f5745fd",
+  "en": "@DaDaland",
+  "ar": "@DaDaland",
+  "ckb": "@DaDaland",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "338dac5171cba8a2d6f5d34ca7638f38faf198875465ae5d30b0872377ce65df",
+  "en": "Kit 01",
+  "ar": "Kit 01",
+  "ckb": "Kit 01",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "bc8fe8db3b95cd29c98b1ed39fd6e3e40466804eb9806c01d554158d60aea990",
+  "en": "Lightning Zelda Master Sword 100cm",
+  "ar": "Lightning Zelda Master Sword 100cm",
+  "ckb": "Lightning Zelda Master Sword 100cm",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "dd2c5975813752dc8b7fae870cb78b42bdba3d4a71579d1b101ad701258e84e5",
+  "en": "Kit 01 OR Kit 02",
+  "ar": "الطقم Kit 01 أو Kit 02",
+  "ckb": "کیتەکانی Kit 01 یان Kit 02",
+  "kind": "block_cell"
+ },
+ {
+  "h": "58927cc99f5432dd6104f2627e996a1a6ff9fb5f83d1b755ae4a12a32f551ecb",
+  "en": "Double Bladed Lightsaber",
+  "ar": "Double Bladed Lightsaber",
+  "ckb": "Double Bladed Lightsaber",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "dd77f2ecb7b80027ebbe05c01855959268f50de891ccb59c85551d04239763cd",
+  "en": "@joel.he",
+  "ar": "@joel.he",
+  "ckb": "@joel.he",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "75346d9af8fc4c21fa20d18d33cb5c439cab8b9bd04f3fb19250034bc2e2123c",
+  "en": "Brick Star Wars Lightsaber",
+  "ar": "Brick Star Wars Lightsaber",
+  "ckb": "Brick Star Wars Lightsaber",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "8eb678eccb891ed388e85315da70955be59d031b8a457c4c880fba04504dd431",
+  "en": "@collinliao",
+  "ar": "@collinliao",
+  "ckb": "@collinliao",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "570b3f8a6cf6a9039fdc75984bd7e4d32cd78ea5eaf736f43e29ecff0b5cdcc5",
+  "en": "Cyber Golden Cudgel",
+  "ar": "Cyber Golden Cudgel",
+  "ckb": "Cyber Golden Cudgel",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "19dd28565b05522379c965545437ece407a94b9c5777b650effa074a356f8999",
+  "en": "APP Operation",
+  "ar": "التشغيل عبر التطبيق",
+  "ckb": "کارپێکردن لە ڕێگەی ئەپەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "4062a097f42b68ce0f2a56894ece916864a8c5923e440b6cf71aabbd374208da",
+  "en": "iOS Users: Search for \"Frocepark V2\" in the App Store",
+  "ar": "مستخدمو iOS: ابحثوا عن \"Frocepark V2\" في App Store",
+  "ckb": "بەکارهێنەرانی iOS: لە App Store بەدوای \"Frocepark V2\" دا بگەڕێن",
+  "kind": "block_line"
+ },
+ {
+  "h": "a07c2042509cf2d9c2d1105aa610273ec8945810c408e9da9efe86a196c5625d",
+  "en": "Android Users: Please scan the QR code to download the app.",
+  "ar": "مستخدمو Android: يرجى مسح رمز QR لتنزيل التطبيق.",
+  "ckb": "بەکارهێنەرانی Android: تکایە کۆدی QR سکان بکەن بۆ داگرتنی ئەپەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7975300f01bc46f86e52e528b29955be87a361f05f2fb96e14629bc0a5495d03",
+  "en": "Hardware",
+  "ar": "العتاد",
+  "ckb": "ڕەقەکاڵا",
+  "kind": "block_title"
+ },
+ {
+  "h": "ce54f0e22dbb39de8a6d9ae0b32b3ecac5bc749fddcb78e4f1e572212b338d63",
+  "en": "Component",
+  "ar": "المكوّن",
+  "ckb": "پێکهاتە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
+  "en": "Description",
+  "ar": "الوصف",
+  "ckb": "وەسف",
+  "kind": "block_cell"
+ },
+ {
+  "h": "8c6d8e2e58e76ae43f5f59d08d8238c55624074afed87a350d2e5844563a617d",
+  "en": "Wire Length",
+  "ar": "طول السلك",
+  "ckb": "درێژیی وایەر",
+  "kind": "block_cell"
+ },
+ {
+  "h": "a9e0c70585121f5f79e52330eaf56937d5088e388f0e8b0e14968d9891044f2c",
+  "en": "Speaker",
+  "ar": "مكبّر الصوت",
+  "ckb": "بڵندگۆ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "44721fec59909771311d814f9da9cac47d7008fcf9c1789780256b53022cc9cc",
+  "en": "Used for sound effects. Connects via the 2P cable to the mainboard.",
+  "ar": "يُستخدم للمؤثرات الصوتية، ويتصل باللوحة الأم عبر كابل 2P.",
+  "ckb": "بۆ کاریگەرییە دەنگییەکان بەکاردێت. لە ڕێگەی کێبڵی 2P بە بۆردی سەرەکییەوە دەبەسترێت.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "d738010ec803da598f6361227bcdd10aedc60f9bc24c851a1ab9acbb7a366c2e",
+  "en": "Control panel",
+  "ar": "لوحة التحكم",
+  "ckb": "پانێڵی کۆنترۆڵ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f4684ff2e286eee1fbe3cdede7044e601614df8fc3c48fbb8b1f1b8fa0d5bd47",
+  "en": "Includes 1 control power button, 1 USB-C charging and power interface, 4 connection ports for LED, buttons, and speakers.",
+  "ar": "يتضمن: زر تحكم بالتشغيل (1)، ومنفذ USB-C للشحن والطاقة (1)، و4 منافذ توصيل لإضاءة LED والأزرار ومكبّرات الصوت.",
+  "ckb": "پێکدێت لە: دوگمەیەکی کۆنترۆڵی هەڵکردن (1)، دەرچەیەکی USB-C بۆ بارگاویکردن و وزە (1)، و 4 دەرچەی پەیوەندی بۆ ڕووناکیی LED، دوگمەکان و بڵندگۆکان.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e78978be8dfcbf17cd27439bb17c8390bc80e6951639128c0e0e1db53cbf0c24",
+  "en": "Supports 18650 battery: 3.7V, 2600mAh capacity. Battery life: 50-60 minutes (depending on power consumption). Charging time: approximately 4-5 hours. Charges via USB-C, with a 5V/1A charging input. Note: does not support fast charging protocols.",
+  "ar": "يدعم بطارية 18650 بجهد 3.7V وسعة 2600mAh. عمر البطارية: 50-60 دقيقة (حسب استهلاك الطاقة). مدة شحن البطارية: نحو 4-5 ساعات. تُشحن عبر USB-C بدخل شحن 5V/1A. ملاحظة: لا يدعم بروتوكولات الشحن السريع.",
+  "ckb": "پشتگیریی باتریی 18650 دەکات بە ڤۆڵتیەی 3.7V و توانای 2600mAh. تەمەنی باتری: 50-60 خولەک (بەپێی خەرجکردنی وزە). ماوەی بارگاویکردن: نزیکەی 4-5 کاتژمێر. لە ڕێگەی USB-C بارگاوی دەکرێت بە چوونەژوورەوەی بارگاویکردنی 5V/1A. تێبینی: پشتگیریی پرۆتۆکۆلەکانی بارگاویکردنی خێرا ناکات.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e3446a152e7af5935cf6fe179dbe2f15ba429ecced8700f97183072424bd3408",
+  "en": "Main Board",
+  "ar": "اللوحة الأم",
+  "ckb": "بۆردی سەرەکی",
+  "kind": "block_cell"
+ },
+ {
+  "h": "452c2512357ade7ae118d41655a145919e5f1a771b667235f7e2c42282577d56",
+  "en": "Equipped with a built-in 32G TF card. Displays various lighting and sound effects with an integrated motion sensor. Features two dedicated ports for accessory modules. Supports multiple power modes. Includes an 18650 lithium battery connector, with internal overcharge and discharge protection.",
+  "ar": "مزوّدة ببطاقة TF مدمجة بسعة 32G. تعرض تأثيرات إضاءة وصوت متنوعة بفضل حساس حركة مدمج. وتتميّز بمنفذين مخصّصين لوحدات الملحقات، وتدعم أوضاع طاقة متعددة. كما تتضمن موصلًا لبطارية ليثيوم 18650، مع حماية داخلية من الشحن الزائد والتفريغ.",
+  "ckb": "کارتێکی TF بە قەبارەی 32G لە ناوەوەیدا دانراوە. بە هەستەوەرێکی جووڵەی تێکەڵکراو کاریگەریی جۆراوجۆری ڕووناکی و دەنگ نیشان دەدات. دوو دەرچەی تایبەتی هەیە بۆ مۆدیولەکانی پێداویستی، و پشتگیریی چەند دۆخێکی وزە دەکات. هەروەها گەیەنەری باتریی لیتیۆمی 18650 لەخۆ دەگرێت، لەگەڵ پاراستنی ناوخۆیی لە بارگاویکردنی زیادە و بەتاڵبوونەوە.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "4f29f2adf4f5c2bc0877ab12b2525240916ec07ed2213ef1cb3207bd3e2d6646",
+  "en": "LED strip1：600 mm LED strip2: 750 mm Battery：30 mm",
+  "ar": "شريط LED رقم 1: 600 mm، شريط LED رقم 2: 750 mm، البطارية: 30 mm",
+  "ckb": "شریتی LED ژمارە 1: 600 mm، شریتی LED ژمارە 2: 750 mm، باتری: 30 mm",
+  "kind": "block_cell"
+ },
+ {
+  "h": "39c0d5bbb92d86ae4157b8216d824b3347c6d90817a84dda2e98d9e4c18a1fcf",
+  "en": "Set Screw",
+  "ar": "برغي تثبيت",
+  "ckb": "بورغیی جێگیرکردن",
+  "kind": "block_cell"
+ },
+ {
+  "h": "da8bf3320d92efd90ac983b59aab0deb14a56bfd3b7c6c42de3ab07efc2dbb07",
+  "en": "Used to secure the 3D-printed base inside the aluminum tube.",
+  "ar": "يُستخدم لتثبيت القاعدة المطبوعة (3D-printed) داخل أنبوب الألمنيوم.",
+  "ckb": "بۆ جێگیرکردنی بنکە چاپکراوەکە (3D-printed) لە ناو بۆریی ئەلەمنیۆمەکەدا بەکاردێت.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2e61d51e67aa7a35c752f19553c666d9ddc45c3989629a10d939f2628577f588",
+  "en": "Self Tapping Screw",
+  "ar": "برغي ذاتي اللولبة",
+  "ckb": "بورغیی خۆپێچ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "3a1bb54b0d57d501d258fa5a99523eb228dc856f37b8b91457f57c29b6a02337",
+  "en": "Used to secure the main board and button board onto the 3D-printed PCB base.",
+  "ar": "يُستخدم لتثبيت اللوحة الأم ولوحة الأزرار على قاعدة PCB المطبوعة (3D-printed).",
+  "ckb": "بۆ جێگیرکردنی بۆردی سەرەکی و بۆردی دوگمەکان لەسەر بنکە چاپکراوەکەی (3D-printed) تایبەت بە PCB بەکاردێت.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "89c37f9160f671e95826a910023eba05c798f6cc4b042df5a6dd01244b0d7e6c",
+  "en": "Connection Part",
+  "ar": "قطعة التوصيل",
+  "ckb": "پارچەی پەیوەستکردن",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0ff5d9599c0ffa3be0cadd0c12d8d4b15094e3bf61c4a615d7cf683310b85538",
+  "en": "Light Diffusion Foam",
+  "ar": "إسفنج ناشر للضوء",
+  "ckb": "ئیسفەنجی بڵاوکەرەوەی ڕووناکی",
+  "kind": "block_cell"
+ },
+ {
+  "h": "269ef03cea86f39f29f914a7870647d41e737dfeb0adb82edc44d964fe04b8d2",
+  "en": "Light-diffusing foam can be inserted into the LED strip, ensuring smooth and even light distribution.",
+  "ar": "يمكن إدخال الإسفنج الناشر للضوء في شريط LED، لضمان توزيع ضوء ناعم ومتجانس.",
+  "ckb": "ئیسفەنجی بڵاوکەرەوەی ڕووناکی دەتوانرێت بخرێتە ناو شریتی LED، بۆ دڵنیابوون لە بڵاوبوونەوەی ڕووناکییەکی نەرم و یەکسان.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9be698fa1ae98c601b7d1e933914ed90c87299bcdeec848f0fac8cdff0c1d73b",
+  "en": "Pixel LED Strip light",
+  "ar": "شريط إضاءة LED بكسلي",
+  "ckb": "شریتی ڕووناکیی پیکسڵیی LED",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9c261bcc6628281b62abc87d196c08b1ed6fb6d5b131f2dd276f11ca7123274d",
+  "en": "The single side consists of 62 high-brightness LED beads, with a total of 124 beads on both sides, creating vibrant and dynamic pixel LED strip lighting effects. The strip is connected to the mainboard via a 3P connector.",
+  "ar": "يتكوّن الجانب الواحد من 62 حبة LED عالية السطوع، بإجمالي 124 حبة على الجانبين، لتوليد تأثيرات إضاءة حيوية وديناميكية بشريط LED البكسلي. ويتصل الشريط باللوحة الأم عبر موصل 3P.",
+  "ckb": "هەر لایەک لە 62 دەنکە LED بە ڕووناکیی بەرز پێکدێت، کۆی گشتی 124 دەنک لە هەردوو لا، کە کاریگەریی ڕووناکیی زیندوو و جووڵاوی شریتی پیکسڵیی LED دروست دەکەن. شریتەکە لە ڕێگەی گەیەنەری 3P بە بۆردی سەرەکییەوە دەبەسترێت.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "c89850a81a9a5c9c3e467c52f80bff7ba9bf9f467f4b7c77f28c80e23b081319",
+  "en": "Aluminum tube",
+  "ar": "أنبوب ألمنيوم",
+  "ckb": "بۆریی ئەلەمنیۆم",
+  "kind": "block_cell"
+ },
+ {
+  "h": "c726fc88b2b5eb87c25ba89a714cd1b19c44dfb5120b9d5a15a78ccb3c94e1b6",
+  "en": "Aluminum tube with button and charging port",
+  "ar": "أنبوب ألمنيوم مع زر ومنفذ شحن",
+  "ckb": "بۆریی ئەلەمنیۆم لەگەڵ دوگمە و دەرچەی بارگاویکردن",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0928d3d290de394bee72359b2e8387bbf96afea98d7194d462d89e0fca3addbf",
+  "en": "Equipped with a charging port, a button hole, and a reset hole. The tube houses a main board and battery.",
+  "ar": "مزوّد بمنفذ شحن وفتحة للزر وفتحة لإعادة الضبط. ويضم الأنبوب لوحة أم وبطارية.",
+  "ckb": "دەرچەی بارگاویکردن، کونی دوگمە و کونی ڕیسێتی تێدایە. بۆرییەکە بۆردی سەرەکی و باترییەکی لە ناودایە.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "b7179fe74411d2b7d53889fa3937b70113687339a4a1b7c81adcae9ea33c3236",
+  "en": "APP",
+  "ar": "التطبيق",
+  "ckb": "ئەپەکە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "6727c9ad67f87d981b0fd5546da3ce6f074e71888017ba90aec2feea04762454",
+  "en": "Connects to the device via Bluetooth, allowing users to adjust lighting and sound effects on their phone. Supports both Android and iOS systems.",
+  "ar": "يتصل بالجهاز عبر Bluetooth، ما يتيح للمستخدمين ضبط تأثيرات الإضاءة والصوت من هواتفهم. ويدعم نظامي Android وiOS.",
+  "ckb": "لە ڕێگەی Bluetooth بە ئامێرەکەوە دەبەسترێت، بەمەش بەکارهێنەران دەتوانن کاریگەرییەکانی ڕووناکی و دەنگ لە مۆبایلەکەیانەوە ڕێکبخەن. پشتگیریی هەردوو سیستەمی Android و iOS دەکات.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "6404a6a1f6f1c670df996fbb150d563a6e137c35eea53541ebfe5991b8e8f9d8",
+  "en": "Lighting Effects",
+  "ar": "تأثيرات الإضاءة",
+  "ckb": "کاریگەرییەکانی ڕووناکی",
+  "kind": "block_cell"
+ },
+ {
+  "h": "777b45f46c5c34d481a4ba574cb1a4101ecc8c6a2772581bc6cc9be7c6fa68a7",
+  "en": "Over 20 pre-installed lighting effects, supports custom lighting effects and allows users to design their own.",
+  "ar": "أكثر من 20 تأثير إضاءة مثبّتًا مسبقًا، ويدعم تأثيرات الإضاءة المخصّصة ويتيح للمستخدمين تصميم تأثيراتهم الخاصة.",
+  "ckb": "زیاتر لە 20 کاریگەریی ڕووناکیی پێشوەختە دامەزراو، پشتگیریی کاریگەریی ڕووناکیی تایبەت دەکات و ڕێگە بە بەکارهێنەران دەدات هی خۆیان دیزاین بکەن.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "de7b57b57b05d02090b4091094e2117271e7df2bf17553017bb0c634ec3492c0",
+  "en": "Sound Effects",
+  "ar": "المؤثرات الصوتية",
+  "ckb": "کاریگەرییە دەنگییەکان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "190e1f79641cbe5948f0dff243c2c18c6d1a943c9ee795ffd9a971f92cc6feae",
+  "en": "Includes 27 sound effects and supports updating the sound library via an TF card to add more desired effects.",
+  "ar": "يتضمن 27 مؤثرًا صوتيًا، ويدعم تحديث مكتبة الأصوات عبر بطاقة TF لإضافة المزيد من المؤثرات المرغوبة.",
+  "ckb": "27 کاریگەریی دەنگی لەخۆ دەگرێت و پشتگیریی نوێکردنەوەی کتێبخانەی دەنگەکان دەکات لە ڕێگەی کارتی TF بۆ زیادکردنی کاریگەریی دڵخوازی زیاتر.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ed638133f5c2d8efb5859240feac87a997ff8db4c0a83370e445f3ab7299a7ca",
+  "en": "Motion Sensory",
+  "ar": "استشعار الحركة",
+  "ckb": "هەستکردن بە جووڵە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "7dd38f5dbab2725c250ed25b8ce5351f557292141aff0ae15d8bd6e7717ded1c",
+  "en": "The motion sensor triggers lighting and sound effects based on movement characteristics, enhancing the immersive experience.",
+  "ar": "يُطلق حساس الحركة تأثيرات الإضاءة والصوت وفقًا لخصائص الحركة، ما يعزّز التجربة الغامرة.",
+  "ckb": "هەستەوەری جووڵە بەپێی تایبەتمەندییەکانی جووڵە کاریگەرییەکانی ڕووناکی و دەنگ دەخاتە کار، و ئەزموونی تێوەگلان بەهێزتر دەکات.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "08be98a8e2e3c077a9475186e96e5a8cffa0d6708543b46b9c8d3ebc45bb3fbe",
+  "en": "Instruction Manual",
+  "ar": "دليل الاستخدام",
+  "ckb": "ڕێبەری بەکارهێنان",
+  "kind": "block_line"
+ },
+ {
+  "h": "4f40db74b082f7a1b86726e6383351d565688393d3f27fdd450e58c8161d6c04",
+  "en": "Firmware Guide",
+  "ar": "دليل البرنامج الثابت",
+  "ckb": "ڕێبەری فێرموێر",
+  "kind": "block_line"
+ },
+ {
+  "h": "b1280fdf95a95cfc45358113e8006c70eb46780451bf802a98dc669bec6194d3",
+  "en": "Update the firmware to optimize motion response for different weapon models.",
+  "ar": "حدّث البرنامج الثابت لتحسين الاستجابة للحركة بحسب طرازات الأسلحة المختلفة.",
+  "ckb": "فێرموێرەکە نوێ بکەرەوە بۆ باشترکردنی وەڵامدانەوەی جووڵە بەپێی مۆدێلە جیاوازەکانی چەک.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2061e3abab30c31d764bc9ccfcafe28ae2c62ed6396dd6bb48ba4ed872487913",
+  "en": "Immersive Motion Interaction (Included with All Kits)",
+  "ar": "تفاعل غامر مع الحركة (مرفق مع جميع الأطقم)",
+  "ckb": "کارلێکی تێوەگلێنەری جووڵە (لەگەڵ هەموو کیتەکاندا هەیە)",
+  "kind": "block_line"
+ },
+ {
+  "h": "3020e7fb68182811c67b5b460d596f70252bf5f775e6acb3cf46a515811089b9",
+  "en": "Optimized Sound Performance (Included with All Kits)",
+  "ar": "أداء صوتي محسّن (مرفق مع جميع الأطقم)",
+  "ckb": "ئەدای دەنگیی باشترکراو (لەگەڵ هەموو کیتەکاندا هەیە)",
+  "kind": "block_line"
+ },
+ {
+  "h": "2fb3abeb8280a7f071928f842558254670a55c809487df24efbbf4c42384e957",
+  "en": "Bluetooth Smart Control (Included with All Kits)",
+  "ar": "تحكم ذكي عبر Bluetooth (مرفق مع جميع الأطقم)",
+  "ckb": "کۆنترۆڵی زیرەک لە ڕێگەی Bluetooth (لەگەڵ هەموو کیتەکاندا هەیە)",
+  "kind": "block_line"
+ },
+ {
+  "h": "24cd12435dde20c11a6b59c8ea830344f5b9fe11cfea88520043fdbe9902c22c",
+  "en": "Dynamic Pixel Lighting Effects (Kit 01 Exclusive)",
+  "ar": "تأثيرات إضاءة بكسلية ديناميكية (حصريًا في Kit 01)",
+  "ckb": "کاریگەریی ڕووناکیی پیکسڵیی جووڵاو (تەنها لە Kit 01 دا)",
+  "kind": "block_line"
+ },
+ {
+  "h": "055616edcf7c53fe2510953e7fd814ddea11a05dba3741e1fbb77627dc641998",
+  "en": "Aluminum Alloy Core Shaft (Kit 01 Exclusive)",
+  "ar": "عمود مركزي من سبيكة الألمنيوم (حصريًا في Kit 01)",
+  "ckb": "میلی ناوەندیی ئاوێتەی ئەلەمنیۆم (تەنها لە Kit 01 دا)",
+  "kind": "block_line"
+ },
+ {
+  "h": "6054438ed4c379626204965c3b0e12643c72c7c2225a793d6e855e44ebfc7438",
+  "en": "This Decoration & Display Kit includes Plastic Button Ornaments For Shoe Charms, Split Ring Keychains, Reclosable Fastener Mounting Tape, Magnet Stickers and Eye Bolts with Self-Tapping Threads, making it ideal for creating personalized shoe decorations, home displays, keychain customizations, and more. It offers flexible solutions for various needs. Whether for home organization, creative decoration, or personalized customization, this set opens up a world of possibilities.",
+  "ar": "يتضمن طقم Decoration & Display Kit هذا: زينة أزرار بلاستيكية للأحذية (Plastic Button Ornaments For Shoe Charms)، وحلقات مفاتيح (Split Ring Keychains)، وشريط تثبيت قابل لإعادة الإغلاق (Reclosable Fastener Mounting Tape)، وملصقات مغناطيسية (Magnet Stickers)، وبراغي حلقية ذاتية اللولبة (Eye Bolts with Self-Tapping Threads)، ما يجعله مثاليًا لصنع زينة أحذية مخصّصة، ومعروضات منزلية، وتخصيص حلقات المفاتيح، وغير ذلك. ويقدّم حلولًا مرنة لاحتياجات متنوعة. سواء لتنظيم المنزل أو الزينة الإبداعية أو التخصيص الشخصي، تفتح هذه المجموعة أمامك عالمًا من الإمكانيات.",
+  "ckb": "کیتی Decoration & Display Kit ئەمانە لەخۆ دەگرێت: ڕازاندنەوەی دوگمەی پلاستیکی بۆ پێڵاو (Plastic Button Ornaments For Shoe Charms)، ئەڵقەی کلیل (Split Ring Keychains)، شریتی جێگیرکەری دووبارە داخراو (Reclosable Fastener Mounting Tape)، ستیکەری موگناتیسی (Magnet Stickers) و بۆڵتی ئەڵقەیی خۆپێچ (Eye Bolts with Self-Tapping Threads)، بۆیە گونجاوترینە بۆ دروستکردنی ڕازاندنەوەی تایبەتی پێڵاو، نمایشی ماڵەوە، تایبەتکردنی ئەڵقەی کلیل و زیاتر. چارەسەری نەرم بۆ پێداویستییە جۆراوجۆرەکان پێشکەش دەکات. جا بۆ ڕێکخستنی ماڵ بێت، ڕازاندنەوەی داهێنەرانە یان تایبەتکردنی کەسی، ئەم کۆمەڵەیە جیهانێک لە دەرفەت لەبەردەمت دەکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "22129979d605243b9ba0da38e7179b69f730d03bd8d784cc4830085243109c22",
+  "en": "Plastic Button Ornaments For Shoe Charms: You can design fun 3D model accessories and attach them to the buttons, adding unique style and personalized decorations to your shoes",
+  "ar": "زينة الأزرار البلاستيكية للأحذية (Plastic Button Ornaments For Shoe Charms): يمكنك تصميم ملحقات ممتعة على شكل نموذج 3D وتثبيتها على الأزرار، لإضافة طابع فريد وزينة مخصّصة إلى حذائك",
+  "ckb": "ڕازاندنەوەی دوگمەی پلاستیکی بۆ پێڵاو (Plastic Button Ornaments For Shoe Charms): دەتوانیت پێداویستیی خۆشی مۆدێلی 3D دیزاین بکەیت و بیانبەستیتەوە بە دوگمەکانەوە، بۆ زیادکردنی شێوازێکی تایبەت و ڕازاندنەوەی کەسی بۆ پێڵاوەکانت",
+  "kind": "block_line"
+ },
+ {
+  "h": "f8590fe52f6114079e8963db8a983ae8263db96523e064039ec9d0584cd2be42",
+  "en": "Reclosable Fastener Mounting Tape: This can be paired with Pixel Puzzle Maker and Make My Lithophane for wall displays, creating personalized artistic decorations. Additionally, its unique mushroom-head design can be combined with the PrintMon Maker to securely hold 3D printed model, ensuring they stay in place for display on desks or in cars, preventing accidental tipping and damage to the models.",
+  "ar": "شريط التثبيت القابل لإعادة الإغلاق (Reclosable Fastener Mounting Tape): يمكن استخدامه مع أداتَي Pixel Puzzle Maker وMake My Lithophane لعرض الأعمال على الجدران وصنع زينة فنية مخصّصة. كما يمكن الجمع بين تصميمه الفريد ذي الرؤوس الفطرية وأداة PrintMon Maker لتثبيت النماذج المطبوعة بطابعة 3D بإحكام، لتبقى في مكانها عند عرضها على المكاتب أو في السيارات، ما يمنع انقلابها عرضًا وتضرّرها.",
+  "ckb": "شریتی جێگیرکەری دووبارە داخراو (Reclosable Fastener Mounting Tape): دەتوانرێت لەگەڵ ئامرازەکانی Pixel Puzzle Maker و Make My Lithophane بەکاربهێنرێت بۆ نمایشی سەر دیوار و دروستکردنی ڕازاندنەوەی هونەریی تایبەت. هەروەها دیزاینە تایبەتەکەی بە سەری قارچکئاسا دەتوانرێت لەگەڵ ئامرازی PrintMon Maker بەکاربهێنرێت بۆ ڕاگرتنی پتەوی مۆدێلە چاپکراوەکانی 3D، تا لە شوێنی خۆیان بمێننەوە کاتێک لەسەر مێز یان لە ئۆتۆمبێلدا نمایش دەکرێن، و ڕێگری لە کەوتنی لەناکاو و زیانگەیشتن بە مۆدێلەکان دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "41530cc27aa17bc0f16a294b5bab205618f95e94964ed194837cf9d34844c254",
+  "en": "Split Ring Keychain: These are ideal for creating personalized keychains; creators can design various shapes, such as animals, toys, names, and more to add a personal touch to everyday keys.",
+  "ar": "حلقة المفاتيح (Split Ring Keychain): مثالية لصنع ميداليات مفاتيح مخصّصة؛ إذ يمكن للمصمّمين تصميم أشكال متنوعة، مثل الحيوانات والألعاب والأسماء وغيرها، لإضافة لمسة شخصية إلى المفاتيح اليومية.",
+  "ckb": "ئەڵقەی کلیل (Split Ring Keychain): گونجاوە بۆ دروستکردنی کلیلدانی تایبەت؛ دروستکەران دەتوانن شێوەی جۆراوجۆر دیزاین بکەن، وەک ئاژەڵ، یاری، ناو و زیاتر، بۆ زیادکردنی تامێکی کەسی بۆ کلیلەکانی ڕۆژانە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9cee687b12330ca07dfbf2b624bb52e55544d4a48f6b3b3f3f306ae8318c9d9d",
+  "en": "Magnet Sticker: These stickers are ideal for designing magnetic whiteboard tools for schools, such as letters, numbers, and shapes, making it easier for interactive teaching. They can also be combined with memo clips and other practical items to create adhesive designs for convenient storage and organization. Additionally, magnetic sticker are perfect for creating magnetic chessboards and pieces, adding fun to tabletop games. They can also be used to print personalized fridge magnets, combining creative patterns with magnets to create unique home decorations.",
+  "ar": "الملصق المغناطيسي (Magnet Sticker): هذه الملصقات مثالية لتصميم أدوات السبورة البيضاء المغناطيسية للمدارس، مثل الحروف والأرقام والأشكال، ما يسهّل التعليم التفاعلي. ويمكن أيضًا دمجها مع مشابك المذكرات وغيرها من الأغراض العملية لصنع تصاميم لاصقة تسهّل الحفظ والتنظيم. كما أن الملصقات المغناطيسية مثالية لصنع رقع شطرنج وقطع مغناطيسية، ما يضيف المتعة إلى ألعاب الطاولة. ويمكن استخدامها كذلك لطباعة مغناطيسات ثلاجة مخصّصة، تجمع بين الأنماط الإبداعية والمغناطيس لصنع زينة منزلية فريدة.",
+  "ckb": "ستیکەری موگناتیسی (Magnet Sticker): ئەم ستیکەرانە گونجاون بۆ دیزاینکردنی ئامرازەکانی تەختەی سپیی موگناتیسی بۆ قوتابخانەکان، وەک پیت، ژمارە و شێوە، کە فێرکردنی کارلێککارانە ئاسانتر دەکەن. هەروەها دەتوانرێت لەگەڵ گیرەی تێبینی و کەرەستەی بەسوودی تر تێکەڵ بکرێن بۆ دروستکردنی دیزاینی چەسپدار بۆ هەڵگرتن و ڕێکخستنی ئاسان. جگە لەوە، ستیکەرە موگناتیسییەکان گونجاون بۆ دروستکردنی تەختە و بەردی شەترەنجی موگناتیسی، کە چێژ دەخەنە سەر یارییەکانی سەر مێز. هەروەها دەتوانرێن بۆ چاپکردنی موگناتیسی سەلاجەی تایبەت بەکاربهێنرێن، کە نەخشی داهێنەرانە و موگناتیس پێکەوە کۆدەکەنەوە بۆ دروستکردنی ڕازاندنەوەی ماڵی بێهاوتا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "de49d757d0dcce1b89411590c0d4e90a3b92a0e4f697864af558482ed18d4ef2",
+  "en": "Eye Bolt with Self-Tapping Thread: The ring design of the eye bolts with self-tapping thread makes them perfect for use as hooks, easily integrated into the design of hangers, racks, or other hanging items. Additionally, they can be part of personalized accessories, such as keychain charms or small decorative toys, enhancing the functionality and aesthetic of your models.",
+  "ar": "البرغي الحلقي ذاتي اللولبة (Eye Bolt with Self-Tapping Thread): تصميم الحلقة في هذه البراغي الحلقية ذاتية اللولبة يجعلها مثالية للاستخدام كخطّافات، ويسهل دمجها في تصميم العلّاقات والرفوف وغيرها من الأغراض المعلّقة. كما يمكن أن تكون جزءًا من الإكسسوارات المخصّصة، مثل تعليقات ميداليات المفاتيح أو الألعاب الزخرفية الصغيرة، ما يعزّز وظيفة نماذجك وجمالها.",
+  "ckb": "بۆڵتی ئەڵقەیی خۆپێچ (Eye Bolt with Self-Tapping Thread): دیزاینی ئەڵقەیی ئەم بۆڵتە ئەڵقەییە خۆپێچانە وایان لێدەکات گونجاو بن بۆ بەکارهێنان وەک قولاپ، و بە ئاسانی دەخرێنە ناو دیزاینی هەڵواسەر، ڕەف یان شتی هەڵواسراوی ترەوە. هەروەها دەتوانن بەشێک بن لە پێداویستیی تایبەت، وەک هەڵواسراوی کلیلدان یان یاریی ڕازاندنەوەی بچووک، کە کارایی و جوانیی مۆدێلەکانت زیاد دەکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0b4b4a2f7fca4e076c08efcc95fc8bf0e7339a56d7752764fed02a83ea742659",
+  "en": "Key Features:",
+  "ar": "أبرز المزايا:",
+  "ckb": "تایبەتمەندییە سەرەکییەکان:",
+  "kind": "block_title"
+ },
+ {
+  "h": "c3616a069a32f2994902ecd60842c7790c070688c690905bfed2bd99eadc8c27",
+  "en": "Compact and Powerful motor: The 030 motor strikes a balance between the N20 motor and TT motor in terms of size and power. It can be used independently or paired with a gearbox. When used alone, it can directly drive 3D-printed propellers, eccentric wheels, and other components.",
+  "ar": "محرك صغير وقوي: يحقّق المحرك 030 توازنًا بين محرك N20 ومحرك TT من حيث الحجم والقدرة. يمكن استخدامه منفردًا أو مع علبة تروس. وعند استخدامه منفردًا، يمكنه تشغيل المراوح الدافعة المطبوعة (3D-printed) والعجلات اللامركزية وغيرها من المكوّنات مباشرةً.",
+  "ckb": "بزوێنەری بچووک و بەهێز: بزوێنەری 030 هاوسەنگییەک لە نێوان بزوێنەری N20 و بزوێنەری TT دا دروست دەکات لە ڕووی قەبارە و تواناوە. دەتوانرێت بە تەنها یان لەگەڵ گێربۆکس بەکاربهێنرێت. کاتێک بە تەنها بەکاردێت، دەتوانێت ڕاستەوخۆ پەروانەی چاپکراو (3D-printed)، تایەی لاناوەندی و پێکهاتەی تر بجووڵێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "99b65a8830cc1624326faaa2b4b14be1c0fe29de7fa066471f7a89a2c0827ead",
+  "en": "Diverse Gear Ratios: The kit includes four gear ratios and single/dual-shaft output options, allowing for various output shaft speeds at the same power level. This caters to different speed requirements for various models, such as slow-speed, high-torque escalator models or high-speed, low-torque vehicle models. 3D printable gearbox housing models and assembly instructions are also provided.",
+  "ar": "نسب تروس متنوعة: يتضمن الطقم أربع نسب تروس وخيارات خرج بعمود مفرد أو مزدوج، ما يتيح سرعات مختلفة لعمود الخرج عند مستوى القدرة نفسه. وهذا يلبّي متطلبات السرعة المختلفة لنماذج متنوعة، مثل نماذج السلالم المتحركة البطيئة ذات العزم العالي أو نماذج المركبات السريعة ذات العزم المنخفض. كما تُقدَّم نماذج لغلاف علبة التروس قابلة للطباعة بطابعة 3D، مع تعليمات التجميع.",
+  "ckb": "ڕێژەی جۆراوجۆری گێر: کیتەکە چوار ڕێژەی گێر و هەڵبژاردەی دەرچوونی تاک میل یان دوو میل لەخۆ دەگرێت، کە ڕێگە بە خێرایی جیاوازی میلی دەرچوون دەدات لە هەمان ئاستی توانادا. ئەمە پێداویستییە جیاوازەکانی خێرایی بۆ مۆدێلە جۆراوجۆرەکان دابین دەکات، وەک مۆدێلی پلیکانەی کارەبایی بە خێرایی کەم و تۆرکی بەرز یان مۆدێلی ئۆتۆمبێل بە خێرایی بەرز و تۆرکی کەم. هەروەها مۆدێلی شیاوی چاپی 3D بۆ بەرگی گێربۆکس و ڕێنماییەکانی پێکەوەنان پێشکەش دەکرێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "531dbda5757836e7d7bd8a683dcf8a3722f8d99e981126c905a93ac51c351ab2",
+  "en": "Flexible Control: Equipped with a PDB set and Y type wire, it can connect to distribution boards, push-button switches, or rotary switches via SH1.0 connectors, enabling diverse and multi-channel control.",
+  "ar": "تحكم مرن: مزوّد بمجموعة PDB وسلك من النوع Y، ويمكنه الاتصال بلوحات التوزيع أو مفاتيح الضغط أو المفاتيح الدوّارة عبر موصلات SH1.0، ما يتيح تحكمًا متنوعًا ومتعدد القنوات.",
+  "ckb": "کۆنترۆڵی نەرمونیان: بە کۆمەڵەیەکی PDB و وایەرێکی جۆری Y تەیار کراوە، و دەتوانێت لە ڕێگەی گەیەنەرەکانی SH1.0 بە بۆردی دابەشکردن، کلیلی پەنجەپێنان یان کلیلی سووڕاوەوە ببەسترێت، کە کۆنترۆڵی جۆراوجۆر و فرەکەناڵ دەڕەخسێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7a3f4ae20974b3e847518caff3e1d6a452bd32db5d32ba31f6141b276bab9f92",
+  "en": "Dual Power Supply: Supports both USB and AAA battery power supply, catering to models that require long-term power or those that need to be free from power cords.",
+  "ar": "مصدر طاقة مزدوج: يدعم التغذية بالطاقة عبر USB وعبر بطاريات AAA، ليناسب النماذج التي تتطلب طاقة لفترات طويلة أو التي تحتاج إلى التحرر من أسلاك الطاقة.",
+  "ckb": "دابینکردنی دووانەی وزە: پشتگیریی هەردوو دابینکردنی وزە لە ڕێگەی USB و باتریی AAA دەکات، کە گونجاوە بۆ ئەو مۆدێلانەی پێویستیان بە وزەی درێژخایەن هەیە یان ئەوانەی پێویستە بێ کێبڵی کارەبا بن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ad06c386e6a1e2f0b04f3946afe5d57750d5341b78e05efc3aec330c7495f154",
+  "en": "Applications:",
+  "ar": "مجالات الاستخدام:",
+  "ckb": "بوارەکانی بەکارهێنان:",
+  "kind": "block_title"
+ },
+ {
+  "h": "070dc435e4f1b9fd7958c5efe08319909abe7106b9806fa6c45c683f141a7ef8",
+  "en": "Train models",
+  "ar": "نماذج القطارات",
+  "ckb": "مۆدێلی شەمەندەفەر",
+  "kind": "block_line"
+ },
+ {
+  "h": "54209f8cb2339331eb23add5b496a65ce39f19eb6dbd4e4067fa7476ff5c7b48",
+  "en": "Rotating display stand",
+  "ar": "حامل عرض دوّار",
+  "ckb": "پایەی نمایشی سووڕاوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "7b22568e6872b00f107e540f5157d5636e7da3dfa1966f1eed16ea623097a0d3",
+  "en": "Escalator models",
+  "ar": "نماذج السلالم المتحركة",
+  "ckb": "مۆدێلی پلیکانەی کارەبایی",
+  "kind": "block_line"
+ },
+ {
+  "h": "91a76248c08500216483cf4090979effad7b4b1f2d2b42d7dbd8e1695832c289",
+  "en": "Fans",
+  "ar": "المراوح",
+  "ckb": "پانکەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "09c8c370d440149d9b6ec7243212ab8c3079cde3ae383bd284a0e193cb3c1952",
+  "en": "Effortless Model Mounting: Securely attach models to smooth surfaces such as glass, tiles, or cabinets with suction caps, making it easy to move and reposition your projects as needed for different settings.",
+  "ar": "تثبيت النماذج بلا عناء: ثبّت النماذج بإحكام على الأسطح الملساء مثل الزجاج أو البلاط أو الخزائن باستخدام كؤوس الشفط، ما يسهّل نقل مشاريعك وإعادة تموضعها حسب الحاجة لتناسب الأماكن المختلفة.",
+  "ckb": "دانانی مۆدێل بەبێ ماندووبوون: مۆدێلەکان بە پتەوی لەسەر ڕووە لووسەکانی وەک شووشە، کاشی یان دۆڵاب جێگیر بکە بە مژەرەکان، بەمەش گواستنەوە و گۆڕینی شوێنی پڕۆژەکانت بەپێی پێویست بۆ شوێنە جیاوازەکان ئاسان دەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1eb223ad4469e4a2cb11d51f331520752aa4ff246ea0fc5db1b88aef498d3f1c",
+  "en": "Flexible Display and Adjustment: Reclosable Fastener Mounting Tape offers a convenient, removable solution, allowing you to change and adjust the placement of decorations effortlessly for dynamic and versatile displays.",
+  "ar": "عرض وضبط مرنان: يوفّر شريط التثبيت القابل لإعادة الإغلاق (Reclosable Fastener Mounting Tape) حلًا عمليًا قابلًا للإزالة، يتيح لك تغيير أماكن الزينة وضبطها بسهولة للحصول على معروضات حيوية ومتعددة الاستخدامات.",
+  "ckb": "نمایش و ڕێکخستنی نەرمونیان: شریتی جێگیرکەری دووبارە داخراو (Reclosable Fastener Mounting Tape) چارەسەرێکی ئاسان و لابراو پێشکەش دەکات، کە ڕێگەت پێدەدات بە ئاسانی شوێنی ڕازاندنەوەکان بگۆڕیت و ڕێکی بخەیت بۆ نمایشی جووڵاو و فرەبەکارهێنان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "16b1de8870ed2ff6f09000054fcf8881707ec54bc5c913f22704b8f965c18925",
+  "en": "Reliable and Strong Installation: Double-Sided Foam Tape provides a firm hold, is residue-free upon removal, and is waterproof, delivering lasting support for your models.",
+  "ar": "تثبيت موثوق وقوي: يوفّر الشريط الإسفنجي مزدوج الوجه (Double-Sided Foam Tape) تثبيتًا محكمًا، ولا يترك أثرًا عند إزالته، وهو مقاوم للماء، ليمنح نماذجك دعمًا يدوم طويلًا.",
+  "ckb": "دامەزراندنی متمانەپێکراو و بەهێز: شریتی ئیسفەنجی دوو ڕوو (Double-Sided Foam Tape) گرتنێکی پتەو دابین دەکات، دوای لابردن هیچ پاشماوەیەک بەجێ ناهێڵێت و دژە ئاوە، و پشتگیریی بەردەوام بۆ مۆدێلەکانت دەڕەخسێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5c8f2645bb3bd8a5df41806603b36d5526d60ed21d11a3e28d3b719d33b0f0c8",
+  "en": "Kit Includes:",
+  "ar": "يتضمن الطقم:",
+  "ckb": "کیتەکە ئەمانە لەخۆ دەگرێت:",
+  "kind": "block_title"
+ },
+ {
+  "h": "ce3cbea6e1ae03a3d19151eb007dce8404cd38019d795b8469cd3750f3181d9f",
+  "en": "A variety of motors: Different models to meet varying load and speed requirements, ensuring your devices are both stable and versatile.",
+  "ar": "تشكيلة من المحركات: طرازات مختلفة لتلبية متطلبات الحمل والسرعة المتفاوتة، لتكون أجهزتك مستقرة ومتعددة الاستخدامات معًا.",
+  "ckb": "جۆرەها بزوێنەر: مۆدێلی جیاواز بۆ دابینکردنی پێداویستییە جیاوازەکانی بار و خێرایی، بۆ ئەوەی ئامێرەکانت هەم جێگیر و هەم فرەبەکارهێنان بن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3a5734a1423a1e8dc526d4e8759a2dadf8caa285a42b073c1e84db928713904a",
+  "en": "LED lights: Add visual appeal to your creations, producing unique lighting effects—especially suitable for display stands and interactive art installations.",
+  "ar": "مصابيح LED: تضيف جاذبية بصرية إلى إبداعاتك وتنتج تأثيرات إضاءة فريدة، وهي مناسبة خصوصًا لحوامل العرض والأعمال الفنية التفاعلية.",
+  "ckb": "گڵۆپەکانی LED: جوانیی بینراو بۆ داهێنانەکانت زیاد دەکەن و کاریگەریی ڕووناکیی بێهاوتا دروست دەکەن، بە تایبەتی گونجاون بۆ پایەکانی نمایش و دامەزراوە هونەرییە کارلێککارەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "362a1da688aacc21d27cacb919f30e080c02d7a7b7780a554666de89947a527e",
+  "en": "Slip ring: Provide stable power transmission while supporting continuous 360-degree rotation, achieving seamless dynamic effects.",
+  "ar": "الحلقة الانزلاقية: توفّر نقلًا مستقرًا للطاقة مع دعم الدوران المستمر بزاوية 360 درجة، لتحقيق تأثيرات حركية سلسة.",
+  "ckb": "ئەڵقەی خلیسکێنەر: گواستنەوەی جێگیری وزە دابین دەکات لەگەڵ پشتگیریی سووڕانەوەی بەردەوامی 360 پلە، بۆ بەدەستهێنانی کاریگەریی جووڵاوی بێ پچڕان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f6bd5dd529f7f0ad25b5c8fb3ba8cd1a3ae1b302c7e9e1d3e4817917f2606d07",
+  "en": "Magnetic connectors: Offer a creative way to connect and disconnect power with a snap, serving as both an electrical connector and a switch.",
+  "ar": "الموصلات المغناطيسية: توفّر طريقة مبتكرة لوصل الطاقة وفصلها بنقرة، إذ تعمل موصلًا كهربائيًا ومفتاحًا في آنٍ واحد.",
+  "ckb": "گەیەنەرە موگناتیسییەکان: ڕێگەیەکی داهێنەرانە پێشکەش دەکەن بۆ پەیوەستکردن و پچڕاندنی وزە بە یەک کرتە، و هەم وەک گەیەنەری کارەبایی و هەم وەک کلیل کار دەکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cc5edc2e8003f77164ed125711cbae32492a49a964bb7df09518047409dab4c2",
+  "en": "Motor speed controller: Pair with TT motors to easily adjust motor speed and precisely control the movement of your devices.",
+  "ar": "وحدة التحكم بسرعة المحرك: تُستخدم مع محركات TT لضبط سرعة المحرك بسهولة والتحكم بدقة في حركة أجهزتك.",
+  "ckb": "کۆنترۆڵەری خێرایی بزوێنەر: لەگەڵ بزوێنەرەکانی TT بەکاری بهێنە بۆ ڕێکخستنی ئاسانی خێرایی بزوێنەر و کۆنترۆڵکردنی وردی جووڵەی ئامێرەکانت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9cb3f1ff1da46166d2822d032cf3130c1477c7b7963d96bd440852d66cd2571b",
+  "en": "Power distribution board set: Connect switches, potentiometers, N20 motors, LED lights, slip rings, and magnetic connectors for flexible assembly and control.",
+  "ar": "مجموعة لوحة توزيع الطاقة: صِل المفاتيح والمقاومات المتغيّرة ومحركات N20 ومصابيح LED والحلقات الانزلاقية والموصلات المغناطيسية لتجميع وتحكم مرنين.",
+  "ckb": "کۆمەڵەی بۆردی دابەشکردنی وزە: کلیلەکان، پۆتێنشیۆمیتەرەکان، بزوێنەرەکانی N20، گڵۆپەکانی LED، ئەڵقە خلیسکێنەرەکان و گەیەنەرە موگناتیسییەکان پێکەوە ببەستە بۆ پێکەوەنان و کۆنترۆڵی نەرمونیان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ee873cf00575f18cdbaeeeebb8b97989caa6219c649eef98460b90e88bf19b88",
+  "en": "Automata devices: Create artistic automated mechanical devices, combining LED lighting and fine-tuned motor adjustments to showcase intricate motion patterns.",
+  "ar": "أجهزة الأوتوماتا: اصنع أجهزة ميكانيكية آلية فنية تجمع بين إضاءة LED وضبط المحركات بدقة لإظهار أنماط حركة معقّدة.",
+  "ckb": "ئامێرەکانی ئۆتۆماتا: ئامێری میکانیکیی خۆکاری هونەری دروست بکە کە ڕووناکیی LED و ڕێکخستنی وردی بزوێنەر پێکەوە کۆدەکەنەوە بۆ نیشاندانی شێوازی جووڵەی ئاڵۆز.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e1a3fc6e99b748d931d9f35659ba1c0d86d0925ab08372bcf0102804f758729e",
+  "en": "Tourbillon models: Design and craft elegant tourbillon mechanisms, achieving graceful rotation effects with speed controllers.",
+  "ar": "نماذج التوربيون: صمّم واصنع آليات توربيون أنيقة، وحقّق تأثيرات دوران رشيقة باستخدام وحدات التحكم بالسرعة.",
+  "ckb": "مۆدێلەکانی تووربیۆن: میکانیزمی تووربیۆنی جوان دیزاین بکە و دروستی بکە، و بە کۆنترۆڵەرەکانی خێرایی کاریگەریی سووڕانەوەی ناسک بەدەست بهێنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b802f9d5c73484b529392226040c108013827603cb8c8a18d45632d0d4570e64",
+  "en": "Marble run models: Use motors to drive automatic and continuous marble movement, making fun and engaging mechanical toys.",
+  "ar": "نماذج مسارات الكرات الزجاجية: استخدم المحركات لتحريك الكرات الزجاجية تلقائيًا وباستمرار، وصنع ألعاب ميكانيكية ممتعة وجذابة.",
+  "ckb": "مۆدێلەکانی ڕێڕەوی تۆپی شووشەیی: بزوێنەرەکان بەکاربهێنە بۆ جووڵاندنی خۆکار و بەردەوامی تۆپە شووشەییەکان، و دروستکردنی یاریی میکانیکیی خۆش و سەرنجڕاکێش.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0a1fa15537eee8a8ebb44e5b41a6f8a81f937f333c9aa514b7eb53f13a9bc492",
+  "en": "Rotating display stands: Add dynamic flair to your 3D-printed figures or art pieces, making your displays more captivating.",
+  "ar": "حوامل العرض الدوّارة: أضف لمسة حيوية إلى مجسّماتك المطبوعة (3D-printed) أو قطعك الفنية، لتصبح معروضاتك أكثر جاذبية.",
+  "ckb": "پایە سووڕاوەکانی نمایش: تامێکی جووڵاو بە پەیکەرە چاپکراوەکانت (3D-printed) یان پارچە هونەرییەکانت ببەخشە، بۆ ئەوەی نمایشەکانت سەرنجڕاکێشتر بن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "af01712cf001f8a6e6075fc307e21c3b7849e575a221b9289eb74e4f7eee9eb4",
+  "en": "The Desktop Ornament Components Kit is designed to bring endless possibilities and personalized creativity to your tabletop. The kit includes a wide variety of electronic and mechanical parts that can be easily assembled with 3D-printed models to create different styles of desktop decorations. Whether you want to craft a playful clock, an ambient lamp, a music box, or any unique tabletop decor, this set of components will meet your needs and help bring your creative ideas to life.",
+  "ar": "صُمّم طقم Desktop Ornament Components Kit ليمنح سطح مكتبك إمكانيات لا حدود لها وإبداعًا شخصيًا. يتضمن الطقم تشكيلة واسعة من القطع الإلكترونية والميكانيكية التي يمكن تجميعها بسهولة مع النماذج المطبوعة (3D-printed) لصنع أنماط مختلفة من زينة المكتب. وسواء أردت صنع ساعة مرحة أو مصباح أجواء أو صندوق موسيقى أو أي زينة مكتبية فريدة، فإن هذه المجموعة من المكوّنات ستلبّي احتياجاتك وتساعدك على تحويل أفكارك الإبداعية إلى واقع.",
+  "ckb": "کیتی Desktop Ornament Components Kit دیزاین کراوە بۆ هێنانی دەرفەتی بێکۆتایی و داهێنانی تایبەت بۆ سەر مێزەکەت. کیتەکە جۆرێکی فراوان لە پارچەی ئەلیکترۆنی و میکانیکی لەخۆ دەگرێت کە دەتوانرێن بە ئاسانی لەگەڵ مۆدێلە چاپکراوەکان (3D-printed) پێکەوە بنرێن بۆ دروستکردنی شێوازی جیاوازی ڕازاندنەوەی سەر مێز. جا بتەوێت کاتژمێرێکی خۆش، چرایەکی کەشساز، سندوقێکی مۆسیقا یان هەر ڕازاندنەوەیەکی بێهاوتای سەر مێز دروست بکەیت، ئەم کۆمەڵە پێکهاتەیە پێداویستییەکانت دابین دەکات و یارمەتیت دەدات بیرۆکە داهێنەرانەکانت بهێنیتە دی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f8c9c2fd216c4a7272a65fa8063a39fd4a93fc30aabd7de2fb39774fbd0a2195",
+  "en": "DIY Desktop Clock: Create a one-of-a-kind personalized clock by combining clock components with a custom 3D-printed frame.",
+  "ar": "ساعة مكتب DIY: اصنع ساعة شخصية فريدة من نوعها بالجمع بين مكوّنات الساعة وإطار مطبوع (3D-printed) حسب تصميمك.",
+  "ckb": "کاتژمێری سەر مێزی DIY: کاتژمێرێکی کەسیی بێوێنە دروست بکە بە تێکەڵکردنی پێکهاتەکانی کاتژمێر لەگەڵ چوارچێوەیەکی چاپکراوی تایبەت (3D-printed).",
+  "kind": "block_line"
+ },
+ {
+  "h": "6b6afeed7fcee1aeaba28de81f766efba4f86c2908070827e130b4292a2b7218",
+  "en": "Mood Lighting: Use LED strips and RGB lights to craft vibrant, dynamic lighting effects that enhance the ambiance of any room.",
+  "ar": "إضاءة الأجواء: استخدم شرائط LED ومصابيح RGB لصنع تأثيرات إضاءة نابضة وحيوية تعزّز أجواء أي غرفة.",
+  "ckb": "ڕووناکیی کەشساز: شریتەکانی LED و گڵۆپەکانی RGB بەکاربهێنە بۆ دروستکردنی کاریگەریی ڕووناکیی زیندوو و جووڵاو کە کەشی هەر ژوورێک خۆشتر دەکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3be15d3c5453d9fb10540d9ca529081957975d0f3255f60e0e59d8a7afa9dd97",
+  "en": "Romantic Candlelight: The LED candlelight kit provides a warm and cozy glow, perfectly mimicking the gentle flicker of real candlelight.",
+  "ar": "ضوء شموع رومانسي: يوفّر طقم شموع LED توهّجًا دافئًا ومريحًا يحاكي تمامًا الوميض الهادئ لضوء الشموع الحقيقية.",
+  "ckb": "ڕووناکیی مۆمی ڕۆمانسی: کیتی مۆمی LED درەوشانەوەیەکی گەرم و ئارام دابین دەکات کە بە تەواوی لاسایی لەرزینی نەرمی ڕووناکیی مۆمی ڕاستەقینە دەکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c0fa14b61524c4d10ab506162663f3802997b92e5b7918da345c14c5f691fb97",
+  "en": "Music Box Ornament: Easily assemble a charming and melodious music box with the included Piano Music Box Winding Kit.",
+  "ar": "زينة صندوق الموسيقى: جمّع بسهولة صندوق موسيقى ساحرًا عذب الألحان باستخدام طقم Piano Music Box Winding Kit المرفق.",
+  "ckb": "ڕازاندنەوەی سندوقی مۆسیقا: بە ئاسانی سندوقێکی مۆسیقای سەرنجڕاکێش و ئاوازدار پێکەوە بنێ بە کیتی Piano Music Box Winding Kit کە لەگەڵدایە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f6bff22083e7e4257baa2e734308f415e640249013df5bf63ab1fc3b431e0aea",
+  "en": "Artistic Light Decor: Combine an acrylic cylinder, adjustable COB light strips, and power components to design a minimalist and elegant art lamp with customizable lighting effects.",
+  "ar": "ديكور ضوئي فني: اجمع بين أسطوانة أكريليك وشرائط إضاءة COB قابلة للضبط ومكوّنات الطاقة لتصميم مصباح فني بسيط وأنيق بتأثيرات إضاءة قابلة للتخصيص.",
+  "ckb": "ڕازاندنەوەی ڕووناکیی هونەری: سیلیندەرێکی ئاکریلیک، شریتی ڕووناکیی ڕێکخراوی COB و پێکهاتەکانی وزە پێکەوە کۆبکەرەوە بۆ دیزاینکردنی چرایەکی هونەریی سادە و جوان بە کاریگەریی ڕووناکیی تایبەتکراو.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a12bfd22a7e5be692608e3656ef660bee6613bf7bbeac89b6fc332c56300f694",
+  "en": "Adhesive Foam Roll: Securely attach and stabilize tabletop ornaments on any flat surface for a firm and steady display.",
+  "ar": "لفّة الإسفنج اللاصق: ثبّت زينة الطاولة بإحكام على أي سطح مستوٍ لعرض ثابت ومتين.",
+  "ckb": "لوولەی ئیسفەنجی چەسپدار: ڕازاندنەوەکانی سەر مێز بە پتەوی لەسەر هەر ڕووێکی تەخت جێگیر بکە بۆ نمایشێکی پتەو و جێگیر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "080768915317c4fa9db3629052750d0c8512d03f68e754b78ef2f5f9a66acc0e",
+  "en": "This Filament Protection Kit includes 6 packs of desiccant, 2 thermometer hygrometers, and 1 roll of adhesive foam sponge strip roll, effectively preventing filaments to absorb moisture by humid environments. The components in the kit can replace expired desiccants in the AMS and add standalone hygrometers. Additionally, they can be used to modify multiple filament storage boxes, providing a safer storage environment for opened filaments.",
+  "ar": "يتضمن طقم Filament Protection Kit هذا 6 عبوات من المادة المجففة، و2 من مقاييس الحرارة والرطوبة، و1 لفّة من شريط الإسفنج اللاصق، ما يمنع الفلامنت بفعالية من امتصاص الرطوبة في البيئات الرطبة. ويمكن لمكوّنات الطقم أن تحلّ محل المواد المجففة منتهية الصلاحية في وحدة AMS، وأن تضيف مقاييس رطوبة مستقلة. كما يمكن استخدامها لتعديل عدة صناديق لتخزين الفلامنت، لتوفير بيئة تخزين أكثر أمانًا للفلامنت المفتوح.",
+  "ckb": "کیتی Filament Protection Kit ئەمانە لەخۆ دەگرێت: 6 پاکەت ماددەی وشککەرەوە، 2 پلەپێو و شێپێو، و 1 ڕۆڵ شریتی ئیسفەنجی چەسپدار، کە بە کارایی ڕێگری لە هەڵمژینی شێ لەلایەن فیلامێنتەوە دەکات لە ژینگەی شێداردا. پێکهاتەکانی کیتەکە دەتوانن جێگەی ماددە وشککەرەوە بەسەرچووەکان لە یەکەی AMS بگرنەوە و شێپێوی سەربەخۆ زیاد بکەن. هەروەها دەتوانرێن بۆ گۆڕینی چەند قوتوویەکی هەڵگرتنی فیلامێنت بەکاربهێنرێن، بۆ دابینکردنی ژینگەیەکی هەڵگرتنی سەلامەتتر بۆ فیلامێنتە کراوەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "45930b2dc5bc4c8f6b3aafa341c58b3dd52c3d27dfc14fdfa5f59f6df6dc1354",
+  "en": "AMS and Filament Box Maintenance: Equipped with sufficient desiccants to meet the replacement needs for expired desiccants.",
+  "ar": "صيانة وحدة AMS وصندوق الفلامنت: مزوّد بكمية كافية من المادة المجففة لتلبية احتياجات استبدال المواد المجففة منتهية الصلاحية.",
+  "ckb": "چاککردنەوەی یەکەی AMS و سندوقی فیلامێنت: بڕێکی تەواو لە ماددەی وشککەرەوەی لەگەڵدایە بۆ پڕکردنەوەی پێداویستیی گۆڕینی ماددە وشککەرەوە بەسەرچووەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c7bb2dc5b37bbd0dffae5bf3400c1cf2790fc14f5623ecdcdbe6205e608acb5a",
+  "en": "Filament Box Upgrades: Use adhesive foam sponge strip roll to enhance the sealing performance of DIY filament box, place desiccants inside to absorb moisture, and install hygrometers for real-time monitoring of storage conditions, ensuring filaments remain in optimal condition.",
+  "ar": "ترقية صناديق الفلامنت: استخدم لفّة شريط الإسفنج اللاصق لتحسين إحكام إغلاق صندوق الفلامنت المصنوع يدويًا (DIY)، وضع المواد المجففة داخله لامتصاص الرطوبة، وركّب مقاييس الرطوبة لمراقبة ظروف التخزين في الوقت الفعلي، لضمان بقاء الفلامنت في أفضل حالة.",
+  "ckb": "نوێکردنەوەی سندوقی فیلامێنت: ڕۆڵی شریتی ئیسفەنجی چەسپدار بەکاربهێنە بۆ باشترکردنی داخستنی سندوقی فیلامێنتی DIY، ماددەی وشککەرەوە بخە ناوی بۆ هەڵمژینی شێ، و شێپێو دابنێ بۆ چاودێریی بارودۆخی هەڵگرتن لە کاتی ڕاستەقینەدا، تا فیلامێنتەکان لە باشترین باردا بمێننەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fa8db91833889bce3a89a2476ade0e4a00d91ed2335d8a93ac2ab184deedf370",
+  "en": "Standardized Connections: The kit contains a wide range of standardized screws and nuts, with screw sizes ranging from M2 to M4 and lengths from 4mm to 30mm, covering most screw sizes commonly used in 3D printed models.",
+  "ar": "وصلات قياسية: يحتوي الطقم على تشكيلة واسعة من البراغي والصواميل القياسية، بمقاسات براغٍ من M2 إلى M4 وأطوال من 4mm إلى 30mm، تغطي معظم مقاسات البراغي الشائعة الاستخدام في النماذج المطبوعة بطابعة 3D.",
+  "ckb": "پەیوەستکردنی ستاندارد: کیتەکە کۆمەڵێکی فراوان لە بورغی و سامۆڵەی ستاندارد لەخۆ دەگرێت، بە قەبارەی بورغی لە M2 تا M4 و درێژی لە 4mm تا 30mm، کە زۆربەی قەبارە باوەکانی بورغی لە مۆدێلە چاپکراوەکانی 3D دا دەگرێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cbd9a08b40d77b87988c7f0cb90c919dec4ae6e63611e1297a902160a2c0dbf7",
+  "en": "Efficient Assembly: Creators can directly use high-precision, high-quality fasteners, eliminating the need for repeated testing and searching for suitable components. This allows for faster assembly and improved work efficiency.",
+  "ar": "تجميع فعّال: يمكن للمصمّمين استخدام مثبّتات عالية الدقة والجودة مباشرةً، دون الحاجة إلى التجربة المتكررة والبحث عن المكوّنات المناسبة. وهذا يتيح تجميعًا أسرع وكفاءة عمل أعلى.",
+  "ckb": "پێکەوەنانی کارا: دروستکەران دەتوانن ڕاستەوخۆ پارچەی جێگیرکەری وردیی بەرز و جۆرایەتیی بەرز بەکاربهێنن، بەبێ پێویستی بە تاقیکردنەوەی دووبارە و گەڕان بەدوای پێکهاتەی گونجاودا. ئەمە پێکەوەنانی خێراتر و کارایی کاری باشتر دەڕەخسێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "66034e9889b2dea962ce025d5036ff05c99fb0cc70093374d1600510a29c78f9",
+  "en": "Small Quantities in Separate Packs: The kit features small, individually packaged quantities, enabling designers to freely match the required fasteners for their models without needing to modify designs to accommodate compatible screws.",
+  "ar": "كميات صغيرة في عبوات منفصلة: يتميّز الطقم بكميات صغيرة معبّأة بشكل منفصل، ما يتيح للمصمّمين اختيار المثبّتات المطلوبة لنماذجهم بحرية، دون الحاجة إلى تعديل التصاميم لتناسب البراغي المتوافقة.",
+  "ckb": "بڕی کەم لە پاکەتی جیاجیادا: کیتەکە بڕی بچووکی بە جیا پاکەتکراوی تێدایە، کە ڕێگە بە دیزاینەران دەدات بە ئازادی پارچە جێگیرکەرە پێویستەکان بۆ مۆدێلەکانیان هەڵبژێرن، بەبێ ئەوەی پێویست بێت دیزاینەکان بگۆڕن بۆ ئەوەی لەگەڵ بورغییە گونجاوەکان بگونجێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e1259c0e97de95a263d2e295ff654b86b4c6876501cb285bca8d29429384c0e0",
+  "en": "Mechanical Structures and Toy Models: Suitable for structural connections in various mechanical structures and toy models, such as car models, robot models, brackets, and scene models, ensuring tight fits and stable connections.",
+  "ar": "الهياكل الميكانيكية ونماذج الألعاب: مناسب للوصلات الهيكلية في مختلف الهياكل الميكانيكية ونماذج الألعاب، مثل نماذج السيارات والروبوتات ودعامات التثبيت ونماذج المشاهد، لضمان تركيب محكم ووصلات ثابتة.",
+  "ckb": "پێکهاتە میکانیکییەکان و مۆدێلی یاری: گونجاوە بۆ پەیوەستکردنی پێکهاتەیی لە پێکهاتە میکانیکییە جۆراوجۆرەکان و مۆدێلی یاریدا، وەک مۆدێلی ئۆتۆمبێل، مۆدێلی ڕۆبۆت، پایەی جێگیرکردن و مۆدێلی دیمەن، بۆ دڵنیابوون لە لەیەکگرتنی توند و پەیوەستکردنی جێگیر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "73141ea7523796852ead41cfbce2ae401e0aec945a23120aa54d54e0dd30c726",
+  "en": "Electronic Device Assembly: Ideal for assembling and securing electronic devices, sensors, hardware boards, and other commonly used electronic components. The selection includes various head types and popular sizes, ensuring the compatibility and reliability of the parts.",
+  "ar": "تجميع الأجهزة الإلكترونية: مثالي لتجميع وتثبيت الأجهزة الإلكترونية والحساسات واللوحات الإلكترونية وغيرها من المكوّنات الإلكترونية الشائعة. وتشمل التشكيلة أنواعًا مختلفة من الرؤوس والمقاسات الشائعة، ما يضمن توافق القطع وموثوقيتها.",
+  "ckb": "پێکەوەنانی ئامێری ئەلیکترۆنی: گونجاوە بۆ پێکەوەنان و جێگیرکردنی ئامێری ئەلیکترۆنی، هەستەوەر، بۆردی ڕەقەکاڵا و پێکهاتە ئەلیکترۆنییە باوەکانی تر. هەڵبژاردەکە جۆری جیاوازی سەر و قەبارە باوەکان لەخۆ دەگرێت، کە گونجاوی و متمانەپێکراویی پارچەکان دەستەبەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "098fbc676d9d6ae58f70c94de9664f2f62970e3e4e0aa89d834b351c72ae5b52",
+  "en": "Home Decoration: Suitable for home decoration projects such as wall racks, display stands, and lighting fixtures, providing reliable and durable connections.",
+  "ar": "ديكور المنزل: مناسب لمشاريع تزيين المنزل مثل الرفوف الجدارية وحوامل العرض وتجهيزات الإضاءة، ويوفّر وصلات موثوقة ومتينة.",
+  "ckb": "ڕازاندنەوەی ماڵ: گونجاوە بۆ پڕۆژەکانی ڕازاندنەوەی ماڵ وەک ڕەفی دیوار، پایەی نمایش و کەرەستەی ڕووناکی، و پەیوەستکردنی متمانەپێکراو و بەرگەگر دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1ab025f41a352133b63bdb6186ac84facbd97717c74c28d02de33dbd0cbbffff",
+  "en": "It's time to give your 3D printing workshop an upgrade with the Workshop Modification Kit! This kit contains medium sized bearings, a thermometer hygrometer, LED solderless quick connector, magnets, pneumatic fittings, desiccant, adhesive foam sponge strip and silicone tube.",
+  "ar": "حان الوقت لترقية ورشة الطباعة 3D الخاصة بك مع طقم Workshop Modification Kit! يحتوي هذا الطقم على محامل متوسطة الحجم، ومقياس حرارة ورطوبة، وموصل LED سريع بلا لحام، ومغناطيسات، ووصلات هوائية، ومادة مجففة، وشريط إسفنجي لاصق، وأنبوب سيليكون.",
+  "ckb": "کاتی ئەوە هاتووە وۆرکشۆپەکەت بۆ چاپی 3D نوێ بکەیتەوە بە کیتی Workshop Modification Kit! ئەم کیتە بێرینگی قەبارە مامناوەند، پلەپێو و شێپێوێک، گەیەنەری خێرای LED بێ لەحیم، موگناتیس، گەیەنەری هەوایی، ماددەی وشککەرەوە، شریتی ئیسفەنجی چەسپدار و بۆریی سیلیکۆن لەخۆ دەگرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c6ab9ad16826786524a21240db48e3dc59e0ab93557ad96dc9caf89e4dc2d5b2",
+  "en": "Whether you need to make your own filament spool winder, drybox, AMS stand, hanging light, tool box or temperature and humidity monitoring kit, this kit will provide you with the parts you need to create the most impressive workshop.",
+  "ar": "سواء كنت تريد صنع أداة لفّ بكرة (spool) الفلامنت الخاصة بك، أو صندوق تجفيف، أو حامل لوحدة AMS، أو مصباح معلّق، أو صندوق أدوات، أو طقم لمراقبة الحرارة والرطوبة، فإن هذا الطقم سيوفّر لك القطع التي تحتاجها لإنشاء ورشة رائعة للغاية.",
+  "ckb": "جا بتەوێت ئامێری پێچانەوەی ماسوورە (spool) بۆ فیلامێنت، سندوقی وشک، پایەی یەکەی AMS، چرای هەڵواسراو، سندوقی ئامراز یان کیتی چاودێریی پلەی گەرمی و شێ دروست بکەیت، ئەم کیتە ئەو پارچانەت پێدەدات کە پێویستتە بۆ دروستکردنی سەرنجڕاکێشترین وۆرکشۆپ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e0df7b360d5e83e9f638b170cc27d180fd6d9f76f36e6fea5def2d643128148e",
+  "en": "AMS Riser: Use the LED strip to light up the printer. Add drawers and magnets to organise your tools.",
+  "ar": "قاعدة رفع لوحدة AMS: استخدم شريط LED لإضاءة الطابعة، وأضف أدراجًا ومغناطيسات لتنظيم أدواتك.",
+  "ckb": "بەرزکەرەوەی یەکەی AMS: شریتی LED بەکاربهێنە بۆ ڕووناککردنەوەی چاپکەرەکە. چەکمەجە و موگناتیس زیاد بکە بۆ ڕێکخستنی ئامرازەکانت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "db67e220732971e6a79f9d249c1813e8363239f29139458819ae20cc07a02b26",
+  "en": "Filament Spool Winder: Use deep groove ball bearings to keep the filament spool rolling smoothly.",
+  "ar": "أداة لفّ بكرة الفلامنت: استخدم المحامل الكروية ذات الأخدود العميق لتبقى بكرة الفلامنت (spool) تدور بسلاسة.",
+  "ckb": "ئامێری پێچانەوەی ماسوورەی فیلامێنت: بێرینگی تۆپەڵەیی شیارقووڵ بەکاربهێنە بۆ ئەوەی ماسوورەی فیلامێنتەکە (spool) بە نەرمی بسووڕێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a00d0e9742ba7a17d4e37da8b9d716e32280897fc95cc38bb6dc8fdebf13d262",
+  "en": "Drybox: Pneumatic connectors, adhesive foam sponge strip and desiccant will help you keep your filament dry. Add a circular thermometer hygrometer to monitor the environment.",
+  "ar": "صندوق التجفيف: ستساعدك الوصلات الهوائية وشريط الإسفنج اللاصق والمادة المجففة على إبقاء الفلامنت جافًا. وأضف مقياس حرارة ورطوبة دائريًا لمراقبة البيئة المحيطة.",
+  "ckb": "سندوقی وشک: گەیەنەرە هەواییەکان، شریتی ئیسفەنجی چەسپدار و ماددەی وشککەرەوە یارمەتیت دەدەن فیلامێنتەکەت وشک ڕابگریت. پلەپێو و شێپێوێکی بازنەیی زیاد بکە بۆ چاودێریکردنی ژینگەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6878e3af185d2c43b0f5e1af3a055d025cd0774a73ce261809b81166d1c26c13",
+  "en": "Tool Boxes & Hangers: Magnets can be used to create self-returning tool boxes, magnetic hangers, and use adhesive foam sponge strips to reduce noise and prevent slipping.",
+  "ar": "صناديق الأدوات والعلّاقات: يمكن استخدام المغناطيسات لصنع صناديق أدوات ذاتية الإرجاع وعلّاقات مغناطيسية، واستخدم شرائط الإسفنج اللاصق لتقليل الضجيج ومنع الانزلاق.",
+  "ckb": "سندوقی ئامراز و هەڵواسەر: موگناتیس دەتوانرێت بەکاربهێنرێت بۆ دروستکردنی سندوقی ئامرازی خۆگەڕاوە و هەڵواسەری موگناتیسی، و شریتی ئیسفەنجی چەسپدار بەکاربهێنە بۆ کەمکردنەوەی دەنگەدەنگ و ڕێگریکردن لە خلیسکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "504bce95d54d31bc77de9a6af89446c16693e20e75da518b57039137b51526f5",
+  "en": "The Eye Bolt with Self-Tapping Thread offers a practical and versatile solution for enhancing the functionality of 3D-printed models. Their unique design—featuring a circular loop and a threaded shaft—makes them ideal for decorative, integrating mechanical, and structural capabilities into printed objects.",
+  "ar": "يقدّم البرغي الحلقي Eye Bolt with Self-Tapping Thread حلًا عمليًا ومتعدد الاستخدامات لتعزيز وظائف النماذج المطبوعة (3D-printed). فتصميمه الفريد، بحلقة دائرية وساق ملولبة، يجعله مثاليًا لإضافة قدرات زخرفية وميكانيكية وهيكلية إلى القطع المطبوعة.",
+  "ckb": "بۆڵتی ئەڵقەیی Eye Bolt with Self-Tapping Thread چارەسەرێکی کرداری و فرەبەکارهێنان پێشکەش دەکات بۆ باشترکردنی کارایی مۆدێلە چاپکراوەکان (3D-printed). دیزاینە تایبەتەکەی، بە ئەڵقەیەکی بازنەیی و میلێکی پێچدار، گونجاوی دەکات بۆ زیادکردنی توانای ڕازاندنەوەیی، میکانیکی و پێکهاتەیی بۆ شتە چاپکراوەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9ed375545604dd64f748fe591dfa2cae17427079b2c2d641fcfe6cbead3da679",
+  "en": "O (mm) Outer diameter",
+  "ar": "القطر الخارجي O (mm)",
+  "ckb": "تیرەی دەرەوە O (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9561d21eeebef55489f4a869926e8b8212575f7c62e6cea8c32bd003c36f8ade",
+  "en": "I (mm) Inner diameter",
+  "ar": "القطر الداخلي I (mm)",
+  "ckb": "تیرەی ناوەوە I (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "bbde304b09e5d218c5651b1ba518bed16c12f5053599d0260b68360cf0b4add0",
+  "en": "T (mm) Threaded section length",
+  "ar": "طول الجزء الملولب T (mm)",
+  "ckb": "درێژیی بەشی پێچدار T (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "a12141847abe1d4c611451b66734bc1f597cc88a05354034e574fd35181af588",
+  "en": "L (mm) Overall length",
+  "ar": "الطول الكلي L (mm)",
+  "ckb": "درێژیی گشتی L (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "87135eaff60dfa67fc0d34796d0a46a322ebc7f49bd96aabd614de89caf66628",
+  "en": "W (mm) Opening width",
+  "ar": "عرض الفتحة W (mm)",
+  "ckb": "پانیی کرانەوە W (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "c3d94a3e0def5a9effb2039bb63ff5260c29ee79c2dbf7f47ed483303a8bbed7",
+  "en": "M (mm) Minor diameter",
+  "ar": "القطر الأصغر M (mm)",
+  "ckb": "تیرەی بچووک M (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f05229da7b5a8d01bdf4c92df961717a985d60cd3e8f9d31c821c728587abf2e",
+  "en": "C (mm) Cross-sectional width",
+  "ar": "عرض المقطع العرضي C (mm)",
+  "ckb": "پانیی بڕگەی عەرزی C (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "d7d4f59db48fb4b8d9fe1fe1b7ec5bff489fc305e0ce38500bbb4acc2166e4ca",
+  "en": "pcs",
+  "ar": "قطعة",
+  "ckb": "دانە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "49ddfd8b03cc08bc92b88c53452e896c597f52e0fceed750b0f077177da28527",
+  "en": "Hanging and Display: Attach to models like ornaments, keychains, or wall decor for easy suspension.",
+  "ar": "التعليق والعرض: ثبّته في نماذج مثل الزينة أو ميداليات المفاتيح أو زينة الجدران لتعليقها بسهولة.",
+  "ckb": "هەڵواسین و نمایش: بیبەستە بە مۆدێلەکانی وەک ڕازاندنەوە، کلیلدان یان ڕازاندنەوەی دیوارەوە بۆ هەڵواسینی ئاسان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a380a55a6336c7bceca0769481754800d834ad06e830adf021bfff6b9a5d1206",
+  "en": "Moving Parts: Use as pivots or connectors for dynamic assemblies like hinges or linked components.",
+  "ar": "الأجزاء المتحركة: استخدمه محورًا للدوران أو وصلة في التجميعات المتحركة مثل المفصّلات أو المكوّنات المترابطة.",
+  "ckb": "پارچە جووڵاوەکان: وەک تەوەری سووڕانەوە یان گەیەنەر بەکاری بهێنە بۆ پێکەوەنانە جووڵاوەکانی وەک لۆلا یان پێکهاتە بەیەکەوە بەستراوەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7c6f5adb9dd8b6dcaaefbec2bf585fe0c09a3f69fa66f287fd6c704a00a7f1a9",
+  "en": "Reinforcement: Strengthen load-bearing models or secure them to walls or ceilings.",
+  "ar": "التدعيم: قوِّ النماذج الحاملة للأوزان أو ثبّتها على الجدران أو الأسقف.",
+  "ckb": "بەهێزکردن: مۆدێلە بارهەڵگرەکان بەهێز بکە یان بە دیوار یان بنمیچەوە جێگیریان بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8312373525da0bf7b6602cbc423b7aeb192dbc4f2dfd1adb96d72bf7d08a3e3e",
+  "en": "Interactive Prototypes: Enhance toys, educational kits, or functional prototypes with mechanical connections.",
+  "ar": "النماذج الأولية التفاعلية: طوّر الألعاب أو الأطقم التعليمية أو النماذج الأولية الوظيفية بوصلات ميكانيكية.",
+  "ckb": "نموونە سەرەتاییە کارلێککارەکان: یاری، کیتی فێرکاری یان نموونەی سەرەتایی کارا بە پەیوەستکردنی میکانیکی باشتر بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e3fbf57a5a70599533693b0613428fff4b4480df57eda7d6ffaa6370bd777087",
+  "en": "Miniature shaft system: Use metal shafts and bearings as rotating shafts when making gearboxes and other shaft systems to improve shaft parallelism and stability of shaft distance and reduce rotating resistance.",
+  "ar": "نظام أعمدة مصغّر: استخدم الأعمدة المعدنية والمحامل كأعمدة دوّارة عند صنع علب التروس وأنظمة الأعمدة الأخرى، لتحسين توازي الأعمدة وثبات المسافة بينها وتقليل مقاومة الدوران.",
+  "ckb": "سیستەمی میلی بچووک: میلی کانزایی و بێرینگ وەک میلی سووڕاوە بەکاربهێنە لە کاتی دروستکردنی گێربۆکس و سیستەمی میلی تردا، بۆ باشترکردنی تەریبیی میلەکان و جێگیریی دووریی نێوانیان و کەمکردنەوەی بەرگریی سووڕانەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "634b0605e3070b0ba467a037d5242f60859a5d75ab98a013280e57c89a7f0424",
+  "en": "Miniature Linkage: Use thrust ball bearings and shoulder screws to improve parallelism between linkages for smoother reciprocating motion.",
+  "ar": "وصلات ربط مصغّرة: استخدم المحامل الكروية الدفعية والبراغي الكتفية لتحسين التوازي بين أذرع الربط للحصول على حركة ترددية أكثر سلاسة.",
+  "ckb": "بەستنەوەی میکانیکیی بچووک: بێرینگی تۆپەڵەیی پاڵنان و بورغیی شانەدار بەکاربهێنە بۆ باشترکردنی تەریبی لە نێوان بەشە بەستراوەکاندا بۆ جووڵەی هاتوچۆیی نەرمتر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "71852f451eca7d1e14cd9f3b81a288bfbd290b2dafcfaffd82a8e640fce96670",
+  "en": "Miniature carriage: Use miniature bearings to make the carriage, reduce the resistance of linear movement.",
+  "ar": "عربة مصغّرة: استخدم المحامل المصغّرة لصنع العربة، وتقليل مقاومة الحركة الخطية.",
+  "ckb": "عەرەبانەی بچووک: بێرینگی بچووک بەکاربهێنە بۆ دروستکردنی عەرەبانەکە، و کەمکردنەوەی بەرگریی جووڵەی هێڵی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e89ac29f9d32ae62c9bfe120b3c2b9106efe345d56432faf52eca4bd326c2511",
+  "en": "Miniature guide: Use metal shaft and copper sleeve to make miniature guide, which makes the linear motion of the model free from the interference of layer lines and smoother and more stable.",
+  "ar": "موجّه مصغّر: استخدم عمودًا معدنيًا وجلبة نحاسية لصنع موجّه مصغّر، يجعل الحركة الخطية للنموذج بمنأى عن تأثير خطوط الطبقات وأكثر سلاسة وثباتًا.",
+  "ckb": "ڕێڕەوی بچووک: میلی کانزایی و بۆشی مس بەکاربهێنە بۆ دروستکردنی ڕێڕەوێکی بچووک، کە جووڵەی هێڵیی مۆدێلەکە لە دەستێوەردانی هێڵەکانی چین ڕزگار دەکات و نەرمتر و جێگیرتری دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a7341251fe62abbd4e61e68efaa48aef4e3dc38228b84d759a2be6b57dfdf436",
+  "en": "Miniature hinge: Use metal shaft as the miniature hinge shaft to improve the strength and rigidity of the model's shaft.",
+  "ar": "مفصّلة مصغّرة: استخدم العمود المعدني محورًا للمفصّلة المصغّرة لتحسين متانة عمود النموذج وصلابته.",
+  "ckb": "لۆلای بچووک: میلی کانزایی وەک میلی لۆلای بچووک بەکاربهێنە بۆ باشترکردنی بەهێزی و ڕەقیی میلی مۆدێلەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f3c6f27c768a7f20e12eba91a373518da71882dc6aaa57f3dcf805a0c989be73",
+  "en": "This kit contains a Remote Controller and a USB controller. We have prepared this replacement kit for RGB LED Strip Light and S-shape LED Strip Light (WS2812B RGB) to cover any possible loss or damage during the crafting process.",
+  "ar": "يحتوي هذا الطقم على جهاز تحكم عن بُعد ووحدة تحكم USB. أعددنا طقم الاستبدال هذا لشريط RGB LED Strip Light وشريط S-shape LED Strip Light (WS2812B RGB) لتعويض أي فقدان أو تلف محتمل أثناء عملية التصنيع اليدوي.",
+  "ckb": "ئەم کیتە کۆنترۆڵێکی لە دوورەوە و کۆنترۆڵەرێکی USB لەخۆ دەگرێت. ئەم کیتی جێگرەوەیەمان بۆ شریتی RGB LED Strip Light و شریتی S-shape LED Strip Light (WS2812B RGB) ئامادە کردووە بۆ قەرەبووکردنەوەی هەر ونبوون یان زیانێکی ئەگەری لە کاتی کاری دەستیدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fa0dda95eb2ce0d35fb20396b2480dc3ed330b76c0c192ab83954a9e05c6ec09",
+  "en": "Start Your 3D Printing Journey with This Maker's Beginner Kit!",
+  "ar": "ابدأ رحلتك في الطباعة 3D مع طقم Maker's Beginner Kit هذا!",
+  "ckb": "بە کیتی Maker's Beginner Kit گەشتەکەت لە جیهانی چاپی 3D دا دەست پێ بکە!",
+  "kind": "block_title"
+ },
+ {
+  "h": "0abcae3eede7959205acc77c185d14998e50ae054a42ad1d11b9c995d9754d8c",
+  "en": "Why Maker's Beginner Kit?",
+  "ar": "لماذا Maker's Beginner Kit؟",
+  "ckb": "بۆچی Maker's Beginner Kit؟",
+  "kind": "block_title"
+ },
+ {
+  "h": "746b4a9062e072745b120d8690aa0d2d6a3312a5b98e2094b261674e66a86256",
+  "en": "Beginner-friendly: Carefully curated models, continuously updated, and easy-to-follow tutorials. No complex tools needed!",
+  "ar": "مناسب للمبتدئين: نماذج مختارة بعناية تُحدَّث باستمرار، مع شروحات سهلة المتابعة. لا حاجة إلى أدوات معقّدة!",
+  "ckb": "گونجاو بۆ سەرەتاکاران: مۆدێلی بە وردی هەڵبژێردراو کە بە بەردەوامی نوێ دەکرێنەوە، لەگەڵ فێرکاریی ئاسانی شوێنکەوتن. پێویستت بە ئامرازی ئاڵۆز نییە!",
+  "kind": "block_line"
+ },
+ {
+  "h": "890006566d0d080ca9e89a3bd0f59a7342c97bd4c1c3c1865f1ee9eeffe32c97",
+  "en": "Endless creativity: With motors, gears, springs, and more, you can let your imagination run wild and create unexpected designs.",
+  "ar": "إبداع بلا حدود: مع المحركات والتروس والنوابض وغيرها، يمكنك إطلاق العنان لخيالك وابتكار تصاميم غير متوقعة.",
+  "ckb": "داهێنانی بێکۆتا: بە بزوێنەر، چەرخی ددانەدار، فەنەر و زیاتر، دەتوانیت خەیاڵت ئازاد بکەیت و دیزاینی چاوەڕواننەکراو دروست بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0bfb8e3e00c598b2edf9068d43227fecde0959c0481247427a0edbee4a9fffdd",
+  "en": "What Can You Make?",
+  "ar": "ماذا يمكنك أن تصنع؟",
+  "ckb": "چی دەتوانیت دروست بکەیت؟",
+  "kind": "block_title"
+ },
+ {
+  "h": "09679dc5bc0bd2d6c64d017cf26cbb13d58a19c3b0d316b0b383cb8a1b3119aa",
+  "en": "You can easily build these models and more with our Maker's Beginner Kit!",
+  "ar": "يمكنك بسهولة بناء هذه النماذج وغيرها مع طقمنا Maker's Beginner Kit!",
+  "ckb": "دەتوانیت بە ئاسانی ئەم مۆدێلانە و زیاتر دروست بکەیت بە کیتەکەمان Maker's Beginner Kit!",
+  "kind": "block_line"
+ },
+ {
+  "h": "053ff0b9d69f4f146d54b6cb98193bf24ae9e23cf55b9391735430625da4229f",
+  "en": "Ready to Dive In?",
+  "ar": "هل أنت مستعد للانطلاق؟",
+  "ckb": "ئامادەیت دەست پێ بکەیت؟",
+  "kind": "block_title"
+ },
+ {
+  "h": "439ca46eeb75428ca4dac13f9c74c003919f74b663fd56a52e16bfffa14df767",
+  "en": "Join the fun of 3D printing! Use your hands to create a fantastic world of your own.",
+  "ar": "انضم إلى متعة الطباعة 3D! واصنع بيديك عالمًا رائعًا خاصًا بك.",
+  "ckb": "بەشداری چێژی چاپی 3D بکە! بە دەستەکانی خۆت جیهانێکی سەرسوڕهێنەری تایبەت بە خۆت دروست بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b16c924ded1e7634be5b49d6d456db9052d1a358cc17664efb2438b1bd34e66f",
+  "en": "Explore Our Model Collection: Scan QR code via Bambu Handy or visit Maker's Beginner Kit Model Collection to access our continuously updated model collection specifically designed for this Kit.",
+  "ar": "استكشف مجموعة نماذجنا: امسح رمز QR عبر تطبيق Bambu Handy أو زر صفحة Maker's Beginner Kit Model Collection للوصول إلى مجموعة نماذجنا المحدّثة باستمرار والمصمّمة خصيصًا لهذا الطقم.",
+  "ckb": "کۆمەڵە مۆدێلەکانمان بپشکنە: کۆدی QR لە ڕێگەی ئەپی Bambu Handy سکان بکە یان سەردانی پەڕەی Maker's Beginner Kit Model Collection بکە بۆ گەیشتن بە کۆمەڵە مۆدێلە بەردەوام نوێکراوەکەمان کە بە تایبەتی بۆ ئەم کیتە دیزاین کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f0666dd080810f637fdcdb0ec3061e76bed9a1f844dbf05c61e016f2d1638953",
+  "en": "Share Your Creations: Show off your work in community via BambuHandy or MakerWorld web page and connect with fellow makers.",
+  "ar": "شارك إبداعاتك: اعرض أعمالك في المجتمع عبر BambuHandy أو صفحة MakerWorld على الويب، وتواصل مع زملائك من الصنّاع.",
+  "ckb": "داهێنانەکانت هاوبەش بکە: کارەکانت لە کۆمەڵگەکەدا نیشان بدە لە ڕێگەی BambuHandy یان پەڕەی وێبی MakerWorld، و پەیوەندی بە دروستکەرانی ترەوە بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f8a452301c76aaf00fbf4969b978abdcd7628b0dcc5f31a9c3c4963f0f38fa7a",
+  "en": "Join the Design Discussions: Visit the Maker's Supply topic on the MakerWorld forum to discuss creative uses for your parts.",
+  "ar": "شارك في نقاشات التصميم: زر موضوع Maker's Supply في منتدى MakerWorld لمناقشة الاستخدامات الإبداعية لقطعك.",
+  "ckb": "بەشداری گفتوگۆکانی دیزاین بکە: سەردانی بابەتی Maker's Supply لە فۆرەمی MakerWorld بکە بۆ گفتوگۆکردن لەسەر بەکارهێنانە داهێنەرانەکانی پارچەکانت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3262e92ed8b0c64e8186a11119619957d770727c974c0f5b4443afd3ffb40260",
+  "en": "Compete in Creative Contests: Participate in our Maker's Beginner Kit model contest on the MakerWorld contest page. Outstanding designs may be featured in our model collection and win amazing prizes!",
+  "ar": "تنافس في المسابقات الإبداعية: شارك في مسابقة نماذج Maker's Beginner Kit على صفحة المسابقات في MakerWorld. قد تُعرض التصاميم المتميزة ضمن مجموعة نماذجنا وتفوز بجوائز رائعة!",
+  "ckb": "لە پێشبڕکێ داهێنەرانەکاندا ڕکابەری بکە: بەشداری پێشبڕکێی مۆدێلەکانی Maker's Beginner Kit بکە لە پەڕەی پێشبڕکێکانی MakerWorld. لەوانەیە دیزاینە نایابەکان لە کۆمەڵە مۆدێلەکانماندا نمایش بکرێن و خەڵاتی سەرسوڕهێنەر ببەنەوە!",
+  "kind": "block_line"
+ },
+ {
+  "h": "4eca262c69e8b0586705941da4e058229f7f02a15ba6ca994cb8b5e3e8f6d6e4",
+  "en": "Models List",
+  "ar": "قائمة النماذج",
+  "ckb": "لیستی مۆدێلەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "38178a20b470cfd18299fb1593dd4ba706f1a83321dac051d01086efd8b7a96f",
+  "en": "No.",
+  "ar": "الرقم",
+  "ckb": "ژمارە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "a1139260dc643b4a4a2cb67febd5efa0843244b7d957af54d3ada23ecd596dd0",
+  "en": "Skill Level",
+  "ar": "مستوى المهارة",
+  "ckb": "ئاستی شارەزایی",
+  "kind": "block_cell"
+ },
+ {
+  "h": "572b17f1fad176fddda8037cf4589d033cadd27b6fd76d753d9d4032b25bfcdb",
+  "en": "Filament Used",
+  "ar": "الفلامنت المستخدم",
+  "ckb": "فیلامێنتی بەکارهاتوو",
+  "kind": "block_cell"
+ },
+ {
+  "h": "259352694f669f0c5c0acc6a5478774ba58d0bd548ea52d89f8b8648364dabd1",
+  "en": "6-Shot Disc Shooter",
+  "ar": "6-Shot Disc Shooter",
+  "ckb": "6-Shot Disc Shooter",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "2dd9b9088b5fefa554b2919e524d24540982f7cc4007dbaaa0f7e661ca3d12ab",
+  "en": "@uhltimate",
+  "ar": "@uhltimate",
+  "ckb": "@uhltimate",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "ce4cb0bd74c79940dd08ecb5450fd278605c8ed741fdf1fecbb6a464bc0d27c1",
+  "en": "Disc Launcher Semi Auto Rapid Fire Print-in-Place",
+  "ar": "Disc Launcher Semi Auto Rapid Fire Print-in-Place",
+  "ckb": "Disc Launcher Semi Auto Rapid Fire Print-in-Place",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "6a18d9deec862cda91aa8b8f0e3def370f101ca873992ca2527a80250e74e564",
+  "en": "@DKdevt",
+  "ar": "@DKdevt",
+  "ckb": "@DKdevt",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "a3996548dd7c7d168e9343fec13edaa3a65527677fd0f5e3d5e94d9a4174bdfc",
+  "en": "Functional Escalator Model - Redux",
+  "ar": "Functional Escalator Model - Redux",
+  "ckb": "Functional Escalator Model - Redux",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "c22de662e94151f38865fc1ddcac6efe5b94b237cb8dbf0ee6ab3a624b4c721a",
+  "en": "@AlexY_",
+  "ar": "@AlexY_",
+  "ckb": "@AlexY_",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "88c2c20b2bfa5ffe6569e7d66599a8d120608ad866c063d08cfe922ba6688a20",
+  "en": "Custom Length Ski Chairlift",
+  "ar": "Custom Length Ski Chairlift",
+  "ckb": "Custom Length Ski Chairlift",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "9c23917b94c1871869e87cca180c6713eebe348de28e263a788740fb833a3ce1",
+  "en": "@Darts_3D",
+  "ar": "@Darts_3D",
+  "ckb": "@Darts_3D",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "078ba733ca03816e1021a5af311a6868ff26db97ae41e0b2818e66b746816f8e",
+  "en": "Retractable Ballpoint Pen",
+  "ar": "Retractable Ballpoint Pen",
+  "ckb": "Retractable Ballpoint Pen",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "4432726b7ba944cce75d9b2eae693eea2effc3626470843240c52e6069f45386",
+  "en": "@wuguigui",
+  "ar": "@wuguigui",
+  "ckb": "@wuguigui",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "ac21d33e835fda0e3f8b7ed3f7274124d7c6005ef9a9d3936a22dfcadf7e91da",
+  "en": "Marble Castle - Desk Fidget Toy",
+  "ar": "Marble Castle - Desk Fidget Toy",
+  "ckb": "Marble Castle - Desk Fidget Toy",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "ae4fd2eac458a34f8f11084470e3b93401df533d15e3a4ed89dafd4b1b6790b5",
+  "en": "@BamBam Design",
+  "ar": "@BamBam Design",
+  "ckb": "@BamBam Design",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "b97ca77e7e9078d944a6b5f62fc600d2b8daf39dbadd22dda728a2145f953029",
+  "en": "Racing Seat Phone Holder",
+  "ar": "Racing Seat Phone Holder",
+  "ckb": "Racing Seat Phone Holder",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "84f7d1f97a7905039a3a8d76c9902149f6f48bd33af2e007ca0e61d2194bce4f",
+  "en": "Stylish Modern Tech Inspired Pen/Pencil cases",
+  "ar": "Stylish Modern Tech Inspired Pen/Pencil cases",
+  "ckb": "Stylish Modern Tech Inspired Pen/Pencil cases",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "37bd9fb9504be5bdde3092fa8d2331946af43601d5dd063d18549266e0e1f78b",
+  "en": "@Josh-3D",
+  "ar": "@Josh-3D",
+  "ckb": "@Josh-3D",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "c9398a64697d20a7e184349f4fd8d8c9590b4210bb784dc993d01ea52ee85e78",
+  "en": "Cute Flexi Pets Chameleon (Keychain Magnet)",
+  "ar": "Cute Flexi Pets Chameleon (Keychain Magnet)",
+  "ckb": "Cute Flexi Pets Chameleon (Keychain Magnet)",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "a196039b16eda1352a29ef0484645ef80ba0ca4dc3a7fe8e12c8bb5c7c90264a",
+  "en": "@Valeria Momo & Mattia",
+  "ar": "@Valeria Momo & Mattia",
+  "ckb": "@Valeria Momo & Mattia",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "6ba93b6a3264339021fe0d200a1ab203dce626ef88a90db4a33d965737a11dac",
+  "en": "Christmas Tree Tea Light Ornament",
+  "ar": "Christmas Tree Tea Light Ornament",
+  "ckb": "Christmas Tree Tea Light Ornament",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "95cefdd8a61608457deb870ec63da2cf6b0ba8edfed0a3a2ae3d0db5c8d6581a",
+  "en": "@TrendtB",
+  "ar": "@TrendtB",
+  "ckb": "@TrendtB",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "079385fd1fcdd5b90c941a92bc0dff878112386a8d8b9b312f9f57e3f864266b",
+  "en": "@NUKDDD",
+  "ar": "@NUKDDD",
+  "ckb": "@NUKDDD",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "6b062a8f7a381b930f9304920a6fef12db9055402f8013122cae0ab24cd92389",
+  "en": "Tealight Christmas pets",
+  "ar": "Tealight Christmas pets",
+  "ckb": "Tealight Christmas pets",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "1c5a2437286f899817bf98ed4ab9e002ff7a01240ab8cd6e3337b33a053d6a8e",
+  "en": "Mechanical Wave Simulator with Lighthouse & Boat",
+  "ar": "Mechanical Wave Simulator with Lighthouse & Boat",
+  "ckb": "Mechanical Wave Simulator with Lighthouse & Boat",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "d018cbec84e6c614575636e8f990fbbb687a114db1851959d530fe81e147b013",
+  "en": "@iabrcam",
+  "ar": "@iabrcam",
+  "ckb": "@iabrcam",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "8e23035600cd87c6fa389233d08baa4b906d0808145d8d10a1d4b75f37758c10",
+  "en": "Magnetic Fishing Toy Set",
+  "ar": "Magnetic Fishing Toy Set",
+  "ckb": "Magnetic Fishing Toy Set",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "2df033ccb09ec9d5df290921b2497089f58eff1a79e3271f2f8010cb2c1c08b6",
+  "en": "@wontonnn",
+  "ar": "@wontonnn",
+  "ckb": "@wontonnn",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "fa9105493e54129cafaaea1495bc37cd53b7e7f90c46fa306dc69fcee20aa753",
+  "en": "Pizza Oven LED Tea Light Holder + Miniatures",
+  "ar": "Pizza Oven LED Tea Light Holder + Miniatures",
+  "ckb": "Pizza Oven LED Tea Light Holder + Miniatures",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "c49e71ce56688ff40189d9c5aeff179df7a30203a4dbe545c280f67d67419328",
+  "en": "3D Model Application instruction",
+  "ar": "تعليمات استخدام نموذج 3D",
+  "ckb": "ڕێنماییەکانی بەکارهێنانی مۆدێلی 3D",
+  "kind": "block_line"
+ },
+ {
+  "h": "0085f9f172c8b0eca7195328864070431ef34f3aae52163944c9653e317252da",
+  "en": "Mushroom on A Shelf",
+  "ar": "Mushroom on A Shelf",
+  "ckb": "Mushroom on A Shelf",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "98e657e28fd30a0dc42e74c9285df776f6cbb748215c47197b710a2226f72a3d",
+  "en": "Jellyfish with remote control LED light",
+  "ar": "Jellyfish with remote control LED light",
+  "ckb": "Jellyfish with remote control LED light",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "c5317964f9963d57f5d6a3903f63dc8bd36ef4b88bafe1e5aead553005cd26ae",
+  "en": "WimV",
+  "ar": "WimV",
+  "ckb": "WimV",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "ab18d8f6585040e0b161cf1393e8dd90a63d595878701c319c27e5bacc5053ed",
+  "en": "ARC Raiders Leaper – Articulated & RGB LED",
+  "ar": "ARC Raiders Leaper – Articulated & RGB LED",
+  "ckb": "ARC Raiders Leaper – Articulated & RGB LED",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "937b488fe5c100b579b41f1f0490daca42202f6a976dddba81bc218b0634a8df",
+  "en": "13 Colors and 2 Modes:Adjustable fade and strobe effects to suit various scene requirements.",
+  "ar": "13 لونًا و2 من الأوضاع: تأثيرات تلاشٍ ووميض قابلة للضبط لتناسب متطلبات المشاهد المختلفة.",
+  "ckb": "13 ڕەنگ و 2 دۆخ: کاریگەریی کاڵبوونەوە و ترووسکەدانی ڕێکخراو بۆ گونجان لەگەڵ پێداویستییە جیاوازەکانی دیمەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b28f36c37aef371a05d1bbfbf4b8b617fefdcd8644a525dd6a2ee0e9a953d667",
+  "en": "4 Brightness Levels: Allows you to create the perfect lighting effect.",
+  "ar": "4 مستويات للسطوع: تتيح لك صنع تأثير الإضاءة المثالي.",
+  "ckb": "4 ئاستی ڕووناکی: ڕێگەت پێدەدات کاریگەریی ڕووناکیی تەواو دروست بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cdce3ddb690b1c67f8e54f290acf9c055c66e23d14b2af896161d8914e3ceb95",
+  "en": "Waterproof Design: Suitable for water-based decorations such as ponds and vases.",
+  "ar": "تصميم مقاوم للماء: مناسب للزينة المائية مثل الأحواض والمزهريات.",
+  "ckb": "دیزاینی دژە ئاو: گونجاوە بۆ ڕازاندنەوەی ئاوی وەک گۆم و گوڵدان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "812301f3cec1fc5e1fe55932546f51ba7ef1af7f8d545fc73584aada812aad2b",
+  "en": "16-Hour Battery Life: Replaceable batteries ensure long-lasting use.",
+  "ar": "عمر بطارية يبلغ ست عشرة ساعة (16-Hour): بطاريات قابلة للاستبدال تضمن استخدامًا طويل الأمد.",
+  "ckb": "تەمەنی باتری شازدە کاتژمێر (16-Hour): باترییە گۆڕدراوەکان بەکارهێنانی درێژخایەن دەستەبەر دەکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9b514f1f3fa1ae69bb521c69e24ab0453a49f21f7ea7a13350158ac012c3e809",
+  "en": "Remote Control Operation: Can control multiple lights simultaneously, with flexible adjustment of lighting effects.",
+  "ar": "التشغيل بجهاز التحكم عن بُعد: يمكنه التحكم في عدة أضواء في وقت واحد، مع ضبط مرن لتأثيرات الإضاءة.",
+  "ckb": "کارپێکردن بە کۆنترۆڵی لە دوورەوە: دەتوانێت لە یەک کاتدا چەند ڕووناکییەک کۆنترۆڵ بکات، لەگەڵ ڕێکخستنی نەرمونیانی کاریگەرییەکانی ڕووناکی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8bdafdc413a63a4679fbd45057d41b3b29ee798dc564b72990053a974552f92e",
+  "en": "The remote control is not waterproof, so keep it away from water.",
+  "ar": "جهاز التحكم عن بُعد غير مقاوم للماء، لذا أبقِه بعيدًا عن الماء.",
+  "ckb": "کۆنترۆڵی لە دوورەوە دژە ئاو نییە، بۆیە لە ئاو دووری بخەرەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1e3a9b265ce23e116d8d9897dc6983e4bb1a049a96e12dfebb1afc640bbb137c",
+  "en": "The infrared remote control has a range of 5-10 meters. Please operate the LED light within this effective range.",
+  "ar": "يبلغ مدى جهاز التحكم عن بُعد بالأشعة تحت الحمراء 5-10 أمتار. يرجى تشغيل ضوء LED ضمن هذا المدى الفعّال.",
+  "ckb": "مەودای کۆنترۆڵی لە دوورەوەی تیشکی ژێرسوور 5-10 مەترە. تکایە ڕووناکیی LED لە ناو ئەم مەودا کاریگەرەدا کارپێبکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3066699d25b3d42814f930fb0121f650df3f301ad6f14af81a896ecd0e0ffdbe",
+  "en": "When the remote is working normally, pressing the \"OFF\" button will turn the light off. Press \"ON\" again to restore the light to its previous mode before it was turned off.",
+  "ar": "عندما يعمل جهاز التحكم بشكل طبيعي، يؤدي الضغط على زر \"OFF\" إلى إطفاء الضوء. اضغط \"ON\" مجددًا لإعادة الضوء إلى وضعه السابق قبل إطفائه.",
+  "ckb": "کاتێک ڕیمۆتەکە بە ئاسایی کار دەکات، پەستانی دوگمەی \"OFF\" ڕووناکییەکە دەکوژێنێتەوە. دووبارە \"ON\" دابگرە بۆ گەڕاندنەوەی ڕووناکییەکە بۆ دۆخی پێشووی پێش کوژاندنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0e0fa42b21823c3d24537dfd028c34531ddeff8947be562aa76ff445c97690b7",
+  "en": "Multiple lights can be controlled simultaneously: The remote control communicates with the light through the receiver (black dot) on the light. Ensure the light is within the effective remote range and aim directly at the light when operating.",
+  "ar": "يمكن التحكم في عدة أضواء في وقت واحد: يتواصل جهاز التحكم عن بُعد مع الضوء عبر المستقبِل (النقطة السوداء) الموجود على الضوء. تأكّد من أن الضوء ضمن المدى الفعّال لجهاز التحكم، ووجّهه مباشرةً نحو الضوء عند التشغيل.",
+  "ckb": "دەتوانرێت لە یەک کاتدا چەند ڕووناکییەک کۆنترۆڵ بکرێن: کۆنترۆڵی لە دوورەوە لە ڕێگەی وەرگرەکەوە (خاڵە ڕەشەکە) کە لەسەر ڕووناکییەکەیە پەیوەندی پێوە دەکات. دڵنیابە لەوەی ڕووناکییەکە لە ناو مەودای کاریگەری ڕیمۆتەکەدایە و لە کاتی بەکارهێناندا ڕاستەوخۆ ئاڕاستەی ڕووناکییەکەی بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9a461a8e49d292ce58a65bbacd6143d3da87557a20146308884973a80a6ee206",
+  "en": "If the light still doesn't respond after replacing the batteries: If you’ve replaced the 2*CR2032 button batteries but the remote still doesn't control the light, check and replace the remote’s battery with 1*CR2025.",
+  "ar": "إذا لم يستجب الضوء بعد استبدال البطاريات: إذا استبدلت بطاريات الأزرار 2*CR2032 ولا يزال جهاز التحكم لا يتحكم في الضوء، فافحص بطارية جهاز التحكم واستبدلها ببطارية 1*CR2025.",
+  "ckb": "ئەگەر ڕووناکییەکە دوای گۆڕینی باترییەکان هێشتا وەڵام نەداتەوە: ئەگەر باترییە دوگمەییەکانت (2*CR2032) گۆڕیبێت بەڵام ڕیمۆتەکە هێشتا ڕووناکییەکە کۆنترۆڵ نەکات، باتریی ڕیمۆتەکە بپشکنە و بە 1*CR2025 بیگۆڕە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a6980e6f184a2bc932aa23b93286c6abe3178ffda792ef02a7b39ee47e540b90",
+  "en": "If not in use for a long time: For extended periods of inactivity, it’s recommended to install the battery insulation sheet or remove the batteries to prolong their life.",
+  "ar": "في حال عدم الاستخدام لفترة طويلة: عند عدم الاستخدام لفترات ممتدة، يُوصى بتركيب الشريحة العازلة للبطارية أو إزالة البطاريات لإطالة عمرها.",
+  "ckb": "ئەگەر بۆ ماوەیەکی درێژ بەکارنەهێنرێت: بۆ ماوە درێژەکانی بەکارنەهێنان، پێشنیار دەکرێت پەڕەی جیاکەرەوەی باتری دابنرێت یان باترییەکان دەربهێنرێن بۆ درێژکردنەوەی تەمەنیان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "48263755cc7da08fd97ef659a451361ee36136b7c55022e733637d1e75ae7d21",
+  "en": "Use high-quality batteries to ensure proper functioning of the device.",
+  "ar": "استخدم بطاريات عالية الجودة لضمان عمل الجهاز بشكل سليم.",
+  "ckb": "باتریی جۆرایەتی بەرز بەکاربهێنە بۆ دڵنیابوون لە کارکردنی دروستی ئامێرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "722d4bf74b183f768191ff7e97161c97c2057e3ce3241358656816d60ab79606",
+  "en": "Please pay attention to the connector markings on the PCB and plug the appliance into the CN-MOTO connector.",
+  "ar": "يرجى الانتباه إلى علامات الموصلات على لوحة PCB، وتوصيل الجهاز بالموصل CN-MOTO.",
+  "ckb": "تکایە ئاگاداری نیشانەکانی گەیەنەر بە لەسەر بۆردی PCB، و ئامێرەکە لە گەیەنەری CN-MOTO بچەقێنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a5cd4a8838edaf8f00060ea16ffe3aed360cbb6fa9d29b9d9e41d04aba062a6c",
+  "en": "Your PrintMon, Your Stage! Ever dreamed of adding your own twist to a popular animation? With PrintMon Maker, you can turn those ideas into reality and transform them into real, tangible creations! No 3D modeling skills are required—this AI-powered generator helps you hatch your one-of-a-kind PrintMon effortlessly.",
+  "ar": "شخصيتك من PrintMon، ومسرحك الخاص! هل حلمت يومًا بإضافة لمستك الخاصة إلى رسوم متحركة شهيرة؟ مع أداة PrintMon Maker، يمكنك تحويل هذه الأفكار إلى واقع وإلى إبداعات حقيقية ملموسة! لا حاجة إلى مهارات النمذجة 3D، فهذا المولّد المدعوم بالذكاء الاصطناعي (AI) يساعدك على ابتكار PrintMon فريد من نوعه بكل سهولة.",
+  "ckb": "کارەکتەری خۆت لە PrintMon، و شانۆی تایبەتی خۆت! هەرگیز خەونت بەوەوە بینیوە کە دەستکاریی تایبەتی خۆت بخەیتە سەر ئەنیمەیشنێکی بەناوبانگ؟ بە ئامرازی PrintMon Maker، دەتوانیت ئەو بیرۆکانە بکەیتە ڕاستی و بیانگۆڕیت بۆ داهێنانی ڕاستەقینە و بەرجەستە! پێویستت بە شارەزایی لە مۆدێلسازیی 3D نییە، ئەم دروستکەرە کە بە AI کار دەکات یارمەتیت دەدات بە ئاسانی کارەکتەرێکی بێهاوتا لە PrintMon بخولقێنیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4da78580c32f6ad569803ebcdd3f2992ecb06427b539b1cfe4ab36eba3afa994",
+  "en": "To showcase your unique creation, pair it with our Turntable Kit—the perfect stage for your PrintMon. Designed with rechargeable components and 608ZZ bearings, this kit ensures smooth, quiet rotations while enhancing load-bearing capacity. The turntable supports 360-degree rotation, bringing your design to life and making every angle shine.",
+  "ar": "لعرض إبداعك الفريد، استخدمه مع طقم Turntable Kit، المسرح المثالي لشخصيتك من PrintMon. صُمّم هذا الطقم بمكوّنات قابلة لإعادة الشحن ومحامل 608ZZ، ليضمن دورانًا سلسًا وهادئًا مع تعزيز قدرة التحمّل. وتدعم القاعدة الدوّارة الدوران بزاوية 360 درجة، فتمنح تصميمك الحياة وتُبرز كل زاوية منه.",
+  "ckb": "بۆ نمایشکردنی داهێنانە بێهاوتاکەت، لەگەڵ کیتی Turntable Kit بەکاری بهێنە، شانۆیەکی تەواو بۆ کارەکتەرەکەت لە PrintMon. ئەم کیتە بە پێکهاتەی دووبارە بارگاویکراو و بێرینگی 608ZZ دیزاین کراوە، و سووڕانەوەی نەرم و بێدەنگ دەستەبەر دەکات لەگەڵ زیادکردنی توانای هەڵگرتنی بار. تەختە سووڕاوەکە پشتگیریی سووڕانەوەی 360 پلە دەکات، دیزاینەکەت زیندوو دەکاتەوە و هەموو گۆشەیەکی دەدرەوشێنێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ba8213d436583e6b5caa0180f0d01e6190c0bed67499f0b2b11b0e6cb4b80099",
+  "en": "Start creating your own PrintMon today with PrintMon Maker, and let the Turntable Kit elevate your creations to the next level!",
+  "ar": "ابدأ اليوم بصنع شخصيتك من PrintMon باستخدام أداة PrintMon Maker، ودع طقم Turntable Kit يرتقي بإبداعاتك إلى مستوى أعلى!",
+  "ckb": "هەر ئەمڕۆ بە ئامرازی PrintMon Maker دەست بکە بە دروستکردنی کارەکتەری خۆت لە PrintMon، و با کیتی Turntable Kit داهێنانەکانت بەرز بکاتەوە بۆ ئاستێکی بەرزتر!",
+  "kind": "block_line"
+ },
+ {
+  "h": "8ea5204920a19589cce2337c0750d04a0be827ac2b0b95ea5594ad284ced02e9",
+  "en": "Fantasy Creatures Display Turntable",
+  "ar": "Fantasy Creatures Display Turntable",
+  "ckb": "Fantasy Creatures Display Turntable",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "4baa33a3d3fd1d370c772c9b484a3a446cc611835ba31f4ff2d8e7b5d17ee023",
+  "en": "@parkeryaojj",
+  "ar": "@parkeryaojj",
+  "ckb": "@parkeryaojj",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "878c240fd717f39d8cec9f7a5cf936873ffcc0757beef703ad2c5f9ed1890344",
+  "en": "maker",
+  "ar": "الصانع",
+  "ckb": "دروستکەر",
+  "kind": "block_line",
+  "needs_review": true
+ },
+ {
+  "h": "d4d768b2d4d90d2ac1a3ccc098cfd3fd86c5fdcff84e3ad373419ac30ab9d0ee",
+  "en": "Nominal thread: M6",
+  "ar": "السنّ الاسمي: M6",
+  "ckb": "پێچی ناوزەد: M6",
+  "kind": "block_line"
+ },
+ {
+  "h": "43ef62bfa1d0e4ed6d06af73d41820b5b343253817526003a78e28e482e43589",
+  "en": "Strength grade: 12.9",
+  "ar": "درجة المتانة: 12.9",
+  "ckb": "پلەی بەهێزی: 12.9",
+  "kind": "block_line"
+ },
+ {
+  "h": "3c33b220ce31fe251a0b145d601f91a11bb71a31c79f21ee75a1236c5cc0ce92",
+  "en": "Type of thread: Full thread",
+  "ar": "نوع السنّ: سنّ كامل",
+  "ckb": "جۆری پێچ: پێچی تەواو",
+  "kind": "block_line"
+ },
+ {
+  "h": "10fce9f075a7fd596163a6ee94548a56cbb9f43d8b21b363f2718bfc65cde822",
+  "en": "The product contains all the non-3D printed parts for assembling a fully functional Flaming Fox V8 Engine. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع مجسّم Flaming Fox V8 Engine يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی مۆدێلی Flaming Fox V8 Engine بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d0b6c3cff490ea8444efcec6bdda086359203ae909aea38f97d6b0ddee340e29",
+  "en": "To download the model files of the Flaming Fox V8 Engine and obtain detailed information, please visit the Flaming Fox V8 Engine on MakerWorld.",
+  "ar": "لتنزيل ملفات نموذج Flaming Fox V8 Engine والحصول على معلومات مفصّلة، يرجى زيارة صفحة Flaming Fox V8 Engine على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێلی Flaming Fox V8 Engine و وەرگرتنی زانیاریی ورد، تکایە سەردانی پەڕەی Flaming Fox V8 Engine لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cff4cecf56e51ad3f3774707fcc0fafcae672a12c4695170bd944b9face226ab",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Hexagon Twist Fidget (V2). To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع لعبة Hexagon Twist Fidget (V2) تعمل بكامل وظائفها. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی یاریی Hexagon Twist Fidget (V2) بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d0930b1f202993042d649ada9eef066570e6663d6d131ca3bfc069ecbe98695c",
+  "en": "To download the model files please visit the Hexagon Twist Fidget (V2)on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Hexagon Twist Fidget (V2) على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Hexagon Twist Fidget (V2) لە MakerWorld بکە.",
+  "kind": "block_line"
+ }
+]

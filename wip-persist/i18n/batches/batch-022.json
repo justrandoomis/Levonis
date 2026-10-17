@@ -1,0 +1,2790 @@
+{
+ "batch": 22,
+ "surface": "api",
+ "handles": [
+  "ppa-cf",
+  "pps-cf",
+  "asa-cf",
+  "tpu-for-ams",
+  "pla-wood",
+  "pla-silk-upgrade",
+  "pc-fr",
+  "tpu-85a-tpu-90a",
+  "support-for-pla-new",
+  "pla-translucent",
+  "pla-tough-upgrade",
+  "pla-basic-beginner-s-filament-pack",
+  "petg-basic"
+ ],
+ "strings": [
+  {
+   "h": "8c9eb521c8ee6ad93d79bf9280f79b2e28588314cb8f7492ef63fd3b4470fc5f",
+   "en": "Metal-Like Strength",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[0].line[1]",
+    "near": "PPA-CF"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d871d70d4133f866e3d466a8702dc17cc031fb986d8bbaeb065dd34fffd7579",
+   "en": "Industrial-Grade Precision",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[0].line[2]",
+    "near": "· Metal-Like Strength"
+   },
+   "dict": null
+  },
+  {
+   "h": "bcd7366552029ff7002f9cee2f683bafbe24da718e62de4c7957b8345f31b01c",
+   "en": "Stable Performance in Humid Conditions",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[0].line[3]",
+    "near": "· Industrial-Grade Precision"
+   },
+   "dict": null
+  },
+  {
+   "h": "65ae84970384c90b941ae3a79046d507a19e6be72baf13f7ed8456864541ba9b",
+   "en": "Unmatched Performance Under High Temperatures",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[0].line[4]",
+    "near": "· Stable Performance in Humid Conditions"
+   },
+   "dict": null
+  },
+  {
+   "h": "7cb8cc742b5cfcb9898edec91ae6a555c8ace2cfc40c3e6c5b0eeffb3d4e2a3f",
+   "en": "PPA-CF offers strength approaching metal levels, being 48% stronger and 102% stiffer than normal PA6-CF. This filament excels in mechanical properties, making it ideal for high-performance engineering applications. Perfect for repairs, it can effectively replace automotive and industrial parts with exceptional durability and reliability.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[1].line[1]",
+    "near": "Metal-Like Strength"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e1161d097a389037712ca6cb7303357e48364fd1f3d960b79f93acd5c246987",
+   "en": "Achieve industrial-grade precision with Bambu PPA-CF. Its superior dimensional stability ensures that your high-precision prototypes match your design drawings exactly, without warping or deformation. Rely on PPA-CF for the accuracy you need in every project.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[2].line[1]",
+    "near": "Industrial-Grade Precision"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f16a2913dc29327fbe0ef1ecf7becd5040c921b658a84a77aa96f8e0745a996",
+   "en": "Bambu PPA-CF supports long-term, stable use in humid environments, even underwater. With a moisture absorption rate 66% lower than normal PA6-CF, it maintains its stiffness and thermal properties over time. Whether printing propellers, customizing surfboards, or any other water-resistant application, PPA-CF delivers reliable performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[3].line[1]",
+    "near": "Stable Performance in Humid Conditions"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a74bcd76e3e1b10e8f1de83afcc706b602734b75af9fae7e5c52bcab134bb01",
+   "en": "Bambu PPA-CF boasts unmatched heat resistance, capable of withstanding prolonged exposure to temperatures up to 227°C without compromising its structural integrity or performance. This filament remains reliable and robust in extreme environments, making it perfect for industrial, mechanical, or automotive parts that must tolerate ultra-high temperatures.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[4].line[1]",
+    "near": "Unmatched Performance Under High Temperatures"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7c08af320ea030280bba14049127a220d4502f92bb202d46e913c97c32af284",
+   "en": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle All Size, and Bambu Liquid Glue.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "c0d4c571059b0b9061a23c4231bed3b761281b5328ab13e6fbe90a8dc7a7997f",
+   "en": "Higher temperatures within the drying range yield better results, but do not exceed 160°C to avoid damaging the spool.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[6]",
+    "near": "Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: Filament drying "
+   },
+   "dict": null
+  },
+  {
+   "h": "6b21033f4b943046e2b75e2c925a05571e0cd2e5f6bd680b6584f668a730cd3e",
+   "en": "For more details, refer to Printing tips for Engineering materials on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[7]",
+    "near": "Higher temperatures within the drying range yield better results, but do not exceed 160°C to avoid damaging the spool."
+   },
+   "dict": null
+  },
+  {
+   "h": "c6b985df5499a1b72015c73ea1fcba0354b398f02e73484f58f866d8192fc6ba",
+   "en": "3.Storage Tips",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[9]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "18b12fab2fe1f67703a978311981639ea18d9fd3328cb0bff26ca0a6b63cb08b",
+   "en": "To prevent the filament from absorbing moisture, use an airtight storage container with desiccant during printing.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[10]",
+    "near": "3.Storage Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "2de2a69c3072ef13b25c92e78cb9b524606d9e7207534aa0bec30c89363faa9e",
+   "en": "For further details, please refer to Printing tips for Engineering materials on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[11]",
+    "near": "To prevent the filament from absorbing moisture, use an airtight storage container with desiccant during printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "c7150df06245495ba5ac032adc5b7e7a74f9584f0283a050d9490a2a146f0e87",
+   "en": "5.Annealing Prints",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[22]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1c4c58ed40eaac3aca7b9c53eb634a36fd00f328844749547b1c76596c309c35",
+   "en": "If you need to anneal the prints, please refer to the Technical Data Sheet (TDS) and the WIKI section Work After Printing Finished.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[23]",
+    "near": "5.Annealing Prints"
+   },
+   "dict": null
+  },
+  {
+   "h": "29b545b97c6c3cf1a76d16aa565f069dec5319a8bf6c0201969bff441d7875c6",
+   "en": "6.Interface Layer",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[25]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0cb33f1d39d17dbc17506f41f440443da986351420ebc8c252bd829d2f8c9ac8",
+   "en": "To prevent the filament from damaging the printing surface and to promote model adhesion, apply a thin coat of glue stick for best results.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[5].line[26]",
+    "near": "6.Interface Layer"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5b10fff81fd85ef8f5647f6a81c3fbeda14fc4ea3d1795d8102f303ed63f450",
+   "en": "Hardened Steel Nozzle Mandatory",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[6].line[5]",
+    "near": "• Unmatched Performance Under High Temperatures"
+   },
+   "dict": null
+  },
+  {
+   "h": "88cc634456412989860dc65e2a7cb8c1057d849284fc140e33bdec673acc3566",
+   "en": "Must Be Dried before Use to Achieve Optimal Print Quality",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "blocks[6].line[6]",
+    "near": "• Hardened Steel Nozzle Mandatory"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2e8042d915ecd913878e67f03a89c4dfeb79b1b8e523eabf10117194af79273",
+   "en": "Ultra-High Heat Resistance",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[0].line[1]",
+    "near": "PPS-CF"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f7b4c9e7670f41cdc9eb47f4352fded1e9c0cb96d24ff0c1fab48eb899f4d84",
+   "en": "Top-Tier Flame Retardant Properties",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[0].line[2]",
+    "near": "· Ultra-High Heat Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "779521a90fdc0a84ba3291e0addf24d1faaa9651172b69338dc749717bc87427",
+   "en": "Peerless Mechanical Properties",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[0].line[3]",
+    "near": "· Top-Tier Flame Retardant Properties"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4ee580bbae724c93ddb1a41f70efb2b4d34d043d1e47ba274ef1403ae0a04f8",
+   "en": "Solvent and Chemical Resistance",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[0].line[4]",
+    "near": "· Peerless Mechanical Properties"
+   },
+   "dict": null
+  },
+  {
+   "h": "a126547ed83a118078cc41bc685ac575408abd40fdbfbbf569fa6d9acc80fff3",
+   "en": "Ultra-Low Water Absorption",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[0].line[5]",
+    "near": "· Solvent and Chemical Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "f615c1c436927cbcc1782e20ddd02f17c13fa3a6abdba5dc96543af203d7f084",
+   "en": "PPS-CF boasts a heat deflection temperature of up to 264°C under 0.45 MPa and can continuously operate at temperatures exceeding 200°C. This significantly outperforms normal PA-CF materials, which have maximum temperatures around 190°C and 120°C. Its exceptional heat resistance ensures outstanding creep resistance, making PPS-CF ideal for demanding industrial environments and applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[1].line[1]",
+    "near": "Ultra-High Heat Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "63e35598224e65ec0e0a46a32c44792c296608997b574cf72f2e6e02ca449bef",
+   "en": "Superior Flame Retardancy",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[2].line[0]",
+    "near": "PPS-CF achieves a UL-94 V-0 flame retardant rating, offering superior safety and reliability in critical areas such as electronics and automotive components. PP"
+   },
+   "dict": null
+  },
+  {
+   "h": "b94e10a22ff5d19fd05c320f925c68127bad0485337429e5ea2ead5e432ecfc9",
+   "en": "PPS-CF achieves a UL-94 V-0 flame retardant rating, offering superior safety and reliability in critical areas such as electronics and automotive components. PPS-CF provides long-lasting durability and peace of mind even in the most demanding environments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[2].line[1]",
+    "near": "Superior Flame Retardancy"
+   },
+   "dict": null
+  },
+  {
+   "h": "17744641d137872251333e2580fd794672f35bb4565c9eb5d17d8578338032af",
+   "en": "Unmatched Mechanical Properties",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[3].line[0]",
+    "near": "Combining the stiffness of PPS polymers with the reinforcing power of carbon fiber, PPS-CF offers exceptional stiffness, bending strength, and tensile strength."
+   },
+   "dict": null
+  },
+  {
+   "h": "7bdb01c9a0d172336f241c05b1fed2498215a25c559bf8bf414a6acb70b50224",
+   "en": "Combining the stiffness of PPS polymers with the reinforcing power of carbon fiber, PPS-CF offers exceptional stiffness, bending strength, and tensile strength. Its superior dimensional stability and resistance to warping ensure that large-scale prints maintain precision and avoid deformation during the printing process, making it perfect for high-precision applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[3].line[1]",
+    "near": "Unmatched Mechanical Properties"
+   },
+   "dict": null
+  },
+  {
+   "h": "86ac9216d00b3d3f1f59d992a634bc2cd954b02294f770849c184cb14f785499",
+   "en": "PPS-CF offers outstanding solvent and chemical resistance, second only to PTFE (Teflon). It remains virtually insoluble in any solvent below 200°C and exhibits exceptional resistance to acids, bases, and salts under normal conditions. This makes PPS-CF the ideal choice for challenging environments where chemical stability is critical.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[4].line[1]",
+    "near": "Solvent and Chemical Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "db33dc79282b8501d0f21d66075b8bf23a62c7174793e562196c4d4b682f2be3",
+   "en": "With an extremely low moisture absorption rate of just 0.05%, PPS-CF ensures that its mechanical and thermal properties remain stable even in humid conditions. Unlike normal PA-CF, which can soften and degrade when exposed to moisture, PPS-CF maintains its strength and durability, making it the superior option for applications requiring high moisture resistance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[5].line[1]",
+    "near": "Ultra-Low Water Absorption"
+   },
+   "dict": null
+  },
+  {
+   "h": "28957ab706701aa2f48da81bf7b1a0a99d3da80fbdd3d60cb250914fcdba5375",
+   "en": "Not compatible with AMS Series, Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, Bambu Liquid Glue.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "14c3a604738a43e61fd30e88d1ba918ef53dc8969182766febb3628e6f9ebcfd",
+   "en": "2.Printing Guidelines",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[4]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a7a9b8284a8b9b7c9f39a3b661870044a458026216334c55e055a737dd8db79f",
+   "en": "Nozzle Temperature: Recommended range is 310 to 340°C.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[5]",
+    "near": "2.Printing Guidelines"
+   },
+   "dict": null
+  },
+  {
+   "h": "62ea4aa0ba9351f4d76a38a1ef77fa892c4ed3f8656f6ca55146dda3e167cb6d",
+   "en": "Chamber Temperature: Recommended range is 60 to 90°C.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[6]",
+    "near": "Nozzle Temperature: Recommended range is 310 to 340°C."
+   },
+   "dict": null
+  },
+  {
+   "h": "2ce828549b36d47e8a08a376038162e9aa4c330221bbc0058f1d0e645bdb23c7",
+   "en": "Tip: Using higher values within these ranges can enhance the mechanical properties of the printed parts, especially in the Z-direction.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[7]",
+    "near": "Chamber Temperature: Recommended range is 60 to 90°C."
+   },
+   "dict": null
+  },
+  {
+   "h": "70da0cd3eec22a443faff012b82692e288854de4b16db110faa20c6aba4b8f62",
+   "en": "Important Note: Higher temperatures within the drying range yield better results, but do not exceed 160°C to avoid damaging the spool.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[10]",
+    "near": "3.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "9581e1b0127662442e79c2c1c5710ea12b727398102c2e3611d7c373dd95ab79",
+   "en": "Additional Information: For more details, refer to the guide on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[11]",
+    "near": "Important Note: Higher temperatures within the drying range yield better results, but do not exceed 160°C to avoid damaging the spool."
+   },
+   "dict": null
+  },
+  {
+   "h": "48d9a146f075e47c6eb1b10e788aa157a8036ccac97caa47d1a206121b23afec",
+   "en": "4.Storage Tips",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[13]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3cdadff827bff5dbcee722e776713eaba35de332e53ed9f85ad99c51a5bf3baf",
+   "en": "Storage Condition: To prevent the filament from absorbing moisture, use an airtight storage container with desiccant during printing.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[14]",
+    "near": "4.Storage Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "7c7d8f9719a07f6952e3430e46c35d4ec360dd1d2aadf073477dfa482d61d46c",
+   "en": "For Further Details: Please refer to the guide on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[15]",
+    "near": "Storage Condition: To prevent the filament from absorbing moisture, use an airtight storage container with desiccant during printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "6582c42c613fe47c123bfcc4de2b44566a87e7294dd844972bf94a31648e74e7",
+   "en": "If you need to anneal the prints, please refer to the Technical Data Sheet (TDS) and the WIKI section Work After Printing is Finished.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[6].line[18]",
+    "near": "5.Annealing Prints"
+   },
+   "dict": null
+  },
+  {
+   "h": "92809e911147f11a09b9a71d2f8cbc5d736df165a520ad7bacc6488c3b668c48",
+   "en": "Top-tier Flame Retardancy",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[7].line[2]",
+    "near": "• Ultra-High Heat Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "975e71a0867669eeb83a7764d3350abe4ece5d9cc67e4d8d308ed8b372f9683b",
+   "en": "Comes with Cardboard Spool",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[7].line[6]",
+    "near": "• Ultra-Low Water Absorption"
+   },
+   "dict": null
+  },
+  {
+   "h": "cf651d9a84d82cf5e8b21a6a5a817dcea842b91010553574e1bb602d817adff0",
+   "en": "For X1E/H2 Series Printing Only",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "blocks[7].line[7]",
+    "near": "• Comes with Cardboard Spool"
+   },
+   "dict": null
+  },
+  {
+   "h": "2341f2a8cdae08be401e9f4b532be690678fe0109dd337e62a46470881f61156",
+   "en": "Superior Outdoor Durability",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[0].line[1]",
+    "near": "ASA-CF"
+   },
+   "dict": null
+  },
+  {
+   "h": "af084fdb3e67946f4d254a99b663b5ef6f54cef5749db12a4088af97e65e0bf6",
+   "en": "Optimized for Large Models",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[0].line[2]",
+    "near": "· Superior Outdoor Durability"
+   },
+   "dict": null
+  },
+  {
+   "h": "908e5d5abbb836345c02caa8834a715a01ca8d77eb9d04d14ffe8b32d54367f3",
+   "en": "Sleek Matte Finish",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[0].line[3]",
+    "near": "· Optimized for Large Models"
+   },
+   "dict": null
+  },
+  {
+   "h": "ab84feff7bf696011dab53c5fbd6341e9735d775c9448076ce67c30e46bb38c3",
+   "en": "Enhanced Stiffness for Load-Bearing Parts",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[0].line[4]",
+    "near": "· Sleek Matte Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "579422bf37d1c5719c39a028744ad90ba625bd38c8c6ca364b0924eea5027295",
+   "en": "Bambu ASA-CF stands out as one of the top materials for outdoor use, with excellent resistance to harsh weather and UV exposure. Reinforced with carbon fiber, it’s ideal for creating durable garden tools, outdoor furniture, and protective enclosures for electronics.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[1].line[1]",
+    "near": "Superior Outdoor Durability"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6e4c42f27097ae743255b0b7db6b8f8a40816f585c4670ac3bdf2c940d1c678",
+   "en": "With carbon fiber reducing warping, Bambu ASA-CF ensures outstanding dimensional stability, making it ideal for large models or parts that require high precision, such as those in assembly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[2].line[1]",
+    "near": "Optimized for Large Models"
+   },
+   "dict": null
+  },
+  {
+   "h": "c731f9d2acc11ddb7ee557f7c0531620ef250eb0bd1a5897b89950307619d61b",
+   "en": "*Specimen Test: Model size (L*W*H): 220*100*90 mm³ (the XY direction)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[2].line[2]",
+    "near": "With carbon fiber reducing warping, Bambu ASA-CF ensures outstanding dimensional stability, making it ideal for large models or parts that require high precisio"
+   },
+   "dict": null
+  },
+  {
+   "h": "c2490f9ff6bb4365d7abd2f4d715c7675b5bfe1619afc61bf3cc94742961f83c",
+   "en": "The smooth matte surface, with minimal visible layer lines, gives Bambu ASA-CF a refined, natural appearance, perfect for detailed models like planters and other outdoor decor.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[3].line[1]",
+    "near": "Sleek Matte Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "b04b7707a06f150822aa4299c70362213c219ab8d2c46fd5d57a01e163d7cad5",
+   "en": "Enhanced Stiffness for High Load-Bearing Parts",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[4].line[0]",
+    "near": "Bambu ASA-CF offers 67% more stiffness compared to standard ASA, making it the go-to material for parts that need to withstand significant load and resist bendi"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f95aafbfa9ad73436d59eaf680b57dae1af685be87b64976a072065eb90eb6f",
+   "en": "Bambu ASA-CF offers 67% more stiffness compared to standard ASA, making it the go-to material for parts that need to withstand significant load and resist bending, such as camping accessories, plant stands or other outdoor furniture.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[4].line[1]",
+    "near": "Enhanced Stiffness for High Load-Bearing Parts"
+   },
+   "dict": null
+  },
+  {
+   "h": "7437172c74fd5c545f3a30aff65ad76c752530341e3b24fb036fca2c68524e6e",
+   "en": "3.Filament Handling Tips",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[6].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "56006325cfc09e914d1e52bfda8bf6d64b980e4823435a3e709bed8f1bc341b2",
+   "en": "Carbon fiber makes ASA-CF more brittle compared to normal ASA. Please avoid excessive bending to prevent filament breakage.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[6].line[8]",
+    "near": "3.Filament Handling Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "ee281bca0f96ade9aa455a9f8bd06de5f6a98f12c9cc62e6e1d8677e8b5d31c7",
+   "en": "Use printers with an enclosure and apply glue on the build plate before printing.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[6].line[11]",
+    "near": "4.Warping Prevention Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3257addbaebd9ea98ac4f2b3f89bfaa6da35e84eab6a37ab3e49f81a3eddff6",
+   "en": "Set lower printing speed and higher heatbed temperature. For more details, please refer to: Common print quality problems and solutions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[6].line[12]",
+    "near": "Use printers with an enclosure and apply glue on the build plate before printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "231dc3ffd1e8bb98b406ac223b638c30120243c505eceecb996789335f2e5206",
+   "en": "5.Post-processing Tips",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[6].line[14]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4b0d181c8368580d8ce28b88c54ca21f35ee2ab3488b2da86ff6b89152a33338",
+   "en": "High heatbed temperatures and glue stick can cause strong adhesion between the print and the build plate. Please allow the print to cool down to room temperature naturally for easier removal and to avoid damage to the model. For more details, please refer to: Work After Printing Finished on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[6].line[15]",
+    "near": "5.Post-processing Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "324c3609810aa6d2ef62f00d20ec4c67acee0fb81e0d408baa21efda7d6ff69e",
+   "en": "Enhanced Stiffness for High Load-Bearing Applications",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[7].line[4]",
+    "near": "• Sleek Matte Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "8f31c151e7495a336744f6485ab5ec3fcaa42754e1d218b49b9de7e6fe9f11be",
+   "en": "We will be introducing a new size specification in the future. Stay tuned for further updates.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-cf",
+    "title": "ASA-CF",
+    "field": "blocks[7].line[7]",
+    "near": "• Dry Out Before Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec9ecbd42fcd7dc1ecff978a624d5335f333545f33613bb2b95458d35bf06ad2",
+   "en": "Seamless AMS & AMS lite Integration",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[0].line[1]",
+    "near": "TPU for AMS"
+   },
+   "dict": null
+  },
+  {
+   "h": "deea597f0d2cbd83c6deb6061db436cfc883e86e15c423478dd581cd4f512bf6",
+   "en": "Tough Yet Flexible",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[0].line[2]",
+    "near": "· Seamless AMS & AMS lite Integration"
+   },
+   "dict": null
+  },
+  {
+   "h": "7bb30dd852f98e9a99b8ae95361d1b6cad938402cf62818602b6a44c36af7e0a",
+   "en": "Less TPU Stringing",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[0].line[3]",
+    "near": "· Tough Yet Flexible"
+   },
+   "dict": null
+  },
+  {
+   "h": "331e28591a4330a5a349fb43b7e6f4cc4892f0af8db9a4120308f3574432f6d0",
+   "en": "Blazing Fast TPU Printing",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[0].line[4]",
+    "near": "· Less TPU Stringing"
+   },
+   "dict": null
+  },
+  {
+   "h": "a73b1e350c603ef82b5ea2540ee67a1245a15376ed5a29332dab432ee51dfff1",
+   "en": "Optimized for use with the AMS system, Bambu TPU for AMS enables smooth and reliable multicolor printing with flexible materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[1].line[1]",
+    "near": "Seamless AMS & AMS lite Integration"
+   },
+   "dict": null
+  },
+  {
+   "h": "296d44507b1aca8ff88b7d2c11419887b55888e23554a8486b53963ef0e58b0e",
+   "en": "With a Shore hardness of 68D, Bambu TPU for AMS combines exceptional toughness with the flexibility and durability of TPU. It's ideal for printing durable, impact-resistant parts like protective cases, phone covers, door stoppers, sports equipment, automotive parts, and much more!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[2].line[1]",
+    "near": "Tough Yet Flexible"
+   },
+   "dict": null
+  },
+  {
+   "h": "a8a293035bbc1e1682abee84a70272a5a7e966b4452be3b75fc3c2d64181df7f",
+   "en": "Goodbye, TPU Stringing",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[3].line[0]",
+    "near": "Say farewell to stringing with Bambu TPU for AMS! Its special formulation greatly minimizes the common stringing problems found in traditional TPU, ensuring cle"
+   },
+   "dict": null
+  },
+  {
+   "h": "8be219ccf7eeedf8d5a71b748060f81038dd9aeb6d079d8cebd59ae069116ecb",
+   "en": "Say farewell to stringing with Bambu TPU for AMS! Its special formulation greatly minimizes the common stringing problems found in traditional TPU, ensuring clean, crisp details in every print for a smoother and more reliable printing experience.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[3].line[1]",
+    "near": "Goodbye, TPU Stringing"
+   },
+   "dict": null
+  },
+  {
+   "h": "a763f9b45375091edf75c228ae62a9e30dc67fdbd0d1e8893930644761ee6e94",
+   "en": "Bambu TPU for AMS delivers up to 60% faster print speeds compared to Bambu TPU 95A HF, boosting efficiency without compromising on quality. Get more done in less time with rapid, reliable results!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[4].line[1]",
+    "near": "Blazing Fast TPU Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "8144cb73a6b8fbba3ad5943426b6b2c5793830b1ad366564a5e974a440fa4509",
+   "en": "Application Tips",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[5].line[0]",
+    "near": "The elasticity of TPU prints is related to the Wall Loops and Sparse Infill Density setting. The higher the wall loops or sparse infill density, the lower the e"
+   },
+   "dict": null
+  },
+  {
+   "h": "78e4d2e428ee909d21988ebc3b58d0c1eb108d044a7d165c8dd05be70ea4d22e",
+   "en": "The elasticity of TPU prints is related to the Wall Loops and Sparse Infill Density setting. The higher the wall loops or sparse infill density, the lower the elasticity, and vice versa.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[5].line[1]",
+    "near": "Application Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "8ece0998a15fbf7e1f7ac2e3248f8414bbe8374b62cd2007c8caea0d662cfda3",
+   "en": "Dry before use for higher printing quality. TPU for AMS must be dried before use and kept moisture-free during the printing process to prevent stringing. For more details, please refer to: Filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[7].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "38aca163ac70ff803bbdebfe8edb500582a934a16cf608d3db6e9c5d17385759",
+   "en": "3.Storage tips",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-for-ams",
+    "title": "TPU for AMS",
+    "field": "blocks[7].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "845f3fbba13ce1080ec5bd063ff428f035d465739a3de9db3def4fdf2d954e66",
+   "en": "Feels Like Real Wood",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Wood"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb92b65a50e248ccdfbd8d11adf76a9184f7cc69eb38b8e98b0d08877b174a70",
+   "en": "Matte Finish, Fine Texture",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[0].line[2]",
+    "near": "· Feels Like Real Wood"
+   },
+   "dict": null
+  },
+  {
+   "h": "c1ecc12b371ffad2d821e049720d15190ec10ceee930d0364289facc4ec7220e",
+   "en": "Integrates Perfectly with Other PLA",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[0].line[3]",
+    "near": "· Matte Finish, Fine Texture"
+   },
+   "dict": null
+  },
+  {
+   "h": "2da8290150a1f9c20cf9888ac5159bd7193181df58640c10f407ef1691947b70",
+   "en": "Bambu PLA Wood offers a smooth yet slightly grainy texture, with the feel of real wood. With natural wood-like colors and a subtle scent, your models will embody the essence of genuine wood. Perfect for projects that demand a true-to-life wood aesthetic, Bambu PLA Wood blends beauty and authenticity for a natural finish.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[1].line[1]",
+    "near": "Feels Like Real Wood"
+   },
+   "dict": null
+  },
+  {
+   "h": "b3086f6b44dc93fb215bc1fe3078073ebcec174ae6f4bd3dd478373d67723600",
+   "en": "The matte finish of Bambu PLA Wood effectively conceals layer lines, delivering smoother, more refined prints. Its seamless surface enhances the overall aesthetic, giving your creations an authentic, real-wood appearance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[2].line[1]",
+    "near": "Matte Finish, Fine Texture"
+   },
+   "dict": null
+  },
+  {
+   "h": "6833d251712b832a393a5ece331f9e9b74d9388d0295b7421132effa37f20d6f",
+   "en": "Enhance Your PLA Models with Wood Accents",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[3].line[0]",
+    "near": "Bambu PLA Wood integrates seamlessly with other Bambu PLA filaments like PLA Basic and PLA Matte, allowing you to combine natural wood textures with vibrant col"
+   },
+   "dict": null
+  },
+  {
+   "h": "f51d783f9d80dc896029e9d99e691dec9b3c57003f725a84363691904e816b63",
+   "en": "Bambu PLA Wood integrates seamlessly with other Bambu PLA filaments like PLA Basic and PLA Matte, allowing you to combine natural wood textures with vibrant colors. Mix and match textures in a single print to unlock endless creative possibilities and bring your designs to life.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[3].line[1]",
+    "near": "Enhance Your PLA Models with Wood Accents"
+   },
+   "dict": null
+  },
+  {
+   "h": "7aa9d32875329640710f84ff62efbb0ababb3c39ee45c536b33b78de572c54d3",
+   "en": "Higher Moisture Absorption: PLA Wood contains natural wood powder, making it more sensitive to moisture. Dry before use to ensure the best print quality and consistent finish.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[5].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ac74fe8552c7c1b13dd806cbfef09bcbb1607119344a97ee4f5c80c39318f30",
+   "en": "Storage and Drying: Although PLA Wood is thoroughly dried and vacuum-sealed prior to shipping, variations in transport conditions may affect its moisture level. We strongly recommend drying it right after opening and storing it in a sealed container with desiccant or AMS. Repeat drying and moisture-proofing before each long-term storage period.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[5].line[6]",
+    "near": "Higher Moisture Absorption: PLA Wood contains natural wood powder, making it more sensitive to moisture. Dry before use to ensure the best print quality and con"
+   },
+   "dict": null
+  },
+  {
+   "h": "fead9f71ac844ffe4cf6dfa81ddfe92ae8120ca4ce7c48e0ffb508a25231506c",
+   "en": "Drying Guidelines: Click here for more details.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[5].line[7]",
+    "near": "Storage and Drying: Although PLA Wood is thoroughly dried and vacuum-sealed prior to shipping, variations in transport conditions may affect its moisture level."
+   },
+   "dict": null
+  },
+  {
+   "h": "745b5826be32dc762f7428721ccd853868f987d5d2f72caae345634e8e7b2c04",
+   "en": "3.Color Variation",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[5].line[9]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "acea786874449e93b737c01768b2cffac6f7dd6794974ffe6df7f7c4eee29dd0",
+   "en": "Natural wood powder may result in slight color variations depending on the drying level and raw material differences.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[5].line[10]",
+    "near": "3.Color Variation"
+   },
+   "dict": null
+  },
+  {
+   "h": "6de7d7fe58b04984896a2f8a4c5d01fa88f4cfa5fb866a07630b4960b09b8abf",
+   "en": "4.Wood-like Smell",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[5].line[12]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "97f64d599d5c3795e9861139d7386fdd68135ac9d8af45fcdb2e28ab9ae308e7",
+   "en": "During printing, PLA Wood emits a mild, natural wood scent due to the wood powder content. It is non-irritating and non-toxic.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-wood",
+    "title": "PLA Wood",
+    "field": "blocks[5].line[13]",
+    "near": "4.Wood-like Smell"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4cc7397ba981ad81aa7799dfa6151ec9a8f1fddb639b7d70ce2b3e55c710b87",
+   "en": "Shiny Like Chrome, Smooth Like Silk",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Silk+"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4a82959414f27c20813c0343601b0618276772b46e8f6b65f501bcd2fcce70a",
+   "en": "Enhanced Layer Adhesion",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[0].line[2]",
+    "near": "· Shiny Like Chrome, Smooth Like Silk"
+   },
+   "dict": null
+  },
+  {
+   "h": "a9dd138affe3109d415993d32f55f0fcc4714fed37ae39d0bc282681669dc4bd",
+   "en": "A Spectrum of Colors",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[0].line[3]",
+    "near": "· Enhanced Layer Adhesion"
+   },
+   "dict": null
+  },
+  {
+   "h": "7cfdcf9b740436f4862b83287bd6665da85cee829cfff6b72e2dfb268cd9f746",
+   "en": "Bambu PLA Silk+ features an enhanced sheen and gloss. Making it ideal for creating models that require a luxurious silk or metallic finish, this filament elevates your printing projects to a new level. Experience the pinnacle of silk printing with Bambu PLA Silk+!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[1].line[1]",
+    "near": "Shiny Like Chrome, Smooth Like Silk"
+   },
+   "dict": null
+  },
+  {
+   "h": "f1f8be5d50e903199ddc5bb04be4352ff1786db948df69247f9626616e915b03",
+   "en": "No need to make any trade-offs between layer adhesion and appearance.* Bambu PLA Silk+ is engineered for strength, providing enhanced layer adhesion and performance. With superior resistance to bending and impact, Bambu PLA Silk+ ensures your creations stand the test of time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[2].line[1]",
+    "near": "Enhanced Layer Adhesion"
+   },
+   "dict": null
+  },
+  {
+   "h": "978a64c6d99f99a691efffb85ca40351de4b586e77b1df6e14cf1f747b41f2cc",
+   "en": "Read printing tips for more information",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[2].line[2]",
+    "near": "No need to make any trade-offs between layer adhesion and appearance.* Bambu PLA Silk+ is engineered for strength, providing enhanced layer adhesion and perform"
+   },
+   "dict": null
+  },
+  {
+   "h": "35aa1974f6479b2521eefaf0e81682540b787d608779168a2c94420821edb893",
+   "en": "Bambu PLA Silk+ presents a stunning array of vibrant color options to suit all your creative needs. Notably, Candy Green and Candy Red are specifically designed for Christmas décor, allowing you to celebrate the holidays with your unique touch!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[3].line[1]",
+    "near": "A Spectrum of Colors"
+   },
+   "dict": null
+  },
+  {
+   "h": "08b3e8eb0c199364832606fc941b75fc74c8833b3278f511e967fe7882ff3971",
+   "en": "Effortless Printing, Flawless Results",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[4].line[0]",
+    "near": "Bambu PLA Silk+ streamlines your printing process with a silk-smooth experience. Its advanced formulation ensures you achieve perfect results with ease, allowin"
+   },
+   "dict": null
+  },
+  {
+   "h": "b375e96a50d911451b9954b128536a53dde478e702c2ad1831a605acd4a9225d",
+   "en": "Bambu PLA Silk+ streamlines your printing process with a silk-smooth experience. Its advanced formulation ensures you achieve perfect results with ease, allowing you to focus on creativity without the hassle. Elevate your projects with a smoother, more efficient printing experience today!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[4].line[1]",
+    "near": "Effortless Printing, Flawless Results"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5b9b847f6f380e00c7096a8d337545be36c848eda958115781d4ed493708677",
+   "en": "Not compatible with Cool Plate SuperTack and Hotend with Hardened Steel Nozzle 0.6mm / 0.8 mm.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[6].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "766c4cdd8dce7853bb61c3f79f3dceb55399d7fb163d6ec9ba34d471d2f7430e",
+   "en": "Although PLA Silk+ is thoroughly dried and vacuum-sealed prior to shipping, variations in transport conditions may affect its moisture level. We strongly recommend drying it right after opening and storing it in a sealed container with desiccant or AMS. Repeat drying and moisture-proofing before each long-term storage period.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[6].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "a7bc30ace04906593bbea227618e3eb4045048b7c4d46d828a90304042b82315",
+   "en": "4.Print Settings",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[6].line[13]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3d24f9f061e09dc1fc7016f6b2c0960b255b8cc9a22044df8bb4fe0e24815afb",
+   "en": "To enhance the gloss of your print’s appearance, it’s recommended to slow down the Outer wall printing speed. No need to worry about the reduced adhesion found in generic PLA Silk—Bambu PLA Silk+’s improved layer bonding fully supports this adjustment.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[6].line[14]",
+    "near": "4.Print Settings"
+   },
+   "dict": null
+  },
+  {
+   "h": "b7a6d57976c8aa2aedc1b57c6e98677f5d9fbf099472295297820e880ff9e2b9",
+   "en": "Concentric top surface pattern can optimize the print quality of top shells.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[6].line[15]",
+    "near": "To enhance the gloss of your print’s appearance, it’s recommended to slow down the Outer wall printing speed. No need to worry about the reduced adhesion found "
+   },
+   "dict": null
+  },
+  {
+   "h": "98554ebe01bc7b81471c3034dbba524c3bf3f982a48462b9037d409557acfc72",
+   "en": "Lower the outer wall speed to 50 mm/s for the best gloss",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-upgrade",
+    "title": "PLA Silk+",
+    "field": "blocks[7].line[5]",
+    "near": "• Effortless Printing, Flawless Results"
+   },
+   "dict": null
+  },
+  {
+   "h": "356099d2e64535e3dc555cf01b91a548de199194f4d3d21e6c5dca4553c0c0d9",
+   "en": "UL 94-2023 V-0 Flame Retardancy",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pc-fr",
+    "title": "PC FR",
+    "field": "blocks[0].line[1]",
+    "near": "PC FR"
+   },
+   "dict": null
+  },
+  {
+   "h": "752852a3be4f9e07a0c9195afccd1b595ee0c35d83ae40dcb02fc6402d0235ce",
+   "en": "Engineering-Level Mechanical Properties",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pc-fr",
+    "title": "PC FR",
+    "field": "blocks[0].line[2]",
+    "near": "· UL 94-2023 V-0 Flame Retardancy"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff2baac4466c096eebde4c769d447ac224d3777177918d53551d8594c53f127b",
+   "en": "Top-Tier Flame Retardancy",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pc-fr",
+    "title": "PC FR",
+    "field": "blocks[1].line[0]",
+    "near": "Tested to meet the UL 94-2023 V-0 standard, the top level of flame resistance for 3D printing filament, Bambu PC FR is engineered to prevent or slow flame propa"
+   },
+   "dict": null
+  },
+  {
+   "h": "bec0119ab9bc246dfb1d3dfb212c019b9453e3e3ae8188c9e7a2a4be2a047f53",
+   "en": "Tested to meet the UL 94-2023 V-0 standard, the top level of flame resistance for 3D printing filament, Bambu PC FR is engineered to prevent or slow flame propagation with exceptional self-extinguishing properties. Ideal for critical applications in electronics, automotive, and mechanical engineering.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pc-fr",
+    "title": "PC FR",
+    "field": "blocks[1].line[1]",
+    "near": "Top-Tier Flame Retardancy"
+   },
+   "dict": null
+  },
+  {
+   "h": "280c5dd6fe616797796a63fa4c6573580762894eef593c7f827cdfadf1da456e",
+   "en": "UL 94 is a plastics flammability standard established by Underwriters Laboratories (USA). V-0—the highest UL 94 V rating—indicates that burning stops within 10 seconds on a vertically positioned specimen, with dripping particles allowed as long as they are not ignited.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pc-fr",
+    "title": "PC FR",
+    "field": "blocks[1].line[2]",
+    "near": "Tested to meet the UL 94-2023 V-0 standard, the top level of flame resistance for 3D printing filament, Bambu PC FR is engineered to prevent or slow flame propa"
+   },
+   "dict": null
+  },
+  {
+   "h": "b3ef173425de7a1cef820fb4e08d55fddd14c0de4aafb9116af4929c6524000d",
+   "en": "Bambu PC FR is an engineering-grade material with toughness comparable to PAHT-CF. Its exceptional stiffness and strength make it a top choice for structural components and protective casings.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pc-fr",
+    "title": "PC FR",
+    "field": "blocks[2].line[1]",
+    "near": "Engineering-Level Mechanical Properties"
+   },
+   "dict": null
+  },
+  {
+   "h": "67a4b6c26406ff8fac5a47d80c4cd5a6e970f036bdaa8fb87c69960ba1624b74",
+   "en": "The nozzle temperature should be between 260-280°C, and the heat bed temperature should be between 90-110°C. Please ensure safety during printing.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pc-fr",
+    "title": "PC FR",
+    "field": "blocks[4].line[8]",
+    "near": "3.Safety Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "beb044497787bbd050427db2f4a9b67316510cafbbd4de695fd8c075a767ea31",
+   "en": "The Best Choice for Cushioning",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[0].line[1]",
+    "near": "TPU 85A & TPU 90Α"
+   },
+   "dict": null
+  },
+  {
+   "h": "415f9c6e6ab3fae9fe5131f5bd1c85eb61611ace2fa03dddab2b86d0f5c627ab",
+   "en": "Exceptional Wear Resistance for Lasting Performance",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[0].line[2]",
+    "near": "· The Best Choice for Cushioning"
+   },
+   "dict": null
+  },
+  {
+   "h": "70d8e2b8f799f6dd4f8506580ee12731397275bbd950c26cbd4d192c8032c40f",
+   "en": "Multi-Material Printing with PLA / PETG",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[0].line[3]",
+    "near": "· Exceptional Wear Resistance for Lasting Performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "d22dd96dd1a9b57cf7d509d9f7223b5adc6ad1b5daf1747ae5758d72f78de49d",
+   "en": "The Best Choice for Impact Absorption and Buffering",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[1].line[0]",
+    "near": "Engineered for durability and flexibility, Bambu TPU 85A and 90A are ideal for shock absorption and soft support. They are well suited for applications such as "
+   },
+   "dict": null
+  },
+  {
+   "h": "b63553203ed8c8f98a3e13c0adfd0468f31961985ef86d2e62dd0884b49e0d8c",
+   "en": "Engineered for durability and flexibility, Bambu TPU 85A and 90A are ideal for shock absorption and soft support. They are well suited for applications such as padding, medical braces, and protective gear.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[1].line[1]",
+    "near": "The Best Choice for Impact Absorption and Buffering"
+   },
+   "dict": null
+  },
+  {
+   "h": "64740fa1895a6ca15423113e72f2b59d2ec52056bdbaaabe286424e0bf28ae3a",
+   "en": "Both filaments deliver excellent wear resistance, ensuring long-lasting performance even after repeated bending, making them a reliable choice for demanding applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[1].line[2]",
+    "near": "Engineered for durability and flexibility, Bambu TPU 85A and 90A are ideal for shock absorption and soft support. They are well suited for applications such as "
+   },
+   "dict": null
+  },
+  {
+   "h": "3d9fc73fa137a35eff9d2160c375d68457d0d622b0152eb42d4f00d225722638",
+   "en": "The softest TPU in Bambu’s lineup, TPU 85A offers exceptional flexibility and resilience. It is perfect for impact-absorbing parts such as protective cases, squishy fidget toys, and soft cushioning elements.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[2].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "07ded6eb40afacfa751321412efa09b587c71212adc85b1ac88a0d6e11f785cb",
+   "en": "With higher hardness, TPU 90A provides greater structural integrity while retaining flexibility. It is ideal for shoe soles, RC tires, and functional components that require both strength and elasticity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[3].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cd969bfa0f6d17ee44d700b56ce324006e918b831e11094a22565830c9d21e04",
+   "en": "Seamless Multi-Material Printing: Strong in Structure, Soft to the Touch*",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[4].line[0]",
+    "near": "Bambu TPU 90A prints seamlessly with all Bambu PLA and PETG series filaments, letting you combine flexible and rigid materials in a single part using beam inter"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6dda53e23ccb88d8aa0c1f5b305b9317a6098852bea361fe781056e32fad84a",
+   "en": "Bambu TPU 90A prints seamlessly with all Bambu PLA and PETG series filaments, letting you combine flexible and rigid materials in a single part using beam interlocking in Bambu Studio.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[4].line[1]",
+    "near": "Seamless Multi-Material Printing: Strong in Structure, Soft to the Touch*"
+   },
+   "dict": null
+  },
+  {
+   "h": "2bb06a6240b1f64e72f50f7e712acea15c9e8cb2ebdbcc09f36d0814f2ca03f1",
+   "en": "From seat cushions and helmet padding to tool handles and beyond, design freely to achieve the perfect balance of stiffness and softness. Bambu Filaments help you expand the functionality and performance of your prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[4].line[2]",
+    "near": "Bambu TPU 90A prints seamlessly with all Bambu PLA and PETG series filaments, letting you combine flexible and rigid materials in a single part using beam inter"
+   },
+   "dict": null
+  },
+  {
+   "h": "fc0d66c874e634ad4d29669c1a8cda20c8f808fbee976c1ce98b16428090a2af",
+   "en": "This feature is exclusive to Bambu TPU 90A and compatible dual-nozzle printers such as Bambu Lab H2C and H2D.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[4].line[3]",
+    "near": "From seat cushions and helmet padding to tool handles and beyond, design freely to achieve the perfect balance of stiffness and softness. Bambu Filaments help y"
+   },
+   "dict": null
+  },
+  {
+   "h": "10106f372c68435449435277ad69c21f83d3f43a94dac1bae3cfd187cae0a1bb",
+   "en": "Diverse Textures, Eclectic Integration",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[5].line[0]",
+    "near": "Bambu TPU 85A & 90A feature specially formulated textured colors, such as metal-like, semi-transparent, and leather-like. These allow flexible filaments to bett"
+   },
+   "dict": null
+  },
+  {
+   "h": "502e6051553e58d9824cc4a5fbdfbd96932005fe3f527925fe5eb5d7508f1528",
+   "en": "Bambu TPU 85A & 90A feature specially formulated textured colors, such as metal-like, semi-transparent, and leather-like. These allow flexible filaments to better integrate into imaginative model creation scenarios, connecting your works with life.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[5].line[1]",
+    "near": "Diverse Textures, Eclectic Integration"
+   },
+   "dict": null
+  },
+  {
+   "h": "983d4f97d4060614fc40c25bd0951630ad8523c9369fadb9203d774508a9fb0d",
+   "en": "A Unique Single-Pass Soft Gradient",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[6].line[0]",
+    "near": "Unlike the high-frequency color transitions of standard gradient filaments, Bambu TPU 90A Blaze & Frozen delivers a unique soft gradient that appears only once "
+   },
+   "dict": null
+  },
+  {
+   "h": "921463544b7f758064385132aec1a5ab310ef37a6de2e7f3c76cc662b738ea71",
+   "en": "Unlike the high-frequency color transitions of standard gradient filaments, Bambu TPU 90A Blaze & Frozen delivers a unique soft gradient that appears only once per spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[6].line[1]",
+    "near": "A Unique Single-Pass Soft Gradient"
+   },
+   "dict": null
+  },
+  {
+   "h": "72baac92769dc65549c480e17a58c0249dc63198e8a29f2c1e3690b6888526c6",
+   "en": "This creates a smooth, single-pass color shift from start to finish, making it specially engineered for large-scale models, fashion wearables, and footwear where a continuous, natural gradient effect matters.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[6].line[2]",
+    "near": "Unlike the high-frequency color transitions of standard gradient filaments, Bambu TPU 90A Blaze & Frozen delivers a unique soft gradient that appears only once "
+   },
+   "dict": null
+  },
+  {
+   "h": "5cd8826c87808eabcc6ce2f964272ff67d6b532117bc2cd9a144c3a639bcdc89",
+   "en": "More Colors, More Ways to Flex",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[7].line[0]",
+    "near": "Bold, pop colors add a vivid touch to your 3D printing projects. They balance the functional needs of everyday flexible applications with your personal aestheti"
+   },
+   "dict": null
+  },
+  {
+   "h": "25fb5c98726bae4137e3a8c57a1794b603dcc982d6e53114dcc4508042cbe311",
+   "en": "Bold, pop colors add a vivid touch to your 3D printing projects. They balance the functional needs of everyday flexible applications with your personal aesthetic expression, so your prints perform well and look great.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[7].line[1]",
+    "near": "More Colors, More Ways to Flex"
+   },
+   "dict": null
+  },
+  {
+   "h": "e946fa1607ca96946ff2ed0e48483bade08ed34b3bf1ab78bd79faa9e8a11d4e",
+   "en": "Translucent by design. Luminous by nature.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[8].line[0]",
+    "near": "Models printed with semi-transparent TPU allow light, underlying colors, and ambient tones to shine through."
+   },
+   "dict": null
+  },
+  {
+   "h": "54ceb854008790e4a4c85b88aa053f4a325085393ac61f06acd4afcf7326031a",
+   "en": "Models printed with semi-transparent TPU allow light, underlying colors, and ambient tones to shine through.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[8].line[1]",
+    "near": "Translucent by design. Luminous by nature."
+   },
+   "dict": null
+  },
+  {
+   "h": "1f90c6546e4109c7951786d04bfc1b0eda35e8e96f64e31482921eb39b74d608",
+   "en": "This interplay blends design creativity with real-world use, making every creation feel unique. It is especially ideal for phone cases, lamp shades, and other designs where light and color interaction enhance the visual effect.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[8].line[2]",
+    "near": "Models printed with semi-transparent TPU allow light, underlying colors, and ambient tones to shine through."
+   },
+   "dict": null
+  },
+  {
+   "h": "e420cce612947107763e8e546922e11ceb36934f0fcbf48b8d2c12c788930d5f",
+   "en": "TPU 85A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[3]",
+    "near": "Printer Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e1535d25fb4801d10d7da6fc7dc7777d59c43810a57875755bc96554f79ea10",
+   "en": "TPU 90A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[4]",
+    "near": "TPU 85A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series."
+   },
+   "dict": null
+  },
+  {
+   "h": "7b8235c6c9f109c4475e53b78a835a1d0cd32abc1889eae2f6964affe8491294",
+   "en": "Multi-material printing with PLA/PETG: Not supported on H2S, X Series, P Series, and A Series. Only available on the H2D/H2C when using TPU 90A.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[5]",
+    "near": "TPU 90A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series."
+   },
+   "dict": null
+  },
+  {
+   "h": "12096d853460d1a287154cfc76d05020293e4d6decebcca61e2c9378b2421ad7",
+   "en": "Nozzle Compatibility",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[6]",
+    "near": "Multi-material printing with PLA/PETG: Not supported on H2S, X Series, P Series, and A Series. Only available on the H2D/H2C when using TPU 90A."
+   },
+   "dict": null
+  },
+  {
+   "h": "c19aad18c8c5a1bc7ac86666de23167544784bea54f9c579544a53bb202c2310",
+   "en": "TPU 85A: Recommended for 0.6 mm and 0.8 mm. Not supported for 0.2 mm, 0.4 mm, and High Flow Nozzle.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[7]",
+    "near": "Nozzle Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "e290b115d7db6c7529ade06e7e31f39c26e3e7620a7e2bc9d365c677711aaa96",
+   "en": "TPU 90A: Recommended for 0.4 mm, 0.6 mm, and 0.8 mm. Not supported for 0.2 mm and High Flow Nozzle.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[8]",
+    "near": "TPU 85A: Recommended for 0.6 mm and 0.8 mm. Not supported for 0.2 mm, 0.4 mm, and High Flow Nozzle."
+   },
+   "dict": null
+  },
+  {
+   "h": "f761b6612da7c8d413a3c539fc7850af94aa788e549fa42f3bb5acc414c03c9f",
+   "en": "Accessory Compatibility",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[9]",
+    "near": "TPU 90A: Recommended for 0.4 mm, 0.6 mm, and 0.8 mm. Not supported for 0.2 mm and High Flow Nozzle."
+   },
+   "dict": null
+  },
+  {
+   "h": "3dc0dd02a05396ed092334040e54c471518e63853d4326d3cc0ea2ba9ce5179d",
+   "en": "Build Plate: Smooth PEI Plate, Textured PEI Plate",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[10]",
+    "near": "Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "82496a15c4cde9c6449b6633cdd32d06fcacec56f440cb73111af5eb87537b0c",
+   "en": "Glue: No Glue Required",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[11]",
+    "near": "Build Plate: Smooth PEI Plate, Textured PEI Plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "a8559476c7b80194da7cf3ba6e2b18d171779ea4a084d260cda69986941b940f",
+   "en": "AMS, AMS lite, AMS 2 Pro: Not Compatible",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[12]",
+    "near": "Glue: No Glue Required"
+   },
+   "dict": null
+  },
+  {
+   "h": "56a8cd3789cf8dadf73b940cd22c9c0a78f099f80aa77a31227c925570da4333",
+   "en": "AMS HT: Compatible. Please read the Wiki carefully for feeding instructions.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[13]",
+    "near": "AMS, AMS lite, AMS 2 Pro: Not Compatible"
+   },
+   "dict": null
+  },
+  {
+   "h": "76b274fbe459095489a5a966ad457328c160a99fe39b37710bd857f9526887ec",
+   "en": "Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. To avoid spool deformation that may prevent it from fitting into the dry box, please use a large dry box. For more details on filament drying conditions, please carefully read the filament drying section on Wiki.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[16]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "67522c9a94908d3ff6152aa481563e618196779b26b37c020794daddb1a27b1e",
+   "en": "Increasing the max volumetric speed is not recommended. Please keep the default speed during printing.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[19]",
+    "near": "3.Printing Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "3271f512d13b067b84d2dc6da50ae4d83cf9e78601a77dfaca9f1ced075037ef",
+   "en": "All the parameters of Bambu TPU 85A & 90A are already pre-set. Please turn off Flow Dynamics Calibration to match the fine-tuned setting.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[20]",
+    "near": "Increasing the max volumetric speed is not recommended. Please keep the default speed during printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "709d921dde75019f0dfbfbe5a4b5682aa5a8a6768c83d379f09baabf8c78ca97",
+   "en": "Bambu TPU 90A does not support printing with filaments other than the PLA and PETG series, and Bambu TPU 85A does not support full multi-material printing. For instructions on multi-material printing with PLA/PETG, please refer to H2D Soft and Hard Filament Multi-Material Printing Guide.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[21]",
+    "near": "All the parameters of Bambu TPU 85A & 90A are already pre-set. Please turn off Flow Dynamics Calibration to match the fine-tuned setting."
+   },
+   "dict": null
+  },
+  {
+   "h": "472b20155a90b199259dc2050c4bbb8c551aed07fa00d10c7f47deba2b6485bf",
+   "en": "To keep your TPU prints clean and vibrant, we recommend avoiding dark-colored PLA as support material.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[22]",
+    "near": "Bambu TPU 90A does not support printing with filaments other than the PLA and PETG series, and Bambu TPU 85A does not support full multi-material printing. For "
+   },
+   "dict": null
+  },
+  {
+   "h": "0327550702251478809338018e8737c8ef8b16ca68c793fb4684c5a4ecd49b62",
+   "en": "4.Filament unload",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[24]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c45200f15e31e6960652186a2e3c88d59b4b170c398685cc1eec6ddd76c08f2d",
+   "en": "Do not press Unload when switching filaments, as this may cause uncut TPU residue to get stuck in the extruder.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[26]",
+    "near": "For X Series/P Series:"
+   },
+   "dict": null
+  },
+  {
+   "h": "2dd3bef0d2aa6389831de5e9812fd4d768c0ef5c30526dbc8e1271eb1b4da8aa",
+   "en": "Please heat the nozzle to 250°C, then control the extruder to retract and manually pull out the filament.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[27]",
+    "near": "Do not press Unload when switching filaments, as this may cause uncut TPU residue to get stuck in the extruder."
+   },
+   "dict": null
+  },
+  {
+   "h": "eac61c12fff8c5690d74c4a18d5db4ee8715e898cf4ad5fee8d8fbbddad9009b",
+   "en": "Pressing Unload to enable auto-retraction is allowed.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[29]",
+    "near": "For H2 Series:"
+   },
+   "dict": null
+  },
+  {
+   "h": "085f9fea85ce31bc0aaa5fee6b6630a9a9ff53da1d688a5bdc52fa4c378bfd22",
+   "en": "Please maintain the filament cutter at the right inlet if printing TPU regularly, as it's more prone to wear out when printing TPU.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[30]",
+    "near": "Pressing Unload to enable auto-retraction is allowed."
+   },
+   "dict": null
+  },
+  {
+   "h": "1fce4dd61a46a538ad785cf26f5e407428e1848b89c1649cdd2763a3ced19a40",
+   "en": "For detailed filament unloading instructions, please refer to Wiki.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[31]",
+    "near": "Please maintain the filament cutter at the right inlet if printing TPU regularly, as it's more prone to wear out when printing TPU."
+   },
+   "dict": null
+  },
+  {
+   "h": "643f44876f33fe937690b9c7675be8d153d993a3bd0192d5a58709e185d5029d",
+   "en": "5.Gradient Length",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[33]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2c429f4813112bbba8c25accef81b5c93bfbbae39b94e28519cc6e3620736fe4",
+   "en": "Please note that the gradient effect of Bambu TPU 90A Blaze and Bambu TPU 90A Frozen will appear only ONCE in a 1kg filament spool.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[9].line[34]",
+    "near": "5.Gradient Length"
+   },
+   "dict": null
+  },
+  {
+   "h": "f85dd1a7d34ecf6fed28bb442fddb1e6395c7e485b694c7be1d3a5332cb5d0ed",
+   "en": "The Softest Bambu TPU",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[10].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "0769db00b5ffb904d5bff12465917d6daca09e3c422f625591bc18cbdfbbd629",
+   "en": "The Best Choice for Impact Absorption",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[10].line[2]",
+    "near": "• The Softest Bambu TPU"
+   },
+   "dict": null
+  },
+  {
+   "h": "a57718b5c18d92107c8aee409817ed367f6fa5c968323b17499a8d777ac3669f",
+   "en": "Includes High Temperature Reusable Spool",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[10].line[5]",
+    "near": "• Multi-Material Printing with PLA / PETG"
+   },
+   "dict": null
+  },
+  {
+   "h": "5dd1e9c6fcf9ab76cdb739062df8e5d4e40dc7be275fe7f0d5973ec777f174f9",
+   "en": "Must dry out before use",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[10].line[6]",
+    "near": "• Includes High Temperature Reusable Spool"
+   },
+   "dict": null
+  },
+  {
+   "h": "beccbd386c1bf38a55ad69cc20995ed98251f7236e9790c6c61a815957ab9412",
+   "en": "Note: Due to the softness of TPU 85A and 90A, please read the printing guide on Wiki carefully before purchase to ensure the best printing experience and understand the requirements.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "blocks[10].line[8]",
+    "near": "• Cautions for Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "912a43992ac8764611b7f7fe26094b7d74830785f837162d2b30cb220b2a292c",
+   "en": "Effortless Removal",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "support-for-pla-new",
+    "title": "Support for PLA (New Version)",
+    "field": "blocks[0].line[1]",
+    "near": "Support for PLA"
+   },
+   "dict": null
+  },
+  {
+   "h": "1cbed2489d1c09da7291091b2b2e55dfb7ecb9422897bce46422bd4336120dab",
+   "en": "Preserve Every Detail",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "support-for-pla-new",
+    "title": "Support for PLA (New Version)",
+    "field": "blocks[0].line[2]",
+    "near": "· Effortless Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "c2f114f042afd9c91df6e445c5be8c458c668fe0d308a11e7c70fa964df15b64",
+   "en": "Use for Support Interface",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "support-for-pla-new",
+    "title": "Support for PLA (New Version)",
+    "field": "blocks[0].line[3]",
+    "near": "· Preserve Every Detail"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a04532edb8b5956cc85d0fdae798ccd5518bbcead373ad54299f46f65159b06",
+   "en": "Bambu Support for PLA is specifically designed for PLA filaments, ensuring clean, residue-free removal by hand. Say goodbye to post-processing and enjoy a seamless 3D printing experience.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-new",
+    "title": "Support for PLA (New Version)",
+    "field": "blocks[1].line[1]",
+    "near": "Effortless Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "c74b2022ef650bc3712a5766741bfef2283dfbd2c0237f7b9c0689836dfd9fea",
+   "en": "With optimized support interface settings* in Bambu Studio, Bambu Support for PLA delivers an ultra-smooth contact surface that protects intricate details as if untouched. Perfect for delicate designs, overhangs, and bridges, it ensures premium quality from start to finish.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-new",
+    "title": "Support for PLA (New Version)",
+    "field": "blocks[2].line[1]",
+    "near": "Preserve Every Detail"
+   },
+   "dict": null
+  },
+  {
+   "h": "edabce02bf23acafcc15dbe6b7547c73273680e43ff782f1141ce03fe427dfb0",
+   "en": "0mm top interface spacing and 0mm Z-distance settings",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-new",
+    "title": "Support for PLA (New Version)",
+    "field": "blocks[2].line[2]",
+    "near": "With optimized support interface settings* in Bambu Studio, Bambu Support for PLA delivers an ultra-smooth contact surface that protects intricate details as if"
+   },
+   "dict": null
+  },
+  {
+   "h": "430c2aa2c6a8345c4bebde28072a74550e1611e4a524c05e5560704de8c8e330",
+   "en": "Activate the \"Support/raft interface\" setting in Bambu Studio to apply support material exclusively to contact surfaces.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-new",
+    "title": "Support for PLA (New Version)",
+    "field": "blocks[3].line[1]",
+    "near": "Use for Support Interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8e6bde6768e5dfc649fe9b0060d02660aa5c205b432682fe6f83218f64116ed",
+   "en": "For large flat surfaces, use the \"normal\" support type with the \"Default\" style for optimal results. For complex models, choose the \"tree\" support type with the \"Tree Hybrid\" style. For more details, visit the Support on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-new",
+    "title": "Support for PLA (New Version)",
+    "field": "blocks[5].line[8]",
+    "near": "3.Support Setting"
+   },
+   "dict": null
+  },
+  {
+   "h": "016963d7e5c304d287e9e4b6ab1730ee6c4dd6576e9a2eb2e6a20ffc68033fe2",
+   "en": "Print the Shape of Light",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Translucent"
+   },
+   "dict": null
+  },
+  {
+   "h": "82bd6db629b60ee63b1c2bbf8c1a55389cdebfdc72db36c925c6aa6e645622ee",
+   "en": "Bambu PLA Translucent, available in 10 vibrant colors, is perfect for crafting lightshades and decorative lanterns. Its frosted finish diffuses light beautifully. With enhanced durability, it’s ideal for long-term indoor lighting and décor. Customize the shape of light with Bambu PLA Translucent!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[1].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3243279f45ff7f55a29831b8d78f6c931e7b022de1b61961427d9d27dac6bb42",
+   "en": "Diffuse Light in a Splash of Colors",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[2].line[0]",
+    "near": "From soft pastels to vibrant candy hues, Bambu PLA Translucent offers a stunning range of frosted tones that add both subtle elegance and bold vibrancy to your "
+   },
+   "dict": null
+  },
+  {
+   "h": "6a4e0c04e9bfcef40fc1354e3b6be628d63abcf3ba834cacc71b816f521d87a3",
+   "en": "From soft pastels to vibrant candy hues, Bambu PLA Translucent offers a stunning range of frosted tones that add both subtle elegance and bold vibrancy to your prints. Its unique matte finish mimics the look of hand-blown frosted glass, making it ideal for crafting light shades, vases, and stained glass decor. PLA Translucent seamlessly bonds with any PLA filament, making adding a translucent accent to your prints as effortless as swapping colors mid‑print.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[2].line[1]",
+    "near": "Diffuse Light in a Splash of Colors"
+   },
+   "dict": null
+  },
+  {
+   "h": "af5a4a5923ab26a328d061fd66208500e8d5109b70c9a3bcbb1899f33f76af1b",
+   "en": "Craft Stained Glass Art That Endures",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[3].line[0]",
+    "near": "Bambu PLA Translucent strikes the perfect balance between visual translucency and everyday durability. It offers greater impact and aging resistance compared to"
+   },
+   "dict": null
+  },
+  {
+   "h": "b978c6a8f3e6c0a76f027a82bca996e153e7ab1e85a43dbc25af4f298ef50b09",
+   "en": "Bambu PLA Translucent strikes the perfect balance between visual translucency and everyday durability. It offers greater impact and aging resistance compared to generic translucent PLA, ensuring your prints last longer and perform better over time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[3].line[1]",
+    "near": "Craft Stained Glass Art That Endures"
+   },
+   "dict": null
+  },
+  {
+   "h": "fed282eb7703deec400b3f7a166ecb1d493bc0a955fc9518135b23b751eb5a33",
+   "en": "3.Appearance Change",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[5].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "067f80a5b09c9db8cb70846e5a4720a915d491b5b66a427e89031080b7f24cda",
+   "en": "Please note that the transparency of prints may vary depending on factors such as size, thickness, structure, and printing parameters (including speed, nozzle temperature, and infill density). To enhance translucency, please refer to the printing tips on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[5].line[8]",
+    "near": "3.Appearance Change"
+   },
+   "dict": null
+  },
+  {
+   "h": "d410b30cd610f29369f146a3176c07fc5f0891801197f1e721cb02916d4b5f84",
+   "en": "PLA Translucent has a frosted glass texture that diffuses light well, while PETG Translucent is more see-through with a crystal-clear finish.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[5].line[9]",
+    "near": "Please note that the transparency of prints may vary depending on factors such as size, thickness, structure, and printing parameters (including speed, nozzle t"
+   },
+   "dict": null
+  },
+  {
+   "h": "44b3068654101055fa60059750825c3e8bde2e25857322e0b96f44e6dd048572",
+   "en": "4.Printability",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[5].line[11]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5ce3014254430bf58b72685b1e2eda9fe7914d32dab2b4d70fca270216210990",
+   "en": "PLA Translucent is more beginner-friendly than PETG Translucent.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[5].line[12]",
+    "near": "4.Printability"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2614ce1ef5b277a806f8ef11e7fe1a62afb1546b3a79d55afd7a736b4665648",
+   "en": "Translucent Appearance That Diffuses Light",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "9aa084816e66f1418863ba408ee47954b0425b87d148cc9b0f50faf60eeb4584",
+   "en": "Bonds with All PLA Filaments",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[6].line[2]",
+    "near": "• Translucent Appearance That Diffuses Light"
+   },
+   "dict": null
+  },
+  {
+   "h": "92bec3cfae69d0357ddff7c28430f1d86acdeda802f90a26603067051e4a24db",
+   "en": "Durable for Long-Term Use",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[6].line[3]",
+    "near": "• Bonds with All PLA Filaments"
+   },
+   "dict": null
+  },
+  {
+   "h": "56e2c58d6f1dd9206e75c36048355f8fd8f8e3e83fabd91cc524c03845cefa23",
+   "en": "Clean Build Plates Before Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-translucent",
+    "title": "PLA Translucent",
+    "field": "blocks[6].line[4]",
+    "near": "• Durable for Long-Term Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "46a25bc7bea1d6d9f9bc305e1d7294bbd4d5f7611b74439f27f14dde96068cb5",
+   "en": "Built to Take a Beating",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Tough+"
+   },
+   "dict": null
+  },
+  {
+   "h": "2efa70c59ce973a833f7d2226daa9464d02a8d7dcde395ab11ae85eb82bfe30f",
+   "en": "Withstands Repeated Flexing",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[0].line[2]",
+    "near": "· Built to Take a Beating"
+   },
+   "dict": null
+  },
+  {
+   "h": "99b2770aeee04af6029a08743675835610ecc89e278c8a8c67b91df7c378449c",
+   "en": "Prints That Last",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[0].line[3]",
+    "near": "· Withstands Repeated Flexing"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c6be241316836a9636b845d88a4f2409a1019bfde25eac6a78ac69180b1eef2",
+   "en": "Engineered for real-world impact, Bambu PLA Tough+ delivers toughness on par with ABS and offers up to 2× stronger layer adhesion than standard PLA. It shrugs off bumps, drops, and hits, making it ideal for RC cars, model planes, and durable tools.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[1].line[1]",
+    "near": "Built to Take a Beating"
+   },
+   "dict": null
+  },
+  {
+   "h": "0cb88cc485eb7a6a13c3685fd390fe84c55cfee7da67bb58462a990ab3413956",
+   "en": "Designed for repeated flexing, Bambu PLA Tough+ outlasts standard PLA where it typically fails. It’s perfect for prints that need to bend without breaking—like springs, clips, and connectors.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[2].line[1]",
+    "near": "Withstands Repeated Flexing"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb6b2bc66934cef06c252526552b33aea5d9b387fa9ac956abe83195b47c93cc",
+   "en": "With enhanced durability, Bambu PLA Tough+ maintains its performance over time, extending the lifespan of standard PLA prints and making it suitable for demanding, tool-grade applications. Use it for parts that need impact resistance and repeated flexing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[3].line[1]",
+    "near": "Prints That Last"
+   },
+   "dict": null
+  },
+  {
+   "h": "375d4cdf5f213130e3a9d312f0fcf5ca2522617e0f2c92e656f7e192d83a9465",
+   "en": "2.Ventilation Tips",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[5].line[4]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "efd64052b3be453b9be30e107a1e0b8957426b8d7630a3711188c77d75e313ba",
+   "en": "Due to the higher printing temperature, PLA Tough+ has a slightly stronger, non-pungent odor than regular PLA when melting. If necessary, lower the printing temperature or maintain ventilation.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[5].line[5]",
+    "near": "2.Ventilation Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "8ad53cb023de5ab2891531af954e991720133d53938cd43955d2978ced546a31",
+   "en": "4.Support Recommendations",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[5].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "97a95cf7827c552b889e2e1d1b63aede2dee73a08976b81e61b73fc490c1d64b",
+   "en": "Due to the high interlayer strength of Bambu PLA Tough+, it is recommended to use dedicated support filaments (Bambu Support for PLA, or Bambu Support for PLA/PETG) as the support interface material for easier removal and a cleaner finish..",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-tough-upgrade",
+    "title": "PLA Tough+",
+    "field": "blocks[5].line[11]",
+    "near": "4.Support Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "a8a1e343e4ce99809e27110a501e96410d10facad50ebdab9f173e41adcf9c20",
+   "en": "PLA Basic - Bambu Green (Filament with Spool / 1KG) *1",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-beginner-s-filament-pack",
+    "title": "PLA Basic Starter Classic Pack",
+    "field": "blocks[6].line[4]",
+    "near": "• Biodegradable"
+   },
+   "dict": null
+  },
+  {
+   "h": "571c5ac528194c17200f93a5fe6f6c747ac9bdb7d5e21b04ae4fb3576ce4f4ae",
+   "en": "PLA Basic - Jade White (Filament with Spool / 1 KG) *1",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-beginner-s-filament-pack",
+    "title": "PLA Basic Starter Classic Pack",
+    "field": "blocks[6].line[5]",
+    "near": "• PLA Basic - Bambu Green (Filament with Spool / 1KG) *1"
+   },
+   "dict": null
+  },
+  {
+   "h": "38f0b51487d15ca464cf4409632741a34c5334ad5d3c9121fd78596c18d64c7b",
+   "en": "PLA Basic - Gray (Filament with Spool / 1 KG ) *1",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-beginner-s-filament-pack",
+    "title": "PLA Basic Starter Classic Pack",
+    "field": "blocks[6].line[6]",
+    "near": "• PLA Basic - Jade White (Filament with Spool / 1 KG) *1"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa1d2ab7a3b8bea7da40e717c244c2f42fbe29b76e1043c59dc50402b1e4fe2e",
+   "en": "PLA Basic - Black (Filament with Spool / 1 KG) *1",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-beginner-s-filament-pack",
+    "title": "PLA Basic Starter Classic Pack",
+    "field": "blocks[6].line[7]",
+    "near": "• PLA Basic - Gray (Filament with Spool / 1 KG ) *1"
+   },
+   "dict": null
+  },
+  {
+   "h": "3df8ed83e572ff10629ed7fd8179dcf28c475a477603ba642d5873064c163bd1",
+   "en": "What's in the Bundle",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-beginner-s-filament-pack",
+    "title": "PLA Basic Starter Classic Pack",
+    "field": "blocks[6].line[8]",
+    "near": "• PLA Basic - Black (Filament with Spool / 1 KG) *1"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3ecdfdd84d10b14b45cdbc249aa3beba9939452bfe6e291779345dd4dadc296",
+   "en": "Strong and Tough",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[0].line[1]",
+    "near": "PETG Basic"
+   },
+   "dict": null
+  },
+  {
+   "h": "f57ce555ecd22d7db27e39403c089d36ade713ee877e9c0f447f44fda6e1bc3a",
+   "en": "Less Stringing, Superior Surface",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[0].line[2]",
+    "near": "· Strong and Tough"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e2e52e3187b1dbfeac98f0c82f3e80f1bf83a1ef4d3d6e3b709cd076138af1b",
+   "en": "Stronger Than Ever, Yet Still Tough",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[1].line[0]",
+    "near": "Thanks to its upgraded formula, Bambu Lab PETG Basic now matches the strength of PLA Basic while retaining the toughness needed to absorb impacts. It can handle"
+   },
+   "dict": null
+  },
+  {
+   "h": "dab392f9fa07ae2a78e388576cf17f81479b8c06cc14ff826820029acc0d1224",
+   "en": "Thanks to its upgraded formula, Bambu Lab PETG Basic now matches the strength of PLA Basic while retaining the toughness needed to absorb impacts. It can handle greater loads and stress than before, making it well suited for structural household parts and practical tools such as holders, wall hooks, brackets, and clips.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[1].line[1]",
+    "near": "Stronger Than Ever, Yet Still Tough"
+   },
+   "dict": null
+  },
+  {
+   "h": "034a3853f4ebe7844e91a67c53fc2c19e7732be6fa43919e5309f0079ba7b544",
+   "en": "Multi-Color, Stunning Results",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[2].line[0]",
+    "near": "Bambu PETG Basic selects 13 colors, offering a rich range of printing color schemes. It is sturdy and durable, yet can also be vibrant and stunning. The abundan"
+   },
+   "dict": null
+  },
+  {
+   "h": "9034d302543e42b550c45b45c25cbeb760a688fd9559002b013e4c5371babe1e",
+   "en": "Bambu PETG Basic selects 13 colors, offering a rich range of printing color schemes. It is sturdy and durable, yet can also be vibrant and stunning. The abundant color matrix opens up endless possibilities for you, from home decor to outdoor gear.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[2].line[1]",
+    "near": "Multi-Color, Stunning Results"
+   },
+   "dict": null
+  },
+  {
+   "h": "dac63e627d3f63fbdf3de3706d68bc477a4fe632c21cc7dd556627bd90a3cfc6",
+   "en": "The all-new Bambu Lab PETG Basic shows reduced stringing thanks to its lower sensitivity to moisture compared to typical PETG filaments, resulting in smoother surfaces and crisper details.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[3].line[1]",
+    "near": "Less Stringing, Superior Surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "027b230cf5127daf8b6266a1e687c4bfa054d29d18b7384b6c821a1ee4d36c30",
+   "en": "*Drying is still recommended to optimize printing results. For more details, please refer to the Printing Tips.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[3].line[2]",
+    "near": "The all-new Bambu Lab PETG Basic shows reduced stringing thanks to its lower sensitivity to moisture compared to typical PETG filaments, resulting in smoother s"
+   },
+   "dict": null
+  },
+  {
+   "h": "8379ba96818130c22286ee211536191692afbc53660105e2f23528dcb4d6c6ac",
+   "en": "PETG Basic is certified to UL GREENGUARD (UL 2904), the recognized standard for 3D printer emissions. The particles and VOCs released measure below the levels of an average kitchen, living room, or office—cleaner than the air you're already breathing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[5].line[1]",
+    "near": "UL GREENGUARD certified. Cleaner air for indoor printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "ee6e34a42b3121d0d4b4c3b761920ae01833ca9ed4277500e9fdcebb94561513",
+   "en": "Dry out before use for higher printing quality. If PETG Basic has been exposed to air with relative humidity above 50% for more than 72 hours, please dry it thoroughly according to the instructions before printing to ensure optimal print quality. For more details, please refer to: Filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[6].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "202a71871a74d7d3fea99d8249f77c58d3ef551446f35473dec91e18b2db3d82",
+   "en": "PETG Basic adheres strongly to the PEI plate. After printing, please wait for the plate to cool down before removing the model to avoid damaging the bottom surface.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "petg-basic",
+    "title": "PETG Basic",
+    "field": "blocks[6].line[11]",
+    "near": "4.Post-processing Tips"
+   },
+   "dict": null
+  }
+ ]
+}

@@ -1,0 +1,3281 @@
+{
+ "batch": 36,
+ "surface": "api",
+ "handles": [
+  "chest-of-superior-tracking-dwarven-theme",
+  "double-laptop-stand-with-a-drawer-organiser",
+  "gravity-hanger-towel-hook-hanger",
+  "extra-rechargeable-battery-upgrade-kit",
+  "cyberbrick-mini-tank",
+  "inertia-drifting-car-ornament-for-car-interior",
+  "mini-suv-cyberbrick-rc",
+  "cyberbrick-official-soccerbot",
+  "bulldozer-cyberbrick-rc",
+  "mini-screwdriver-toolkit",
+  "handheld-vacuum-cleaner-kit",
+  "all-in-one-fast-charging-kit-for-cyberbrick",
+  "christmas-santa-s-snowcat-cyberbrick-rc",
+  "fcyberbrick-official-forklift-and-truck",
+  "arctic-snowcat-cyberbrick-rc",
+  "200mm-xh2-54-female-to-ph2-0-male-conversion-wire",
+  "easy-grip-jumper-shunt",
+  "4x4-mini-off-roader-cyberbrick-rc",
+  "relic-rush-board-game",
+  "water-turret-cyberbrick-rc",
+  "poop-chute-basket-outlet-for-x1c-p1s-p2s",
+  "gridfinity-storage-box-v2",
+  "50mm-y-type-xh2-54-male-to-dual-xh2-54-female-conversion-cable-2pcs-pd003"
+ ],
+ "strings": [
+  {
+   "h": "c8293e056d2cdd8ba4ab05d823e539018e66994fe15c8fba56aca7c598614e75",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Chest of Superior Tracking - Dwarven Theme. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chest-of-superior-tracking-dwarven-theme",
+    "title": "Chest of Superior Tracking - Dwarven Theme",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "898dab6ca8ac79e101f4bd6b1e9ff0dcb3a4b33fdb0db0432cc06e1da6b56cda",
+   "en": "To download the model files please visit the Chest of Superior Tracking - Dwarven Theme on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chest-of-superior-tracking-dwarven-theme",
+    "title": "Chest of Superior Tracking - Dwarven Theme",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "c693169c26d237498b0e98919fbd7556e7144ead9513c0f0e459d12ff9cad4eb",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Double laptop stand with a drawer organiser. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "double-laptop-stand-with-a-drawer-organiser",
+    "title": "Double laptop stand with a drawer organiser",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "cecf982a4d01c36eb2df8ece3a4a6201d44844855389638ae7472a29f3ff57dc",
+   "en": "To download the model files please visit the Double laptop stand with a drawer organiser on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "double-laptop-stand-with-a-drawer-organiser",
+    "title": "Double laptop stand with a drawer organiser",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "cb8a64a43671dbafabec21b105041207bddab9d4b81a594bea6699053b50f8ae",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Gravity Hanger - Towel Hook/Hanger. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "gravity-hanger-towel-hook-hanger",
+    "title": "Gravity Hanger - Towel Hook/Hanger",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "32955b1e3518f147b38cc0f8829f1ed1595e6047b6c4f68cc6e1b497cbb5599e",
+   "en": "To download the model files please visit the Gravity Hanger - Towel Hook/Hanger on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "gravity-hanger-towel-hook-hanger",
+    "title": "Gravity Hanger - Towel Hook/Hanger",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "71b8138f6f5da5e6db0e55b6a845082fb8594c0eb771ba42464a0b1cec8e5561",
+   "en": "Elevate your CyberBrick model's power and convenience with the Extra Rechargeable Battery Upgrade Kit. The core lithium battery is built for enduring performance and stable power delivery. The integrated switchboard provides clear control, while the 2-pin cable ensures a secure and efficient connection.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extra-rechargeable-battery-upgrade-kit",
+    "title": "Extra Rechargeable Battery Upgrade Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e34ed2cc1c0ffba0aa5e264bd305084ede49cd300850ed99575e4eec74aabd2",
+   "en": "The Ultimate Power Solution: More Play, Less Waste, Endless Fun.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extra-rechargeable-battery-upgrade-kit",
+    "title": "Extra Rechargeable Battery Upgrade Kit",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "239a1337ef49cc439e6322e8bbbea3c59c041c08c7ed309fdca44de8233037a2",
+   "en": "The kit provides a rechargeable Li-ion Battery and a Power Switch Module ,",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extra-rechargeable-battery-upgrade-kit",
+    "title": "Extra Rechargeable Battery Upgrade Kit",
+    "field": "blocks[4].line[2]",
+    "near": "• The Ultimate Power Solution: More Play, Less Waste, Endless Fun."
+   },
+   "dict": null
+  },
+  {
+   "h": "1411e530a63260324c714f1b5eea6bdc865a6fb3551e7536488863ba6b1955a7",
+   "en": "Step into the world of the CyberBrick Mini T, where creation and combat meet in the palm of your hand. This remote-controlled tank is engineered for effortless 3D printing—requiring no supports or glue—and assembles seamlessly with the official CyberBrick Starter Kit. Hone your skills in solo target practice or challenge a friend to an epic tank duel. The modular battlefield components let you redesign the terrain for endless replayability. More than a model, it's your personal arsenal of fun.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "09816b5c0e881d097836a5a251b85cc44c2a806aeea429e6bf459d97623e67a5",
+   "en": "Ready to Command Your Battlefield?",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[0].line[2]",
+    "near": "Step into the world of the CyberBrick Mini T, where creation and combat meet in the palm of your hand. This remote-controlled tank is engineered for effortless "
+   },
+   "dict": null
+  },
+  {
+   "h": "4a48a0ad386311a4304cbd596b494f14a671eadd5ede88d3447d19dc41a3c0f0",
+   "en": "Find all files and details on its MakerWorld Page.",
+   "kind": "block_line",
+   "freq": 7,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[0].line[3]",
+    "near": "Ready to Command Your Battlefield?"
+   },
+   "dict": null
+  },
+  {
+   "h": "85b8cdf3d40c6bb6511302a1535ab4cdde0be57a2878037ebd21152c4920ff1e",
+   "en": "*For a smooth build, we recommend reviewing the assembly guide first.",
+   "kind": "block_line",
+   "freq": 9,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[0].line[4]",
+    "near": "Find all files and details on its MakerWorld Page."
+   },
+   "dict": null
+  },
+  {
+   "h": "3101df122057913d0b4bc2161c2167282be9c7e1c654b4a2673ab58388b861cc",
+   "en": "Rich Gameplay, Endless Fun",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[1].line[0]",
+    "near": "The CyberBrick Mini Tank is not just an RC tank—it's a dynamic battle platform for creative expression."
+   },
+   "dict": null
+  },
+  {
+   "h": "5c3843657c4e160efab98a8e7f5c4122e701cb1f91327236cc4ce8645ca14908",
+   "en": "The CyberBrick Mini Tank is not just an RC tank—it's a dynamic battle platform for creative expression.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[1].line[1]",
+    "near": "Rich Gameplay, Endless Fun"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a67cb5d05a10f859d1525303ec6e5d774e64cb87b76d76a4ada81fde38dba29",
+   "en": "Whether in solo training or multiplayer competition, you have full control over everything from the tank's appearance to target setup.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[1].line[2]",
+    "near": "The CyberBrick Mini Tank is not just an RC tank—it's a dynamic battle platform for creative expression."
+   },
+   "dict": null
+  },
+  {
+   "h": "64a8af13ae90ccce22f5cc1d46f1757d5aa58d6e6c6823be55ee97038a988889",
+   "en": "Smooth Control",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[2].line[0]",
+    "near": "• Dual Control Modes: Two built-in control modes allow seamless switching via the CyberBrick app, making it easy to get started."
+   },
+   "dict": null
+  },
+  {
+   "h": "aa0c5758cd8f155a976e05057157875bf2eaf24cce99f0d471bf90bf9448397c",
+   "en": "Dual Control Modes: Two built-in control modes allow seamless switching via the CyberBrick app, making it easy to get started.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[2].line[1]",
+    "near": "Smooth Control"
+   },
+   "dict": null
+  },
+  {
+   "h": "404ac6c2531b54bef78416dc8c7d18f62bdea2f547b4ae8320f7e41041bf5487",
+   "en": "Flexible Moving: Unique track design enables on-the-spot turning, allowing smooth navigation even in tight spaces.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[2].line[2]",
+    "near": "• Dual Control Modes: Two built-in control modes allow seamless switching via the CyberBrick app, making it easy to get started."
+   },
+   "dict": null
+  },
+  {
+   "h": "3d278d4ddb1954579c4869e90da6ceed267226ec47730bcc2749b30fb86699b3",
+   "en": "Dynamic Firing Adjustment: Real-time barrel angle adjustment enables precise \"point-and-shoot\" accuracy while moving.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[2].line[3]",
+    "near": "• Flexible Moving: Unique track design enables on-the-spot turning, allowing smooth navigation even in tight spaces."
+   },
+   "dict": null
+  },
+  {
+   "h": "817fc0c7c47d722321f3e38b19c26feba147ff8b6d1d70916dae8af2d9e5a434",
+   "en": "Your Battlefield, Your Rules",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[3].line[0]",
+    "near": "• Custom Color Schemes: Choose your preferred filament color to print tank exteriors, creating unique battlefield identifiers."
+   },
+   "dict": null
+  },
+  {
+   "h": "9a6de3433a4bbba82ea9b41a45dadb52844a7b9a1142eb363cc28a320acd01ad",
+   "en": "Custom Color Schemes: Choose your preferred filament color to print tank exteriors, creating unique battlefield identifiers.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[3].line[1]",
+    "near": "Your Battlefield, Your Rules"
+   },
+   "dict": null
+  },
+  {
+   "h": "4346823d8a18243ac39ad94cd0007d404d1b6fd55b24d3370f4817a1a29884b2",
+   "en": "Unlimited Ammo Supply: Both discs and targets are 3D printable, allowing on-demand printing for continuous ammunition.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[3].line[2]",
+    "near": "• Custom Color Schemes: Choose your preferred filament color to print tank exteriors, creating unique battlefield identifiers."
+   },
+   "dict": null
+  },
+  {
+   "h": "b6063f8eb0aa260873723265b2a0c562a2fac332f24bebe5e6ff13365378b28e",
+   "en": "Modular Battlefield: 3D-printed terrain components support flexible assembly, enabling custom battlefield layouts built like interlocking bricks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[3].line[3]",
+    "near": "• Unlimited Ammo Supply: Both discs and targets are 3D printable, allowing on-demand printing for continuous ammunition."
+   },
+   "dict": null
+  },
+  {
+   "h": "bce13de8cea0579115e9b6d2eb32be0b927e07d2db1c24fe4c6812e74e7f1c95",
+   "en": "Beginner-Friendly",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[4].line[0]",
+    "near": "• Officially Verified Design: Both the model and instruction manual are officially tested to ensure successful printing and smooth assembly."
+   },
+   "dict": null
+  },
+  {
+   "h": "845b887f1c54bfdce25dbdd0f31361dc55049e116ef35c6140ccafc8917a080b",
+   "en": "Officially Verified Design: Both the model and instruction manual are officially tested to ensure successful printing and smooth assembly.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[4].line[1]",
+    "near": "Beginner-Friendly"
+   },
+   "dict": null
+  },
+  {
+   "h": "aef899015b54dd14bc24574d8524f578d7265020cdb4c9a94a05e8b0c4e66e30",
+   "en": "Simplified Assembly: Requires no supports or glue, and uses snap-fit designs to significantly reduce screw usage, saving your printing and assembly time.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[4].line[2]",
+    "near": "• Officially Verified Design: Both the model and instruction manual are officially tested to ensure successful printing and smooth assembly."
+   },
+   "dict": null
+  },
+  {
+   "h": "a3a9b490fc86572c5ad61704cbde1853b620efdd630aa3f7da75e7fe0a639707",
+   "en": "Step-by-step instructions for a correct and safe installation.",
+   "kind": "block_line",
+   "freq": 22,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[5].line[2]",
+    "near": "Assembly Guide"
+   },
+   "dict": null
+  },
+  {
+   "h": "77938bd8c6b58690b604a66720f4d91847f4f9687316fe5d59faf003893c244b",
+   "en": "View More Download",
+   "kind": "block_line",
+   "freq": 16,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[5].line[3]",
+    "near": "Step-by-step instructions for a correct and safe installation."
+   },
+   "dict": null
+  },
+  {
+   "h": "cf3989428553dbeb2548a6cce1451dbb0960bfadb231684fd616d4385d27e01f",
+   "en": "RC Framework",
+   "kind": "block_line",
+   "freq": 7,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[6].line[0]",
+    "near": "Link and configure your remote control and vehicle, open with CyberBrick Apps."
+   },
+   "dict": null
+  },
+  {
+   "h": "4102ee9b49fd48257a34aeefe1778d4b3396b65a4f78202881e066e50cf7811d",
+   "en": "Link and configure your remote control and vehicle, open with CyberBrick Apps.",
+   "kind": "block_line",
+   "freq": 10,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[6].line[1]",
+    "near": "RC Framework"
+   },
+   "dict": null
+  },
+  {
+   "h": "2007b17456d660bc18075cf26fc27d53cddc7125e2c05c1c1e071b213e75255a",
+   "en": "To ensure safety, please read and carefully follow the guidelines below. Minors must be under direct adult supervision when using this product.",
+   "kind": "block_line",
+   "freq": 9,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[7].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "20f8b07c63f2597322c5863d8441e82271f08549653af58694657ab4f14bcecb",
+   "en": "Intended Users: This product is intended for users aged 14 and above. Users under the age of 14 must be under direct adult supervision throughout use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[7].line[2]",
+    "near": "To ensure safety, please read and carefully follow the guidelines below. Minors must be under direct adult supervision when using this product."
+   },
+   "dict": null
+  },
+  {
+   "h": "f0fefaa6c8177887ddfa78c7f0da0fd9c61e154d523495936c34bf72da0eab3c",
+   "en": "Core Safety Rules: It is strictly prohibited to launch discs at people, animals, glass, fragile objects, or any property. The product may only be used to shoot at designated targets or for battles with other tanks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[7].line[3]",
+    "near": "• Intended Users: This product is intended for users aged 14 and above. Users under the age of 14 must be under direct adult supervision throughout use."
+   },
+   "dict": null
+  },
+  {
+   "h": "f4805a46c92a9189f342300dcfbe463e5a76f0376c56d80f6292829eb6f3cb4a",
+   "en": "Firmware Safety: Please use only official tools for any firmware operations.",
+   "kind": "block_line",
+   "freq": 7,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[7].line[4]",
+    "near": "• Core Safety Rules: It is strictly prohibited to launch discs at people, animals, glass, fragile objects, or any property. The product may only be used to shoo"
+   },
+   "dict": null
+  },
+  {
+   "h": "8f7f3eaad78a6d54498abe371c21e68cb99ba813a9f15001673fbd20912ced1f",
+   "en": "Operational Safety: Do not touch the moving tracks or wheels while the device is operating to prevent pinching injuries, and do not make any modifications to the launcher.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[7].line[5]",
+    "near": "• Firmware Safety: Please use only official tools for any firmware operations."
+   },
+   "dict": null
+  },
+  {
+   "h": "25f6cda8bc829d7145326c0d765c12899d5de316febe93e8f2db8334e9ce1f07",
+   "en": "Battery & Charging: DO NOT use chargers with output higher than 5V or 2A, only the officially designated battery and charger must be used. Avoid exposing the battery to high temperatures or water.",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[7].line[6]",
+    "near": "• Operational Safety: Do not touch the moving tracks or wheels while the device is operating to prevent pinching injuries, and do not make any modifications to "
+   },
+   "dict": null
+  },
+  {
+   "h": "0a0a16a0e3ae7fa6d878f9e9f5e04884fc5c73c7b9f0d666c0f0b00fc02f5fec",
+   "en": "Maintenance & Storage: Before use, inspect all 3D-printed parts and sand down any sharp edges or burrs if present. Store the model and small parts in a location out of reach of children and pets to prevent choking hazards.",
+   "kind": "block_line",
+   "freq": 7,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[7].line[7]",
+    "near": "• Battery & Charging: DO NOT use chargers with output higher than 5V or 2A, only the officially designated battery and charger must be used. Avoid exposing the "
+   },
+   "dict": null
+  },
+  {
+   "h": "da01123068118bc29f24a9024f8a6c6deb51e3c7236c2f256c4dc13c8b8d9d9b",
+   "en": "Our company is not liable for any equipment damage, failure, fire, or other loss caused by non-compliance with the above requirements.",
+   "kind": "block_line",
+   "freq": 8,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[7].line[8]",
+    "near": "• Maintenance & Storage: Before use, inspect all 3D-printed parts and sand down any sharp edges or burrs if present. Store the model and small parts in a locati"
+   },
+   "dict": null
+  },
+  {
+   "h": "307c7e96561d5dc71aef569491bf7758b66996bca7250cc19cd478b394f8b6f9",
+   "en": "Please strictly follow the safety instructions for this product.",
+   "kind": "block_line",
+   "freq": 8,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[7].line[9]",
+    "near": "Our company is not liable for any equipment damage, failure, fire, or other loss caused by non-compliance with the above requirements."
+   },
+   "dict": null
+  },
+  {
+   "h": "f463fd127bb95607e1afb5dcc9cd9dc0113141c7c17eb74e63291ecb67a0122e",
+   "en": "The product does not include the 3D printed parts as shown in the main image.",
+   "kind": "block_line",
+   "freq": 8,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[8].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "e36645ec6cb641bec411dae8da95d4c989d75f2e2e0d91d85593a6df157ffb93",
+   "en": "CyberBrick is a modular smart toy ecosystem that combines programmable hardware, 3D printable structures, and dual-level coding environments. CyberBrick empowers anyone to build and enjoy a wide range of 3D-printed projects, from R/C toys to productivity tools.",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[8].line[2]",
+    "near": "• The product does not include the 3D printed parts as shown in the main image."
+   },
+   "dict": null
+  },
+  {
+   "h": "c435080ba5d138018ba1a307cdb823bfce2e3650a801640b4cf3e4de37a6f272",
+   "en": "Except for the hardware parts , all models and configuration files are free. The model kit includes a beginner's kit covering most of the hardware parts needed to build a remote-controlled vehicle. If you are not satisfied with a specific model, you can easily replace it with another one.",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[8].line[3]",
+    "near": "• CyberBrick is a modular smart toy ecosystem that combines programmable hardware, 3D printable structures, and dual-level coding environments. CyberBrick empow"
+   },
+   "dict": null
+  },
+  {
+   "h": "d589489774b2f29d4312847f59c0a568ca7e3856d9e044aeb5e6f23b888ba5c0",
+   "en": "The following installation information for a single Vehicle is provided for reference:",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "blocks[8].line[4]",
+    "near": "• Except for the hardware parts , all models and configuration files are free. The model kit includes a beginner's kit covering most of the hardware parts neede"
+   },
+   "dict": null
+  },
+  {
+   "h": "e3d68959e0b25a2865e8634ddd1c5b81d79d323e4e84b2835eb42b3a16d733f4",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Inertia Drifting Car Ornament for Car Interior. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "inertia-drifting-car-ornament-for-car-interior",
+    "title": "Inertia Drifting Car Ornament for Car Interior",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6c195aa0390e21a5764552840eacc5da82e09c321e7369f30a2f11b84fe5bb7",
+   "en": "To download the model files please visit the Inertia Drifting Car Ornament for Car Interior on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "inertia-drifting-car-ornament-for-car-interior",
+    "title": "Inertia Drifting Car Ornament for Car Interior",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "cbf8886ec1c3326cd81badc8fff686316f3b57113b5a9bc489cfd50e6341968c",
+   "en": "Meet the Mini SUV CyberBrick RC – where iconic 4x4 design meets CyberBrick ecosystem. It features a classic, robust body with a distinctive grille and spare tire. Its proportional steering and efficient drivetrain deliver precise control on any terrain when paired with the CyberBrick system. Best of all, it requires no AMS, no supports, and no glue—making it effortless to print, customize with your color, and bring to life using the beginner-friendly CyberBrick Starter Kit. Your complete creative off-road experience starts now.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d741d49ec222af3b3a3f3c04ee24c5ad0edf10d104ec05ddc2084aa305081ee7",
+   "en": "Design & Performance",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[1].line[0]",
+    "near": "• Realistic appearance: Featuring a robust body, distinctive grille, and spare tire mount, this Mini SUV captures the essence of a classic off-roader in perfect"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa07bccf5a384a6020c18e630070ef0457e07997319605f1799891646df0d105",
+   "en": "Realistic appearance: Featuring a robust body, distinctive grille, and spare tire mount, this Mini SUV captures the essence of a classic off-roader in perfectly proportioned miniature form.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[1].line[1]",
+    "near": "Design & Performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "6b00aca2fa5168b6b3d6aed5f211eb0c9b0ada473ed0ba152dd8c75f47c98a60",
+   "en": "Precision Control: By combining proportional steering with an efficient drivetrain, the Mini SUV provides seamless response and precise control on any surface.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[1].line[2]",
+    "near": "• Realistic appearance: Featuring a robust body, distinctive grille, and spare tire mount, this Mini SUV captures the essence of a classic off-roader in perfect"
+   },
+   "dict": null
+  },
+  {
+   "h": "fafe9e74f91cae028afeb8967423fc0822d09ef581eafc9503a9c8aebd51dacb",
+   "en": "*The 1:21 Gear Kit (LA012) offers higher speed than the 1:48 gear included in kits (ZK004).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[1].line[3]",
+    "near": "• Precision Control: By combining proportional steering with an efficient drivetrain, the Mini SUV provides seamless response and precise control on any surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "af1debe2531acfac0b0c813eb4fa131d09b5990c74df60879fa9cb4c258f8ff6",
+   "en": "Expand Your Play",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[2].line[0]",
+    "near": "• Outdoor Exploration: Take your Mini SUV outdoors to conquer real-world terrain like gravel paths and grassy slopes, discovering its capabilities in various en"
+   },
+   "dict": null
+  },
+  {
+   "h": "614ad88b49e8bbd1ff6270098f8d75a0495919dac386dec3630ff43dbe55e8a3",
+   "en": "Outdoor Exploration: Take your Mini SUV outdoors to conquer real-world terrain like gravel paths and grassy slopes, discovering its capabilities in various environments",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[2].line[1]",
+    "near": "Expand Your Play"
+   },
+   "dict": null
+  },
+  {
+   "h": "319e4b5b388c7cef66feff2b86937fb5be784106c4a6b456c686c80583ac0d74",
+   "en": "Build Your Own Off-Road Game: Transform any space into an adventure course. Build challenging obstacles with natural elements, then put your precision control into the game. Perfect your technique and challenge friends to head-to-head races.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[2].line[2]",
+    "near": "• Outdoor Exploration: Take your Mini SUV outdoors to conquer real-world terrain like gravel paths and grassy slopes, discovering its capabilities in various en"
+   },
+   "dict": null
+  },
+  {
+   "h": "94892d6e55bd5bf0f92b3f4e68c51224b1c278d758ed7009bdb4f0ac5b479704",
+   "en": "All-in-One Experience: Only the CyberBrick Starter Kit is required—no complicated part sourcing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[3].line[2]",
+    "near": "• Officially Verified Design: Both the model and instruction manual are officially tested to ensure successful printing and smooth assembly."
+   },
+   "dict": null
+  },
+  {
+   "h": "8bcdf257cb72983cb59513db2d096d106e74b33452517e86af395cadc4a37eba",
+   "en": "Creative Freedom",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[4].line[0]",
+    "near": "• Efficient & Smart Printing: Optimized for single-color printing—no AMS required, no support needed. This streamlined approach not only saves printing time but"
+   },
+   "dict": null
+  },
+  {
+   "h": "549ab4a5b45dbd35750e3faad4ac15fb0678421327cf3e48b06794eaf736d7c1",
+   "en": "Efficient & Smart Printing: Optimized for single-color printing—no AMS required, no support needed. This streamlined approach not only saves printing time but also reduces material waste by eliminating filament changes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[4].line[1]",
+    "near": "Creative Freedom"
+   },
+   "dict": null
+  },
+  {
+   "h": "c0bd3841696a39b1515b4626e0403834c689baff2b6f1a6dd1a6443cc9b8ba83",
+   "en": "Your Color, Your Style: Choose your favorite filament color to print the SUV body, creating a truly one-of-a-kind vehicle that reflects your personal creative vision.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[4].line[2]",
+    "near": "• Efficient & Smart Printing: Optimized for single-color printing—no AMS required, no support needed. This streamlined approach not only saves printing time but"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ef0050a6ec9178503c3f6a867f528d3c5ab6cc384c22d33d60a6547aa67c391",
+   "en": "Official RC Framework",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[6].line[0]",
+    "near": "Link and configure your remote control and vehicle, open with CyberBrick Apps."
+   },
+   "dict": null
+  },
+  {
+   "h": "cec5fc5f8768a8e07d3caab0630d41cec978a9ac3ce294fdf64cf378a74c36ea",
+   "en": "DO NOT touch the moving tracks or wheels while the device is operating to prevent pinching injuries.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[7].line[3]",
+    "near": "• Please use only official tools for any firmware operations."
+   },
+   "dict": null
+  },
+  {
+   "h": "08eb060e803b606994c1e5f3ebcf0eb3108b998204ccbf1bdd2728d2e859bed6",
+   "en": "For reference, the official installation data for a single Mini SUV is listed below.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "blocks[11].line[4]",
+    "near": "• Notes:"
+   },
+   "dict": null
+  },
+  {
+   "h": "cdf5a98a0dd6961cdb07396aba6153a54c4d5d7e281584775354cbc354b9cd53",
+   "en": "Experience the thrill of mini robot soccer with this innovative battle set. Featuring Remote control, SoccerBots deliver powerful kicks and precise movements for strategic matches. The system encourages creativity through event-based programming, allowing you to code special moves and custom rules. Furthermore, the fully 3D-printable design enables endless DIY upgrades. You can choose your preferred filament color to print the SoccerBot, experience a dynamic and customizable platform where high-tech meets the thrill of competition.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-official-soccerbot",
+    "title": "CyberBrick Official SoccerBot",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f660904f7c39e594a2b19715fd16278e2be3736bd3b6f089c0db8e78945e3a1c",
+   "en": "Ready to build your own soccer game?",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-official-soccerbot",
+    "title": "CyberBrick Official SoccerBot",
+    "field": "blocks[0].line[2]",
+    "near": "Experience the thrill of mini robot soccer with this innovative battle set. Featuring Remote control, SoccerBots deliver powerful kicks and precise movements fo"
+   },
+   "dict": null
+  },
+  {
+   "h": "a50e600f18316b4d189c19036fc188deb748bcd6a54e39d604895e235eea9a31",
+   "en": "CyberBrick is a modular smart toy ecosystem that combines programmable hardware, 3D printable structures, and dual-level coding environments. It is where 3D printing collides with electronics and coding through an intuitive, snap-together design. CyberBrick empowers anyone to build and enjoy a wide range of 3D-printed projects, from R/C toys to productivity tools.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cyberbrick-official-soccerbot",
+    "title": "CyberBrick Official SoccerBot",
+    "field": "blocks[4].line[2]",
+    "near": "• The product does not include the 3D printed parts as shown in the main image."
+   },
+   "dict": null
+  },
+  {
+   "h": "11081ae0c56ced5c2f5d72e4e195b6d6e02f8b4829f09ead8f694148df9de29a",
+   "en": "For reference, the official installation data for a single SoccerBot is listed below.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-official-soccerbot",
+    "title": "CyberBrick Official SoccerBot",
+    "field": "blocks[4].line[4]",
+    "near": "• Notes:"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd3a1a272e87301512bbd1a5d53f1efddd4ccdef3b77ce4a1e75115975e99c6d",
+   "en": "Unleash your creativity with the RC Bulldozer, powered by the CyberBrick ecosystem. The bulldozer features smooth controls, durable tracks, and a functional blade for a realistic pushing and maneuvering experience.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e6ffd4b98b46c435f14c4de62a445a064ca73b92b766c91ba5b523378b86558",
+   "en": "No AMS is required for printing, and all parts fit on the A1 mini! This Bulldozer offers an engaging building experience, culminating in great remote-controlled action. With simplified assembly using the CyberBrick Beginner Hardware Kit, anyone can build and enjoy the fun of this RC Bulldozer!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[0].line[2]",
+    "near": "Unleash your creativity with the RC Bulldozer, powered by the CyberBrick ecosystem. The bulldozer features smooth controls, durable tracks, and a functional bla"
+   },
+   "dict": null
+  },
+  {
+   "h": "8df147fbe017680a3d57ca9d4e6bcd9f825412a4b0ed4fec860f0ce525598626",
+   "en": "Realistic Design & Function",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[1].line[0]",
+    "near": "The CyberBrick Bulldozer is not just an RC toy—it's a dynamic platform for creative expression."
+   },
+   "dict": null
+  },
+  {
+   "h": "5eb721cb424130883ae95c143069f8f97cd35bea558951fa915c4cc74496c8cf",
+   "en": "The CyberBrick Bulldozer is not just an RC toy—it's a dynamic platform for creative expression.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[1].line[1]",
+    "near": "Realistic Design & Function"
+   },
+   "dict": null
+  },
+  {
+   "h": "1924d0cfb0a05fd01d799183bec20e21ef56ce8ec241fc960e3ea61dc2499e50",
+   "en": "As seen in the images, it features a vibrant \"Sunflower Yellow\" body, customizable lights, controllable ripper attachment, and a fully functional front blade.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[1].line[2]",
+    "near": "The CyberBrick Bulldozer is not just an RC toy—it's a dynamic platform for creative expression."
+   },
+   "dict": null
+  },
+  {
+   "h": "aca63e395ca5312263609fc25ffac4e5568badc1ae9192905318524de16dbcdd",
+   "en": "Bulldoze whatever you want",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[2].line[0]",
+    "near": "• Real-World Ready: You can take it outside and interact with gravel and soil. Just like a real-world bulldozer!"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d4e3955c21c413513b6f891f014e760cd07f2b3a49fa4b1bee251906b2273c4",
+   "en": "Real-World Ready: You can take it outside and interact with gravel and soil. Just like a real-world bulldozer!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[2].line[1]",
+    "near": "Bulldoze whatever you want"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4a0807751b33e20a2776039b24cc5804d1df2d071cd880d1ae951f7f9bdedef",
+   "en": "Endless Customization: Print gravel or anything else for your own bulldozer. You can find gravel models on its MakerWorld page. Want to try something else? Just search for it on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[2].line[2]",
+    "near": "• Real-World Ready: You can take it outside and interact with gravel and soil. Just like a real-world bulldozer!"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b2d193518e676fb482a77432b5a046e2496b402e94034e13169098944a00ea8",
+   "en": "More Than a Model: Tired of organizing small items? Let the mini bulldozer help! It can gather your stuff and even retrieve things from tight spots you can't reach. Let it become your handy little helper!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[2].line[3]",
+    "near": "• Endless Customization: Print gravel or anything else for your own bulldozer. You can find gravel models on its MakerWorld page. Want to try something else? Ju"
+   },
+   "dict": null
+  },
+  {
+   "h": "31df19313054eaa1d302ff120e494d9dcd4662737c4488c1822e85bc38e00819",
+   "en": "Printer-Friendly: All parts are designed for easy 3D printing without requiring an AMS (Automatic Material System) and are optimized to fit on any Bambu Lab printers such as A1 mini.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[3].line[3]",
+    "near": "• Simplified Assembly: Requires no supports or glue, and uses snap-fit designs to significantly reduce screw usage, saving your printing and assembly time."
+   },
+   "dict": null
+  },
+  {
+   "h": "43520347dce328ecd2461e566caa91fd2c525451c0d564678c1a49651fb01574",
+   "en": "Charging Tips",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[4].line[0]",
+    "near": "If charging is required, unplug the 2-pin cable from the back of the bulldozer and plug it into the charger provided in the kit."
+   },
+   "dict": null
+  },
+  {
+   "h": "63da2ccc60caa31d59842b1f4c2b5a0b2ebb63f510f528efef0f59724053e709",
+   "en": "If charging is required, unplug the 2-pin cable from the back of the bulldozer and plug it into the charger provided in the kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[4].line[1]",
+    "near": "Charging Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "4dc3995f3cc0512585ff9ffed71494e85d81f2a1faf476a0fabf5047e0818252",
+   "en": "*Important: Ensure the switch module is in the ON position to allow charging.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[4].line[2]",
+    "near": "If charging is required, unplug the 2-pin cable from the back of the bulldozer and plug it into the charger provided in the kit."
+   },
+   "dict": null
+  },
+  {
+   "h": "998bea4b68e23ea7172aebbb6241cce4922a882e16372720f3c5a215e1be2ec4",
+   "en": "Intended Users: This product is intended for users aged 16 and above. Users under the age of 16 must be under direct adult supervision throughout use.",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[7].line[2]",
+    "near": "To ensure safety, please read and carefully follow the guidelines below. Minors must be under direct adult supervision when using this product."
+   },
+   "dict": null
+  },
+  {
+   "h": "bc99bc03e81ca734a67e8abfff98b0d2f91fc3f823afcb8e0e61fafddf055968",
+   "en": "Operational Safety: Do not touch the moving tracks or wheels while the device is operating to prevent pinching injuries.",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[7].line[4]",
+    "near": "• Firmware Safety: Please use only official tools for any firmware operations."
+   },
+   "dict": null
+  },
+  {
+   "h": "0cd536e4f46d22948fbfa229873405e0bc5f65d896fe000dbc97e3904002036a",
+   "en": "Battery & Charging: DO NOT use chargers with output higher than 5V or 2A, only the officially designated battery and charger may be used. Avoid exposing the battery to high temperatures or water.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[7].line[5]",
+    "near": "• Operational Safety: Do not touch the moving tracks or wheels while the device is operating to prevent pinching injuries."
+   },
+   "dict": null
+  },
+  {
+   "h": "eea4a28b889356be578d1314209a6a8428b6f30e26261d978b32c59d868d85d1",
+   "en": "The following installation data for a single bulldozer are provided for reference:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "blocks[8].line[4]",
+    "near": "• Notes:"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b00b07ba754d63d40de63482df971ae5b2ab276dbcfa98e55f3bbc5b0bc0faa",
+   "en": "The Essential Tool Kit for Your CyberBrick. Designed specifically for assembling and maintaining your CyberBrick Hardware Kit, this screwdriver set gives you the right tools to build and modify your projects with ease.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-screwdriver-toolkit",
+    "title": "Mini Screwdriver Toolkit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a10d10c321e950c085e35dfd1ea732059d2c655f650679b18a938f1f6170e4d6",
+   "en": "Prooduct Features",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "mini-screwdriver-toolkit",
+    "title": "Mini Screwdriver Toolkit",
+    "field": "blocks[1].line[0]",
+    "near": "• Purpose-Built for CyberBrick: Contains the two essential screwdrivers required to assemble and work on your CyberBrick creations, especially the servos and ot"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f3dbf037050f70e112d38d69acd67ea8225dc0ef60dac44ecfea480b2b866cf",
+   "en": "Purpose-Built for CyberBrick: Contains the two essential screwdrivers required to assemble and work on your CyberBrick creations, especially the servos and other core components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-screwdriver-toolkit",
+    "title": "Mini Screwdriver Toolkit",
+    "field": "blocks[1].line[1]",
+    "near": "Prooduct Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4e50dab1a5e2b98ecbeb71ace31370118dd895832aeacf76e7c8f5c6ee1eee3",
+   "en": "PH0 Cross Head Screwdriver: Perfectly sized for the screws found in servos and small electronic modules. Achieve a secure fit without stripping the screw heads.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-screwdriver-toolkit",
+    "title": "Mini Screwdriver Toolkit",
+    "field": "blocks[1].line[2]",
+    "near": "• Purpose-Built for CyberBrick: Contains the two essential screwdrivers required to assemble and work on your CyberBrick creations, especially the servos and ot"
+   },
+   "dict": null
+  },
+  {
+   "h": "db9fc612e3fe5afe8fb70f6995056d5e7d758d9ca7e887b22db095bfd30e0a4a",
+   "en": "H1.5 Hex Key Screwdriver: The ideal tool for driving the common hex screws used throughout the CyberBrick structural framework. Ensures a tight and professional build.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-screwdriver-toolkit",
+    "title": "Mini Screwdriver Toolkit",
+    "field": "blocks[1].line[3]",
+    "near": "• PH0 Cross Head Screwdriver: Perfectly sized for the screws found in servos and small electronic modules. Achieve a secure fit without stripping the screw head"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0a903d4c205b069c1d7976269b6e1980f7373ee03fd46660a88aa1e0b778c10",
+   "en": "Compact and Portable: The compact size makes it easy to store or carry anywhere—your perfect workshop-on-the-go.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-screwdriver-toolkit",
+    "title": "Mini Screwdriver Toolkit",
+    "field": "blocks[1].line[4]",
+    "near": "• H1.5 Hex Key Screwdriver: The ideal tool for driving the common hex screws used throughout the CyberBrick structural framework. Ensures a tight and profession"
+   },
+   "dict": null
+  },
+  {
+   "h": "529a7e411d150993b4e7cd342e8055834df702b063cd3876324dd3c6780dc282",
+   "en": "This screwdriver set is exclusively designed for screws with H1.5 and PH0 drive types . Using a screwdriver that does not match the screw’s drive is a primary cause of screw head damage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-screwdriver-toolkit",
+    "title": "Mini Screwdriver Toolkit",
+    "field": "blocks[2].line[2]",
+    "near": "To ensure safety, please read and carefully follow the guidelines below. Minors must be under direct adult supervision when using this product."
+   },
+   "dict": null
+  },
+  {
+   "h": "9af88c2de9fa2719bb4ad2b2007e28106b8c74feabe25bd06455b790660a97be",
+   "en": "Screwdrivers should be kept out of reach of children, and ensure individuals under 16 use them with adult supervision.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-screwdriver-toolkit",
+    "title": "Mini Screwdriver Toolkit",
+    "field": "blocks[2].line[3]",
+    "near": "• This screwdriver set is exclusively designed for screws with H1.5 and PH0 drive types . Using a screwdriver that does not match the screw’s drive is a primary"
+   },
+   "dict": null
+  },
+  {
+   "h": "c34215e129b27dc01f3f3a50cb4d7d361ef3416526363547961811182733dadf",
+   "en": "This Handheld Vacuum Cleaner Kit offers versatile expandability, adapting to diverse scenarios through interchangeable components. Whether within the print chamber, on the optical shaft lead screw, or in desktop crevices, maintaining tidiness proves effortless and convenient. Users may freely design custom enclosures according to unique preferences and requirements, or obtain a wide variety of printed casings from MakerWorld to achieve personalised appearance customisation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "1acbe1a30559c54edf2b05cc54b34af2edf01f9e8802409bfeb4b8360a677003",
+   "en": "Multi - Clean Handy",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[2].cell[0]",
+    "near": "Model Links | Creators | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "8837e5f0ccb314789a3c0cf2ba8eada3bb851a3ddf97156198b3f95df71d9833",
+   "en": "Darts_3D",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[2].cell[1]",
+    "near": "Model Links | Creators | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "9adc952e70353af98dbffa4a02d8d8193261e5dcc2c323c160bcfb4d0cd1358d",
+   "en": "AeroVac – Sleek Handheld Vacuum",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[3].cell[0]",
+    "near": "Multi - Clean Handy | Darts_3D | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "d907638f6b1df825511e07cb44da4557348d9b163f162c49dc6170001c86a871",
+   "en": "JANBERRY DESIGN",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[3].cell[1]",
+    "near": "Multi - Clean Handy | Darts_3D | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6cc1d2cfa87ac20fc86c2bf8697d5b81a14ed5a46b8a57ad3189fd4e871deaa",
+   "en": "Siphon01 Handheld Vacuum Cleaner",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[4].cell[0]",
+    "near": "AeroVac – Sleek Handheld Vacuum | JANBERRY DESIGN | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "50f46d3e1e09f3d82e2d613dd7ae702157f99b3970b50d62ae1eb77484618ae0",
+   "en": "Nuka-Cola",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "AeroVac – Sleek Handheld Vacuum | JANBERRY DESIGN | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "7379765745c1fba663037595b969a15f392fb71198f88ed9d5fa56460aa17b70",
+   "en": "Handheld vacuum cleaner",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[5].cell[0]",
+    "near": "Siphon01 Handheld Vacuum Cleaner | Nuka-Cola | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e292210b264fc3d00b481b2315f958a7c2ad2682a008e013ee5a731c5387f6a",
+   "en": "jindouyun",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[5].cell[1]",
+    "near": "Siphon01 Handheld Vacuum Cleaner | Nuka-Cola | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "930606fd3ef1d0c4b89139782fee3ed11d0c8b239ca952ade0edbc7dfd982202",
+   "en": "Handheld Vacuum Cleaner Kit - By Foxwood",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[6].cell[0]",
+    "near": "Handheld vacuum cleaner | jindouyun | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb546e8cfcb818a3eb0c29a68fad56e6550673c3e8173adc9729e4aaebbc748e",
+   "en": "J.Foxwood",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[6].cell[1]",
+    "near": "Handheld vacuum cleaner | jindouyun | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c5d53f1e1630812782c19e2bd1e0071189199489c1bddaae5d9dd9e246e8fd4",
+   "en": "Ultra-strong Suction Car Desktop Handheld Vacuum Cleaner",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[7].cell[0]",
+    "near": "Handheld Vacuum Cleaner Kit - By Foxwood | J.Foxwood | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "8f396b00b2f9fda0223b3a58b307c966cf3d18f71295cb4b6293044775c09275",
+   "en": "MakerVac",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[8].cell[0]",
+    "near": "Ultra-strong Suction Car Desktop Handheld Vacuum Cleaner | 326605913 | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "489d38f6a43a84e81a20c47d6fb4ee1e18366d28eb418b67a4db8566a9e9d314",
+   "en": "JorgeRui",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[8].cell[1]",
+    "near": "Ultra-strong Suction Car Desktop Handheld Vacuum Cleaner | 326605913 | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "9d4b4f6531a45692b08e925880f983391cfca72c7df998ac726c93049575267c",
+   "en": "Mini Mantis - Portable Vacuum Cleaner",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[9].cell[0]",
+    "near": "MakerVac | JorgeRui | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "1203188f820d230287e66998612ae0c2c0b8465b3c7b0add4d804d6dd4a20d71",
+   "en": "Handheld Vacuum Cleaner",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[10].cell[0]",
+    "near": "Mini Mantis - Portable Vacuum Cleaner | JorgeRui | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "465e6fb7a9505a471a49602c01852f8e8e33f532ade6bd50cc85b97059fb01f1",
+   "en": "SabreDesign",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[10].cell[1]",
+    "near": "Mini Mantis - Portable Vacuum Cleaner | JorgeRui | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "493c55e0000651332dec8667aeded6a98c5e348828681e47c2968021d2a45ffd",
+   "en": "Note: This model may require additional Maker's Supply parts for full assembly. Please check the model link for the complete BOM list.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "blocks[1].line[11]",
+    "near": "Handheld Vacuum Cleaner | SabreDesign | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "967c53f2cfa37dd4d2e2a4dc7c6f07c7bfc0db8c9c1805809535ef604068182a",
+   "en": "Meet the All-in-One Fast Charging Kit – the definitive power solution designed to supercharge your CyberBrick experience. We've bundled all you need for continuous, uninterrupted play into one simple kit. Say goodbye to your battery anxiety.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d8b7586fb9a640fed01797bde8c20f8a127f117db3ced9eb2752f0e6b18bf28",
+   "en": "Recommended For:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[0].line[2]",
+    "near": "Meet the All-in-One Fast Charging Kit – the definitive power solution designed to supercharge your CyberBrick experience. We've bundled all you need for continu"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ac677faa9478882d0bf9dcc61d73cef8430a05ea4433c65623876f486a635e4",
+   "en": "CyberBrick owners who want to eliminate playtime limits.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[0].line[3]",
+    "near": "Recommended For:"
+   },
+   "dict": null
+  },
+  {
+   "h": "12166214efab8742412d66fdaa715d8d5c047cb4575c77e47a4aa7eb0dddac3e",
+   "en": "Families and friends who enjoy multi-player RC battles.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[0].line[4]",
+    "near": "• CyberBrick owners who want to eliminate playtime limits."
+   },
+   "dict": null
+  },
+  {
+   "h": "9ac1d0e5a3ed1f641a73130268adb458c64f4a223a8991fc3c34f3ea76520b44",
+   "en": "Hobbyists seeking a professional, efficient charging setup.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[0].line[5]",
+    "near": "• Families and friends who enjoy multi-player RC battles."
+   },
+   "dict": null
+  },
+  {
+   "h": "bef514e3cbf4d5f37b37b9ad4c8ce40a28cda08821b080a5a3325c403eccf9a7",
+   "en": "The Ultimate All-In-One Kit: This complete bundle has it all: 14500 7.4V 800mAh Li-ion Battery*6, 7.4V Lithium Battery Charger*2, and 20W Dual-Port Fast Charger*2. No need to buy anything else – you get a full charging station in one box.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[1].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "248cd0a8a245aae6cfdf750196290df6c0a8a2e3cb80429c87e50365b0c02450",
+   "en": "Extend your CyberBrick Playtime: Play longer by changing between multiple batteries, Easily power CyberBrick Ultimate Hardware Kit (2 cars, 2 remotes) simultaneously for epic head-to-head races. One battery drains, and another is ready to go, guaranteeing your fun never pauses.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[1].line[2]",
+    "near": "• The Ultimate All-In-One Kit: This complete bundle has it all: 14500 7.4V 800mAh Li-ion Battery*6, 7.4V Lithium Battery Charger*2, and 20W Dual-Port Fast Charg"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7f4ecd2b2881044720b0a8facb9bb9ecf09ee9a05e3ab0bf95b4386e2a9c303",
+   "en": "Simultaneous Charging: Each charging hub is equipped with one USB-A port and one USB-C port, and includes two interchangeable adapters compatible with EU (European standard), UK (British standard), and US (American standard) power outlets. The battery charger included in the set utilizes the USB-A port, while the spare USB-C port serves as an excellent option for powering your other devices.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[1].line[3]",
+    "near": "• Extend your CyberBrick Playtime: Play longer by changing between multiple batteries, Easily power CyberBrick Ultimate Hardware Kit (2 cars, 2 remotes) simulta"
+   },
+   "dict": null
+  },
+  {
+   "h": "49b38b8aa561df11336479ee6f2aba2237555686844ee6969dcd50b9b3738787",
+   "en": "Adult supervision is required when children are handling batteries or the charger. DO NOT operate the product while it is charging.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[2].line[2]",
+    "near": "• This product utilizes a replaceable rechargeable lithium battery."
+   },
+   "dict": null
+  },
+  {
+   "h": "9794f5836a9c1b622f82943fdbfb4b8a4a4b7c84d08053d31b50ca589d021907",
+   "en": "Regularly inspect the charger's cord, plug, housing, and other components for damage. If any damage is found, discontinue use immediately until the device is fully repaired.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[2].line[4]",
+    "near": "• Ensure the battery is installed correctly. Improper installation may result in short circuits, overheating, or potential explosion."
+   },
+   "dict": null
+  },
+  {
+   "h": "70682ae872021b0a308e9df85276dadd1882dce215c5ab2ba04a413c43f101c6",
+   "en": "Official adapter: Fully compatible and 100% safe to use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[3].line[1]",
+    "near": "Charging Precautions"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4b12182db323bf006cb8af82db81913920d080b36d354a40198d6a3cae889ac",
+   "en": "Third-Party adapters: Output must not exceed 5V 2A. You can also safely charge via a computer USB port.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[3].line[2]",
+    "near": "• Official adapter: Fully compatible and 100% safe to use."
+   },
+   "dict": null
+  },
+  {
+   "h": "c878731b6cded6a38b455f65e102f8be1c22ee1e1817cb70be8b84db2eddee2c",
+   "en": "DO NOT use fast chargers, 9V/12V adapters, or any power supply exceeding 5V 2A. Doing so may result in device damage, overheating, or fire hazards.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[3].line[3]",
+    "near": "• Third-Party adapters: Output must not exceed 5V 2A. You can also safely charge via a computer USB port."
+   },
+   "dict": null
+  },
+  {
+   "h": "2ee8a8badaf019da177001a601d5faf6787330ffda18951ab8558af83245c21e",
+   "en": "DO NOT cover the device. Keep away from heat, moisture, and flammable materials. Never charge unattended.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[3].line[4]",
+    "near": "• DO NOT use fast chargers, 9V/12V adapters, or any power supply exceeding 5V 2A. Doing so may result in device damage, overheating, or fire hazards."
+   },
+   "dict": null
+  },
+  {
+   "h": "001b41620f3f7da270615efedd22a050d9a01a2037a19961be1353e36a1aad1f",
+   "en": "DO NOT charge the battery pack if it is overheating. If the charger or battery overheats abnormally, stop charging immediately and contact official support.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[3].line[5]",
+    "near": "• DO NOT cover the device. Keep away from heat, moisture, and flammable materials. Never charge unattended."
+   },
+   "dict": null
+  },
+  {
+   "h": "f8ade253bf2d90ada438006c3cf378e4ef6bb64478cb2834fd6b0c3064c474a0",
+   "en": "Ensure the battery and charger are completely cool and dry before charging.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[3].line[6]",
+    "near": "• DO NOT charge the battery pack if it is overheating. If the charger or battery overheats abnormally, stop charging immediately and contact official support."
+   },
+   "dict": null
+  },
+  {
+   "h": "111534e69ef70b1b9111adc9cc0fd8271b90e47f66a17bc73ee5ed0124e1a6a3",
+   "en": "The Ultimate Charging Kit for Non-Stop CyberBrick Fun！ The kit provides 6 rechargeable Li-ion Batteries, 2 Li-ion Battery Charging cables and 2 Dual-Port Fast Chargers, meticulously curated to keep you in action longer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "all-in-one-fast-charging-kit-for-cyberbrick",
+    "title": "All-in-One Fast Charging Kit for CyberBrick",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ebefba5240452de2b8d7eab99768ecfcc0f6c417e89192b7ae040b2eb9ead1a",
+   "en": "Get ready to spread seasonal cheer with this uniquely festive, remote-controlled snowcat. Dressed in festive red and sporting decorative antlers, it’s the perfect addition to your winter celebrations. Perfect for play or display, it’s the ultimate Christmas gift for endless winter fun.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "deb18ed31106b37da289c22fa4b6d1d2cc4583f69d5aa8b7fc419d7a03879f9c",
+   "en": "Easily control its movement and front shovel via remote to transport gifts and spread joy. Customizable LED lights add a warm glow, while the durable tracks glide smoothly over snow. We hope this snowcat will accompany you throughout the remaining winter season, have fun!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[0].line[2]",
+    "near": "Get ready to spread seasonal cheer with this uniquely festive, remote-controlled snowcat. Dressed in festive red and sporting decorative antlers, it’s the perfe"
+   },
+   "dict": null
+  },
+  {
+   "h": "46e8a56787ad1b1264a1b30076606b2fe18cf8b17db1f3498998d904cb496757",
+   "en": "Reborn with CyberBrick",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[1].line[0]",
+    "near": "With the innovative CyberBrick Kit, your decorative Snowcat truly comes alive!"
+   },
+   "dict": null
+  },
+  {
+   "h": "3efc3a79c480c361b01bc74aed71e30e4ab3aa9eebfb1adc8b6c45972f48d392",
+   "en": "With the innovative CyberBrick Kit, your decorative Snowcat truly comes alive!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[1].line[1]",
+    "near": "Reborn with CyberBrick"
+   },
+   "dict": null
+  },
+  {
+   "h": "e779ac6976f1f5e5ce392a3dfa6735c147d4f2b1841b8465ef1691779e585d20",
+   "en": "You can use the remote control to perform various actions, transforming the Snowcat into your personal interactive winter journey.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[1].line[2]",
+    "near": "With the innovative CyberBrick Kit, your decorative Snowcat truly comes alive!"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7bb62a2618593281afad9c39da3488161ea2fd3a7ceb957e042b16682c3a5f4",
+   "en": "Create your own Christmas scene",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[2].line[0]",
+    "near": "• Spacious decorating space: This snowcat is equipped with a massive front blade and a cargo bed, providing ample space for decorating your snowcat."
+   },
+   "dict": null
+  },
+  {
+   "h": "aa0c29fa8278799281570e2e05383c5937c6001a94e2b3c2d9f8e2d7dd428818",
+   "en": "Spacious decorating space: This snowcat is equipped with a massive front blade and a cargo bed, providing ample space for decorating your snowcat.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[2].line[1]",
+    "near": "Create your own Christmas scene"
+   },
+   "dict": null
+  },
+  {
+   "h": "acd275226cd217627a1f937f81ad2223691899be94e25824f3cf55b268f1ed5f",
+   "en": "Customized decoration parts: The interior layout includes two independent front seats, along with a spacious cabin. You can even 3D-print an adorable toy figure to serve as the driver for your snowcat.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[2].line[2]",
+    "near": "• Spacious decorating space: This snowcat is equipped with a massive front blade and a cargo bed, providing ample space for decorating your snowcat."
+   },
+   "dict": null
+  },
+  {
+   "h": "a45858269739ca36428620cad6c2331d1618c3a845dfab45cd21f26fa7397373",
+   "en": "Ready for Snow & Gifts: With excellent appearance and power, the snowcat is a perfect companion for winter dioramas or Christmas displays. Carry gifts, decorate your scene, and bring festive stories to life!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[2].line[3]",
+    "near": "• Customized decoration parts: The interior layout includes two independent front seats, along with a spacious cabin. You can even 3D-print an adorable toy figu"
+   },
+   "dict": null
+  },
+  {
+   "h": "19191bfb9e2557a0729eac68291f38e94ce41f3389ede890a971edd31c923f2a",
+   "en": "Easy to Print & Build",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[3].line[0]",
+    "near": "• Official Design: All model designs, software configurations, and installation instructions are provided by the official Bambu Lab team so that you can enjoy a"
+   },
+   "dict": null
+  },
+  {
+   "h": "184b706edf63b2545d79f978434ef8ec6fce596b4136f6efd8262ac1c89314ef",
+   "en": "Official Design: All model designs, software configurations, and installation instructions are provided by the official Bambu Lab team so that you can enjoy a highly satisfactory experience at every step.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[3].line[1]",
+    "near": "Easy to Print & Build"
+   },
+   "dict": null
+  },
+  {
+   "h": "a7d765517103809c4323bff1e3b2f6ad65ea7dc0983f88bd4e634c112a29cd20",
+   "en": "Simplified Assembly: The snowcat is assembled from multiple parts, snap-fit parts and minimal screws simplify assembly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[3].line[2]",
+    "near": "• Official Design: All model designs, software configurations, and installation instructions are provided by the official Bambu Lab team so that you can enjoy a"
+   },
+   "dict": null
+  },
+  {
+   "h": "e42d5c8044bda4a988565a215260a6eee98247e6eaa07e843ae187f2fa52e79d",
+   "en": "Printer-Friendly: All components are optimized for easy 3D printing on any Bambu Lab printer without requiring an AMS(except the multi-colored decorative plates located on both sides of the vehicle).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "blocks[3].line[3]",
+    "near": "• Simplified Assembly: The snowcat is assembled from multiple parts, snap-fit parts and minimal screws simplify assembly."
+   },
+   "dict": null
+  },
+  {
+   "h": "6d496784ad31a959b725eaa8538ea80e201dd17b9c3cf70e222f96d591861a86",
+   "en": "Discover the ultimate tabletop logistics experience with this compact remote-controlled forklift and truck set. Despite its small size, it delivers pro-level performance with fully proportional steering and throttle control. The intricately 3D-printed details include a functional telescoping mast and rear differential for rigorous realism. Through multi-device connectivity, seamlessly toggle between vehicles for cooperative play—all in a 3D-printed miniature warehouse setting. Precision engineering meets immersive fun!",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ee64cc57eb6a7d5a8ad21b58a18073b42bf58e613c9d9d7eb775d591e3be7b19",
+   "en": "Find all files and RC Frameworks on their MakerWorld pages: Forklift Truck Lift & Load Combo",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "blocks[0].line[2]",
+    "near": "Discover the ultimate tabletop logistics experience with this compact remote-controlled forklift and truck set. Despite its small size, it delivers pro-level pe"
+   },
+   "dict": null
+  },
+  {
+   "h": "05b1f04a63955b0df4798409da4bb33efa1cd57d61b917df6f7c49268ca585d2",
+   "en": "Compact Size, Pro-Level Control",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "blocks[1].line[0]",
+    "near": "Don’t let the cute design fool you—hidden inside are high-performance specs, including fully proportional steering and throttle control, a rare feature at this "
+   },
+   "dict": null
+  },
+  {
+   "h": "62ce2863cebd752fe60d2be8e3f0e5e56871b620f096d40b7cad6e5e57a16fb8",
+   "en": "Don’t let the cute design fool you—hidden inside are high-performance specs, including fully proportional steering and throttle control, a rare feature at this scale.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "blocks[1].line[1]",
+    "near": "Compact Size, Pro-Level Control"
+   },
+   "dict": null
+  },
+  {
+   "h": "ed358c6625e2fb1078cd8bf46615c060929efe209915fd1c8761d2bda44ab17b",
+   "en": "Delicately Modeled for Rigorous Realism",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "blocks[2].line[0]",
+    "near": "This vehicle kit features a cabinet-driven telescoping mast on the forklift and a functional rear differential on the truck—where 3D printing meets uncompromise"
+   },
+   "dict": null
+  },
+  {
+   "h": "93f81c6b9de26c9561df7004b631686770c0184d1ca85e60b0e4880948f0682c",
+   "en": "This vehicle kit features a cabinet-driven telescoping mast on the forklift and a functional rear differential on the truck—where 3D printing meets uncompromised detail.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "blocks[2].line[1]",
+    "near": "Delicately Modeled for Rigorous Realism"
+   },
+   "dict": null
+  },
+  {
+   "h": "8f0e9d051769ea274c6681c578b18ba1f733a8572af671a7c1479c150b574609",
+   "en": "Seamless Dual-Vehicle Control",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "blocks[3].line[0]",
+    "near": "The multi-device connection enables real-time toggling between vehicles, so you can team up with yourself for a co-op game right at your table!"
+   },
+   "dict": null
+  },
+  {
+   "h": "b32efdb868a333d0ffdd3e6da7987b681601336ed1125f1ff928204021df8f56",
+   "en": "The multi-device connection enables real-time toggling between vehicles, so you can team up with yourself for a co-op game right at your table!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "blocks[3].line[1]",
+    "near": "Seamless Dual-Vehicle Control"
+   },
+   "dict": null
+  },
+  {
+   "h": "387d559ecc8d677ccb435f57058911c3c5bd43e6f115ea5e3cfa49018eb60351",
+   "en": "Find all files and RC Frameworks on their MakerWorld pages: Classic Holiday Edition",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "blocks[0].line[2]",
+    "near": "Discover the ultimate tabletop logistics experience with this compact remote-controlled forklift and truck set. Despite its small size, it delivers pro-level pe"
+   },
+   "dict": null
+  },
+  {
+   "h": "a8c7cd964108ddb15e0896f11528f8fd92029132bc08b6e57b5b835ac4c0bd04",
+   "en": "Rich Detail, Smooth Build",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "blocks[1].line[0]",
+    "near": "Rich colors, charming decorations, and delightful micro-details everywhere — all optimized by the creator for smooth printing and easy assembly. Even single-noz"
+   },
+   "dict": null
+  },
+  {
+   "h": "bcc515279caf4b0636dcdd18fb48b31462dd8124086446ba969cbbe3b551635a",
+   "en": "Rich colors, charming decorations, and delightful micro-details everywhere — all optimized by the creator for smooth printing and easy assembly. Even single-nozzle printers can handle this build with no stress.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "blocks[1].line[1]",
+    "near": "Rich Detail, Smooth Build"
+   },
+   "dict": null
+  },
+  {
+   "h": "e25d8af6e1821932ee9d13895f6b871cddf1938fbba54ef66684697699399304",
+   "en": "Customizable Lighting Effects",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "blocks[2].line[0]",
+    "near": "Shining golden headlights and rear light accents bring your Snowcat to life with dynamic, customizable CyberBrick lighting."
+   },
+   "dict": null
+  },
+  {
+   "h": "f50908e6643b15be7128631e542b333e3af0058608bf4a01b7f1b644a0d15e2d",
+   "en": "Shining golden headlights and rear light accents bring your Snowcat to life with dynamic, customizable CyberBrick lighting.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "blocks[2].line[1]",
+    "near": "Customizable Lighting Effects"
+   },
+   "dict": null
+  },
+  {
+   "h": "deab4f7a5266ac9e51801155d9c12f45a4b8fa57064072a82140d1de6119ad8b",
+   "en": "More Power, More Fun",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "blocks[3].line[0]",
+    "near": "A major upgrade from traditional 030-motor vehicles, this Snowcat utilizes 360° servos to deliver massive torque. Featuring a classic differential tank-drive sy"
+   },
+   "dict": null
+  },
+  {
+   "h": "164b50ed51ddb7e1b6108d1446af677e25ed182a1c8c8216229f73cc597c6f66",
+   "en": "A major upgrade from traditional 030-motor vehicles, this Snowcat utilizes 360° servos to deliver massive torque. Featuring a classic differential tank-drive system, it conquers all types of rugged terrain with ease—including real snow!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "blocks[3].line[1]",
+    "near": "More Power, More Fun"
+   },
+   "dict": null
+  },
+  {
+   "h": "3cbbe0cc397cba38ff9bc2e645cdc00138bdb4601fe19daa0e2ae7ee1570330b",
+   "en": "Beyond the Holiday Season",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "blocks[4].line[0]",
+    "near": "Exceptional designs transcend the calendar. Complementing the festive Christmas Snowcat, the Snowcat features a meticulously crafted Yellow Edition, ensuring a "
+   },
+   "dict": null
+  },
+  {
+   "h": "8d6ec4e35c0caaa46916512f0552e916f8acc357eb6c241dacd246460a79b691",
+   "en": "Exceptional designs transcend the calendar. Complementing the festive Christmas Snowcat, the Snowcat features a meticulously crafted Yellow Edition, ensuring a versatile option for enjoyment throughout the entire year.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "blocks[4].line[1]",
+    "near": "Beyond the Holiday Season"
+   },
+   "dict": null
+  },
+  {
+   "h": "3dc4d3c980638df26fce2ef50c37bd6871be38b3f3a540f156d92661bcfc4b03",
+   "en": "The 7.4V power supply is incompatible with devices that require lower operating voltages, such as the Lithophane LED Backlight Board, the N20 Dual Shaft Worm Gear Motor (model LA009) , and COB LED Strip Lights.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "200mm-xh2-54-female-to-ph2-0-male-conversion-wire",
+    "title": "XH2.54 Female to PH2.0 Male Conversion Wire",
+    "field": "blocks[1].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "e853b37cbef4af0ee82c735cb65589048c78671291c416aff884fa1ee9142ad9",
+   "en": "Before use, always verify the compatible voltage range listed in the product details page for your specific device.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "200mm-xh2-54-female-to-ph2-0-male-conversion-wire",
+    "title": "XH2.54 Female to PH2.0 Male Conversion Wire",
+    "field": "blocks[1].line[2]",
+    "near": "• The 7.4V power supply is incompatible with devices that require lower operating voltages, such as the Lithophane LED Backlight Board, the N20 Dual Shaft Worm "
+   },
+   "dict": null
+  },
+  {
+   "h": "1d37c20398b6d294f4fd4ac27163ed2fa17cf963e93631e477f5ff5ca0d44de0",
+   "en": "Application: Manually restore the core board to factory settings",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "easy-grip-jumper-shunt",
+    "title": "Easy-Grip Jumper Shunt",
+    "field": "blocks[1].line[0]",
+    "near": "1. Remove the multi-function core board from the expansion shield."
+   },
+   "dict": null
+  },
+  {
+   "h": "c8b4e76ab35fd97d1f2a33336d4d1eec0a5fa4ce5002a5de9dc3f77bfe345c37",
+   "en": "1. Remove the multi-function core board from the expansion shield.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "easy-grip-jumper-shunt",
+    "title": "Easy-Grip Jumper Shunt",
+    "field": "blocks[1].line[1]",
+    "near": "Application: Manually restore the core board to factory settings"
+   },
+   "dict": null
+  },
+  {
+   "h": "556f85764a6b99d12f9fde17e0a1ca94817bf270951d2a6a19630692bc32fdfa",
+   "en": "2. Place the Jumper Shunt over Pin 1 and Pin 2 on the multi-function core board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "easy-grip-jumper-shunt",
+    "title": "Easy-Grip Jumper Shunt",
+    "field": "blocks[1].line[2]",
+    "near": "1. Remove the multi-function core board from the expansion shield."
+   },
+   "dict": null
+  },
+  {
+   "h": "e1ef769ece7eb79c8dccaec8f5b97478c28e81dd2617481ca057f3e2e28a47e4",
+   "en": "3. Plug the Type-C cable into the multi-function core board and a power supply.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "easy-grip-jumper-shunt",
+    "title": "Easy-Grip Jumper Shunt",
+    "field": "blocks[1].line[3]",
+    "near": "2. Place the Jumper Shunt over Pin 1 and Pin 2 on the multi-function core board."
+   },
+   "dict": null
+  },
+  {
+   "h": "79efda569c7832a05e4afbc1226ec514a5ac6d7af151d0be4cd37b78dfe59cae",
+   "en": "4. Wait for 5 seconds until the LED indicator on the multi-function core board flashes purple, which means the restore is complete.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "easy-grip-jumper-shunt",
+    "title": "Easy-Grip Jumper Shunt",
+    "field": "blocks[1].line[4]",
+    "near": "3. Plug the Type-C cable into the multi-function core board and a power supply."
+   },
+   "dict": null
+  },
+  {
+   "h": "0c5e805eb87989e771b8b353c204c851ce5fdb9ce2b3df137baef963d2a79577",
+   "en": "5. Open the CyberBrick mobile app or the desktop app, reconnect your device, and upload your project.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "easy-grip-jumper-shunt",
+    "title": "Easy-Grip Jumper Shunt",
+    "field": "blocks[1].line[5]",
+    "near": "4. Wait for 5 seconds until the LED indicator on the multi-function core board flashes purple, which means the restore is complete."
+   },
+   "dict": null
+  },
+  {
+   "h": "aaf136261ae36433a8e098647f463e0f8a41e11f367098a903a3e2f11e671a99",
+   "en": "The 4x4 Mini Off-Roader – CyberBrick RC is a fully functional, modular, 3D printable remote control off-road vehicle designed for hobbyists, makers, and enthusiasts. At its core is a printable dual differential drivetrain paired with a robust body-on-frame chassis, delivering true Four Wheel Drive performance that can handle sand, grass, gravel, and more.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c41f88cf3715792c1b854d24e7a10da07979b0f53fe7223bafe2aac2788a0bb4",
+   "en": "The journey from digital files to a fully drivable Off-Roader is a big part of the magic. It gives builders hands-on experience with mechanical design, assembly, and problem-solving, making it a rewarding project for individuals, parents, and kids to learn and create together.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[0].line[2]",
+    "near": "The 4x4 Mini Off-Roader – CyberBrick RC is a fully functional, modular, 3D printable remote control off-road vehicle designed for hobbyists, makers, and enthusi"
+   },
+   "dict": null
+  },
+  {
+   "h": "923e97020051a30c13dcd65632d7ccaf4cecca07074dad17e7a0d01de7497090",
+   "en": "Start your build adventure. Download the model, prepare your printer, and gather the CyberBrick kits to engineer your own rugged, high-performance 4x4 Mini Off-Roader – CyberBrick RC.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[0].line[3]",
+    "near": "The journey from digital files to a fully drivable Off-Roader is a big part of the magic. It gives builders hands-on experience with mechanical design, assembly"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f43e1f415a68807c8e52e97cd9f7eb1049b7a9ef938c109492d60ad82fd1651",
+   "en": "Engineered to confidently conquer diverse landscapes such as sand, grass, and gravel. Its off-road capability is ensured by three key features:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[1].line[1]",
+    "near": "Design & Performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9a9e1cd19205231be7e072917a4449365bd64c3f730bce4c5127251fe7527d6",
+   "en": "High Ground Clearance: Allows the vehicle to glide over obstacles and uneven terrain.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[1].line[2]",
+    "near": "Engineered to confidently conquer diverse landscapes such as sand, grass, and gravel. Its off-road capability is ensured by three key features:"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbfeceea3a015e8c6f68b3346680796d3e6b0b5b9fe56a49a56d311666bc378c",
+   "en": "Independent Suspension: Provides responsive handling and improved traction on rough surfaces. Compatible with a range of aftermarket springs for customization.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[1].line[3]",
+    "near": "• High Ground Clearance: Allows the vehicle to glide over obstacles and uneven terrain."
+   },
+   "dict": null
+  },
+  {
+   "h": "2cdce75082c8a4d077ab4789cbc8d532434a87d3229a7fe2c64dde7f8e3c44c6",
+   "en": "Optional Large-Diameter Tires: Enhance grip and capability across loose or soft terrain.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[1].line[4]",
+    "near": "• Independent Suspension: Provides responsive handling and improved traction on rough surfaces. Compatible with a range of aftermarket springs for customization"
+   },
+   "dict": null
+  },
+  {
+   "h": "3dfc46176ff0eee23f448e29db3d130dcd78c3c4ff520b937ebb2d30f6dc49b6",
+   "en": "Authentic Engineering & Off-Road Performance",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[2].line[0]",
+    "near": "• True Four Wheel Drive with Differentials: Features a fully functional, printable dual differential drivetrain rather than a simple direct drive system. This a"
+   },
+   "dict": null
+  },
+  {
+   "h": "7df9a3b870d3314a000abe3589c68300b9afdedcc7918cb477b17c96f58774a8",
+   "en": "True Four Wheel Drive with Differentials: Features a fully functional, printable dual differential drivetrain rather than a simple direct drive system. This allows each wheel to rotate at the appropriate speed during cornering, resulting in improved traction, smoother handling, and more realistic off-road behavior.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[2].line[1]",
+    "near": "Authentic Engineering & Off-Road Performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "bf79bb05eb5154df626bc6fac6fdced1e6664e5ab2fbfec9b12622dba201ac1a",
+   "en": "Durable Body-on-Frame Construction: Inspired by real off-road vehicles, the design uses a separate ladder frame with a removable body. This architecture provides excellent impact resistance while enabling easy customization, upgrades, and complete body swaps in the future.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[2].line[2]",
+    "near": "• True Four Wheel Drive with Differentials: Features a fully functional, printable dual differential drivetrain rather than a simple direct drive system. This a"
+   },
+   "dict": null
+  },
+  {
+   "h": "245a51908743dddf6365d01c0a96bd5c8c31c622d489207bba70b64763b573a5",
+   "en": "Open Design & Customization Platform",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[3].line[0]",
+    "near": "This model is more than a kit. It is a starting point for your imagination:"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c3dbec4f8888aa14b1db7691caac7fe553bc03f591a6113e89edf5b58bfa640",
+   "en": "This model is more than a kit. It is a starting point for your imagination:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[3].line[1]",
+    "near": "Open Design & Customization Platform"
+   },
+   "dict": null
+  },
+  {
+   "h": "d6e979d965515e11d6a2c0bada206febe5be84da3fc580ebde2d784087582e77",
+   "en": "Personalize Your Build: Print the Off-Roader body in any filament you choose. From vibrant colors to specialty materials, this freedom lets you design a vehicle that is a true reflection of your style.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[3].line[2]",
+    "near": "This model is more than a kit. It is a starting point for your imagination:"
+   },
+   "dict": null
+  },
+  {
+   "h": "1da3cbf67d9174635e92acad755365b1771c1bc0fa5a4fc79e68f73821eefbaf",
+   "en": "Open-Source Customization: Included STEP files for the rims and chassis allow advanced users to modify wheel designs or create entirely new vehicle bodies, turning the kit into a platform for your own inventions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[3].line[3]",
+    "near": "• Personalize Your Build: Print the Off-Roader body in any filament you choose. From vibrant colors to specialty materials, this freedom lets you design a vehic"
+   },
+   "dict": null
+  },
+  {
+   "h": "3afa859d98b229e35540e9bddc624edb214dad4696feebd0863ed99e4b5319b3",
+   "en": "Performance-Oriented Printing Guide",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[0]",
+    "near": "For optimal performance, we recommend using different materials for flexible tires and for rigid structural parts."
+   },
+   "dict": null
+  },
+  {
+   "h": "b94937a60dbb93ab885368b6a2c0019f7795999bb011bec6daf80c7b4647d97a",
+   "en": "For optimal performance, we recommend using different materials for flexible tires and for rigid structural parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[1]",
+    "near": "Performance-Oriented Printing Guide"
+   },
+   "dict": null
+  },
+  {
+   "h": "efbcd674b4f43dccabacb225785788da668a0a975e51eae40b05687ddea370f9",
+   "en": "Parts",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[2].cell[0]",
+    "near": "For optimal performance, we recommend using different materials for flexible tires and for rigid structural parts."
+   },
+   "dict": null
+  },
+  {
+   "h": "10f67885643dceea83631de44ceea7aa2b1c9616ecec06482046fa285e14d162",
+   "en": "Primary Goal",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[2].cell[1]",
+    "near": "For optimal performance, we recommend using different materials for flexible tires and for rigid structural parts."
+   },
+   "dict": null
+  },
+  {
+   "h": "83ef6f202cdcebb4affb84f1eed046a3cdce2fe89e1b65f0a1a851c925447431",
+   "en": "Recommended Material",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[2].cell[2]",
+    "near": "For optimal performance, we recommend using different materials for flexible tires and for rigid structural parts."
+   },
+   "dict": null
+  },
+  {
+   "h": "92bf474b7e2d1c9b2c50f4881bfdf54630e72c727e78847a945518073889966a",
+   "en": "Alternative Material",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[2].cell[3]",
+    "near": "For optimal performance, we recommend using different materials for flexible tires and for rigid structural parts."
+   },
+   "dict": null
+  },
+  {
+   "h": "41171d0d57a61f55eb2f635ac7ded9f7f53acfe5260c41366174d5d9d6fde4ec",
+   "en": "Tires",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[3].cell[0]",
+    "near": "Parts | Primary Goal | Recommended Material | Alternative Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "1591a29ef999ad01f86589c4904875378a1aec9604cef33407d43a657654e564",
+   "en": "Maximize Flexibility & Grip",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[3].cell[1]",
+    "near": "Parts | Primary Goal | Recommended Material | Alternative Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "4cda04d2be806170be624259329788d6b1d04e2cbd3fa52d92a173b6872f4c20",
+   "en": "TPU 90A (Superior off-road traction)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[3].cell[2]",
+    "near": "Parts | Primary Goal | Recommended Material | Alternative Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "45454ccda4c7e97715f657d97bd1f348cbd59b72d1373d258ee9b1fc768234ca",
+   "en": "TPU 95A (Good balance of grip and printability)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[3].cell[3]",
+    "near": "Parts | Primary Goal | Recommended Material | Alternative Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e03bcaab3a5dbb61affb5b4c25647360db0fb6c4ec2d288b23f291573d2d543",
+   "en": "Chassis & Drivetrain",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[4].cell[0]",
+    "near": "Tires | Maximize Flexibility & Grip | TPU 90A (Superior off-road traction) | TPU 95A (Good balance of grip and printability)"
+   },
+   "dict": null
+  },
+  {
+   "h": "168fd9ef8515136523da24ac7d4f018c03209240525cd0e5321f4d65ca9dec93",
+   "en": "Maximize Strength & Stiffness",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[4].cell[1]",
+    "near": "Tires | Maximize Flexibility & Grip | TPU 90A (Superior off-road traction) | TPU 95A (Good balance of grip and printability)"
+   },
+   "dict": null
+  },
+  {
+   "h": "420d71584b28bfbb25137cf4c0e242cf7b1df62de6f545df8ec7faa39cd5070f",
+   "en": "PLA-CF / PETG / ASA (High durability and rigidity)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "blocks[4].line[4].cell[2]",
+    "near": "Tires | Maximize Flexibility & Grip | TPU 90A (Superior off-road traction) | TPU 95A (Good balance of grip and printability)"
+   },
+   "dict": null
+  },
+  {
+   "h": "de1cc468078e47f520b15b91b1a440e658465df60b0a28b5eb1026d90b4724c3",
+   "en": "Step into the race of Relic Rush, a fast-paced, family-friendly board game where interaction, constant motion, and real-time excitement collide. It’s a thrilling game across a board that changes as you play, filled with interactive dangers and delightful surprises.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "df1a4fa7de3b5824f6dc0ac71fd5c0e44c071379b757a75adda2a1b61e405769",
+   "en": "We recommend checking the project instruction first to see if this is the proper game for you. Find all details on the MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[0].line[2]",
+    "near": "Step into the race of Relic Rush, a fast-paced, family-friendly board game where interaction, constant motion, and real-time excitement collide. It’s a thrillin"
+   },
+   "dict": null
+  },
+  {
+   "h": "03e72aadf3aec736d0ff64078b5d2970c889c5a975c4fc9e0f99340831b5af2b",
+   "en": "This model is offered as a crowdfunding project. Your purchase involves two steps:",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[0].line[3]",
+    "near": "We recommend checking the project instruction first to see if this is the proper game for you. Find all details on the MakerWorld."
+   },
+   "dict": null
+  },
+  {
+   "h": "cbe6631f078cb468a215992f4c7bdebd938db0ea711501d3f0d5a11ef5546ac0",
+   "en": "1. Purchase the necessary parts kit on this page to assemble your model.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[0].line[4]",
+    "near": "This model is offered as a crowdfunding project. Your purchase involves two steps:"
+   },
+   "dict": null
+  },
+  {
+   "h": "363512b7edee346bada152619faf7107ec1cf95a31da9aea8205beea0e25d026",
+   "en": "2. Get the 3D print files by backing the project on the crowdfunding page.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[0].line[5]",
+    "near": "1. Purchase the necessary parts kit on this page to assemble your model."
+   },
+   "dict": null
+  },
+  {
+   "h": "be629214738746a292290a48a4b87a4504007148930b2e401334fcbd04825767",
+   "en": "*Relic Rush is continuously improved based on feedback from our players and makers. The Creator is actively refining models, mechanics, and components based on community feedback. For the latest updates, upgrade files, and additional content, be sure to follow the creator’s page on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[0].line[6]",
+    "near": "2. Get the 3D print files by backing the project on the crowdfunding page."
+   },
+   "dict": null
+  },
+  {
+   "h": "0d3c908dd80e5dcf263d6e69086d9a9ffc6bf14b9a9a602e8eac13c5ec2eae3b",
+   "en": "Fast and Furious",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[1].line[0]",
+    "near": "Everyone takes their turns at once on a board that’s never static. Roll the dice, and if you land on a disaster—trigger it instantly with the custom remote!"
+   },
+   "dict": null
+  },
+  {
+   "h": "416ceddc189bfe32a26f4890099e55a78dcad4b7fa83201b33ee163a260e32c9",
+   "en": "Everyone takes their turns at once on a board that’s never static. Roll the dice, and if you land on a disaster—trigger it instantly with the custom remote!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[1].line[1]",
+    "near": "Fast and Furious"
+   },
+   "dict": null
+  },
+  {
+   "h": "c078f918cb1e857bfb6f4d701e944610faf38e546d0c9e2393e228065703dfb0",
+   "en": "Strategy meets speed: plan your route, time your moves, and outpace the clock before time runs out and catastrophe strikes for all!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[1].line[2]",
+    "near": "Everyone takes their turns at once on a board that’s never static. Roll the dice, and if you land on a disaster—trigger it instantly with the custom remote!"
+   },
+   "dict": null
+  },
+  {
+   "h": "b7e8735973ec3d2d397f5a69148ac793a2d6bc0d6b0d7d8d5809c5bf37fe9f0a",
+   "en": "Traps Keep Everyone Guessing",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[2].line[0]",
+    "near": "The board itself is your opponent. Navigate a landscape where every element can change:"
+   },
+   "dict": null
+  },
+  {
+   "h": "19fc146d020d214487e64cf2f5e2e86ee037726416d78d26875bfa8bc4c4de16",
+   "en": "The board itself is your opponent. Navigate a landscape where every element can change:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[2].line[1]",
+    "near": "Traps Keep Everyone Guessing"
+   },
+   "dict": null
+  },
+  {
+   "h": "b6fc69a7687e192f82c83a66ee7a1cbf99d708cbb1190fa5a284279876e1d1a3",
+   "en": "Bridge: a collapse could knock out any players on the bridge and block one of the paths to the relics.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[2].line[2]",
+    "near": "The board itself is your opponent. Navigate a landscape where every element can change:"
+   },
+   "dict": null
+  },
+  {
+   "h": "1463c3d8dee8e67fe6980f7f62d8863b6f363c6fe032fd16253c4bfba60d46d1",
+   "en": "Spikes: risking the spikes can provide a faster, but more dangerous path.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[2].line[3]",
+    "near": "• Bridge: a collapse could knock out any players on the bridge and block one of the paths to the relics."
+   },
+   "dict": null
+  },
+  {
+   "h": "7f673d15a9db3da4ae22e7ca1ed9f68b568577f271a70653611563c368cdf141",
+   "en": "Stairs: one of the fastest paths to the relics can transform into a player-eliminating slide.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[2].line[4]",
+    "near": "• Spikes: risking the spikes can provide a faster, but more dangerous path."
+   },
+   "dict": null
+  },
+  {
+   "h": "e70bf09f80b3b697a1b51d378ed7f6890e4542041a2dfda78db0e5928a225565",
+   "en": "Wall: this rotating piece can open or block your path to the relics.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[2].line[5]",
+    "near": "• Stairs: one of the fastest paths to the relics can transform into a player-eliminating slide."
+   },
+   "dict": null
+  },
+  {
+   "h": "da1b952f8c23c0d1f3281aa5c12615ac5e3db6fb9816fbdbe177f39614b7d55c",
+   "en": "River & Lava: time your movement to not get trapped and swept over the edge. Or be risky and climb the vertical lava-fall.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[2].line[6]",
+    "near": "• Wall: this rotating piece can open or block your path to the relics."
+   },
+   "dict": null
+  },
+  {
+   "h": "654cc1dd2b3fb0ed988b5bcc9d0a33bb1b6de3467f1f1a7457951a0785ee47d1",
+   "en": "Two Complete Build Versions",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[3].line[0]",
+    "near": "Choose the experience that fits your style:"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ce29e6b4ade7a2ce220747bb3984d958955b5312e338927447f93b5ea763a98",
+   "en": "Choose the experience that fits your style:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[3].line[1]",
+    "near": "Two Complete Build Versions"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e596e30345b548ca27785dd404bb510a5b5e66da7e021cb130c3965564b332a",
+   "en": "CyberBrick Version: contains everything you need to build the game board with servo & motor-controlled interactive elements along with a remote. This is the default version of the game.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[3].line[2]",
+    "near": "Choose the experience that fits your style:"
+   },
+   "dict": null
+  },
+  {
+   "h": "41d48d8f367aba5e7ae14d1637f1faf071b3cc5079cddd83ccb503d4d1978b91",
+   "en": "Wired Version: uses manually-operated traps without a remote control. To keep track of rounds, you can use this free timer app on your phone.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[3].line[3]",
+    "near": "• CyberBrick Version: contains everything you need to build the game board with servo & motor-controlled interactive elements along with a remote. This is the d"
+   },
+   "dict": null
+  },
+  {
+   "h": "6bb775beab2575ed58af3d377a5b41528c628edfbe57c49b70f08d8ae7c94a18",
+   "en": "Custom Remote & Organized Storage",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[4].line[0]",
+    "near": "Build your custom remote and an optional storage container for the player figures, custom dice, relics and other game pieces."
+   },
+   "dict": null
+  },
+  {
+   "h": "de2389678405b49508f294993ea759a90c0b8ab39e10de79c65bfffb61bbb086",
+   "en": "Build your custom remote and an optional storage container for the player figures, custom dice, relics and other game pieces.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[4].line[1]",
+    "near": "Custom Remote & Organized Storage"
+   },
+   "dict": null
+  },
+  {
+   "h": "27ad70fc0ea9b8057721d0f0d470db9d1ecbafadc73eb25e74db245e0fadf8cd",
+   "en": "Choose between printable and laser-cut versions of each.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[4].line[2]",
+    "near": "Build your custom remote and an optional storage container for the player figures, custom dice, relics and other game pieces."
+   },
+   "dict": null
+  },
+  {
+   "h": "dd8102b00598e3fc784f88d40ac448d7fb9787efdcd2c921f6f04dbcc07f0081",
+   "en": "The storage box stacks with the remote.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[4].line[3]",
+    "near": "• Choose between printable and laser-cut versions of each."
+   },
+   "dict": null
+  },
+  {
+   "h": "d8519e1fd6400f910941889b80ee55bd27e5aec97a5c23cd400a8501def698d4",
+   "en": "Includes extra space for future expansion components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[4].line[4]",
+    "near": "• The storage box stacks with the remote."
+   },
+   "dict": null
+  },
+  {
+   "h": "e0fa46c93f8fe749c556560bfac4f369ed765ffaf9658593af7a7e30a0a9bb33",
+   "en": "Made for Makers",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[5].line[0]",
+    "near": "Are you up for a challenge? Relic Rush is a great project for people who enjoy the process of building something complex."
+   },
+   "dict": null
+  },
+  {
+   "h": "afce9935cc2d896e620367ce9a2c82b6a5e41ea1dd82b138fe46275f9e2460df",
+   "en": "Are you up for a challenge? Relic Rush is a great project for people who enjoy the process of building something complex.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[5].line[1]",
+    "near": "Made for Makers"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6038119a03c4a52aae88979044b403fad7035391d13f3737dcceb37f0d0ab9e",
+   "en": "360° of detailed design",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[5].line[2]",
+    "near": "Are you up for a challenge? Relic Rush is a great project for people who enjoy the process of building something complex."
+   },
+   "dict": null
+  },
+  {
+   "h": "b602df5b8dbf5f5206c90c9a4077ab824a80fbcc4f9a71087011456a8b8abfaf",
+   "en": "200+ unique parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[5].line[3]",
+    "near": "• 360° of detailed design"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d15225f18ca36bbb398b4c687ad393d5061744913d9d72f968b06c0bef824e9",
+   "en": "Final weight: 3.5kg+",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[5].line[4]",
+    "near": "• 200+ unique parts."
+   },
+   "dict": null
+  },
+  {
+   "h": "900db9ae58077966b95fd120667b3ea458a1cd5973575f835856e58d1682eeaa",
+   "en": "Full step-by-step assembly guide (takes about 4 hours)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[5].line[5]",
+    "near": "• Final weight: 3.5kg+"
+   },
+   "dict": null
+  },
+  {
+   "h": "e273f05c6a6e7c706996d11029d8ed0e0892cf30ce440db187cad48f101fedfd",
+   "en": "Print in multi-color or paint and detail it yourself.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[5].line[6]",
+    "near": "• Full step-by-step assembly guide (takes about 4 hours)"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd6c5d6741f3527c95acb116f1d6d6a8fdbc1f5a7de509b2c4aa75b387274a02",
+   "en": "The board is a versatile playspace—create and share your own game modes with the community.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[5].line[7]",
+    "near": "• Print in multi-color or paint and detail it yourself."
+   },
+   "dict": null
+  },
+  {
+   "h": "3b8e05d2ae7e04ab64022bd85876b064232762cbcee71b4c5f37edc0a727baa8",
+   "en": "Battery & Charging: DO NOT use chargers with output higher than 5V or 2A. Use only the official battery and charger. Avoid exposing the battery to high temperatures or water.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[7].line[4]",
+    "near": "• Firmware Safety: Please use only official tools for any firmware operations."
+   },
+   "dict": null
+  },
+  {
+   "h": "d2858c8d1cb59dccfde6fa610ec50efcdc755caab86673a1d3e66cea92507a5a",
+   "en": "For a multi-nozzle printer in multi-color, it'd take 270 hours and 5,038g of filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[8].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "5b6b2c99d681541c999f9a4e6d1025cb57ebde4f08c9b7a5f868fd2f7651c01c",
+   "en": "For a single-nozzle printer in multi-color, it'd be 344h and 5,456g.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[8].line[2]",
+    "near": "• For a multi-nozzle printer in multi-color, it'd take 270 hours and 5,038g of filament."
+   },
+   "dict": null
+  },
+  {
+   "h": "05e7895856cae867806dc759b1a76527c4b5bd9699861c5f0a2dfafa832d8b9c",
+   "en": "For a single nozzle printer printing in a single color, it'd be 150h and 3,431g.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[8].line[3]",
+    "near": "• For a single-nozzle printer in multi-color, it'd be 344h and 5,456g."
+   },
+   "dict": null
+  },
+  {
+   "h": "b39c08e775b55084669854ae6bf4695b25dc2e2609d62b85765ce47b20c5fd5d",
+   "en": "For reference, the official installation data is listed below.",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "blocks[8].line[6]",
+    "near": "• *Please note that the product does not include the 3D printed parts as shown in the main image."
+   },
+   "dict": null
+  },
+  {
+   "h": "fcf9266c777c8043ea24dca13e66be8a283c849c51a78bf64bfaac7644d616a1",
+   "en": "Want to be the MVP of your next outdoor party, backyard water fight, or beach day? The CyberBrick Remote-Controlled Water Turret is your go-to for instant fun. Built with CyberBrick’s innovative modular components, this fully remote-controlled turret delivers nonstop action with 360° continuous rotation, adjustable vertical aiming, and an impressive water range of up to 7.5 meters. Designed for builders and players aged 13 and up, it’s easy to assemble, durable enough for outdoor use, and guaranteed to turn any gathering into a splash-filled highlight that everyone will want a turn with.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f26dd119ff7d205523804ee61da4e2e73b6d0aa7345acaeae153e10bfd671194",
+   "en": "Shoot everywhere with no blind spots",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[1].line[0]",
+    "near": "Spin the turret endlessly to cover every angle, and adjust the barrel up and down for precise targeting."
+   },
+   "dict": null
+  },
+  {
+   "h": "aab4dd408d9e2386e55765e3864ddb66fc994d4e6154214f8d2f87147a4dcbc9",
+   "en": "Spin the turret endlessly to cover every angle, and adjust the barrel up and down for precise targeting.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[1].line[1]",
+    "near": "Shoot everywhere with no blind spots"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e3a859a484ded53a57d487536dd18a63d49333e19614bea6f809ac82c3c6889",
+   "en": "Impressive 7.5-Meter Range",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[2].line[0]",
+    "near": "Blast water up to 7.5 meters away, outpacing ordinary water blasters and keeping you competitive even at long distances."
+   },
+   "dict": null
+  },
+  {
+   "h": "27f6b0dcdb6426c67dfccc1901eaa4837f859ba2c1100c32371f9f7aeb288f53",
+   "en": "Blast water up to 7.5 meters away, outpacing ordinary water blasters and keeping you competitive even at long distances.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[2].line[1]",
+    "near": "Impressive 7.5-Meter Range"
+   },
+   "dict": null
+  },
+  {
+   "h": "73cf9330d5514fb80f7d903590dc664fc29ef7f28266538680eb30b31fd28a7e",
+   "en": "LED Firing Lights",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[3].line[0]",
+    "near": "Lights up when you shoot, making every splash feel more exciting and fun to watch."
+   },
+   "dict": null
+  },
+  {
+   "h": "8ead7fa95cdb148e49879ee07fd82d6025e0b687fb1d03ad768fb69effae1d35",
+   "en": "Lights up when you shoot, making every splash feel more exciting and fun to watch.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[3].line[1]",
+    "near": "LED Firing Lights"
+   },
+   "dict": null
+  },
+  {
+   "h": "983725b0bd4bc4b32a343fe7ed759a9506a9c76bbda0b5c38f92c7e3dbf1db58",
+   "en": "2-Liter Integrated Water Tank",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[4].line[0]",
+    "near": "This built-in tank holds up to 2 liters of water and also acts as a counterbalance for smooth, stable turret movement. Its large capacity and dense print design"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4faea875c1d4f5645760791ae07f3ba814996bc849cd8f2eceb5eafcb39d44a",
+   "en": "This built-in tank holds up to 2 liters of water and also acts as a counterbalance for smooth, stable turret movement. Its large capacity and dense print design help ensure reliable performance during extended play.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[4].line[1]",
+    "near": "2-Liter Integrated Water Tank"
+   },
+   "dict": null
+  },
+  {
+   "h": "be7ea17370a4084d2114e469839d1da8a10192d75c06096da9968a82396e7fe1",
+   "en": "Hassle-Free Use",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[5].line[0]",
+    "near": "• Includes a custom one-handed controller design and works seamlessly with the official Bambu controller using the default configuration."
+   },
+   "dict": null
+  },
+  {
+   "h": "8513e373603112785ab6aa59e7aec4724d341ffa81e2b7065ca83da219d0be13",
+   "en": "Includes a custom one-handed controller design and works seamlessly with the official Bambu controller using the default configuration.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[5].line[1]",
+    "near": "Hassle-Free Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1644df577a84cd7c76845caa84d42dec153b0bb2d6ac6e480d34bbd6039766a",
+   "en": "You can even slip the controller into your pocket for stealthy operation so no one will guess who’s behind the splashes",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[5].line[2]",
+    "near": "• Includes a custom one-handed controller design and works seamlessly with the official Bambu controller using the default configuration."
+   },
+   "dict": null
+  },
+  {
+   "h": "480caf639ef844af5fed67301133df5a9bcc894d287bafc873fca957c084a409",
+   "en": "Built for Outdoor Adventures",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[6].line[0]",
+    "near": "• Recommended to print with Bambu PETG HF for excellent weather resistance (tested with Bambu PLA Basic too), no need to worry about normal outdoor wear."
+   },
+   "dict": null
+  },
+  {
+   "h": "fdbe6cf495bc089e43e7cbc01095bdf5b01b498fd49535bf60ef72069877676f",
+   "en": "Recommended to print with Bambu PETG HF for excellent weather resistance (tested with Bambu PLA Basic too), no need to worry about normal outdoor wear.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[6].line[1]",
+    "near": "Built for Outdoor Adventures"
+   },
+   "dict": null
+  },
+  {
+   "h": "997392cf5840c63d69486ccd7b0890c6a47fe27a350391214b002e4fca72b16e",
+   "en": "Use bright, non-realistic colors as a safety-first choice to make it clear this is a toy and avoid any confusion during water play.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[6].line[2]",
+    "near": "• Recommended to print with Bambu PETG HF for excellent weather resistance (tested with Bambu PLA Basic too), no need to worry about normal outdoor wear."
+   },
+   "dict": null
+  },
+  {
+   "h": "60c3c7d143439b82bad1469e2eef082a158ef2381d5cb104c06dd201d3ea7e3d",
+   "en": "The following installation information for a single turret is provided for reference:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-turret-cyberbrick-rc",
+    "title": "Water Turret - CyberBrick RC",
+    "field": "blocks[10].line[4]",
+    "near": "• Except for the hardware parts , all models and configuration files are free. The model kit includes a beginner's kit covering most of the hardware parts neede"
+   },
+   "dict": null
+  },
+  {
+   "h": "4816d7345309a218481ec64eb296392ba07568f858e2c1c8c856afe8a36dc088",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Poop Chute & Basket/Outlet for X1C/P1S/P2S. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "poop-chute-basket-outlet-for-x1c-p1s-p2s",
+    "title": "Poop Chute & Basket/Outlet for X1C/P1S/P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c4432d7bba53ec452aac9c92e4bca5148f02f8ba34b219209390db7283eb7f1",
+   "en": "To download the model files please visit the Poop Chute & Basket/Outlet for X1C/P1S/P2S on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "poop-chute-basket-outlet-for-x1c-p1s-p2s",
+    "title": "Poop Chute & Basket/Outlet for X1C/P1S/P2S",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "78c742a31a14d3613e7d16e420e2accd1e2f1eab3f9a9b523f74a7ff2098c501",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Gridfinity Storage Box V2. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "gridfinity-storage-box-v2",
+    "title": "Gridfinity Storage Box V2",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ec500bd345daf85920a7e1e40b607a4e46256a6d4671d2ac9c4bfb43d2b64bf",
+   "en": "To download the model files please visit the Gridfinity Storage Box V2 on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "gridfinity-storage-box-v2",
+    "title": "Gridfinity Storage Box V2",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "e552cc7c6b23470453e781fde0f5fd9457827779e3155cfd856598be10498d7d",
+   "en": "Current capacity: When using this Y-type splitter cable to connect two devices, ensure that the total current draw does not exceed the maximum output capacity of the power source.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "50mm-y-type-xh2-54-male-to-dual-xh2-54-female-conversion-cable-2pcs-pd003",
+    "title": "Y Type XH2.54 Male to Dual XH2.54 Female Conversion Cable",
+    "field": "blocks[0].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f8c4f564a45096a59bdcb19126e04a239894fa7636d82b63d791ce6410bb53d",
+   "en": "Voltage compatibility: Verify that both connected devices share the same voltage requirements, as this cable provides parallel power/signal distribution.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "50mm-y-type-xh2-54-male-to-dual-xh2-54-female-conversion-cable-2pcs-pd003",
+    "title": "Y Type XH2.54 Male to Dual XH2.54 Female Conversion Cable",
+    "field": "blocks[0].line[2]",
+    "near": "• Current capacity: When using this Y-type splitter cable to connect two devices, ensure that the total current draw does not exceed the maximum output capacity"
+   },
+   "dict": null
+  }
+ ]
+}

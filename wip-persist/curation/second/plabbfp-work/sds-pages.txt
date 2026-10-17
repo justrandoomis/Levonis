@@ -1,0 +1,617 @@
+=== PAGE 1
+=== PAGE 2
+                           SAFETY DATA SHEETS（SDS）
+                           化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+            According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                     Date: Jul. 24. 2025                    Page 2 of 18
+     1 - Identification of the substance /preparation and of the company/undertaking
+                                    第一章 化学品及企业标识
+Product identifier
+产品标识
+Product name                  :    Bambu PLA Basic
+产品名称                               3D 打印线材
+Model                         :    A00-xx(xx stands for any suffix)
+型号                                 A00-xx（xx 代表任意后缀）
+Unique Formula                :    N/A
+Identifier(UFI)
+唯一配方标识符
+Export to                     :    /
+出口国
+CAS No.                       :    Refer to section 3
+                                   见第三章
+EC No.                        :    Refer to section 3
+                                   见第三章
+Relevant identified uses of the substance or mixture and uses advised against
+有关的确定的物质或混合物的用途和建议不适合的用途
+Relevant identified uses      :    3D printing filament
+有关已确定用途                       :    3D 打印线材
+Uses advised against
+使用建议                          :    /
+Details of the supplier of the safety data sheet
+安全技术说明书提供者的详情
+=== PAGE 3
+                         SAFETY DATA SHEETS（SDS）
+                         化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+            According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                   Date: Jul. 24. 2025                          Page 3 of 18
+Manufacturer                 :   Shenzhen Tuozhu Technology Co., Ltd.
+制造商                          :   深圳拓竹科技有限公司
+Address                      :   903, West Zone, Hengchang Science and Technology Building, No.
+                                 2228 Linhai Avenue, Nanshan Street,Qianhai Shengang Cooperation
+                                 Zone, Shenzhen
+地址                           :   深圳市前海深港合作区南山街道临海大道 2228 号恒昌科技大厦西区 903
+Telephone/电话                 :   0755-86575393
+E-mail address               :   /
+电子邮件地址
+Emergency phone              :   /
+紧急通信电话
+                                     2 - Hazards Identification
+                                          第二章危险性概述
+Hazard Classification
+危险性类别
+In accordance with regulation (EC) No. 1272/2008(CLP), Classification of the substance or mixture
+根据(EC) No. 1272/2008(CLP)标准，物质或混合物分类的分类
+Not classified.
+没有分类
+For the full text of the health note (H-) mentioned in this section, see section 16.
+本部分提及的健康说明（H-)全文请见第16部分。
+Label elements
+标签要素
+Hazard pictograms              :   No symbol.
+象形图                              无危险图标
+Warning words               :    No signal word
+警示词                              无警示词
+Danger statement            :    None
+危险申明                             无
+Preventive measures         :    None
+预防措施                             无
+Response                    :    None
+=== PAGE 4
+                         SAFETY DATA SHEETS（SDS）
+                         化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+            According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                     Date: Jul. 24. 2025                            Page 4 of 18
+事故响应                              无
+Storage                    :      None
+安全储存                              无
+Disposal                   :      None
+废弃处置                              无
+health hazard              :      None
+健康危害                              无
+Environment hazard         :      None
+环境危害                              无
+Physical and chemical      :      None
+hazards
+物理和化学危害                           无
+Other hazards              :      The mixture does not contain PBT/vPvB substance
+其他危害                              该混合物不含 PBT/vPvB 物质。
+                                  The mixture does not contain endocrine disruptors
+                                  该混合物不含内分泌干扰物。
+                         3 - Composition / Information on Ingredients
+                                     第三章 成分/组成信息
+Substance or Preparation: Preparation
+物质 □        混合物■
+                                                                                Specific Concentration
+                                                                               limits, M-Factors, Acute
+                                        CAS         EINECS          CLP
+Component/Substance                                                           Toxicity Estimates (ATE)特
+                                       Number       Number      Classificatio
+     成分/物质              % by wt                                               定浓度极限值，M 因子急性
+                                       CAS 号         EC 号       n CLP 分类
+                                                                                   毒性估计（ATE）
+   Polylactic acid                                                 None                None
+                         95-99        26023-30-3       N/A
+       聚乳酸                                                          无                   无
+      Additive                                                     None                None
+       添加剂                1-5            N/A           N/A          无                   无
+Note: CAS Number is Chemical Abstract Service Registry Number.
+注： CAS 编号表示化学文摘服务登记编号。
+EINECS Number is EUROPEAN Inventory of Existing Commercial Chemical Substance.
+=== PAGE 5
+                          SAFETY DATA SHEETS（SDS）
+                          化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+             According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                     Date: Jul. 24. 2025                             Page 5 of 18
+EC 编号表示欧洲现有商业化学品目录编号。
+      N/A = not applicable. N/A表示不适用。
+                                       4 - First Aid Measures
+                                           第四章 急救措施
+Description of first aid measures
+急救措施的说明
+If inhaled                   :      If breathed in, remove to fresh air immediately. Keep the respiratory
+                                    tract smooth. Use oxygen if available. Get medical aid.
+吸入                                  如果吸入，迅速脱离现场至空气新鲜处。保持呼吸道通畅。如
+                                    有必要，给予输氧。就医。
+In case of skin contact      :      Rinse with clear water.
+皮肤接触                                用清水冲洗。
+In case of eye contact       :      If contact with eyes, Rinse with plenty of water or normal saline.
+眼睛接触                                如果接触到眼睛，用大量清水或生理盐水冲洗。
+If swallowed                 :      Never give anything by mouth to an unconscious person.Rinse
+                                    mouth with water. Get medical aid at once.
+食入                                  切勿给失去知觉者喂食任何东西。用水漱口。立刻就医。
+Most important               :      No data available
+symptoms and effects,
+both acute and delayed
+主要症状和影响，急性和迟发                       无可用数据。
+效应
+Indication of any            :      Transfer patients to a safe place. Consult a doctor. Present this
+immediate medical                   chemical safety data sheet to the doctor on site.
+attention and special
+treatment needed
+=== PAGE 6
+                          SAFETY DATA SHEETS（SDS）
+                          化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+               According to REGULATION (EC) No 1272/2008
+   No.: SDS20250724A00                 Date: Jul. 24. 2025                            Page 6 of 18
+                                将患者转移到安全的场所。咨询医生。出示此化学品安全技术说明书给到
+及时的医疗处理和所需的特
+                                现场的医生看。
+殊处理的说明和指示
+                                  5 - Fire-Fighting Measures
+                                         第五章 消防措施
+Extinguishing media
+灭火介质
+Suitable              :    Use water spray, alcohol-resistant foam, dry chemical or carbon dioxide.
+extinguishing media
+灭火方法及灭火剂                   用水雾，耐醇泡沫，干粉或二氧化碳灭火。
+Special hazards       :    No data available.
+arising from the
+substance or
+mixture
+源于此物质或混合物的
+                           无可用数据
+特别的危害
+Combustion                 No data available.
+                      :
+Products
+燃烧产物                       无可用数据
+Advice for            :    As soon as possible, remove the goods from fire to open place.For small
+firefighters               fires, use dry chemical, carbon dioxide, water spray or alcohol-resistant
+                           foam. For large fires, Standing on the windward, use water spray, fog, or
+                           alcohol-resistant foam. Use water spray to cool fire-exposed containers.
+给消防员的建议                    尽快将货物从火中移开。对于小火，使用干粉，二氧化碳，水喷雾或耐酒精泡沫。
+                           对于大型火灾，站在迎风，使用水喷雾，雾，或耐酒精泡沫。用水喷雾冷却暴露
+                           在火中的容器。
+Further information   :    Wear suitable protective clothing, gloves, eye/face protection and
+                           self-contained breathing apparatus in pressure-demand,MSHA/NIOSH
+                           (approved or equivalent), and full protective gear.
+进一步信息                      在压力要求下穿戴合适的防护服、手套、眼/面保护和自备呼吸器，
+                           MSHA/NIOSH（认可或等效）和全防护装置。
+=== PAGE 7
+                        SAFETY DATA SHEETS（SDS）
+                        化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+              According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00               Date: Jul. 24. 2025                           Page 7 of 18
+                             6 - Accidental Release Measures
+                                    第六章 泄露应急处理
+Personal precautions,    :   Avoid inhaling aerosol or gas. Ensure adequate ventilation.Evacuate
+protective equipment         people to a safe area.
+and emergency
+procedures
+作业人员防护措施、防护装备
+                             避免吸入气雾或气体，保证充分的通风，将人员疏散到安全区域。
+和应急处置程序
+Environmental            :   No special environmental prevention requirements.
+precautions
+环境保护措施                       无特别的环境预防要求。
+Methods and materials    :   Contain spillage, soak up residue with an absorbent such as dry
+for containment and          quicksand and then collect with an electrically protected vacuum
+cleaning up                  cleaner or by wet-brushing and place in container for disposal
+                             according to local regulations.
+泄漏化学品的收容、清除方法                围堵溢出，用吸附材料如干砂等吸附，用防电真空清洁器或湿刷子将溢出
+及所使用的处置材料                    物收集起来，并放置到容器中去，根据当地规定处理。
+Reference to other       :
+                             For disposal see section 13.
+sections
+参考其他部分                       丢弃处理请参阅第 13 章。
+                                7 - Handling and Storage
+                                  第七章 操作处置与储存
+Precautions for safe     :    No special operation opinions are required.
+handing
+安全操作的注意事项                     无需特殊的操作意见。
+=== PAGE 8
+                          SAFETY DATA SHEETS（SDS）
+                          化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+             According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                 Date: Jul. 24. 2025                             Page 8 of 18
+Conditions for safe        :    Store in a closed container when possible to prevent accidental
+storage, including any          dust generation and to prevent possible product contamination.
+incompatibilities               Protect containers from physical damage. Keep dry and isolated
+                                from acids, caustics,halogenated compounds and oxidizers. Do not
+                                store near combustible materials. Guard against dust accumulation
+                                and dust becoming airborne.Keep container tightly closed in a cool,
+                                well-ventilated place. Keep the sample as a easy identification.
+                                Equip with relevant type and quantities of the extinguishment
+                                instruments.
+安全储存的条件,包括任何不                   尽可能存放在密闭的容器中，以防止意外的灰尘产生并防止可能的产品污
+兼容性                             染。保护容器免受物理损坏。保持干燥，与酸，苛性碱，卤化物和氧化剂
+                                分离。不要存放在易燃材料附近。防止灰尘积聚和粉尘的空气传播。储存
+                                于阴凉，干燥，通风的库房。保持样品容易识别。配备相应品种和数量的
+                                消防器材。
+Specific end use(s)        :    No data available.
+特定用途                            无可用数据
+                          8 - Exposure Controls / Personal Protection
+                                   第八章 接触控制/个体防护
+Allowable concentration    :    No data available.
+容许浓度                            无可用数据
+Monitoring method          :    No data available.
+检测方法                            无可用数据
+Components with            :    In accordance with good industrial and safety regulations. Wash
+workplace control               hands before rest and at the end of work.
+parameters
+暴露控制                            按照良好工业和安全规范操作。休息前和工作结束时洗手。
+Personal protective        :    It is not necessary to use protective equipment under normal
+equipment                       conditions.
+个体防护装备                          正常条件下没有必要使用防护装备。
+Eye Protection             :    It is not necessary to use protective equipment under normal
+                                conditions.
+眼睛防护                            正常条件下没有必要使用防护装备。
+=== PAGE 9
+                            SAFETY DATA SHEETS（SDS）
+                            化学品安全技术说明书（SDS）
+         According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+            According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                      Date: Jul. 24. 2025                         Page 9 of 18
+Skin protection              :      It is not necessary to use protective equipment under normal
+                                    conditions.
+皮肤保护                                正常条件下没有必要使用防护装备。
+Body Protection              :      It is not necessary to use protective equipment under normal use
+                                    conditions.
+身体保护                                正常条件下没有必要使用防护装备。
+Respiratory protection       :      It is not necessary to use protective equipment under normal use
+                                    conditions.
+呼吸系统防护                              正常条件下没有必要使用防护装备。
+Other protection             :      None
+其他防护                                无
+                                 9 - Physical and Chemical Properties
+                                            第九章 理化特性
+Physical state:         :    Thread                  Odor                  :     No data available.
+物理形态                         线                       气味                          无可用数据
+Color                   :    No data available.      pH                    :     No data available.
+颜色                           无可用数据                   pH 值                        无可用数据
+Melting Point           :    No data available.      Density               :     No data available.
+熔点                           无可用数据                   密度                          无可用数据
+Boiling point or        :    No data available.      Flashing Point        :     No data available.
+initial boiling point
+and boiling range
+沸点或初始沸点沸腾                    无可用数据                   闪点                          无可用数据
+范围(°C)
+Explosion Upper         :    No data available.      Explosion Lower       :     No data available.
+Limits                                               Limits
+爆炸上限                         无可用数据                   爆炸下限                        无可用数据
+Kinematic viscosity     :    No data available.      Particle              :     No data available.
+(mm2/s)                                              characteristics
+运动粘度(mm2/s)                  无可用数据                   粒子特性                        无可用数据
+=== PAGE 10
+                             SAFETY DATA SHEETS（SDS）
+                             化学品安全技术说明书（SDS）
+       According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+             According to REGULATION (EC) No 1272/2008
+   No.: SDS20250724A00                         Date: Jul. 24. 2025                               Page 10 of 18
+Ignition                 :    No data available.          Decomposition           :     No data available.
+temperature                                               temperature
+着火点                           无可用数据                       分解温度                          无可用数据
+Solubility               :    No data available.
+溶解度                           无可用数据
+                                          10 - Stability and Reactivity
+                                            第十章 稳定性和反应活性
+Reactivity                       :         No data available.
+反应活性                                       无可用数据
+Chemical stability               :         Stable under recommended storage conditions.
+化学稳定性                                      正常情况下稳定
+Conditions to avoid              :         Avoid fire, elevated temperatures. direct sunlight.
+应避免的条件                                     避免火灾，高温，阳光直射
+Incompatible materials           :         No data available.
+禁配物                                        无可用数据
+Hazardous decomposition          :         No data available.
+products
+危险的分解产物                                    无可用数据
+                                         11 - Toxicological Information
+                                               第十一章 毒理学资料
+Information on toxicological         :      No data available.
+effects Acute Toxicity
+急性毒性                                        无可用数据
+Skin corrosion/irritation            :      No data available.
+皮肤腐蚀/刺激性                                    无可用数据
+Serious eye damage/eye               :      No data available.
+irritation
+=== PAGE 11
+                           SAFETY DATA SHEETS（SDS）
+                           化学品安全技术说明书（SDS）
+       According to Regulation (EC) No 1907/2006. Annex，
+    Amended by COMMISSION REGULATION (EU) 2020/878.
+            According to REGULATION (EC) No 1272/2008
+    No.: SDS20250724A00              Date: Jul. 24. 2025                            Page 11 of 18
+严重眼伤害/眼刺激                         无可用数据
+Respiratory or skin           :   No data available.
+Sensitization
+呼吸系统或皮肤致敏作用                       无可用数据
+Germ cell mutagenicity        :   No data available.
+生殖细胞致变性                           无可用数据。
+Carcinogenicity               :   IARC：No component of this product present at levels greater
+                                  than or equal to 0.1% is identified as probable, possible or
+                                  confirmed human carcinogen by IARC.
+致癌性                               IARC：该产品中不存在大于或等于 0.1%的组分被 IARC 鉴定为可能
+                                  的、可能的或证实的人类致癌物。
+Reproductive toxicity         :   No data available.
+生殖毒性                              无可用数据。
+Specific target organ         :   No data available.
+toxicity-single exposure
+特定靶器官毒性-单次暴露                      无可用数据。
+Specific target organ         :   No data available.
+toxicity-repeated
+特定靶器官毒性-长期暴露                      无可用数据。
+Aspiration hazard             :   No data available.
+吸入危害                              无可用数据。
+Information on other          :   The mixture does not contain endocrine disruptors
+hazards Endocrine
+disrupting properties
+关于其他危险的资料内分泌干扰                    该混合物不含内分泌干扰物。
+物
+Additional information        :   No data available.
+其他信息                              无可用数据。
+=== PAGE 12
+                          SAFETY DATA SHEETS（SDS）
+                          化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+             According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                 Date: Jul. 24. 2025                            Page 12 of 18
+                                 12 - Ecological Information
+                                     第十二章 生态学资料
+Toxicity                     :     No data available.
+生态毒性                               无可用数据
+Persistence and              :     No data available.
+degradability
+持久性和降解性                            无可用数据
+Bioaccumulative potential    :     No data available.
+潜在的生物累积性                           无可用数据
+Mobility in soil             :     No data available.
+土壤中的迁移性                            无可用数据
+Results of PBT and vPvB      :     No data available.
+assessment
+PBT 和 vPvB 的结果评价                   无可用数据
+Endocrine disrupting         :     The mixture does not contain endocrine disruptors
+properties
+内分泌干扰物                             这种混合物不含内分泌干扰物。
+Other adverse effects        :     No data available.
+其他有害影响                             无可用数据
+                                 13 - Disposal Considerations
+                                       第十三章废弃处置
+Waste disposal methods
+废弃处置方法
+Product                      :     This product is not classified as hazardous waste under
+                                   Regulation (EC) No. 1272/2008.
+产品性质                               根据法规(EC)第 1272/2008 号，该产品不被视为危险废物。
+Waste disposal methods       :     Consult relevant national and local regulations before disposal.
+废弃处置方法                             回收利用或参阅国家和地方有关法规。
+Contaminated packaging       :     Use and recycle after cleaning.
+=== PAGE 13
+                          SAFETY DATA SHEETS（SDS）
+                          化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+            According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                    Date: Jul. 24. 2025                           Page 13 of 18
+受污染的容器和包装                            清洗后使用回收。
+Attention abandoned:           :     Before disposal, refer to relevant national and local laws and
+                                     regulations.
+废弃注意事项                               废弃处置前应参阅国家和地方有关法规。
+                                   14 - Transport Information
+                                         第十四章运输信息
+Transport Attentions:
+运输注意事项：
+Please select the appropriate transportation method and corresponding transportation and
+storage conditions according to the nature of the chemical. The product can be transported by air,
+land or sea. The means of transportation should be equipped with corresponding types and
+quantities of fire extinguishing materials and leakage emergency treatment equipment. Do not mix
+with antioxidants, acids, alkali metals and amines. Prevent direct sunlight, rain and high
+temperature transportation.
+Please refer to section 7-HANDLING AND STORAGE also, and requirements of the IATA/ICAO/PG .
+请根据化学品的性质选择适当的运输方式和相应的运输和储存条件。该产品可以空运，陆运或海运方式运输。
+运输工具应配备相应品种和数量的灭火材料和泄漏应急处理设备。禁止与抗氧化剂，酸，碱金属和胺混合使
+用。防止阳光直射，雨淋和高温运输。
+具体请参照ADR-RID/PG , IMO/IMDG/PG , IATA/ICAO/PG以及第七部分的要求。
+Maritime transport IMDG
+国际海运危险货物规则
+IMDG Code                      :     Not hazardous goods
+危险类别                                 非危害品
+UN-Number                      :     /
+UN 编号
+Packing group                  :     /
+包装组别
+Proper shipping name           :     /
+运输名称
+DOT regulations
+运输部条例
+Hazard class                   :    Not hazardous goods
+危险类别                                非危害品
+UN-Number                      :    /
+=== PAGE 14
+                        SAFETY DATA SHEETS（SDS）
+                         化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+            According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                   Date: Jul. 24. 2025                  Page 14 of 18
+UN 编号
+Packing group                  :    /
+包装组别
+Proper shipping name           :    /
+运输名称
+Land transport ADR/RID(cross-border)
+陆路运输条例
+Hazard class                   :    Not hazardous goods
+危险类别                                非危害品
+UN-Number                      :    /
+UN 编号
+Packing group                  :    /
+包装组别
+Proper shipping name           :    /
+运输名称
+Air transport ICAO-TI and IATA-DGR
+航空运输 国际民航组织和国际航空运输协会危险货物规则
+ICAO-TI-II class               :    Not hazardous goods
+危害等级                                非危害品
+UN/ID Number                   :    /
+联合国编号
+Packing group                  :    /
+运输包装
+Proper shipping name           :    /
+合适运输名称
+  Transport in bulk according to Annex II of MARPOL 73/78 and the IBC Code
+  防止船舶污染国际公约 73/78 附件 II 和散装危险化学品船舶载运的建设和设备的国际代码
+  Not available data
+  无可用数据
+=== PAGE 15
+                         SAFETY DATA SHEETS（SDS）
+                          化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+              According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                    Date: Jul. 24. 2025                             Page 15 of 18
+                                   15 - Regulatory Information
+                                         第十五章法规信息
+Safety, health and environmental regulations/legislation specific for the substance or mixture
+针对物质或混合物的安全、健康和环境的特别的法规/法律
+German regulations concerning the classification of hazard for          :    Not listed
+water(WGK)
+德国关于水危害分类的规定（WGK）                                                           不列入
+Substance of Very High Concern (SVHC) according to Regulation         :     Not listed
+(EC) No. 1907/2006 (REACH)
+REACH 法规(EC) No. 1907/2006 的高度关注物                                           不列入
+The conditions of restrictions according to Regulation (EC) No.       :     Not listed
+1907/2006 (REACH) Article 67 and Annex XVII for the
+manufacturing, placing on the market and use must be observed
+法规（EC）1907/2006 号（REACH）第 67 条和附件 XVII 对制造、投放                               不列入
+市场和使用上必须遵守的限制条件制造、投放市场和使用上必须遵守的限制
+条件
+Regulation (EC) No. 1907/2006 (REACH) Annex XVII( requiring           :     Not listed
+Authorisation for use)
+法规（EC）1907/2006 号（REACH）附件 XVII(需要授权才能使用物质)                                 不列入
+Regulation (EC) No. 1907/2006 (REACH)-Pre-registered                  :     Not listed
+substance.
+法规（EC）1907/2006 号（REACH）预注册物质                                               不列入
+Regulation (EC) No. 1005/2009 on substances that deplete the          :     Not listed
+ozone layer
+法规（EC）1005/2009 号关于破坏臭氧层物质                                                  不列入
+Regulation (EC) No 649/2012 concerning the export and import of       :     Not listed
+dangerous chemicals, Annex I
+法规（EC）649/2012 号关于危险化学品的出口、进口，附录 I                                          不列入
+ELINECS(European List of Notified Chemical Substances)                :     Not listed
+ELINECS（欧洲化学品通报清单）                                                          不列入
+Specific provisions                                                   :     No data available.
+特别规定                                                                        无可用数据
+=== PAGE 16
+                           SAFETY DATA SHEETS（SDS）
+                           化学品安全技术说明书（SDS）
+        According to Regulation (EC) No 1907/2006. Annex，
+     Amended by COMMISSION REGULATION (EU) 2020/878.
+             According to REGULATION (EC) No 1272/2008
+     No.: SDS20250724A00                 Date: Jul. 24. 2025                         Page 16 of 18
+                                      16 - Other Information
+                                         第十六章其他信息
+ACGIH        :    American Conference of Governmental Industrial
+                  美国政府工业学家会议
+ADR          :    European Agreement concerning the International Carriage of Dangerous Goods by
+                  Road
+                  欧洲关于危险国际货物公路运输的协议
+CAS          :    Chemical Abstracts Service
+                  化学文摘社
+CLP          :    Classification Packaging and Labelling
+                  分类、包装、标签
+EC           :    European Commission
+                  欧洲委员会
+ECHA         :    European Chemicals Agency
+                  欧洲化学品中心
+EINECS       :    The European Inventory of Existing Commercial Chemical Substances
+                  欧洲现有商业化学物质的目录
+GHS          :    Globally Harmonised System of Classification and Labelling of Chemicals
+                  全球化学品分类和标签制度
+IARC         :    International Agency for Research on Cancer
+                  国际癌症研究机构
+IATA         :    International Air Transport Association
+                  国际航空运输协会
+IBC Code     :    International code for the construction and equipment of ships carrying dangerous
+                  chemical in bulk
+                  散装危险化学品船舶载运的建设和设备的国际代码
+ICAO         :    International Civil Aviation Organization
+                  国际民航组织
+IMDG         :    International Maritime Dangerous Goods
+                  国际海运危险货物规则
+IC50         :    Inhibitory Concentration fifty
+                  半数抑制浓度
+LC50         :    Lethal Concentration fifty
+=== PAGE 17
+                        SAFETY DATA SHEETS（SDS）
+                        化学品安全技术说明书（SDS）
+       According to Regulation (EC) No 1907/2006. Annex，
+  Amended by COMMISSION REGULATION (EU) 2020/878.
+           According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                 Date: Jul. 24. 2025                            Page 17 of 18
+               半数致死浓度
+LD50       :   Lethal Dose fifty per cent.
+               半数致死剂量
+MARPOL     :   International Convention for the Prevention of Pollution From Ships
+               防止船舶造成污染国际公约
+REACH      :   Registration Evaluation And Authorisation Of Chemicals
+               化学品的注册，评估和授权
+RID        :   Regulations Relating to International Carriage of Dangerous Goods by Rail
+               国际危险货物铁路运输规则
+RTECS      :   Registry of Toxic Effects of Chemical Substances
+               化学品毒性危害注册
+STEL       :   Short term exposure limit
+               短时间暴露限值
+TWA        :   Time-Weighted Average
+               时间加权平均值
+OSHA       :   Occupational Safety and Health Administration
+               职业安全与健康管理局
+NIOSH      :   National Institute for Occupational Safety and Health
+               国家职业安全与健康研究所
+TLV-TWA    :   Threshold Limit Value-Time Weighted Average
+               容许最高浓度-时间加权平均值
+TLV-STEL   :   Threshold Limit Value-Short Term Exposure Limit
+               容许最高浓度-短时间暴露限值
+PEL        :   Permissible Exposure Limit
+               容许暴露限值
+=== PAGE 18
+                          SAFETY DATA SHEETS（SDS）
+                          化学品安全技术说明书（SDS）
+      According to Regulation (EC) No 1907/2006. Annex，
+   Amended by COMMISSION REGULATION (EU) 2020/878.
+            According to REGULATION (EC) No 1272/2008
+  No.: SDS20250724A00                    Date: Jul. 24. 2025                            Page 18 of 18
+Date: Jul. 24. 2025
+填表时间：2025年07月24日
+Data Audit Units: Shenzhen Tuozhu Technology Co., Ltd.
+数据审核单位：深圳拓竹科技有限公司
+Disclaimer: The information in this Safety Data Sheet (SDS) was obtained from sources which we
+believe are reliable. However, the information is provided without any warranty, express or implied,
+regarding the accuracy or correctness. The conditions or methods of handling, storage, use and
+disposal of the product are beyond our control and may be beyond our knowledge.For this and other
+reasons, we do not assume responsibility and expressly disclaim liability for loss, damage, or expense
+arising out of or in any way connected with the handling, storage, use, or disposal of this product. All
+information, recommendations, and suggestions appearing herein concerning this product are taken
+from sources or based upon data believed to be reliable.
+本资料并非产品说明书，只是为了提供指导性的建议，这里没有任何的担保、表白或承诺。推荐的工业卫生和
+安全处理程序只是基于我们的经验和行业中的普遍共识。因此，每位用户应于使用本产品前仔细审阅本资料和
+产品说明书，并决定本资料是否适用于用户的特定用途和领域的具体应用。
+样品照片Sample Photo
+                                       ***The End of MSDS***
+                                          *** MSDS结束***

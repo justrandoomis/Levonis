@@ -1,0 +1,648 @@
+{
+  "handle": "pla-aero",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T22:18:04.706Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "package.contents"
+      ]
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/3d202a3c9d2d4fe19b7317aa50b4eee0/SDS20251127A11_Bambu_PLA_Aero.pdf",
+      "title": "Safety Data Sheet SDS20251127A11 — Bambu PLA Aero",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "mechanical.*",
+        "safety.*",
+        "identity.model"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "mechanical.*",
+        "thermal.heat_deflection_temp",
+        "compat.statement"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide | Bambu Lab Wiki",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "mechanical.*",
+        "material.*",
+        "thermal.heat_deflection_temp",
+        "compat.statement"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations | Bambu Lab Wiki",
+      "keys": [
+        "drying.*",
+        "material.spool_type"
+      ]
+    }
+  ],
+  "specs": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "specification (filament)",
+      "key": "material.diameter",
+      "value": 1.75,
+      "unit": "mm",
+      "locator": "p.1 › Specifications › Diameter",
+      "quote": "Diameter 1.75 mm"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681886055297030",
+        "value_text": "1kg"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "specification (net filament weight per spool)",
+      "key": "material.net_weight",
+      "value": 1000,
+      "unit": "g",
+      "locator": "p.1 › Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "specification (spool)",
+      "key": "material.spool_type",
+      "value": "ABS spool (temperature resistance 70 °C), 200 mm diameter × 67 mm height",
+      "unit": "",
+      "locator": "p.1 › Specifications › Spool Material; Spool Size",
+      "quote": "Spool Material ABS (Temperature resistance 70 °C) | Spool Size Diameter: 200 mm; Height: 67 mm"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "blast drying oven, before printing",
+      "key": "drying.temperature",
+      "value": 55,
+      "unit": "°C",
+      "locator": "p.1 › Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h",
+      "note": "Oven value agrees with the dry-filament wiki (forced-air oven 55 °C, 8 h) and the PLA wiki (convection oven 55 ℃, 8 h). Heatbed drying not stored: TDS «X1 Series Printer Heatbed: 65 - 75 °C, 12 h» vs dry-filament wiki 60-70 °C, 12 h vs PLA wiki Hot Bed 70 °C, 12 h"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "blast drying oven at 55 °C, before printing",
+      "key": "drying.time",
+      "value": 8,
+      "unit": "h",
+      "locator": "p.1 › Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "key": "print_settings.nozzle_temp",
+      "value": {
+        "min": 210,
+        "max": 260
+      },
+      "unit": "°C",
+      "locator": "p.1 › Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 210 - 260 °C",
+      "conflict": "material-table wiki gives the generic PLA* row (which its note ② says includes PLA Aero) 190 - 240 °C (±10 °C); the product TDS value is kept"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "recommended printing setting (bed surface preparation: glue)",
+      "key": "print_settings.recommended_plate",
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "locator": "p.1 › Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "recommended printing setting (bed surface preparation: glue)",
+      "key": "print_settings.bed_temp",
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "locator": "p.1 › Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45 °C",
+      "conflict": "material-table wiki (generic PLA): Cool Plate 35 - 45 ℃ agrees; Smooth PEI / High-Temperature Plate and Textured PEI Plate 45 - 65 ℃ differ; the product TDS value is kept"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "key": "print_settings.fan_speed",
+      "value": "Turn on",
+      "unit": "",
+      "locator": "p.1 › Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "recommended printing setting (upper bound only; no lower bound published)",
+      "key": "print_settings.print_speed",
+      "value": "< 180 mm/s",
+      "unit": "mm/s",
+      "locator": "p.1 › Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 180 mm/s"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "ISO 1183",
+      "test_condition": "raw material (filament), not the foamed print",
+      "key": "material.density",
+      "value": 1.21,
+      "unit": "g/cm³",
+      "locator": "p.2 › Properties › Physical Properties › Density",
+      "quote": "Density ISO 1183 1.21 g/cm³ (filament)"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "material property (DSC)",
+      "key": "thermal.melting_temp",
+      "value": 153,
+      "unit": "°C",
+      "locator": "p.2 › Properties › Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 153 °C"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "material property (DSC)",
+      "key": "thermal.glass_transition",
+      "value": 55,
+      "unit": "°C",
+      "locator": "p.2 › Properties › Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 55 °C"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Bambu Lab standard samples (specimen form not stated in the TDS)",
+      "key": "thermal.vicat_softening",
+      "value": 54,
+      "unit": "°C",
+      "locator": "p.2 › Properties › Physical Properties › Vicat Softening Temperature",
+      "quote": "Vicat Softening Temperature ISO 306, GB/T 1633 54 °C"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "ISO 75",
+      "test_condition": "load 0.45 MPa; Bambu Lab standard samples (the TDS also lists 48 °C at 1.8 MPa)",
+      "key": "thermal.heat_deflection_temp",
+      "value": 53,
+      "unit": "°C",
+      "locator": "p.2 › Properties › Physical Properties › Heat Deflection Temperature (0.45 MPa row)",
+      "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 53 °C"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "printed specimen, X-Y (TDS Specimen Test: nozzle 210 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 55 °C for 8 h); ± 2 MPa; Z: 18 ± 3 MPa",
+      "key": "mechanical.tensile_strength",
+      "value": 24,
+      "unit": "MPa",
+      "locator": "p.2 › Properties › Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 24 ± 2 MPa"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "printed specimen, X-Y (TDS Specimen Test: nozzle 210 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 55 °C for 8 h); ± 0.7 %; Z: 1.2 ± 0.4 %",
+      "key": "mechanical.elongation_at_break",
+      "value": 2.6,
+      "unit": "%",
+      "locator": "p.2 › Properties › Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 2.6 ± 0.7 %"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "printed specimen, X-Y (TDS Specimen Test: nozzle 210 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 55 °C for 8 h); ± 4 MPa; Z: 17 ± 3 MPa",
+      "key": "mechanical.flexural_strength",
+      "value": 45,
+      "unit": "MPa",
+      "locator": "p.2 › Properties › Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 45 ± 4 MPa"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "printed specimen, X-Y (TDS Specimen Test: nozzle 210 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 55 °C for 8 h); ± 120 MPa; Z: 1410 ± 80 MPa",
+      "key": "mechanical.flexural_modulus",
+      "value": 1690,
+      "unit": "MPa",
+      "locator": "p.2 › Properties › Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 1690 ± 120 MPa"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "printed specimen, X-Y (TDS Specimen Test: nozzle 210 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 55 °C for 8 h); first value (not marked notched), ± 1.3 kJ/m²; notched 8.2 ± 0.7 kJ/m²; Z: 3.1 ± 0.7 kJ/m²",
+      "key": "mechanical.impact_strength",
+      "value": 28.8,
+      "unit": "kJ/m²",
+      "locator": "p.2 › Properties › Mechanical Properties › Impact Strength (X-Y), first value",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 28.8 ± 1.3 kJ/m²; 8.2 ± 0.7 kJ/m² (notched)"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V4.0 — PLA Aero",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:52Z",
+      "test_method": "",
+      "test_condition": "composition",
+      "key": "material.type",
+      "value": "PLA (polylactic acid)",
+      "unit": "",
+      "locator": "p.3 › Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polylactic acid"
+    },
+    {
+      "key": "identity.model",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "A11-xx",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "sds",
+      "source_url": "https://store.bblcdn.com/s7/default/3d202a3c9d2d4fe19b7317aa50b4eee0/SDS20251127A11_Bambu_PLA_Aero.pdf",
+      "source_title": "Safety Data Sheet SDS20251127A11 — Bambu PLA Aero",
+      "locator": "p.2 › 1 - Identification › Product identifier › Model",
+      "quote": "Model : A11-xx(xx stands for any suffix)",
+      "test_method": "",
+      "test_condition": "manufacturer model code; xx stands for any suffix",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:54Z"
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "All AMS Series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "locator": "1.1 Hardware compatibility › PLA Aero row",
+      "quote": "PLA Aero | Only compatible with 0.4 mm nozzles | All printers compatible | Fully compatible with the AMS series",
+      "note": "The store page states «All AMS Series Compatible» (feature bullet) and also warns: «PLA Aero filament is relatively soft which may result in material loading and unloading failures during AMS printing.»"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "",
+      "target_label": "Open-frame printer (A Series, P1P, etc.)",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "3. AMS & AMS lite › PLA* row; Table Notes ②",
+      "quote": "PLA* | Compatible | Compatible | Compatible | — ② \"PLA\" here refers to standard PLA … This includes PLA Basic, PLA Matte, PLA Tough, PLA Metal, PLA Silk, PLA Aero, PLA Dynamic"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "",
+      "target_label": "Enclosed printer (H2 Series, X2D, P2S, X1 Series, P1S, etc.)",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "3. AMS & AMS lite › PLA* row; Table Notes ②",
+      "quote": "PLA* | Compatible | Compatible | Compatible | — ② \"PLA\" here refers to standard PLA … This includes PLA Basic, PLA Matte, PLA Tough, PLA Metal, PLA Silk, PLA Aero, PLA Dynamic"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_family": "",
+      "target_label": "Hotend with Hardened Steel Nozzle 0.6 mm",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-aero",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "corroborated_by": {
+        "source_url": "https://wiki.bambulab.com/en/filament/pla",
+        "locator": "3.2 › PLA Aero",
+        "quote": "it is not advisable to use 0.6 / 0.8 mm hardened steel nozzles, as the strong fluidity of the filaments can cause filament leakage"
+      },
+      "conflict": "TDS p.1 «Nozzle Size 0.4, 0.6, 0.8 mm»; PLA wiki table «Only compatible with 0.4 mm nozzles»"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_family": "",
+      "target_label": "Hotend with Hardened Steel Nozzle 0.8 mm",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-aero",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "corroborated_by": {
+        "source_url": "https://wiki.bambulab.com/en/filament/pla",
+        "locator": "3.2 › PLA Aero",
+        "quote": "it is not advisable to use 0.6 / 0.8 mm hardened steel nozzles, as the strong fluidity of the filaments can cause filament leakage"
+      },
+      "conflict": "TDS p.1 «Nozzle Size 0.4, 0.6, 0.8 mm»; PLA wiki table «Only compatible with 0.4 mm nozzles»"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_family": "",
+      "target_label": "Hotend with Stainless Steel Nozzle 0.2 mm",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-aero",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "corroborated_by": {
+        "source_url": "https://wiki.bambulab.com/en/filament/pla",
+        "locator": "3.2 › PLA Aero",
+        "quote": "It is not recommended to use a 0.2 mm stainless steel nozzle, as the filament expanded after foaming tends to swell during printing"
+      },
+      "conflict": "material-table wiki marks the generic PLA* row «Compatible» with a 0.2 mm nozzle; the product-specific statements are kept"
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+      "title": "Bambu PLA Aero Technical Data Sheet",
+      "version_label": "V4.0",
+      "language": "en",
+      "retrieved_at": "2026-10-16T08:23:52Z"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/3d202a3c9d2d4fe19b7317aa50b4eee0/SDS20251127A11_Bambu_PLA_Aero.pdf",
+      "title": "Bambu PLA Aero Safety Data Sheet",
+      "version_label": "SDS20251127A11",
+      "published_on": "2025-11-27",
+      "language": "en",
+      "retrieved_at": "2026-10-16T08:23:54Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "language": "en",
+      "retrieved_at": "2026-10-16T08:22:37Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "language": "en",
+      "retrieved_at": "2026-10-16T08:22:43Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "language": "en",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ]
+}

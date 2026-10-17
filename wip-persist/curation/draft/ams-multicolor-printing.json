@@ -1,0 +1,871 @@
+{
+  "handle": "ams-multicolor-printing",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T11:10:24Z",
+  "searched": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/x1/manual/intro-ams",
+      "title": "Introduction to AMS | Bambu Lab Wiki",
+      "keys": [
+        "ams.*",
+        "physical.*",
+        "electrical.*",
+        "connectivity.*",
+        "safety.*",
+        "printing.filament_runout_sensor",
+        "printing.filament_tangle_sensor",
+        "printing.filament_odometry",
+        "package.contents"
+      ],
+      "retrieved_at": "2026-10-16T08:24:52Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams/manual/ams-function-introduction",
+      "title": "AMS main functions and workflow introduction | Bambu Lab Wiki",
+      "keys": [
+        "ams.*",
+        "physical.*",
+        "electrical.*",
+        "safety.*",
+        "printing.filament_runout_sensor",
+        "printing.filament_tangle_sensor",
+        "printing.filament_odometry"
+      ],
+      "retrieved_at": "2026-10-16T08:24:46Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "keys": [
+        "ams.*",
+        "connectivity.*",
+        "electrical.*",
+        "physical.*",
+        "safety.*",
+        "compat.statement"
+      ],
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    }
+  ],
+  "specs": [
+    {
+      "key": "ams.slots",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/x1/manual/intro-ams",
+      "source_title": "Introduction to AMS | Bambu Lab Wiki",
+      "locator": "Filament Slot",
+      "quote": "The AMS has 4 filament slots, each filament slot has its own motor and gears to actively push the filament forward or wind it back to the spool.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:52Z",
+      "note": "Agrees with the store page description (\"Each Bambu Lab AMS is composed of 4 filament slots\"), which the package does not parse into a row."
+    },
+    {
+      "key": "connectivity.interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Two 6-pin ports on the back (daisy-chain)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › Cable Connection",
+      "quote": "Each AMS has two 6-pin ports on the back, allowing you to daisy-chain multiple AMS units.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "note": "The guide defines \"AMS\" as the AMS (first generation), AMS 2 Pro and AMS HT together. The same section: \"6-pin cables are required to connect AMS to 3D printer for power and communication\". The guide also notes the cable supplied with the AMS has a 1.1 mm step height (2.5 mm for AMS 2 Pro / AMS HT); no registry key holds it."
+    },
+    {
+      "key": "physical.operating_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "10–30 °C",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/x1/manual/intro-ams",
+      "source_title": "Introduction to AMS | Bambu Lab Wiki",
+      "locator": "Introduction (first paragraph)",
+      "quote": "when using AMS, please note that the ambient temperature must be maintained at 10-30 ℃ and the humidity must be less than 85%.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:52Z",
+      "note": "The same sentence requires humidity below 85%; no registry key for humidity applies to the ams type (part.humidity is parts-only)."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/ams-function-introduction",
+      "source_title": "AMS main functions and workflow introduction | Bambu Lab Wiki",
+      "locator": "AMS feeding system introduction › Filament hub",
+      "quote": "The odometer is used to determine whether the filament has been sent out of the AMS, and can also be used to calculate the length of the filament sent out.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:46Z",
+      "note": "The X1 manual page describes the same part as \"one magnetic rotary encoder\" in the Filaments Hub."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/ams-function-introduction",
+      "source_title": "AMS main functions and workflow introduction | Bambu Lab Wiki",
+      "locator": "The main functions of AMS › Filament run-out detection and auto-refill function",
+      "quote": "When you use AMS printing, it still has the filament run-out detection function",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:46Z",
+      "note": "Each filament slot also has a sensor to detect the filament (X1 manual, \"Filament Slot\"). Agrees with the store page feature bullet \"Filament Runout & Winding Detection\"."
+    },
+    {
+      "key": "printing.filament_tangle_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "Description › Filament Tangle Detection",
+      "quote": "When the filament at the toolhead encounters resistance, it may be that the filament is tangled or the spool is stuck, AMS can detect it immediately and suspend printing",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:19Z",
+      "note": "Store page prose only, so unverified. The connection guide attributes tangle detection to the filament buffer (\"The filament buffer assists with feeding filament from the AMS to the printer by adjusting the feeding speed and detecting filament tangles\"), which the store page lists in the box but which X1/P1 setups must otherwise buy separately."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793285681157",
+        "value_text": "A1 Series"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A1 Series Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS units (AMS, AMS 2 Pro, or AMS HT) connected at the same time. You can mix these models in any combination.",
+      "test_method": "",
+      "test_condition": "A1 series: up to 4 AMS units in total (AMS, AMS 2 Pro or AMS HT, any mix), through the A1 series AMS Hub",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "note": "Agrees with the A1 Series variant description (\"A1 series printer can connect up to 4 AMS units (including AMS HT, AMS, AMS 2 Pro).\")."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018497",
+        "value_text": "X1/P1 Series"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/x1/manual/intro-ams",
+      "source_title": "Introduction to AMS | Bambu Lab Wiki",
+      "locator": "AMS Hub",
+      "quote": "The AMS Hub replaces the filament Buffer. It allows the user to connect four AMS units, which in turn can supply 16 different filament spools to the printer.",
+      "test_method": "",
+      "test_condition": "X1/P1 series, through the AMS Hub: 4 units in total (AMS, AMS 2 Pro and AMS HT counted together)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:52Z",
+      "note": "The connection guide adds \"The X1/P1 supports up to 4 AMS 2 Pro or 4 AMS HT units — 4 units in total.\"; the X1/P1 variant descriptions say \"up to 4 AMS units (including AMS HT, AMS, AMS 2 Pro)\". All agree."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018498",
+        "value_text": "P2S"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "Variant description (P2S variants 692867724455018527 and 692867724455018533) › line 3",
+      "quote": "P2S printer can connect up to 4 AMS units (including AMS, AMS 2 Pro) and 4 AMS HT units.",
+      "test_method": "",
+      "test_condition": "P2S: AMS and AMS 2 Pro counted together; plus up to 4 AMS HT units",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:19Z",
+      "note": "The connection guide row names the second-generation units only (\"The P2S supports up to 4 AMS 2 Pro and 4 AMS HT units simultaneously — 8 units in total with 20 slots.\"); the store text names the AMS (first generation) explicitly, so it is the source."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018499",
+        "value_text": "H2S"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "Variant description (H2S variants 692867724455018539 and 692867724455018545) › line 3",
+      "quote": "H2 series printer can connect up to 4 AMS units (including AMS, AMS 2 Pro) and 8 AMS HT units.",
+      "test_method": "",
+      "test_condition": "H2S: AMS and AMS 2 Pro counted together; plus up to 8 AMS HT units",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:19Z",
+      "note": "The connection guide row names the second-generation units only (\"Supports up to 4 AMS 2 Pro units and 8 AMS HT units connected simultaneously.\"); the store text names the AMS (first generation) explicitly, so it is the source."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018500",
+        "value_text": "H2D/H2C"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "Variant description (H2D/H2C variants 692867724455018551 and 692867724455018557) › line 3",
+      "quote": "H2 series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro) and 8 AMS HT units .",
+      "test_method": "",
+      "test_condition": "H2D/H2C: AMS and AMS 2 Pro counted together; plus up to 8 AMS HT units",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:19Z",
+      "note": "The connection guide row names the second-generation units only (\"Supports up to 4 AMS 2 Pro units and 8 AMS HT units connected simultaneously.\"); the store text names the AMS (first generation) explicitly, so it is the source."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720832839102210049",
+        "value_text": "X2D"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "Variant description (X2D variant 720832839106404352) › line 1",
+      "quote": "X2D series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro) and 8 AMS HT units.",
+      "test_method": "",
+      "test_condition": "X2D: AMS and AMS 2 Pro counted together; plus up to 8 AMS HT units",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:19Z",
+      "note": "The connection guide row names the second-generation units only (\"Supports up to 4 AMS 2 Pro and 8 AMS HT units simultaneously.\"); the store text names the AMS (first generation) explicitly, so it is the source."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "738525025828491265",
+        "value_text": "A2 Series"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A2L Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS units and 1 AMS lite simultaneously",
+      "test_method": "",
+      "test_condition": "A2L: up to 4 AMS units (AMS, AMS 2 Pro and AMS HT counted together) plus 1 AMS lite",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "note": "The guide uses \"AMS\" for the AMS, AMS 2 Pro and AMS HT together. Agrees with the A2 Series variant descriptions (\"A2L series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro and AMS HT) and 1 AMS lite.\")."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "target_source_handle": "a1",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793285681157",
+        "value_text": "A1 Series"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "A1 Series Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS units (AMS, AMS 2 Pro, or AMS HT) connected at the same time.",
+      "note": "Needs the A1 series AMS Hub and printer firmware 01.07.00.00 or later."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "X1 Series",
+      "target_source_handle": "refurbished-x1c",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018497",
+        "value_text": "X1/P1 Series"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 1 AMS to the X1/P1 series printer, you need to purchase a Filament Buffer , a PTFE Tube Coupler , and a 4-pin Cable separately."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "P1 Series",
+      "target_source_handle": "p1s",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018497",
+        "value_text": "X1/P1 Series"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 1 AMS to the X1/P1 series printer, you need to purchase a Filament Buffer , a PTFE Tube Coupler , and a 4-pin Cable separately."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_source_handle": "p2s",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018498",
+        "value_text": "P2S"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "P2S › Accessories required",
+      "quote": "When pairing a standalone P2S with a standalone AMS, you also need to purchase a P2S filament buffer ."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "H2S",
+      "target_source_handle": "h2s",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018499",
+        "value_text": "H2S"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "H2 Series AMS Connection Guide › PTFE Tube Connection",
+      "quote": "When connecting two AMS units to the H2S, a 4-in-1 PTFE Adapter is also required.",
+      "note": "The H2 series filament buffer is built in."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "H2D",
+      "target_source_handle": "h2d",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018500",
+        "value_text": "H2D/H2C"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "H2 Series AMS Connection Guide",
+      "quote": "The connection method for AMS with H2D and H2C is the same.",
+      "note": "The H2 series filament buffer is built in."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "H2C",
+      "target_source_handle": "h2c",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018500",
+        "value_text": "H2D/H2C"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "H2 Series AMS Connection Guide",
+      "quote": "The connection method for AMS with H2D and H2C is the same.",
+      "note": "The H2 series filament buffer is built in."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "target_source_handle": "x2d",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720832839102210049",
+        "value_text": "X2D"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X2D Printer Connection Guide",
+      "quote": "Accessory Required: Scenarios with more than two AMS units require purchasing the 4-in-1 PTFE adapter II ."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "A2 Series",
+      "target_source_handle": "a2l",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "738525025828491265",
+        "value_text": "A2 Series"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "A2L Connection Guide › Accessories required",
+      "quote": "When connecting a single AMS to the A2L, no additional accessories are required",
+      "note": "A single AMS connects through the PTFE tube coupler included in the A2L tool kit."
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793285681157",
+        "value_text": "A1 Series"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "A1 Series Connection Guide › Maximum number of connected AMS units",
+      "quote": "Alternatively, you can connect one AMS lite — but the AMS lite cannot be combined with other AMS models.",
+      "note": "On the A1 series only: the AMS lite and this AMS cannot be connected at the same time. The A2L takes 4 AMS units and 1 AMS lite together."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "hub",
+      "target_label": "A1 series AMS Hub",
+      "target_source_handle": "ams-hub-a1-series",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793285681157",
+        "value_text": "A1 Series"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "A1 Series Connection Guide › Accessories required",
+      "quote": "To connect AMS, AMS 2 Pro, or AMS HT, an A Series AMS Hub are required, which should be purchased seperately.",
+      "note": "The guide also warns: \"Do not use the filament buffer or AMS Hub included with the AMS to connect an A series printer to the AMS.\""
+    },
+    {
+      "relation": "requires",
+      "target_kind": "buffer",
+      "target_label": "Filament Buffer",
+      "target_source_handle": "filament-buffer",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018515",
+        "value_text": "X1/P1 Series / Connect 1 AMS unit / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 1 AMS to the X1/P1 series printer, you need to purchase a Filament Buffer , a PTFE Tube Coupler , and a 4-pin Cable separately.",
+      "note": "Only for one AMS unit. The package attaches the same requirement to both X1/P1 variants because their descriptions are identical."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "PTFE Tube Coupler",
+      "target_source_handle": "ptfe-tube-coupler",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018515",
+        "value_text": "X1/P1 Series / Connect 1 AMS unit / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 1 AMS to the X1/P1 series printer, you need to purchase a Filament Buffer , a PTFE Tube Coupler , and a 4-pin Cable separately.",
+      "note": "Only for one AMS unit. The package attaches the same requirement to both X1/P1 variants because their descriptions are identical."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "4-pin Cable (CAB002-N)",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018515",
+        "value_text": "X1/P1 Series / Connect 1 AMS unit / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 1 AMS to the X1/P1 series printer, you need to purchase a Filament Buffer , a PTFE Tube Coupler , and a 4-pin Cable separately.",
+      "note": "Only for one AMS unit. The package attaches the same requirement to both X1/P1 variants because their descriptions are identical. CAB002-N is unresolved in compat-targets.json (ambiguous_target_needs_review): no crawled page carries it."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "hub",
+      "target_label": "AMS Hub",
+      "target_source_handle": "ams-hub",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018521",
+        "value_text": "X1/P1 Series / Connect 2 or more AMS units / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 2 or more AMS units to the X1/P1, you need to purchase a AMS Hub , a PTFE Tube Coupler , and a 4-pin Cable separately.",
+      "note": "For 2 or more AMS units."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "PTFE Tube Coupler",
+      "target_source_handle": "ptfe-tube-coupler",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018521",
+        "value_text": "X1/P1 Series / Connect 2 or more AMS units / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 2 or more AMS units to the X1/P1, you need to purchase a AMS Hub , a PTFE Tube Coupler , and a 4-pin Cable separately.",
+      "note": "For 2 or more AMS units."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "4-pin Cable (CAB002-N)",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018521",
+        "value_text": "X1/P1 Series / Connect 2 or more AMS units / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 2 or more AMS units to the X1/P1, you need to purchase a AMS Hub , a PTFE Tube Coupler , and a 4-pin Cable separately.",
+      "note": "For 2 or more AMS units. CAB002-N is unresolved in compat-targets.json (ambiguous_target_needs_review)."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "buffer",
+      "target_label": "P2S Filament Buffer",
+      "target_source_handle": "filament-buffer-p2s",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692867724455018498",
+        "value_text": "P2S"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "P2S › Accessories required",
+      "quote": "When pairing a standalone P2S with a standalone AMS, you also need to purchase a P2S filament buffer .",
+      "note": "A standalone P2S only: \"The P2S Combo includes a filament buffer — no additional purchase is needed.\""
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018533",
+        "value_text": "P2S / Connect 3 or more AMS units / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "P2S › PTFE Tube Connection",
+      "quote": "When connecting 3 or more AMS units, 4-in-1 PTFE Adapters are required to connect the PTFE tubes.",
+      "note": "Not needed for one or two AMS units (\"If using only two AMS units, no 4-in-1 PTFE adapter is needed\"); the package attaches it to both P2S variants because their descriptions are identical."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018545",
+        "value_text": "H2S / Connect 2 or more AMS units / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "H2 Series AMS Connection Guide › PTFE Tube Connection",
+      "quote": "When connecting two AMS units to the H2S, a 4-in-1 PTFE Adapter is also required."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018557",
+        "value_text": "H2D/H2C / Connect 3 or more AMS units / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "H2 Series AMS Connection Guide › PTFE Tube Connection",
+      "quote": "If you need to use 2 AMS units plus an external spool, or 3 or more AMS units, you need to use a 4-in-1 PTFE Adapter for expansion.",
+      "note": "For the H2D. The H2C needs the H2 series dedicated version (see the next relation)."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "H2 Series Dedicated 4-in-1 PTFE Adapter (4-in-1 PTFE Adapter II, SA014)",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "692867724455018557",
+        "value_text": "H2D/H2C / Connect 3 or more AMS units / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "4-in-1 PTFE Adapter › Types › Note",
+      "quote": "The H2C printer requires the H2 series dedicated 4-in-1 PTFE Adapter, while the P2S and X2D requires the standard 4-in-1 PTFE Adapter.",
+      "note": "H2C only. The store page words it as a recommendation (\"For better performance, we recommend 4-in-1 PTFE Adapter II (SA014) for H2C.\"). No manifest product is this adapter, so the target is unresolved."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "720832839106404358",
+        "value_text": "X2D / Connect 3 or more AMS units / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "X2D Printer Connection Guide › PTFE Tube Connection",
+      "quote": "To use 2 AMS units plus an external spool, or 3 or more AMS units, a 4-in-1 PTFE adapter is required.",
+      "note": "CONFLICT for review: the same guide says the X2D needs the standard adapter (\"the P2S and X2D requires the standard 4-in-1 PTFE Adapter\") and, in the X2D section, \"the 4-in-1 PTFE adapter II\"; the store X2D variant says \"To connect 3 or more AMS units, a PTFE Tube Coupler(FAZ006) is required.\" (the package writes requires PTFE Tube Coupler from it)."
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "738525025828491272",
+        "value_text": "A2 Series / Connect 2 or more AMS units / AMS"
+      },
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "locator": "A2L Connection Guide › Accessories required",
+      "quote": "If you need to connect two or more AMS units, you will need to purchase an additional 4-in-1 PTFE Adapter ."
+    }
+  ],
+  "in_the_box": [
+    {
+      "text": "AMS",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "What's in the box › 1",
+      "quote": "AMS",
+      "retrieved_at": "2026-10-16T06:57:19Z"
+    },
+    {
+      "text": "PTFE Tube",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "What's in the box › 2",
+      "quote": "PTFE Tube",
+      "retrieved_at": "2026-10-16T06:57:19Z"
+    },
+    {
+      "text": "Bus Cable - 6pin & Bus Cable - 4pin",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "What's in the box › 3",
+      "quote": "Bus Cable - 6pin & Bus Cable - 4pin",
+      "retrieved_at": "2026-10-16T06:57:19Z"
+    },
+    {
+      "text": "Spare Filament Cutter",
+      "qty": 2,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "What's in the box › 4",
+      "quote": "Spare Filament Cutter (x2)",
+      "retrieved_at": "2026-10-16T06:57:19Z"
+    },
+    {
+      "text": "PTFE Tube Connector",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "What's in the box › 5",
+      "quote": "PTFE Tube Connector",
+      "retrieved_at": "2026-10-16T06:57:19Z"
+    },
+    {
+      "text": "Filament Buffer",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "What's in the box › 6",
+      "quote": "Filament Buffer",
+      "retrieved_at": "2026-10-16T06:57:19Z",
+      "note": "For review: the Important notice says \"All accessories mentioned in the description need to be purchased separately\" and the X1/P1 variants list a Filament Buffer(SA003) as required; the connection guide confirms the AMS ships with a filament buffer or AMS Hub (\"Do not use the filament buffer or AMS Hub included with the AMS to connect an A series printer\")."
+    },
+    {
+      "text": "Reusable Spool",
+      "qty": 3,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "What's in the box › 7",
+      "quote": "Reusable Spool (x3)",
+      "retrieved_at": "2026-10-16T06:57:19Z"
+    },
+    {
+      "text": "High Temperature Reusable Spool",
+      "qty": null,
+      "section": "",
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-multicolor-printing",
+      "source_title": "Bambu Lab AMS - Automatic Material System: store page",
+      "locator": "What's in the box › 8",
+      "quote": "High Temperature Reusable Spool",
+      "retrieved_at": "2026-10-16T06:57:19Z"
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "title": "Connection Guide for Multiple AMS Units with Different Printer Models",
+      "text": "Connection Guide for Multiple AMS Units with Different Printer Models",
+      "note": "Linked from the store page's Important notice ('Multiple AMS Units Connection Guide'); the package does not collect it."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/x1/manual/intro-ams",
+      "title": "Introduction to AMS",
+      "text": "Introduction to AMS",
+      "note": "Linked from the store page ('how AMS works')."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams/manual/ams-function-introduction",
+      "title": "AMS main functions and workflow introduction",
+      "text": "AMS main functions and workflow introduction",
+      "note": "Linked from the store page ('AMS feeding system introduction')."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "note": "Linked from the store page ('Filament Guide'). Its 'AMS / AMS lite Compatibility' column covers every AMS model and is not used to replace the store page's own Supported / Unsupported Filament rows."
+    }
+  ],
+  "not_published": [
+    "electrical.voltage",
+    "electrical.current",
+    "electrical.rated_power",
+    "electrical.max_power",
+    "safety.certifications",
+    "physical.noise"
+  ]
+}

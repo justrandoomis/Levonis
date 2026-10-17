@@ -1,0 +1,3301 @@
+{
+ "batch": 35,
+ "surface": "api",
+ "handles": [
+  "universal-joint-shaft-coupling-with-screws",
+  "ac-dc-power-adapter",
+  "m3-carbon-steel-full-thread-rod",
+  "m3-aluminum-rod-end-ball-joint",
+  "dc5521-female-to-2pin-solderless-quick-connector",
+  "sh1-0-to-sh1-0-connector-adapter-board",
+  "sh1-0-to-ph2-0-power-adapter-board",
+  "foldable-key-phone-stand",
+  "360-rotating-marble-run-enclosed-with-lights",
+  "wankel-engine-motorized",
+  "white-cct-tunable-cob-led-strip-light-combo-kit",
+  "p1s-x1-door-hinge-180-270-v3-adjustable",
+  "led-light-strip-256rgb-5050led-815mm",
+  "snapatrack",
+  "bike-saddle-rail",
+  "round-shoelace",
+  "the-limit-of-possibility-no-electronics",
+  "bambu-lab-stickers",
+  "moca-mobile-phone-cage-kit",
+  "0-3mm-transparent-pvc-sheet-5pcs",
+  "plastic-differential-gear-kit-1pcs",
+  "ws2812-rgb-led-with-idc0-8-4pin-2pcs",
+  "ws2812-led-hub-with-3pin-sh1-0-connector-1pcs",
+  "rubber-tire-4pcs",
+  "cyberbrick-hardware-kit",
+  "7-4v-lithium-battery-charger-with-xh2-54-connector-1pcs",
+  "cyberbrick-timelapse-kit",
+  "sh1-0-to-dual-sh1-0-adapter-2pcs",
+  "multi-function-controller-core-1pcs",
+  "remote-control-receiver-shield-1pcs",
+  "remote-control-transmitter-shield-1pcs",
+  "single-axis-joystick-module-with-3pin-sh1-0-connector-1pcs",
+  "dual-axis-joystick-module-with-3pin-sh1-0-connectors-1pcs",
+  "power-switch-module-with-2pin-xh2-54-connector-1pcs",
+  "momentary-button-module-with-2pin-sh1-0-connector-1pcs",
+  "14500-7-4v-800mah-li-ion-battery-1pcs",
+  "1-4-camera-screw-3pcs",
+  "1-4-camera-quick-release-plate-nut-2pcs",
+  "ams-flipper-for-p1s-x1-series",
+  "adjustable-hand-wrist-strap",
+  "1-4-aluminium-alloy-screw-3pcs-fc011",
+  "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+  "lipo-battery-fireproof-storage-bag",
+  "type-c-female-head-to-ph2-0-power-supply-cable",
+  "20w-dual-port-fast-charger-1pcs",
+  "cyberbrick-tank",
+  "duel-bumper-car-cyberbrick",
+  "dodgebot-for-cyberbrick",
+  "blv-ams-ams-2-riser-for-x1c-p1s-v3-1",
+  "flexi-skeleton-–-fun-and-spooky-articulated-fidget",
+  "helicopter-kit",
+  "h2d-h2s-h2c-toolbox",
+  "retracting-spool-holder"
+ ],
+ "strings": [
+  {
+   "h": "3f3a915fb22661ff4938a2d557bdb8cfb57414337c9b44893f283cb7d2dc84e2",
+   "en": "M1 (mm) Nominal Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "universal-joint-shaft-coupling-with-screws",
+    "title": "Universal Joint Shaft Coupling with Screws",
+    "field": "blocks[3].line[0].cell[2]",
+    "near": "FC002 | 2.0 | 2.0 | 3.0 | 7.0 | 13.6"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb4126da484cc8c48cc5bcaae2b8a1af917f795302990613cf2508a49f632e63",
+   "en": "M2 (mm) Nominal Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "universal-joint-shaft-coupling-with-screws",
+    "title": "Universal Joint Shaft Coupling with Screws",
+    "field": "blocks[3].line[0].cell[3]",
+    "near": "FC002 | 2.0 | 2.0 | 3.0 | 7.0 | 13.6"
+   },
+   "dict": null
+  },
+  {
+   "h": "5edd8de78f877dbf954833d041796f84668ffb026ab5a8b75434dee45b25a514",
+   "en": "Robotics: Connect motors and drive components for flexible movement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "universal-joint-shaft-coupling-with-screws",
+    "title": "Universal Joint Shaft Coupling with Screws",
+    "field": "blocks[4].line[1]",
+    "near": "Applications"
+   },
+   "dict": null
+  },
+  {
+   "h": "794bb0a1018fd9e2e6308c3e03e18a4720650cc45676b1a04df9a7216c6ad54f",
+   "en": "3D Printers: Ensure smooth movement and accurate positioning of the print head.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "universal-joint-shaft-coupling-with-screws",
+    "title": "Universal Joint Shaft Coupling with Screws",
+    "field": "blocks[4].line[2]",
+    "near": "• Robotics: Connect motors and drive components for flexible movement."
+   },
+   "dict": null
+  },
+  {
+   "h": "a2e54f7f1c81e67c45e1b72d6fe91681530f25bcd078a8dc019d10849bc44e7e",
+   "en": "DIY Vehicles: Connect motors and wheels in an electric scooter or go-kart.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "universal-joint-shaft-coupling-with-screws",
+    "title": "Universal Joint Shaft Coupling with Screws",
+    "field": "blocks[4].line[3]",
+    "near": "• 3D Printers: Ensure smooth movement and accurate positioning of the print head."
+   },
+   "dict": null
+  },
+  {
+   "h": "146a3920a045e87ca0819ab78ce7e22d52dd2bd624916bd170644fde1da979cf",
+   "en": "Mechanical Art Installations: Add motion to artwork and engage audiences.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "universal-joint-shaft-coupling-with-screws",
+    "title": "Universal Joint Shaft Coupling with Screws",
+    "field": "blocks[4].line[4]",
+    "near": "• DIY Vehicles: Connect motors and wheels in an electric scooter or go-kart."
+   },
+   "dict": null
+  },
+  {
+   "h": "69e7dce9ffe7c225a700e0454708d78539bcf274037c8377c39a3b991e894649",
+   "en": "Connector Type",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "ac-dc-power-adapter",
+    "title": "AC to DC Power Adapter",
+    "field": "blocks[1].line[0].cell[1]",
+    "near": "B-XB004 | Barrel Connector | 4.0x1.7mm | 12V DC | 2A | 100-240V 50/60Hz | 1.2m"
+   },
+   "dict": null
+  },
+  {
+   "h": "ce8176aac0ebdb05869bfce14495c4ae23910162e464f7003944c3b47c5f2644",
+   "en": "DC Plug (mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "ac-dc-power-adapter",
+    "title": "AC to DC Power Adapter",
+    "field": "blocks[1].line[0].cell[2]",
+    "near": "B-XB004 | Barrel Connector | 4.0x1.7mm | 12V DC | 2A | 100-240V 50/60Hz | 1.2m"
+   },
+   "dict": null
+  },
+  {
+   "h": "0822213a0867e94e1df630d032d67aaf866a951c763280cfe2c94aa63690c189",
+   "en": "Input Voltage （Volts）",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "ac-dc-power-adapter",
+    "title": "AC to DC Power Adapter",
+    "field": "blocks[1].line[0].cell[3]",
+    "near": "B-XB004 | Barrel Connector | 4.0x1.7mm | 12V DC | 2A | 100-240V 50/60Hz | 1.2m"
+   },
+   "dict": null
+  },
+  {
+   "h": "97eb779226964d8f41895dd22f78c2dbcde0a18770cc3e00fabdf8dec9157210",
+   "en": "Amperage Current （Amps）",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "ac-dc-power-adapter",
+    "title": "AC to DC Power Adapter",
+    "field": "blocks[1].line[0].cell[4]",
+    "near": "B-XB004 | Barrel Connector | 4.0x1.7mm | 12V DC | 2A | 100-240V 50/60Hz | 1.2m"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d04001a5fd63fc4f3a61179865a1f6a3d888b359e58f48ae406d816a0fc65ca",
+   "en": "Barrel Connector",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "ac-dc-power-adapter",
+    "title": "AC to DC Power Adapter",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "Product ID | Connector Type | DC Plug (mm) | Input Voltage （Volts） | Amperage Current （Amps） | Input | Wire Length"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad4bca9ea9cdaa7ba409965d5ccc317651dc9ff48ab54f255285c06048d3de39",
+   "en": "The 12V 2A adapter is suitable for the Magnetic Levitation DIY Kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ac-dc-power-adapter",
+    "title": "AC to DC Power Adapter",
+    "field": "blocks[2].line[1]",
+    "near": "Applications"
+   },
+   "dict": null
+  },
+  {
+   "h": "4769b81ba59dc6b43699c55b695af11b30da68180d74ae3e09195b1fe2d127e4",
+   "en": "Supports any device that requires 12V or 24V with a power output of up to 2A.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ac-dc-power-adapter",
+    "title": "AC to DC Power Adapter",
+    "field": "blocks[2].line[2]",
+    "near": "• The 12V 2A adapter is suitable for the Magnetic Levitation DIY Kit."
+   },
+   "dict": null
+  },
+  {
+   "h": "464eb97f45792f1a154a37c1bda096d80ec2df2f0f7e7c89ddb36d529d6d6551",
+   "en": "The adapter's maximum output of 2A ensures it can supply up to, but not exceeding, 2A. For example, if your device requires 1.5A, it will receive 1.5A. However, if your device demands more than 2A, the adapter will be limited to supplying only 2A, which may not be sufficient for your device's needs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ac-dc-power-adapter",
+    "title": "AC to DC Power Adapter",
+    "field": "blocks[3].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "14ae94b1b3641abf6537bb077b902c9bc7fab1cea8f3213c18895a92df92e82a",
+   "en": "This fully threaded rod is made from high-quality carbon steel, and is available in M3x16mm and M3x30mm sizes. It's durable and great for various DIY projects. Primarily used to connect nuts and secure components, it serves as an essential fixture in U-bolts, hangers, and other applications. Additionally, it pairs perfectly with M3 Aluminum Rod End Ball Joints, offering an effective solution for connections and flexible movement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m3-carbon-steel-full-thread-rod",
+    "title": "M3 Carbon Steel Full-Thread Rod",
+    "field": "blocks[2].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "2d5b436da7905f1a058a1803871aa8bf8d2cb7c2945a96d70f33e6b4956338ae",
+   "en": "Tightening Connections: Used to fasten two or more components together, providing a stable connection.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m3-carbon-steel-full-thread-rod",
+    "title": "M3 Carbon Steel Full-Thread Rod",
+    "field": "blocks[4].line[1]",
+    "near": "Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "931b82676c69cf84eda285a9d5e3793db407c18ad7b7c86efc6b83241b3701b5",
+   "en": "Adjustment Devices: Can be used to adjust positions or heights, commonly found in brackets or mechanical structures.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m3-carbon-steel-full-thread-rod",
+    "title": "M3 Carbon Steel Full-Thread Rod",
+    "field": "blocks[4].line[2]",
+    "near": "• Tightening Connections: Used to fasten two or more components together, providing a stable connection."
+   },
+   "dict": null
+  },
+  {
+   "h": "c0d0752776efe7cab70accc1bd8f748cab4bafb4331e7c619a2e22805ecc328f",
+   "en": "Easy Attachments for Motive Designs: It works great with M3 aluminum rod-end ball joints, allowing for easy attachment and movement. By installing the ball head on top of the fully-thread rod, you can easily achieve design like robotic arms, brackets, and other motive designs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m3-carbon-steel-full-thread-rod",
+    "title": "M3 Carbon Steel Full-Thread Rod",
+    "field": "blocks[4].line[3]",
+    "near": "• Adjustment Devices: Can be used to adjust positions or heights, commonly found in brackets or mechanical structures."
+   },
+   "dict": null
+  },
+  {
+   "h": "6fe3bcc519d033af983233265310f472d6e058422f611b5ba4b6131848e144cf",
+   "en": "High-Quality Aluminum Alloy:Made from durable aluminum alloy, offering excellent corrosion resistance, wear protection, and a lightweight design.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "blocks[3].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "e770ae987c67bc08f278989f1e1f06dad4cb71e25b898868920e43abc02e3d9f",
+   "en": "Smooth & Precise Movement:The ball joint ensures smooth articulation, making it ideal for RC car suspensions, steering systems, and other pivot-based mechanisms.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "blocks[3].line[2]",
+    "near": "• High-Quality Aluminum Alloy:Made from durable aluminum alloy, offering excellent corrosion resistance, wear protection, and a lightweight design."
+   },
+   "dict": null
+  },
+  {
+   "h": "0945fbea70fd303f3b165242e3d485ecdab498a48452cc4d977882621c536468",
+   "en": "Flexible & Practical Applications:Compatible with fully threaded rods, making assembly easy and secure. Ideal for RC car upgrades, robotics, and custom 3D-printed projects requiring reliable pivoting components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "blocks[3].line[3]",
+    "near": "• Smooth & Precise Movement:The ball joint ensures smooth articulation, making it ideal for RC car suspensions, steering systems, and other pivot-based mechanis"
+   },
+   "dict": null
+  },
+  {
+   "h": "5c16b50b95484f6128c5896d1613f5b88c4b27380a78da65e3532c7d43e30a86",
+   "en": "Important Notices",
+   "kind": "block_title",
+   "freq": 22,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "blocks[4].line[0]",
+    "near": "• Torque limit: Do not overtighten the M3 screws when installing the ball joint to prevent stripping the aluminum threads."
+   },
+   "dict": null
+  },
+  {
+   "h": "436f39b06a999e2765506d8b35085c89254b5fcc963b8fa7912c0085ae03593a",
+   "en": "Torque limit: Do not overtighten the M3 screws when installing the ball joint to prevent stripping the aluminum threads.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "blocks[4].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "8569d66a328d499f4402868e1ff7f38334e16b0231dc12a8347d6382abcb3e44",
+   "en": "Choking hazard: This product contains small parts. Keep out of reach of children to avoid accidental ingestion.",
+   "kind": "block_line",
+   "freq": 10,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "blocks[4].line[2]",
+    "near": "• Torque limit: Do not overtighten the M3 screws when installing the ball joint to prevent stripping the aluminum threads."
+   },
+   "dict": null
+  },
+  {
+   "h": "4ff244e649610e928c4ffab9329c0bb06d52cb6139804210d253ba7c457c174e",
+   "en": "Always disconnect power before installation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dc5521-female-to-2pin-solderless-quick-connector",
+    "title": "DC5521 Female to 2PIN Solderless Quick Connector",
+    "field": "blocks[0].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d62d382165b16b84c1595d70595c447adf4920ce8b587d45b55d4cfff5ff85b",
+   "en": "Do not connect to power adapters exceeding 24V to prevent potential damage or safety risks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dc5521-female-to-2pin-solderless-quick-connector",
+    "title": "DC5521 Female to 2PIN Solderless Quick Connector",
+    "field": "blocks[0].line[2]",
+    "near": "• Always disconnect power before installation."
+   },
+   "dict": null
+  },
+  {
+   "h": "2ca8f658f124522f4d3e08af9e5c0fd9ca66dc9cfa7b3914a4a32e1dc3e1b323",
+   "en": "Keep out of reach of children. This product is not a toy and should be handled responsibly.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "dc5521-female-to-2pin-solderless-quick-connector",
+    "title": "DC5521 Female to 2PIN Solderless Quick Connector",
+    "field": "blocks[0].line[3]",
+    "near": "• Do not connect to power adapters exceeding 24V to prevent potential damage or safety risks."
+   },
+   "dict": null
+  },
+  {
+   "h": "59b5ef0e948e9f58d0776c3584502076fa5aab5337c723cac671401cdd754d38",
+   "en": "The SH1.0 to SH1.0 Connector Adapter Board facilitates seamless SH1.0 connection, delivering reliable signal and power transmission for compact devices and modular systems. It can also be paired with a Wire Pair with SH1.0 connectors, serving as an extension kit for enhanced SH1.0 connection capabilities.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "c15ecff9cdff82e1fc235357f32a452b4361753e26024998b701316f97da2ea9",
+   "en": "Operating Current (A)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[2].line[0].cell[2]",
+    "near": "XA013 | SH1.0 to SH1.0 | 1A | 3~6V | 12.7*5.2*4.74"
+   },
+   "dict": null
+  },
+  {
+   "h": "290e55882f59cef4472ea6e88eeccdb056d75d9f6538d70f721d4179ddaa8dac",
+   "en": "Operating Voltage (V)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[2].line[0].cell[3]",
+    "near": "XA013 | SH1.0 to SH1.0 | 1A | 3~6V | 12.7*5.2*4.74"
+   },
+   "dict": null
+  },
+  {
+   "h": "3627e06931ee137689b3019174cca7fc2d465242e7d408b8f352b8ffe85961ae",
+   "en": "Product Dimensions (mm)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[2].line[0].cell[4]",
+    "near": "XA013 | SH1.0 to SH1.0 | 1A | 3~6V | 12.7*5.2*4.74"
+   },
+   "dict": null
+  },
+  {
+   "h": "c80f10c7053dcc5d352fdb16fbacda1edff43a00fbb408be14401905bd912ae7",
+   "en": "SH1.0 to SH1.0",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Product ID | Connector Type | Operating Current (A) | Operating Voltage (V) | Product Dimensions (mm)"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d74cf218775f3a17cf20bfef12d95b8af9a5f8e1e810036ec21aef107f4b573",
+   "en": "Embedded system development: Ideal for prototyping and integrating components in embedded system projects.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[3].line[1]",
+    "near": "Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "40c5ad77668371d7e7aac04ee80523e16854f1aa79373186b5935cb080e068f0",
+   "en": "Circuit debugging and testing: Simplifies troubleshooting and ensures reliable circuit performance during testing.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[3].line[2]",
+    "near": "• Embedded system development: Ideal for prototyping and integrating components in embedded system projects."
+   },
+   "dict": null
+  },
+  {
+   "h": "add9624638c1196c6d25e0208baffde9b0edfe98023047a669d91ce5cc53dd63",
+   "en": "Modular device interconnections: Enables seamless connectivity between modular devices for efficient integration.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[3].line[3]",
+    "near": "• Circuit debugging and testing: Simplifies troubleshooting and ensures reliable circuit performance during testing."
+   },
+   "dict": null
+  },
+  {
+   "h": "bb4a5218766edb66a0a15e197a089c89f827c1c85b3bc8aa7f8c000c013d3022",
+   "en": "Signal and power transmission for compact devices: Ensures stable signal and power flow in space-constrained device setups.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[3].line[4]",
+    "near": "• Modular device interconnections: Enables seamless connectivity between modular devices for efficient integration."
+   },
+   "dict": null
+  },
+  {
+   "h": "74658662cafd543fb5a851749555f87b1598bb9a3e4d18525ee3dea5db9190cc",
+   "en": "Pin alignment: Ensure correct pin alignment when connecting cables. Reversing the polarity may cause short circuits and damage connected devices.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "blocks[4].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "86040aa5a595bed479ff4c11148ab6b0907a02dc9837f8e873bd24613ee8eaed",
+   "en": "The SH1.0 to PH2.0 Power Adapter Board enables fast and reliable connections between SH1.0 and PH2.0 interfaces, ensuring stable power delivery for embedded devices and modular systems. It can be paired with a USB-A Power Cable with PH2.0 Connector to supply power to SH1.0-compatible devices, such as the 030 Micro DC Motor with SH1.0 interface.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-ph2-0-power-adapter-board",
+    "title": "SH1.0 to PH2.0 Power Adapter Board",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb8b4b64e39da84b999317b0f25172cd9631030a1034f9b72ee42b06c47a5158",
+   "en": "SH1.0 to PH2.0",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-ph2-0-power-adapter-board",
+    "title": "SH1.0 to PH2.0 Power Adapter Board",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Product ID | Connector Type | Operating Current (A) | Operating Voltage (V) | Product Dimensions (mm)"
+   },
+   "dict": null
+  },
+  {
+   "h": "3647b48a852205f25924a3bdcda7884efba449c78640f0c4017642241d125fc4",
+   "en": "Embedded system development: Ideal for prototyping and integrating components in embedded system projects",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-ph2-0-power-adapter-board",
+    "title": "SH1.0 to PH2.0 Power Adapter Board",
+    "field": "blocks[3].line[1]",
+    "near": "Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "1664fdc8ccd79d868d693841023130bc872b7298719b8e472efd1cd1f02e3e85",
+   "en": "Circuit debugging and testing: Simplifies troubleshooting and ensures reliable circuit performance during testing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-ph2-0-power-adapter-board",
+    "title": "SH1.0 to PH2.0 Power Adapter Board",
+    "field": "blocks[3].line[2]",
+    "near": "• Embedded system development: Ideal for prototyping and integrating components in embedded system projects"
+   },
+   "dict": null
+  },
+  {
+   "h": "31a0b8e6e5a3adda3e11dba66ef7a5cf733c8d17f3dbfe5721e2fa40710e0403",
+   "en": "Modular device interconnections: Enables seamless connectivity between modular devices for efficient integration",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-ph2-0-power-adapter-board",
+    "title": "SH1.0 to PH2.0 Power Adapter Board",
+    "field": "blocks[3].line[3]",
+    "near": "• Circuit debugging and testing: Simplifies troubleshooting and ensures reliable circuit performance during testing"
+   },
+   "dict": null
+  },
+  {
+   "h": "146c2b16544771b657f06e8dc3e11ee5d98b4af88806e799f453aeab886ff482",
+   "en": "Signal and power transmission for compact devices: Ensures stable signal and power flow in space-constrained device setups",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-ph2-0-power-adapter-board",
+    "title": "SH1.0 to PH2.0 Power Adapter Board",
+    "field": "blocks[3].line[4]",
+    "near": "• Modular device interconnections: Enables seamless connectivity between modular devices for efficient integration"
+   },
+   "dict": null
+  },
+  {
+   "h": "082c56adabb70f2e4cff32d7ed0a52feef4b24647669893b11c7c90c16a2200e",
+   "en": "To download the model files please visit the Foldable Key Phone Stand on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "foldable-key-phone-stand",
+    "title": "Foldable Key Phone Stand",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "ceda3a2735dd31a1b91d946a8c85662e8e3b89518fdf75f0e36f6f4cb7eadfc9",
+   "en": "To download the model files please visit the 360˚ Rotating Marble Run - Enclosed with Lights on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "360-rotating-marble-run-enclosed-with-lights",
+    "title": "360˚ Rotating Marble Run - Enclosed with Lights",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "0f61c0988e08d11d4cbafb528f5fb64f22161e5c871cbc59d82501d7ef53bf5d",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Wankel engine - motorized. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wankel-engine-motorized",
+    "title": "Wankel engine - motorized",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d45b8f4255fcafdde7a169471c3575db2654aa28e08c67da7c4c1c76d8fed34c",
+   "en": "To download the model files please visit the Wankel engine - motorized on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wankel-engine-motorized",
+    "title": "Wankel engine - motorized",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "d4dceceead6f268b64b51a086251583f7007baa0442140a8cf4295301284373e",
+   "en": "Power Safety",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbf199f36ebca57df34577d3db0ca4274ab3c6245325bdd72c5ab8e7318aa3fc",
+   "en": "1. Always disconnect the power supply before starting any installation to prevent electric shock or short circuits.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[2]",
+    "near": "Power Safety"
+   },
+   "dict": null
+  },
+  {
+   "h": "3cdd0b7797de42296afcc857ec09695781a09b28fd6d1e1778c8c27d80959e90",
+   "en": "2. Ensure you are using the correct voltage as specified on the product to avoid damage, overheating, or potential fire hazards.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[3]",
+    "near": "1. Always disconnect the power supply before starting any installation to prevent electric shock or short circuits."
+   },
+   "dict": null
+  },
+  {
+   "h": "9f3b65d35380d1d23e870075b3468f6e97e9cac8c856fbd14ece52cb360abdf6",
+   "en": "3. Total connected length must not exceed 3 meters with the included adapter, as doing so triggers overload protection and will result in an abnormal power supply.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[4]",
+    "near": "2. Ensure you are using the correct voltage as specified on the product to avoid damage, overheating, or potential fire hazards."
+   },
+   "dict": null
+  },
+  {
+   "h": "997f48c240a6cc3a488ca11c7ea6dedd835a7182f4da184cf0a495cb04d5f6b2",
+   "en": "Cutting & Bending",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[5]",
+    "near": "3. Total connected length must not exceed 3 meters with the included adapter, as doing so triggers overload protection and will result in an abnormal power supp"
+   },
+   "dict": null
+  },
+  {
+   "h": "280760e39cd619555574e9264f7a6bfa6b632befbd036ae14f2da8319719073a",
+   "en": "1. Cut only along the predefined cut marks to maintain electrical continuity and proper function. Cutting in the wrong place may lead to circuit failure.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[6]",
+    "near": "Cutting & Bending"
+   },
+   "dict": null
+  },
+  {
+   "h": "3cf0e7eaf7919190087e2903b86e48fb950dc57322727ce3a8038b76fbf95e26",
+   "en": "2. Avoid bending or twisting the lamp strip over very short distances, as this can damage internal wiring and compromise durability.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[7]",
+    "near": "1. Cut only along the predefined cut marks to maintain electrical continuity and proper function. Cutting in the wrong place may lead to circuit failure."
+   },
+   "dict": null
+  },
+  {
+   "h": "a60085b0e31ef64d8fd15a75ea28c44266cb8c54354e80048d5c6c338db9bb6e",
+   "en": "3. If bending is required, do so gradually and within the recommended bending radius to prevent breakage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[8]",
+    "near": "2. Avoid bending or twisting the lamp strip over very short distances, as this can damage internal wiring and compromise durability."
+   },
+   "dict": null
+  },
+  {
+   "h": "2dc0dfa8e595dcca90294bf5fd089624646a028c40c1248003adddca87746238",
+   "en": "Soldering & Heat Protection",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[9]",
+    "near": "3. If bending is required, do so gradually and within the recommended bending radius to prevent breakage."
+   },
+   "dict": null
+  },
+  {
+   "h": "0cbd48111edc0a962429aaae01807016796ffe897cbb8a22ccbedb14cfc3f623",
+   "en": "1. Use a soldering iron with appropriate temperature control when attaching wiring heads to avoid overheating components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[10]",
+    "near": "Soldering & Heat Protection"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a1e2b769e4d2ce30172c769467facdbdc801e9051882e819bbd451528a94a74",
+   "en": "2. Keep the luminescent colloid (LEDs and surrounding encapsulation) away from excessive heat, as high temperatures can cause burns, discoloration, or reduced lifespan.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[11]",
+    "near": "1. Use a soldering iron with appropriate temperature control when attaching wiring heads to avoid overheating components."
+   },
+   "dict": null
+  },
+  {
+   "h": "d588a0a443b61745c83a7264a1b178ac006de37d004a8e22457e9b75e8105008",
+   "en": "Operational Integrity",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[12]",
+    "near": "2. Keep the luminescent colloid (LEDs and surrounding encapsulation) away from excessive heat, as high temperatures can cause burns, discoloration, or reduced l"
+   },
+   "dict": null
+  },
+  {
+   "h": "dbf708911c7b806b6cddc3c8a201ca06ad664123602ca01049afd467c0e0c222",
+   "en": "1. Follow the manufacturer’s guidelines for installation and usage to ensure the strip functions correctly and lasts as intended.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[13]",
+    "near": "Operational Integrity"
+   },
+   "dict": null
+  },
+  {
+   "h": "2d6ecd5f935f6562da08bf2be6180e6ec90b8c6d381dbe98e7586ef264b8848b",
+   "en": "2. Improper handling, excessive bending, or exposure to incompatible environmental conditions may compromise the product’s performance and safety.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "blocks[3].line[14]",
+    "near": "1. Follow the manufacturer’s guidelines for installation and usage to ensure the strip functions correctly and lasts as intended."
+   },
+   "dict": null
+  },
+  {
+   "h": "721b291fbbefbfbfd428dbe36032cee684ad64cc6e8b7d9b7af3fa11a17a3be4",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional P1S/X1 Door Hinge 180/270° - V3 Adjustable. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1s-x1-door-hinge-180-270-v3-adjustable",
+    "title": "P1S/X1 Door Hinge 180/270° - V3 Adjustable",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "59fb975fc5f332edb2b7ab0b451a31377ba5ee94696bfbe9481b2da283f12922",
+   "en": "To download the model files please visit the P1S/X1 Door Hinge 180/270° - V3 Adjustableon MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1s-x1-door-hinge-180-270-v3-adjustable",
+    "title": "P1S/X1 Door Hinge 180/270° - V3 Adjustable",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "b302d63c2dea35a065d4c983998cff2a5c83137e0bac9266d4a39ceb7e3c2cf3",
+   "en": "If it is used with the Motion-Activated Sound and Light Props Kit-01 & 02，you need to adjust the number of control light beads to 128 in the APP.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-256rgb-5050led-815mm",
+    "title": "LED light strip 256RGB 5050LED 815MM",
+    "field": "blocks[0].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "1ebbb4109f404d4dd8c9b7fd7fa155253a6a552f910d3403eeb686dd173596aa",
+   "en": "Always disconnect the power supply before starting any installation to prevent electric shock or short circuits.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-256rgb-5050led-815mm",
+    "title": "LED light strip 256RGB 5050LED 815MM",
+    "field": "blocks[0].line[2]",
+    "near": "• If it is used with the Motion-Activated Sound and Light Props Kit-01 & 02，you need to adjust the number of control light beads to 128 in the APP."
+   },
+   "dict": null
+  },
+  {
+   "h": "9dd8281797fe4c1d7bfff8d39f2812c0d42143e0c384115d82086fed0958943c",
+   "en": "Ensure the input voltage matches the specified DC 3.7v-4.2v to prevent damage or reduced lifespan.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-256rgb-5050led-815mm",
+    "title": "LED light strip 256RGB 5050LED 815MM",
+    "field": "blocks[0].line[3]",
+    "near": "• Always disconnect the power supply before starting any installation to prevent electric shock or short circuits."
+   },
+   "dict": null
+  },
+  {
+   "h": "016ad7a786b9c27537d4a40991c66a474cdb6bc3c04f9844b1daf245cf5e3f85",
+   "en": "Do not exceed the recommended operating current to ensure optimal performance and product longevity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-256rgb-5050led-815mm",
+    "title": "LED light strip 256RGB 5050LED 815MM",
+    "field": "blocks[0].line[4]",
+    "near": "• Ensure the input voltage matches the specified DC 3.7v-4.2v to prevent damage or reduced lifespan."
+   },
+   "dict": null
+  },
+  {
+   "h": "0dbbc9e6e6142967a8ba6f050d115d1aa283c8b9774bf2c2f0fa6c6309bad7c8",
+   "en": "Keep away from moisture and excessive heat sources.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-256rgb-5050led-815mm",
+    "title": "LED light strip 256RGB 5050LED 815MM",
+    "field": "blocks[0].line[5]",
+    "near": "• Do not exceed the recommended operating current to ensure optimal performance and product longevity."
+   },
+   "dict": null
+  },
+  {
+   "h": "acee96b96bcccf726e75967046348ea3cabf3b854d987b558c72aba55c81e499",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional SnapaTrack. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "snapatrack",
+    "title": "Snapa Track",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "848faa4d933b4db16cd1c917759c7ec2b288cb099b20a77460fe1259bf31cc40",
+   "en": "To download the model files, please visit the SnapaTrack on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "snapatrack",
+    "title": "Snapa Track",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "3e67cf9ef3d87f6b950bf1a6d7663e54c39b98b8e8aeab931c9065434ea18e7e",
+   "en": "After a while, your vehicle may have difficulty climbing the bridge. First wash the O-rings in warm soapy water. The O-rings are dust magnets and will need to be cleaned every now and again.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "snapatrack",
+    "title": "Snapa Track",
+    "field": "blocks[1].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa79169677bf909a2ce3d91e2bf9ddd5ac83af44c8d84a0b5ba27db62e932576",
+   "en": "Turning the lights off will help the batteries last longer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "snapatrack",
+    "title": "Snapa Track",
+    "field": "blocks[1].line[2]",
+    "near": "• After a while, your vehicle may have difficulty climbing the bridge. First wash the O-rings in warm soapy water. The O-rings are dust magnets and will need to"
+   },
+   "dict": null
+  },
+  {
+   "h": "908c94f7cda8da019d8c86fb867eff3510b326d64dff3c5b9ddbec243d52a13e",
+   "en": "If the wheels spin in the wrong direction, simply rotate the motor.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "snapatrack",
+    "title": "Snapa Track",
+    "field": "blocks[1].line[3]",
+    "near": "• Turning the lights off will help the batteries last longer."
+   },
+   "dict": null
+  },
+  {
+   "h": "188424743229d90516f82195feeae337ad3f3a52b143bcf4692d5a7a47613b23",
+   "en": "Each kit contains all the parts you need to complete one car model.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "snapatrack",
+    "title": "Snapa Track",
+    "field": "blocks[1].line[4]",
+    "near": "• If the wheels spin in the wrong direction, simply rotate the motor."
+   },
+   "dict": null
+  },
+  {
+   "h": "4d70e9cf6046dbe553ad2b6eb1fcc0cc24ee5d4919bf2969079fe043fd24c943",
+   "en": "Bicycle Saddle",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bike-saddle-rail",
+    "title": "Bike Saddle Rail",
+    "field": "blocks[1].line[3].cell[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "7c9fd7e4a2e97a353382cd8342d3a5bfd9ddc8196f3346714c3be413dd619f39",
+   "en": "@Makerworld",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bike-saddle-rail",
+    "title": "Bike Saddle Rail",
+    "field": "blocks[1].line[3].cell[1]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8bca59957c35f8fbfac58901049264e5f70de2fd3b412afab8bf20897fde9c7",
+   "en": "High-Strength Chromoly Steel: Durable and bend-resistant construction built for challenging terrains.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bike-saddle-rail",
+    "title": "Bike Saddle Rail",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "00fff53abc044feabbdffd4dbfd74567df030ac6e46f236a0ed9faa40b09648b",
+   "en": "Universal Tool-Free Installation: Seamlessly fits 3D-printed and traditional saddles with a secure clamping system.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bike-saddle-rail",
+    "title": "Bike Saddle Rail",
+    "field": "blocks[2].line[2]",
+    "near": "• High-Strength Chromoly Steel: Durable and bend-resistant construction built for challenging terrains."
+   },
+   "dict": null
+  },
+  {
+   "h": "2dbbe40e2dacad47ec772936e5c79b45cb547bb833acc8c28e47b6d545ebc155",
+   "en": "All-Weather Corrosion Defense: Electroplated coating resists rain, sweat, and abrasion for urban or off-road use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bike-saddle-rail",
+    "title": "Bike Saddle Rail",
+    "field": "blocks[2].line[3]",
+    "near": "• Universal Tool-Free Installation: Seamlessly fits 3D-printed and traditional saddles with a secure clamping system."
+   },
+   "dict": null
+  },
+  {
+   "h": "401b6f63404c2444c968d6c2ce3a7cd7efa77796451767548ad9991454d7b558",
+   "en": "Whaleberry",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "round-shoelace",
+    "title": "Round Shoelace",
+    "field": "blocks[1].line[1].cell[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "be229aeacb4c2b588c9914e39212a81e43df75348dff230bd1441426e0af7204",
+   "en": "@CloudBerry",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "round-shoelace",
+    "title": "Round Shoelace",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "05a6a71f448d5a0c42fb15514750b719129100c3ad62725dcd06114619d4c7af",
+   "en": "Dual-Color Style Options: Classic Black/White and Reflective Black/White variants to adapt to different styling scenarios.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "round-shoelace",
+    "title": "Round Shoelace",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "5762cf86f101a9d6c98eeae5d8056648164a55ccd88f3d05d65687307ca3810e",
+   "en": "Anti-Slip Durable Weave: Cross-woven high-density polyester fibers with heat-sealed reinforced tips ensure secure fastening without loosening.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "round-shoelace",
+    "title": "Round Shoelace",
+    "field": "blocks[2].line[2]",
+    "near": "• Dual-Color Style Options: Classic Black/White and Reflective Black/White variants to adapt to different styling scenarios."
+   },
+   "dict": null
+  },
+  {
+   "h": "10f6b27862237255baa16f8e51f52dc6ff38f8e60cb39217cbac97324bd21a01",
+   "en": "Universal Fit Design: 100cm length compatible with various shoe eyelet systems, making lacing and adjustment effortless.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "round-shoelace",
+    "title": "Round Shoelace",
+    "field": "blocks[2].line[3]",
+    "near": "• Anti-Slip Durable Weave: Cross-woven high-density polyester fibers with heat-sealed reinforced tips ensure secure fastening without loosening."
+   },
+   "dict": null
+  },
+  {
+   "h": "b76e637f3cbd3a7084f9187357f3f9fe203623bc6d82b6857a97d3cf041e2831",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional The Limit of Possibility (no electronics). To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "the-limit-of-possibility-no-electronics",
+    "title": "The Limit of Possibility (no electronics)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b71043e922d3726e57f0ff57942097cffd630f58dfab46cff3c7580a48e3b25f",
+   "en": "To download the model files please visit the The Limit of Possibility (no electronics) on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "the-limit-of-possibility-no-electronics",
+    "title": "The Limit of Possibility (no electronics)",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "9228426dc2382e1a77c1630543f44042fe63606cedf1481265a73455090b0b65",
+   "en": "Bambu Lab Stickers are crafted for creators, designers, and 3D printing enthusiasts, offering a fun and easy way to personalize your gear. Made from high-quality PVC, these stickers are durable and can be applied to a variety of surfaces, like 3D printers, models, laptops, and more. They’re lightweight, easy to use, and can be removed without leaving any residue, allowing you to add a touch of personality to your projects and tools.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-lab-stickers",
+    "title": "Bambu Lab Stickers",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "65a9e0fc0baf432b9f65bf4af03b9a9c82cb0ed4d341d55d1a3571bb7ee23c91",
+   "en": "1:16 scale Formula One Model Car, F1",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-lab-stickers",
+    "title": "Bambu Lab Stickers",
+    "field": "blocks[0].line[3].cell[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "cee108d3e9e2389999ac2e1077f14227d920597731504b11ca05bfa0b3cfd885",
+   "en": "@NotKuro",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-lab-stickers",
+    "title": "Bambu Lab Stickers",
+    "field": "blocks[0].line[3].cell[1]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "840e28b3e14dbf73b506410956ee1a3ac5b25e7a992a43f9941ee7cff5a369e6",
+   "en": "Lightweight and easy to use",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-lab-stickers",
+    "title": "Bambu Lab Stickers",
+    "field": "blocks[1].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "c76a363ee307b378da549083243bda33a9b21bf0fe7f035184fea592f8617e0f",
+   "en": "Waterproof and scuff-resistant",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-lab-stickers",
+    "title": "Bambu Lab Stickers",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "05e8f1a6e9d71614fbf0b2c7ba91b4519be0e614372dce49e642196b0565f497",
+   "en": "High quality PET",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-lab-stickers",
+    "title": "Bambu Lab Stickers",
+    "field": "blocks[1].line[1].cell[2]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "20bd75317753a6e1765ca19a3f8386b40c5580ccfea71616043c57884e89e149",
+   "en": "1:16 scale Formula One Model Car, F1 - ZH111",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-lab-stickers",
+    "title": "Bambu Lab Stickers",
+    "field": "blocks[3].line[0]",
+    "near": "Item Number | Item Name | Qty"
+   },
+   "dict": null
+  },
+  {
+   "h": "53cc5c614068e653998311a674c57731f5fd505252572dac4a9bcc82c60a7f8b",
+   "en": "BT3x8 SHCS Self Tapping Screw (20PCS) - AA108",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-lab-stickers",
+    "title": "Bambu Lab Stickers",
+    "field": "blocks[3].line[2].cell[1]",
+    "near": "Item Number | Item Name | Qty"
+   },
+   "dict": null
+  },
+  {
+   "h": "c34b2ed8a3e4ac2e512955c10369791f8e25895678c8c98399633487d2854626",
+   "en": "BT2.5x8 SHCS Self Tapping Screw (20PCS) - AA101",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-lab-stickers",
+    "title": "Bambu Lab Stickers",
+    "field": "blocks[3].line[3].cell[1]",
+    "near": "1 | BT3x8 SHCS Self Tapping Screw (20PCS) - AA108 | 1"
+   },
+   "dict": null
+  },
+  {
+   "h": "585a4b1b0f9d35ea3961561c17b499f772260f9dd86f319dce491636b78d49b5",
+   "en": "MOCA Mobile Phone Cage Kit is a modular filming kit designed for efficient content creation. Featuring a NATO rail system and 1/4\" standard mounts, it supports quick attachment of accessories like LED lights and microphones. Adaptable for handheld, vertical, and tripod shooting modes. Customizable via 3D printing with color options and pro-grade materials for both daily use and demanding outdoor scenarios.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "moca-mobile-phone-cage-kit",
+    "title": "MOCA Mobile Phone Cage Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5025999a8bc731c05088cedfc57bd9294a3cafb0c5de1e553dd93c190bc04e01",
+   "en": "Anti-Shake Ergonomic Grip: Textured rubber handles with 15° angled design reduce wrist fatigue and minimize shake during handheld filming.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "moca-mobile-phone-cage-kit",
+    "title": "MOCA Mobile Phone Cage Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e23236dc52d9f602ce84a2b8fb6388973e76e48cc95412928109be0de0a9c2e",
+   "en": "Tool-Free NATO Rail System: Dual-side quick-release rails (1/4\" mounts) hold accessories like LED panels (≤500g) without screws – swap in 3 seconds.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "moca-mobile-phone-cage-kit",
+    "title": "MOCA Mobile Phone Cage Kit",
+    "field": "blocks[1].line[2]",
+    "near": "• Anti-Shake Ergonomic Grip: Textured rubber handles with 15° angled design reduce wrist fatigue and minimize shake during handheld filming."
+   },
+   "dict": null
+  },
+  {
+   "h": "9b4b75f9b7ca6bc140d14cefff9ce82c11f62cfa6cb98fde4281370a8e964a42",
+   "en": "360° Multi-Scene Adapter 360°: Rotatable clamp supports vertical shooting, tripod mounting, and overhead angles with a 90° locking mechanism.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "moca-mobile-phone-cage-kit",
+    "title": "MOCA Mobile Phone Cage Kit",
+    "field": "blocks[1].line[3]",
+    "near": "• Tool-Free NATO Rail System: Dual-side quick-release rails (1/4\" mounts) hold accessories like LED panels (≤500g) without screws – swap in 3 seconds."
+   },
+   "dict": null
+  },
+  {
+   "h": "35c84a5aaa32cb799847775e5375accf914c9ddc5b53d7d625660398fca9c92f",
+   "en": "thrutheframe",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "moca-mobile-phone-cage-kit",
+    "title": "MOCA Mobile Phone Cage Kit",
+    "field": "blocks[1].line[5].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "7fede96825a701d15f5992b662fc9968f66c4ed66e1dd5564f7af839d1c78ad9",
+   "en": "MOCA Plus Mobile Phone Cage Kit",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "moca-mobile-phone-cage-kit",
+    "title": "MOCA Mobile Phone Cage Kit",
+    "field": "blocks[1].line[6].cell[0]",
+    "near": "MOCA Mobile Phone Cage Kit | thrutheframe | MOCA Mobile Phone Cage Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4f0da5d2843e2a623cc9342cce984ac6cc967c26e00fecb0e1ffb9c7a5263d8",
+   "en": "MOCA Plus Mobile Phone Cage",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "moca-mobile-phone-cage-kit",
+    "title": "MOCA Mobile Phone Cage Kit",
+    "field": "blocks[1].line[6].cell[2]",
+    "near": "MOCA Mobile Phone Cage Kit | thrutheframe | MOCA Mobile Phone Cage Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "e8b63535ff9fa66f1b8417ab555a7a0a03f0fdf5822f844ceaeca669f7c42d39",
+   "en": "Bambu Transparent PVC Sheet offers a clear, glass-like finish. Its transparency and durable design make it perfect for transparent sections in your projects such as model car windows or photo frames.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "0-3mm-transparent-pvc-sheet-5pcs",
+    "title": "0.3mm Transparent PVC Sheet (5pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "3496fdb3b2b42a87bba8d1e8328b01a79e9fc658d0e3def6818b79b8ccfcc5bc",
+   "en": "Multi-Purpose Use: Ideal for photo frames, model car windows, DIY crafts, and creative projects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "0-3mm-transparent-pvc-sheet-5pcs",
+    "title": "0.3mm Transparent PVC Sheet (5pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5438f812b48f86d4a91a3bb72600bfce0846669374e7ffb74c9812e08272c46",
+   "en": "Doodle-Friendly Surface: Draw, paint, or write effortlessly with markers, acrylics, or pens (erasable with alcohol).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "0-3mm-transparent-pvc-sheet-5pcs",
+    "title": "0.3mm Transparent PVC Sheet (5pcs)",
+    "field": "blocks[1].line[2]",
+    "near": "• Multi-Purpose Use: Ideal for photo frames, model car windows, DIY crafts, and creative projects."
+   },
+   "dict": null
+  },
+  {
+   "h": "d9c653fdd574a96eee03dd4d3dce33d9989dc489677fe2e99ed425e6ae3bd72e",
+   "en": "The PVC Sheet is not compatible with the H2D blade cutting, as it can damage the blade. Instead, it is recommended to use scissors for cutting it.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "0-3mm-transparent-pvc-sheet-5pcs",
+    "title": "0.3mm Transparent PVC Sheet (5pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac93fba46cca51ec29013836dd291da6cd9cc5d7f035b17a837733803fd28a00",
+   "en": "Clear, glass-like finish",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "0-3mm-transparent-pvc-sheet-5pcs",
+    "title": "0.3mm Transparent PVC Sheet (5pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "d075af2c02cd0d61afffc35d7b4f467e9e9ff176372b23b09372bb1bc999384a",
+   "en": "Ideal for creating transparent sections in projects",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "0-3mm-transparent-pvc-sheet-5pcs",
+    "title": "0.3mm Transparent PVC Sheet (5pcs)",
+    "field": "blocks[3].line[2]",
+    "near": "• Clear, glass-like finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "cd748977174c349f79917591ebdf89961f2777073a1d3a5bf9df051ad7c23652",
+   "en": "*Solid Model: 3D digital models used to represent the actual dimensions and structural features.",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "plastic-differential-gear-kit-1pcs",
+    "title": "Plastic Differential Gear Kit (1PCS)",
+    "field": "blocks[1].line[1]",
+    "near": "Application Instruction"
+   },
+   "dict": null
+  },
+  {
+   "h": "bc65549d64f64530a520491f8f097b235dbb0ec8e1ca5fe27042b628578b9d3c",
+   "en": "*Application Instruction: Guide to assembling modules that support extended application cases.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-differential-gear-kit-1pcs",
+    "title": "Plastic Differential Gear Kit (1PCS)",
+    "field": "blocks[1].line[2]",
+    "near": "*Solid Model: 3D digital models used to represent the actual dimensions and structural features."
+   },
+   "dict": null
+  },
+  {
+   "h": "f3a30e9d588b7c985b0cc14f3c10c59788fd7af7bc76455ba64808046a993109",
+   "en": "Lubrication: Apply appropriate plastic-safe lubricating grease to the gears before use to reduce wear and extend lifespan.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-differential-gear-kit-1pcs",
+    "title": "Plastic Differential Gear Kit (1PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea570577324c5b803b3b38e847bcff6fa51af9ffc6ec232fafe773b07f23f515",
+   "en": "Load limit: Avoid operating the gears under excessive load or high speeds beyond their designed limits, which may cause the plastic teeth to strip.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-differential-gear-kit-1pcs",
+    "title": "Plastic Differential Gear Kit (1PCS)",
+    "field": "blocks[3].line[2]",
+    "near": "• Lubrication: Apply appropriate plastic-safe lubricating grease to the gears before use to reduce wear and extend lifespan."
+   },
+   "dict": null
+  },
+  {
+   "h": "7718f0c9ef675dcf4926cd3c5530ccac7b26c4e1df1884fa50b5553033154c0a",
+   "en": "*User's Manual: Includes product function description and configuration guidelines.",
+   "kind": "block_line",
+   "freq": 7,
+   "context": {
+    "handle": "ws2812-rgb-led-with-idc0-8-4pin-2pcs",
+    "title": "WS2812 RGB LED with IDC0.8 4PIN (2PCS)",
+    "field": "blocks[1].line[1]",
+    "near": "Solid Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "bdfe0994ca3bcf76a8ec5cdcc5091614083cc6a3f4784a960a1eaca7f75a52d4",
+   "en": "Voltage limit: Ensure the voltage does not exceed the rated voltage. Overvoltage will instantly destroy the LED chip.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812-rgb-led-with-idc0-8-4pin-2pcs",
+    "title": "WS2812 RGB LED with IDC0.8 4PIN (2PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "31fd52433e0285157cd6bf077766091e820715a74c9f3f86a0bb3cf202631120",
+   "en": "*Specifications: Essential electrical and physical parameters required for proper operation.",
+   "kind": "block_line",
+   "freq": 12,
+   "context": {
+    "handle": "ws2812-led-hub-with-3pin-sh1-0-connector-1pcs",
+    "title": "WS2812 LED Hub with 3Pin SH1.0 Connector (1PCS)",
+    "field": "blocks[1].line[2]",
+    "near": "*User's Manual: Includes product function description and configuration guidelines."
+   },
+   "dict": null
+  },
+  {
+   "h": "492b218dd8186fc15be3913927f4fdf8f06a34457ab3ff837eaa1ddb347b6060",
+   "en": "The product comes with a 100mm Wire with 3Pin SH1.0 Connectors.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "ws2812-led-hub-with-3pin-sh1-0-connector-1pcs",
+    "title": "WS2812 LED Hub with 3Pin SH1.0 Connector (1PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "f923a8d3748f71c5577a3ff1c3b552bc4996540d59e637a90b81656c89c346eb",
+   "en": "Chemical exposure: Keep the tires away from corrosive chemicals (such as solvents or strong acids) to prevent material degradation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-tire-4pcs",
+    "title": "Ø33.7×13.85mm Rubber Tire (4PCS)",
+    "field": "blocks[2].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "d604b5fc6936509660281143dcc124fd903457363ae094d541e1c3772bd75766",
+   "en": "What Is CyberBrick™?",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[0].line[0]",
+    "near": "CyberBrick offers a series of smart modules that empower anyone to build and enjoy a wide range of 3D-printed projects. From R/C toys to functional productivity"
+   },
+   "dict": null
+  },
+  {
+   "h": "f27dd572024946735e43f8d1e6e16a365abef765afca5ba9c813bf1d7b492a25",
+   "en": "1. Assemble",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[1].line[0]",
+    "near": "Just follow the step-by-step guide, no expertise needed! Snap, click, and feel your ride materialize right in your hands. Stuck? The MakerWorld community's got "
+   },
+   "dict": null
+  },
+  {
+   "h": "17853cf2df4ac3a5a85ef519a55f82dcb797c21e735b69e9b100c1d63f624744",
+   "en": "Just follow the step-by-step guide, no expertise needed! Snap, click, and feel your ride materialize right in your hands. Stuck? The MakerWorld community's got your back.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[1].line[1]",
+    "near": "1. Assemble"
+   },
+   "dict": null
+  },
+  {
+   "h": "18b6701de5532049c1d2973721fc42271a4648c8df4db0a74d5d244e07f8b076",
+   "en": "2. Sync",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[2].line[0]",
+    "near": "Skip the setup hassle! Browse, download, sync, and start playing right away. Need help? Jump into the community!"
+   },
+   "dict": null
+  },
+  {
+   "h": "0af84a1b9366a302b4e587eeeca963799e2f56f66d20e1ffa6bb5f0112aea8d7",
+   "en": "Skip the setup hassle! Browse, download, sync, and start playing right away. Need help? Jump into the community!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[2].line[1]",
+    "near": "2. Sync"
+   },
+   "dict": null
+  },
+  {
+   "h": "615cf56fce0b495987f37e117abc10d109efe328db3e8647306d681d9ce915e9",
+   "en": "3. Fine Tune",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[3].line[0]",
+    "near": "Unleash your imagination with powerful configuration tools on PC and mobile, then share your creations and custom tunes with the MakerWorld community!"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3e8c02157731826010637634fca61f5f3e0ebbd007c5f89827565ba19ff2cf4",
+   "en": "Unleash your imagination with powerful configuration tools on PC and mobile, then share your creations and custom tunes with the MakerWorld community!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[3].line[1]",
+    "near": "3. Fine Tune"
+   },
+   "dict": null
+  },
+  {
+   "h": "2de32a7ce48c4d7cbff90440390494e90e6f090d0388999e27b6b8f0f223161d",
+   "en": "Core Safety Rules",
+   "kind": "block_title",
+   "freq": 17,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[4].line[0]",
+    "near": "• This product is intended for users aged 14 and above. Users under the age of 14 must be under direct adult supervision throughout use."
+   },
+   "dict": null
+  },
+  {
+   "h": "2ef7ddd07d6cf22f0b36deaa566b09d450f46506be232baa0b793d352d160292",
+   "en": "This product is intended for users aged 14 and above. Users under the age of 14 must be under direct adult supervision throughout use.",
+   "kind": "block_line",
+   "freq": 14,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[4].line[1]",
+    "near": "Core Safety Rules"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a097302bb4b0053d768effe3c8f2492c79fb51f7195a870fc5e02409e8073c5",
+   "en": "Please use only official tools for any firmware operations.",
+   "kind": "block_line",
+   "freq": 17,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[4].line[2]",
+    "near": "• This product is intended for users aged 14 and above. Users under the age of 14 must be under direct adult supervision throughout use."
+   },
+   "dict": null
+  },
+  {
+   "h": "e4628a353d81e161934847d6f68ee633eb0b1905a55235e160a7e93dd22b5d39",
+   "en": "CyberBrick is a modular smart toy ecosystem that combines programmable hardware, 3D printable structures, and dual-level coding environments. It is where 3D printing collides with electronics and coding through simplicity. CyberBrick empowers anyone to build and enjoy a wide range of 3D-printed projects, from R/C toys to productivity tools.",
+   "kind": "block_line",
+   "freq": 13,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[7].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e073fb124c5ff4d3c4481a2054d243369944b7e077a095559fc0ddac680c669",
+   "en": "Electronics modules only. 3D printed parts and tools are not included.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "blocks[7].line[2]",
+    "near": "• CyberBrick is a modular smart toy ecosystem that combines programmable hardware, 3D printable structures, and dual-level coding environments. It is where 3D p"
+   },
+   "dict": null
+  },
+  {
+   "h": "fc750966866922083d1da720adf9cf40e25df7b8283f5399592fffbabe672cef",
+   "en": "This charger is equipped with a standard XH2.54 connector and is suitable for charging the 14500 7.4V 800mAh Li-ion Battery. It is widely used in battery-powered applications such as model toys, small robots, and DIY projects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "7-4v-lithium-battery-charger-with-xh2-54-connector-1pcs",
+    "title": "7.4V Lithium Battery Charger with XH2.54 Connector (1PCS)",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "41563adef4f55eb19c6ea6e471224254595a73a780971d40bbeeb7df57af6aec",
+   "en": "Output short-circuit and reverse polarity protection.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "7-4v-lithium-battery-charger-with-xh2-54-connector-1pcs",
+    "title": "7.4V Lithium Battery Charger with XH2.54 Connector (1PCS)",
+    "field": "blocks[2].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c8cac806534150a6d3631caa4003c5893fba06401377791fa8d696f7eaeefe2",
+   "en": "LED Indicator Status: Indicator is off when power is connected / Red LED lights up during charging / Red LED turns off when charging is complete",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "7-4v-lithium-battery-charger-with-xh2-54-connector-1pcs",
+    "title": "7.4V Lithium Battery Charger with XH2.54 Connector (1PCS)",
+    "field": "blocks[2].line[2]",
+    "near": "• Output short-circuit and reverse polarity protection."
+   },
+   "dict": null
+  },
+  {
+   "h": "953f871cde57da2c07b3fb0ddc9bc68025797c05102650f87aa19c1426894b0e",
+   "en": "The USB charger for this product only supports standard 5V 1-2A input. Please always use the original charger that meets the voltage/current requirements, or charge directly via a computer USB port. Do not use chargers with output higher than 5V or 2A (such as mobile fast chargers, 9V/12V adapters, etc.), as this may cause device damage, overheating, or even serious fire hazards. Do not cover the device while charging, and keep it away from high temperature, humidity, or flammable environments. Never charge the device unattended.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "7-4v-lithium-battery-charger-with-xh2-54-connector-1pcs",
+    "title": "7.4V Lithium Battery Charger with XH2.54 Connector (1PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "399bf3807c0b4a0abf611acca5e6e2f892d827b56f622e1daac6b6ce63d03cfe",
+   "en": "The company is not responsible for any device damage, malfunction, fire, or other losses resulting from failure to comply with the above requirements. Please strictly follow the safety instructions for this product.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "7-4v-lithium-battery-charger-with-xh2-54-connector-1pcs",
+    "title": "7.4V Lithium Battery Charger with XH2.54 Connector (1PCS)",
+    "field": "blocks[3].line[2]",
+    "near": "• The USB charger for this product only supports standard 5V 1-2A input. Please always use the original charger that meets the voltage/current requirements, or "
+   },
+   "dict": null
+  },
+  {
+   "h": "47ae27f1096a76ac1da0821c776ed5697d39b66e873d833d4b49692905771472",
+   "en": "This kit includes a Multi-Function Core Board and a Time-lapse Trigger Expansion Board. Just install the core board onto the expansion board, connect it to your printer with the Bambu Bus cable, and follow the wiki to quickly pair your camera. The core board comes preloaded with the required firmware, so you can start time-lapse photography right away.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "96cde16e61d5e7428502def34e0487b4b98f43d333c1d358c54b95c7b3a899d1",
+   "en": "Includes the product function description and configuration guidelines.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[2].line[2]",
+    "near": "User’s Manual"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e4165027f3edbdb77853123a97f717346c5da16e0fa5d23d2e8df1463d71dc3",
+   "en": "3D Files",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[3].line[0]",
+    "near": "Containing product enclosure printing files and 3D models of the hardware kit."
+   },
+   "dict": null
+  },
+  {
+   "h": "dc04bba7a40fe5017e6868ce00d77f0f002bc78050fa71b8fe46c9592df6f25c",
+   "en": "Containing product enclosure printing files and 3D models of the hardware kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[3].line[1]",
+    "near": "3D Files"
+   },
+   "dict": null
+  },
+  {
+   "h": "42c4241babd564b88232bb2c7b8ced3f24bf0ca3583b6689ae2f2f09556b0777",
+   "en": "Step-by-step visual guide for product assembly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[4].line[1]",
+    "near": "Application Instruction"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c7cd8b6060f381283dee89370bd5250868845d75e1b1d7c46e6055f6f9770bd",
+   "en": "For security and stability, the CyberBrick Multi-Function Core Board only supports firmware updates through official tools. Please use only official tools for any firmware operations. Thank you for your understanding!",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[5].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "3da5ee1d5a47ad3eb10cae2d593691e80c0afbf5351236bda900c4590d3fa6c1",
+   "en": "If you have purchased the time-lapse photography shield and are using it together with the Cyberbrick core board, please refer to the wiki to flash the time-lapse photography firmware.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[5].line[2]",
+    "near": "• For security and stability, the CyberBrick Multi-Function Core Board only supports firmware updates through official tools. Please use only official tools for"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f483b8632c2e2345ad2c0590ca5ab3fe83e4961eee03f2144d86efb6b360f0e",
+   "en": "*Please note that the product does not include the 3D printed parts as shown in the main image. *For P2S Users who don't already have an AMS connected, you will need to purchase the P2S AMS Buffer to use the product",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "192b1f94c538ca4e150ed5313509781a0c037ffa38586ee1c323ecaced8798bb",
+   "en": "*Please note that the product does not include the 3D printed parts as shown in the main image.",
+   "kind": "block_line",
+   "freq": 16,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[6].line[2]",
+    "near": "• *Please note that the product does not include the 3D printed parts as shown in the main image. *For P2S Users who don't already have an AMS connected, you wi"
+   },
+   "dict": null
+  },
+  {
+   "h": "780e684dc5b7d8ab84c94a38cd4a0af0e37424df87bc792cd7f8fc9344f0f4b2",
+   "en": "*For P2S Users who don't already have an AMS connected, you will need to purchase the P2S AMS Buffer to use the product",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "blocks[6].line[3]",
+    "near": "• *Please note that the product does not include the 3D printed parts as shown in the main image."
+   },
+   "dict": null
+  },
+  {
+   "h": "23cd2692ad69555861c6d06584b7bae7e207885421fe684e077db64211dcdfb6",
+   "en": "This product corresponds to the earlier B-ZH090.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-dual-sh1-0-adapter-2pcs",
+    "title": "SH1.0 to Dual SH1.0 Adapter (2PCS)",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "dfb909de1afcf0b32fbbddce2abd7253ef0a0757bab1945dd11c2d2a412118c7",
+   "en": "You can pair this product with either the Remote Control Receiver Shield or the Remote Control Transmitter Shield to serve as the receiver or transmitter component in RC projects. Additionally, by combining it with the Time-lapse Expansion Board, you can create a time-lapse photography module for Bambu Lab 3D printers.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff21bc92982c65e3007b8807aeac93ac8ed55f81c617cdc6b8cd23ff4f1772d9",
+   "en": "Time-lapse Photography",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "blocks[1].line[0]",
+    "near": "Explore the Product Wiki & Documentation"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5053b1c3cede7af60940b6753ded15fefc0fddfbaa9f35c09a1e01a43627c17",
+   "en": "This versatile controller is specially designed for a wide range of CyberBrick projects, featuring built-in Bluetooth and Wi-Fi. It supports quick connection and disconnection via dual-pin headers, making it easy to switch between different expansion boards. When paired with various expansion modules, it enables applications such as remote control toys, 3D printer time-lapse photography, and many more.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a7d66a8dc2bb4c1ccc7f8452db0006f9489301d9829029bf5b50690a9b49c28",
+   "en": "You can combine this product with a Multi-Function Core Board to form a Cyberbrick receiver module. By pairing the Remote Control Transmitter Shield with another Multi-Function Core Board, you can create a Cyberbrick transmitter module. Connect joysticks and buttons to the transmitter module, and connect motors or servos to the receiver module, and you will have the minimal Cyberbrick remote control car project unit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "0203de13c4ccd667d56a8061e69c8ad55e750e70d985950d9aa76d567c79e251",
+   "en": "This is a Remote Control Receiver Shield specifically designed for Cyberbrick. You can combine it with a Multi-Function Core Board to serve as the signal receiving end for various CyberBrick projects. This shield integrates 2 DC motor ports, 4 servo motor ports, and 2 WS2812 RGB LED ports, enabling coordinated control of the powertrain, steering, and lighting systems-all without the need for soldering.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "50f36f6052a380e1e9a48ef7e5d6645f2968765877265a553b144c9598d0876d",
+   "en": "You can combine this product with a Multi-Function Core Board to form a Cyberbrick transmitter module. By pairing a Remote Control Receiver Shield with another Multi-Function Core Board, you can create a Cyberbrick receiver module. Connect joysticks and buttons to the transmitter module, and motors or servos to the receiver module, and you will have a minimal Cyberbrick remote control car project unit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "06f04ca5acc603951383735719bc5fca47337cf33f25d071da9ac2de5cb5c7ec",
+   "en": "Wiring: Strictly follow the wire sequence to avoid damaging the board or connected components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "833f2095473f1f5cc9a347198c1e623eb4772888244ba89e46f6880127d3d229",
+   "en": "Power supply: Ensure the power supply matches the specified voltage requirements to avoid damaging the transmitter shield.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "blocks[3].line[2]",
+    "near": "• Wiring: Strictly follow the wire sequence to avoid damaging the board or connected components."
+   },
+   "dict": null
+  },
+  {
+   "h": "2ed83f54cea3f99283ce9c5cdfa9e7a1eb7a3418ab95965cc784b321a89eab8f",
+   "en": "This is a remote control transmitter shield designed for Cyberbrick. You can combine it with the Multi-Function Core Board to serve as the signal transmission end for various CyberBrick projects. The expansion board is equipped with 6 ADC input channels and 4 digital input channels, allowing flexible integration with joysticks, knobs, and custom buttons to meet a wide range of needs—from basic remote control to advanced command programming.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "0655979a16583d395c642425c849da7b634689ae4c6773d058cbf26f2993a03c",
+   "en": "For example, in a vehicle model, one single-axis joystick module can be used to control the speed of movement, and another to control the steering; or in a tower crane model, a single-axis joystick module can control the lifting of the hook; or in a tracked vehicle model, two single-axis joystick modules can be used to independently control the speed of each track.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "single-axis-joystick-module-with-3pin-sh1-0-connector-1pcs",
+    "title": "Single-Axis Joystick Module with 3Pin SH1.0 Connector (1PCS)",
+    "field": "blocks[2].line[2]",
+    "near": "The Single-Axis Joystick Module is a 1-channel analog input module. It automatically returns to the center position. Compared to a Dual-Axis Joystick Module, th"
+   },
+   "dict": null
+  },
+  {
+   "h": "ccad8f072170f5be7af74e2731856a2868bdc4ed4c3359ee1c997919d5d66e34",
+   "en": "Included accessory: The product comes with a 100mm Wire with 3Pin SH1.0 Connectors.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "single-axis-joystick-module-with-3pin-sh1-0-connector-1pcs",
+    "title": "Single-Axis Joystick Module with 3Pin SH1.0 Connector (1PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "d1d985b39ecd513626903cba1cfa75a41dafd785ea9b54df86f6b0b5317be527",
+   "en": "For example, in vehicle models, one axis is used to control the moving speed, and the other axis is used to control the steering; or in the model of a tower crane, one axis is used to control the rotation, and the other axis is used to control the distance of the trolley car.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-axis-joystick-module-with-3pin-sh1-0-connectors-1pcs",
+    "title": "Dual-Axis Joystick Module with 3Pin SH1.0 Connectors (1PCS)",
+    "field": "blocks[2].line[2]",
+    "near": "The Dual-Axis Joystick Module is a 2-channel analog input module. It automatically returns to the center. The dual-channel joystick is suitable for use as a con"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc277efd18487722c769e2f67e9d21e45bca73c06b8c268ca6ef5338190c55ec",
+   "en": "Power switch module is a two-position switch that is often used to control power on/off without removing the battery. There are two 2pinXH2.54 connectors on the switch board, which are usually connected in series between the power supply and the expansion board. The switch board can be used to cut off the power supply without removing the battery directly, avoiding the continuous standby state that causes the battery to lose power as well.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "power-switch-module-with-2pin-xh2-54-connector-1pcs",
+    "title": "Power Switch Module with 2Pin XH2.54 Connector (1PCS)",
+    "field": "blocks[2].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "1456bbf4c615119e5843a7e0aee6958e85ab9a6688f96cf301ea64617409453f",
+   "en": "Connector handling: Please hold the connector by the plastic housing when plugging and unplugging. Do not pull directly on the wires to avoid detachment.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "power-switch-module-with-2pin-xh2-54-connector-1pcs",
+    "title": "Power Switch Module with 2Pin XH2.54 Connector (1PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Important Notices"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa54446cb4fecba9b7b2df0623376b5a13cd23446c76ab7113f0292496e46be2",
+   "en": "Rated current: Do not exceed the rated current capacity of the switch module.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "power-switch-module-with-2pin-xh2-54-connector-1pcs",
+    "title": "Power Switch Module with 2Pin XH2.54 Connector (1PCS)",
+    "field": "blocks[3].line[2]",
+    "near": "• Connector handling: Please hold the connector by the plastic housing when plugging and unplugging. Do not pull directly on the wires to avoid detachment."
+   },
+   "dict": null
+  },
+  {
+   "h": "57c1cc707e3d4457232588aa7ee31ec63b60ee231c052d518789239f4cb2d82d",
+   "en": "The product comes with a 100mm Wire with 2Pin XH2.54 Connectors.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "power-switch-module-with-2pin-xh2-54-connector-1pcs",
+    "title": "Power Switch Module with 2Pin XH2.54 Connector (1PCS)",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "abb6c8c6e5037e7f5b7db6e7bf11afe0b65b3bb9d832593ac8f35478e42644af",
+   "en": "Momentary button module is a binary input module. Different signals can be sent by short press, long press, press and lift and other actions. Compared to a three-position rocker switch module, a momentary button module has only two states: pressed and flicked up, and it always returns to flicked up. The momentary button module can be used to switch between various modes in a specified order, trigger and stop some actions in real time. For example, triggering a shot on a model with a shooting mechanism, or switching the mode and color of lights on a model with RGB lights.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "momentary-button-module-with-2pin-sh1-0-connector-1pcs",
+    "title": "Momentary Button Module with 2Pin SH1.0 Connector (1PCS)",
+    "field": "blocks[2].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "aeb700ffd8be0bf72b0b9b1d0881ff88feeb3e70374bd4e18b8cca54402facaf",
+   "en": "The product comes with a 100mm Wire with 2Pin SH1.0 Connectors.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "momentary-button-module-with-2pin-sh1-0-connector-1pcs",
+    "title": "Momentary Button Module with 2Pin SH1.0 Connector (1PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "09d8da581f7684b50fd7c01e84b16235bd3f391205f0bcb8bce3137bd87052bf",
+   "en": "Used with a Lithium Battery Charger with XH2.54 Connector, the 14500 7.4V 800mAh Li-ion battery enables efficient charging.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "blocks[2].line[2]",
+    "near": "The 14500 7.4V 800mAh Li-ion battery provides high-performance, rechargeable power for portable devices. Similar in size to AA batteries, it offers higher volta"
+   },
+   "dict": null
+  },
+  {
+   "h": "8df52214cab9b46d3fbd527b0955a47ef53fd8b17ab055746ef74d11739e6e6a",
+   "en": "Used with a Power Switch Module with 2Pin XH2.54 Connector, it is more convenient to switch the battery power.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "blocks[2].line[3]",
+    "near": "• Used with a Lithium Battery Charger with XH2.54 Connector, the 14500 7.4V 800mAh Li-ion battery enables efficient charging."
+   },
+   "dict": null
+  },
+  {
+   "h": "bcffa6378ca52016147be29bf496146f398107b0cd66e801aae84a05e1c86cc9",
+   "en": "Short Circuit Protection: The battery has protection for short circuits to prevent damage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7e05e14f209f0b665788511ae6963ba045554cd80de7d445cf9daee4fcdd33a",
+   "en": "Overcharge and Over-discharge Protection: Protects the battery from damage caused by excessive charging or discharging.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "blocks[3].line[2]",
+    "near": "• Short Circuit Protection: The battery has protection for short circuits to prevent damage."
+   },
+   "dict": null
+  },
+  {
+   "h": "c0737e57b5631cb461d02caa5ff2b7009e9afe9aa1bd77b02c975b0372554683",
+   "en": "L1(mm) Bolt Length",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "blocks[1].line[0].cell[1]",
+    "near": "FC014 | 6.5 | 5 | 3.5 | 12 | 4.0 | H4.0"
+   },
+   "dict": null
+  },
+  {
+   "h": "9285a31e679a796cb1bae147d3647a77e3a65c908fddff0605df818abadf162a",
+   "en": "L2 (mm) Thread Length",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "blocks[1].line[0].cell[2]",
+    "near": "FC014 | 6.5 | 5 | 3.5 | 12 | 4.0 | H4.0"
+   },
+   "dict": null
+  },
+  {
+   "h": "79e0d1211240b15045e5a3ecf4b9ef5f81d6aab7a9380825b0b958c30e8a4da6",
+   "en": "Made of corrosion-resistant stainless steel, durable and anti-rust",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "b89975b0c32cf41d23cab87b6691df2d8094b7a3576750e298a0c4835c7d8527",
+   "en": "Standard 1/4''- 20 UNC coarse thread, suitable for common photography and industrial mounting systems",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "blocks[2].line[2]",
+    "near": "• Made of corrosion-resistant stainless steel, durable and anti-rust"
+   },
+   "dict": null
+  },
+  {
+   "h": "24a1cf624b7736d2cc89838d383fec8fa47a0da95c09b345acbd1756f34c0ed7",
+   "en": "Precision-machined hex socket for easy installation with Allen wrench",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "blocks[2].line[3]",
+    "near": "• Standard 1/4''- 20 UNC coarse thread, suitable for common photography and industrial mounting systems"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3727fd8bdd809c295539bc0ae7cb9ecc66dcb1ddf52b3b789c78cdd2609fea6",
+   "en": "With bottom groove diameter for positioning or locking structures",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "blocks[2].line[4]",
+    "near": "• Precision-machined hex socket for easy installation with Allen wrench"
+   },
+   "dict": null
+  },
+  {
+   "h": "4c44766a21f5f428ffc20f6d5c9c93f315290346888957c42cff358514691aa6",
+   "en": "Ideal for camera tripod plates, rig systems, or quick-release systems",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "blocks[2].line[5]",
+    "near": "• With bottom groove diameter for positioning or locking structures"
+   },
+   "dict": null
+  },
+  {
+   "h": "b863065862dbdf913fa3e447d96c4ce5c5d312b3c72088e54065b1ead8213260",
+   "en": "The quick release plate nut is a small accessory used to securely attach a camera or other equipment to a tripod, gimbal, or quick release plate.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-camera-quick-release-plate-nut-2pcs",
+    "title": "1/4\" Camera Quick Release Plate Nut (2PCS)",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a05a186b0d8d3b39d7b6b49d921cdec446deb120bdb5f4140d061c3cdef7efa",
+   "en": "Standard 1/4''-20 UNC coarse thread, suitable for common photography and industrial mounting systems",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-camera-quick-release-plate-nut-2pcs",
+    "title": "1/4\" Camera Quick Release Plate Nut (2PCS)",
+    "field": "blocks[2].line[2]",
+    "near": "• Made of corrosion-resistant stainless steel, durable and anti-rust"
+   },
+   "dict": null
+  },
+  {
+   "h": "88584439f44f93cd397e5b1f507782d7fa036f2f2cc5b42d8cd131abe1b2cbaf",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional AMS Flipper - for P1S/X1 Series. To complete the project, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-flipper-for-p1s-x1-series",
+    "title": "AMS Flipper - better access to the P1S/X1C/P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc2b7e71ab9ac7af85b21cd3777355ea99a29bf43062c3e7339fdb79b21ac6c7",
+   "en": "To download the model files of the AMS Flipper - for P1S/X1 Series and obtain detailed information, please visit the AMS Flipper - for P1S/X1 Series on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-flipper-for-p1s-x1-series",
+    "title": "AMS Flipper - better access to the P1S/X1C/P2S",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "9c69f864cf678bdf4a6c780522d5c65526fc4eb36c945b5d7f87a136ae599e6e",
+   "en": "Crafted from premium, rigorously tested polyester, this durable lanyard offers tool-free installation and keeps charging ports accessible. Its versatile design securely holds phones, cameras, USB drives, wallets, ID badges, and custom 3D printed items like ornaments, tags, or protective cases, providing peace of mind for any activity, from hiking to daily commutes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "adjustable-hand-wrist-strap",
+    "title": "Adjustable Hand Wrist Strap",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "eec2523abd798699c6ec2aed530497dcc8031f4d2e2d0932b5fd65a37e2df6b0",
+   "en": "L(mm) Bolt Length",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[1].line[0].cell[1]",
+    "near": "FC011 | 13 | 5 | 8 | 0.5 | 20 | 15 | 16 | 4.8"
+   },
+   "dict": null
+  },
+  {
+   "h": "97ac9d25caf36cff6570039292d1458dc673c0318b7eb7921721157c9b12d010",
+   "en": "h (mm) Small Step Thickness",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[1].line[0].cell[4]",
+    "near": "FC011 | 13 | 5 | 8 | 0.5 | 20 | 15 | 16 | 4.8"
+   },
+   "dict": null
+  },
+  {
+   "h": "6dfbbd3496b338c3a3ae49e6ae833f4d835d5c665b2e7ac6a98622466e1846a0",
+   "en": "d (mm) Small Step Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[1].line[0].cell[6]",
+    "near": "FC011 | 13 | 5 | 8 | 0.5 | 20 | 15 | 16 | 4.8"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe2b9c30a8ef7f0d9783417d061245b52d9b870895c34388fccfd92a22d63948",
+   "en": "DK (mm) Recessed Inner Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[1].line[0].cell[7]",
+    "near": "FC011 | 13 | 5 | 8 | 0.5 | 20 | 15 | 16 | 4.8"
+   },
+   "dict": null
+  },
+  {
+   "h": "924f5e41b698020bfa87b2cd55e17c16c998825fb3410d20107505f72a0a8b27",
+   "en": "K（mm） Hole Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[1].line[0].cell[8]",
+    "near": "FC011 | 13 | 5 | 8 | 0.5 | 20 | 15 | 16 | 4.8"
+   },
+   "dict": null
+  },
+  {
+   "h": "54373da6380029341b8661c02c37d0b7d048ed772d761de5ca9ecf29ce9d71bf",
+   "en": "Made of high-strength aluminum alloy, lightweight and durable",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f504cd11294901d609e9d9fdc7d791dae59decdc1f2a70c9591ac2a8a94dcc8",
+   "en": "Surface treated with precision anodizing to resist corrosion",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[2].line[2]",
+    "near": "• Made of high-strength aluminum alloy, lightweight and durable"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b0d67b485765229faaf1c61ab03ccc68c6fd91ecf89a6581fd25beb278fdaff",
+   "en": "1/4-20 UNC thread, compatible with most photographic and mounting equipment",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[2].line[3]",
+    "near": "• Surface treated with precision anodizing to resist corrosion"
+   },
+   "dict": null
+  },
+  {
+   "h": "82f614a5d034dcabebcb2c66f91733ac09d48161f257e6eeda7400651d4caba2",
+   "en": "Easy to tighten and loosen by hand without tools",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[2].line[4]",
+    "near": "• 1/4-20 UNC thread, compatible with most photographic and mounting equipment"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c8aa560b23ea5e84c76d0082d87fc884da31d49ed3de97d10bed36d4756a09e",
+   "en": "Recessed hollow head with 6-hole design for enhanced grip and reduced weight",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[2].line[5]",
+    "near": "• Easy to tighten and loosen by hand without tools"
+   },
+   "dict": null
+  },
+  {
+   "h": "6089a9ca5a86e9b4d9560f803e953be57c4e54353cb82544b039c9a5dd2d856e",
+   "en": "Ideal for camera tripods, quick release plates, rigs, and other accessories",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "blocks[2].line[6]",
+    "near": "• Recessed hollow head with 6-hole design for enhanced grip and reduced weight"
+   },
+   "dict": null
+  },
+  {
+   "h": "9517eeafef662677d8f928c423b064c4b7b12ef7ea5c2405f8c6a5dc8c0c9605",
+   "en": "Nominal Diameter (unc)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+    "title": "1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS)",
+    "field": "blocks[0].line[2].cell[1]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "bdfe0a0c1c2a3746677b21096ed705189d632ce27e74120cbdf9d4c9e40f05cc",
+   "en": "Outer Diameter (mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+    "title": "1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS)",
+    "field": "blocks[0].line[2].cell[2]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "596155d3b65cd23298766f2a5c6500558858d24a7b9535ee8907fa1f1cec2631",
+   "en": "Length (mm)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+    "title": "1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS)",
+    "field": "blocks[0].line[2].cell[3]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e193bf90eb2ce1b6eb4bf99bd010f524f489525ee4eaa18d55174b78610ed90",
+   "en": "Round threaded brass heat-insert nut with vertical knurling",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+    "title": "1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS)",
+    "field": "blocks[1].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e27b237bcc41eb109ad2257ea246522d187216f0c3bf679f3753a8e1d4afbdc",
+   "en": "High thermal conductivity brass for fast and uniform heat transfer",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+    "title": "1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS)",
+    "field": "blocks[1].line[2]",
+    "near": "• Round threaded brass heat-insert nut with vertical knurling"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1ece6662616b0d9582ba42731cc1f52a58c296eb9321b0650a0876c8989f4aa",
+   "en": "The LiPo Battery Fireproof Storage Bag is designed for safely storing and transporting LiPo batteries, providing peace of mind for hobbyists and professionals. Made from premium fiberglass with a heat-insulating aluminum foil lining, it offers excellent fire protection. Weighing only 76.5g and measuring 60*185*75mm, the bag is lightweight, portable, and spacious enough to hold multiple batteries. This reliable and easy-to-use accessory is a must-have for anyone working with LiPo batteries.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lipo-battery-fireproof-storage-bag",
+    "title": "LiPo Battery Fireproof Storage Bag",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "f83bd72c676d7382348acbd5fe0ac9e1d3e692082ac1fa887665272f70527395",
+   "en": "Designed specifically for safely storing and transporting Lithium batteries, our LiPo Battery Safe Bag provides peace of mind for hobbyists and professionals alike.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lipo-battery-fireproof-storage-bag",
+    "title": "LiPo Battery Fireproof Storage Bag",
+    "field": "blocks[1].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "8897454182591a0574f47720da839f8fd5cacac6d2b41328f6dfc374ae396701",
+   "en": "Constructed from high-quality fiberglass with an interior lined with heat-insulating aluminum foil, this fireproof bag offers superior protection against accidental fires.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lipo-battery-fireproof-storage-bag",
+    "title": "LiPo Battery Fireproof Storage Bag",
+    "field": "blocks[1].line[2]",
+    "near": "• Designed specifically for safely storing and transporting Lithium batteries, our LiPo Battery Safe Bag provides peace of mind for hobbyists and professionals "
+   },
+   "dict": null
+  },
+  {
+   "h": "29fe6e1ef3c699fd434824fb2e122b5a677ed48f73e8b106d1142872d1dde603",
+   "en": "This combination of impact resistance and fire isolation makes the LiPo Battery Safe Bag a must-have for anyone looking to store or transport LiPo batteries securely.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lipo-battery-fireproof-storage-bag",
+    "title": "LiPo Battery Fireproof Storage Bag",
+    "field": "blocks[1].line[3]",
+    "near": "• Constructed from high-quality fiberglass with an interior lined with heat-insulating aluminum foil, this fireproof bag offers superior protection against acci"
+   },
+   "dict": null
+  },
+  {
+   "h": "41759d374b2572060e9500071570e31401b8ebee4dc2600a853f38ead517e050",
+   "en": "This product does not support any fast charging protocols.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "type-c-female-head-to-ph2-0-power-supply-cable",
+    "title": "TYPE C Female Head to PH2.0 Power Supply Cable",
+    "field": "blocks[0].line[2]",
+    "near": "• Please hold the connector when plugging and unplugging, and do not forcefully twist the connectors to avoid wires loosening or detaching."
+   },
+   "dict": null
+  },
+  {
+   "h": "2b1cf546886e8e21c7af7e1f2371484e58cb09195b4b0808e81c55d0c4e9a7dd",
+   "en": "Rated Input Voltage",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "20w-dual-port-fast-charger-1pcs",
+    "title": "20W Dual Port Fast Charger(1PCS)",
+    "field": "blocks[1].line[0].cell[1]",
+    "near": "B-XB006 | 100-240Vac | 50/60Hz | 15W/20W | 5V 3A 9V 2.22A 12V 1.67A | 5V 3A 9V 2A 12V 1.5A"
+   },
+   "dict": null
+  },
+  {
+   "h": "5140cb1f4fdf84cae2f7c8f99c9ae78287408ba3e741b36cdc99fe02e9bf84b1",
+   "en": "Rated Input Frequency",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "20w-dual-port-fast-charger-1pcs",
+    "title": "20W Dual Port Fast Charger(1PCS)",
+    "field": "blocks[1].line[0].cell[2]",
+    "near": "B-XB006 | 100-240Vac | 50/60Hz | 15W/20W | 5V 3A 9V 2.22A 12V 1.67A | 5V 3A 9V 2A 12V 1.5A"
+   },
+   "dict": null
+  },
+  {
+   "h": "181e7e7c1367107d1bd49357bacf4a25b5447bba930e9b1e5bd2106d90f4f067",
+   "en": "Rating Output Power",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "20w-dual-port-fast-charger-1pcs",
+    "title": "20W Dual Port Fast Charger(1PCS)",
+    "field": "blocks[1].line[0].cell[3]",
+    "near": "B-XB006 | 100-240Vac | 50/60Hz | 15W/20W | 5V 3A 9V 2.22A 12V 1.67A | 5V 3A 9V 2A 12V 1.5A"
+   },
+   "dict": null
+  },
+  {
+   "h": "d1ff3c7095553943ae19409511c954f58d38db6a173eeda152cc7bfc601c8426",
+   "en": "USB-C Output",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "20w-dual-port-fast-charger-1pcs",
+    "title": "20W Dual Port Fast Charger(1PCS)",
+    "field": "blocks[1].line[0].cell[4]",
+    "near": "B-XB006 | 100-240Vac | 50/60Hz | 15W/20W | 5V 3A 9V 2.22A 12V 1.67A | 5V 3A 9V 2A 12V 1.5A"
+   },
+   "dict": null
+  },
+  {
+   "h": "1da065cb77fb262c333a626ea0f9baea0c16af14ba97b0ae2c3280d94bbc9c80",
+   "en": "USB-A Output",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "20w-dual-port-fast-charger-1pcs",
+    "title": "20W Dual Port Fast Charger(1PCS)",
+    "field": "blocks[1].line[0].cell[5]",
+    "near": "B-XB006 | 100-240Vac | 50/60Hz | 15W/20W | 5V 3A 9V 2.22A 12V 1.67A | 5V 3A 9V 2A 12V 1.5A"
+   },
+   "dict": null
+  },
+  {
+   "h": "6dfdc7ffbf04a432ebb5d59aa912780c9aebfa198c69de46b73a1e3b437126bc",
+   "en": "Ideal for charging smartphones, tablets, wireless earbuds, and other USB-powered devices.Supports simultaneous charging of two devices via USB-A and USB-C ports.Perfect for home, office, or travel use thanks to its compact and portable design.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "20w-dual-port-fast-charger-1pcs",
+    "title": "20W Dual Port Fast Charger(1PCS)",
+    "field": "blocks[2].line[1]",
+    "near": "Applications"
+   },
+   "dict": null
+  },
+  {
+   "h": "280b4dfbf2f1917f17676a194982ae887fe46e1c9f2984a4709c7054f16b64fc",
+   "en": "The charger's maximum total output is 20W, shared between both ports.When only one device is connected, it can receive up to the full 20W.When two devices are connected, the total 20W output is split between them.Please ensure your devices do not require more power than the charger’s rated output to avoid slower charging or compatibility issues.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "20w-dual-port-fast-charger-1pcs",
+    "title": "20W Dual Port Fast Charger(1PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "e3358372b75526c6715bdd991687de094a95cd4c175c0b006f6fc8725abbeda4",
+   "en": "Experience the CyberBrick RC Tank",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[1].line[0]",
+    "near": "Assemble your own CyberBrick Tank, a modular designed for dynamic play. Once built, take command of its impressive capabilities – from precise maneuverability t"
+   },
+   "dict": null
+  },
+  {
+   "h": "df2504c9afccaf9c03a0f9f7bdf55f775941f1ca67998feb565a79d12110fef0",
+   "en": "Assemble your own CyberBrick Tank, a modular designed for dynamic play. Once built, take command of its impressive capabilities – from precise maneuverability to rapid-fire disc launching. This isn't just a model; it's an interactive experience where every battle is an adventure you craft.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[1].line[1]",
+    "near": "Experience the CyberBrick RC Tank"
+   },
+   "dict": null
+  },
+  {
+   "h": "86c4577c0447332b63028a8245ec0cdad859b1e21be321f2aea68210e2edb42c",
+   "en": "Print Time",
+   "kind": "block_line",
+   "freq": 14,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[1].line[4]",
+    "near": "11.8h"
+   },
+   "dict": null
+  },
+  {
+   "h": "f1ab14d3b44e186c63f46a0ce5fc096adf754f9d9b2e60bb301ce5d12887982e",
+   "en": "per car",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[1].line[5]",
+    "near": "Print Time"
+   },
+   "dict": null
+  },
+  {
+   "h": "0a9066fa6acd2d7a545af769171444d090e5b7940f5dd39e77b9a2c924b5982c",
+   "en": "Filament",
+   "kind": "block_line",
+   "freq": 14,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[1].line[7]",
+    "near": "366g"
+   },
+   "dict": {
+    "ar": "فلامنت",
+    "ckb": "فیلامێنت"
+   }
+  },
+  {
+   "h": "2506204d5d098d80e8426605394e7c5c54d050ce4808dcf42ea8de01e22f8fa7",
+   "en": "Experienced",
+   "kind": "block_line",
+   "freq": 7,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[1].line[10]",
+    "near": "Skill Level"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7b120df67a800c88b80ee03fc11dd596c7f05b041b12b1836f5196408fa18a2",
+   "en": "Age Range",
+   "kind": "block_line",
+   "freq": 13,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[1].line[12]",
+    "near": "14+"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c50993b009c62dd6600bc0113d0424f9e8ffee8f7eddb0cdad9d4aad67eb4f6",
+   "en": "years",
+   "kind": "block_line",
+   "freq": 12,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[1].line[13]",
+    "near": "Age Range"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ade96f97842e9ff8fb93eb1964b634e04e6b34122830c15752d4b6481e56e82",
+   "en": "Precision 360° Maneuverability",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[2].line[0]",
+    "near": "Navigate tight spaces and outflank opponents with ease. The tank pivots on its axis, offering full rotational control without needing forward momentum. Pinpoint"
+   },
+   "dict": null
+  },
+  {
+   "h": "a277434aaf6cf48a26cacaf1c1e3cd83d03e247ce95ea40c41ecfc8c4487a268",
+   "en": "Navigate tight spaces and outflank opponents with ease. The tank pivots on its axis, offering full rotational control without needing forward momentum. Pinpoint positioning is key to victory.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[2].line[1]",
+    "near": "Precision 360° Maneuverability"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a389029541913be88c62bc5e444caf1a56f1e47045198d6509c0dc7a6a2216c",
+   "en": "Firepower on the Move",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[3].line[0]",
+    "near": "Maintain offensive pressure even while repositioning. The CyberBrick Tank fires 14mm Plastic balls accurately while in motion, keeping targets suppressed as you"
+   },
+   "dict": null
+  },
+  {
+   "h": "bc1bf9740cfb1bd08bd14c0b23ae385aab116e96d36b3cb034492a316b88ed2d",
+   "en": "Maintain offensive pressure even while repositioning. The CyberBrick Tank fires 14mm Plastic balls accurately while in motion, keeping targets suppressed as you advance or retreat. Never break your attack rhythm.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[3].line[1]",
+    "near": "Firepower on the Move"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb49321325f8d0c7aa99322dcb82cbb30e882860c435071238cef8297912016c",
+   "en": "Target Acquisition and Engagement",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[4].line[0]",
+    "near": "Lock onto your objectives and unleash a precise strike. Watch balls fly straight and true, hitting designated targets with satisfying impact. Practice your aim "
+   },
+   "dict": null
+  },
+  {
+   "h": "48a0eec7dc7b4484488cc258de30d1e3f0d8d4084f462e01ccf0d8100e5b8f0b",
+   "en": "Lock onto your objectives and unleash a precise strike. Watch balls fly straight and true, hitting designated targets with satisfying impact. Practice your aim and become a master gunner.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[4].line[1]",
+    "near": "Target Acquisition and Engagement"
+   },
+   "dict": null
+  },
+  {
+   "h": "c01d0a9a006f9a4271647463b1346057096b21b2fe40050318eb26e3341a3d40",
+   "en": "Rapid-Fire Plastic ball Blaster",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[5].line[0]",
+    "near": "Overwhelm your rivals with a relentless barrage of balls. The integrated blaster fires continuously, ensuring a steady stream of projectiles. Keep the pressure "
+   },
+   "dict": null
+  },
+  {
+   "h": "f36cd65f17c8ab95f443e2688801b3c3e0e12383a6f8a0ff6df072044f262fdb",
+   "en": "Overwhelm your rivals with a relentless barrage of balls. The integrated blaster fires continuously, ensuring a steady stream of projectiles. Keep the pressure on from start to finish.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[5].line[1]",
+    "near": "Rapid-Fire Plastic ball Blaster"
+   },
+   "dict": null
+  },
+  {
+   "h": "6256b98ddb4e491615c06c1b314aee1d07215330899219993f621ad114e74eb4",
+   "en": "Custom Battlefield Creation",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[6].line[0]",
+    "near": "Design your own tactical arenas with included target and anti-tank obstacle models. Set up challenging scenarios, practice advanced maneuvers, and perfect your "
+   },
+   "dict": null
+  },
+  {
+   "h": "8cb45791da667f91d7e1ae92ffb71e236a713eeda7b665fc090cc7d9df54c70c",
+   "en": "Design your own tactical arenas with included target and anti-tank obstacle models. Set up challenging scenarios, practice advanced maneuvers, and perfect your strategy. The battlefield is yours to command.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[6].line[1]",
+    "near": "Custom Battlefield Creation"
+   },
+   "dict": null
+  },
+  {
+   "h": "1bb96870ca7cef2ca68c7b4d041805802d0b9ad3b7ee34b05ea753a1b5c1890d",
+   "en": "DO NOT touch the moving parts while the device is operating to prevent pinching injuries.",
+   "kind": "block_line",
+   "freq": 15,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[7].line[2]",
+    "near": "• This product is intended for users aged 14 and above. Users under the age of 14 must be under direct adult supervision throughout use."
+   },
+   "dict": null
+  },
+  {
+   "h": "1bcd839b7891d7d612fd9ee1616213fc90b8be23ee1ca009c7b997b43e7e0ea9",
+   "en": "Before use, inspect all 3D-printed parts and sand down any sharp edges or burrs if present. Store the model and small parts in a location out of reach of children and pets to prevent choking hazards.",
+   "kind": "block_line",
+   "freq": 15,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[7].line[4]",
+    "near": "• Please use only official tools for any firmware operations."
+   },
+   "dict": null
+  },
+  {
+   "h": "06b6fed8b1bf8045f2a8dfa4ae71c380b063c7c76fab636f6cadb7f51ef6c1ab",
+   "en": "For reference, the official installation data for a single car is listed below.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "blocks[11].line[3]",
+    "near": "• *Please note that the product does not include the 3D printed parts as shown in the main image."
+   },
+   "dict": null
+  },
+  {
+   "h": "3e96c73c2721aea218057df9a377c42d55f7a76598f5b52d16ad1912e25dd2a5",
+   "en": "Experience Bumper Car Action Like Never Before",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "duel-bumper-car-cyberbrick",
+    "title": "Duel Bumper Car CyberBrick",
+    "field": "blocks[1].line[0]",
+    "near": "This clever RC car ejects the driver's head when hit from the side. With a single-wheel drive and steer system, it moves forward, backward, and turns smoothly —"
+   },
+   "dict": null
+  },
+  {
+   "h": "932928252e920af7970ff11906a1740e063c73c6aee07c13f6b167b58ec52fd2",
+   "en": "This clever RC car ejects the driver's head when hit from the side. With a single-wheel drive and steer system, it moves forward, backward, and turns smoothly — just like the real thing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "duel-bumper-car-cyberbrick",
+    "title": "Duel Bumper Car CyberBrick",
+    "field": "blocks[1].line[1]",
+    "near": "Experience Bumper Car Action Like Never Before"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad54f5de0c14b89632a1a5c952d155dd2dcfe6ce7ecfb300e68eff7c91be5e1c",
+   "en": "Perfect for kids and beginners, this remote-controlled car brings the excitement of amusement park bumper battles right to your home. Ideal for makers, gamers, and collectors — unleash your battlefield creativity with CyberBrick!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "duel-bumper-car-cyberbrick",
+    "title": "Duel Bumper Car CyberBrick",
+    "field": "blocks[1].line[2]",
+    "near": "This clever RC car ejects the driver's head when hit from the side. With a single-wheel drive and steer system, it moves forward, backward, and turns smoothly —"
+   },
+   "dict": null
+  },
+  {
+   "h": "257950e09840faff26707ee66b433835ae73b9909c106c7faf3bc9d69093714f",
+   "en": "Agile Maneuverability",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "duel-bumper-car-cyberbrick",
+    "title": "Duel Bumper Car CyberBrick",
+    "field": "blocks[2].line[0]",
+    "near": "CyberBrick drive system delivers authentic bumper car maneuverability — forward, backward, and smooth turns just like the real one."
+   },
+   "dict": null
+  },
+  {
+   "h": "3de43bb56e00b6e65c51a1749169443266583eaff20ddbd2e94687720a5a967b",
+   "en": "CyberBrick drive system delivers authentic bumper car maneuverability — forward, backward, and smooth turns just like the real one.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "duel-bumper-car-cyberbrick",
+    "title": "Duel Bumper Car CyberBrick",
+    "field": "blocks[2].line[1]",
+    "near": "Agile Maneuverability"
+   },
+   "dict": null
+  },
+  {
+   "h": "2fcf5e59d0356a8c52c9a8978eda0cfb2fc657af2d1b054b0ab0f2ca7262d752",
+   "en": "Don't Lose Your Head",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "duel-bumper-car-cyberbrick",
+    "title": "Duel Bumper Car CyberBrick",
+    "field": "blocks[3].line[0]",
+    "near": "The driver's head ejects when hit from the side — a thrilling mechanic that makes every collision count in your battles."
+   },
+   "dict": null
+  },
+  {
+   "h": "2d2bc95de8908e90cc60fa73ed7ba865f000a37e6820ac786b52de966e79b865",
+   "en": "The driver's head ejects when hit from the side — a thrilling mechanic that makes every collision count in your battles.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "duel-bumper-car-cyberbrick",
+    "title": "Duel Bumper Car CyberBrick",
+    "field": "blocks[3].line[1]",
+    "near": "Don't Lose Your Head"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e7b54a68e3bc9e02c7fe79697c6e915e6956097935da9fde6c33d1a075c4449",
+   "en": "This product is intended for users aged 16 and above. Users under the age of 16 must be under direct adult supervision throughout use.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "duel-bumper-car-cyberbrick",
+    "title": "Duel Bumper Car CyberBrick",
+    "field": "blocks[4].line[1]",
+    "near": "Core Safety Rules"
+   },
+   "dict": null
+  },
+  {
+   "h": "c59f3324952bd5d5e7394f85e70b18f4b8f73762d925a2f96c6355c8f23459c8",
+   "en": "This dynamic, 3D-printed RC racer remixes the classic CyberBrick™ SoccerBot, swapping the ball launcher for an exciting disc shooter. Battle solo or head-to-head, using lightweight or mediumweight discs for strategic play. With a 20-disc capacity and intuitive controls, it’s perfect for fast-paced competitive or cooperative action. Build, customize, and dominate the arena!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dodgebot-for-cyberbrick",
+    "title": "DodgeBot for CyberBrick",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "499ccdce536f699f772fe6bf8ccd081ff57158141ee0572a5b19ba1c31c07479",
+   "en": "Ideal for makers, gamers, and collectors — unleash your battlefield creativity with CyberBrick!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dodgebot-for-cyberbrick",
+    "title": "DodgeBot for CyberBrick",
+    "field": "blocks[0].line[2]",
+    "near": "This dynamic, 3D-printed RC racer remixes the classic CyberBrick™ SoccerBot, swapping the ball launcher for an exciting disc shooter. Battle solo or head-to-hea"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f3c32dde6fa2f8646596488b4f61fa5f03a1f2c469d1cd0c7bd62f8dd26ba7a",
+   "en": "To download the model files and obtain detailed information, please visit the DodgeBot for CyberBrick on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dodgebot-for-cyberbrick",
+    "title": "DodgeBot for CyberBrick",
+    "field": "blocks[0].line[3]",
+    "near": "Ideal for makers, gamers, and collectors — unleash your battlefield creativity with CyberBrick!"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4da79ce5ed5f2ae4edbb9a2a667ff6a7980dca2fef3eb0456764b09e8a58077",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional BLV - AMS / AMS 2 Riser for X1C / P1S v3.1. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "blv-ams-ams-2-riser-for-x1c-p1s-v3-1",
+    "title": "BLV - AMS / AMS 2 Riser for X1C / P1S v3.1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1889b9a50c819f7f36678c56c4992d837becccb30b05e509c86fbb6c4a5fb3e5",
+   "en": "To download the model files please visit the BLV - AMS / AMS 2 Riser for X1C / P1S v3.1 on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "blv-ams-ams-2-riser-for-x1c-p1s-v3-1",
+    "title": "BLV - AMS / AMS 2 Riser for X1C / P1S v3.1",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "92e09a2531616dc391e8b851fd831e5a4741eabfe9968cb1f9d170cd4e5c9803",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Flexi Skeleton – Fun and Spooky Articulated Fidget. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "flexi-skeleton-–-fun-and-spooky-articulated-fidget",
+    "title": "Flexi Skeleton – Fun and Spooky Articulated Fidget",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a84aa9e7e09e94558f4be6d172147a76be30676608d6635e3844c33d4018870",
+   "en": "To download the model files please visit the Flexi Skeleton – Fun and Spooky Articulated Fidget on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "flexi-skeleton-–-fun-and-spooky-articulated-fidget",
+    "title": "Flexi Skeleton – Fun and Spooky Articulated Fidget",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "a71daec80c6af7166a41cf09eeb40d22a6a2cab29aab1094e36ea73614d6b8c2",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Helicopter Kit. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "helicopter-kit",
+    "title": "Helicopter Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7baeb717c185ef88e0d62c5e16f584cea09da0f6251029b6b01c51e14f8c2d44",
+   "en": "To download the model files please visit the Helicopter Kit on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "helicopter-kit",
+    "title": "Helicopter Kit",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "fec335a11a30c414873f43b49fa393f5cb5e68e0b985373fa2d45f080f54a572",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional H2D / H2S / H2C Toolbox. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-h2s-h2c-toolbox",
+    "title": "H2D / H2S / H2C Toolbox",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "77ae4d93b94ef79f4daec070a73e06fbbf5af59d29df7111642b23c3143dafb4",
+   "en": "To download the model files please visit the H2D / H2S / H2C Toolbox on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-h2s-h2c-toolbox",
+    "title": "H2D / H2S / H2C Toolbox",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "74132bcbf126a33c48a426dd4dd6faf2fe2a3a40e20caaa176d4a4189b5a6226",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Retracting Spool Holder. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "retracting-spool-holder",
+    "title": "Retracting Spool Holder",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c87bba7c8dda9288f12a1d6abd2e958c73f01f6c33cd3e43b55775818b091852",
+   "en": "To download the model files please visit the Retracting Spool Holder on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "retracting-spool-holder",
+    "title": "Retracting Spool Holder",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  }
+ ]
+}

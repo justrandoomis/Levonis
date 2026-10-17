@@ -1,0 +1,969 @@
+{
+ "sourceProductId": "593999615810912256",
+ "handle": "pla-translucent",
+ "canonicalUrl": "https://us.store.bambulab.com/products/pla-translucent",
+ "title": "PLA Translucent",
+ "seoMetaDescription": "",
+ "route": "552709755819347968>552709755857096704>594000098526253056",
+ "isFilament": true,
+ "groups": [
+  {
+   "propertyKeyId": "593999615827689472",
+   "propertyKey": "Color",
+   "type": 1,
+   "title": "",
+   "position": 1,
+   "values": [
+    {
+     "id": "593999615827689473",
+     "value": "Teal (13612)",
+     "selectedDefault": true,
+     "colorUrl": "https://store.bblcdn.com/s7/default/de621108b9954ddcaf2be76a22a7ac3c/Rectangle_4549.png"
+    },
+    {
+     "id": "593999615827689474",
+     "value": "Blue (13611)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/b3b4f16ef3494bc18ab4205e2dc91a80/Rectangle_4550.png"
+    },
+    {
+     "id": "593999615827689476",
+     "value": "Orange (13301)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/82f66860820f409ea224a4aa9f472821/Rectangle_4552.png"
+    },
+    {
+     "id": "593999615827689475",
+     "value": "Purple (13710)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/c8e6f924466e4d819da1670edb2f5300/Rectangle_4551.png"
+    },
+    {
+     "id": "593999615827689477",
+     "value": "Red (13210)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/028d8f0bac3948f89639f3ffcb35113f/Rectangle_4553.png"
+    },
+    {
+     "id": "593999615827689478",
+     "value": "Light Jade (13510)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/f4a6d331ab47473c8ea08189959aafb9/Rectangle_4554.png"
+    },
+    {
+     "id": "593999615827689479",
+     "value": "Mellow Yellow (13410)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/04f1bffd8b094dd8b92358029d8143d6/Rectangle_4555.png"
+    },
+    {
+     "id": "593999615827689480",
+     "value": "Cherry Pink (13211)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/54b3f5ff98934b8a86f5326961f72684/Rectangle_4556.png"
+    },
+    {
+     "id": "593999615827689481",
+     "value": "Ice Blue (13610)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/8bca6cc749bf4010b10cd6b92a53a3b2/Rectangle_4557.png"
+    },
+    {
+     "id": "593999615827689482",
+     "value": "Lavender (13711)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/7306088e92224c1e9ac166616b72423e/Rectangle_4558.png"
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "593999615827689483",
+   "propertyKey": "Type ",
+   "type": 1,
+   "title": "",
+   "position": 2,
+   "values": [
+    {
+     "id": "593999615827689484",
+     "value": "Filament with spool",
+     "selectedDefault": true,
+     "colorUrl": ""
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "593999615827689485",
+   "propertyKey": "Size",
+   "type": 1,
+   "title": "",
+   "position": 3,
+   "values": [
+    {
+     "id": "593999615827689486",
+     "value": "1 kg",
+     "selectedDefault": true,
+     "colorUrl": ""
+    }
+   ]
+  }
+ ],
+ "skus": [
+  {
+   "id": "593999615827689487",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Teal (13612)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594003813261496320",
+    "url": "https://store.bblcdn.com/s7/default/7a274c60cf77465295cb0ebbd5597668/teal.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "593999615827689493",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Blue (13611)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594004126590427136",
+    "url": "https://store.bblcdn.com/s7/default/38803a9888d047619ec6fec250f8fa99/blue.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "593999615827689499",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Purple (13710)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594004126836322304",
+    "url": "https://store.bblcdn.com/s7/default/5b62331f74db41698e6159b071c635cc/purple.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "593999615827689505",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Orange (13301)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594004126413516800",
+    "url": "https://store.bblcdn.com/s7/default/89199c1d16cf434d8a60cd3d3c376ead/orange.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "593999615827689511",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Red (13210)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594004126606454784",
+    "url": "https://store.bblcdn.com/s7/default/fc112bd633b34efcaf106b5832801acf/red.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "593999615827689517",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Light Jade (13510)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594004126533496832",
+    "url": "https://store.bblcdn.com/s7/default/b25d0ca092ee4784a22ece2eccbeed06/Jade_green.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "593999615827689523",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Mellow Yellow (13410)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594004126873444352",
+    "url": "https://store.bblcdn.com/s7/default/5e6eb876f811436791130e24a3bab789/mellow_yellow.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "593999615827689529",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Cherry Pink (13211)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594004126894772224",
+    "url": "https://store.bblcdn.com/s7/default/f3214824ddf848ffb74689918501980d/pink.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "593999615827689535",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Ice Blue (13610)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594004126902149120",
+    "url": "https://store.bblcdn.com/s7/default/6378eaa8eb0040eaaf0c467d5d8e283f/light_blue.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "593999615827689541",
+   "props": [
+    {
+     "propertyKeyId": "593999615827689472",
+     "propertyKey": "Color",
+     "value": "Lavender (13711)"
+    },
+    {
+     "propertyKeyId": "593999615827689483",
+     "propertyKey": "Type ",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "593999615827689485",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "594004126621577216",
+    "url": "https://store.bblcdn.com/s7/default/abe58fb0b2544300b78ca426ef95d5c2/lavender.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  }
+ ],
+ "gallery": [
+  {
+   "resourceFileId": "594003813261496320",
+   "url": "https://store.bblcdn.com/s7/default/7a274c60cf77465295cb0ebbd5597668/teal.jpg"
+  },
+  {
+   "resourceFileId": "594006910516195328",
+   "url": "https://store.bblcdn.com/s7/default/1ca67c64e814468d9b7c820388e8a20b/PLA_Translucent_interaction.png"
+  },
+  {
+   "resourceFileId": "594004126590427136",
+   "url": "https://store.bblcdn.com/s7/default/38803a9888d047619ec6fec250f8fa99/blue.jpg"
+  },
+  {
+   "resourceFileId": "594004126413516800",
+   "url": "https://store.bblcdn.com/s7/default/89199c1d16cf434d8a60cd3d3c376ead/orange.jpg"
+  },
+  {
+   "resourceFileId": "594004126836322304",
+   "url": "https://store.bblcdn.com/s7/default/5b62331f74db41698e6159b071c635cc/purple.jpg"
+  },
+  {
+   "resourceFileId": "594004126606454784",
+   "url": "https://store.bblcdn.com/s7/default/fc112bd633b34efcaf106b5832801acf/red.jpg"
+  },
+  {
+   "resourceFileId": "594004126533496832",
+   "url": "https://store.bblcdn.com/s7/default/b25d0ca092ee4784a22ece2eccbeed06/Jade_green.jpg"
+  },
+  {
+   "resourceFileId": "594004126873444352",
+   "url": "https://store.bblcdn.com/s7/default/5e6eb876f811436791130e24a3bab789/mellow_yellow.jpg"
+  },
+  {
+   "resourceFileId": "594004126894772224",
+   "url": "https://store.bblcdn.com/s7/default/f3214824ddf848ffb74689918501980d/pink.jpg"
+  },
+  {
+   "resourceFileId": "594004126902149120",
+   "url": "https://store.bblcdn.com/s7/default/6378eaa8eb0040eaaf0c467d5d8e283f/light_blue.jpg"
+  },
+  {
+   "resourceFileId": "594004126621577216",
+   "url": "https://store.bblcdn.com/s7/default/abe58fb0b2544300b78ca426ef95d5c2/lavender.jpg"
+  }
+ ],
+ "featuresTitle": "Product Features",
+ "features": [
+  {
+   "title": "Product Features",
+   "html": "<div style=\"text-align: left; box-sizing: border-box;\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul style=\"margin: 0px; padding: 0px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">Translucent Appearance That Diffuses Light</li>\n<li style=\"box-sizing: border-box;\">Bonds with All PLA Filaments</li>\n<li style=\"box-sizing: border-box;\">Durable for Long-Term Use</li>\n<li style=\"box-sizing: border-box;\">Diameter: 1.75mm +/- 0.03mm</li>\n</ul>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<div class=\"bbl-title-4 text-bbl-grey-13 font-bold\">Cautions for Use</div>\n<ul style=\"margin: 0px; padding: 0px; margin-top: 8px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">All AMS Series Compatible</li>\n<li style=\"box-sizing: border-box;\">Clean Build Plates Before Printing</li>\n</ul>"
+  }
+ ],
+ "videos": [],
+ "description": {
+  "kind": "page_builder",
+  "config": {
+   "schemaVersion": "1.0",
+   "templateId": "tpl-1778237392446",
+   "components": [
+    {
+     "id": "banner_1776859885795_imdr8wmzy",
+     "type": "banner",
+     "variant": "banner_1",
+     "name": "Banner",
+     "anchor": {
+      "enabled": true,
+      "name": "Overview",
+      "id": "banner_1776859885795_imdr8wmzy"
+     },
+     "modules": {
+      "media": {
+       "pc": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/14acecc74135453d998172faba4f4938/Bambu_PLA_Translucent01-compressed.jpg",
+        "naturalWidth": 5120,
+        "naturalHeight": 1280
+       },
+       "mo": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/38d16fbe26e34655baafde67a7e796f0/Bambu_PLA_Translucent_MO01-compressed.jpg",
+        "naturalWidth": 2048,
+        "naturalHeight": 960
+       }
+      },
+      "typeStyles": {
+       "content": {
+        "title": "PLA Translucent",
+        "description": "Print the Shape of Light"
+       }
+      }
+     }
+    },
+    {
+     "id": "chapter_1776860120943_tabnn7pvy",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "卖点",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-9",
+      "id": "chapter_1776860120943_tabnn7pvy"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "",
+        "description": ""
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1776860161046_c2ynsoh65",
+       "type": "content_block",
+       "variant": "content-block-6",
+       "name": "卖点 1",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1776860161046_c2ynsoh65"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Bambu PLA Translucent",
+          "description": "Bambu PLA Translucent, available in 10 vibrant colors, is perfect for crafting lightshades and decorative lanterns. Its frosted finish diffuses light beautifully. With enhanced durability, it’s ideal for long-term indoor lighting and décor. Customize the shape of light with Bambu PLA Translucent!"
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/373a8f81c7354506bb8b75764007ea16/Bambu_PLA_Translucent02-compressed.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 918
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/6e9b49a48fb94b968c2f3c3fe34ce854/Bambu_PLA_Translucent_MO04-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 840
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789728488296_fp7annd5y"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860162526_2x88208di",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 2",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1776860162526_2x88208di"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Diffuse Light in a Splash of Colors",
+          "description": "From soft pastels to vibrant candy hues, Bambu PLA Translucent offers a stunning range of frosted tones that add both subtle elegance and bold vibrancy to your prints. Its unique matte finish mimics the look of hand-blown frosted glass, making it ideal for crafting light shades, vases, and stained glass decor. PLA Translucent seamlessly bonds with any PLA filament, making adding a translucent accent to your prints as effortless as swapping colors mid‑print."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/45d36f85f8bc471dbbf0967c8457147c/20260511-170416.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/c666b47e033040668ca50dba4e091d0f/20260511-175025.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789728488296_b56035iim"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/61acdf4e818e42249014408a28343ca6/Frame_1123864805-1-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/cc0b7dd676444099af5ea2a7f8a446f5/Bambu_PLA_Translucent_MO06-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789728488296_kl70i84lm"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/183ece81b12940d483f882507b60d070/Frame_1123864806-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/4c935b62e62f4c788b8b8de586fdd243/Bambu_PLA_Translucent_MO05-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789728488296_s1h2pen33"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860163846_rda8jgx7m",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 3",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-3",
+        "id": "content_block_1776860163846_rda8jgx7m"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Craft Stained Glass Art That Endures",
+          "description": "Bambu PLA Translucent strikes the perfect balance between visual translucency and everyday durability. It offers greater impact and aging resistance compared to generic translucent PLA, ensuring your prints last longer and perform better over time."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/13940847ac6f4d55adcfdaa9a453b172/Frame_1123864805-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1120
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/222b8235a7904ac19845e11b596c8ead/20260511-175022.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789728488296_r1zwifhed"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/ce7a6c063418400db934f4ec146f9380/Content_Block_Media-8-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1120
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/e252fa72702f479a840f27370a38b231/Bambu_PLA_Translucent_MO02-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789728488296_tw4w72kxm"
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "content_block_1776744592796_vv35dwp6b",
+     "type": "content_block",
+     "variant": "content-block-1",
+     "name": "RFID",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-6",
+      "id": "content_block_1776744592796_vv35dwp6b"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "RFID for Intelligent Printing",
+        "description": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+       }
+      },
+      "featureConfig": {
+       "tabs": [
+        {
+         "name": "Tab 1",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/488456bb882744c892a36df11c4b152e/RFID_for_Intelligent_Printing-compressed.jpg",
+           "naturalWidth": 2400,
+           "naturalHeight": 918
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/abcaed5cd3574c9da111ef385bf977c5/RFID_for_Intelligent_PrintingMO-compressed.jpg",
+           "naturalWidth": 1344,
+           "naturalHeight": 840
+          }
+         },
+         "id": "comp_1789728488296_4bvz9iith"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744650085_nu31krt23",
+     "type": "content_block",
+     "variant": "content-block-17",
+     "name": "Download",
+     "anchor": {
+      "enabled": true,
+      "name": "Download",
+      "id": "content_block_1776744650085_nu31krt23"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Download"
+       }
+      },
+      "featureConfig": {
+       "items": [
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/44b88c2274b2430397da892f1de79f70/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament TDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/ae93f41da01945f88065983d34818b36/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/594aafe776d84ca39708b8e3afff8c27/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+         "id": "comp_1789728488296_fis17r5cb"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/5575e961df094c9591a7faa849ca9b77/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament MSDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/c8f7afa024d94cf1b5066489e1bc899f/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/4662d4268d9d4889a1f310febd999878/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/8a9bc9278da74ee4bd5490bae9fb634d/SDS20250928A17_Bambu_PLA_Translucent.pdf",
+         "id": "comp_1789728488296_fbspcvbuo"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/bf5dbaee598d46e9bd8170e43facfa96/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament RoHS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/3cf1e95dc8804e8bb81fce31d351c41e/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/06f87e11609d480baeaf5d18a7064aad/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/369b7d0c17804f9d8a4402a121dd8d1d/Bambu_PLA_Translucent_RoHS.pdf",
+         "id": "comp_1789728488296_5qhz1cz29"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/fdec58d7e8cd4820bb93af5ef7582247/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Hex Code",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/b7b39addfd99493f8f32ce399f4b0454/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/a38a4597cabe45e7a4b7006a44223418/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+         "id": "comp_1789728488296_5ves3ydk8"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744740718_dwoqb1p7t",
+     "type": "content_block",
+     "variant": "content-block-21-pro",
+     "name": "FAQ",
+     "anchor": {
+      "enabled": true,
+      "name": "Printing Tips",
+      "id": "content_block_1776744740718_dwoqb1p7t"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Printing Tips"
+       }
+      },
+      "featureConfig": {
+       "faqs": [
+        {
+         "question": "1.Accessory Compatibility",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Not compatible with <strong>Hotend with Stainless Steel Nozzle 0.2 mm</strong>.</div>",
+           "id": "comp_1789728488296_dsvkwg9cv"
+          }
+         ],
+         "id": "comp_1789728488296_4bmlva19h"
+        },
+        {
+         "question": "2.Drying Recommendations",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: <a href=\"https://wiki.bambulab.com/en/filament-acc/filament/dry-filament\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">Filament drying instructions</span></span></a> on WIKI.</div>",
+           "id": "comp_1789728488296_zk5i4xsy3"
+          }
+         ],
+         "id": "comp_1789728488296_d3ll5diie"
+        },
+        {
+         "question": "3.Appearance Change",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<ul>\n<li>Please note that the transparency of prints may vary depending on factors such as size, thickness, structure, and printing parameters (including speed, nozzle temperature, and infill density). To enhance translucency, please refer to the <span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\"><a style=\"color: #00ae42; text-decoration: underline;\" href=\"https://wiki.bambulab.com/en/knowledge-sharing/transparent-petg\" target=\"_blank\" rel=\"noopener\">printing tips</a></span></span> on WIKI.</li>\n</ul>",
+           "id": "comp_1789728488296_4zps64abg"
+          },
+          {
+           "type": "rich-text",
+           "content": "<ul>\n<li>PLA Translucent has a frosted glass texture that diffuses light well, while PETG Translucent is more see-through with a crystal-clear finish.</li>\n</ul>",
+           "id": "comp_1789728488296_m1v6efovp"
+          },
+          {
+           "type": "media",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/12aed21ae43b414b9b3fb5b4b25b7b31/Bambu_PLA_Translucent07-compressed.jpg",
+             "naturalWidth": 1992,
+             "naturalHeight": 480
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/e05848a83ffd4f4c8e18c39f795d6949/Bambu_PLA_Translucent_MO10-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 960
+            }
+           },
+           "id": "comp_1789728488296_ctmxrg9uw"
+          }
+         ],
+         "id": "comp_1789728488296_m8g9h29sq"
+        },
+        {
+         "question": "4.Printability",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>PLA Translucent is more beginner-friendly than PETG Translucent.</div>",
+           "id": "comp_1789728488296_jzpml26j2"
+          }
+         ],
+         "id": "comp_1789728488296_jfem1pp28"
+        },
+        {
+         "question": "5.Safety Tips",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<ul>\n<li>Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.</li>\n<li>Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.</li>\n<li>For opened filament, we recommend drying before use according to the wiki&rsquo;s recommended temperature and time settings.</li>\n<li>Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.</li>\n<li>As this filament is not food-grade, please avoid using finished prints for food storage or contact.&nbsp;</li>\n</ul>",
+           "id": "comp_1789728488296_5gp7bxpvl"
+          }
+         ],
+         "id": "comp_1789728488296_hg1i0trm6"
+        }
+       ]
+      }
+     }
+    }
+   ]
+  }
+ },
+ "jsonld": {
+  "productGroupId": "593999615810912256",
+  "variantSkus": [
+   "593999615827689487",
+   "593999615827689493",
+   "593999615827689499",
+   "593999615827689505",
+   "593999615827689511",
+   "593999615827689517",
+   "593999615827689523",
+   "593999615827689529",
+   "593999615827689535",
+   "593999615827689541"
+  ],
+  "brand": "Bambu Lab"
+ }
+}

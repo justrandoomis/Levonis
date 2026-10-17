@@ -1,0 +1,567 @@
+{
+  "handle": "vortek-utility-hotends-bundle",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T15:26:54Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "title": "Vortek Utility Hotends Bundle (store page)",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "contents.pieces",
+        "compat.statement",
+        "product.*",
+        "package.*",
+        "part.*",
+        "motion.max_flow",
+        "extrusion.*",
+        "electrical.*",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "variant.note"
+      ],
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "Parsed with the package (extractPage + buildImportPayload, format legacy_html, productType \"hotend\"); the corpus copy, offline. Product Specifications (one 4-cell table): \"Max. Printing Temp. | 350 ℃ | Length | 56.2 mm\", \"Packaging Weight | 0.095 kg | Packaging Size | 135*100*45 mm\"; no width, height, net weight, flow or electrical value. In the Box: 3 lines (4 hotends). Description bullets give each hotend's size, side and material. \"Filament Compatibility\": 43 filaments × 7 induction nozzle columns; only the 0.2 mm Stainless Steel, 0.4 mm Hardened Steel and 0.6 mm Hardened Steel columns match this bundle; a matrix stays text (§C.6), and relations are written only for the 12 filaments marked √ in all three and Compatible in the wiki table. Not written: PC and PC FR (page √ at 0.2 mm, wiki PC row \"Not Recommended\" at 0.2 mm); TPU 85A (page X in every column, but the page's own note 4 says \"TPU85A is only supported on the right-side Fixed Hotend\" and the wiki says 0.4/0.6 mm Compatible); PET-CF, PPA-CF, PPS-CF (page √ for induction 0.4/0.6 mm, but note 5 says \"supported only on the left-side Liftable Hotend\"); every filament with a mixed, X or \"Not recommended\" cell among the three sizes (the single bundle value cannot carry a per-hotend relation). Nozzle diameters are three (0.2/0.4/0.6 mm), which the single-number nozzle.diameter cannot hold; they stay in the Size value text and the In the Box list. Marketing sentences (\"up to 7 filaments\", \"up to 24 materials\") prove no number; not stored."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "compat.statement",
+        "printing.layer_height",
+        "motion.max_flow",
+        "product.*",
+        "package.*",
+        "part.*",
+        "extrusion.*",
+        "electrical.*",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "note": "Read in full from the cached HTML (the cached .txt omits the tab panels). Vortek Induction Nozzle panel: \"Compatibility: H2C (right hotend) | Max. Printing Temp: 350 ℃ | Size: 0.2mm/ 0.4mm/ 0.6mm/ 0.8mm | Materials: Hardened steel / Stainless steel\"; H2 Series/P2S/X2D Nozzle panel: \"H2C (left hotend) | Max. Printing Temp: 350 ℃\". Both name their own purchase links, not this bundle; they agree with the store page (350 ℃; sizes and materials). The \"about 8 seconds to reach printing temperature (e.g., 220°C)\" sentence has no registry key and is a claim, not a spec row; not stored. The layer-height table is general guidance per nozzle size, and this bundle mixes three sizes; not stored. No dimensions, weight, flow or electrical value."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "compat.statement",
+        "printing.layer_height",
+        "motion.max_flow"
+      ],
+      "note": "Linked from the store page. A general guide for every Bambu nozzle (0.2/0.4/0.6/0.8 mm and High flow columns); none of its rows is stored as a spec of this product. Used to cross-check the filament relations for the bundle's standard LHS 0.2 mm and 0.6 mm hotends, which the page's \"Induction\" columns do not name. Its nozzle temperatures are per filament, not the hotend maximum."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2c/manual/induction-hotend-system-workflow",
+      "title": "Introduction to the Workflow of the Vortek Induction Hotend | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:26:57Z",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "motion.max_flow",
+        "electrical.*",
+        "product.*",
+        "extrusion.*",
+        "part.*"
+      ],
+      "note": "How the Vortek induction hotend works (coil, U-shaped steel sleeve, NTC, in-position magnet; contactless heating and data link). It states no maximum temperature, flow, power, dimensions or weight. \"Only about 8 seconds to reach printing temperature (e.g., 220°C)\" has no registry key; not stored."
+    }
+  ],
+  "specs": [
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Product Specifications › row 1 › pair 1",
+      "quote": "Max. Printing Temp. | 350 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "Agrees with the deterministic row (350 ℃, verified, official_page); same rank, so the merge keeps the page row. Both wiki nozzle panels for the two hotend types in this bundle state the same maximum: the Vortek Induction Nozzle panel (\"Compatibility: H2C (right hotend) | Max. Printing Temp: 350 ℃\") and the H2 Series/P2S/X2D Nozzle panel (\"Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D | Max. Printing Temp: 350 ℃\"). Those panels name the component products (H2C Induction Hotend; Bambu Hotend - H2/P2S), not this bundle, so they are corroboration only. In range (150–350 °C)."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 56.2,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Product Specifications › row 1 › pair 2",
+      "quote": "Length | 56.2 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "Agrees with the deterministic row (56.2 mm). The page does not say which of the bundle's two hotend types (induction RHS or standard LHS) this length measures; kept as the page states it. No width or height is published (see not_published)."
+    },
+    {
+      "key": "package.weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 95,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Product Specifications › row 2 › pair 1",
+      "quote": "Packaging Weight | 0.095 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "The registry stores grams: 0.095 kg = 95 g; the merge writes the text as published (\"0.095 kg\"). Agrees with the deterministic row (value_num 95). A packaging (logistics) measure (§B.7), never products.package_* or net_weight_g."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 135,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Product Specifications › row 2 › pair 2 › dimension 1",
+      "quote": "Packaging Size | 135*100*45 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "First of the three published packaging dimensions (L*W*H as written). Agrees with the deterministic row."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 100,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Product Specifications › row 2 › pair 2 › dimension 2",
+      "quote": "Packaging Size | 135*100*45 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "Second of the three published packaging dimensions. Agrees with the deterministic row."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 45,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Product Specifications › row 2 › pair 2 › dimension 3",
+      "quote": "Packaging Size | 135*100*45 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "Third of the three published packaging dimensions. Agrees with the deterministic row."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0.4 mm induction hotend (RHS) ×2: Hardened Steel; 0.2 mm hotend (LHS): Stainless Steel; 0.6 mm hotend (LHS): Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Description › \"The Hotend Combo gives you:\" › bullets 1–3",
+      "quote": "0.4 mm Induction hardened Steel Nozzle (RHS) ×2 | 0.2 mm stainless steel nozzle (LHS) ×1 | 0.6 mm hardened steel nozzle (LHS) ×1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "The bundle mixes materials, so each hotend's material is written with its size and side, in the page's own words. The page's Filament Compatibility header agrees for the RHS hotends (\"Induction 0.4 mm Hardened Steel\"). Product scope: the page has one Size value (\"0.2mm LHS + 0.6mm LHS + 0.4mm*2 RHS\") and one variant, so this replaces the deterministic not_found row for the product."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "In the Box › list items 1–3",
+      "quote": "In the Box - 0.4mm Induction Hotend (RHS) *2 - 0.2mm Hotend (LHS) *1 - 0.6mm Hotend (LHS) *1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "The official In the Box list counts 2 + 1 + 1 = 4 hotends. The Size value (\"0.2mm LHS + 0.6mm LHS + 0.4mm*2 RHS\") and the description bullets (×2, ×1, ×1) give the same count. In range (1–100)."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H2C",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value); Compatibility section",
+      "quote": "Printer Model: H2C | Compatibility: H2C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "Conflict with the parsed store page: the deterministic row for this key holds the whole compatibility block (the wiki link sentence, the six numbered H2C usage notes and \"H2C\"; unverified, official_page). The printer the page names is H2C, in the option group and under its own \"Compatibility\" heading. This row (official_variant) outranks the page row at merge, and mergeCurated records the disagreement (spec_sources_disagree). The wiki places the parts: the induction hotends fit the H2C right hotend (\"Compatibility: H2C (right hotend)\"), the standard H2 Series hotends the H2C left hotend (\"H2C (left hotend)\"), which matches the page's RHS/LHS labels.",
+      "conflict": "The deterministic compat.statement row carries the full compatibility block text, not the printer; replaced by \"H2C\"."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667219482704769025",
+        "value_text": "H2C"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C",
+      "target_family": "",
+      "target_source_handle": "h2c",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Option group \"Printer Model\" › value 1; Compatibility section",
+      "quote": "Printer Model: H2C | Compatibility: H2C",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "Same target as the deterministic parse (compat-targets.json \"H2C\" → h2c). The wiki nozzles page confirms the placement of the parts: \"Compatibility: H2C (right hotend)\" for the Vortek Induction Nozzle and \"H2C (left hotend)\" for the H2 Series/P2S/X2D Nozzle; the bundle uses both positions, so the relation is to the H2C as a whole."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 1 (PLA Basic) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "PLA Basic | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"PLA*\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; PLA* | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 2…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 2 (PLA Matte) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "PLA Matte | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"PLA*\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; PLA* | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 2…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Lite",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 3 (PLA Lite) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "PLA Lite | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"PLA*\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; PLA* | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 2…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 4 (PLA Basic Gradient) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "PLA Basic Gradient | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"PLA*\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; PLA* | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 2…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 8 (PLA Metal) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "PLA Metal | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"PLA Metal\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; PLA Metal | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 19…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA tough+",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 15 (PLA tough+) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "PLA tough+ | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"PLA*\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; PLA* | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 2…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 18 (PETG HF) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "PETG HF | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"PETG HF\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; PETG HF | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 230 …). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Basic",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 19 (PETG Basic) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "PETG Basic | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"PETG\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; PETG | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 240 - 2…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 22 (ABS) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "ABS | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"ABS\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; ABS | Compatible (For X2D printer: Main hotend Compatible, auxiliary hotend not recommended) | Compatible | Compatible |…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 24 (ASA) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "ASA | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"ASA\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; ASA | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 240 - 28…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 40 (Support for PLA/PETG) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "Support for PLA/PETG | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"Support for PLA, Support for PLA/PETG\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; Support for PLA, Support for PLA/PETG | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Co…). No numbered note on the page restricts this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "locator": "Filament Compatibility › row 42 (Support for PLA (New Version)) › columns Induction 0.2 mm Stainless Steel, Induction 0.4 mm Hardened Steel, Induction 0.6 mm Hardened Steel",
+      "quote": "Support for PLA (New Version) | √ | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "note": "√ in the three columns that match the bundle's hotends by size and material (0.2 mm Stainless Steel, 0.4 mm Hardened Steel, 0.6 mm Hardened Steel). The page's columns are named \"Induction\"; the bundle's 0.2 mm and 0.6 mm hotends are standard LHS hotends, for which the general wiki material table agrees (row \"Support for PLA, Support for PLA/PETG\": Compatible for the 0.2, 0.4 and 0.6 mm nozzle columns; Support for PLA, Support for PLA/PETG | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Co…). No numbered note on the page restricts this filament."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/vortek-utility-hotends-bundle",
+      "source_title": "Vortek Utility Hotends Bundle (store page)",
+      "retrieved_at": "2026-10-16T07:08:08Z",
+      "locator": "In the Box › list items 1–3",
+      "quote": "In the Box - 0.4mm Induction Hotend (RHS) *2 - 0.2mm Hotend (LHS) *1 - 0.6mm Hotend (LHS) *1",
+      "items": [
+        {
+          "text": "0.4mm Induction Hotend (RHS)",
+          "qty": 2,
+          "section": ""
+        },
+        {
+          "text": "0.2mm Hotend (LHS)",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "0.6mm Hotend (LHS)",
+          "qty": 1,
+          "section": ""
+        }
+      ],
+      "note": "The page's own In the Box list; the deterministic parse stores the same three lines as package.contents (verified)."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "note": "Linked from the store page (\"Learn more about filament compatibility on Bambu Lab Wiki\"); the builder already records it (same id, so the merge does not add it twice)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles",
+      "text": "Introduction to Bambu Nozzles",
+      "note": "Not linked from the store page; the §F nozzles page. Its Vortek Induction Nozzle and H2 Series/P2S/X2D Nozzle panels describe the two hotend types in this bundle."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2c/manual/induction-hotend-system-workflow",
+      "title": "Introduction to the Workflow of the Vortek Induction Hotend",
+      "text": "Introduction to the Workflow of the Vortek Induction Hotend",
+      "note": "Linked from the nozzles page's Vortek Induction Nozzle panel; explains how the induction hotends in this bundle work."
+    }
+  ],
+  "not_published": [
+    "product.width",
+    "product.height",
+    "product.net_weight",
+    "motion.max_flow",
+    "extrusion.filament_diameter"
+  ]
+}

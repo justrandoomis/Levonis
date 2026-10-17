@@ -1,0 +1,3280 @@
+{
+ "batch": 24,
+ "surface": "api",
+ "handles": [
+  "bambu-cool-plate-supertack",
+  "bambu-engineering-plate",
+  "build-plate-combo",
+  "glue-stick-for-build-plate",
+  "ams-hub",
+  "liquid-glue-for-build-plate",
+  "anti-vibration-feet",
+  "p1p-enclosure-kit",
+  "bambu-4-in-1-ptfe-adapter",
+  "bambu-filament-swatches",
+  "lubricant-grease",
+  "lubricant-oil",
+  "stronggrip-cutting-mat",
+  "lightgrip-cutting-mat",
+  "fine-point-blade",
+  "material-pins",
+  "smoke-purifier-air-filter",
+  "vision-encoder",
+  "smoke-purifier",
+  "laser-grid-panel",
+  "silicone-desiccant",
+  "ams-2-pro-switching-adapter",
+  "ams-2-pro-upgrade-compatibility-kit",
+  "hardened-steel-upgrade-combo",
+  "sandisk-ultra-fit-usb-3-2-flash-drive",
+  "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+  "l-type-hex-wrench",
+  "accessory-box-for-ams",
+  "accessory-box-for-ams-lite",
+  "accessory-box-for-p1p",
+  "accessory-box-for-x1c-and-p1s",
+  "accessory-box-for-a1",
+  "accessory-box-for-a1-mini",
+  "bambu-reusable-spool",
+  "durable-self-healing-cutting-mat",
+  "laser-upgrade-kit",
+  "cutting-upgrade-kit-h2-series-a2l",
+  "ams-hub-a1-series",
+  "cutting-mat-combo-3-pcs",
+  "filament-cleaning-pad-of-4-in-1-ptfe-adapter-ii",
+  "toolhead-enhanced-cooling-fan",
+  "maker-s-supply-screwdriver-kit"
+ ],
+ "strings": [
+  {
+   "h": "b6656dd96af533fa6a397412ea4163f8f9d9d328ea3aae7c288592ddf80afa0d",
+   "en": "Say Goodbye to Print Failures",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[0].line[0]",
+    "near": "SuperTack coating provides ultra-strong adhesion to PLA and PETG filaments, even at lower heatbed temperatures. It enhances printing success by eliminating adhe"
+   },
+   "dict": null
+  },
+  {
+   "h": "8709a97b5be9b5ccd272b85c4772d6e7c9115301e72ab44402ce138b2f636092",
+   "en": "SuperTack coating provides ultra-strong adhesion to PLA and PETG filaments, even at lower heatbed temperatures. It enhances printing success by eliminating adhesion issues, reduces warping when printing large objects and works well with surfaces that are in bad shape.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[0].line[1]",
+    "near": "Say Goodbye to Print Failures"
+   },
+   "dict": null
+  },
+  {
+   "h": "1652842632820e3f2449191fb0440a232ab3ee5cf5c11dc1431ac192f91b600e",
+   "en": "Long Lasting Performance",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[1].line[0]",
+    "near": "The SuperTack coating is durable, retaining its sticky properties even after extensive use. This results in a longer lifespan for the printing plate, reducing p"
+   },
+   "dict": null
+  },
+  {
+   "h": "65e3bfdf15361388d1636b7d1e67f150ca38e762896e60cd4adcc2f66eac7cda",
+   "en": "The SuperTack coating is durable, retaining its sticky properties even after extensive use. This results in a longer lifespan for the printing plate, reducing printing costs (less than 20% adhesion loss after 300 prints) and lowering carbon emissions.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[1].line[1]",
+    "near": "Long Lasting Performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "c9ccdd6b227078bdb1cb18540450aec19299d607f0fb19fad4c4931508d7a6c9",
+   "en": "*The test data was produced using PLA Basic filament and completed on the A1 3D Printer.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[2].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3501da4261448f10884812b4592a397cd38bd001017c887ea38dad624711d7bd",
+   "en": "Smooth & Natural Surface Finish",
+   "kind": "block_title",
+   "freq": 4,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[3].line[0]",
+    "near": "The SuperTack coating can impart a smooth and matte texture to the bottom surface of the printed object, better blend-in with other surfaces."
+   },
+   "dict": null
+  },
+  {
+   "h": "3f7bf2b41b58bd4540793d4a37aeba781fea63368d2728b99c02793a93b4a170",
+   "en": "The SuperTack coating can impart a smooth and matte texture to the bottom surface of the printed object, better blend-in with other surfaces.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[3].line[1]",
+    "near": "Smooth & Natural Surface Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "518cec6bc44d7b83288d614ab0c3de0d2182049f092784cf9b04b88c90f330ec",
+   "en": "Energy Saving",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[4].line[0]",
+    "near": "The SuperTack coating requires only an extremely low heatbed temperature to ensure that printed objects adhere securely. This means you can save a significant a"
+   },
+   "dict": null
+  },
+  {
+   "h": "9419160898014c2e18d467de24e4386cef6c4e3e9649b9c92423806a4cd1452e",
+   "en": "The SuperTack coating requires only an extremely low heatbed temperature to ensure that printed objects adhere securely. This means you can save a significant amount of energy during heating, leading to lower power bills and, more importantly, helping to protect our planet.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[4].line[1]",
+    "near": "Energy Saving"
+   },
+   "dict": null
+  },
+  {
+   "h": "26d87a4576b6ee23baf84013d2b8add0d0b496fc31c04becf5eb6b6e1d7beef9",
+   "en": "Comparison of Heatbed Temperatures for Different Build Plates",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[5].line[0]",
+    "near": "Materials | Heatbed Temperature with Textured PEI | Heatbed temperature with SuperTack"
+   },
+   "dict": null
+  },
+  {
+   "h": "401634fc3680d4fbd72d0baaf06078b11f2a3604593c6e4a9598267452883a43",
+   "en": "Heatbed Temperature with Textured PEI",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[5].line[1].cell[1]",
+    "near": "Comparison of Heatbed Temperatures for Different Build Plates"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f07cda2db54adaa53191810bc36b212e939bd000baa7b274d272640dbe81eb2",
+   "en": "Heatbed temperature with SuperTack",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[5].line[1].cell[2]",
+    "near": "Comparison of Heatbed Temperatures for Different Build Plates"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb1e94490ad38c2d94f433838e2d068f234c89a6a67981c0b0fa00d976cc3de8",
+   "en": "The surface is soft. Be careful when using a scraper to remove printed parts.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[6].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "4d1b2887c172bc40c3f887fb89fb98453473e2010fda47b2cd83ab355e1a8527",
+   "en": "Do NOT print with TPU filament, as it will damage the build plate.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[6].line[2]",
+    "near": "• The surface is soft. Be careful when using a scraper to remove printed parts."
+   },
+   "dict": null
+  },
+  {
+   "h": "ace27fa0e151a627719da601ce6772f2f8af78b59ad57db34a5c87637baea8c8",
+   "en": "Bambu Cool Plate SuperTack is considered a consumable part, which will degrade over time.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[6].line[5]",
+    "near": "• Before auto-leveling, it is necessary to repeatedly rub the nozzle in the special wiping area of the build plate to completely remove any residual material at"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f2bf934a21d8f353174ae2e4d136e47894ec2972b7e54075b02cafd5d2ef41b",
+   "en": "SuperTack provides good adhesion without adhesive or frequent cleaning. You can clean the surface with water and detergent if heavy dirt appears. Do NOT use organic solvents (especially acetone) to clean the build plate, as it will damage the SuperTack surface.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[6].line[6]",
+    "near": "• Bambu Cool Plate SuperTack is considered a consumable part, which will degrade over time."
+   },
+   "dict": null
+  },
+  {
+   "h": "95d68cae857c31f11d26024493b4f7609941d00a792a5fc259dc4e9e9ee9462e",
+   "en": "Bambu PLA Silk material exhibits strong adhesion on the SuperTack build plate, which may damage printed models. Therefore, we do not recommend using Bambu PLA Silk material on the SuperTack build plate. For users printing with third-party PLA Silk materials, please select the Generic PLA Silk preset in Bambu Studio and evaluate material compatibility based on the specific conditions.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[6].line[7]",
+    "near": "• SuperTack provides good adhesion without adhesive or frequent cleaning. You can clean the surface with water and detergent if heavy dirt appears. Do NOT use o"
+   },
+   "dict": null
+  },
+  {
+   "h": "e1d7bb9ec8b8b514ece71c9f0561d11691460cd3bc1c0808c838ec27a09feb5b",
+   "en": "Reliable surface adhesion",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[7].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "bdc7a1f0fbacab668632fa69446860b6ad73f4efe6dfcf33212bd415cb2ca532",
+   "en": "Durable coating for long-lasting performance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[7].line[2]",
+    "near": "• Reliable surface adhesion"
+   },
+   "dict": null
+  },
+  {
+   "h": "0bdd118d2d6df822e8aa1abd9aa0da6a17ac42d221eb5c444e1b22f5636dbf0a",
+   "en": "Natural texture seamlessly hides the bottom surface",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[7].line[3]",
+    "near": "• Durable coating for long-lasting performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "dbb2c20f8602e66ff07f18be1bb72dd139b2986109e20e8856bbb3d97e61b3fb",
+   "en": "Designed for PLA and PETG",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "blocks[7].line[4]",
+    "near": "• Natural texture seamlessly hides the bottom surface"
+   },
+   "dict": {
+    "ar": "مصمّم لـPLA وPETG",
+    "ckb": "بۆ PLA و PETG دروستکراوە"
+   }
+  },
+  {
+   "h": "00fb53b5021e0691580131928de82da0051868724f790e1efa4935edefa4ccee",
+   "en": "One Build Plate for All Filaments",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[1].line[0]",
+    "near": "With a simple layer of glue, the Engineering Plate is compatible with our entire filament lineup, it's the perfect go-to solution when you're not sure which pla"
+   },
+   "dict": null
+  },
+  {
+   "h": "669c259ac163665687072aebe17b7cd12f5c76215dcdfedd08ded2fe1318b20c",
+   "en": "With a simple layer of glue, the Engineering Plate is compatible with our entire filament lineup, it's the perfect go-to solution when you're not sure which plate to use.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[1].line[1]",
+    "near": "One Build Plate for All Filaments"
+   },
+   "dict": null
+  },
+  {
+   "h": "b48c129529a6c475a71c6e2d35bfea16fa88916a40a434947df559d1d1d31156",
+   "en": "Durable Smooth Surface Coating",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[2].line[0]",
+    "near": "The refreshed coating significantly improves the plate's temperature, scratch, and corrosion resistance. Built to withstand prolonged high-temperature printing "
+   },
+   "dict": null
+  },
+  {
+   "h": "bd32526be9645087152b635c60e7fb72d83d6c28930f233125ef49fbd1d224cb",
+   "en": "The refreshed coating significantly improves the plate's temperature, scratch, and corrosion resistance. Built to withstand prolonged high-temperature printing and hundreds of washes and peels, its smooth, dependable surface guarantees stable adhesion every single time.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[2].line[1]",
+    "near": "Durable Smooth Surface Coating"
+   },
+   "dict": null
+  },
+  {
+   "h": "6add756bc00148f89dd4345efd49adb944939e48e7b5b92f4713e715784cf3b8",
+   "en": "The smooth base coating can impart a smooth & flat texture to the bottom surface of the printed object, better blend in with other surfaces.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[3].line[1]",
+    "near": "Smooth & Natural Surface Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "4160a119bfa50364e8dc4dd588b1d03e15209ed1c3dcfa065a5eda9b500406e5",
+   "en": "1. Before printing with any filament, it is recommended to apply glue on the Engineering Plate. Applying solid glue can make part removal easier, but since solid glue has a certain thickness and is difficult to apply evenly, the printing stability and first-layer quality are usually not as good as when using liquid glue. On the other hand, liquid glue may make part removal more difficult. You should choose the appropriate glue type based on the filament, printing environment, and other practical conditions. For more details, please refer to the official wiki: Bambu Lab Wiki.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[4].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "2d6c072ac99d639bcf343efda17abf3d49891ca6ce24de997bd813d4d60da585",
+   "en": "2. When using a scraper to remove prints, make sure to use the correct technique. If the model adheres too tightly to the build plate, apply alcohol to the interface between the model and the plate to reduce adhesion and make removal easier. This helps prevent damage to the model, the build plate, or potential injury to the user caused by excessive force.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[4].line[2]",
+    "near": "• 1. Before printing with any filament, it is recommended to apply glue on the Engineering Plate. Applying solid glue can make part removal easier, but since so"
+   },
+   "dict": null
+  },
+  {
+   "h": "faaa723be168cf77fbcac4f2bec1ce33ae5035ba584e6f1af2d608fc8dd554c2",
+   "en": "3. Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve the most suitable level of adhesion.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[4].line[3]",
+    "near": "• 2. When using a scraper to remove prints, make sure to use the correct technique. If the model adheres too tightly to the build plate, apply alcohol to the in"
+   },
+   "dict": null
+  },
+  {
+   "h": "712ab44dde572d214d8b9d4ccd38efcc3242811974d3cdaa10f3039b5e8d8c8d",
+   "en": "4. For X1 series, P1 series, and A1 printers, before auto-leveling, it is necessary to repeatedly rub the nozzle in the wiping area of the build plate to thoroughly remove any residual material at the tip of the nozzle. The coating in the wiping area will gradually wear over time, which is normal and does not affect print quality or nozzle lifespan, so there is no need to worry about quality issues.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[4].line[4]",
+    "near": "• 3. Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achi"
+   },
+   "dict": null
+  },
+  {
+   "h": "e011c42599a038637c1b8ce6ec41b210248660982dbf1393e4e9fc366e27bd77",
+   "en": "5. Dust and grease deposits on the build plate can reduce adhesion. It is recommended to regularly clean the build plate with warm water and dish soap to maintain optimal adhesion. Do not use other unapproved cleaning agents.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[4].line[5]",
+    "near": "• 4. For X1 series, P1 series, and A1 printers, before auto-leveling, it is necessary to repeatedly rub the nozzle in the wiping area of the build plate to thor"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb276764d4d27bed229b9194c314117e29b406f73e26076dd2b3fb026778d39b",
+   "en": "6. Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and cannot be held responsible for any damage caused to plates as a result of using third-party glue on build plates. Do not clean the Engineering Plate with Acetone, as it will damage the Engineering Plate surface.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[4].line[6]",
+    "near": "• 5. Dust and grease deposits on the build plate can reduce adhesion. It is recommended to regularly clean the build plate with warm water and dish soap to main"
+   },
+   "dict": null
+  },
+  {
+   "h": "52a4db4966dfdced86f555a1f6ea90e1b926be5703e063a61b0eb8d8d04a2db6",
+   "en": "7. Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and ensures a long lifetime of the product.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[4].line[7]",
+    "near": "• 6. Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and cannot be held responsible for any damage caused to plates as a "
+   },
+   "dict": null
+  },
+  {
+   "h": "e9d3d87f2093d1a32c7b167e61369eb7e11398afb92c7ddd674a6adfb10e05b0",
+   "en": "8. The latest firmware brings significant improvements to the Bambu Engineering Plate calibration using the Micro Lidar, and it is now fully compatible with the automatic calibration process.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[4].line[8]",
+    "near": "• 7. Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and "
+   },
+   "dict": null
+  },
+  {
+   "h": "9d3d17fe9430ae6c41f8f72400fc41e1f9e5007a47522130a30e61516772f244",
+   "en": "9. The Engineering Plate plate is considered a consumable part, which will degrade over time.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[4].line[9]",
+    "near": "• 8. The latest firmware brings significant improvements to the Bambu Engineering Plate calibration using the Micro Lidar, and it is now fully compatible with t"
+   },
+   "dict": null
+  },
+  {
+   "h": "822f41fbdd76be87e6bb72d0d4c733487b0495e0e16690cc8699b220d47cbf6d",
+   "en": "Optimized for high-temperature filaments",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "caf8a00f71b35fb5718ce2dd63ff02d4bde9a7e27106d8ca8dd1ccc5dc51d6a1",
+   "en": "Built for long-lasting performance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[6].line[2]",
+    "near": "• Optimized for high-temperature filaments"
+   },
+   "dict": null
+  },
+  {
+   "h": "ddca9a57e6760d266f27063c26072c168671f416b9b11762895fce04be4d98b5",
+   "en": "Important",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[6].line[3]",
+    "near": "• Built for long-lasting performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "1763f03c2d726beee85d97a48f376b0b2c085cc7404bd1a5623e72ea407a4ede",
+   "en": "Glue must be applied before printing any material on the Engineering Plate.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "blocks[6].line[4]",
+    "near": "• Important"
+   },
+   "dict": null
+  },
+  {
+   "h": "36732dff1c1454d19b282f7f93b3c50992c0c108b18240aeddc4965dd611b9a9",
+   "en": "Which Build Plate Is Right for You?",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[0]",
+    "near": "Build Plate Types | Main Features | Filament Precautions"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f90066fe14fff7aff36427223ddb266637068a5a5c6752d3e631aefa76ab51e",
+   "en": "Build Plate Types",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[1].cell[0]",
+    "near": "Which Build Plate Is Right for You?"
+   },
+   "dict": null
+  },
+  {
+   "h": "50f0a30a0a261539ef68a95eb24a34583a65cb428ac109e0c1ddad33d37e201d",
+   "en": "Main Features",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[1].cell[1]",
+    "near": "Which Build Plate Is Right for You?"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a9911a4494fcee8452b795f7824a0cb5cc0a3003ebc3038fbb0ba9f11819dbd",
+   "en": "Filament Precautions",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[1].cell[2]",
+    "near": "Which Build Plate Is Right for You?"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c6179219409b086373eb4b63a423384cbfb11a90ec7ba801dc713b5aab7698c",
+   "en": "Special textured surface: Adds a unique textured finish to the bottom surface of printed parts. Strong adhesion: In most cases, it provides excellent adhesion without the need for adhesive. Durable, long-lasting coating: The PEI surface coating is highly durable and robust.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[2].cell[1]",
+    "near": "Build Plate Types | Main Features | Filament Precautions"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac4947e756c65e11ce94b271eb478dd848c697bd97ea7c1040371a357187b8ac",
+   "en": "Compatible with Various Filaments: PEI enables printing not only with common materials such as PLA, TPU, PETG, but also with materials that require high temperatures like ABS and Nylon. When printing PC/PA/ABS/ASA filaments on a Textured PEI Plate, it may be necessary to apply a layer of glue stick.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[2].cell[2]",
+    "near": "Build Plate Types | Main Features | Filament Precautions"
+   },
+   "dict": null
+  },
+  {
+   "h": "45c9a14f421f5237387078790d9a271b8eed840405f096ccee9138eeacafb943",
+   "en": "Dual-Texture PEI Plate",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[3].cell[0]",
+    "near": "Textured PEI Plate | Special textured surface: Adds a unique textured finish to the bottom surface of printed parts. Strong adhesion: In most cases, it provides"
+   },
+   "dict": null
+  },
+  {
+   "h": "df4328c931c5596820274fa2d9ef4a497ce77df2eedc78ea1550b31df11b4fe8",
+   "en": "The stainless steel plate is equipped with dual-sided coatings, one side featuring textured PEI and the other side featuring smooth PEI. Users can choose between different surface textures, allowing the model's bottom surface to have either a matte or smooth finish, providing more printing options.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[3].cell[1]",
+    "near": "Textured PEI Plate | Special textured surface: Adds a unique textured finish to the bottom surface of printed parts. Strong adhesion: In most cases, it provides"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca14a3f4d42ca6c00227db2cffc35baa810b3b08c2317a0fff39ca54bb84dfd0",
+   "en": "Smooth side: PEI enables printing not only with common materials such as PLA, TPU, PETG, but also with materials that require high temperatures like ABS and Nylon. (Note: Please apply glue to prevent the sheet from tearing if printing with filaments other than PLA.) For the textured side, refer to the first row of this table (Textured PEI Plate).",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[3].cell[2]",
+    "near": "Textured PEI Plate | Special textured surface: Adds a unique textured finish to the bottom surface of printed parts. Strong adhesion: In most cases, it provides"
+   },
+   "dict": null
+  },
+  {
+   "h": "18ddda7ab19310b254e7288809c9a272d50eacf856b519075fb418a0c60eb439",
+   "en": "The Engineering Plate is manufactured using a corrosion-resistant reinforced coating process, specifically optimized for printing engineering materials such as ABS, ASA, PC, and PA. Compared with traditional build plates that tend to suffer from coating degradation over time, the new flat build plate significantly enhances surface corrosion resistance and durability. Its fine and uniform surface texture ensures stable adhesion while providing printed parts with a smoother, nearly glossy bottom finish.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[4].cell[1]",
+    "near": "Dual-Texture PEI Plate | The stainless steel plate is equipped with dual-sided coatings, one side featuring textured PEI and the other side featuring smooth PEI"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb77a0f4416b876b6a4b03f0de13e4747c86a5e24079affcfe3647c1d7c49fe5",
+   "en": "The Engineering Plate is compatible with the full range of Bambu Lab filaments. Simply apply a thin layer of glue before printing. When you are unsure which build plate to use, this plate serves as the perfect all-around solution.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[4].cell[2]",
+    "near": "Dual-Texture PEI Plate | The stainless steel plate is equipped with dual-sided coatings, one side featuring textured PEI and the other side featuring smooth PEI"
+   },
+   "dict": null
+  },
+  {
+   "h": "8759b6f7cda0bb9b3cf6160ed186b0673e2a3ec7a01df8e9f150be4bc9481dbe",
+   "en": "Cool Plate SuperTack Series",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[5].cell[0]",
+    "near": "Engineering Plate | The Engineering Plate is manufactured using a corrosion-resistant reinforced coating process, specifically optimized for printing engineerin"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4f61c576cdbe83942f62c21179720bd1a3d938aadfdc6283816c86af0df3fff",
+   "en": "The Cool Plate SuperTack features a finely textured surface that approaches a smooth, glossy finish. It is a beginner-friendly build plate, especially suitable for glue-free printing with PLA and PETG filaments. The surface is resistant to dirt, provides strong adhesion, and minimizes print detachment. In addition, the coating greatly reduces the energy required for bed heating, lowers the risk of nozzle clogging when printing PLA and PETG, decreases electricity consumption, and is more environmentally friendly.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[5].cell[1]",
+    "near": "Engineering Plate | The Engineering Plate is manufactured using a corrosion-resistant reinforced coating process, specifically optimized for printing engineerin"
+   },
+   "dict": null
+  },
+  {
+   "h": "a365e6590038144c15dd1897fce83a1469abc5239cd27aec7ecac5222ac56f14",
+   "en": "This plate is designed only for printing PLA and PETG. Using any other materials may damage the surface coating.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[5].cell[2]",
+    "near": "Engineering Plate | The Engineering Plate is manufactured using a corrosion-resistant reinforced coating process, specifically optimized for printing engineerin"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ee000e89b75af36a4a658eab99107c6d3dbb9629c77e00825ea93a3c9418c0b",
+   "en": "Learn more about build plates at: Bambu Lab Wiki",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[0].line[6]",
+    "near": "Cool Plate SuperTack Series | The Cool Plate SuperTack features a finely textured surface that approaches a smooth, glossy finish. It is a beginner-friendly bui"
+   },
+   "dict": null
+  },
+  {
+   "h": "98143613c4974e810a4993942dfacff2be45fb78b00835944aaf81cf8f36395d",
+   "en": "Textured PEI",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[1].line[0]",
+    "near": "Bambu Textured PEI Plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "70adb70251404449de1548cc90e196182a6fcb8319286b117f8c40f634e43a75",
+   "en": "For the 2-Pack Combo: Ideal for users who need both easy everyday PLA/PETG printing and reliable support for engineering filaments like ABS, ASA, PC, and PA.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[23].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "09aba575312ab46e5e3d7f3c99a638ee03cc93e2b1ac1472cb0a286cbf9c3c17",
+   "en": "For the 3-Pack Combo: Best for users who want the most printing flexibility, with support for everyday and engineering filaments, and the choice of smooth or textured bottom finishes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "blocks[23].line[2]",
+    "near": "• For the 2-Pack Combo: Ideal for users who need both easy everyday PLA/PETG printing and reliable support for engineering filaments like ABS, ASA, PC, and PA."
+   },
+   "dict": null
+  },
+  {
+   "h": "214fb794a269194e4102ab18081c627e0bc1abc5992057082739a7fced94e9bb",
+   "en": "A Bambu glue stick provides suitable adhesion between the build plate and the model, and also it's formaldehyde-free.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "959461dfcacd104c1a608745c8b022fcc96edd6033abe3bda99591b4b23b34cd",
+   "en": "WARNING! CHOKING HAZARD. Please keep small parts away from children under 3 years old and stored in a cool and dry place.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "blocks[1].line[1]",
+    "near": "Note"
+   },
+   "dict": null
+  },
+  {
+   "h": "84e8c868cb7bc5c106c87f242f80b3554ce7623e2d8269284105e09f842d1ae4",
+   "en": "The AMS Hub is used to expand the number of AMS connected to Bambu X1/P1 series printers from 1 AMS unit (4 channels) to a maximum of 4 AMS units (16 channels) to improve the refueling speed across your multiple AMS units and support the redundancy of a buffered signal.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "74520abc033717a90d2dba2e42a3bac826941c4296cce5438c1861f50d95526f",
+   "en": "You will need a Bus cable (4pin) to connect the AMS Hub to the printer. Besides the 4-pin cable, the Bambu Lab AMS Hub includes all necessary accessories to connect 2x AMS units to the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "blocks[0].line[2]",
+    "near": "The AMS Hub is used to expand the number of AMS connected to Bambu X1/P1 series printers from 1 AMS unit (4 channels) to a maximum of 4 AMS units (16 channels) "
+   },
+   "dict": null
+  },
+  {
+   "h": "7b0eebede3f72e01878eb1cc5b2b81d6a7b9c1f5e49a3ed6fdc212c877fd41c5",
+   "en": "If you wish to add more AMS units, you need to order additional Bus cable (6pin) and PTFE Tube. To use 4x AMS units, you need to order additional 2x Bus cable (6pin) and 2x 2m PTFE Tube.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "blocks[0].line[3]",
+    "near": "* You will need a Bus cable (4pin) to connect the AMS Hub to the printer. Besides the 4-pin cable, the Bambu Lab AMS Hub includes all necessary accessories to c"
+   },
+   "dict": null
+  },
+  {
+   "h": "5319946d251d3ed62986f300be8c62853a39054af033107965bfa92d822d8e16",
+   "en": "*The picture is for reference only, try to place the AMS on the left side of the AMS Hub when actually printing, otherwise the filament in the PTFE tube is easy to get stuck.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "blocks[1].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d0f3bbacb0cf7e9571c9c1b27f0f478e2741da6f6357e8131ce73f1220c05cd7",
+   "en": "Expand Your AMS Options",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "blocks[2].line[0]",
+    "near": "The built-in buffer of the printer can only be connected to 1 AMS. When replaced with AMS Hub, the printer will be able to connect up to 4 AMS."
+   },
+   "dict": null
+  },
+  {
+   "h": "1e78a78d7f0fde28ce0f027f94491e3fec8cf154f69f2f1ec8ee52e4fd9586fa",
+   "en": "The built-in buffer of the printer can only be connected to 1 AMS. When replaced with AMS Hub, the printer will be able to connect up to 4 AMS.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "blocks[2].line[1]",
+    "near": "Expand Your AMS Options"
+   },
+   "dict": null
+  },
+  {
+   "h": "724f01c11f75cd7996b0a0166e4787c3b8af1256583b31f06d0ae1c5bdb7456e",
+   "en": "The Bambu Lab Liquid Glue is an adhesive specially developed for 3D printing, suitable for printing materials such as PLA, ABS, and PETG on all Bambu Lab build plates. When using Bambu Lab Liquid Glue, constant adhesion is maintained without worrying about models falling off or warping.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5697d03daef4de9cf8db7cb11755f71358a32b4acca94909a9d449f71040d2dd",
+   "en": "Features",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[1].line[0]",
+    "near": "1. Excellent Adhesion: This avoids printing failures by ensuring that the models adhere perfectly to the print surface. Bambu Lab Liquid Glue also makes it easi"
+   },
+   "dict": null
+  },
+  {
+   "h": "7526c87e2b73461bff33f2d8b287333ba8f734ec491cfb3cf155f296291d1064",
+   "en": "1. Excellent Adhesion: This avoids printing failures by ensuring that the models adhere perfectly to the print surface. Bambu Lab Liquid Glue also makes it easier to remove prints from the plate when finished.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[1].line[1]",
+    "near": "Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "f875e8830b1ee92f28e97f8b67366c57c8e027901ab19aea20a91dfae99d9018",
+   "en": "2. Easier to Clean: The Bambu Lab Liquid Glue can be cleaned easily from the print surface and from models. Compared with glue stick, liquid glue for build plate will leave less residue on the printed model and is easier to clean up.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[1].line[2]",
+    "near": "1. Excellent Adhesion: This avoids printing failures by ensuring that the models adhere perfectly to the print surface. Bambu Lab Liquid Glue also makes it easi"
+   },
+   "dict": null
+  },
+  {
+   "h": "e434ebb5fcc7c869aa94a801f6eda0a7a48560a88fb78b10980c0417559b443c",
+   "en": "3. More Uniform Application: Compared with a glue stick, Bambu Lab Liquid Glue is easier to apply uniformly over the build plate surface.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[1].line[3]",
+    "near": "2. Easier to Clean: The Bambu Lab Liquid Glue can be cleaned easily from the print surface and from models. Compared with glue stick, liquid glue for build plat"
+   },
+   "dict": null
+  },
+  {
+   "h": "9be7984d0c2d2950b7c643755cea6422db75ed39a334478eba9bcd10ef161217",
+   "en": "4. Environmentally Friendly and Safe: The ingredients are environmentally friendly and harmless to the human body, with lower odor compared to other glues",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[1].line[4]",
+    "near": "3. More Uniform Application: Compared with a glue stick, Bambu Lab Liquid Glue is easier to apply uniformly over the build plate surface."
+   },
+   "dict": null
+  },
+  {
+   "h": "8652006988c4cb2545da170cc8c12556a166074acdf175b58358b900437fdcdf",
+   "en": "Hotbed Temperature",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Recommended Settings"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e178e6c65f95e64f44ab34d7cb1f8661f991b98392c4501061774d820f39f7e",
+   "en": "Caution",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[3].line[0]",
+    "near": "Suitable for filaments such as PLA, PETG, PET, ABS, ASA, TPU."
+   },
+   "dict": null
+  },
+  {
+   "h": "64324aa041f6d022ac54dbeb5ab347ff42098acac488a0c1caaea1ee5863982b",
+   "en": "Suitable for filaments such as PLA, PETG, PET, ABS, ASA, TPU.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[3].line[1]",
+    "near": "Caution"
+   },
+   "dict": null
+  },
+  {
+   "h": "fcd8b5f57700051bbc1a8e9015cbd9fca52dbea51dfcc5c60bb6612ce7d1c9e5",
+   "en": "To ensure maximum effect, multiple glue applications are not recommended.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[3].line[2]",
+    "near": "Suitable for filaments such as PLA, PETG, PET, ABS, ASA, TPU."
+   },
+   "dict": null
+  },
+  {
+   "h": "7d41953520fdf6f08eb40545b29bfd74b33e436e24a5be91ec5516b012c95629",
+   "en": "Do not squeeze the bottle too hard.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[3].line[3]",
+    "near": "To ensure maximum effect, multiple glue applications are not recommended."
+   },
+   "dict": null
+  },
+  {
+   "h": "8693987306abab7c2901b0eea9fe908681de81b1285cefe5fdc8c9bcf3517f77",
+   "en": "If the adhesion to some filament is not enough, please increase the temperature of the hotbed appropriately.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "blocks[3].line[4]",
+    "near": "Do not squeeze the bottle too hard."
+   },
+   "dict": null
+  },
+  {
+   "h": "2913dbe7cfcb14ba2c4412da8f889b31a4df1cfcabe8f027ca54ed7df87e2de8",
+   "en": "These rubber feet are designed to absorb vibrational energy, helping to minimize machine wear caused by vibrations.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb69be52e38cdc4f7ce476a373b7e777f367ae70021f3912c6dfa014a0e94d41",
+   "en": "*To help the Anti-Vibration Feet stay more stable, please also 3D print and install the Anti-Vibration Feet Adapter uploaded by @SpectreGadget on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[0].line[2]",
+    "near": "These rubber feet are designed to absorb vibrational energy, helping to minimize machine wear caused by vibrations."
+   },
+   "dict": null
+  },
+  {
+   "h": "d5b67bc930cd33c0c62c478cb250387d18e05304ba7d0e02fd1acea699044d20",
+   "en": "Benefits",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[1].line[0]",
+    "near": "When you place a single printer on the desktop, the anti-vibration feet can effectively reduce the desktop shaking caused by printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "57f4571e31465e2ea794d03a597829dae1b0b97b370ec09bf3da8fd1cf7bd9af",
+   "en": "When you place a single printer on the desktop, the anti-vibration feet can effectively reduce the desktop shaking caused by printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[1].line[1]",
+    "near": "Benefits"
+   },
+   "dict": null
+  },
+  {
+   "h": "a8ce13054170985bd15d245406efa5d097fde43fd37f30098abf38d26c198325",
+   "en": "When you place multiple printers on the same desktop, the anti-vibration feet can effectively reduce the impact of machine vibration from nearby machines.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[1].line[2]",
+    "near": "When you place a single printer on the desktop, the anti-vibration feet can effectively reduce the desktop shaking caused by printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "06ed9a262818f341401e331f620ffd81702e96b8820039fc843dd4d9aade3214",
+   "en": "Downsides",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[2].line[0]",
+    "near": "The printer can oscillate, but it has no effect on printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "06ab2398fb5be360c6ead0a5a9fc2a0eb7ee00b2a7bb89342a4f16c31d505ed7",
+   "en": "The printer can oscillate, but it has no effect on printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[2].line[1]",
+    "near": "Downsides"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f8fed116c26f26d66f0a032f9f2654878a3a4396ff592c9a4cf261a4f5375a0",
+   "en": "May cause the metallic plate inside the purge chute to shake and produce some noise",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[2].line[2]",
+    "near": "The printer can oscillate, but it has no effect on printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "ece299d0f5e8c9509391213d9dae707dd7a1d31d6b65fee140459372ecd64c2c",
+   "en": "Reduce Vibration",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[3].line[0]",
+    "near": "\"Thanks to @tombeardy4833 for the inspiration.\""
+   },
+   "dict": null
+  },
+  {
+   "h": "487a36977e8c6d7e59be92b06d37ed71be387b2d746fba400d5d2f196305744a",
+   "en": "\"Thanks to @tombeardy4833 for the inspiration.\"",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "blocks[3].line[1]",
+    "near": "Reduce Vibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d05382c7a42bc586a58c8904fd7fe844e95b03ecf94ac4f039b6a741eb3b3ea",
+   "en": "The Bambu Lab P1P Enclosure Kit packs all the parts needed to enclose the P1P 3D printer. After enclosing the P1P, the printer definition will remain the same. It is not possible to change the printer definition from P1P to P1S after the enclosure.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "689c896fd1a2aca3dfbf2d0771e8f4d54e511e18336251cbf1c3d90cb46fa399",
+   "en": "The glass cover plate, front glass door, left/right plastic panels, rear metal panel, front cover can enclose the P1P 3D printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "blocks[0].line[2]",
+    "near": "The Bambu Lab P1P Enclosure Kit packs all the parts needed to enclose the P1P 3D printer. After enclosing the P1P, the printer definition will remain the same. "
+   },
+   "dict": null
+  },
+  {
+   "h": "0dfb5e3e7f2a8b377c52dc2e0ca5a88aaff4e87eab73708a341766bf2290991f",
+   "en": "The auxiliary part cooling fan, control board fan, and chamber temperature regulator fan can aid heat dissipation to achieve higher-speed printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "blocks[0].line[3]",
+    "near": "The glass cover plate, front glass door, left/right plastic panels, rear metal panel, front cover can enclose the P1P 3D printer."
+   },
+   "dict": null
+  },
+  {
+   "h": "a7697ee2605a1c0a25f69f3b57a5713ec36d235a11e7f3f3921934b6be671d23",
+   "en": "The cable chain and P1S toolhead cable can ensure reliable performance during repetitive bending as a result of motion. The 550mm PTFE tube (for P1S and X1 Series) allows more ample movement of the filament and lowers the extra abrasion.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "blocks[0].line[4]",
+    "near": "The auxiliary part cooling fan, control board fan, and chamber temperature regulator fan can aid heat dissipation to achieve higher-speed printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "76489258ea1f27b8748cccbafd737e2281f01d8e47711bb674795690f03388c8",
+   "en": "The Bambu 4-in-1 PTFE Adapter is an adapter used to connect the PTFE tube. Compared to the original PTFE tube connector, the 4-in-1 adapter can connect 4 feeder modules to the printer at the same time. (up to 7 different filaments: 1 AMS and other 3 filaments)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b3105d4d620e76388ad9f5be0c960b6e7bb83a7276fff9d7347c747ada1fc945",
+   "en": "It can help users to connect the printer to AMS along with other filaments which are not compatible with AMS such as TPU 95A, Bambu PET-CF and other brands' carbon-fiber/glass-fiber contained filaments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "blocks[0].line[2]",
+    "near": "The Bambu 4-in-1 PTFE Adapter is an adapter used to connect the PTFE tube. Compared to the original PTFE tube connector, the 4-in-1 adapter can connect 4 feeder"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe4fafad912f0aa33d39a33507a26815a241d7344ebb687303b3fb5397d891e7",
+   "en": "Product Information",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[0]",
+    "near": "• Packaging Size: 30*30*205 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "9085febf28aa204b9d981d21815f45054cb0b4da95c4f37478e7addbe2d3786f",
+   "en": "Packaging Size: 30*30*205 mm",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[1]",
+    "near": "Product Information"
+   },
+   "dict": null
+  },
+  {
+   "h": "a425a0d64a350d4d0565057f79af6f2c071108bee3924c703d3b8d4c6ec98429",
+   "en": "Packaging Weight: 0.14 kg",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[2]",
+    "near": "• Packaging Size: 30*30*205 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "691b23b71610a4e94c95577d2df52bbfb3492f534cca2f3a91f10cffec6eaa16",
+   "en": "Quantity: 80 pcs",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[3]",
+    "near": "• Packaging Weight: 0.14 kg"
+   },
+   "dict": {
+    "ar": "الكمية: 80 قطعة",
+    "ckb": "بڕ: 80 دانە"
+   }
+  },
+  {
+   "h": "a7445eedb805a958d82f7c6fa9bc6361362410c8fd78ddf2b12d08dd366179f4",
+   "en": "Swatch Size: 24*24 mm",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[4]",
+    "near": "• Quantity: 80 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "629df6c7c0383c9367ef5d1d0c31687707affbae54692c780bb5714dc387c85d",
+   "en": "Production Technology: Injection molding & 3D Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[5]",
+    "near": "• Swatch Size: 24*24 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "d45ac052b669124f07eb8b5c4ec2e695613f3a9e36ffdc23812926a5ebc485ff",
+   "en": "Note: The Filament Swatch includes 80 sample chips, but does not fully include all types and colors available for sale. It mainly features popular filaments like PLA Basic, PLA Matte, and PETG.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[6]",
+    "near": "• Production Technology: Injection molding & 3D Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "a96c7933a4f9caf869213efe6bcdf26e0b16c2e97b4d47739a4220ed9bb793cd",
+   "en": "Due to the continuous expansion and adjustment of Bambu Lab's filament lineup, the swatch contents may be adjusted accordingly, so the version you receive may differ slightly from what is shown.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[7]",
+    "near": "• Note: The Filament Swatch includes 80 sample chips, but does not fully include all types and colors available for sale. It mainly features popular filaments l"
+   },
+   "dict": null
+  },
+  {
+   "h": "c5ad20d3c6ffbe80295a20bb0e6ba65592203d5a3f21ba013d1e89a45c6e522d",
+   "en": "How to use Bambu Filament Swatches?",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[8]",
+    "near": "• Due to the continuous expansion and adjustment of Bambu Lab's filament lineup, the swatch contents may be adjusted accordingly, so the version you receive may"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f9fd5b497467c6f6e6a19694dfa5d38d95762fdce2926ad893bc4ced0eeb0ac",
+   "en": "Choose your desired filament and color",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[9]",
+    "near": "How to use Bambu Filament Swatches?"
+   },
+   "dict": null
+  },
+  {
+   "h": "01aa2e4d95a7eb6ccf33865d05c2dd74d104eb71d962f9fe301a21ae562e0169",
+   "en": "Entering the 5-digit filament code in the search bar",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[10]",
+    "near": "• Choose your desired filament and color"
+   },
+   "dict": null
+  },
+  {
+   "h": "21b5c9af10c75c570e3bfb43cda479ddbe8ea417864582a804057ec90a6a2a01",
+   "en": "Accurately purchase the filaments you are interested in",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[11]",
+    "near": "• Entering the 5-digit filament code in the search bar"
+   },
+   "dict": null
+  },
+  {
+   "h": "525917515357f8cc261a73bfccb16b1a876e5731acdf7ded162c812b5d7bc867",
+   "en": "Recommended Models",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[12]",
+    "near": "• Accurately purchase the filaments you are interested in"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b4ea8dbc1a1df04a4a77cd2848a20c743a217d0d85195b4abead39ea40f8b15",
+   "en": "Swatch Display Board: https://makerworld.com/en/models/14863#profileId-19744",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[0].line[13]",
+    "near": "Recommended Models"
+   },
+   "dict": null
+  },
+  {
+   "h": "34fd66d9fd482690578ca3842e1eb974f6381b3d7eb5ff391a86271af1cb1d69",
+   "en": "Due to the continuous increase and adjustment of filaments, the Filament Swatches do not fully include all types and colors available for sale. Bambu Lab will flexibly adjust the contents of the Filament Swatches.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-filament-swatches",
+    "title": "Bambu Filament Swatches",
+    "field": "blocks[1].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "268db208f55e7ec9fd19b0cf70f6a9718f815545ae7d08c5c0b2b6de671d402f",
+   "en": "Lubricant Grease is used to lubricate lead screws, or to eliminate noise issues between belts and idle pulleys. Currently, Lubricant Grease comes in two different packaging forms (randomly distributed) with the same gram weight.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lubricant-grease",
+    "title": "Lubricant Grease",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "95ff5781d3b0138fc440ef121872223a3f4143ff92073cf1b07af98fbe6b630f",
+   "en": "Inspect and reapply lubricant to lead screws and guide rails approximately every 3 months.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lubricant-grease",
+    "title": "Lubricant Grease",
+    "field": "blocks[0].line[2]",
+    "near": "Lubricant Grease is used to lubricate lead screws, or to eliminate noise issues between belts and idle pulleys. Currently, Lubricant Grease comes in two differe"
+   },
+   "dict": null
+  },
+  {
+   "h": "98cdf46e218d1f10ea62e932a82a8f4740c5262e2e4550e8e68a922251137dc7",
+   "en": "Lubricant Oil is typically used for the lubrication of linear guides, slide rails, and steel shafts. Inspect and reapply lubricant to lead screws and guide rails approximately every 3 months.",
+   "kind": "block_line",
+   "freq": 10,
+   "context": {
+    "handle": "lubricant-oil",
+    "title": "Lubricant Oil",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ff8d9783b780054205a4252f062e1ce8b1972ede8009e245ff29a128389ddbe",
+   "en": "Theoretically, Lubricant Oil can also be used for lead screw lubrication, but since Lubricant Oil is prone to evaporation, this would require more frequent reapplication of the lubricant.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lubricant-oil",
+    "title": "Lubricant Oil",
+    "field": "blocks[0].line[2]",
+    "near": "Lubricant Oil is typically used for the lubrication of linear guides, slide rails, and steel shafts. Inspect and reapply lubricant to lead screws and guide rail"
+   },
+   "dict": null
+  },
+  {
+   "h": "58d633ce53618d62c11de9af4f38ef7d0c26a6df1ff057bdd5d3b9895b1afe35",
+   "en": "Designed for heavy materials like leather and thick cardstock. Its strong adhesive ensures secure holding during cutting.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stronggrip-cutting-mat",
+    "title": "StrongGrip Cutting Mat",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "41bdd65874b2e38d91073d4e29ac47e1cb6531756672bdf1a73bee93fd30af76",
+   "en": "Ideal for lighter materials such as regular cardstock and paper. Provides gentle adhesion for easy removal.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lightgrip-cutting-mat",
+    "title": "LightGrip Cutting Mat",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "63eeccfefa8f5ea093ec02f78fda391e5fd0c7821b3034ca41eb9c30091a9fd8",
+   "en": "The Fine Point Blade is used for performing precise cutting tasks with the cutting module.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fine-point-blade",
+    "title": "Fine Point Blade",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d1d48d1583f9d0ac4108287bb0303d23f9c264533f054d85668ace644f9d651",
+   "en": "Material Pins are used to firmly hold the material in place, preventing it from moving. They are suitable for small materials and also effective for securing the edges of larger materials to prevent warping.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "material-pins",
+    "title": "Material Pins",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4d3d70ecc7ccdf47296020cc821b385e582634955385bd488f488ea2b8c5f3e",
+   "en": "1. Smoke Purifier Primary Filter (Recommended replacement: every 80–100 hours)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "756d227a5f7d50bd6d401a52fdf8491d935ca70bad0cc6681686df56d7fb335c",
+   "en": "Replace the Primary Filter when more than 70% of its surface is covered with dust and it can no longer be cleaned effectively.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "blocks[0].line[2]",
+    "near": "1. Smoke Purifier Primary Filter (Recommended replacement: every 80–100 hours)"
+   },
+   "dict": null
+  },
+  {
+   "h": "de98082836db4f055f6c7a1cc0124754144e3147765ee6eeffbbe5588bdb3f13",
+   "en": "2. Smoke Purifier Medium Efficient Particulate Filter (Recommended replacement: every 300–500 hours)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "blocks[0].line[3]",
+    "near": "Replace the Primary Filter when more than 70% of its surface is covered with dust and it can no longer be cleaned effectively."
+   },
+   "dict": null
+  },
+  {
+   "h": "69ee4f5edade1ec3bb353c3601e3e9f332fec1660f02ffa41a96b39318f6dc97",
+   "en": "Clean or replace the medium efficient Filter when visible dust accumulation starts affecting suction power. If cleaning is ineffective, replace it immediately.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "blocks[0].line[4]",
+    "near": "2. Smoke Purifier Medium Efficient Particulate Filter (Recommended replacement: every 300–500 hours)"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b214e6f9751ee180fa06b294dd9c26aabd4588f5d7d1dee194a527c6fbad41b",
+   "en": "3. Smoke Purifier High Efficient Particulate Filter (Recommended replacement: every 800–1000 hours)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "blocks[0].line[5]",
+    "near": "Clean or replace the medium efficient Filter when visible dust accumulation starts affecting suction power. If cleaning is ineffective, replace it immediately."
+   },
+   "dict": null
+  },
+  {
+   "h": "3d8be657512e8c66599492cf28f11f5380b4bcb1f81bee7f8168b4392002f5f6",
+   "en": "Replace the HEPA Filter when it can no longer effectively eliminate smoke odors.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "blocks[0].line[6]",
+    "near": "3. Smoke Purifier High Efficient Particulate Filter (Recommended replacement: every 800–1000 hours)"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c59e753708f4bf682c71d97a3b4ec2f0a78cce6ff92478d7afb0b739f9a4105",
+   "en": "Bambu Lab Vision Encoder – Accuracy To A New Level",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[0].line[0]",
+    "near": "Take your 3D printing accuracy to the next level with the Bambu Lab Vision Encoder. This advanced calibration tool enhances motion accuracy to below 50μm, compe"
+   },
+   "dict": null
+  },
+  {
+   "h": "83972c70de27331185f21f1c20af5780b72893eec7cbb218966d90f12094aa2e",
+   "en": "Take your 3D printing accuracy to the next level with the Bambu Lab Vision Encoder. This advanced calibration tool enhances motion accuracy to below 50μm, compensating for natural mechanical variances and long-term wear across machines. This calibration is distance-independent, ensuring consistent accuracy regardless of model size, with its impact becoming even more pronounced in larger prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[0].line[1]",
+    "near": "Bambu Lab Vision Encoder – Accuracy To A New Level"
+   },
+   "dict": null
+  },
+  {
+   "h": "280cef635908b6a348f59a04393f6dc0cb4628331f769eb52180100228061d77",
+   "en": "Paired with exclusive Bambu Studio features like Auto Hole-Contour Compensation, the Vision Encoder enables injection-molded-level assembly for parts printed with Bambu Lab H2 Series. Design, print, and install-it's that easy.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[0].line[2]",
+    "near": "Take your 3D printing accuracy to the next level with the Bambu Lab Vision Encoder. This advanced calibration tool enhances motion accuracy to below 50μm, compe"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f74a8e635037cc9250c597079321d33880e65f0097c86d39ac1d7e7a08e471a",
+   "en": "Below 50μm Motion Accuracy – Compensating Inevitable Uncertainties",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[1].line[0]",
+    "near": "Even the most precise 3D printer can't escape mechanical inaccuracies—but the Bambu Lab Vision Encoder ensures they never compromise your prints. Featuring a ma"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9e60d81299c7b49a0a7eb5dc569dee807ec50b7f5ba779a5da552d41fd6a4d5",
+   "en": "Even the most precise 3D printer can't escape mechanical inaccuracies—but the Bambu Lab Vision Encoder ensures they never compromise your prints. Featuring a matrix of 10⁴ Encode Markers and 5μm-resolution optical measurements, this advanced XY-axis calibration solution delivers motion accuracy within 50μm—thinner than human hair.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[1].line[1]",
+    "near": "Below 50μm Motion Accuracy – Compensating Inevitable Uncertainties"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c11d1c0bcadfc9255b9e406e0443225647ef720362e4c6e3d67e933e4bb32b2",
+   "en": "More than just compensating for inherent mechanical variances, the Vision Encoder is built to adapt over time, correcting issues like belt loosening and mechanical wear to maintain accuracy throughout your entire Bambu Lab H2 Series journey.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[1].line[2]",
+    "near": "Even the most precise 3D printer can't escape mechanical inaccuracies—but the Bambu Lab Vision Encoder ensures they never compromise your prints. Featuring a ma"
+   },
+   "dict": null
+  },
+  {
+   "h": "078294a497aec37dfff3314d4273949e2b5b930348b29a5d4bf73ebaddca538c",
+   "en": "The Larger the Print, the More Pronounced the Accuracy",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[2].line[0]",
+    "near": "With Bambu Lab Vision Encoder, <50μm motion accuracy is distance-independent, ensuring precision remains consistent regardless of print size. In fact, the large"
+   },
+   "dict": null
+  },
+  {
+   "h": "ba74aa727271c2b622c1371a99889d2574483a93dab8ebd891d89fd2c72e0799",
+   "en": "With Bambu Lab Vision Encoder, <50μm motion accuracy is distance-independent, ensuring precision remains consistent regardless of print size. In fact, the larger the print, the more pronounced its accuracy becomes, making it ideal for architectural prototypes and full-size functional parts that demand rigorous dimensional compliance. Achieve unmatched accuracy—no matter the scale.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[2].line[1]",
+    "near": "The Larger the Print, the More Pronounced the Accuracy"
+   },
+   "dict": null
+  },
+  {
+   "h": "cededdddeae3293fcfe3d6b0e6cc57413799224ad0ced663f5c66a48f9accbf6",
+   "en": "Achieve Injection-Molded-Level Quality",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[3].line[0]",
+    "near": "Powered by Bambu Studio's exclusive Auto Hole-Contour Compensation, a temperature-controlled chamber, and pre-tuned filament parameters, Bambu Lab H2 Series wit"
+   },
+   "dict": null
+  },
+  {
+   "h": "da6473581005ed280c5977fb5617ad706c32a73cb809d3356cf67367fa27dd39",
+   "en": "Powered by Bambu Studio's exclusive Auto Hole-Contour Compensation, a temperature-controlled chamber, and pre-tuned filament parameters, Bambu Lab H2 Series with Vision Encoder goes beyond desktop 3D printing, delivering machined-level accuracy and injection-molded quality. Say goodbye to extensive adjustments and post-processing—fit components seamlessly and streamline your workflow like never before.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[3].line[1]",
+    "near": "Achieve Injection-Molded-Level Quality"
+   },
+   "dict": null
+  },
+  {
+   "h": "baa3bcf0c0876ba1b1056cde0a843ab1af04d67380abd4bfcbeb52a51b017ebe",
+   "en": "5-Minute Calibration for Weeks-Long Accuracy",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[4].line[0]",
+    "near": "Place, calibrate, and go. A quick 5-minute calibration ensures weeks of ultra-high accuracy printing with no hassle. Just minutes of setup to counteract wear ov"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac44cb5061af3abf606b015a4c2f9de7e1bf002af273186af95169b3e82d3356",
+   "en": "Place, calibrate, and go. A quick 5-minute calibration ensures weeks of ultra-high accuracy printing with no hassle. Just minutes of setup to counteract wear over time—keeping your prints precise and your workflow smooth.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[4].line[1]",
+    "near": "5-Minute Calibration for Weeks-Long Accuracy"
+   },
+   "dict": null
+  },
+  {
+   "h": "56769070d44dfb747d80321382891bc8f28555639dfe19222b43aa82f1c42533",
+   "en": "Below 50μm Motion Accuracy Against Inevitable Uncertainties",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "0fae875e6363edb2874dbcfd9ae841a333f0210e3ed9a8349b358dba5540ddd7",
+   "en": "Multi-Stage Filtration: Filter Out 99% of Particles Down to 0.3µm & VOCs",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "blocks[0].line[0]",
+    "near": "Equipped with G4 filter and F8 filter to capture dust and larger particles, a high-performance Carbon Filter (1200mg/g adsorption power) to remove VOCs, and a H"
+   },
+   "dict": null
+  },
+  {
+   "h": "4eab6339ded3806646c875248b001efd2197cffada101b9a01dd6c5d953f804d",
+   "en": "Equipped with G4 filter and F8 filter to capture dust and larger particles, a high-performance Carbon Filter (1200mg/g adsorption power) to remove VOCs, and a HEPA H13 filter to trap ultra-fine particles as small as 0.3µm, the Bambu Lab Smoke Purifier ensures efficient air purification. It effectively eliminates chemicals and unpleasant odors through a layered filtration system, creating a healthier, stress-free creative environment with fresh air.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "blocks[0].line[1]",
+    "near": "Multi-Stage Filtration: Filter Out 99% of Particles Down to 0.3µm & VOCs"
+   },
+   "dict": null
+  },
+  {
+   "h": "61f17b2c01bdc7c1e5ffff1383fe67f2ab0fb54074ead470b4f6d27b6bbbdac9",
+   "en": "G4 Filter Cotton: Primary Filter",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "blocks[0].line[2]",
+    "near": "Equipped with G4 filter and F8 filter to capture dust and larger particles, a high-performance Carbon Filter (1200mg/g adsorption power) to remove VOCs, and a H"
+   },
+   "dict": null
+  },
+  {
+   "h": "84081a0f1227449d687002cd5508e149b7f820c263d8af1cc8042b82fb4650b6",
+   "en": "F8 Filter: Medium-Efficient Particulate Filter",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "blocks[0].line[3]",
+    "near": "G4 Filter Cotton: Primary Filter"
+   },
+   "dict": null
+  },
+  {
+   "h": "0fdbee6ec043d00e720479ea678ee625961f762f46c6f0b58826485fd0a539f2",
+   "en": "Carbon Filter & H13 Filter: High-Efficient Particulate Filter",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "blocks[0].line[4]",
+    "near": "F8 Filter: Medium-Efficient Particulate Filter"
+   },
+   "dict": null
+  },
+  {
+   "h": "df04aeb4b62ca5022ffdd75d1d3bf8f7fc8a01b5f0bb1a519776b6a0b055c375",
+   "en": "Compact yet High-Capacity",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "blocks[1].line[0]",
+    "near": "Designed to seamlessly integrate with Bambu Lab laser devices, the Bambu Lab Smoke Purifier maintains a small footprint while offering high dust-holding capacit"
+   },
+   "dict": null
+  },
+  {
+   "h": "8f1e5474de727e3afc858a764534795c59bb340d31f8d7934373f8db9693d337",
+   "en": "Designed to seamlessly integrate with Bambu Lab laser devices, the Bambu Lab Smoke Purifier maintains a small footprint while offering high dust-holding capacity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "blocks[1].line[1]",
+    "near": "Compact yet High-Capacity"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d29fdef56d2dda26b3c1b17a1920baa39539864f5ee5f2ff9381fe8d980ee59",
+   "en": "Filter Out 99% of Particles Down to 0.3µm & VOCs",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e54ed1d1ebda839a876215bb273778b70edcddaea27f60413e8ea9371e9c58a",
+   "en": "The Laser Grid Panel is a base plate used for processing flexible and small materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-grid-panel",
+    "title": "Laser Grid Panel",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4852992c4823b69629295ed084546c39d3d17cabd45e44002f1b396f509d3d1",
+   "en": "The color-changing silicone desiccant absorbs moisture and keeps the air inside AMS 2 Pro dry. After the desiccant absorbs sufficient moisture, the yellow particles inside will turn purple. When the desiccant turns purple, it needs to be replaced with a new desiccant.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-desiccant",
+    "title": "Silicone Desiccant",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "6faffd5c0d27211f814a684174f32fc87ecbd27439bfb735d8c0370e822130c4",
+   "en": "Note: The desiccant should be removed from the sealed transparent plastic bag before being placed in the AMS 2 Pro.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "silicone-desiccant",
+    "title": "Silicone Desiccant",
+    "field": "blocks[0].line[2]",
+    "near": "The color-changing silicone desiccant absorbs moisture and keeps the air inside AMS 2 Pro dry. After the desiccant absorbs sufficient moisture, the yellow parti"
+   },
+   "dict": null
+  },
+  {
+   "h": "60d431d4b1909efdf1adf6c6a5ed072a1534347322a355f39dad2e1b1704db94",
+   "en": "If you need to dry the filaments in more than one AMS 2 Pro at the same time, you will need to use the Bambu Lab official Switching Adapter to power the additional AMS 2 Pro.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "117d79bf9614cbb813ef5b179fa04604f2ea7f4be3a50f7c6e5c5d6e07d009f7",
+   "en": "If the X1, P1, A1 series printer is used with the AMS 2 Pro and uses the AMS 2 Pro's drying function, each AMS 2 Pro requires an official Bambu Lab Switching Adapter to power it.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[0].line[2]",
+    "near": "If you need to dry the filaments in more than one AMS 2 Pro at the same time, you will need to use the Bambu Lab official Switching Adapter to power the additio"
+   },
+   "dict": null
+  },
+  {
+   "h": "445e84626282cdb202e2eb54d73e1361145c13c5c463b4e8217609e3d77d9d49",
+   "en": "1. Connecting a Single AMS 2 Pro:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[1].line[1]",
+    "near": "For H2 Series Printer&P2S Printer："
+   },
+   "dict": null
+  },
+  {
+   "h": "7e954623a395c9586c5086a5215b015f1e71242fcc9cd67bb96e9a3c254ed3d9",
+   "en": "A single AMS 2 Pro can be powered and dried by the printer directly, no additional Switching Adapter is required.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[1].line[2]",
+    "near": "1. Connecting a Single AMS 2 Pro:"
+   },
+   "dict": null
+  },
+  {
+   "h": "12f0217a143c08c0adc3e008a804c6370a3d97e344be69179abfc36bde17eb76",
+   "en": "2. Connecting multiple AMS 2 Pro units together:",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[1].line[3]",
+    "near": "- A single AMS 2 Pro can be powered and dried by the printer directly, no additional Switching Adapter is required."
+   },
+   "dict": null
+  },
+  {
+   "h": "d033c1e19a402142d1b132ff0efaaeacaeb481cb508dd26c3c042dea5d3c9d20",
+   "en": "If the drying function is enabled for multiple units, each AMS 2 Pro requires its own Switching Adapter.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[1].line[4]",
+    "near": "2. Connecting multiple AMS 2 Pro units together:"
+   },
+   "dict": null
+  },
+  {
+   "h": "38537807534f67f4d8211c0dc26afe936e712d19f33695ae421f418c11cfbf1d",
+   "en": "Even if only one unit is drying, the system power may automatically reduce, leading to insufficient drying. It is recommended to use a power adapter to ensure optimal drying performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[1].line[5]",
+    "near": "- If the drying function is enabled for multiple units, each AMS 2 Pro requires its own Switching Adapter."
+   },
+   "dict": null
+  },
+  {
+   "h": "5673b9b3dfa461edf27794282b27c0c0419bcfdd9e503b6fde1bff0f21240a28",
+   "en": "1. Drying Function Requirement:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[2].line[1]",
+    "near": "For X1/P1 Series Printer:"
+   },
+   "dict": null
+  },
+  {
+   "h": "90e999443e1d9061ca38ac94a7d85457e4a63f11fb3e7f44810fa66cbce86600",
+   "en": "A power adapter must be used when enabling the drying function to ensure sufficient power.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[2].line[2]",
+    "near": "1. Drying Function Requirement:"
+   },
+   "dict": null
+  },
+  {
+   "h": "4aee2cba3c66141e4b833f74cc5e96374f31e488cc2bd90dfd7174551d07d89c",
+   "en": "3. Non-Drying Function Use:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[2].line[5]",
+    "near": "- If the drying function is enabled for multiple units, each AMS 2 Pro requires its own Switching Adapter."
+   },
+   "dict": null
+  },
+  {
+   "h": "187f241eae9c4db3cbc2c1fc310022f9890633ee85b0bb089e9e28eef31f5c02",
+   "en": "The Switching Adapter can be omitted if the drying function is not used.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[2].line[6]",
+    "near": "3. Non-Drying Function Use:"
+   },
+   "dict": null
+  },
+  {
+   "h": "da4f7ea58d963b1a302b76b8fa5570190106c673b9cf2975468b8caea5e27384",
+   "en": "Notes:",
+   "kind": "block_title",
+   "freq": 5,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[3].line[0]",
+    "near": "The AMS 2 Pro is compatible with X1/P1 series printers for multi-material printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "8baceaf81fd766d3801827790b560d5d09a8078cd0da0d8c355f0ff8eaf05cbd",
+   "en": "The AMS 2 Pro is compatible with X1/P1 series printers for multi-material printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "blocks[3].line[1]",
+    "near": "Notes:"
+   },
+   "dict": null
+  },
+  {
+   "h": "a30e2756160c4b083e003c126ce6f0fc9d3ee8e4bfdf54a9f5d268ce882ece21",
+   "en": "Drying Function Requirement:",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-upgrade-compatibility-kit",
+    "title": "AMS 2 Pro Upgrade Compatibility Kit",
+    "field": "blocks[0].line[0]",
+    "near": "- A Switching Adapter (included in the kit) must be used when enabling the drying function to ensure sufficient power."
+   },
+   "dict": null
+  },
+  {
+   "h": "0c5ad0c4ba06466f01916c53d3251a04e55be05625fa202a2a1a955b1944c3e2",
+   "en": "A Switching Adapter (included in the kit) must be used when enabling the drying function to ensure sufficient power.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-upgrade-compatibility-kit",
+    "title": "AMS 2 Pro Upgrade Compatibility Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Drying Function Requirement:"
+   },
+   "dict": null
+  },
+  {
+   "h": "5733e2c2407a2e661a9fad16e0b0442571a8397aaf2299b40a7b469311f50417",
+   "en": "If the drying function is enabled for multiple AMS 2 Pro units, each unit requires its own Switching Adapter.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-upgrade-compatibility-kit",
+    "title": "AMS 2 Pro Upgrade Compatibility Kit",
+    "field": "blocks[0].line[2]",
+    "near": "- A Switching Adapter (included in the kit) must be used when enabling the drying function to ensure sufficient power."
+   },
+   "dict": null
+  },
+  {
+   "h": "891a0f4fc333ad2d935259041032b6d35a03d9488ada0d9a3c23600aeb0bcb40",
+   "en": "You need to use the 6-pin cable included in the AMS 2 Pro package to connect the AMS Hub to the printer. The 6-pin cable included with the AMS Hub is designed exclusively for the AMS ONLY.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-upgrade-compatibility-kit",
+    "title": "AMS 2 Pro Upgrade Compatibility Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Notes:"
+   },
+   "dict": null
+  },
+  {
+   "h": "86afb7f30d0b61eb0d2f04594a2b07594cdad39a0396fbe327eae2267521c9ad",
+   "en": "Built with heavy-duty materials, the hardened steel extruder gear and the hardened steel hotend have better capability of printing with tough engineering filaments containing carbon fiber or glass fiber for long-lasting performance with enhanced abrasion or clogging resistance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-upgrade-combo",
+    "title": "Hardened Steel Upgrade Combo",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "53d508b1ba4ce3530f7b34eb8dd7ff5c518d937bb0e2e0a5bce95228aa1747cb",
+   "en": "H2 series provides an external USB port for connecting a USB flash drive. Import the slice file into the USB flash drive and directly initiate printing from the screen. In addition, you can also save work videos, timelapse and print cache.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sandisk-ultra-fit-usb-3-2-flash-drive",
+    "title": "SanDisk Ultra Fit USB 3.2 Flash Drive",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a706cc65e3605e2a33b5f0b4e20665eaa61381f76bc913404733cbc6aac09299",
+   "en": "SanDisk Ultra Fit USB 3.2 Flash Drive saves time with transfer speeds up to 130MB/s.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "sandisk-ultra-fit-usb-3-2-flash-drive",
+    "title": "SanDisk Ultra Fit USB 3.2 Flash Drive",
+    "field": "blocks[0].line[2]",
+    "near": "H2 series provides an external USB port for connecting a USB flash drive. Import the slice file into the USB flash drive and directly initiate printing from the"
+   },
+   "dict": null
+  },
+  {
+   "h": "1acdf00149023f01b00f06e6f6fa20d566b7484651c82b0c2c00f9dd0040daea",
+   "en": "Stronger Threads for Functional 3D Prints",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[0].line[0]",
+    "near": "Printed plastic threads can wear out or strip over time, especially in parts that are assembled and disassembled repeatedly. Brass heat-set inserts provide dura"
+   },
+   "dict": null
+  },
+  {
+   "h": "90bfc29c867418cfac09266c6ccf972d9f79ce7ad858797505e5bef9a53486cc",
+   "en": "Printed plastic threads can wear out or strip over time, especially in parts that are assembled and disassembled repeatedly. Brass heat-set inserts provide durable metal threads, helping improve assembly strength and making printed parts more suitable for repeated fastening.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[0].line[1]",
+    "near": "Stronger Threads for Functional 3D Prints"
+   },
+   "dict": null
+  },
+  {
+   "h": "044830c6207424255a5ab9df214c0f9be109145d30485520351247dcc44aac88",
+   "en": "Multiple Sizes for Common Insert Standards",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[1].line[0]",
+    "near": "The included heat-insert tooling supports common insert sizes used in 3D printing, including M2, M2.5, M3, M4, M5, M6, and M8. This makes it easier to handle a "
+   },
+   "dict": null
+  },
+  {
+   "h": "2db52dc4f1237db3fc9ec8ea73e2a26fdbd52026dca1aeb32ae4576dce2708a7",
+   "en": "The included heat-insert tooling supports common insert sizes used in 3D printing, including M2, M2.5, M3, M4, M5, M6, and M8. This makes it easier to handle a wide range of printed enclosures, brackets, and functional assemblies.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[1].line[1]",
+    "near": "Multiple Sizes for Common Insert Standards"
+   },
+   "dict": null
+  },
+  {
+   "h": "aec7621e3b56257fdad06ba985f65d2275365389096aa0afc2f4a56db26f852a",
+   "en": "Fast USB‑C Heating with Accurate Temperature Control",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[2].line[0]",
+    "near": "With USB‑C PD/QC input, the soldering iron supports fast heat-up and accurate temperature control in a compact form factor. A temperature range of 100–450°C ±5°"
+   },
+   "dict": null
+  },
+  {
+   "h": "e411d3421b7453912dc7363b1da812b85af4786173ef81d1713b20c10580cdde",
+   "en": "With USB‑C PD/QC input, the soldering iron supports fast heat-up and accurate temperature control in a compact form factor. A temperature range of 100–450°C ±5°C and a heat-up time of 2 seconds at 100W make it suitable for both soldering tasks and heat-insert installation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[2].line[1]",
+    "near": "Fast USB‑C Heating with Accurate Temperature Control"
+   },
+   "dict": null
+  },
+  {
+   "h": "cd507028bafee787eb4516aa60a71d7cb926b1e9735e25e81fc84fe58170ad68",
+   "en": "Includes a 3D model file of the soldering iron for holder or fixture design.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[3].line[1]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "30790b2a95b57684dafa570cd67cd7f8f1ab5f89864b4407f0c8859d015ca4dd",
+   "en": "WARNING: Sharp blade/edge.",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[4].line[0]",
+    "near": "• This product contains a knife blade, sharp edge, pointed tip, or other sharp component. Improper use or handling may cause cuts, puncture wounds, or other per"
+   },
+   "dict": null
+  },
+  {
+   "h": "ab55f2f48f5e21333e7009e670f5415c5e7c8a6d20c8b414b1dd9e3acfdf880b",
+   "en": "This product contains a knife blade, sharp edge, pointed tip, or other sharp component. Improper use or handling may cause cuts, puncture wounds, or other personal injury.",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[4].line[1]",
+    "near": "WARNING: Sharp blade/edge."
+   },
+   "dict": null
+  },
+  {
+   "h": "fd17e076854b5aeb512fe3f6a9327ce16cab8759c088250f49b0df4fc5626ff4",
+   "en": "Use only for its intended purpose and in accordance with applicable instructions.",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[4].line[2]",
+    "near": "• This product contains a knife blade, sharp edge, pointed tip, or other sharp component. Improper use or handling may cause cuts, puncture wounds, or other per"
+   },
+   "dict": null
+  },
+  {
+   "h": "5caf479f3794942bfbffaf613e5ccfa44b147da7a836a0b624e19df55423a1ea",
+   "en": "Handle with care, keep hands and body parts away from the cutting path, and do not use the product in any unlawful, unsafe, reckless, or unintended manner.",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[4].line[3]",
+    "near": "• Use only for its intended purpose and in accordance with applicable instructions."
+   },
+   "dict": null
+  },
+  {
+   "h": "82ff665517e79f0db7d0febea6a25f1f65fc25816942848e2a515d796fd612a7",
+   "en": "Do not use if damaged, loose, or otherwise unsafe.",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[4].line[4]",
+    "near": "• Handle with care, keep hands and body parts away from the cutting path, and do not use the product in any unlawful, unsafe, reckless, or unintended manner."
+   },
+   "dict": null
+  },
+  {
+   "h": "8cf7641486d3ac5507f39a2942f637d6560b3cad1a851477a0c22e57bbe6ad3f",
+   "en": "Keep out of reach of children and pets.",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[4].line[5]",
+    "near": "• Do not use if damaged, loose, or otherwise unsafe."
+   },
+   "dict": null
+  },
+  {
+   "h": "1096d3742dd0084e16bca60f2797e724ab02ae2c9059c2ad5bbfab9e7297bd66",
+   "en": "Clean carefully after use and store securely, preferably with any blade guard, sheath, cover, lock, or protective packaging provided.",
+   "kind": "block_line",
+   "freq": 11,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[4].line[6]",
+    "near": "• Keep out of reach of children and pets."
+   },
+   "dict": null
+  },
+  {
+   "h": "9f67f77b9decb704b9a752e253909fce3f2bdfa4661a2b1bbcdfddb237c3bb32",
+   "en": "This product includes a US plug and an EU plug adapter. If your region uses a different plug type, please prepare an appropriate converter separately",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "b605350bc00209520b7cd8f546322663356ba630708f71bbf30aead6b3dd608e",
+   "en": "Introduction",
+   "kind": "block_title",
+   "freq": 64,
+   "context": {
+    "handle": "l-type-hex-wrench",
+    "title": "L Type Hex Wrench",
+    "field": "blocks[0].line[0]",
+    "near": "Crafted from high-strength carbon steel, the L Type Hex Wrench delivers exceptional durability and resistance to deformation. Its ergonomic L-shaped design leve"
+   },
+   "dict": null
+  },
+  {
+   "h": "e99f764800d3c331dd38d224134f52b8362ad158723ccded064fb60d02bab377",
+   "en": "The Accessory Box for AMS provides key components like PTFE tubes, couplers, and specialized screws for AMS setup and maintenance, helping achieve smooth filament feeding and stable assembly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-for-ams",
+    "title": "Accessory Box for AMS",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "68cc08723361f71a61a8a2c744a5a0ed231f8d637fe0a8566e379ec9b80ab103",
+   "en": "The Accessory Box for AMS lite contains multiple PTFE tube lengths and tools for installation. This kit helps maintain organized wiring and smooth filament flow for your AMS lite system.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-for-ams-lite",
+    "title": "Accessory Box for AMS lite",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "85d7fe07baf5550e61c821f53dabe2cdacb1a47dffcd9255a38f14e5cefa3311",
+   "en": "Designed specifically for the P1P 3D printer, this accessory box includes nozzle cleaning kits, precision screw sets, and filament system parts. This comprehensive kit supports routine upkeep and hardware modifications for optimal printer performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-for-p1p",
+    "title": "Accessory Box for P1P",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e08fc8cc4bb86f8866f8ed8c2e780c4bd1f72f372ad5220dfbc559370e6a737",
+   "en": "Engineered exclusively for the X1C and P1S 3D printers, this accessory box combines essential implements like the unclogging pin, scraper blade and specialized XP Series screw kits for extruder and hotend servicing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-for-x1c-and-p1s",
+    "title": "Accessory Box for X1C and P1S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6f740e621c7ef163446bc85f4b6d29d1dcc5a76c93f3c73b0e71de411c1fad6",
+   "en": "The Accessory Box for A1 provides essential tools and components for A1 3D printer maintenance and assembly. Includes screws for AMS lite installation, nozzle tools, lubricants and so on.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-for-a1",
+    "title": "Accessory Box for A1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "32a5828ff80b8c926400c337287edbdad62f10030fdf15dd3a2093dfca432c2b",
+   "en": "The Accessory Box for A1 mini contains maintenance tools and hardware for printer care and AMS lite setup. Includes scraper blade, lubricants, and mounting screws.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-for-a1-mini",
+    "title": "Accessory Box for A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "bf39de91e0da003a4b697ab95078dc99b923a694e5a8fe97b6fe184613e1ff7f",
+   "en": "1.Tutorial Videos",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-reusable-spool",
+    "title": "Bambu Reusable Spool",
+    "field": "blocks[0].line[1]",
+    "near": "FAQ"
+   },
+   "dict": null
+  },
+  {
+   "h": "3181f5ea6b21b41134b5cb49858c3fddbd2ae8e8865406f36eeb9bd9a99ea6f5",
+   "en": "Learn more about swapping the new filament with Bambu Reusable Spool on Wiki, Click Here.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-reusable-spool",
+    "title": "Bambu Reusable Spool",
+    "field": "blocks[0].line[2]",
+    "near": "1.Tutorial Videos"
+   },
+   "dict": null
+  },
+  {
+   "h": "fed6c62c33e0f9a8bd9f7a50ef79ce1a3bc99d1fbd15042410826831986a6a7b",
+   "en": "Protects Your Workspace During Precision Cutting",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[0].line[0]",
+    "near": "Cutting directly on a desk can damage the work surface and dull blades quickly, especially during repeated trimming and model work. This self-healing cutting ma"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb0317428c62bdaa102b891f34b7a376e8283e5946f8cde2bae22fb9ca347581",
+   "en": "Cutting directly on a desk can damage the work surface and dull blades quickly, especially during repeated trimming and model work. This self-healing cutting mat provides a dedicated surface for precise cutting tasks, helping protect your workspace while supporting cleaner, more controlled cuts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[0].line[1]",
+    "near": "Protects Your Workspace During Precision Cutting"
+   },
+   "dict": null
+  },
+  {
+   "h": "3002ec27ea9fdd9715c6df86eb5c9f3c9a29ba4e994bbb1ac4d3cb5ab60c95b7",
+   "en": "Built-In Measuring Guides for Bench Work",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[1].line[0]",
+    "near": "The mat features a wide range of printed measuring guides, including edge rulers, grid lines, angle markings, circle references, arc guides, and fine-detail gri"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a5c4c548f7c39f8e89c021cd582883e04aa28d37489a437f283e24659cfcf92",
+   "en": "The mat features a wide range of printed measuring guides, including edge rulers, grid lines, angle markings, circle references, arc guides, and fine-detail grids. These built-in references make it easier to measure materials, align parts, and plan cuts more accurately during maker tasks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[1].line[1]",
+    "near": "Built-In Measuring Guides for Bench Work"
+   },
+   "dict": null
+  },
+  {
+   "h": "6dc7a821251ad962a71231d285c0d67e8711a81713f01176ff5b801d3e46620e",
+   "en": "Two Sizes for Different Workspaces",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[2].line[0]",
+    "near": "Available in A3 and A4 sizes, the cutting mat fits different bench setups and working styles. A3 offers more room for larger projects, while A4 provides a compa"
+   },
+   "dict": null
+  },
+  {
+   "h": "7c484bf056bceccc9175d650cf8720c6dee1c7264f2d48a2e7eb3c2b256b978c",
+   "en": "Available in A3 and A4 sizes, the cutting mat fits different bench setups and working styles. A3 offers more room for larger projects, while A4 provides a compact option for smaller desks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[2].line[1]",
+    "near": "Two Sizes for Different Workspaces"
+   },
+   "dict": null
+  },
+  {
+   "h": "51fb8f7b673aa8f67d732af570ae18decdf1a4a1952cf23e31ea18f97e7ebbdd",
+   "en": "Self-healing surface stays smooth after repeated cuts",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "c384d4cf24cecf29db59dc09f7f3f01190dd055dbb42ded832420abb37d1b819",
+   "en": "Double-sided usable design for longer service life",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[3].line[2]",
+    "near": "• Self-healing surface stays smooth after repeated cuts"
+   },
+   "dict": null
+  },
+  {
+   "h": "e3bce657d9363823b15256f396becc8038a45516fcb1aeb36ca87fe877e0e669",
+   "en": "Built-in angle guides and measurement grids for precise work",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[3].line[3]",
+    "near": "• Double-sided usable design for longer service life"
+   },
+   "dict": null
+  },
+  {
+   "h": "f33e57adf76e960e2e8c6c8bd4b62b5e17cf7506a715c45c399d64dd262ad3ed",
+   "en": "Durable construction resists warping, cracking, and over-cutting",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "durable-self-healing-cutting-mat",
+    "title": "Durable Self-Healing Cutting Mat",
+    "field": "blocks[3].line[4]",
+    "near": "• Built-in angle guides and measurement grids for precise work"
+   },
+   "dict": null
+  },
+  {
+   "h": "d5d6cb00bd6fa9aea169a8c98148d9a7f5671c8a4bee298caca9e65daee3627c",
+   "en": "Powerful Cutting Efficiency",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[0].line[0]",
+    "near": "With its high-power 455nm laser, 40W laser module achieves blazing speeds up to 1000mm/s and effortlessly cuts through thicker plywood in a single pass."
+   },
+   "dict": null
+  },
+  {
+   "h": "fc10de48b0c642b248a2ad97f7b606e4780d107325304f5cc01556c944443d29",
+   "en": "With its high-power 455nm laser, 40W laser module achieves blazing speeds up to 1000mm/s and effortlessly cuts through thicker plywood in a single pass.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Powerful Cutting Efficiency"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a324fa430fc4eb58a7bdf5f8239a29d0a361ad80f21cdc3fbf089eb4dde42d6",
+   "en": "Flame Sensor",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[3].line[0]",
+    "near": "The H2 chamber is equipped with a flame sensor that can instantly detect fire. In the event of a fire, it quickly sends alerts through push notifications and a "
+   },
+   "dict": null
+  },
+  {
+   "h": "b3a05701e74dfeb8cc1945abb3ded0897d1fdd3b5611125aa9c51ca9a5a46150",
+   "en": "The H2 chamber is equipped with a flame sensor that can instantly detect fire. In the event of a fire, it quickly sends alerts through push notifications and a buzzer, minimizing potential risks.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Flame Sensor"
+   },
+   "dict": null
+  },
+  {
+   "h": "c2ad949d95052792aae32a00c7f3c2510267478ee74d5f37e91271d8aaef7a0b",
+   "en": "What is the difference between 40W, and 10W?",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[4].line[0]",
+    "near": "Max Cutting Thickness"
+   },
+   "dict": null
+  },
+  {
+   "h": "130e4e347bf087d01397abb8d1d98bf1039a4c61117b2457204d0f017d80ae40",
+   "en": "Max Cutting Thickness",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[4].line[1]",
+    "near": "What is the difference between 40W, and 10W?"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ad4dc39675547118fbcc231de70a01beb105a199d565324c6a22720ca2ccdc5",
+   "en": "Basswood Plywood",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[4].line[3].cell[0]",
+    "near": "Laser Module | 40 W | 10 W"
+   },
+   "dict": null
+  },
+  {
+   "h": "ebf9943e3c22933446a908ac34eca2e3f04ec5077efd1f779b525a29b45b8929",
+   "en": "Birch Plywood",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[4].line[4].cell[0]",
+    "near": "Basswood Plywood | 15 mm | 6 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "1cb66f98dd0ad107813f39aa2be789f76ce0e2f998f97c8ce6198b5af65f036b",
+   "en": "Bamboo Board",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[4].line[5].cell[0]",
+    "near": "Birch Plywood | 15 mm | 6 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "8f488341d717466d5a8b38a392200b5d4a643bd188186920a7d68fbc483ace2a",
+   "en": "Black Acrylic",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[4].line[6].cell[0]",
+    "near": "Bamboo Board | 6 mm | 3 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "c582af07aff385948bd6af0e9e1b1744ead2e541a91721954cdca7e3de56c565",
+   "en": "Cork Sheet",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[4].line[7].cell[0]",
+    "near": "Black Acrylic | 15 mm | 3 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "d6bd0f11fa781a586b31eef6b74b16541b43057a7bae8fb1c5dfc18b7ff1adaf",
+   "en": "Stainless Metal",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[4].line[8].cell[0]",
+    "near": "Cork Sheet | 4 mm | 2 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "bbddd953d0e8759c8fc4a75fdf95952362d0f2f32b5cd2cd14b9423787c2af5a",
+   "en": "Max Cutting Speed (Single Pass)",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[5].line[0]",
+    "near": "Laser Module | 40 W | 10 W"
+   },
+   "dict": null
+  },
+  {
+   "h": "93f4037922165007aaebc5e4381d5431ba6692a93a782398426743d0843245a4",
+   "en": "3mm Basswood",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[5].line[2].cell[0]",
+    "near": "Laser Module | 40 W | 10 W"
+   },
+   "dict": null
+  },
+  {
+   "h": "da66c89ce0e339b866de4c5d05b96131a37371548f24ad3b52fb9db3407199fe",
+   "en": "4mm Basswood",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[5].line[3].cell[0]",
+    "near": "3mm Basswood | 16 mm/s | 5 mm/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "a149d3c16be4ef76bcc36a88725548235eb6f08ef8b9a10c2a4c31901bb51aa8",
+   "en": "6mm Basswood",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[5].line[4].cell[0]",
+    "near": "4mm Basswood | 15 mm/s | 4 mm/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "202c7979d4214d8b009b423f7842cfa7f208ba860a440f352427892b67b6eb6e",
+   "en": "10mm Basswood",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[5].line[5].cell[0]",
+    "near": "6mm Basswood | 10 mm/s | 2 mm/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e2e3e0cd6c0286c0d0a50a264b534bfb975a8e8458ac40eefaccc37ff7d296b",
+   "en": "High-Power Laser, Exceptional Cutting Efficiency",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "943ae776a549460ce0d6f5e1563f73d6720d55bb37f1472d4739d2d4adf5b2e6",
+   "en": "High Positioning Accuracy, Precision Machining",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[6].line[2]",
+    "near": "• High-Power Laser, Exceptional Cutting Efficiency"
+   },
+   "dict": null
+  },
+  {
+   "h": "94acc3b6048a39c9d1c57ba386497d89cf19e650625a03c1bb0c2c02c380a771",
+   "en": "Flame Sensors for Enhanced Safety",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[6].line[3]",
+    "near": "• High Positioning Accuracy, Precision Machining"
+   },
+   "dict": null
+  },
+  {
+   "h": "795d99694c91bb2ef627f994d1c130cc5f85c614b2474f784cd2925854da8f59",
+   "en": "Air Assist for Improved Surface Quality",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[6].line[4]",
+    "near": "• Flame Sensors for Enhanced Safety"
+   },
+   "dict": null
+  },
+  {
+   "h": "4389ef22e219d225eda6496da6d12f300490bd8066a45d61d4ff828660461fce",
+   "en": "2. The Laser Upgrade involves a more advanced installation process. Before making a purchase, we strongly recommend reviewing the Bambu Lab Wiki (For H2D/H2C: Bambu Lab Wiki/For H2S: Bambu Lab Wiki ) and watching the Laser Upgrade Kit video to ensure you're confident with the procedure.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "blocks[6].line[6]",
+    "near": "• Important Notice Before Purchase"
+   },
+   "dict": null
+  },
+  {
+   "h": "acff4c6db4f7c8d13c68f2f6ef005f74e7142d5fcdcd21b9bd908ab0592381d9",
+   "en": "The cutting upgrade kit unlocks digital cutting functionality for your H2 Series/A2L, enabling precise cutting of various materials. For added versatility, the included pen attachment allows you to easily switch between cutting and drawing/writing functions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-upgrade-kit-h2-series-a2l",
+    "title": "Cutting Upgrade Kit - H2 Series/A2L",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac2079452f168c7e3585f79aab002d4eb0b411fe4fea5d3109b0778200ecc46c",
+   "en": "Precise cutting on a variety of materials",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-upgrade-kit-h2-series-a2l",
+    "title": "Cutting Upgrade Kit - H2 Series/A2L",
+    "field": "blocks[1].line[1]",
+    "near": "Digital Cutting"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7e3d9bbfab03c4ded1ec79d843f238869fb2cc6f0e0164a134e4ea6e47d8dc7",
+   "en": "Precise multi-material cutting",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-upgrade-kit-h2-series-a2l",
+    "title": "Cutting Upgrade Kit - H2 Series/A2L",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "154f98038f046264812f7726feeb77c88614b8bcf1379668d49f73b987db5ac4",
+   "en": "Easily switch between cutting and drawing/writing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-upgrade-kit-h2-series-a2l",
+    "title": "Cutting Upgrade Kit - H2 Series/A2L",
+    "field": "blocks[3].line[2]",
+    "near": "• Precise multi-material cutting"
+   },
+   "dict": null
+  },
+  {
+   "h": "edaab93c5534aa5e42941f465a01fcb61900d0167963ea588134a6dc76fb5407",
+   "en": "Turn colorful designs into precise cuts effortlessly",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-upgrade-kit-h2-series-a2l",
+    "title": "Cutting Upgrade Kit - H2 Series/A2L",
+    "field": "blocks[3].line[3]",
+    "near": "• Easily switch between cutting and drawing/writing"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a0ca07989bedfd67d910e78c52da6393dc53c9e7274d794f36770830f8202c6",
+   "en": "3. If you have purchased the Laser Upgrade Kit, the Birds Eye Camera is included.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-upgrade-kit-h2-series-a2l",
+    "title": "Cutting Upgrade Kit - H2 Series/A2L",
+    "field": "blocks[3].line[5]",
+    "near": "• Important Notice Before Purchase"
+   },
+   "dict": null
+  },
+  {
+   "h": "c63f442f038a58d5c18f1d1a4c08401b9c72712db36ce213c6eabbcd3628f8b2",
+   "en": "This HUB accessory is specifically designed for A1-series 3D printers, serving as a standardized hub for seamless connectivity and integrated functionality between the AMS, AMS 2 Pro, and AMS HT.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub-a1-series",
+    "title": "AMS Hub - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "29680a57c2fae1db34c56dcb7bfe64d1b6edd5e1afbee1f88d66734ad34a15d8",
+   "en": "LightGrip Cutting Mat: Ideal for lighter materials such as regular cardstock and paper. Provides gentle adhesion for easy removal.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cutting-mat-combo-3-pcs",
+    "title": "Cutting Mat Combo (3 pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "49d03f0780b45c8b5bb64e70d4f37118659d185419b7bed0f35fe62917f9588f",
+   "en": "StrongGrip Cutting Mat: Designed for heavy materials like leather and thick cardstock. Its strong adhesive ensures secure holding during cutting.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cutting-mat-combo-3-pcs",
+    "title": "Cutting Mat Combo (3 pcs)",
+    "field": "blocks[0].line[2]",
+    "near": "LightGrip Cutting Mat: Ideal for lighter materials such as regular cardstock and paper. Provides gentle adhesion for easy removal."
+   },
+   "dict": null
+  },
+  {
+   "h": "0dd01dc1e306bcf099124318fc3b69b991d150d1a73d0a5ac1338edbdfa6ce7f",
+   "en": "The Filament Cleaning Pad of 4-in-1 PTFE Adapter II is installed at the filament outlet of the 4-in-1 PTFE adapter. Its main function is to block debris on the filament at the cleaning pad side, allowing the debris to be discharged through the debris outlet on the tube expansion port. Please replace the cleaning pad when it shows obvious wear.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "filament-cleaning-pad-of-4-in-1-ptfe-adapter-ii",
+    "title": "Filament Cleaning Pad of 4-in-1 PTFE Adapter II",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "00c56876d9c61a8ae3d3e535a9cefc48966bea666f5e139ac6aecdf27cb96f82",
+   "en": "Enhanced Hotend Cooling",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-enhanced-cooling-fan",
+    "title": "Toolhead Enhanced Cooling Fan",
+    "field": "blocks[0].line[0]",
+    "near": "The Toolhead Enhanced Cooling Fan directs airflow across the hotend heatsink fins, helping maintain stable temperatures during high-temperature printing. This r"
+   },
+   "dict": null
+  },
+  {
+   "h": "241cf73397f6013950435f731a80f69fe1d660ec13fda8feddbe1bff74c117b8",
+   "en": "The Toolhead Enhanced Cooling Fan directs airflow across the hotend heatsink fins, helping maintain stable temperatures during high-temperature printing. This reduces the risk of heatsink overheating, which could otherwise lead to clogs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-enhanced-cooling-fan",
+    "title": "Toolhead Enhanced Cooling Fan",
+    "field": "blocks[0].line[1]",
+    "near": "Enhanced Hotend Cooling"
+   },
+   "dict": null
+  },
+  {
+   "h": "93c711002b601f7d901f31766004d646a1a70946cfd59e8ef1c2329c38c9df83",
+   "en": "Additional Cooling for the Extruder",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-enhanced-cooling-fan",
+    "title": "Toolhead Enhanced Cooling Fan",
+    "field": "blocks[1].line[0]",
+    "near": "Maintaining a controlled extruder temperature is crucial when printing filaments prone to heat creep. The Enhanced Cooling Fan also provides targeted airflow to"
+   },
+   "dict": null
+  },
+  {
+   "h": "247bf140960f4488fbad2b1bf690848e81750176f4dcfedc69e651663e39b71d",
+   "en": "Maintaining a controlled extruder temperature is crucial when printing filaments prone to heat creep. The Enhanced Cooling Fan also provides targeted airflow to the extruder, improving reliability when printing low heat-creep-tolerance materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-enhanced-cooling-fan",
+    "title": "Toolhead Enhanced Cooling Fan",
+    "field": "blocks[1].line[1]",
+    "near": "Additional Cooling for the Extruder"
+   },
+   "dict": null
+  },
+  {
+   "h": "81e186c376886ae475f7eaf52dbb21fa4b99693dbe12d97536eea2aa1ae8d5b4",
+   "en": "The Toolhead Enhanced Cooling Fan is identical to the fan already pre-installed in the H2C and H2D Pro, and is intended as a replacement or spare part for those models. For the H2D, it functions as an upgrade part that improves reliability during high‑temperature operation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-enhanced-cooling-fan",
+    "title": "Toolhead Enhanced Cooling Fan",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "b703d1d654e91c713a4e3f8a461712409e5a9c37376e1f967684ddd057e0416a",
+   "en": "Hex Sizes Optimized for 3D Printing Hardware",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[0].line[0]",
+    "near": "Most modern FDM printers rely heavily on metric hex fasteners. The included hex sizes—from H4.0 to H0.9—cover common components such as frame bolts, hotend asse"
+   },
+   "dict": null
+  },
+  {
+   "h": "00fda76ea6cea95506567c511eddadb223d94f8515f6111e286ec3b522d7531a",
+   "en": "Most modern FDM printers rely heavily on metric hex fasteners. The included hex sizes—from H4.0 to H0.9—cover common components such as frame bolts, hotend assemblies, extruders, and printed part hardware, making it a practical toolkit for both maintenance and assembly work.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Hex Sizes Optimized for 3D Printing Hardware"
+   },
+   "dict": null
+  },
+  {
+   "h": "c9c859bac2ac1a9421c07f6cd0053ec7e47a2550c591df3d62e9e600de2723d2",
+   "en": "Durable S2 Steel Bits with Nickel Plating",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[1].line[0]",
+    "near": "The screwdriver bits are made from high‑strength S2 tool steel, providing excellent hardness and wear resistance. The bright nickel plating improves corrosion r"
+   },
+   "dict": null
+  },
+  {
+   "h": "a131d37a63972ea74229453d50b66f1fa8f24a02537683c16df73f6248f22240",
+   "en": "The screwdriver bits are made from high‑strength S2 tool steel, providing excellent hardness and wear resistance. The bright nickel plating improves corrosion resistance while maintaining precise edges for reliable screw engagement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Durable S2 Steel Bits with Nickel Plating"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb1bcd0953f6966a5b49dfc288f8878940e2c237a8060dc32101eefbf809f473",
+   "en": "Ergonomic Handle with Quick‑Change Chuck",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[2].line[0]",
+    "near": "The aluminum alloy handle provides a comfortable anti‑slip grip for precise control. A magnetic self‑locking chuck allows fast bit installation, and all bits ar"
+   },
+   "dict": null
+  },
+  {
+   "h": "c759555c7526edd28acab8baa2c21e3f16fb1ac951e34293450ce014fa67d867",
+   "en": "The aluminum alloy handle provides a comfortable anti‑slip grip for precise control. A magnetic self‑locking chuck allows fast bit installation, and all bits are stored in a compact case that keeps them organized and ready to go.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Ergonomic Handle with Quick‑Change Chuck"
+   },
+   "dict": null
+  },
+  {
+   "h": "856053aaa040f27b7b8c25885aafc5d6c8755349201c712a30c945b56f4f7a4c",
+   "en": "Made for Precision Work",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "74d0a5ea1ff2cdd605b9ebbe70a0a39112f0d0dbcf51b91a12d2b24aa7e7680d",
+   "en": "Durable S2 Steel + Nickel Plating",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[4].line[2]",
+    "near": "• Made for Precision Work"
+   },
+   "dict": null
+  },
+  {
+   "h": "29a5d836b8fcaba57e74016d08283f0717b7785cb0fdb3ad482a4ec35c404553",
+   "en": "Complete Bit Range",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[4].line[3]",
+    "near": "• Durable S2 Steel + Nickel Plating"
+   },
+   "dict": null
+  },
+  {
+   "h": "36fbaa090b1268ec5db27b7df6c315256d2f4bbb9e882a299df29c8883d2d6ab",
+   "en": "Quick-Change Chuck & Ergonomic Handle",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[4].line[4]",
+    "near": "• Complete Bit Range"
+   },
+   "dict": null
+  },
+  {
+   "h": "2cc504e8d9350bff567dc15326d90f2fb13759e932a7731f9cc290acfef6f2b1",
+   "en": "Portable Storage Case",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "blocks[4].line[5]",
+    "near": "• Quick-Change Chuck & Ergonomic Handle"
+   },
+   "dict": null
+  }
+ ]
+}

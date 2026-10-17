@@ -1,0 +1,3349 @@
+{
+ "batch": 6,
+ "surface": "page",
+ "handles": [
+  "touch-screen-a1-mini",
+  "filament-cutter-lever-a1-series",
+  "heatbed-nozzle-wiper-a1-mini",
+  "ptfe-tube-connector-a1-mini",
+  "spool-holder-a1-mini",
+  "bambu-micro-lidar-cover-x1-series",
+  "purge-wiper-a1-series",
+  "z-axis-coupler-a1-mini",
+  "x-motor-a1-mini",
+  "y-motor-a1-mini",
+  "z-motor-a1-mini",
+  "a1-mini-heatbed-unit",
+  "extruder-filament-sensor-p1-series",
+  "extruder-filament-sensor-x1-series",
+  "ams-power-board",
+  "ams-connector-board",
+  "idler-pulley",
+  "front-cover-x1c",
+  "mc-board-p1-series-1",
+  "z-axis-top-cover-a1-mini",
+  "p1s-heatsink-for-mc-board",
+  "purge-chute",
+  "bambu-usb-c-cable-a1",
+  "live-view-camera-a1",
+  "touch-screen-a1-a2l",
+  "y-belt-a1",
+  "z-belt-a1",
+  "spool-holder-a1",
+  "ams-lite-top-mount-screws-kit",
+  "x-belt-a1",
+  "heatbed-nozzle-wiper-a1-a2l",
+  "ams-main-frame-v3",
+  "ams-rfid-board",
+  "filament-buffer-connection-board",
+  "ap-board-p1p",
+  "z-belt-timing-pulley",
+  "button-board-with-chamber-temperature-sensor-x1-series",
+  "bambu-micro-lidar-dual-red-laser-x1-series",
+  "ams-top-lid-handle",
+  "xy-belt-tensioner-with-pulley",
+  "supportive-footpad-a1",
+  "ptfe-tube-connector-a1",
+  "internal-power-supply",
+  "screws-kit-a1-series-and-ams-lite",
+  "right-side-panel-hr-x1-series",
+  "left-side-panel-hl-x1-series",
+  "heatbed-surface-magnet-without-cutout",
+  "heatbed-surface-magnet-with-cutout-p1p",
+  "heatbed-unit-v3-p1-series",
+  "heatbed-unit-v3-x1-series",
+  "ac-board-x1-series-and-p1-series",
+  "base-housing-a1-mini",
+  "baseplate-a1-mini",
+  "a1-mini-x-axis-motor-cover",
+  "y-axis-tensioner-a1-mini",
+  "x-y-axis-pulley-a1-mini",
+  "extruder-motor-a1-series",
+  "toolhead-block-a1-series",
+  "ams-lite-mainboard",
+  "ams-lite-feeder-support",
+  "ams-lite-feeder-cap",
+  "ams-lite-feeder-motor",
+  "ams-lite-stand",
+  "filament-sensor-base-a1-series",
+  "display-rear-housing-with-hinge-x1-series",
+  "motor-drive-pulley-x1-series-and-p1-series",
+  "toolhead-front-carriage-x1-series-and-p1-series",
+  "z-axis-tensioner-x1-series-and-p1-series",
+  "spool-holder-x1-series-and-p1-series",
+  "ap-board-p1s",
+  "ap-board-x1-series",
+  "led-light-p1-series",
+  "printer-cable-pack-7-in-1",
+  "part-cooling-fan-air-duct",
+  "th-board-h2-series",
+  "purge-wiper-h2-series",
+  "usb-c-cable-h2-series",
+  "toolhead-to-mc-board-cable-h2d-h2c",
+  "anti-vibration-feet-h2-series",
+  "cooling-fan-for-hotend-h2",
+  "xy-motor-h2-series",
+  "hotend-cooling-fan-air-duct",
+  "nozzle-blocker-magnet-bracket-h2d-h2c",
+  "z-motor-h2-series",
+  "nozzle-camera",
+  "xy-belt-tensioner-h2-series",
+  "toolhead-camera-h2-series",
+  "dual-extruder-unit-h2d-h2c",
+  "x-axis-idler-pulley-h2-series",
+  "dual-extruder-filament-guide",
+  "quick-change-tool-interface-h2d-h2c",
+  "dual-extruder-idlers-and-filament-sensor",
+  "regular-idler-pulley",
+  "dual-extruder-gears",
+  "h2-ptfe-tube-coupler",
+  "xy-belt-h2-series",
+  "z-belt-h2-series",
+  "x-axis-assembly-h2-series",
+  "front-glass-door-h2-series"
+ ],
+ "strings": [
+  {
+   "h": "6a191ca7dc3e9e57be3e60a176a2e55469084e7a8c50425290dd7fdb13dc24c0",
+   "en": "2.4-inch IPS capacitive touchscreen which connects to the Mainboard. Users can control the printer through the touch screen interface.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5571505ae199be9b30f4fe1e80d7681ec2cfb9997c012af1b773f6865db2f373",
+   "en": "Learn more about the installation process of the Touch Screen for A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "189884afa241f723b6816d1ad04753310548f0902712b23b91365bd17093b02e",
+   "en": "Screen Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "specs[x.screen_size].label",
+    "near": "2.4 Inch"
+   },
+   "dict": null
+  },
+  {
+   "h": "2f022502028391951d8cabccca974f910889f3e8f94f264e6c58e3b2362e5682",
+   "en": "2.4 Inch",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "specs[x.screen_size]",
+    "near": "Screen Size"
+   },
+   "dict": {
+    "ar": "2.4 إنش",
+    "ckb": "2.4 ئینچ"
+   }
+  },
+  {
+   "h": "6b58be8bf04222b39e4ac89e48f4253186e4853cbc0978352880eae5dbd4e77b",
+   "en": "262K Colors",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "specs[part.display_colours]",
+    "near": "Display colours"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d4503051df7718bb3764211a56b28f8730e54d3e94f7896b089e88ac3e41e9d",
+   "en": "30,000 Hours",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "specs[part.expected_life]",
+    "near": "Expected life"
+   },
+   "dict": {
+    "ar": "30,000 ساعة",
+    "ckb": "30,000 کاتژمێر"
+   }
+  },
+  {
+   "h": "5778b4420f79aba2301ea4c1604e121c14957b882f0a70b43451e252641bff92",
+   "en": "Interface Mode",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "specs[x.interface_mode].label",
+    "near": "4SPI"
+   },
+   "dict": null
+  },
+  {
+   "h": "dade703137e8424d152677d68a023a461908a957a9bc0c28fccbd2e7fda1e31b",
+   "en": "Pixel Arrangement",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "specs[x.pixel_arrangement].label",
+    "near": "RGB_Stripe"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ccd08bc2c64b5a6b876286947e5e368ced449e9f9729cebfa0fb378b3743f0b",
+   "en": "RGB_Stripe",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "specs[x.pixel_arrangement]",
+    "near": "Pixel Arrangement"
+   },
+   "dict": null
+  },
+  {
+   "h": "60feb67f9a1c6451c1bb5872e8a5260c37f952e7774c60d64293c945d6d545a6",
+   "en": "Operation Temperature",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-mini",
+    "title": "Touch Screen - A1 mini",
+    "field": "specs[x.operation_temperature].label",
+    "near": "-10~60°C"
+   },
+   "dict": null
+  },
+  {
+   "h": "79ecddab8c7dc8be42261d4f7b68ffec78ab8fbc9a7c30f3bd6af64c901b3eae",
+   "en": "The filament cutter lever is mounted on the extrusion component, used for securing the cutter and the material-cutting detection magnet. During the cutting process, the filament cutter lever must be pressed. Once the material is severed, the lever rebounds to its initial position.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "filament-cutter-lever-a1-series",
+    "title": "Filament Cutter Lever - A1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8d02cf6bdb6882241b3d07fcb5a06f63715ef8d21329e7c29012142fa2923db3",
+   "en": "Please check and replace the filament cutter lever when it shows signs of breakage or when there are problems cutting. Learn more about the replacement of the Filament Cutter Lever for A1 Series on on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-lever-a1-series",
+    "title": "Filament Cutter Lever - A1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "72f7c894ad6c4ce2ef5483c768bb24bb83cc671b013d896e036ae64a8cbc35c1",
+   "en": "plastic",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-lever-a1-series",
+    "title": "Filament Cutter Lever - A1 Series",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5e1b0fbe354b17bc1766a84a927af94517cf0859bb12cdb277c667fe2d6aa15",
+   "en": "The heatbed nozzle wiper is designed for cleaning the hot nozzle before starting a print job. The machine's heated bed comes with a built-in nozzle wiping kit, and the cleaning action is automatically performed after initiating each print task without the need for manual intervention.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-mini",
+    "title": "Heatbed Nozzle Wiper - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "af93e69d36dd071847f1cd4d1295e69430a0e6b59752cfc7c39b348f19a81279",
+   "en": "Please replace the nozzle wiper when it is deformed or cracked. Learn more about the replacement of the Heatbed Nozzle Wiper for A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-mini",
+    "title": "Heatbed Nozzle Wiper - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6b7f287916c478d98021ff6805a3147969434782066b8ffa3b9c6a310a2207ae",
+   "en": "Heatbed Nozzle Wiper",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-mini",
+    "title": "Heatbed Nozzle Wiper - A1 mini",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "341828a58d42512e281610271f2d87bae867acdc32bd70dddcb756ce36d1e386",
+   "en": "The PTFE Tube Connector used in A1 mini is attached to the X-axis motor housing and can be removed together with the pneumatic connector.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "ptfe-tube-connector-a1-mini",
+    "title": "PTFE Tube Connector - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "572ebcc8897163f900c43c247b83c8dc50fa240b480fd4eec8f79f9f61b18d3d",
+   "en": "Learn more about the replacement of the PTFE Tube Connector for A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-connector-a1-mini",
+    "title": "PTFE Tube Connector - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dc418fff99ffa8fa6b0f3d1e4b2f44752cbb602dfbd9406017cbc28960d83b8d",
+   "en": "The Spool holder used in A1 mini is attached to the Z-axis column and is compatible with most commonly used filament spools.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "spool-holder-a1-mini",
+    "title": "Spool Holder - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2f7bf58ab6cef1f554c496f17ccad8539bb138b8a9cdcbfd6117b794dbc51377",
+   "en": "Please slide in the spool holder. (match the slot orientation).",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-a1-mini",
+    "title": "Spool Holder - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about the Spool Holder on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "7741ef14021638445980e7125a92bf6816e5db6f6f25c8a786daa06131193874",
+   "en": "Learn more about the Spool Holder on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-a1-mini",
+    "title": "Spool Holder - A1 mini",
+    "field": "usage[0].body.line[1]",
+    "near": "Please slide in the spool holder. (match the slot orientation)."
+   },
+   "dict": null
+  },
+  {
+   "h": "e5fbc4b4c82c2040fa0098bd94117611afe92164c9aa745e14f8cd23be053bc6",
+   "en": "Learn more about the replacement of the Bambu Micro Lidar Cover - X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-micro-lidar-cover-x1-series",
+    "title": "Bambu Micro Lidar Cover - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "145c4e2f4f4a3f3c72bb60c0f61fa1248bd6745761381315d06ce87a81fd5ce4",
+   "en": "Bambu Micro Lidar Top Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-micro-lidar-cover-x1-series",
+    "title": "Bambu Micro Lidar Cover - X1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "22e1bc51230cc6619073ebf400c5c4b62d9ff6d1af0fd8b699ec5f85b5b427f2",
+   "en": "Bambu Micro Lidar Bottom Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-micro-lidar-cover-x1-series",
+    "title": "Bambu Micro Lidar Cover - X1 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1753ef9f3ebab1ef9f7ae4f486ba9150df0d6016d5a75774763e92b0827717ba",
+   "en": "The Purge Wiper is designed to efficiently remove waste filament generated by the printer's hotend. It gathers and dislodges waste filament during different stages, including printer setup, pause and resume operations, and filament changes for multi-color printing. Its purpose is to ensure the proper management and disposal of waste materials for seamless printing processes.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a1-series",
+    "title": "Purge Wiper - A1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "02b7f4773670e41ee457687e71fc14946549fb5f074162087a86c48ee94393d9",
+   "en": "Learn more about the replacement of the Purge Wiper for A1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a1-series",
+    "title": "Purge Wiper - A1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1f7068d0b450b52cbd4e7b5a9dff217abad01ac95b05ab682af6c858737efb90",
+   "en": "The Z-axis coupler is used to connect the Z-axis motor and the Z-axis lead screw. It enables precise transmission of motion and torque while accommodating certain levels of radial, axial, and angular misalignment.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-coupler-a1-mini",
+    "title": "Z-Axis Coupler - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4b77498d47035ad94aa4705bb3838e2706db36ec3361ecec09baeaed2bf6dfe1",
+   "en": "Learn more about the replacement of the Z-Axis Coupler for A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-coupler-a1-mini",
+    "title": "Z-Axis Coupler - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "889bb0d5f0c6bb76a266bf73a884e0b94e2f607813cdd33a6f54e059a0cb0b73",
+   "en": "Z-Axis Coupler",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-coupler-a1-mini",
+    "title": "Z-Axis Coupler - A1 mini",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e242b125fa8cd05758eb19427671914ed324acd5b63e203c035ac0c136845836",
+   "en": "The X Motor is utilized to drive the tool head in the back-and-forth motion along the X-axis. Compatibility A1 mini In the Box X Motor *1 M3-05 *4 Installation Learn more about the replacement of the X Motor for A1 mini on Bambu Lab Wiki. Product Specification Materials Metal Color Silver Package size 58*58*70 mm Package weight 320 g",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "x-motor-a1-mini",
+    "title": "X Motor - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "17e85010683f5b023e99786403417580285c6af61bc4af685ef89c83af854b44",
+   "en": "Learn more about the replacement of the X Motor for A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "x-motor-a1-mini",
+    "title": "X Motor - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "24e3ac3c63d6a5612dd78eb55cf07bb8fa17e4bda575a258efb0d70616f314ea",
+   "en": "X Motor",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-motor-a1-mini",
+    "title": "X Motor - A1 mini",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d0e353585ba101ef8603a6d835dedace70fd7f8b49bcecc8804b2dcfe67e7b4",
+   "en": "The Y Motor is used to drive the heated bed in the back-and-forth motion along the Y-axis. Compatibility A1 mini In the Box Y Motor *1 M3-06 *3 Installation Learn more about the replacement of the Y Motor for A1 mini on Bambu Lab Wiki. Product Specification Materials Metal Color Silver Package size 58*58*70 mm Package weight 310 g",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "y-motor-a1-mini",
+    "title": "Y Motor - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "44437e6ab7c52bb4b6923f3eac32a6aabf39ece4e7762c3c07929d36eb8e58f4",
+   "en": "Learn more about the replacement of the Y Motor for A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "y-motor-a1-mini",
+    "title": "Y Motor - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fb414b69cbc1422cbcc4dbe9fe69c5b61373d4a2061d8ff7ebcfb11b522ce7d5",
+   "en": "Y Motor",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-motor-a1-mini",
+    "title": "Y Motor - A1 mini",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "13c7d1d89e393798abd4934bfff64468046231611aef695c3fe17e15d05e6a8f",
+   "en": "The Z Motor is used to drive the Z-axis assembly in the up-and-down motion along the Z-axis.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "z-motor-a1-mini",
+    "title": "Z Motor - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "587fb4ff064f1dc727e670cd2478807f34d22febed08a6239208a11345a1731e",
+   "en": "Learn more about the replacement of the Z Motor for A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-motor-a1-mini",
+    "title": "Z Motor - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9b00a6f635cc3d83360037726c2d42ee8588615848a04f3347266237cdd03338",
+   "en": "The heatbed unit of the A1 mini is a printing platform installed on the printer, which can move back and forward along the Y direction and can be heated according to the temperature set by the user. Setting a suitable heat bed temperature can effectively improve adhesion between the model and the build plate and prevent the model from warping. Please follow our recommended heatbed temperatures for each filament to get the best results. Compatibility A1 mini In the Box Heatbed Unit *1 Installation Learn more about the replacement of the A1 mini Heatbed Unit on Bambu Lab Wiki if your printer has the following issues: The heat bed does not heat up, and it has been confirmed that the connectors are all in a normal state. Physical damage or obvious deformation affects the function of the heatbed unit. The customer support team has concluded that the heat bed needs to be replaced. Product Specification Materials Metal Color Black Package size 305*230*80 mm Package weight 700 g",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini-heatbed-unit",
+    "title": "Heatbed Unit - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8a95f4c4a856790506785c4222cd53baa28ce7756a254a04eac14f459d107617",
+   "en": "Learn more about the replacement of the A1 mini Heatbed Unit on Bambu Lab Wiki if your printer has the following issues:",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini-heatbed-unit",
+    "title": "Heatbed Unit - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": "The heat bed does not heat up, and it has been confirmed that the connectors are all in a normal state."
+   },
+   "dict": null
+  },
+  {
+   "h": "6082adb858f27c3b035ca8aa900e6c3be79e59f990d10f2a0b5d1e12362f297e",
+   "en": "The heat bed does not heat up, and it has been confirmed that the connectors are all in a normal state.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini-heatbed-unit",
+    "title": "Heatbed Unit - A1 mini",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about the replacement of the A1 mini Heatbed Unit on Bambu Lab Wiki if your printer has the following issues:"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a65d7e48a93e6f708cf8aa428ce3c25a8cc2e1de9f6dc2de32f426e05548762",
+   "en": "Physical damage or obvious deformation affects the function of the heatbed unit.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini-heatbed-unit",
+    "title": "Heatbed Unit - A1 mini",
+    "field": "usage[0].body.line[2]",
+    "near": "The heat bed does not heat up, and it has been confirmed that the connectors are all in a normal state."
+   },
+   "dict": null
+  },
+  {
+   "h": "d8d4dd6cbfbf1fab53fcb0b2487edf176686cc0837b3004008d069bb1502d562",
+   "en": "The customer support team has concluded that the heat bed needs to be replaced.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini-heatbed-unit",
+    "title": "Heatbed Unit - A1 mini",
+    "field": "usage[0].body.line[3]",
+    "near": "Physical damage or obvious deformation affects the function of the heatbed unit."
+   },
+   "dict": null
+  },
+  {
+   "h": "b57945ff31a8c5a381f85f1c12c7dfc77bfb339713e3f212290c35390550566f",
+   "en": "Heatbed Unit",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "a1-mini-heatbed-unit",
+    "title": "Heatbed Unit - A1 mini",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ef798bc82b8e4c33681cf6b107986119cb45f4a5375be684cda57301035c783a",
+   "en": "Learn more about the replacement of the Extruder Filament Sensor - P1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-filament-sensor-p1-series",
+    "title": "Extruder Filament Sensor - P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "47028cb8defab4b3ebcd02adadc5a005f719845889369dd940b39403ec82305b",
+   "en": "Extruder Filament Sensor",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "extruder-filament-sensor-p1-series",
+    "title": "Extruder Filament Sensor - P1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "60df9334305a9228cbda7ac0710c1a623f6c44df3dc1bb19b7660222b7cf93a6",
+   "en": "Learn more about the Extruder Filament Sensor - X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-filament-sensor-x1-series",
+    "title": "Extruder Filament Sensor - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2192164cccddb15b4096e828e59b6b70249650e742fb85aa8a3803456e497fab",
+   "en": "Learn more about the replacement of the AMS Power Board on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-power-board",
+    "title": "AMS Power Board",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "adb55cd2b16977582166e517162bad663bf3bfebe37d665288beab724adb85c4",
+   "en": "Learn more about the replacement of the AMS Connector Board on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-connector-board",
+    "title": "AMS Connector Board",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5372efb2a80a396e3a74dc4da1bcc5e14c56ed9914d08f97f6176e25edd6870f",
+   "en": "Learn more about the replacement of the Idler Pulley on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "idler-pulley",
+    "title": "Idler Pulley",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c3a19875154427ca239c4c4b1e9365fc8fed928a9afff60f0f572a96c91f7d58",
+   "en": "Graphite Nylon Gasket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "idler-pulley",
+    "title": "Idler Pulley",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f5b1e0413ef79169a09fbdf98bc9fcb3808aaddcd3987acbeb58c506856a98a",
+   "en": "Learn more about the replacement of the Front Cover on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "front-cover-x1c",
+    "title": "Front Cover - X1C",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "febe9fc98afc871acb2109d6e96fe0f8ff772a9f0ab28a6ba1272296f9f6e735",
+   "en": "Learn more about the replacement of the MC Board - P1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mc-board-p1-series-1",
+    "title": "MC Board - P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "aebdfaae86638b4f520ec5f9e66b527054cef5e51dd94924fd1b59f56e9efa35",
+   "en": "Learn more about replacing the Z-Axis Top Cover on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-top-cover-a1-mini",
+    "title": "Z-Axis Top Cover - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7ce95b1ccb89fd9349fc1bf3986bd7350c7272cb5d21825e64f44a285eab5788",
+   "en": "Dark Grey",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-top-cover-a1-mini",
+    "title": "Z-Axis Top Cover - A1 mini",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8dacd1aceb01ec970f5fb3ffd749b586997ed12255970e3ce80983a461c9e8d",
+   "en": "1. Z-Axis Top Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-top-cover-a1-mini",
+    "title": "Z-Axis Top Cover - A1 mini",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e09bb338086371087c05b7d6a55f7498f096c9d3b87ec40ee7d08e9666a29d21",
+   "en": "2. M3-14 Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-top-cover-a1-mini",
+    "title": "Z-Axis Top Cover - A1 mini",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "265415b42e5e758ec55ff92bba1415cfe99f74dc75085f4c9d50ccabf6969a1e",
+   "en": "Learn more about replacing the P1S Heatsink for MC Board on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "p1s-heatsink-for-mc-board",
+    "title": "P1S Heatsink for MC Board",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "56ed502034449a295c308981d80ded0d4946e6c0cba89049f8078f17f3396047",
+   "en": "1. Heatsink",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1s-heatsink-for-mc-board",
+    "title": "P1S Heatsink for MC Board",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb5ca7bc4473b5b87c11fa7b06b10f422e27440e60a019599afcf39359e0b77b",
+   "en": "2. Silicone Glue",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1s-heatsink-for-mc-board",
+    "title": "P1S Heatsink for MC Board",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4fd1cabfc2969e9a1e5ec8c46e28ea6795295b0144fa8f7d04f11e47304f1934",
+   "en": "3. Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1s-heatsink-for-mc-board",
+    "title": "P1S Heatsink for MC Board",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0f10beb6c89b52ffca54163892e61102803c5a7f4b2f1da04a5d9b1dd922502a",
+   "en": "Learn more about the replacement of the Purge Chute on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "purge-chute",
+    "title": "Purge Chute",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6c8782d752a414fe5e4e574c41c58f4ea1913ed1c96eb5ba323c973066404192",
+   "en": "Learn more about the replacement of the A1 Bambu USB-C Cable on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-usb-c-cable-a1",
+    "title": "Bambu USB-C Cable - A1",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "372196a003b67a12e05c3dc9d9be1d656790032cdf74980c6e1dfcc371056992",
+   "en": "Learn more about the replacement of the Live View Camera - A1 on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-a1",
+    "title": "Live View Camera - A1",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "61b89165e03cfbce3122d18996d74f061aa0612b342c7c4153b70f634db2819b",
+   "en": "Learn more about replacing the A1 Touch Screen on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-a2l",
+    "title": "Touch Screen - A1/A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ae7cf0be4551d6b6d8eb5c9c0253be71775f86be2a489b1f45f9e5ad72d136ff",
+   "en": "Touch Screen",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-a2l",
+    "title": "Touch Screen - A1/A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "85e023493688601693ad122b1ab473209dddb31bde0d9499ebf79b2277b0c56d",
+   "en": "Learn more about replacing the Y Belt - A1 on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "y-belt-a1",
+    "title": "Y Belt - A1",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "117005c5a66d5f2fb0ab39efe85c91343d2d25b0f80d62fea5f30ee43a76a6f4",
+   "en": "Rubber, Fiberglass",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "y-belt-a1",
+    "title": "Y Belt - A1",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "f5f7a54d5a42502f1062b35d12f218850954b39255fdcff2445c4c1dbbe395f3",
+   "en": "Learn more about replacing the Z Belt - A1 on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt-a1",
+    "title": "Z Belt - A1",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c2fc64139183bb7ee26fda8c6661826f5bab08efbaf1631dd38aeee41d01ab90",
+   "en": "Learn more about replacing the Spool Holder - A1 on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-a1",
+    "title": "Spool Holder - A1",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "01d3a669e1b5bf488d40e5b2d0676d2bbcb45acb98015462dda7812d7fedaafc",
+   "en": "Black and Silver",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-top-mount-screws-kit",
+    "title": "AMS lite Top Mount Screws Kit",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أسود وفضي",
+    "ckb": "ڕەش و زیوی"
+   }
+  },
+  {
+   "h": "0c0cc047dd9bf08b824414bf79200f3f761eb0db1cfaf9220d1399220f263e09",
+   "en": "1. BT3-12 Screw *13 (for stiffener C Clamp and AMS lite)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-top-mount-screws-kit",
+    "title": "AMS lite Top Mount Screws Kit",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ddc448cf705de897352babc4c0b709ecfc5fd90c8642d3d23e8557af38111a99",
+   "en": "2. BT3-23 Screw *3 (for top mount latch)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-top-mount-screws-kit",
+    "title": "AMS lite Top Mount Screws Kit",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbaedee858fd14fb327ad53faad1fcef7d260a1a36ebbb8964a3520c14eb89f9",
+   "en": "3. ST3-8 Screw *5 (not needed for the installation but users can keep it for spare use)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-top-mount-screws-kit",
+    "title": "AMS lite Top Mount Screws Kit",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "33ab859bebdeb5be4216ea469f1223580e0a2b8b4e1bb6ab9460bcc8aa4bda76",
+   "en": "Learn more about replacing the X Belt - A1 on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "x-belt-a1",
+    "title": "X Belt - A1",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7b94174e94f4a4ea62c2c119cd3ed672629c60c41325478e4be5b805989bc4f0",
+   "en": "Rubber, Plastic",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "x-belt-a1",
+    "title": "X Belt - A1",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "b2431b2c3c622cdcace39685755399e1c2a5c994b6c54e2415251ee410c459c3",
+   "en": "Learn more about the replacement of Heatbed Nozzle Wiper on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-a2l",
+    "title": "Heatbed Nozzle Wiper - A1/A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a60f7b0cee08ea8a9a93528ee621fe2361555d1718ccc6875321f4e7a3392bec",
+   "en": "Rubber",
+   "kind": "spec_value_text",
+   "freq": 8,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-a2l",
+    "title": "Heatbed Nozzle Wiper - A1/A2L",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "da5f48be97294064be9bb173e461f8ec3b03d2fd6f5f2397531727f999b5c2e2",
+   "en": "Learn more about the replacement of the AMS Main Frame V3 on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-main-frame-v3",
+    "title": "AMS Main Frame V3",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "09189f4a72989eb9cc2f1b568f83cedca0ab282ca0adaf6dda467aeca2eb1b1a",
+   "en": "AMS Main Frame",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-main-frame-v3",
+    "title": "AMS Main Frame V3",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2c77e1637f8681b4d78a48be433aca61f56e3bcb987c53fd77bfd625be7d86f",
+   "en": "Learn more about the replacement of the AMS RFID Board on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-rfid-board",
+    "title": "AMS RFID Board",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c3e563207dd7345cf6190ff198bf9057a630f7f4b0017d826b2258aea68f8e6c",
+   "en": "Learn more about the replacement of the Filament Buffer Connection Board on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "filament-buffer-connection-board",
+    "title": "Filament Buffer Connection Board",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c6db43246c6d5751fb2988d2389518a76c4809335aafcbf00f79dce478a3e430",
+   "en": "Learn more about the replacement of the AP Board for P1P on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-p1p",
+    "title": "AP Board - P1P",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ef09593bfe66a2f79aaf8c97ee7d12e904482b6d0bb636b677b35cb5c76333d9",
+   "en": "Learn more about the replacement of the Z Belt Timing Pulley on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt-timing-pulley",
+    "title": "Z Belt Timing Pulley",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "77424892c6efde3aa295a829b9dc7da2c5328b100b3b2057fe3ed167d0dff655",
+   "en": "Learn more about the replacement of the Button Board with Chamber Temperature Sensor on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "button-board-with-chamber-temperature-sensor-x1-series",
+    "title": "Button Board with Chamber Temperature Sensor - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a5d84996ee148ca9149f8eb05df81451564e69f70518894f0aee517dbf982075",
+   "en": "Button Board with Chamber Temperature Sensor",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "button-board-with-chamber-temperature-sensor-x1-series",
+    "title": "Button Board with Chamber Temperature Sensor - X1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9056763f8b1a2bb94afaffc2afa0de15881bce6bdf5054224e1fe2b51b63d85e",
+   "en": "Learn more about the replacement of the Bambu Micro Lidar (Dual Red Laser) - X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-micro-lidar-dual-red-laser-x1-series",
+    "title": "Bambu Micro Lidar (Dual Red Laser) - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "645f4c20ed08ce359b66c5ccc8c309d705262690bd9ad06f7d555a3dd98ee8c6",
+   "en": "Sealed o-ring",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-top-lid-handle",
+    "title": "AMS Top Lid Handle",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "564a4a4d299a31369e950b1c7bf7a6f27ff6f8bfdb21b85b9a9204d2897726aa",
+   "en": "Learn more about the replacement of the XY Belt Tensioner with Pulley on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-with-pulley",
+    "title": "XY Belt Tensioner with Pulley",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5ef7267568ec4c0a8b9f81eb5288d4992a322760e29e55edee0b5caaacc79a07",
+   "en": "Support gasket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-with-pulley",
+    "title": "XY Belt Tensioner with Pulley",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0eed42618a21bdf6a6e10b60aaf25847f0ab33378b79bbd90c0d0a1bf4c5192d",
+   "en": "M3x6mm Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-with-pulley",
+    "title": "XY Belt Tensioner with Pulley",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "849a271e94d1431281b0a5fbf9cf2bb2a724671a3fce3ea3f786dd1c63258585",
+   "en": "Learn more about replacing the Supportive Footpad - A1 on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "supportive-footpad-a1",
+    "title": "Supportive Footpad - A1",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5517bab653668facef67e08f959d3af9f63e80a0570411d1f4f7c6b0460bc24e",
+   "en": "EVA",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "supportive-footpad-a1",
+    "title": "Supportive Footpad - A1",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "92ce16ca00c4a7ad9bcc245a9e1a0fffdb4f313810a92b348639fff17424c658",
+   "en": "Supportive Footpad",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "supportive-footpad-a1",
+    "title": "Supportive Footpad - A1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "323bb13a307e0613625afe17a4b2327757cec80ed921af65b485bfecc36f577f",
+   "en": "Learn more about replacing the PTFE Tube Connector - A1 on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-connector-a1",
+    "title": "PTFE Tube Connector - A1",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3ce772ae12181bb72a64c6d5a6a07adbb329b3865a30503530d8b7941160bc16",
+   "en": "The power module is an AC to DC power converter, with variable input of 100-240V and output of 24V. It supplies power to the entire printer except the heatbed.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "internal-power-supply",
+    "title": "Internal Power Supply",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "473936690a570fa9bfaeb2085bb607ab97e693c05b2e5e1963a533634500a657",
+   "en": "Learn more about the replacement of the Internal Power Supply on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "internal-power-supply",
+    "title": "Internal Power Supply",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f0c78c37e3b5b95f7c083b51db22fd1327f11391a98c7404408908e6ea183d4f",
+   "en": "Filament Sensor Base",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[5].cell[3]",
+    "near": "3 | BT2x5 SHCS (Self Tapping Screw) | 20 | Feeder unit and the Filament Sensor"
+   },
+   "dict": null
+  },
+  {
+   "h": "98822179407453c175d123c6ca4dea2f6b1b6abb65baae121b38ca03b215555d",
+   "en": "Extruder Unit",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[12].cell[3]",
+    "near": "10 | BT3x8 SHCS (Self Tapping Screw) | 10 | Bottom Plate of A1& A1 mini"
+   },
+   "dict": null
+  },
+  {
+   "h": "40f6907245f7658b3d4ab3a12581899e3ff258afa0914355de02e3e39ce1066d",
+   "en": "Learn more about the replacement of the Right Side Panel (HR) - X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "right-side-panel-hr-x1-series",
+    "title": "Right Side Panel (HR) - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4db13cfef5931b4fa7f338acf7f15fb8da93b226a2a1985441a7835c9b413b78",
+   "en": "Learn more about the replacement of the Left Side Panel (HL) - X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "left-side-panel-hl-x1-series",
+    "title": "Left Side Panel (HL) - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ef8d9bcf6d890d6e09ec139465ff2597874bafd322260f2a8e1de868e7c76e4b",
+   "en": "Learn more about the replacement of the Heatbed Surface Magnet on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "heatbed-surface-magnet-without-cutout",
+    "title": "Heatbed Surface Magnet (without Cutout) - X1 Series and P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "854c1ac3c6aec1735659d7c2e19e016a01f3bd51375be2072cb7566276255341",
+   "en": "Heatbed Surface Magnet (without Cutout)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-surface-magnet-without-cutout",
+    "title": "Heatbed Surface Magnet (without Cutout) - X1 Series and P1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "43247e4bd66107be860de71eda53bbdeaa0e0c4873fc201bb15ad34c994763b9",
+   "en": "Heatbed Surface Magnet (with Cutout)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-surface-magnet-with-cutout-p1p",
+    "title": "Heatbed Surface Magnet (with Cutout) - P1P",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "27434db667b65e41ba16ec10a73f98a1cde8f9d9585dfb94384a5596721cfd21",
+   "en": "Learn more about the replacement of the Heatbed Unit V3 - P1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-v3-p1-series",
+    "title": "Heatbed Unit V3 - P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b8109eb22994042922734a9229b2f1c5ffdde1095e5478cb53c9e41e6a3bbb7d",
+   "en": "Heatbed Unit V3*1",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "heatbed-unit-v3-p1-series",
+    "title": "Heatbed Unit V3 - P1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "832df7a68d44f85d240818b9559f472df3bce00af02caf47e5da8abd55fa1a8d",
+   "en": "Learn more about the replacement of the Heatbed Unit V3 - X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-v3-x1-series",
+    "title": "Heatbed Unit V3 - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a103fe11971102659b0520a91923aa5c320403b16f940c83e334f0e129f26bab",
+   "en": "Learn more about the replacement of the AC Board on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ac-board-x1-series-and-p1-series",
+    "title": "AC Board - X1 Series and P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d4855d9fe851e075ef351d75619381363bbe67b62f53e01a50615f90163756d1",
+   "en": "Black, Yellow",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "ac-board-x1-series-and-p1-series",
+    "title": "AC Board - X1 Series and P1 Series",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أسود، أصفر",
+    "ckb": "ڕەش، زەرد"
+   }
+  },
+  {
+   "h": "c07c79565f49286b43bf5f0f6312fab7d066d6d7ff68e76899dee2e4cf0fc633",
+   "en": "AC Board",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "ac-board-x1-series-and-p1-series",
+    "title": "AC Board - X1 Series and P1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1444df1236f44c699803f7d28ebe9fdd7fa70fa13cc60af1146787b8b2570104",
+   "en": "Overview The white plastic upper cover of the A1 mini.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "base-housing-a1-mini",
+    "title": "Base Housing - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5ce1ae3a37f4cdbd28d2505a11af31df001c737b2d40f1f39d40536f968c3380",
+   "en": "Learn more about the replacement of the Base Housing - A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "base-housing-a1-mini",
+    "title": "Base Housing - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2ae0bc4ebafb9d977cb6aad9c38f26a16de38e3c216d07f449c8e0376ebef83d",
+   "en": "Learn more about the replacement of the Baseplate - A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "baseplate-a1-mini",
+    "title": "Baseplate - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ed0305d07baf8d2ab94ddc2e62eeafb803124524453e7473f81c8ba40eb5dc79",
+   "en": "Overview A white closed box used to cover the X motor, including a front cover, a back cover and a middle frame.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini-x-axis-motor-cover",
+    "title": "X-Axis Motor Cover - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ba81674f4d3af59fc16c44bb471bbc09a3b6ca0f892b5fbcfaf9628bb06b29a3",
+   "en": "Learn more about the replacement of the X-Axis Motor Cover - A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini-x-axis-motor-cover",
+    "title": "X-Axis Motor Cover - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e78a66a590289ed609bdb37ed054a62f1b82e490af13b14f64f1aef52a93c602",
+   "en": "Overview A component for tensioning the Y-axis belt of the A1 mini.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-tensioner-a1-mini",
+    "title": "Y-Axis Tensioner - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4059a22400564bb4bf7bd67a89309fae1608b88c7c2c751248a54225e2c52ada",
+   "en": "Learn more about the replacement of the Y-Axis Tensioner - A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-tensioner-a1-mini",
+    "title": "Y-Axis Tensioner - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "94e2b33be42cb92178be61edce5007eebaeb9dc94484b95cac29b98792da6d14",
+   "en": "Overview The idler pulley installed on the left side of the X-axis is used to change the direction of movement of the X belt.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "x-y-axis-pulley-a1-mini",
+    "title": "XY-Axis Pulley - A1 mini",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ea8d2556879ca5aa88fbf5b86c135c1cbed972b53b9599e45029d024257613fb",
+   "en": "Learn more about the replacement of the X/Y-Axis pulley - A1 mini on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "x-y-axis-pulley-a1-mini",
+    "title": "XY-Axis Pulley - A1 mini",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "382aa01bdfe2c3bc1f6052a6e271d38d9f30a1a9571403567daaf32154d14762",
+   "en": "X/Y-Axis Pulley - A1 mini",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-y-axis-pulley-a1-mini",
+    "title": "XY-Axis Pulley - A1 mini",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6ab75a4fae139b3a6e05354542d81696d14e2040310c9e912f98c14027a44af9",
+   "en": "Bambu La",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "x-y-axis-pulley-a1-mini",
+    "title": "XY-Axis Pulley - A1 mini",
+    "field": "documents[0]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "36ef9cb68c3433a0efe343f1912a1384ac6444fc9fed827d9831c591d6dfd43e",
+   "en": "Overview The extruder motor is installed on the tool head and used to drive the extruder to move.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-motor-a1-series",
+    "title": "Extruder Motor - A1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3fe4162480f8bcb9300e207fc23b9db6ad1b928eb190c5e9cf1c5cb66c2e6e04",
+   "en": "Learn more about the replacement of the Extruder Motor - A1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-motor-a1-series",
+    "title": "Extruder Motor - A1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a2682ab838e3ac09c074ee6ed51c3e46cd5b3c8b1546fda7461d91c0be524a2b",
+   "en": "Overview The toolhead holder for A1 series printer.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-block-a1-series",
+    "title": "Toolhead Block - A1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "acd3ab43ad95e61a4866f6f4a6e04dc750ff70a4a9eb7cd8062bc9c958105925",
+   "en": "Learn more about the replacement of the Toolhead Block - A1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-block-a1-series",
+    "title": "Toolhead Block - A1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f4275df663d3ba8daa4d213fb0317a48eb69754a8cad894d6f19567973e1457e",
+   "en": "M3-8 Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-block-a1-series",
+    "title": "Toolhead Block - A1 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "826eb837ccbd0230bcfc6bba6123b70971f3bbbae003e1fffbe63b5e4f5cac5b",
+   "en": "Overview The AMS lite Mainboard is a circuit board that install inside the AMS lite. After connecting to the printer, it can control AMS lite to complete the automatic material changing function.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-mainboard",
+    "title": "AMS lite Mainboard",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e39a9d2b753194d908a5d4ab3556d83ab7c90feec788874cd57e9521788d9b23",
+   "en": "Learn more about the replacement of the AMS lite Mainboard on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-mainboard",
+    "title": "AMS lite Mainboard",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "235931993ce2363f7e64feaeaa6aa8a678244eff281a3f346337784d609e66d3",
+   "en": "Overview A plastic connector that connects the two Feeder Units together, and fix them to the AMS lite body.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-support",
+    "title": "AMS lite Feeder Support",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fb2a7db23dd56042415631620a7e05e167637c4de148774dbbb54a1ebf76f7e7",
+   "en": "Learn more about the replacement of the AMS lite Feeder Support on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-support",
+    "title": "AMS lite Feeder Support",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e8fa7dc1ef2f946fac1088b577965355cf6f4e93593fdd97163ff2a83097ec79",
+   "en": "Overview The top cover for the AMS Feeder Unit, and is marked with numbers.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-cap",
+    "title": "AMS lite Feeder Cap",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c84a099e7dc086275297bfdb6184cd739064e26c7266fb6df802728fa5cd929d",
+   "en": "Learn more about the replacement of the AMS lite Feeder Cap on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-cap",
+    "title": "AMS lite Feeder Cap",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c0eb0afd640874267ea2d0e5c201fa9221e2dc4f21ab801780b27232ca96f6fc",
+   "en": "Overview The motor installed inside the Feeder Unit, and it is used to drive the feeder to send out the filament.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-motor",
+    "title": "AMS lite Feeder Motor",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b3c26a900c775f31ab0735ab96f45d2611570c462dd2da821468d58a51c62d28",
+   "en": "Learn more about the replacement of the AMS lite Feeder Motor on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-motor",
+    "title": "AMS lite Feeder Motor",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "95f6bebec1ad89f74b29cd2253c38ac5757e38577e2a5ac2ab1db57854e65eaf",
+   "en": "Overview A bracket that support the AMS lite body.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-stand",
+    "title": "AMS lite Stand",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "228865d8e2cbc19595bba443894bf15749975be84654ca2034dbf0966f381dcf",
+   "en": "Learn more about the replacement of the AMS lite Stand on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-stand",
+    "title": "AMS lite Stand",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1681fe0b32f59c55a95512eeaefa2f0eb775bfd01929f2975e241578e10c3cff",
+   "en": "Learn more about replacing the Filament Sensor Base - A1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-base-a1-series",
+    "title": "Filament Sensor Base - A1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e97cee8c27cba9a94208035438e65ae74550c9aa1609be1982e2d39aab7c374a",
+   "en": "Learn more about the replacement of the Display Rear Housing with Hinge - X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "display-rear-housing-with-hinge-x1-series",
+    "title": "Display Rear Housing with Hinge - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "91e710f3a47681ec4ac3577a724769fe454f111856cf57a0816fa506c5d58642",
+   "en": "Learn more about the replacement of the Motor Drive Pulley on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "motor-drive-pulley-x1-series-and-p1-series",
+    "title": "Motor Drive Pulley - X1 Series and P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b6edee802697f699c5d373b792d1ad8c103be0d4321ff65a474f9e4038476704",
+   "en": "Motor Drive Pulley",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "motor-drive-pulley-x1-series-and-p1-series",
+    "title": "Motor Drive Pulley - X1 Series and P1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b9acfd6e71d2699616f2da52b4f58af8981f68fb24b62d63a4acff3b6c49f47",
+   "en": "Learn more about the replacement of the Toolhead Front Carriage on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-front-carriage-x1-series-and-p1-series",
+    "title": "Toolhead Front Carriage - X1 Series and P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "10432039c1e0bbbcf9bef45b99049e95bb979c976ef415af22fe77e972f1c520",
+   "en": "Toolhead Front Carriage",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-front-carriage-x1-series-and-p1-series",
+    "title": "Toolhead Front Carriage - X1 Series and P1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "aafbc7d5000ab5fc2c9273a062f3238b7d66336fbe4a72c5970d8957f7b3bbc8",
+   "en": "Learn more about the replacement of the Z-Axis Tensioner on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-tensioner-x1-series-and-p1-series",
+    "title": "Z-Axis Tensioner - X1/P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b2595d498e98ee7533563e405b76e6627165fcea3e563173423aef0233fc3111",
+   "en": "Z-Axis Tensioner",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "z-axis-tensioner-x1-series-and-p1-series",
+    "title": "Z-Axis Tensioner - X1/P1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "585dabac7c8081cbcb971b1539725ca96c88d9faf6473431c3b672f234b28c9b",
+   "en": "Learn more about the replacement of the Spool Holder on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-x1-series-and-p1-series",
+    "title": "Spool Holder - X1 Series and P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e7effb01c6987880edc649df5b7b2e2a4b67b619ef001b7fd376fb0e3878e618",
+   "en": "Learn more about the replacement of the AP Board for P1S on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-p1s",
+    "title": "AP Board - P1S",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "44486ac2ea174b301adabcc0cd54e62cebbfae196e673f9fbf26ce1579a60253",
+   "en": "Learn more about the replacement of the AP Board for X1C Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-x1-series",
+    "title": "AP Board - X1C",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "81593562078ee339860ba9d4e0b8f0a3b0419b7b0dfb9353d5652537c5993c30",
+   "en": "AP Board - X1 Series",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-x1-series",
+    "title": "AP Board - X1C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa8d23d3b8187f05d86b7dd2cdb817e9271c2e71124521c5f54f482a26928374",
+   "en": "Learn more about the replacement of the LED Light for P1 series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-p1-series",
+    "title": "LED Light - P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c394af549bb08e916f30a1d5652d17ef7d0d9ef104a6656efc4ff5149b6bef62",
+   "en": "Learn more about the Printer Cable Pack (7-in-1) on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "40eadfa8eeca3dbd39a3f4095f3726ef8c133405a71efb871d94843ff8b6006a",
+   "en": "Black, White, Gray",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أسود، أبيض، رمادي",
+    "ckb": "ڕەش، سپی، خۆڵەمێشی"
+   }
+  },
+  {
+   "h": "49d66be4da6bc83b8942ca081cb01dcbac9f3f4365981697994779c6268b39f1",
+   "en": "MC-AC Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "82c7e9d385c4a75815eb55652cf2a79f04ea3627cbd45f7079b358b993550f3c",
+   "en": "Emergency Stop Button Detection Hall Board Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b4b584372f1d812ac28750278536f309adb35f62924b455c6495da6fe885e4e",
+   "en": "Left Side Panel Hall Sensor Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c582c714a5ed19479e264f281f4fb25fc0645751a0d558df9cb4d01c0b4fe0e1",
+   "en": "Right Side Panel Hall Sensor Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ef30d32dce0152efd9b57575b376fd9176d89cba6680e9bde5560e84affca7b",
+   "en": "MC Board Power Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "64420df7acd6d5aef14ed673056178049d968a7e3aa47a3e51ed914dfc2d5315",
+   "en": "4-Pin Interface Board Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a4126f7d217386b4cd9a9e43e0b55f51433f1ae8977c86e8bd27943071fd1aa",
+   "en": "Buffer Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a947f51654e3dc08d7cb2d9b1a10e755019e1dd6133d24442d4c81c39e288ae2",
+   "en": "Learn more about Part Cooling Fan Air Duct on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "part-cooling-fan-air-duct",
+    "title": "Part Cooling Fan Air Duct",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "70d6b8c7343fbfa6c0ee18c5b57453465dd7ad2ac4d9dfc7893409125d1ab3a9",
+   "en": "Plastic kg",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "part-cooling-fan-air-duct",
+    "title": "Part Cooling Fan Air Duct",
+    "field": "specs[package.weight]",
+    "near": "Package weight"
+   },
+   "dict": null
+  },
+  {
+   "h": "e8b35dd7a1ad9ed18215bf4a6ecf5fe3dbf27900e12c40c523c1be9912c747e4",
+   "en": "BT3-8 Screw",
+   "kind": "box_item",
+   "freq": 30,
+   "context": {
+    "handle": "part-cooling-fan-air-duct",
+    "title": "Part Cooling Fan Air Duct",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d1b563e56486fe15cefd4d0c60f1c49ef08cd54c50198a503985ad8579c9848",
+   "en": "Learn more about H2D TH Board on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-h2-series",
+    "title": "TH Board - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about H2S TH Board on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "08a068e3afe3dd6b9d1ad8d6e672901eb2ceb39e96459da881caebf9fc34fa4e",
+   "en": "Learn more about H2S TH Board on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-h2-series",
+    "title": "TH Board - H2 Series",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about H2D TH Board on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "d5a828159a0848c9ebaa7c3494c93dda369385c14e9f7366acc847957ea37879",
+   "en": "Learn more about H2C TH Board on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-h2-series",
+    "title": "TH Board - H2 Series",
+    "field": "usage[0].body.line[2]",
+    "near": "Learn more about H2S TH Board on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "2a6df65ba9974e52f32dd2a4231da84268d263355a56158de1e0baf94fdfe940",
+   "en": "Circuit board",
+   "kind": "spec_value_text",
+   "freq": 9,
+   "context": {
+    "handle": "th-board-h2-series",
+    "title": "TH Board - H2 Series",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4df2c6d470d416d52eb52904409a8d454039d60980a9d33e07f6e59d1375430",
+   "en": "BT2.6-8 Screw",
+   "kind": "box_item",
+   "freq": 8,
+   "context": {
+    "handle": "th-board-h2-series",
+    "title": "TH Board - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "179ae3bd0bc8a2549d02997b06b2e8234512775f1d2a80ab53c8d619c15d214f",
+   "en": "Thermal Paste (5g)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-h2-series",
+    "title": "TH Board - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f722b0b1a356373a148bb682cfec78e71345632926e11b514c25e9f02417ea13",
+   "en": "Learn more about H2D and H2C Purge Wiper on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-h2-series",
+    "title": "Purge Wiper - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about H2S Purge Wiper on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "357fbcf12d4231321aa7fe8c24e884fac6e38a777ce6baba201075a3fffbb3d5",
+   "en": "Learn more about H2S Purge Wiper on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-h2-series",
+    "title": "Purge Wiper - H2 Series",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about H2D and H2C Purge Wiper on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "5f0084736506bea1e6137b00e727571d097e922f9208d17bb64d37d82a263307",
+   "en": "Black, Gray",
+   "kind": "spec_value_text",
+   "freq": 7,
+   "context": {
+    "handle": "purge-wiper-h2-series",
+    "title": "Purge Wiper - H2 Series",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أسود، رمادي",
+    "ckb": "ڕەش، خۆڵەمێشی"
+   }
+  },
+  {
+   "h": "b2bb9a40c9a8ace4e0dddf2339937e204a3df12017c3cf571a8f943422ee9726",
+   "en": "Learn more about H2D/H2C USB-C Cable Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "usb-c-cable-h2-series",
+    "title": "USB-C Cable - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about H2S USB-C Cable Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "07ebd0d10f8920103e49d7139032582b61cd8f388a97aee5bff9dd880868da6c",
+   "en": "Learn more about H2S USB-C Cable Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "usb-c-cable-h2-series",
+    "title": "USB-C Cable - H2 Series",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about H2D/H2C USB-C Cable Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "1e778e54c10c879cfd2ec12dd552fd519b64a095f04911a7c84e8db5d2296cff",
+   "en": "USB-C Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "usb-c-cable-h2-series",
+    "title": "USB-C Cable - H2 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "575a0f8a8f8dffae2f7e40f7b64921e756def865c40c41468ac620a6e850a3bd",
+   "en": "Learn more about Toolhead to MC Board Cable on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-to-mc-board-cable-h2d-h2c",
+    "title": "Toolhead to MC Board Cable - H2D/H2C",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cc5625f9b48ca3ecc67a3cca244bc401013d80f0657c6ea1e2051bc896ec255f",
+   "en": "Toolhead to MC Board Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-to-mc-board-cable-h2d-h2c",
+    "title": "Toolhead to MC Board Cable - H2D/H2C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d23b4a9128c71e2ec20e60c44aaa816d75bf4e11458d8807bb65089a6c6273df",
+   "en": "Learn more about the Anti-Vibration Feet on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet-h2-series",
+    "title": "Anti-Vibration Feet - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "72580753a8c5f310a9ef311803202843f86c07ea44a48c09ce9dcb8155e822cf",
+   "en": "Gasket",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "anti-vibration-feet-h2-series",
+    "title": "Anti-Vibration Feet - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1341909473846bad1a11809258177fe22b9ff90d0d40108e76d9ad7923ee33b7",
+   "en": "Learn more about H2D and H2C Cooling Fan for Hotend on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cooling-fan-for-hotend-h2",
+    "title": "Cooling Fan for Hotend - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about H2S Cooling Fan for Hotend on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "eec33149d11886a28cc6b638b316006b07fcbfcd049a71572cc3ec11cf5d7f3c",
+   "en": "Learn more about H2S Cooling Fan for Hotend on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cooling-fan-for-hotend-h2",
+    "title": "Cooling Fan for Hotend - H2 Series",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about H2D and H2C Cooling Fan for Hotend on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "2b22a310d464235b2cdcff062741afb17bcbb7a8a23247a095cc3084832a547f",
+   "en": "Cooling Fan for Hotend",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "cooling-fan-for-hotend-h2",
+    "title": "Cooling Fan for Hotend - H2 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "439ee94bdf24e89409e5e3987d60479f89150668df24942c23bb898ee4d6838b",
+   "en": "M2.5-8 Screw",
+   "kind": "box_item",
+   "freq": 7,
+   "context": {
+    "handle": "cooling-fan-for-hotend-h2",
+    "title": "Cooling Fan for Hotend - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f09514c6642ff5a0b020056775e64ac8fad8bd481d2b85fc3b7dbaa28bc4ff8",
+   "en": "BT2-4 Screw",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "cooling-fan-for-hotend-h2",
+    "title": "Cooling Fan for Hotend - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6790556179c5678b2196ef6af9c1da25f4e9d583aa3fcf8eb7c3f837466106cc",
+   "en": "Learn more about XY Motor on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "xy-motor-h2-series",
+    "title": "XY Motor - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "db2963883b9a494929f5d8bb3b5e69f8535e8887b8a6c8b60c1911fb9936fa32",
+   "en": "M3-6 Screw",
+   "kind": "box_item",
+   "freq": 12,
+   "context": {
+    "handle": "xy-motor-h2-series",
+    "title": "XY Motor - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbae1b1a1268e92d2cdb63d3fd3274fb255a13c41d1737056a2ec7b88e969d36",
+   "en": "M3-6 Screw*2（These two screws have different thread adhesives.）",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-motor-h2-series",
+    "title": "XY Motor - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d55a46353465422b0b7a6ef3f42b1959e011e819f45fa956ec1aa5cc8c858ee5",
+   "en": "Learn more about Hotend Cooling Fan Air Duct on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-cooling-fan-air-duct",
+    "title": "Hotend Cooling Fan Air Duct",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c37f7c0f5c192ebf2436ee27cc4eee309049d86f8cdbb6cfeecbf63fe25d7d0f",
+   "en": "M2-5 Screw",
+   "kind": "box_item",
+   "freq": 10,
+   "context": {
+    "handle": "hotend-cooling-fan-air-duct",
+    "title": "Hotend Cooling Fan Air Duct",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "dfa746ed09c8b112a04e708a51f67daa70dcd385d3255974e6d16c30876c894c",
+   "en": "Learn more about Nozzle Blocker Magnet Bracket on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-blocker-magnet-bracket-h2d-h2c",
+    "title": "Nozzle Blocker Magnet Bracket - H2D/H2C",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1bcc474be09f93d1654e16031bd09f2ccb009e71fc7277cb07aee6ba9b176337",
+   "en": "Nozzle Blocker Magnet Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-blocker-magnet-bracket-h2d-h2c",
+    "title": "Nozzle Blocker Magnet Bracket - H2D/H2C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad7b295ce062ce7215851bdc5fcd27ceb4df80e3d0b0c1e1db6f171f2aefbbde",
+   "en": "Learn more about Z Motor Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-motor-h2-series",
+    "title": "Z Motor - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c3b4b45eb94bc504392cb1c51ac883cb866cb4c777c9507eee127baa6858739d",
+   "en": "M3-8 Screw",
+   "kind": "box_item",
+   "freq": 9,
+   "context": {
+    "handle": "z-motor-h2-series",
+    "title": "Z Motor - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "886a39397177dfab31fa1880762a557f63900df1f2b7b08ef147dc44a4797f07",
+   "en": "Learn more about Nozzle Camera on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-camera",
+    "title": "Nozzle Camera",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6af287a9483b3539af59d982a45f3fb94f9a361c067d83d5ad22956e6574959c",
+   "en": "Learn more about XY Belt Tensioner on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-h2-series",
+    "title": "XY Belt Tensioner - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "123b6d6e1725f05d66c118b14a14bff0b89b5b747f130d13243dd6de85da8e52",
+   "en": "Tensioner Pulley Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-h2-series",
+    "title": "XY Belt Tensioner - H2 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9256e39afc544aa46fc31320c892b27e61aba14bd280095636731b5bade5a7b0",
+   "en": "Tensioner Pulley Plate",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-h2-series",
+    "title": "XY Belt Tensioner - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe8120ba59e32e343ce3f1bc740f813cdc53c57e4d1e77b76b11f3d4890297bb",
+   "en": "Tensioner Pulley Slider",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-h2-series",
+    "title": "XY Belt Tensioner - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4cb66aa3b922c10acc890396bc7ddf4540076f0574688698528fd5da5f1d224",
+   "en": "Tensioner Pulley Spring",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-h2-series",
+    "title": "XY Belt Tensioner - H2 Series",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "21fc19edb867c00bc71c34f2f324207f92ddcb4f931f9416d6b3d1507c6f9c1d",
+   "en": "Learn more about H2D/H2C Toolhead Camera on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-camera-h2-series",
+    "title": "Toolhead Camera - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about H2S Toolhead Camera on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "3fda38b2ae34fb4913dba05520f148617a1ef92f6a9e75b2398a4b9402de4549",
+   "en": "Learn more about H2S Toolhead Camera on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-camera-h2-series",
+    "title": "Toolhead Camera - H2 Series",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about H2D/H2C Toolhead Camera on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "fbff342c1b889d0b4f7d066318192540e9e3aa5adfd7e64f79f0ec4446e53592",
+   "en": "Toolhead Camera",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "toolhead-camera-h2-series",
+    "title": "Toolhead Camera - H2 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "acb44999d818f920bb8ce035962045ebc6416a9f718160a3658e503643d85e2c",
+   "en": "Learn more about Dual Extruder Unit for H2D on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-unit-h2d-h2c",
+    "title": "Dual Extruder Unit - H2D/H2C",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about Dual Extruder Unit for H2C on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "d97a3524ae18d6e8a80b0c266303db3fd96765ad81b1b4d37591d9dd74bc7c80",
+   "en": "Learn more about Dual Extruder Unit for H2C on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-unit-h2d-h2c",
+    "title": "Dual Extruder Unit - H2D/H2C",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about Dual Extruder Unit for H2D on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "732e27aa4d19a1f6ae324bf8217f37c035ba1c2c20e81022be9af0d0e0d321a9",
+   "en": "Dual Extruder Unit",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-unit-h2d-h2c",
+    "title": "Dual Extruder Unit - H2D/H2C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "419e9bac842e83be359bede20d94e187d7b1eefbba7bcbcd0ba1215a1cfee423",
+   "en": "Learn more about X-Axis Idler Pulley on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-idler-pulley-h2-series",
+    "title": "X-Axis Idler Pulley - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "12b36731fd60203d07e3d2ef953dc7a6ae51b430c3b638c6577d3e5d0d43e951",
+   "en": "X-Axis Idler Pulley",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-idler-pulley-h2-series",
+    "title": "X-Axis Idler Pulley - H2 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "38bd46631ea1c60ec23cfcbd82301ef3153f9ae5b668aa9a1a602ca559940dc4",
+   "en": "X-Axis Idler Shaft",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-idler-pulley-h2-series",
+    "title": "X-Axis Idler Pulley - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5bca089f85804a461aba3611104a0e55796e4700b26545be9d6a35816667c4c",
+   "en": "Graphite Gasket",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-idler-pulley-h2-series",
+    "title": "X-Axis Idler Pulley - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "88a06e269ddab4a36ecb1690adc562e889600737c28f60a0ddb40c2a172b1802",
+   "en": "Learn more about the Dual Extruder Filament Guide for H2D on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-filament-guide",
+    "title": "Dual Extruder Filament Guide",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about the Dual Extruder Filament Guide for H2C on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "7a75ba7c3ed7b4465ff522a68897ac7ad9001fe42ea0e90eb1bb26b447e63740",
+   "en": "Learn more about the Dual Extruder Filament Guide for H2C on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-filament-guide",
+    "title": "Dual Extruder Filament Guide",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about the Dual Extruder Filament Guide for H2D on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "8b94573e139aee26984bdae1cd65ab0bc97b0d852e78aa7176a1aff585190f2a",
+   "en": "BT2-6 Screw",
+   "kind": "box_item",
+   "freq": 11,
+   "context": {
+    "handle": "dual-extruder-filament-guide",
+    "title": "Dual Extruder Filament Guide",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0ec1752c823659aa8874cbc3b872df09d975e7df4dab2dc73217c1c9c1b7080",
+   "en": "M2.5-7 Screw",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "dual-extruder-filament-guide",
+    "title": "Dual Extruder Filament Guide",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f32d1d8b45100907d96101dd99aefe5b4163b6c409401682bbb15e88cb8439f0",
+   "en": "M2.5x7 Screw",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "dual-extruder-filament-guide",
+    "title": "Dual Extruder Filament Guide",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7c65e86f0969f55e53dc5a2c836f8e69f57abc1b03fd7e7c87b031a00a013d9",
+   "en": "Filament cutter",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-filament-guide",
+    "title": "Dual Extruder Filament Guide",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c62f4fa34302c79d8a57afd13dbea4360e4fa9615806ea9d1627be464e794265",
+   "en": "Learn more about Quick Change Tool Interface for H2D on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "quick-change-tool-interface-h2d-h2c",
+    "title": "Quick Change Tool Interface - H2D/H2C",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about Quick Change Tool Interface for H2C on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "6c2147c71e4019510649cc2d343859346bc2c7fe8fb08fafcefd5a36190b49ec",
+   "en": "Learn more about Quick Change Tool Interface for H2C on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "quick-change-tool-interface-h2d-h2c",
+    "title": "Quick Change Tool Interface - H2D/H2C",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about Quick Change Tool Interface for H2D on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "60e567bf7379aecd085843ed18b4958eeedcc4ccf0840e3bbb0948a02efa729e",
+   "en": "Quick Change Tool Interface",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "quick-change-tool-interface-h2d-h2c",
+    "title": "Quick Change Tool Interface - H2D/H2C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc8c2dcc1a039ddbbce2ae857e88725ba6b68f11479345a2d6e7389744ef9b92",
+   "en": "Learn more about Dual Extruder Idlers and Filament Sensor on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-idlers-and-filament-sensor",
+    "title": "Dual Extruder Idlers and Filament Sensor",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3eac6cf1c300636a837df50906173aab73e18a36cf563b31e69c8a26ef7a0df9",
+   "en": "MG2.5-19.5 Screw",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "dual-extruder-idlers-and-filament-sensor",
+    "title": "Dual Extruder Idlers and Filament Sensor",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad83e747d82c47991d91fc3e46acd7d349bc31029347ae9f9f6ad76d4d6cc5a9",
+   "en": "Learn more about Regular Idler Pulley on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "regular-idler-pulley",
+    "title": "Regular Idler Pulley",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cf83fa05f229e14ca5029a9c0a98822eff064d31f6ac1e3354ee1f25b5996040",
+   "en": "Idler Shaft",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "regular-idler-pulley",
+    "title": "Regular Idler Pulley",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "85888efb94a1d3fc86865ae316a834e64642fec709d5e97be16edcdf502213aa",
+   "en": "Tensioner Idler Shaft",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "regular-idler-pulley",
+    "title": "Regular Idler Pulley",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "837987d71b2482538f26e85dc171d6fafecafccb9338547a8255c54d4c134cea",
+   "en": "Learn more about the Dual Extruder Gears on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-gears",
+    "title": "Dual Extruder Gears",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "288a0ec504b05846ce95217427be46cfa7345c23dead1daca227cd133c5e63e8",
+   "en": "Learn more about the H2 PTFE Tube Coupler on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "h2-ptfe-tube-coupler",
+    "title": "H2 PTFE Tube Coupler",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6582f2b4cffe65e84faac5e6cbc1f3a8576c8d3d5c48f57dfdcc7e3dc71a5339",
+   "en": "BT3-5 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "h2-ptfe-tube-coupler",
+    "title": "H2 PTFE Tube Coupler",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "17d75fbceb279a2e8987f3d9da254c0ffb56a546042cd0e801342a8f93724f6f",
+   "en": "Learn more about H2D/H2C XY Belt on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-h2-series",
+    "title": "XY Belt - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about H2S XY Belt on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "f68e9c96f5624ebec47bbe8358bee69f759d71b57c75e07bfdcc248bebc07c0f",
+   "en": "Learn more about H2S XY Belt on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-h2-series",
+    "title": "XY Belt - H2 Series",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about H2D/H2C XY Belt on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "444dbfc9dfe9861370c2e1ad7a4dc20c453b67e15787cfa0487184b45860efac",
+   "en": "Belt Fixing Block",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "xy-belt-h2-series",
+    "title": "XY Belt - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0f4be0982d839ca54e1a59f7e717b7b7b8b09049af284822bb2b9c46741225a9",
+   "en": "Belt Fixing Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-h2-series",
+    "title": "XY Belt - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e77556f7688c6ce17ffbcbbad7551c29d4141e2315b19935afbc13359516e62d",
+   "en": "Belt Fixing Block (Left)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-h2-series",
+    "title": "XY Belt - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a21b363bcda604c43e58fc95a9ae5b9aaf8b0d3babea2f76b8c82b5297dcce4",
+   "en": "Belt Fixing Block (Right)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-h2-series",
+    "title": "XY Belt - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "15d3f3d1a52f2726098209856c698522bbf85cc6069c115022735f0218032296",
+   "en": "Belt Tensioning Block",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-h2-series",
+    "title": "XY Belt - H2 Series",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a663cd3d81fb6f7008da01bf3688444974e7a3e69f23e95876e43161728a9835",
+   "en": "Learn more about Z Belt on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt-h2-series",
+    "title": "Z Belt - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9ee901c032c22e14043baddd6a0277768433b242f70b836fc1c6d0b02fe4a2d3",
+   "en": "Z-axis synchronizer wheel",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt-h2-series",
+    "title": "Z Belt - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a5564c9346dcd8c0a91264d42346c971dd7cdb4ce96a4d8d1e819183b6a9dbc",
+   "en": "Learn more about H2D/H2C X-Axis Assembly on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": "Learn more about H2S X-Axis Assembly on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "7e39ad1cf5ccb028fffb0ee1e6fab05fe0da2700fc241276a157b189cf96669b",
+   "en": "Learn more about H2S X-Axis Assembly on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "usage[0].body.line[1]",
+    "near": "Learn more about H2D/H2C X-Axis Assembly on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "cbb3575f938c1ccd5f6d8e0614cde24f1525307ca49a42a1647d728b027153b8",
+   "en": "X-Axis Assembly",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "04694c0e98125f226570968297225f9fa6d435c2438d67cdab839b1e5fe7fe4b",
+   "en": "H2.0 Hex Wrench",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "46772aacb76deeab7654eccbefe1b63b5f122ba91a190e570fc94f3cbd1c50da",
+   "en": "Screw driver",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9e942bba4907bbc50c0eac76347a680907fa2cb487dbe09e550e250e8376400",
+   "en": "Screws Kit",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "97f466e194a8819141f78cc65f88e56723b951db6689092efd0413032de724cc",
+   "en": "H2.0 Hex Wrench*1（short）",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d10cfc0767dc7d4a54ee4286e2d7a39206e29e6ce96a878c5933ed1184a248d4",
+   "en": "H2.0 Hex Wrench*1（long）",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e07663637ebcf7d99e44b517b9a5fe398a57f4f9c468082a78193771ab8ec5b4",
+   "en": "M3x6 Screw",
+   "kind": "box_item",
+   "freq": 8,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b9e0ccf7ec9f0e0ddfb50fdbaa83e4cc794c31e864b209cf91e06ff9f24c335",
+   "en": "BT2x5 Screw",
+   "kind": "box_item",
+   "freq": 21,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "02c5541de12b09e1387997c2c086e75e1db7d5252c6bbe98da3854437c0485ad",
+   "en": "BT3x8 Screw",
+   "kind": "box_item",
+   "freq": 10,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "759c870a186590f3e3d141b6a96042ca7c40041134620f67a981eee684361980",
+   "en": "M3x8 Screw",
+   "kind": "box_item",
+   "freq": 6,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7666cf2e71ec544f451e40a558bf5217cf6c7ce4d6855ccdeedd2665a032c392",
+   "en": "Learn more about the Front Glass Door on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "front-glass-door-h2-series",
+    "title": "Front Glass Door - H2 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c2410b3e40215be3da2786f7ffcd5f4d139d054e96cd7bbf5be43eff482a11be",
+   "en": "Transparent gray",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "front-glass-door-h2-series",
+    "title": "Front Glass Door - H2 Series",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": null
+  },
+  {
+   "h": "27941ef8cbb1e07d8dbb44b04b6ad289368c4fee43194bb31ecd6720db5c4ae0",
+   "en": "Door Hinge Silicone Pad (Pre-installed on the Front Door)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "front-glass-door-h2-series",
+    "title": "Front Glass Door - H2 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "14b4aab8808fb4b87c0454abfe7e15c47117bc8403c2ad88b8e4930545862338",
+   "en": "M3-3 Screw",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "front-glass-door-h2-series",
+    "title": "Front Glass Door - H2 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+const P = '/home/user/levonis-curated/packages/catalog/src/bambuImport';
+const { extractPage } = await import(`${P}/extract.ts`);
+const { buildImportPayload } = await import(`${P}/payload.ts`);
+const { extractionFingerprint } = await import(`${P}/fingerprint.ts`);
+const [, , htmlPath, out] = process.argv;
+const html = gunzipSync(readFileSync(htmlPath)).toString('utf8');
+const x = extractPage(html).extraction;
+const manifest = JSON.parse(readFileSync('/home/user/Levonis/docs/bambu-import/p0/manifest.json', 'utf8'));
+const row = manifest.rows.find((r: any) => r.handle === 'bambu-hotend-a1-a2');
+const targets = JSON.parse(readFileSync('/home/user/Levonis/docs/bambu-import/p0/compat-targets.json', 'utf8'));
+const overrides = JSON.parse(readFileSync('/home/user/Levonis/docs/bambu-import/p0/media-overrides.json', 'utf8')).overrides;
+const build = buildImportPayload({ extraction: x, writeMode: 'create', extractionSha256: extractionFingerprint(x), manifestRow: row, identity: null, targets, overrides, retrievedAt: '2026-10-16T00:00:00Z' });
+writeFileSync(out, JSON.stringify({ extraction: x, payload: build.payload, report: build.report }, null, 1));
+console.log('ok', x.sourceProductId, x.handle, x.title);

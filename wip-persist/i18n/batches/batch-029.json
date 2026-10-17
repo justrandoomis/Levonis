@@ -1,0 +1,3262 @@
+{
+ "batch": 29,
+ "surface": "api",
+ "handles": [
+  "3mm-black-walnut-plywood-6pcs",
+  "2mm-cork-sheet-4pcs",
+  "3mm-bamboo-board-6pcs",
+  "bambu-stainless-steel-tag",
+  "black-aluminium-card-10pcs",
+  "250g-cardstock-25pcs",
+  "bambu-matte-heat-transfer-vinyl",
+  "carbon-fiber-textured-removable-vinyl-10pcs",
+  "light-gray-reflective-decal-sheet-5pcs",
+  "transfer-tape-10pcs",
+  "pebbled-pu-leatherette-fabric",
+  "pearlescent-white-greeting-card-set-ye004",
+  "rectangular-pu-iron-on-patch",
+  "matte-removable-vinyl-10pcs",
+  "bambu-opaque-glossy-acrylic-sheet",
+  "a4-200g-kraft-paper-25pcs",
+  "chrome-foil-heat-transfer-vinyl-10pcs",
+  "bambu-sapele-plywood",
+  "3mm-laser-plywood-bamboo-trial-kit-30pcs",
+  "laser-material-kit-–-starter-pack-for-h-series",
+  "white-matte-printable-vinyl-sticker-paper-25pcs",
+  "cutting-material-kit-–-starter-pack",
+  "2-5d-framed-blueprint-pacific-clipper",
+  "2mm-basswood-plywood-6pcs",
+  "black-square-stone-slate-coasters-4pcs",
+  "material-mystery-box",
+  "winter-cottage-led-lamp",
+  "wooden-desktop-pinball",
+  "ultimate-opaque-glossy-acrylic-kit",
+  "round-pu-leather-patch-sticker"
+ ],
+ "strings": [
+  {
+   "h": "d4bf6fdadc36600dc75c7858172f2458c586b8335033158f731e18585af6e4ac",
+   "en": "Bambu Black Walnut Plywood",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-black-walnut-plywood-6pcs",
+    "title": "3mm Black Walnut Plywood (6pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Unique for its dark-colored aesthetics, Bambu Black Walnut Plywood, with its natural, flowing grain patterns, is perfect for elegant designs. With a smooth and "
+   },
+   "dict": null
+  },
+  {
+   "h": "2b02ed5243d61d62ff950d2c2fea0e51fb0892c9b4062e4f2730aaf0d03f5fc1",
+   "en": "*E0 Glue refers to extremely low (not more than 0.5 mg/L ) of formaldehyde and can be termed to be the best grade.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-black-walnut-plywood-6pcs",
+    "title": "3mm Black Walnut Plywood (6pcs)",
+    "field": "blocks[0].line[2]",
+    "near": "Unique for its dark-colored aesthetics, Bambu Black Walnut Plywood, with its natural, flowing grain patterns, is perfect for elegant designs. With a smooth and "
+   },
+   "dict": null
+  },
+  {
+   "h": "cdce47e59e5fa40072a6134c68da61298f2f4cd68a563479e06aa540f3ce848e",
+   "en": "Dark-Colored Aesthetics for Classic Decor",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-black-walnut-plywood-6pcs",
+    "title": "3mm Black Walnut Plywood (6pcs)",
+    "field": "blocks[3].line[0]",
+    "near": "Bambu Black Walnut Plywood is ideal for high-end home decor and furnishings, such as display shelves, clocks, lamps, chess sets, mechanical gearbox and customiz"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6cf4dd0f702f2c4d5c3daa615011053d4ee3dfb81466b3772bd30ea26dde788",
+   "en": "Bambu Black Walnut Plywood is ideal for high-end home decor and furnishings, such as display shelves, clocks, lamps, chess sets, mechanical gearbox and customized artwork like bookmarks, intricate accessories and handbags.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-black-walnut-plywood-6pcs",
+    "title": "3mm Black Walnut Plywood (6pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Dark-Colored Aesthetics for Classic Decor"
+   },
+   "dict": null
+  },
+  {
+   "h": "774d1b54b4beed00eed5e8063970db26a973abc864d15e558c066ca86b8222b8",
+   "en": "Narrow the tolerance and boost the precision compared to existing products. Bambu Black Walnut Plywood significantly reduces the need for size adjustments, making assembly effortless from the first try.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-black-walnut-plywood-6pcs",
+    "title": "3mm Black Walnut Plywood (6pcs)",
+    "field": "blocks[4].line[1]",
+    "near": "Fit Snugly, Right the First Time"
+   },
+   "dict": null
+  },
+  {
+   "h": "7edbc7c9ff14cb0683a33161c4d942f06ed5d9dd25a6245a3907fa02ad0f959c",
+   "en": "When not in use, store the plywood in its original sealed bag to maintain a stable moisture level. The sealed bag helps slow down both moisture absorption and moisture loss, reducing the risk of deformation caused by humidity changes.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "3mm-black-walnut-plywood-6pcs",
+    "title": "3mm Black Walnut Plywood (6pcs)",
+    "field": "blocks[6].line[2]",
+    "near": "• Ensure that a person is always present to closely monitor the machine throughout the laser engraving and cutting process."
+   },
+   "dict": null
+  },
+  {
+   "h": "fb446cd7276b3e906aa0341dc7c8107a4a14485e18f50e1223756d19568f7349",
+   "en": "Dark-Colored Aesthetics",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-black-walnut-plywood-6pcs",
+    "title": "3mm Black Walnut Plywood (6pcs)",
+    "field": "blocks[7].line[5]",
+    "near": "• Designed for Laser Cutting and Engraving"
+   },
+   "dict": null
+  },
+  {
+   "h": "2f45bb847ea21f0911436f0302008581fa3e0ba47fbe4be79c43ee924b001627",
+   "en": "Bambu Cork Sheet is easy to cut and customize. With excellent water absorption and thermal insulation properties, it's perfect for customizing, from DIY crafts to functional use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-cork-sheet-4pcs",
+    "title": "2mm Cork Sheet (4pcs)",
+    "field": "blocks[0].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ae0b55c1ac73f59c7ca865fb61e3c7b281c1a45c5dc1c9241a9f523b28a796b8",
+   "en": "Easy to Cut and Engrave",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-cork-sheet-4pcs",
+    "title": "2mm Cork Sheet (4pcs)",
+    "field": "blocks[1].line[0]",
+    "near": "Bambu Cork Sheet is perfect for a variety of applications, from DIY crafts and home decor to functional items like coasters and bulletin boards. Effortlessly pa"
+   },
+   "dict": null
+  },
+  {
+   "h": "88c4958ff5a5c9fdd697de919c41a1bc43fcddef21284f8b3fed13e65a5c720a",
+   "en": "Bambu Cork Sheet is perfect for a variety of applications, from DIY crafts and home decor to functional items like coasters and bulletin boards. Effortlessly paint or cut Bambu Cork Sheet to fit your creative needs, making customization a breeze.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-cork-sheet-4pcs",
+    "title": "2mm Cork Sheet (4pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Easy to Cut and Engrave"
+   },
+   "dict": null
+  },
+  {
+   "h": "bdab8e51a98dc28c46808d8c23942488e67ad5d3304a6116f100ad4ed799d427",
+   "en": "Water Absorption & Thermal Insulation",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-cork-sheet-4pcs",
+    "title": "2mm Cork Sheet (4pcs)",
+    "field": "blocks[2].line[0]",
+    "near": "Bambu Cork Sheet stands up to heat and water, making it a reliable choice for a wide range of applications. Whether you're creating coasters for hot beverages, "
+   },
+   "dict": null
+  },
+  {
+   "h": "583d31bfa0b11a1e9710b1e69c838bbb1fc602f679625accca9a4d979e5d37bf",
+   "en": "Bambu Cork Sheet stands up to heat and water, making it a reliable choice for a wide range of applications. Whether you're creating coasters for hot beverages, crafting kitchen accessories, or designing outdoor decor, this cork sheet maintains its integrity and durability.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-cork-sheet-4pcs",
+    "title": "2mm Cork Sheet (4pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Water Absorption & Thermal Insulation"
+   },
+   "dict": null
+  },
+  {
+   "h": "9fbf2591a557b55cb30b7241e7d2fd0914a60d96c544c13d4f87fb70f8169e9a",
+   "en": "Ensure proper ventilation in the processing environment and consider using a high-efficiency air purification system for optimal air quality.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "2mm-cork-sheet-4pcs",
+    "title": "2mm Cork Sheet (4pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e5b9a9e379f619038ae17e680d5261ae4fc9165fe98d3eb106a0545de7be54a",
+   "en": "Just close the printer door, and you're good to go. CodeSync instantly syncs Bambu Board data in seconds. Say goodbye to digging through complex databases and hello to instant creation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-bamboo-board-6pcs",
+    "title": "3mm Bamboo Board (6pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Sync in Seconds, No More Tedious Searching"
+   },
+   "dict": null
+  },
+  {
+   "h": "748b2115a2dc9cf0cba74a86dd19b3fbe448b2fe689828af9ee51e23c9656ed4",
+   "en": "Bamboo Aesthetics for Everyday Items",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-bamboo-board-6pcs",
+    "title": "3mm Bamboo Board (6pcs)",
+    "field": "blocks[3].line[0]",
+    "near": "Bamboo Board is perfect for crafting bamboo calendars, bookmarks, ornaments, desktop clocks, business card holders, and stationery racks, adding bamboo accents "
+   },
+   "dict": null
+  },
+  {
+   "h": "46f5201fc161609534ecf3703da0cbdd27811b9fd37f943b74a0dc5e1f4dd8c8",
+   "en": "Bamboo Board is perfect for crafting bamboo calendars, bookmarks, ornaments, desktop clocks, business card holders, and stationery racks, adding bamboo accents to your everyday life.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-bamboo-board-6pcs",
+    "title": "3mm Bamboo Board (6pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Bamboo Aesthetics for Everyday Items"
+   },
+   "dict": null
+  },
+  {
+   "h": "0a77a040a80d6d67d5485259e664af2fe6d372550a901dc2e13925c6a916c2cf",
+   "en": "Made Entirely of Bamboo: Nature's Integrity Preserved",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-bamboo-board-6pcs",
+    "title": "3mm Bamboo Board (6pcs)",
+    "field": "blocks[5].line[0]",
+    "near": "Our bamboo board is crafted entirely from solid bamboo. This preserves the material's innate integrity, creating surfaces with uninterrupted grain patterns and "
+   },
+   "dict": null
+  },
+  {
+   "h": "3ba4d0b89f90a13f70700ed3a94eb4ae828b4cce324e8a982cd452a1e784733f",
+   "en": "Our bamboo board is crafted entirely from solid bamboo. This preserves the material's innate integrity, creating surfaces with uninterrupted grain patterns and a harmonious tactile experience - ideal for crafting premium storage boxes, displays and decorative pieces.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-bamboo-board-6pcs",
+    "title": "3mm Bamboo Board (6pcs)",
+    "field": "blocks[5].line[1]",
+    "near": "Made Entirely of Bamboo: Nature's Integrity Preserved"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e0e0854bd6f8ab7ee5c1e5b5f0f52e07be86c123d98d6f25b1c2c750e90690d",
+   "en": "Click here to get more information about materials for the laser module.",
+   "kind": "block_line",
+   "freq": 7,
+   "context": {
+    "handle": "3mm-bamboo-board-6pcs",
+    "title": "3mm Bamboo Board (6pcs)",
+    "field": "blocks[7].line[3]",
+    "near": "• When not in use, store the plywood in its original sealed bag to maintain a stable moisture level. The sealed bag helps slow down both moisture absorption and"
+   },
+   "dict": null
+  },
+  {
+   "h": "b774d42b1ff196daefa4036fb7a3adf8ed332b1d22678a757e2b57118dddfad6",
+   "en": "Made Entirely of Bamboo",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-bamboo-board-6pcs",
+    "title": "3mm Bamboo Board (6pcs)",
+    "field": "blocks[8].line[3]",
+    "near": "• Precise thickness: 3±0.2 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "30829c39c776938c3435ec216300c630fcfa1e55a835147d12db19b3bc32bc26",
+   "en": "Store bamboo boards in sealed bags when not in use to avoid deformation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-bamboo-board-6pcs",
+    "title": "3mm Bamboo Board (6pcs)",
+    "field": "blocks[8].line[7]",
+    "near": "• Natural wood grain may vary slightly between pieces"
+   },
+   "dict": null
+  },
+  {
+   "h": "b030ef3ea2ab50e1e95be1ac2ba916ae8a809298c8e5d260e116f05f5dd110c7",
+   "en": "High Quality",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-stainless-steel-tag",
+    "title": "Round Stainless Steel Tag (5pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "The Bambu Stainless Steel Tag is highly resistant to fading and warping to ensure long-lasting quality and is non-toxic and pet safe. You can customize it with "
+   },
+   "dict": null
+  },
+  {
+   "h": "82f4d1c90b43b7ad9ebf77029fe4922516e28d24111dd5fa113e24b1ee438568",
+   "en": "DIY -- Tailored Just for You",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-stainless-steel-tag",
+    "title": "Round Stainless Steel Tag (5pcs)",
+    "field": "blocks[1].line[0]",
+    "near": "Make your own pendants with the Bambu Stainless Steel Tag—ideal for pet tags and necklaces. They also pair perfectly with Bambu Split Ring Keychains for practic"
+   },
+   "dict": null
+  },
+  {
+   "h": "e0482d5dac020e713c95ebde9755dfa0bf09ad947a1c094435e908a5d900c901",
+   "en": "Make your own pendants with the Bambu Stainless Steel Tag—ideal for pet tags and necklaces. They also pair perfectly with Bambu Split Ring Keychains for practical, stylish decorations.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-stainless-steel-tag",
+    "title": "Round Stainless Steel Tag (5pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "DIY -- Tailored Just for You"
+   },
+   "dict": null
+  },
+  {
+   "h": "f51bca6ae851ab1b8e426e32db83737145d4dcb9ff290c9251198a315037b1c4",
+   "en": "For processing this material, we strongly recommend using a Laser Grid Panel to ensure a smoother engraving process. If a Laser Grid Panel is unavailable, you can densely arrange Laser Slats Pack before laser engraving and place the stainless steel tag on top of them.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-stainless-steel-tag",
+    "title": "Round Stainless Steel Tag (5pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb73b541040f66a767b4efcde632cf8cb1c291fbd3db38b309771b53e31fbb33",
+   "en": "For more information, you can refer to Wiki.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-stainless-steel-tag",
+    "title": "Round Stainless Steel Tag (5pcs)",
+    "field": "blocks[2].line[2]",
+    "near": "• For processing this material, we strongly recommend using a Laser Grid Panel to ensure a smoother engraving process. If a Laser Grid Panel is unavailable, you"
+   },
+   "dict": null
+  },
+  {
+   "h": "f73058702fffde1d27d25b5c690b5570464e0101923a4780447f52f52aa14ad7",
+   "en": "Ensure that a person is always present to closely monitor the machine throughout the laser engraving process.",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-stainless-steel-tag",
+    "title": "Round Stainless Steel Tag (5pcs)",
+    "field": "blocks[2].line[3]",
+    "near": "• For more information, you can refer to Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "0400a510b53cf13baedc5ef6b26de9fe365a02752dd8bbf26967323f497400b2",
+   "en": "Before engraving it, please wipe down the stainless steel tag and keep it clean.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-stainless-steel-tag",
+    "title": "Round Stainless Steel Tag (5pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "9699f66687fe001f1365a9f5104927244ac31f3eeab1a197fdb9f08fd31c0264",
+   "en": "Engrave Your Own Card",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu Black Aluminum Card is designed for effortless engraving. Personalize it with your desired text or custom design to create a unique piece."
+   },
+   "dict": null
+  },
+  {
+   "h": "ef2a1e1756485180bbca2810d80600c0bad92f56847e931f05b7904599eabb53",
+   "en": "Multiple Colors Available",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "blocks[1].line[0]",
+    "near": "The Bambu Colored Aluminum Cards are designed to elevate any moment. From festive holiday greetings and elegant art exhibition invitations to thoughtful gifts a"
+   },
+   "dict": null
+  },
+  {
+   "h": "e8b4690009de00c19a2feebec7deb1d09fdd5ecc809f8905edb49815d062550b",
+   "en": "The Bambu Colored Aluminum Cards are designed to elevate any moment. From festive holiday greetings and elegant art exhibition invitations to thoughtful gifts and social gatherings, they add a tangible touch of sophistication. Choose your color and thickness to perfectly set the tone.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "blocks[1].line[1]",
+    "near": "Multiple Colors Available"
+   },
+   "dict": null
+  },
+  {
+   "h": "a42193561ea48ca7c79997511d055e2c2bf302ad233d553ba242a92a74aa2cda",
+   "en": "Built-to-Last Aluminum Alloy Cards",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "blocks[2].line[0]",
+    "near": "Made from aluminum alloy, Bambu Black Aluminum Card is corrosion-resistant, waterproof, and highly durable. Ideal for business cards, custom VIP cards, etc."
+   },
+   "dict": null
+  },
+  {
+   "h": "c036a7756d1e3af030c1081c699093b07b9e32607237dc9d9ecab90bc2f9ca24",
+   "en": "Made from aluminum alloy, Bambu Black Aluminum Card is corrosion-resistant, waterproof, and highly durable. Ideal for business cards, custom VIP cards, etc.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "blocks[2].line[1]",
+    "near": "Built-to-Last Aluminum Alloy Cards"
+   },
+   "dict": null
+  },
+  {
+   "h": "64eb7ac41229381e2799165ab436a5de2ef0f0d410ce2bb4eef28ef31757f052",
+   "en": "Before engraving it, please wipe down the metal card and keep it clean.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "blocks[3].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad435819a75a2577fd5a3ac35a424ba23e4a141ab1137649403eca06dab04648",
+   "en": "For processing this material, we strongly recommend using a Laser Grid Panel to ensure a smoother engraving process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "blocks[3].line[2]",
+    "near": "• Before engraving it, please wipe down the metal card and keep it clean."
+   },
+   "dict": null
+  },
+  {
+   "h": "c397fa8bc2c0d8bad55cf36b2243ca03f1dcc57e5ef2a7da1cc577f240a43be9",
+   "en": "Easy to Engrave and Customize",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "de348f9627457c47c50e956aaf1fc1b89b29a0c5468b8f01b2c8a75cc5e37567",
+   "en": "Long-Lasting Aluminum Alloy Cards",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "blocks[4].line[3]",
+    "near": "• Multiple Colors Available"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4cd7876b81523da631954e698ab0e3179678524e35c1256376ab86e17d56ebc",
+   "en": "Product Features",
+   "kind": "block_title",
+   "freq": 11,
+   "context": {
+    "handle": "250g-cardstock-25pcs",
+    "title": "250g Cardstock (25pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "• Easy to Cut and Paint: The moderate thickness and smooth surface make it easy to cut accurately without burrs and keep the edges neat after cutting. The smoot"
+   },
+   "dict": null
+  },
+  {
+   "h": "dfd950297ad6a952aec43a87e8dbea777937c6cd2d2450e6f35476c112e3ba52",
+   "en": "Easy to Cut and Paint: The moderate thickness and smooth surface make it easy to cut accurately without burrs and keep the edges neat after cutting. The smooth surface ensures a flawless paint finish.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "250g-cardstock-25pcs",
+    "title": "250g Cardstock (25pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2491843a08d531e462f5cca6067bec321da6974d3e2016b5f44dffd74c1e6c8",
+   "en": "High Flexibility: Suitable for folding and splicing, it performs well in making three-dimensional structures.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "250g-cardstock-25pcs",
+    "title": "250g Cardstock (25pcs)",
+    "field": "blocks[0].line[2]",
+    "near": "• Easy to Cut and Paint: The moderate thickness and smooth surface make it easy to cut accurately without burrs and keep the edges neat after cutting. The smoot"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff9134d98e509db326594dde963c26cf7672e3e6390eb462ce4c4bc08321291a",
+   "en": "Versatile Application: Ideal for crafting premium invitations, decorative hangings, and artistic tags, offering both creativity and personalization.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "250g-cardstock-25pcs",
+    "title": "250g Cardstock (25pcs)",
+    "field": "blocks[0].line[3]",
+    "near": "• High Flexibility: Suitable for folding and splicing, it performs well in making three-dimensional structures."
+   },
+   "dict": null
+  },
+  {
+   "h": "7a44ada1091be7477bafa725b69212feedea4bb496f1511fd8aa9d6c5450fa20",
+   "en": "Click here to get more information about Safety Tips for Laser Processing of Paper.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "250g-cardstock-25pcs",
+    "title": "250g Cardstock (25pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "b90d88c58d6df7341a36c04bd77cd2448dc08d259680757b5cf4898481c926f6",
+   "en": "Click here to get more information about introduction to the Laser Platform and Cutting Platform.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "250g-cardstock-25pcs",
+    "title": "250g Cardstock (25pcs)",
+    "field": "blocks[1].line[2]",
+    "near": "• Click here to get more information about Safety Tips for Laser Processing of Paper."
+   },
+   "dict": null
+  },
+  {
+   "h": "6f0af7370b701c65b0e2a29f2ff188831073a50c6fadd2a16a040f21063c4069",
+   "en": "Ensure that a person is always present to closely monitor the machine throughout the laser processing.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "250g-cardstock-25pcs",
+    "title": "250g Cardstock (25pcs)",
+    "field": "blocks[1].line[3]",
+    "near": "• Click here to get more information about introduction to the Laser Platform and Cutting Platform."
+   },
+   "dict": null
+  },
+  {
+   "h": "e14fddb74b99b5fc3cabe327b9836babf3031bf22695ef3c910c1eb6e2ebe580",
+   "en": "*A matte texture will appear after it has been transferred to the product.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Bambu Matte Heat Transfer Vinyl features a matte texture* and a variety of vibrant color options. It is easy to cut and weed without leaving residue, sticking s"
+   },
+   "dict": null
+  },
+  {
+   "h": "72ec397584ee53665f76f612792dc3c0fb28904cd2b0b3910c1049bccb84f3db",
+   "en": "Variety of Colors for One-of-a-Kind Designs",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[1].line[0]",
+    "near": "With 9 vibrant colors, Bambu Matte Heat Transfer Vinyl offers a palette to make your designs pop. Use it for T-shirts, hoodies, bags, hats, and team uniforms to"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f6073a18235a90c98372193b3641d7213dd03d4c42171ee2e2119de97322dfa",
+   "en": "With 9 vibrant colors, Bambu Matte Heat Transfer Vinyl offers a palette to make your designs pop. Use it for T-shirts, hoodies, bags, hats, and team uniforms to express your attitude through apparel or to add a personal touch to gifts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Variety of Colors for One-of-a-Kind Designs"
+   },
+   "dict": null
+  },
+  {
+   "h": "e5a2d1efee4f70508429527816b2c3336f1787539c9bdf67b2fb80140df7ec67",
+   "en": "Easy to Peel, Hassle-Free Application",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[2].line[0]",
+    "near": "Bambu Matte Heat Transfer Vinyl is designed for smooth, effortless peeling—no snagging or stretching—making your creative process faster and more efficient."
+   },
+   "dict": null
+  },
+  {
+   "h": "0f7d7226241682b62731b29c1947cb06f08bcd249abb1f10002db029d7713930",
+   "en": "Bambu Matte Heat Transfer Vinyl is designed for smooth, effortless peeling—no snagging or stretching—making your creative process faster and more efficient.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Easy to Peel, Hassle-Free Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "a969af30df9ad79a5ad5ec45b3e250311a26dfba8e2a023dd7402351d11d7c59",
+   "en": "High-Tack and Washable for Long-Lasting Results",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[3].line[0]",
+    "near": "Bambu Matte Heat Transfer Vinyl forms a strong bond once ironed on, ensuring durability through multiple washes and stretches."
+   },
+   "dict": null
+  },
+  {
+   "h": "2cd7aae07aebad6cdbf0a79f325fda4c854a70e966d98d9ade53d8128be27c15",
+   "en": "Bambu Matte Heat Transfer Vinyl forms a strong bond once ironed on, ensuring durability through multiple washes and stretches.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "High-Tack and Washable for Long-Lasting Results"
+   },
+   "dict": null
+  },
+  {
+   "h": "027a2701848d148c1d41c9b35d2183636fbe30676dc205729a98bcef306fd8dc",
+   "en": "Use Guide",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[4].line[0]",
+    "near": "Click here to get more information about heat transfer vinyl material introduction."
+   },
+   "dict": null
+  },
+  {
+   "h": "ed4969cb5795121cbe8eb41361b1b0c3b6af74da3e6d7232e16751e0771b98e9",
+   "en": "Click here to get more information about heat transfer vinyl material introduction.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[4].line[1]",
+    "near": "Use Guide"
+   },
+   "dict": null
+  },
+  {
+   "h": "3efc9982111fff95fa6b6c77044a72a103b173ba3e99571f88b14ed966e287ad",
+   "en": "Heat Press Temperature and Time Guide",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[0]",
+    "near": "Surface Material Type | Temperature | Time"
+   },
+   "dict": null
+  },
+  {
+   "h": "fffb2b5f5ea77b9bae64960a310ccf9db71b2eff71a5fd03e0cc2a08bbf86cdc",
+   "en": "Surface Material Type",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[1].cell[0]",
+    "near": "Heat Press Temperature and Time Guide"
+   },
+   "dict": null
+  },
+  {
+   "h": "b958ce8b871ab36b3ceee0e0f012b6182962b2db7926be0a670149f9fbd00b84",
+   "en": "Temperature",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[1].cell[1]",
+    "near": "Heat Press Temperature and Time Guide"
+   },
+   "dict": null
+  },
+  {
+   "h": "33b93476cf597a3330653b66a658983d892ac264b5d6029a2dc642b9b1f30870",
+   "en": "Time",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[1].cell[2]",
+    "near": "Heat Press Temperature and Time Guide"
+   },
+   "dict": null
+  },
+  {
+   "h": "21942a68fa3caf582f6732f3b42f486ef9320ada0933b86754c3d2a0a98a2335",
+   "en": "Polyester",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[3].cell[0]",
+    "near": "Cotton | 150°C | 15s"
+   },
+   "dict": null
+  },
+  {
+   "h": "2d02fa893c43d55f546ba105cbb7c108483011348a569196a234f43392dfeaa4",
+   "en": "Cotton–Polyester Blend (eg. based on 50% cotton and 50% polyester)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[4].cell[0]",
+    "near": "Polyester | 140°C | 12s"
+   },
+   "dict": null
+  },
+  {
+   "h": "4723ff9912e9a53af3817bb32b0e06be8dd19eb87a117e6b5d1b6a93f6799bda",
+   "en": "Linen (eg. based on 50% ramie and linen blend)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[5].cell[0]",
+    "near": "Cotton–Polyester Blend (eg. based on 50% cotton and 50% polyester) | 140°C | 12s"
+   },
+   "dict": null
+  },
+  {
+   "h": "27299d8616f7ce373ad16e1d7b2147c6f7015fd3d3399996d00f772cd7ff3e25",
+   "en": "Cowhide Leather",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[6].cell[0]",
+    "near": "Linen (eg. based on 50% ramie and linen blend) | 140°C | 15s"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ad55ccbed7d9e1bc6fed96ad6d256aa5172e184395c4e08b2040bd4fac5d196",
+   "en": "PU Synthetic Leather",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[7].cell[0]",
+    "near": "Cowhide Leather | 150°C | 15s"
+   },
+   "dict": null
+  },
+  {
+   "h": "338157ef2b570e22d45d2ff0de65f6a5f4b589a2e96b373757fdd1fcf86de7ad",
+   "en": "Nylon–Spandex Blend (eg. based on 78% nylon and 23% spandex)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[9].cell[0]",
+    "near": "Nylon | 135°C | 12s"
+   },
+   "dict": null
+  },
+  {
+   "h": "af9f4f05663d2d65e6af66b712b234803f8c35ce83e24aba5de838be738874eb",
+   "en": "A Palette of Colors",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "7eed24cb5da8d543d60c6be349b6c953738858846cc9c645f6b462a93b5b9b7d",
+   "en": "Easy to Cut, Weed, and Iron-On",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[6].line[2]",
+    "near": "• A Palette of Colors"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c659b72993ae87db1e435eda50b42d8ee5f14c5a25748951ce3246a960bc529",
+   "en": "High Tack and Washable for Long-Lasting Results",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[6].line[3]",
+    "near": "• Easy to Cut, Weed, and Iron-On"
+   },
+   "dict": null
+  },
+  {
+   "h": "111671b0804b1de67fffe328f3c9fd761f2a205f1868dada1dc9e8e968bdf4de",
+   "en": "Not recommended for laser cutting or engraving",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[6].line[4]",
+    "near": "• High Tack and Washable for Long-Lasting Results"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4fd328ada852ba6df891fb6fe44b06ccab4f1742222a759fb82be57cbd7b12d",
+   "en": "Please ensure to mirror the image and place the back of the material facing the blade during processing",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[6].line[5]",
+    "near": "• Not recommended for laser cutting or engraving"
+   },
+   "dict": null
+  },
+  {
+   "h": "55cef804a94423f87b4e15916152c08f05f6dc45906118c43c8ebcedf07e3195",
+   "en": "Caution for Use",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[6].line[6]",
+    "near": "• Please ensure to mirror the image and place the back of the material facing the blade during processing"
+   },
+   "dict": null
+  },
+  {
+   "h": "6caac225fee72924c4669f1c7a3eec7629147f6d973d050b38ec20f34b091e0c",
+   "en": "Carbon Fiber Textured Removable Vinyl",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu Carbon Fiber Textured Removable Vinyl mimics the sleek and dynamic appearance of real carbon fiber, reflecting a 3D effect that adds a high-tech look to y"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb0833d06ad06f4aeffa50aba668d7c7a698bae10adfb1dc14fda6188d8c5ad6",
+   "en": "Add a High-Tech Look to Your Beloved Items. Particularly suited for automotive and motorcycle customization. Bambu Carbon Fiber Textured Removable Vinyl is durable, waterproof, and UV-resistant.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6584d14e480b62aa776d1472312b7f5d947ddb299e318bfa5a0000d88be248a",
+   "en": "Strong Adhesion, Residue-Free Removal. Bambu Carbon Fiber Textured Removable Vinyl is easy to cut, weed and stick. Once applied, Bambu Carbon Fiber Textured Removable Vinyl adheres firmly but can be removed without leaving sticky residue, making it perfect for temporary applications or quick changes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[1].line[2]",
+    "near": "• Add a High-Tech Look to Your Beloved Items. Particularly suited for automotive and motorcycle customization. Bambu Carbon Fiber Textured Removable Vinyl is du"
+   },
+   "dict": null
+  },
+  {
+   "h": "7cfb3d45439a088a944d8583997362b66e32c0370ddfd49511259a85e02c3b44",
+   "en": "The carbon fiber textured side should face up when using blade cutting.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a61e11764127d9292c4c782f9bfb938e866cba3e44b17ca1c496f14f8067426",
+   "en": "Transfer tape is required when transferring designs that are not connected but need to be applied as a whole.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[2].line[2]",
+    "near": "• The carbon fiber textured side should face up when using blade cutting."
+   },
+   "dict": null
+  },
+  {
+   "h": "6c9e5aeee163676774ec9aaff32eb6512dbb622751cda380d059d1d05abe65cd",
+   "en": "Roller brushes and weeding tools are recommended when processing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[2].line[3]",
+    "near": "• Transfer tape is required when transferring designs that are not connected but need to be applied as a whole."
+   },
+   "dict": null
+  },
+  {
+   "h": "1e7751ac6d59b2a9212718a9d786b59a934aad57c905dad44f881a5a1b98c75d",
+   "en": "Removable vinyl is not recommended for laser cutting and engraving.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[2].line[4]",
+    "near": "• Roller brushes and weeding tools are recommended when processing."
+   },
+   "dict": null
+  },
+  {
+   "h": "0da2fea3b4b756bb8a1be4733acdf494f70ff7c933aff87d2a5bf4027633f34c",
+   "en": "High-Tech Carbon Fiber Style",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "92a0135f8af5012c5c47b685b193ff54bf542095cce8567d8cecc0974807fd2e",
+   "en": "Easy to Cut, Weed, and Transfer",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[3].line[2]",
+    "near": "• High-Tech Carbon Fiber Style"
+   },
+   "dict": null
+  },
+  {
+   "h": "f9a22e7d2769b6fb39e11eb4d204cae30910c46fb33609c54fdab54aa97dc44a",
+   "en": "Removes Easily Without Leaving Residue",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "blocks[3].line[3]",
+    "near": "• Easy to Cut, Weed, and Transfer"
+   },
+   "dict": null
+  },
+  {
+   "h": "477356ca8b21390716a5e609ef2a5c75c66d8c09b8975de68c50ccb9716e262f",
+   "en": "Light Gray Reflective Decal Sheet",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "light-gray-reflective-decal-sheet-5pcs",
+    "title": "Light Gray Reflective Decal Sheet (5pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu Light Gray Reflective Decal Sheet adds a high-visibility touch to any surface, making your items stand out in low light and at night. With excellent UV re"
+   },
+   "dict": null
+  },
+  {
+   "h": "b8516a2c038a92cc15b75729c0fbe8c81344a6444d8593a2f7f3ca7c15331717",
+   "en": "Reflect Light to Increase Safety. Perfect for automotive customization (cars, bicycles, motorcycles), helmets, and apparel, Bambu Light Gray Reflective Decal Sheet adds both visibility and style. Its superb light-reflecting function ensures visibility from every angle, keeping you safe.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "light-gray-reflective-decal-sheet-5pcs",
+    "title": "Light Gray Reflective Decal Sheet (5pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "ae5a82bd9e739cbc0e3ad0d3f19fd369bb7e90e31ce811af0816fcf7bed92429",
+   "en": "Durable Performance in Varied Conditions. Bambu Reflective Decal Sheets offer good durability in various conditions due to their high adhesion, oil-proof and waterproof properties, and resistance to UV exposure.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "light-gray-reflective-decal-sheet-5pcs",
+    "title": "Light Gray Reflective Decal Sheet (5pcs)",
+    "field": "blocks[1].line[2]",
+    "near": "• Reflect Light to Increase Safety. Perfect for automotive customization (cars, bicycles, motorcycles), helmets, and apparel, Bambu Light Gray Reflective Decal "
+   },
+   "dict": null
+  },
+  {
+   "h": "69d9759880e1948ed1442f4b5a71695e238677335ada4cd9e653962a26dbaac6",
+   "en": "Please mirror the image and place the cutting side of the material facing the blade. Refer to wiki for the complete mirror setting guide.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "light-gray-reflective-decal-sheet-5pcs",
+    "title": "Light Gray Reflective Decal Sheet (5pcs)",
+    "field": "blocks[2].line[2]",
+    "near": "• Transfer tape is required when transferring designs that are not connected but need to be applied as a whole."
+   },
+   "dict": null
+  },
+  {
+   "h": "af650b2f999d9edc46306dc35f213836888a82f547b85e7da0e5cf454ecf61ed",
+   "en": "High-Visibility Upgrade to Your Items",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "light-gray-reflective-decal-sheet-5pcs",
+    "title": "Light Gray Reflective Decal Sheet (5pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c46e6d6875d240a466d4fa3f49edff037e9883e81de033cd117b63c4c831148",
+   "en": "Durable Performance in Varied Conditions",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "light-gray-reflective-decal-sheet-5pcs",
+    "title": "Light Gray Reflective Decal Sheet (5pcs)",
+    "field": "blocks[3].line[2]",
+    "near": "• High-Visibility Upgrade to Your Items"
+   },
+   "dict": null
+  },
+  {
+   "h": "e91aee7ed239e2d68112ea23fcf6a0658e4abf36e2336a3fa9b199c6af1e15a2",
+   "en": "Bambu Transfer Tape",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "transfer-tape-10pcs",
+    "title": "Transfer Tape (10pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Simplify your transfer process with Bambu Transfer Tape, designed for removable vinyl projects. Use it to decorate everyday items like bottles and boxes, as wel"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff75a6a2f220c1089151efec8b64d1bb7924ad5ddb8bb02244defd9f4ab1df48",
+   "en": "Designed for removable vinyl projects",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "transfer-tape-10pcs",
+    "title": "Transfer Tape (10pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e69715313929037079b9eab5817af1dc3f57cc8ea10f0190c2ef5297fe46785",
+   "en": "Effortlessly picks up vinyl graphics; leaves no residue",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "transfer-tape-10pcs",
+    "title": "Transfer Tape (10pcs)",
+    "field": "blocks[1].line[2]",
+    "near": "• Designed for removable vinyl projects"
+   },
+   "dict": null
+  },
+  {
+   "h": "05d57878e1dc3709ece38ea5f9749b34e756225537df76a92514b3ef54fe930f",
+   "en": "Read the instructions before use",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "transfer-tape-10pcs",
+    "title": "Transfer Tape (10pcs)",
+    "field": "blocks[1].line[3]",
+    "near": "• Effortlessly picks up vinyl graphics; leaves no residue"
+   },
+   "dict": null
+  },
+  {
+   "h": "476af471d22f702b0f725ce8904f445e561b67c5df98c88ec79a88a916266c83",
+   "en": "Pebbled PU Leatherette Fabric",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pebbled-pu-leatherette-fabric",
+    "title": "Pebbled PU Leatherette Fabric (5pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Crafted from high-quality PU leather, Bambu Pebbled PU Leatherette Fabric is easy to cut and offers a sleek appearance with excellent durability and waterproof "
+   },
+   "dict": null
+  },
+  {
+   "h": "263c338de726310f1fc1d934e382f0d5fb45bd7cc05dfefb07878d35f125e5ef",
+   "en": "Click here to get more information about materials for the blade cutting module.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pebbled-pu-leatherette-fabric",
+    "title": "Pebbled PU Leatherette Fabric (5pcs)",
+    "field": "blocks[1].line[3]",
+    "near": "• Click here to get more information about materials for the laser module."
+   },
+   "dict": null
+  },
+  {
+   "h": "edeeb8d38be6c5b6b695d024b2382830b3dea4471e7c05a1996ee0ea7631eaff",
+   "en": "Use the strong grip cutting mat",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pebbled-pu-leatherette-fabric",
+    "title": "Pebbled PU Leatherette Fabric (5pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c9fdcc80786793efcd5393589c9386245f7799c46c1b85c31c53a28efe7e6a1",
+   "en": "PU leatherette fabric releases toxic and harmful gases during laser processing. Please ensure good ventilation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pebbled-pu-leatherette-fabric",
+    "title": "Pebbled PU Leatherette Fabric (5pcs)",
+    "field": "blocks[2].line[2]",
+    "near": "• Use the strong grip cutting mat"
+   },
+   "dict": null
+  },
+  {
+   "h": "72b2e82c7109458c6bed4cb89354733e3d296e71eae833a8ba8b020a0b238293",
+   "en": "Pearlescent White Greeting Card Set",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pearlescent-white-greeting-card-set-ye004",
+    "title": "Pearlescent White Greeting Card Set (2pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu Greeting Card Set includes 2 pearlescent white card stocks for intricate blade cutting, paired with 2 sky-blue inner cards for your heartfelt messages, an"
+   },
+   "dict": null
+  },
+  {
+   "h": "440fd12ee953e4b651d36c69803adbaabe191c3ee3fbea6dbb15359995d004df",
+   "en": "The cuttable section is the pearlescent white card stock.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pearlescent-white-greeting-card-set-ye004",
+    "title": "Pearlescent White Greeting Card Set (2pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "2d9413ed7114edbb6da1840a1c90fcc87651ead7b3b91c07ae8bddd84db2e9e3",
+   "en": "Complete Card Set",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pearlescent-white-greeting-card-set-ye004",
+    "title": "Pearlescent White Greeting Card Set (2pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "5772581285b95497c576d29aecbd57fc9bc5344ccbac4a108f9cb94238f790a4",
+   "en": "Elegant Pearl Shimmer",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pearlescent-white-greeting-card-set-ye004",
+    "title": "Pearlescent White Greeting Card Set (2pcs)",
+    "field": "blocks[2].line[2]",
+    "near": "• Complete Card Set"
+   },
+   "dict": null
+  },
+  {
+   "h": "8123d6fa0d1d947abd79ee7fe3407f4cf807b35d9b039d2faee37e934f4e300a",
+   "en": "Wide Usage Scenarios",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pearlescent-white-greeting-card-set-ye004",
+    "title": "Pearlescent White Greeting Card Set (2pcs)",
+    "field": "blocks[2].line[3]",
+    "near": "• Elegant Pearl Shimmer"
+   },
+   "dict": null
+  },
+  {
+   "h": "43d4e9a08e029afdc5f4865ea402ce5b69b35951185675fca7fe87d646801c88",
+   "en": "Rectangular PU Iron-on Patch",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-pu-iron-on-patch",
+    "title": "Rectangular PU Iron-on Patch (10pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu PU iron-on patch enables precise laser engraving to remove the surface coating, revealing pre-layered contrasting color underneath. Ideal for creating dis"
+   },
+   "dict": null
+  },
+  {
+   "h": "81e8971e47fc43d168a3bb321eab1d393cf77e5c068122792f7c63a90edb0e0d",
+   "en": "To enhance your engraving experience, a Laser Grid Panel is recommended as the work surface. If unavailable, you can densely arrange Laser Slats Pack and place the PU iron-on patch on top of them.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-pu-iron-on-patch",
+    "title": "Rectangular PU Iron-on Patch (10pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "61868b562be0d49ccf6375facb6670d66bf7f6392472cf3cc8e9b820e06a4a98",
+   "en": "Wait at least 24 hours before washing, turn the item inside out and use a gentle cycle.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-pu-iron-on-patch",
+    "title": "Rectangular PU Iron-on Patch (10pcs)",
+    "field": "blocks[1].line[3]",
+    "near": "• Ensure that a person is always present to closely monitor the machine throughout the laser engraving process."
+   },
+   "dict": null
+  },
+  {
+   "h": "cc16c0b0770fb3aa751a57b202551a8e44b6176e97b90cf3672334c3ce1ce1bf",
+   "en": "Click here to get more information about the rectangular pu iron-on patch material introduction.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-pu-iron-on-patch",
+    "title": "Rectangular PU Iron-on Patch (10pcs)",
+    "field": "blocks[1].line[4]",
+    "near": "• Wait at least 24 hours before washing, turn the item inside out and use a gentle cycle."
+   },
+   "dict": null
+  },
+  {
+   "h": "efb71cad33d9952fd3035055cb6bb49ee2e3d2ab8b9e68e82076dd2b47f2b8fe",
+   "en": "Rich Colors to Make Everyday Items Stand Out：With a full palette of colors, Bambu Removable Vinyl brings style and personality to your everyday items.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "matte-removable-vinyl-10pcs",
+    "title": "Matte Removable Vinyl (10pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "4497e06cb1f554fac3a96af157e54877f5ba1520039bd600757249b27f545786",
+   "en": "No Residue, so Multiple Trys：Easily removable without leaving residue, giving items a like-new surface when you want to remove the design and change styles! Decorate your items in as many styles as you want with ease.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "matte-removable-vinyl-10pcs",
+    "title": "Matte Removable Vinyl (10pcs)",
+    "field": "blocks[1].line[2]",
+    "near": "• Rich Colors to Make Everyday Items Stand Out：With a full palette of colors, Bambu Removable Vinyl brings style and personality to your everyday items."
+   },
+   "dict": null
+  },
+  {
+   "h": "8f2ccdf549da89986c3b51c0d650e90078d42284b6e288e6f440cd0906bac311",
+   "en": "Transfer tape is recommended when transferring designs that are complicated or not connected but need to be applied as a whole.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "matte-removable-vinyl-10pcs",
+    "title": "Matte Removable Vinyl (10pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "85e0d3dd8a41ee54ab82c33cb1aa04ba530298c444e39a39449628742e5d20a1",
+   "en": "Weeding tools and scraper are recommended when processing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "matte-removable-vinyl-10pcs",
+    "title": "Matte Removable Vinyl (10pcs)",
+    "field": "blocks[2].line[2]",
+    "near": "• Transfer tape is recommended when transferring designs that are complicated or not connected but need to be applied as a whole."
+   },
+   "dict": null
+  },
+  {
+   "h": "c311e35a0480fd3ca8eb89f52f5ead57bc82f0f98f1b1a26c511cbec36b02e04",
+   "en": "It's required to clean the surface of the item before applying the transfer tape for better adhesion.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "matte-removable-vinyl-10pcs",
+    "title": "Matte Removable Vinyl (10pcs)",
+    "field": "blocks[2].line[3]",
+    "near": "• Weeding tools and scraper are recommended when processing."
+   },
+   "dict": null
+  },
+  {
+   "h": "bcf58e4ff427024d739db2b4266c5e96e7562baeab7fe018af8d98d39d9d148a",
+   "en": "Click here to get more information about matte removable vinyl material introduction.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "matte-removable-vinyl-10pcs",
+    "title": "Matte Removable Vinyl (10pcs)",
+    "field": "blocks[2].line[5]",
+    "near": "• Ensure that a person is always present to closely monitor the machine throughout the laser engraving and cutting process."
+   },
+   "dict": null
+  },
+  {
+   "h": "09617523be5ecb2ee6a4cb1acdfe93e612422dca7f087bd4726fe3096822c53c",
+   "en": "Bambu Opaque Glossy Acrylic Sheet offers vivid color options and an opaque style. Bambu Acrylic sheet is perfect for creating personal decorative projects but also intricate small business items. Easy to work with, the Bambu Acrylic sheet ensures your creations stand out with quality and style.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[0].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "50dd41deab946bce4adea4e69754161cc9d7e8978046e4f25d5fb9e1cd823d81",
+   "en": "Superior Quality",
+   "kind": "block_title",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[1].line[0]",
+    "near": "With a flawless finish and superior quality, your designs will stand out with lasting radiance. Their outstanding clarity and smooth surface enhance creative pr"
+   },
+   "dict": null
+  },
+  {
+   "h": "54c1f261a15477861384f8c7e67ba0f9c9b7148758a096349411f4730a6a0d46",
+   "en": "With a flawless finish and superior quality, your designs will stand out with lasting radiance. Their outstanding clarity and smooth surface enhance creative projects.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Superior Quality"
+   },
+   "dict": null
+  },
+  {
+   "h": "126146e244b524c40834f9c112e49f940102bdd34a7910962c1129453b5c26c2",
+   "en": "Please note: Acrylic sheet has a certain degree of UV resistance, but prolonged exposure to intense light is not recommended.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[1].line[2]",
+    "near": "With a flawless finish and superior quality, your designs will stand out with lasting radiance. Their outstanding clarity and smooth surface enhance creative pr"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c0df0afa1a65a6b09a2a08be3adb59fe85065ef05e41315e07a3ef6f17209e2",
+   "en": "Protective Film for a Flawless Start",
+   "kind": "block_title",
+   "freq": 7,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[2].line[0]",
+    "near": "Bambu Opaque Glossy Acrylic Sheet comes with protective film on both sides, safeguarding the surface from scratches and ensuring it arrives in pristine conditio"
+   },
+   "dict": null
+  },
+  {
+   "h": "30b0873e064a2a034005cecabaaa865cefe349e1cfd8bc6d2a40b46500909a18",
+   "en": "Bambu Opaque Glossy Acrylic Sheet comes with protective film on both sides, safeguarding the surface from scratches and ensuring it arrives in pristine condition.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Protective Film for a Flawless Start"
+   },
+   "dict": null
+  },
+  {
+   "h": "6548421b803f85c41cdeec0ad47ab885b3ccb6925ba950fbf769a0467522029b",
+   "en": "Engineered for Consistency: Tight Thickness Tolerance, Every Sheet",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[3].line[0]",
+    "near": "Bambu Opaque Glossy Acrylic Sheet is committed to providing reliable quality. By precisely controlling thickness, it minimizes variations in each sheet, improvi"
+   },
+   "dict": null
+  },
+  {
+   "h": "3345118052a1bdc9aac8d05ab15f1acb45fd1e66b63f5a567c2952787bb9169b",
+   "en": "Bambu Opaque Glossy Acrylic Sheet is committed to providing reliable quality. By precisely controlling thickness, it minimizes variations in each sheet, improving the consistency of your projects and making assembly easier. Whether crafting intricate decor or mass-producing for your business, you can rely on Bambu Acrylic sheets for smooth, uniform cuts and stress-free accuracy.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Engineered for Consistency: Tight Thickness Tolerance, Every Sheet"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9847c7b597b4f27ae707d3a9d5e61d5d671fe546ae087d57e6006c5c19c0bde",
+   "en": "Ensure that a person is always present to closely monitor the machine throughout the laser engraving and cutting process",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[4].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "2d652c87568dba56b73597f8787d86fc483cad44da92dd1c999cc7f6a618f577",
+   "en": "Please remove the protective film before processing.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[4].line[3]",
+    "near": "• Click here to get more information about materials for the laser module."
+   },
+   "dict": null
+  },
+  {
+   "h": "f41130681da0d89207cb8347a4781ac5a7dfc9200619fa66a3ff764a25c325b6",
+   "en": "Easy to Work With",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "c2b96b84de97849b7630d0c807f9553aa3c7cf2e12b1abd7473c20b6e5afd031",
+   "en": "Opaque Glossy Acrylic Sheet releases toxic and harmful gases during laser processing. Please ensure good ventilation.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "blocks[5].line[5]",
+    "near": "• Cautions for Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "237b30f4463c5c9384f9494beb922d06565b12ab96f658c0f111a812305b02d5",
+   "en": "Bambu Kraft Paper",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "a4-200g-kraft-paper-25pcs",
+    "title": "A4 200g Kraft Paper (25pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu A4 Kraft Paper is designed for laser cutting, engraving, and blade cutting. Its moderate thickness ensures that every cut is free of burrs, delivering cle"
+   },
+   "dict": null
+  },
+  {
+   "h": "e514ddd9bcdf95aeb26d67bc0267b7b98865741d54a7f1ca61edf7477bbf0427",
+   "en": "Moderate thickness for easy cutting",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a4-200g-kraft-paper-25pcs",
+    "title": "A4 200g Kraft Paper (25pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "7170f023a1b66cc6609ad97d7507ec2abf83476a310da20cd2a70d6c4696ee43",
+   "en": "Clean, neat edges free of burrs",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a4-200g-kraft-paper-25pcs",
+    "title": "A4 200g Kraft Paper (25pcs)",
+    "field": "blocks[2].line[2]",
+    "near": "• Moderate thickness for easy cutting"
+   },
+   "dict": null
+  },
+  {
+   "h": "1fa53eed13898f5bf50dc69fba26977802545ceb35f415f5042f6b0cc4f6d36d",
+   "en": "Smooth surface for writing or stamping",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a4-200g-kraft-paper-25pcs",
+    "title": "A4 200g Kraft Paper (25pcs)",
+    "field": "blocks[2].line[3]",
+    "near": "• Clean, neat edges free of burrs"
+   },
+   "dict": null
+  },
+  {
+   "h": "fcf161405a36ab4684690bf295655d1925d533d7f8f1df6a24c09a6badbc4857",
+   "en": "Chrome Foil Heat Transfer Vinyl",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "chrome-foil-heat-transfer-vinyl-10pcs",
+    "title": "Chrome Foil Heat Transfer Vinyl (10pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu Chrome Foil Heat Transfer Vinyl comes with an eye-catching, mirror-like metallic finish, making your everyday items stand out. It's easy to cut and weed w"
+   },
+   "dict": null
+  },
+  {
+   "h": "d982a8d6133a11ea2e07c72e9e052d6f5f261d63d6813a4732b6251633a33163",
+   "en": "Mirror-Like Metallic Finish",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "chrome-foil-heat-transfer-vinyl-10pcs",
+    "title": "Chrome Foil Heat Transfer Vinyl (10pcs)",
+    "field": "blocks[1].line[0]",
+    "near": "Featuring a unique mirror-like metallic finish, Bambu Chrome Foil Heat Transfer Vinyl brightens your everyday items, especially when creating cool logos or grap"
+   },
+   "dict": null
+  },
+  {
+   "h": "da1f05d3ec90e0f56cdf4ec70b74f349f574a34d7c8de939ffc5aaeb683657ef",
+   "en": "Featuring a unique mirror-like metallic finish, Bambu Chrome Foil Heat Transfer Vinyl brightens your everyday items, especially when creating cool logos or graphics.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chrome-foil-heat-transfer-vinyl-10pcs",
+    "title": "Chrome Foil Heat Transfer Vinyl (10pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Mirror-Like Metallic Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "2afda8f0762cd041856cc4bd33d83c06084ef66d002f36a076221238273bf9c5",
+   "en": "Bambu Chrome Foil Heat Transfer Vinyl is designed for smooth, effortless peeling — no snagging or stretching — making your creative process faster and more efficient.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chrome-foil-heat-transfer-vinyl-10pcs",
+    "title": "Chrome Foil Heat Transfer Vinyl (10pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Easy to Peel, Hassle-Free Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "3fca09e3a70bed8c26a2f58cf14cfe89674eda0573823a9a99dbf34ef04a5078",
+   "en": "Bambu Chrome Foil Heat Transfer Vinyl forms a strong bond once ironed on, ensuring durability through multiple washes and stretches.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chrome-foil-heat-transfer-vinyl-10pcs",
+    "title": "Chrome Foil Heat Transfer Vinyl (10pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "High-Tack and Washable for Long-Lasting Results"
+   },
+   "dict": null
+  },
+  {
+   "h": "8202a9df4a6f497f0d56e2356c12041862fa9cd05c62695831a387135c395a2e",
+   "en": "Bambu Sapele Plywood",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-sapele-plywood",
+    "title": "3mm Sapele Plywood (6pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Unique for its reddish-brown color, Bambu Sapele Plywood features smooth rosewood grain patterns that enhance the natural beauty of your designs. It is flat, fr"
+   },
+   "dict": null
+  },
+  {
+   "h": "f1b73cd52ab710357e7518f9096c16f07fae7e637d5b9b4b64e8062273e0d5d1",
+   "en": "Unique for its reddish-brown color, Bambu Sapele Plywood features smooth rosewood grain patterns that enhance the natural beauty of your designs. It is flat, free from warping or burrs, durable, making it perfect for luxurious furnishings, decor, gifts, and more. Plus, the E0 glue* reduces formaldehyde, enhancing air quality.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-sapele-plywood",
+    "title": "3mm Sapele Plywood (6pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Bambu Sapele Plywood"
+   },
+   "dict": null
+  },
+  {
+   "h": "709cc34c4fdaf03a7de93baff18d88f84529f131b9d8f53f6f09081e0890cd77",
+   "en": "Rosewood Style for Premium Creations",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-sapele-plywood",
+    "title": "3mm Sapele Plywood (6pcs)",
+    "field": "blocks[3].line[0]",
+    "near": "With its unique reddish-brown color, Bambu Sapele Plywood is perfect for elegant décor and furniture, such as book nooks, wine trays, and wine boxes. It is also"
+   },
+   "dict": null
+  },
+  {
+   "h": "a80033018e85e18684868924448803f05d4d78ff17b775ab28cbc2f370485d4a",
+   "en": "With its unique reddish-brown color, Bambu Sapele Plywood is perfect for elegant décor and furniture, such as book nooks, wine trays, and wine boxes. It is also ideal for musical instruments like violins and guitars, as well as delicate DIY gifts such as gift cards, photo frames, wall art, and sculptures.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-sapele-plywood",
+    "title": "3mm Sapele Plywood (6pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Rosewood Style for Premium Creations"
+   },
+   "dict": null
+  },
+  {
+   "h": "2127be9d2911b70821f4965d5e0f4c42921fa3a2c1460b3c3b92c04341bd731a",
+   "en": "Narrow the tolerance and boost the precision compared to existing products. Bambu Sapele Plywood significantly reduces the need for size adjustments, making assembly effortless from the first try.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-sapele-plywood",
+    "title": "3mm Sapele Plywood (6pcs)",
+    "field": "blocks[4].line[1]",
+    "near": "Fit Snugly, Right the First Time"
+   },
+   "dict": null
+  },
+  {
+   "h": "530b6f37511e9c016e0a1ae4969365ef9b603a69e21e706207b2a9af56934fe6",
+   "en": "Rosewood Grain",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-sapele-plywood",
+    "title": "3mm Sapele Plywood (6pcs)",
+    "field": "blocks[7].line[5]",
+    "near": "• Designed for Laser Cutting and Engraving"
+   },
+   "dict": null
+  },
+  {
+   "h": "21e4b90955d2fb2b6256b76ae2b723c85d539bad68784a5272d4925fb41c11e2",
+   "en": "One Kit. Endless Possibilities.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-laser-plywood-bamboo-trial-kit-30pcs",
+    "title": "3mm Laser Plywood & Bamboo Trial Kit (30pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Unlock the full potential of laser crafting with Bambu Lab’s 3mm Laser Plywood & Bamboo Trial Kit — 30 premium boards across five popular materials: Basswood, S"
+   },
+   "dict": null
+  },
+  {
+   "h": "e49e1aea45d8c02c0f28613bec63987d11a381b64b2a9c5a683c31336135bed0",
+   "en": "Unlock the full potential of laser crafting with Bambu Lab’s 3mm Laser Plywood & Bamboo Trial Kit — 30 premium boards across five popular materials: Basswood, Sapele, Black Walnut, Birch, and Bamboo. Whether you're building models that combine different plywoods or exploring how each type brings a unique look to your designs, this all-in-one set has you covered.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-laser-plywood-bamboo-trial-kit-30pcs",
+    "title": "3mm Laser Plywood & Bamboo Trial Kit (30pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "One Kit. Endless Possibilities."
+   },
+   "dict": null
+  },
+  {
+   "h": "0c3fa92862bf6e92fa4b6732fd2245e87f2cc083306f01348d83a9af8393a04d",
+   "en": "Narrow the tolerance and boost the precision compared to existing products. Bambu Basswood Plywood and Bamboo Board significantly reduce the need for size adjustments, making assembly effortless from the first try.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-laser-plywood-bamboo-trial-kit-30pcs",
+    "title": "3mm Laser Plywood & Bamboo Trial Kit (30pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Fit Snugly, Right the First Time"
+   },
+   "dict": null
+  },
+  {
+   "h": "7fb4b48a2bd1a54f1d290907287e0fc062ff560e401fc1d3a3d0d49f7a9b0ab8",
+   "en": "5 Materials in One Kit",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-laser-plywood-bamboo-trial-kit-30pcs",
+    "title": "3mm Laser Plywood & Bamboo Trial Kit (30pcs)",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4b0cf94293bb330f35eb53456b3351b73077bec326635f448109b83589fb83e",
+   "en": "Laser Material Kit – Starter Pack",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[0].line[0]",
+    "near": "This all-in-one material set includes plywood, acrylic, cork sheets, metal tags, and leather, perfect for both laser beginners and enthusiasts. Whether you want"
+   },
+   "dict": null
+  },
+  {
+   "h": "64004eea616c81835e8ae70f105afced333c481535bef2da814ba41a015e14d3",
+   "en": "True All-in-One",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[1].line[0]",
+    "near": "Plywood, acrylic, cork sheets, metal tags, leather...8 categories, 49 pieces. The most popular Bambu Lab laser-compatible materials included to fully support yo"
+   },
+   "dict": null
+  },
+  {
+   "h": "8eb8c8a69bf18fd0c8e7954d7b59e3a6d15a02ab23dbb6024cf9a123a88a1cf9",
+   "en": "Plywood, acrylic, cork sheets, metal tags, leather...8 categories, 49 pieces. The most popular Bambu Lab laser-compatible materials included to fully support your creative designs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[1].line[1]",
+    "near": "True All-in-One"
+   },
+   "dict": null
+  },
+  {
+   "h": "90a98d3d4d4e12714f81cd61c74f1796510e0a87e2eec63c8f9ccd7e0137cf9c",
+   "en": "Easy to Use, Beginner-Friendly",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[2].line[0]",
+    "near": "All materials are perfectly sized for the H Series—no trimming needed. Plus, Bambu Suite comes with pre-tested calibration settings for every material. Just loa"
+   },
+   "dict": null
+  },
+  {
+   "h": "e6e85a07d63ea628444608ff70f542d9ce4fc5c63c366ac109c5e7c1b247c370",
+   "en": "All materials are perfectly sized for the H Series—no trimming needed. Plus, Bambu Suite comes with pre-tested calibration settings for every material. Just load the material, choose your preferred effect, and you’re ready to go.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[2].line[1]",
+    "near": "Easy to Use, Beginner-Friendly"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb0d0ac6b67136981925c8c907ed9a2876346488445a0c9cb6a6f79b0de44492",
+   "en": "Premium Quality for Your Premium Work",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[3].line[0]",
+    "near": "Each Bambu Lab material undergoes strict quality control to ensure stable, high-performance results. Take Bambu plywood as an example—constructed with a premium"
+   },
+   "dict": null
+  },
+  {
+   "h": "d516f41166e806aa5d24d175ab5f6fe1e6812a05cd9454a2d246f53f1088cf81",
+   "en": "Each Bambu Lab material undergoes strict quality control to ensure stable, high-performance results. Take Bambu plywood as an example—constructed with a premium poplar core, it offers a uniform fiber structure, minimizes charring, and guarantees smooth cuts with a flawless finish.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[3].line[1]",
+    "near": "Premium Quality for Your Premium Work"
+   },
+   "dict": null
+  },
+  {
+   "h": "a111c9ce8bcbf2d46c0d21013cc9ee231f2a384baaec533d1ddf02c968f6591f",
+   "en": "Please make sure to remove the protective film from the acrylic surface before processing.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[4].line[3]",
+    "near": "• When not in use, store plywood in sealed bags to maintain a stable moisture level. The sealed bag helps slow down both moisture absorption and moisture loss, "
+   },
+   "dict": null
+  },
+  {
+   "h": "fdaead190ae436011c037cefc96876c41d8d5446643f541213af37b4607b31fe",
+   "en": "For processing items such as stainless steel tags, PU iron-on patches, or aluminum cards, we strongly recommend using a Laser Grid Panel to ensure a smoother engraving process. If a Laser Grid Panel is unavailable, you can densely arrange the Laser Slats Pack before laser engraving and place the stainless steel tag on top of them.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[4].line[4]",
+    "near": "• Please make sure to remove the protective film from the acrylic surface before processing."
+   },
+   "dict": null
+  },
+  {
+   "h": "75ef9965dcc6ec1989c074b163b4401fbf58b86c566bad05fec062f03182216e",
+   "en": "8 Materials in One Kit",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "c27b4bf2a6075e035f811420faf35b055163ff3a2b1f22f6f743cb75773fb691",
+   "en": "CodeSync Auto-Match for Plywood and Acrylic",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[5].line[2]",
+    "near": "• 8 Materials in One Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "28cb936a7cde0740a9d80333d65ac04cffdeb686df5f3ace3a9f010543f668bf",
+   "en": "A Great First Kit for New Makers",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "blocks[5].line[3]",
+    "near": "• CodeSync Auto-Match for Plywood and Acrylic"
+   },
+   "dict": null
+  },
+  {
+   "h": "a92769fd468f96dc3103b136095d61a87b43ce770e1afc0a1b09f4aa66d26be2",
+   "en": "Matte Printable Vinyl Sticker Paper",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[0].line[0]",
+    "near": "Turn your designs into durable, professional stickers with our Matte Printable Vinyl Sticker Paper. This material delivers vibrant prints that dry instantly. Th"
+   },
+   "dict": null
+  },
+  {
+   "h": "84acc5f54e98ad2bc0072e594ccb5d971186fc7c4fbd637ba877f7d10f5363e4",
+   "en": "Turn your designs into durable, professional stickers with our Matte Printable Vinyl Sticker Paper. This material delivers vibrant prints that dry instantly. The PET liner helps prevent curling, ensuring a smooth, flat application. The firm-holding adhesive removes cleanly without leaving any sticky residue. It's ideal for all your creative projects, allowing you to easily print your own vibrant graphics, custom decals, product labels, and logos.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[0].line[1]",
+    "near": "Matte Printable Vinyl Sticker Paper"
+   },
+   "dict": null
+  },
+  {
+   "h": "813ffab2a4285190d778dd48c3f64ce6a7751c492b1dbd0800825223c8b5d1b2",
+   "en": "Vibrant, Quick-Drying Prints",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[1].line[0]",
+    "near": "Matte Printable Vinyl Sticker Paper delivers vibrant, high-quality prints that dry quickly. This versatile material is perfect for all your DIY projects, allowi"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b5ca1cfedd0d79cf70a35b534b145a46740f59c654f9dfd4b7b62af6da9b4b7",
+   "en": "Matte Printable Vinyl Sticker Paper delivers vibrant, high-quality prints that dry quickly. This versatile material is perfect for all your DIY projects, allowing you to create custom stickers and labels to apply to various surfaces like cups, notebooks, 3D-printed models, laptops, and more.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[1].line[1]",
+    "near": "Vibrant, Quick-Drying Prints"
+   },
+   "dict": null
+  },
+  {
+   "h": "5cbdbb2689a4093389288748967682de9b08b3a847619bde45a8a05174f11f15",
+   "en": "Strong Adhesive, Curl Resistance, and Clean Removal",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[2].line[0]",
+    "near": "The Matte Printable Vinyl Sticker Paper features a strong, firm-holding adhesive that resists curling. The PET liner ensures your stickers lay flat. Once placed"
+   },
+   "dict": null
+  },
+  {
+   "h": "b46de4db2cd42e760c90dd363c77fe6282ea8ec1ea8272fd0de87e5ee70f0d6c",
+   "en": "The Matte Printable Vinyl Sticker Paper features a strong, firm-holding adhesive that resists curling. The PET liner ensures your stickers lay flat. Once placed, the adhesive holds reliably to the surface, yet removes cleanly without leaving any residue behind.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[2].line[1]",
+    "near": "Strong Adhesive, Curl Resistance, and Clean Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "9eed9c65e0cee91e80e76637b0e04a7ce0c92d80cd1338dd60cd4d6d6fa6f3c6",
+   "en": "Click here to get more information about using the Matte Printable Vinyl Sticker Paper.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0c714c2f839aec0f78663e552d401a75c67a852b9bc94b835049c72ad09614a",
+   "en": "Vibrant, quick-drying prints",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "e419b004f594107cf61c6af2c434260bb786513a4218e4a2b9d12c78e8aa09a7",
+   "en": "Curl-resistant and residue-free",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[4].line[2]",
+    "near": "• Vibrant, quick-drying prints"
+   },
+   "dict": null
+  },
+  {
+   "h": "3753f58f8fa7f0fda433abe186d00f1db9995645a5b879124f05447b6240f778",
+   "en": "Designed for blade cutting",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "blocks[4].line[3]",
+    "near": "• Curl-resistant and residue-free"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e30f0c92948235c7d8253ec1e8d56df3d4c64822c3a0dfed232054806b34dcf",
+   "en": "A complete set of PU, paper, sticker, and vinyl materials. 3 categories, 7 types, and 67 pieces in total, featuring the most popular Bambu Lab cutting and printing-compatible options to bring your creative ideas to life.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-material-kit-–-starter-pack",
+    "title": "Cutting Material Kit – Starter Pack",
+    "field": "blocks[1].line[1]",
+    "near": "True All-in-One"
+   },
+   "dict": null
+  },
+  {
+   "h": "83f2f542fb16f829e22fc043939c1a4c6de3cbbc23f7e2132182c2a5f3bd1a4d",
+   "en": "All materials are perfectly sized for the H-Series and the A2L— No trimming needed. Plus, Bambu Suite includes pre-tested calibration settings for every material to ensure optimal cutting performance. Just load the material, choose your preferred effect, and you’re ready to go.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-material-kit-–-starter-pack",
+    "title": "Cutting Material Kit – Starter Pack",
+    "field": "blocks[2].line[1]",
+    "near": "Easy to Use, Beginner-Friendly"
+   },
+   "dict": null
+  },
+  {
+   "h": "c1aed4aa6352cc75fd9bf803b4b2677b69267bd73d5895922f052b8d651ed9a0",
+   "en": "When transferring vinyl material designs that are separated but need to be applied as a whole, transfer tape is required.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-material-kit-–-starter-pack",
+    "title": "Cutting Material Kit – Starter Pack",
+    "field": "blocks[3].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "3493bc48456911808b2e0eeca24d4f582200ef194e22a81c44b8d1cb081b91a9",
+   "en": "When processing vinyl material, it is recommended to use roller brushes and weeding tools to improve efficiency and precision.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-material-kit-–-starter-pack",
+    "title": "Cutting Material Kit – Starter Pack",
+    "field": "blocks[3].line[2]",
+    "near": "• When transferring vinyl material designs that are separated but need to be applied as a whole, transfer tape is required."
+   },
+   "dict": null
+  },
+  {
+   "h": "ee5ad681cca9e0059b73a309526de12527ccb3a668ccabcb46adbb9b7ed5f23c",
+   "en": "A Great Starter Kit for Users New to the Blade Cutting Module",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-material-kit-–-starter-pack",
+    "title": "Cutting Material Kit – Starter Pack",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1fc05331ba0672338493faea3b8c0722eef3629baa095c5165e84d622ec5fe3",
+   "en": "7 Materials in One Kit",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-material-kit-–-starter-pack",
+    "title": "Cutting Material Kit – Starter Pack",
+    "field": "blocks[4].line[2]",
+    "near": "• A Great Starter Kit for Users New to the Blade Cutting Module"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c5db9caad8fe80544b08255459538255ed2f32c7561b461c16903029a822482",
+   "en": "This kit contains vinyls, which must not be laser-cut",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-material-kit-–-starter-pack",
+    "title": "Cutting Material Kit – Starter Pack",
+    "field": "blocks[4].line[3]",
+    "near": "• 7 Materials in One Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "10ffd6a8598148d307232f88966511ac26d0911ab8b56b136139ed17cf728d42",
+   "en": "Caution for use",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-material-kit-–-starter-pack",
+    "title": "Cutting Material Kit – Starter Pack",
+    "field": "blocks[4].line[4]",
+    "near": "• This kit contains vinyls, which must not be laser-cut"
+   },
+   "dict": null
+  },
+  {
+   "h": "d31bf3208c25330f77bd0a126f73a4f59be6047e65230f90ad7933b852c00488",
+   "en": "Design Features and Use Scenarios",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[1].line[0]",
+    "near": "• 2.5D Creative Effect: This unique 2.5D framed model adds a subtle depth effect, making the airplane appear as if it’s coming out of the drawing. It’s a stando"
+   },
+   "dict": null
+  },
+  {
+   "h": "b888687af2edbcc659730e598d7706ad7c41a674f14bdc414e80b83b4342848c",
+   "en": "2.5D Creative Effect: This unique 2.5D framed model adds a subtle depth effect, making the airplane appear as if it’s coming out of the drawing. It’s a standout piece that brings more visual interest than a traditional flat blueprint.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[1].line[1]",
+    "near": "Design Features and Use Scenarios"
+   },
+   "dict": null
+  },
+  {
+   "h": "333e84cd3a33ec294de6284851a6004902fd3462f65cd6fefaae3ae1f7d71bea",
+   "en": "Perspective effect: The combination of a wooden frame and a 3D-printed PLA shell presents a three-dimensional airplane body. Rather than simply restoring the outer appearance, this model reveals the internal structure, better reflecting the blueprint aesthetic.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[1].line[2]",
+    "near": "• 2.5D Creative Effect: This unique 2.5D framed model adds a subtle depth effect, making the airplane appear as if it’s coming out of the drawing. It’s a stando"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a936f9ae647f387b6460063b1541739508a10c1c92d4dcd6dd1b9377b079372",
+   "en": "Size: With a frame size of 585 × 283 mm, this piece delivers a strong visual presence while revealing more internal details. The size is perfect for display and also works beautifully as a wall-mounted picture frame.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[1].line[3]",
+    "near": "• Perspective effect: The combination of a wooden frame and a 3D-printed PLA shell presents a three-dimensional airplane body. Rather than simply restoring the "
+   },
+   "dict": null
+  },
+  {
+   "h": "ab0c7c3556a1b507ea8ee07319c7a69af7fd5f225f281227bc15b13a4c468d49",
+   "en": "Details: The model includes interactive features such as rotatable propellers and movable ailerons, offering a more engaging display. It also highlights the aircraft’s signature element—the wing passage for engine maintenance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[1].line[4]",
+    "near": "• Size: With a frame size of 585 × 283 mm, this piece delivers a strong visual presence while revealing more internal details. The size is perfect for display a"
+   },
+   "dict": null
+  },
+  {
+   "h": "88d48935341f240d3de048ec838a8ec67a914d65c9de1ea8f128949f2140fbda",
+   "en": "Nameplate with backlight: The nameplate features a built-in backlight using a 6500K white LED light strip, adding a refined glow that enhances the overall visual appeal of the frame.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[1].line[5]",
+    "near": "• Details: The model includes interactive features such as rotatable propellers and movable ailerons, offering a more engaging display. It also highlights the a"
+   },
+   "dict": null
+  },
+  {
+   "h": "13d9c57135ce31f2f9dfee35de5ac63242c6ec569a223fb84b9bed2cfaefc132",
+   "en": "Important Informations:",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[2].line[0]",
+    "near": "• This model incorporates 3D printing elements. To inspire creative expression, the kit does not include 3D printing filaments—allowing you to freely choose the"
+   },
+   "dict": null
+  },
+  {
+   "h": "13bcb061c3434169369fd0366e0a1b8c71fb14cf9ecc58b9e552d7b6a100fc51",
+   "en": "This model incorporates 3D printing elements. To inspire creative expression, the kit does not include 3D printing filaments—allowing you to freely choose the colors and textures that suit your personal style and printing preferences.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[2].line[1]",
+    "near": "Important Informations:"
+   },
+   "dict": null
+  },
+  {
+   "h": "72f8d965a61f55f243459f3630b50370d6ca3328f4dcc432e6f036be2204f771",
+   "en": "Materials used for optional decorative purposes, such as waterslide decal paper and PVC/PET transparent stickers, are not included in the kit. You can also achieve great effects with carbon fiber sheets or printable vinyl sticker, which allows users to personalize their builds through DIY customization.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[2].line[2]",
+    "near": "• This model incorporates 3D printing elements. To inspire creative expression, the kit does not include 3D printing filaments—allowing you to freely choose the"
+   },
+   "dict": null
+  },
+  {
+   "h": "2025ea0b835da509365ab0dcd5954d85352e19b9a4eecc1f2cc77aa495cebb4d",
+   "en": "The background blueprint is intended to be printed on paper using a 2D printer. You can download the printable file and production guidelines in the Documentation section of this page and print it with a large-format printer or via a local print shop.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[2].line[3]",
+    "near": "• Materials used for optional decorative purposes, such as waterslide decal paper and PVC/PET transparent stickers, are not included in the kit. You can also ac"
+   },
+   "dict": null
+  },
+  {
+   "h": "173e326950cc398ef54b73925b47e98119acf53d472857fc28dd577d1f5fa2f6",
+   "en": "Building Tips",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[3].line[0]",
+    "near": "• Ensure that a person is always present to closely monitor the machine throughout the laser engraving and cutting process. At the same time, make sure the work"
+   },
+   "dict": null
+  },
+  {
+   "h": "773c5394d9ffa831a33fa1ad34a4babff0d16d3c572e296946334619e90abdf4",
+   "en": "Ensure that a person is always present to closely monitor the machine throughout the laser engraving and cutting process. At the same time, make sure the workspace is well ventilated and consider using a high‑efficiency air purification system for optimal air quality.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[3].line[1]",
+    "near": "Building Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "d3dec7f4c9152de2e7da5eaf27fb6aac04dd9f2f7cf974ce2e70b25929f455c5",
+   "en": "When using the 10w laser cutting module, the power limitation will result in slower processing speeds. The slower ablation process may cause edge carbonization, which is normal.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[3].line[2]",
+    "near": "• Ensure that a person is always present to closely monitor the machine throughout the laser engraving and cutting process. At the same time, make sure the work"
+   },
+   "dict": null
+  },
+  {
+   "h": "d25999fab1340ecae2efe503fa8e26c0eafc00ce05cc2cce7aa82fd2dbb9f2af",
+   "en": "Before assembly, please sand the cut edges with sandpaper to prevent carbonized powder from contaminating the model body.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[3].line[3]",
+    "near": "• When using the 10w laser cutting module, the power limitation will result in slower processing speeds. The slower ablation process may cause edge carbonizatio"
+   },
+   "dict": null
+  },
+  {
+   "h": "38cb28cc61ae155475f4d123b74661a079fed8054eb0bd54d09234185048b83e",
+   "en": "Please remove the protective film from the acrylic material before processing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[3].line[4]",
+    "near": "• Before assembly, please sand the cut edges with sandpaper to prevent carbonized powder from contaminating the model body."
+   },
+   "dict": null
+  },
+  {
+   "h": "d53105984b6eb99adcee498d581e29f4791f5a112c589903e7172ac490a7a6a3",
+   "en": "Click here for more of this model.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[3].line[5]",
+    "near": "• Please remove the protective film from the acrylic material before processing."
+   },
+   "dict": null
+  },
+  {
+   "h": "42fc453dc0740767ab122ee53a583816999b9c036de7726bc68422aa639b5011",
+   "en": "Click here for more material guides.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[3].line[6]",
+    "near": "• Click here for more of this model."
+   },
+   "dict": null
+  },
+  {
+   "h": "573e5d60b23dd9f1e7ed9a58d172f9b546e6113dabb5d87f2a4a042708eb0786",
+   "en": "A kit specially designed for this model.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "52db38768015f95db36939ee48a177cece2c15f0d65694d4b54096b27358fbc0",
+   "en": "Filaments are not included, so you can pick your preferred colors.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "blocks[5].line[2]",
+    "near": "• A kit specially designed for this model."
+   },
+   "dict": null
+  },
+  {
+   "h": "bf95b315787a265e586251d98dd29fa0c8a1e81f4f77591539770126c3e83b55",
+   "en": "Bambu Basswood Plywood",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu 2mm Basswood Plywood features a precisely controlled thickness that enables exceptional detail and smooth curves. Its flat, fine-grained surface is free f"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f981a79863ae21e8c5d25dbed818f60ff345aeea32f8f49b1666176f792ca57",
+   "en": "Bambu 2mm Basswood Plywood features a precisely controlled thickness that enables exceptional detail and smooth curves. Its flat, fine-grained surface is free from warping or burrs, making it easy to laser cut and engrave. The thin profile is perfect for crafting intricate, precise components in mechanical transmission models or for creating flexible, curved designs. Ideal for detailed decorations and fine crafts, its smooth surface also provides an excellent base for painting and finishing, bringing vibrant color to your creations. Plus, the E0 glue* reduces formaldehyde, enhancing air quality.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Bambu Basswood Plywood"
+   },
+   "dict": null
+  },
+  {
+   "h": "09e388cd4d8623a0b2a2c2fe823e3af5acb4c686c516799a881d772f188e8098",
+   "en": "2mm Basswood Plywood",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[1].line[2].cell[0]",
+    "near": "Material | Appearance | Applications | Advantages"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4b47d8d6b5293e69433bab1a92171ed72339015d1ff1e2827182877e06667ed",
+   "en": "Intricate detail crafts, mechanical transmission models, puzzles",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[1].line[2].cell[2]",
+    "near": "Material | Appearance | Applications | Advantages"
+   },
+   "dict": null
+  },
+  {
+   "h": "fbc649904bcdc3974eb2ac55ca8bf6fb0ace046cedc4a7d7c337fcd9bd634f7d",
+   "en": "High precision for intricate cuts, more flexible (Compared to 3mm), easy to cut and engrave, suitable for painting and detailed designs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[1].line[2].cell[3]",
+    "near": "Material | Appearance | Applications | Advantages"
+   },
+   "dict": null
+  },
+  {
+   "h": "1bca49a7f88ca2f066825a22b1fd21bef05305b8ec93cd2b22053df1b1ae4be3",
+   "en": "Delicate crafts, puzzles, children’s DIY, painting projects",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[1].line[3].cell[2]",
+    "near": "2mm Basswood Plywood | Fine wood grain, beige-yellow color | Intricate detail crafts, mechanical transmission models, puzzles | High precision for intricate cut"
+   },
+   "dict": null
+  },
+  {
+   "h": "bbb5453f0c9b29d51616d3ae22e1050a3d82d1bc01ae947adaf1b415208f855c",
+   "en": "High structural strength (Compared to 2mm), better support/rigidity, more durable, easy to cut and engrave, suitable for painting and detailed designs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[1].line[3].cell[3]",
+    "near": "2mm Basswood Plywood | Fine wood grain, beige-yellow color | Intricate detail crafts, mechanical transmission models, puzzles | High precision for intricate cut"
+   },
+   "dict": null
+  },
+  {
+   "h": "a90ba2aa62b3d736ef7398baf29c7f5231b7c35d139ac1f51e5446a184f73dd3",
+   "en": "Superior Precision for Dynamic Mechanics",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[4].line[0]",
+    "near": "Precision thickness allows for sharper details and minimal seams, resulting in exquisite cut pieces. This thin profile is perfect for crafting the intricate, pr"
+   },
+   "dict": null
+  },
+  {
+   "h": "505980b191141aa75b260cd6c91eae3fe53db71a737085c404118554f2822f60",
+   "en": "Precision thickness allows for sharper details and minimal seams, resulting in exquisite cut pieces. This thin profile is perfect for crafting the intricate, precise components required for functional, dynamic transmission models and fine mechanical assemblies.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[4].line[1]",
+    "near": "Superior Precision for Dynamic Mechanics"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ca5e71e19a9456e3dc198fc1913c8238eb9127d1292d04767759a169b66117f",
+   "en": "Enhanced Flexibility for Seamless Curvature",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[5].line[0]",
+    "near": "Enjoy bending and curving your models without cracking. The 2mm Basswood Plywood is ideal for projects with organic shapes, living hinges, or foldable designs. "
+   },
+   "dict": null
+  },
+  {
+   "h": "1d6b0abfdd563e870ea1efa923ce0b874b4cec4f2df8d9ce4f9c869bf44bd572",
+   "en": "Enjoy bending and curving your models without cracking. The 2mm Basswood Plywood is ideal for projects with organic shapes, living hinges, or foldable designs. It maintains strength while offering the flexibility to explore more creative forms.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[5].line[1]",
+    "near": "Enhanced Flexibility for Seamless Curvature"
+   },
+   "dict": null
+  },
+  {
+   "h": "f33f0bc340d801ca035b6b02a6aa52422e55fd7921f0e56381061533f6ac4393",
+   "en": "Made for Fine Details and Flexible Designs",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[9].line[2]",
+    "near": "• CodeSync Auto-Match"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2409ff891fc841f3db96c69df034b09862625494a1efcee8856a82382a2b48b",
+   "en": "Precise thickness: 2±0.2 mm",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[9].line[4]",
+    "near": "• Poplar Core to Minimize Charring"
+   },
+   "dict": null
+  },
+  {
+   "h": "249e30dc950ec2fbd1a53127da043cf114270a2e9595d49cd5891be990d28262",
+   "en": "Black Square Stone Slate Coasters",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "Made from premium natural black slate, these elegant coasters combine style with everyday functionality. Perfect for laser engraving or DIY customization, they "
+   },
+   "dict": null
+  },
+  {
+   "h": "5804ab0e2873c62fd99311092714b7f87a897ee3af844e2a877ab3e943b43ef0",
+   "en": "Unique Texture, Personalized Design",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[1].line[0]",
+    "near": "Crafted from natural black slate, these coasters are perfect for laser engraving or DIY artwork. Whether you’re adding artistic patterns or a personalized logo,"
+   },
+   "dict": null
+  },
+  {
+   "h": "10881eaac8fc87269d4b066b4b03c826c6680322a81f767f87c4276c8a75ca8e",
+   "en": "Crafted from natural black slate, these coasters are perfect for laser engraving or DIY artwork. Whether you’re adding artistic patterns or a personalized logo, each piece showcases its own unique texture and brings a touch of ceremony to every toast. Elegant, customizable, and timeless, they also make an excellent gift for any occasion.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Unique Texture, Personalized Design"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a1df65687c52a7494503f5ae4f6285e42d87aff9bd71124b989dae11a4ec390",
+   "en": "Perfect for Hand-Painted DIY Projects",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[2].line[0]",
+    "near": "The slate surface is ideal for painting or decorating with pigments and markers, making it easy to create unique designs that showcase your creativity and perso"
+   },
+   "dict": null
+  },
+  {
+   "h": "182141b172429383f59c1815f63648d66be0a426d7bcc713f2d82c47379fcacb",
+   "en": "The slate surface is ideal for painting or decorating with pigments and markers, making it easy to create unique designs that showcase your creativity and personal style.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Perfect for Hand-Painted DIY Projects"
+   },
+   "dict": null
+  },
+  {
+   "h": "56a95a73cbeae2889f49f6ccd3f76a45e9ef16d2d8d0a2f94401a46830bdf937",
+   "en": "This product is crafted from natural stone; therefore, minor dust or debris upon arrival is normal, and the item may break if subjected to strong impact.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[3].line[2]",
+    "near": "• Ensure that a person is always present to closely monitor the machine throughout the laser engraving process."
+   },
+   "dict": null
+  },
+  {
+   "h": "496633c4e39e3cd2172439a93f43fcaf7fc7123acb50f590a1ab498a507a80b1",
+   "en": "Premium natural black slate material",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "57ca2f21c5963cfe0aca912fbb597e829f9df4dfd95eb7ec6988d7401f6d6535",
+   "en": "Perfect for laser engraving and DIY projects",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[4].line[2]",
+    "near": "• Premium natural black slate material"
+   },
+   "dict": null
+  },
+  {
+   "h": "50bd276a8f7a92d3eee5c0b9214cd1c775e164f502cd072a81079ce7ad222afa",
+   "en": "Soft non-slip pads on the bottom",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[4].line[3]",
+    "near": "• Perfect for laser engraving and DIY projects"
+   },
+   "dict": null
+  },
+  {
+   "h": "55a05f484046133b8659be795ed546f238e1450bde4fd1007bf8652fc9a87c40",
+   "en": "Easy to decorate with pigments or markers",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "blocks[4].line[4]",
+    "near": "• Soft non-slip pads on the bottom"
+   },
+   "dict": null
+  },
+  {
+   "h": "f1a785e17053d6a94f5dae9734ca90d516f8819317e0ec9a261a7a8b561e2015",
+   "en": "Choose your pack for materials to expand your creative possibilities:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "blocks[0].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0454e468279e0c17e039b70d9e4c276bd01a89cbcfd6be65be500df752f3134",
+   "en": "📦- Laser Mystery Box (Inc.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "blocks[0].line[2]",
+    "near": "• Choose your pack for materials to expand your creative possibilities:"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd2e4a2e34c6ab14eb74a3cea4c9a505773918c10815c66c569b76fd529e63f7",
+   "en": "(1％ probability) .",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "blocks[0].line[3]",
+    "near": "• 📦- Laser Mystery Box (Inc."
+   },
+   "dict": null
+  },
+  {
+   "h": "32df3ab461be4537e91ca347b9599ed3ba5262a7908a6235289e62898abba61b",
+   "en": "📦- Cutting Mystery Box (Inc.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "blocks[0].line[4]",
+    "near": "• (1％ probability) ."
+   },
+   "dict": null
+  },
+  {
+   "h": "366364996d12fafcba8241a17045343969d07050c144f9eebb0ffa778dbeb6da",
+   "en": "Purchase Tips:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "blocks[0].line[6]",
+    "near": "• (1％ probability) ."
+   },
+   "dict": null
+  },
+  {
+   "h": "8c41b0d2ea39663914dd3285f486d7ecae4cd694da23800cfc7fa5710eea516e",
+   "en": "(1) Random Selection: All Materials contained in the Mystery Boxes are supplied randomly, and specific variants, colors and styles are not be guaranteed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "blocks[0].line[7]",
+    "near": "• Purchase Tips:"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4a363325263b4b54e2049e9934aa6a91ff00ae128bbbb35026a5e79837b12a0",
+   "en": "Create a warm winter scene with this hybrid decorative house, expertly crafted with laser-cut wood and 3D-printed details. Featuring engraved wood textures, a snowy base, and frosted rooftops, it blends handcrafted charm with modern making techniques. The house includes a complete LED lamp kit, allowing it to glow softly from within, with light shining gently through the windows. Add your own small seasonal decorations to complete a festive display that’s both enchanting and personal.Ideal as a centerpiece, a DIY project, or a gift, this illuminated cottage brings a cozy, inviting atmosphere to any space. Just click here to get the model files.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a0e8ad3537917fc89b06a07b77998b3a98a58f1d2b7ce4336a1e2abd8d748536",
+   "en": "Design Features",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[1].line[0]",
+    "near": "• Hybrid Build: Laser-cut wooden walls and roof + 3D-printed snow base"
+   },
+   "dict": null
+  },
+  {
+   "h": "18edf6ac61d74e8a1a4e16d8a5af571df057ab409584e890b99ef3a29d8a0ae0",
+   "en": "Hybrid Build: Laser-cut wooden walls and roof + 3D-printed snow base",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[1].line[1]",
+    "near": "Design Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a6b851b5739b15fa2d0631b9fcb6ad87fb1fba45b395bcc94a29d33c3025936",
+   "en": "Engraved Textures: Beautifully etched wood grain and fine architectural details",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[1].line[2]",
+    "near": "• Hybrid Build: Laser-cut wooden walls and roof + 3D-printed snow base"
+   },
+   "dict": null
+  },
+  {
+   "h": "649a08b2cdac2901ce617b15f9bd85a816d66ab090e87cf0225155368cab4c7b",
+   "en": "Snow Accents: Light 3D-printed snow effects for a wintry atmosphere",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[1].line[3]",
+    "near": "• Engraved Textures: Beautifully etched wood grain and fine architectural details"
+   },
+   "dict": null
+  },
+  {
+   "h": "8eac73b122a889c1d66cba05e92042ede5bbfc374682caac7658bcf168e182d8",
+   "en": "LED-Ready: Compatible with the LED lamp kit",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[1].line[4]",
+    "near": "• Snow Accents: Light 3D-printed snow effects for a wintry atmosphere"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e53c0ac00faef9ee2e21228bb15d09c4901f0d332ce46a30a89f5d52116849b",
+   "en": "Customization: Add your own Christmas decorations for a personal touch",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[1].line[5]",
+    "near": "• LED-Ready: Compatible with the LED lamp kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "c77b5ab60b4f7c9dedec27ba9f36545d981751561ba59604846cd80ca8e8f0f9",
+   "en": "Filament: White basic PLA recommended for snow.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[2].line[1]",
+    "near": "Building Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "56d1b5d40e2fb71f818e8619d12d88d1b7bba991aca4cd222700525e9e179009",
+   "en": "Plywood: 3 mm plywood sheets. Each wooden sheet requires about 60 minutes to cut and engrave.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[2].line[2]",
+    "near": "• Filament: White basic PLA recommended for snow."
+   },
+   "dict": null
+  },
+  {
+   "h": "dec8507fc24891ae4f4868838ac98e95ec6a101956e7481d89884eea4fb5629c",
+   "en": "Snow parts: No supports are needed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[2].line[3]",
+    "near": "• Plywood: 3 mm plywood sheets. Each wooden sheet requires about 60 minutes to cut and engrave."
+   },
+   "dict": null
+  },
+  {
+   "h": "944a292ed5aaf33d82fef5a6f9e600a1af83a35c420159a4e9693d9ca9169f50",
+   "en": "Carefully remove the snow details from the plate — a scraper is recommended.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[2].line[4]",
+    "near": "• Snow parts: No supports are needed."
+   },
+   "dict": null
+  },
+  {
+   "h": "66a64c8d52ada05ad16fc13e8b893860aa2d1957d692399f2da932aa4e5114ec",
+   "en": "Use light wood glue or craft glue to secure the wooden parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[2].line[5]",
+    "near": "• Carefully remove the snow details from the plate — a scraper is recommended."
+   },
+   "dict": null
+  },
+  {
+   "h": "6efc7eabd0962d10a7fce1501a94b929ae1394e0ff6141ca69f33c10297718e3",
+   "en": "Filament is an optional add-on, based on your needs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "blocks[3].line[2]",
+    "near": "• A kit specially designed for this model."
+   },
+   "dict": null
+  },
+  {
+   "h": "4407558a359c5bf96b7a4162b2d7040fc5dc7be6b0d909593571c07fab8b6e80",
+   "en": "This pinball machine is a unique hybrid project that combines two different technologies: laser cutting/engraving and 3D printing, bringing to life a retro-style game inspired by the world of Pac-Man. The base and playfield are made of 3mm basswood plywood, laser-cut for precise shapes and engraved details directly on the surface. The engravings include decorative writings such as PINBALL, RUN, and GAME OVER, as well as iconic shapes of Pac-Man and the ghosts, enriching the playfield with a nostalgic style. Just click here to get the assembly guide.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd1a67d08652c1969f7a05b7f73edc74d51ba38d27ed3606834138bf484f8b40",
+   "en": "The result is a completely mechanical game, without electronics, that combines craftsmanship, retro design, and modern technologies, offering a gaming experience that is both simple and fascinating.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "blocks[1].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "009b703dc8dd3e415fd0fca4520d383bb4d228b0c1cca9036781046504abbd0a",
+   "en": "The ball launching system is located on the right side and can be operated manually.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "blocks[2].line[1]",
+    "near": "Design Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "bfa0c6ac8b4cd528f4da99762a9101ced845db327e4bb1097e45e1aa65f34e75",
+   "en": "The steel balls are stored in the front compartment engraved with GAME OVER.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "blocks[2].line[2]",
+    "near": "• The ball launching system is located on the right side and can be operated manually."
+   },
+   "dict": null
+  },
+  {
+   "h": "3c6d472cf326198ed645ba5d633304d85d43a6e96c0c0836e47918a26776afce",
+   "en": "The laser engravings not only embellish the pinball but also serve as gameplay guides, marking paths and targets.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "blocks[2].line[3]",
+    "near": "• The steel balls are stored in the front compartment engraved with GAME OVER."
+   },
+   "dict": null
+  },
+  {
+   "h": "95d4cfd349795f96915c8fa77f64e281ee8719a91428a036ccf64da89f5155df",
+   "en": "The combination of natural wood colors and red details creates a vivid and eye-catching contrast.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "blocks[2].line[4]",
+    "near": "• The laser engravings not only embellish the pinball but also serve as gameplay guides, marking paths and targets."
+   },
+   "dict": null
+  },
+  {
+   "h": "77a52aebf60ca2fe74b60e7634c9d9e1e0a1f8563d3837f64ca35a35a601b771",
+   "en": "This pinball can be played with multiple balls at the same time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "blocks[2].line[5]",
+    "near": "• The combination of natural wood colors and red details creates a vivid and eye-catching contrast."
+   },
+   "dict": null
+  },
+  {
+   "h": "beb7d84b4edc84c233823e29082335954cbe54085efe9b660776654476a00615",
+   "en": "In addition to the right-side launcher, it is possible to release multiple balls simultaneously from the top by holding down the red button.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "blocks[2].line[6]",
+    "near": "• This pinball can be played with multiple balls at the same time."
+   },
+   "dict": null
+  },
+  {
+   "h": "ee909505796c5e1939d831fda904f6b140f0d991e0b9cf9f83119a557cdbf5c4",
+   "en": "This model is compatible with the Maker’s Beginner Kit (B-ZC002). The kit includes various non-printed parts to support multiple designs, so some components may not be necessary for this specific model.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "blocks[3].line[1]",
+    "near": "Building Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "897abf51d70f1fd012e9f9598b0be5dc51435dec459f547ade97c94ae48293fe",
+   "en": "Why Choose the Ultimate Opaque Glossy Acrylic Kit",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "ultimate-opaque-glossy-acrylic-kit",
+    "title": "Ultimate 3mm Opaque Glossy Acrylic Kit (15 pcs)",
+    "field": "blocks[0].line[0]",
+    "near": "No need to settle for one when you can have the full palette! This curated acrylic kit is designed to help you master intricate models with ease. By combining f"
+   },
+   "dict": null
+  },
+  {
+   "h": "a8f769640c4c2364aab6ddb09338e79781a550e098b7064f044b17d05635ad92",
+   "en": "No need to settle for one when you can have the full palette! This curated acrylic kit is designed to help you master intricate models with ease. By combining five vivid colors in one package, you can bring multi-layered designs to life and significantly enrich your crafting experience.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ultimate-opaque-glossy-acrylic-kit",
+    "title": "Ultimate 3mm Opaque Glossy Acrylic Kit (15 pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Why Choose the Ultimate Opaque Glossy Acrylic Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "59677fdb570cf64b4be0e0e0ac639b24d4b6263a1add0cb504f87929f63d9414",
+   "en": "By precisely controlling thickness, it minimizes variations in each sheet, improving the consistency of your projects and making assembly easier. Whether crafting intricate decor or mass-producing for your business, you can rely on Bambu Acrylic sheets for smooth, uniform cuts and stress-free accuracy.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ultimate-opaque-glossy-acrylic-kit",
+    "title": "Ultimate 3mm Opaque Glossy Acrylic Kit (15 pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Engineered for Consistency: Tight Thickness Tolerance, Every Sheet"
+   },
+   "dict": null
+  },
+  {
+   "h": "e18a3f95c2d8d13352b2d04ba43d3d27cdc8e6355ca0bf7b86a831e4501081d4",
+   "en": "Bambu PU Leather Patches are crafted from premium, waterproof leather with a heavy-duty 3M self-adhesive backing. Specifically designed for precision laser engraving, the surface coating peels away to reveal a vibrant contrasting color underneath. Perfect for adding custom flair to canvas bags, baseball caps, and more—simply peel and stick; no ironing required.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "round-pu-leather-patch-sticker",
+    "title": "Round PU Leather Patch Sticker",
+    "field": "blocks[0].line[1]",
+    "near": "Round PU Leather Patch Sticker"
+   },
+   "dict": null
+  },
+  {
+   "h": "bcb370adbaed581ee5747e1bb0496ae73a8f36f6eecc66e9a9e7cbbe6ecff915",
+   "en": "To enhance your engraving experience, a Laser Grid Panel is recommended as the work surface. If unavailable, you can densely arrange Laser Slats Pack and place the Round PU Leather Patch Sticker on top of them.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "round-pu-leather-patch-sticker",
+    "title": "Round PU Leather Patch Sticker",
+    "field": "blocks[1].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a89e86ced72a5e1efb72b58684c541ea74f69d9183d79a8d999ee589c61b4c6",
+   "en": "Engrave to Reveal Color",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "round-pu-leather-patch-sticker",
+    "title": "Round PU Leather Patch Sticker",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "180231a40d84f6ad69b87f513e5800d23b3d3dca0faf7942aab2e38f6862e00b",
+   "en": "Self-Adhesive 3M Backing, No Need to Iron On",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "round-pu-leather-patch-sticker",
+    "title": "Round PU Leather Patch Sticker",
+    "field": "blocks[2].line[2]",
+    "near": "• Engrave to Reveal Color"
+   },
+   "dict": null
+  },
+  {
+   "h": "e18e6949359c26a4f46dda26a19a8f17b102a0329c04ae9129b23db30b118aaa",
+   "en": "Sleek Appearance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "round-pu-leather-patch-sticker",
+    "title": "Round PU Leather Patch Sticker",
+    "field": "blocks[2].line[3]",
+    "near": "• Self-Adhesive 3M Backing, No Need to Iron On"
+   },
+   "dict": null
+  },
+  {
+   "h": "0cc6ee66fabdb63f555f402c62a4102be01d533dc0e14176936d3815a8782e88",
+   "en": "Durable and Water Proof",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "round-pu-leather-patch-sticker",
+    "title": "Round PU Leather Patch Sticker",
+    "field": "blocks[2].line[4]",
+    "near": "• Sleek Appearance"
+   },
+   "dict": null
+  }
+ ]
+}

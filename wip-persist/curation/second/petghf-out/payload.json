@@ -1,0 +1,2274 @@
+{
+ "protocol": 2,
+ "source": "bambu_us",
+ "source_product_id": "8280001544328",
+ "handle": "petg-hf",
+ "route": "552709755819347968>552709756440104960>552709756469465088",
+ "write_mode": "create",
+ "product_id": "p_6b9fddc2e6306d2dde4512c0",
+ "curated_sha256": "",
+ "extraction_sha256": "c7d03ddbf589ca4d56974addbfca909a13743e32db52743d9fa98149d5aae782",
+ "product": {
+  "title_en": "PETG HF",
+  "short_description_en": "PETG HF is a fully optimized PETG filament designed specifically for high-speed printing. With a default printing speed that is twice as fast as standard PETG filaments, PETG HF takes your printing efficiency to new heights. It effectively addresses common issues such as oozing and clumping associated with regular PETG, ensuring smoother and more reliable prints. The new matte finish not only enhances the aesthetic by smoothing out uneven gloss during speed transitions but also provides a consistently uniform look. Offering greater durability and toughness than PLA, PETG HF is the ideal choice for creating long-lasting items with an improved finish and faster production times.",
+  "variant_mode": "VARIANT_COMBINATION",
+  "usage_steps": [],
+  "usage_official_url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament"
+ },
+ "groups": [
+  {
+   "id": "og_b887b235931654936b9ae0de",
+   "source_id": "10935428120712",
+   "sort": 1,
+   "name_en": "Colour",
+   "name_ar": "اللون",
+   "name_ckb": "ڕەنگ",
+   "kind": "color",
+   "source_label": "Color",
+   "default_value_id": "ov_dd9cca8aa304e8667da67c57",
+   "values": [
+    {
+     "id": "ov_dd9cca8aa304e8667da67c57",
+     "source_id": "564681894469070866",
+     "name_en": "Black (33102)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-4b971d0a5a4da5203cb0f460",
+     "variant_label": "Black (33102)",
+     "sort": 0,
+     "colour_code": "33102"
+    },
+    {
+     "id": "ov_d6622eedcc03d3735a7a0bce",
+     "source_id": "564681894469070867",
+     "name_en": "White (33100)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-0f59eff3188cadf231c3095f",
+     "variant_label": "White (33100)",
+     "sort": 1,
+     "colour_code": "33100"
+    },
+    {
+     "id": "ov_981dac9a1e22d5204c069ee3",
+     "source_id": "564681894469070864",
+     "name_en": "Red (33200)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-aaa5da4c7eb1df1e88795c1e",
+     "variant_label": "Red (33200)",
+     "sort": 2,
+     "colour_code": "33200"
+    },
+    {
+     "id": "ov_37b553df8ffab7f05b1c2e05",
+     "source_id": "564681894469070868",
+     "name_en": "Gray (33101)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-ba0f90ea191ba8c1027375c6",
+     "variant_label": "Gray (33101)",
+     "sort": 3,
+     "colour_code": "33101"
+    },
+    {
+     "id": "ov_03b4a1616b231b38fec92037",
+     "source_id": "564681894469070874",
+     "name_en": "Dark Gray (33103)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-38cfb9ce209a7ea93af0309d",
+     "variant_label": "Dark Gray (33103)",
+     "sort": 4,
+     "colour_code": "33103"
+    },
+    {
+     "id": "ov_4e79bfb5e2337fa09dfed692",
+     "source_id": "564681894469070875",
+     "name_en": "Cream (33401)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-7ab908fbeaf561c14d583b70",
+     "variant_label": "Cream (33401)",
+     "sort": 5,
+     "colour_code": "33401"
+    },
+    {
+     "id": "ov_be98a7448eac9874cdd8a48e",
+     "source_id": "564681894469070869",
+     "name_en": "Yellow (33400)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-209e86d90e95fd314c867766",
+     "variant_label": "Yellow (33400)",
+     "sort": 6,
+     "colour_code": "33400"
+    },
+    {
+     "id": "ov_1068e8074d7437391927e99b",
+     "source_id": "564681894469070870",
+     "name_en": "Orange (33300)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-d5406c61718260459fbba7d2",
+     "variant_label": "Orange (33300)",
+     "sort": 7,
+     "colour_code": "33300"
+    },
+    {
+     "id": "ov_ed62f2afc38cafd625f755ed",
+     "source_id": "564681894469070873",
+     "name_en": "Peanut Brown (33801)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-a595095934ee593f6fd681c2",
+     "variant_label": "Peanut Brown (33801)",
+     "sort": 8,
+     "colour_code": "33801"
+    },
+    {
+     "id": "ov_5d4a0f05a728347cc8576558",
+     "source_id": "564681894469070876",
+     "name_en": "Lime Green (33501)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-89bbf6b36781849bede325e7",
+     "variant_label": "Lime Green (33501)",
+     "sort": 9,
+     "colour_code": "33501"
+    },
+    {
+     "id": "ov_1c50b993f8147a47bb512b4f",
+     "source_id": "564681894469070871",
+     "name_en": "Green (33500)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-42b12ddbb9c1fcc7f9a897a0",
+     "variant_label": "Green (33500)",
+     "sort": 10,
+     "colour_code": "33500"
+    },
+    {
+     "id": "ov_701827f474bc7e2570c4474e",
+     "source_id": "564681894469070872",
+     "name_en": "Forest Green (33502)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-35867233b2f403f71b45d570",
+     "variant_label": "Forest Green (33502)",
+     "sort": 11,
+     "colour_code": "33502"
+    },
+    {
+     "id": "ov_b8b25b541caee8092ea91dc8",
+     "source_id": "564681894469070877",
+     "name_en": "Lake Blue (33601)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-2a60ba57d4a4c77703e01d62",
+     "variant_label": "Lake Blue (33601)",
+     "sort": 12,
+     "colour_code": "33601"
+    },
+    {
+     "id": "ov_1f32f71328fc194d851f0e9d",
+     "source_id": "564681894469070865",
+     "name_en": "Blue (33600)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-5ab2c295a4faa26ba5dcf756",
+     "variant_label": "Blue (33600)",
+     "sort": 13,
+     "colour_code": "33600"
+    }
+   ]
+  },
+  {
+   "id": "og_22b442d5f5b2155ba73f0fb2",
+   "source_id": "10935428153480",
+   "sort": 2,
+   "name_en": "Spool",
+   "name_ar": "البكرة",
+   "name_ckb": "ماسوورە",
+   "kind": "spool",
+   "source_label": "Type",
+   "default_value_id": "ov_0d2f88a775d9b044670bba1e",
+   "values": [
+    {
+     "id": "ov_0d2f88a775d9b044670bba1e",
+     "source_id": "564681894469070878",
+     "name_en": "Refill",
+     "name_ar": "عبوة بدون بكرة",
+     "name_ckb": "پڕکردنەوە بەبێ ماسوورە",
+     "variant_key": "bv-2a5dffaab2b3c03d5065c167",
+     "variant_label": "Refill",
+     "sort": 0,
+     "colour_code": ""
+    },
+    {
+     "id": "ov_69d17d3ff554fd18e546bcee",
+     "source_id": "564681894469070879",
+     "name_en": "Filament with spool",
+     "name_ar": "مع بكرة",
+     "name_ckb": "لەگەڵ ماسوورە",
+     "variant_key": "bv-cf785697dfaec2c85bf9d1d1",
+     "variant_label": "Filament with spool",
+     "sort": 1,
+     "colour_code": ""
+    }
+   ]
+  },
+  {
+   "id": "og_1eeb9aeea9b97fa5c7e78a18",
+   "source_id": "10935428186248",
+   "sort": 3,
+   "name_en": "Net weight",
+   "name_ar": "الوزن الصافي",
+   "name_ckb": "کێشی پوخت",
+   "kind": "pack",
+   "source_label": "Size",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_f4c671c3cd44304983f9a3a4",
+     "source_id": "564681894469070880",
+     "name_en": "1 kg",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-e76d01229426f8e6e619211a",
+     "variant_label": "1 kg",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  }
+ ],
+ "variants": [
+  {
+   "id": "pv_f9883d19ddf847d9afa3bc93",
+   "source_id": "42735939420296",
+   "combo_key": "o:ov_1f32f71328fc194d851f0e9d|o:ov_69d17d3ff554fd18e546bcee|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_1f32f71328fc194d851f0e9d",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_3690e04c6afff4b3254b2453",
+   "source_id": "42735939551368",
+   "combo_key": "o:ov_69d17d3ff554fd18e546bcee|o:ov_981dac9a1e22d5204c069ee3|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_981dac9a1e22d5204c069ee3",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_c9352147f5f6628003e7f4b3",
+   "source_id": "42735939682440",
+   "combo_key": "o:ov_69d17d3ff554fd18e546bcee|o:ov_dd9cca8aa304e8667da67c57|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_dd9cca8aa304e8667da67c57",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_2ae6648287d6b3e0c80a47c9",
+   "source_id": "42735939715208",
+   "combo_key": "o:ov_0d2f88a775d9b044670bba1e|o:ov_dd9cca8aa304e8667da67c57|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_dd9cca8aa304e8667da67c57",
+    "ov_0d2f88a775d9b044670bba1e",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_942ecf56095fb6a6c6f4a479",
+   "source_id": "42735939747976",
+   "combo_key": "o:ov_37b553df8ffab7f05b1c2e05|o:ov_69d17d3ff554fd18e546bcee|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_37b553df8ffab7f05b1c2e05",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_979f4a0633e7129d87d59a30",
+   "source_id": "42735939813512",
+   "combo_key": "o:ov_69d17d3ff554fd18e546bcee|o:ov_d6622eedcc03d3735a7a0bce|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_d6622eedcc03d3735a7a0bce",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_9d4cf214f6747ff0bbfc8104",
+   "source_id": "654207405072093185",
+   "combo_key": "o:ov_03b4a1616b231b38fec92037|o:ov_69d17d3ff554fd18e546bcee|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_03b4a1616b231b38fec92037",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_34d41d67ad3c55251c7c7fc4",
+   "source_id": "654207405072093191",
+   "combo_key": "o:ov_4e79bfb5e2337fa09dfed692|o:ov_69d17d3ff554fd18e546bcee|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_4e79bfb5e2337fa09dfed692",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_f8dbcf95182f045d0ba08772",
+   "source_id": "654207405072093197",
+   "combo_key": "o:ov_1068e8074d7437391927e99b|o:ov_69d17d3ff554fd18e546bcee|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_1068e8074d7437391927e99b",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_3e91fccd02b63e00f0927441",
+   "source_id": "654207405072093203",
+   "combo_key": "o:ov_1c50b993f8147a47bb512b4f|o:ov_69d17d3ff554fd18e546bcee|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_1c50b993f8147a47bb512b4f",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_72ce9d22a36d1fc748884ab6",
+   "source_id": "654943233990885377",
+   "combo_key": "o:ov_69d17d3ff554fd18e546bcee|o:ov_be98a7448eac9874cdd8a48e|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_be98a7448eac9874cdd8a48e",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_10f34a06c34e04d69ef811c0",
+   "source_id": "654943233990885383",
+   "combo_key": "o:ov_5d4a0f05a728347cc8576558|o:ov_69d17d3ff554fd18e546bcee|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_5d4a0f05a728347cc8576558",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_1411b30530643c12b420c37a",
+   "source_id": "654943233990885389",
+   "combo_key": "o:ov_69d17d3ff554fd18e546bcee|o:ov_701827f474bc7e2570c4474e|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_701827f474bc7e2570c4474e",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_ab24af0eba5b35662bcba0bd",
+   "source_id": "654943233990885395",
+   "combo_key": "o:ov_69d17d3ff554fd18e546bcee|o:ov_b8b25b541caee8092ea91dc8|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_b8b25b541caee8092ea91dc8",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  },
+  {
+   "id": "pv_c47a7e55f372d77470cc6081",
+   "source_id": "659540022699311104",
+   "combo_key": "o:ov_69d17d3ff554fd18e546bcee|o:ov_ed62f2afc38cafd625f755ed|o:ov_f4c671c3cd44304983f9a3a4",
+   "value_ids": [
+    "ov_ed62f2afc38cafd625f755ed",
+    "ov_69d17d3ff554fd18e546bcee",
+    "ov_f4c671c3cd44304983f9a3a4"
+   ]
+  }
+ ],
+ "images": [
+  {
+   "id": "pi_fb5ada98376da4ed2176de22",
+   "source_media_id": "37257776824456",
+   "source_url": "https://store.bblcdn.com/s7/default/834a8ad1816747b290e1d6c0ea018942/PETGHF_6.jpg",
+   "sort_order": 0,
+   "is_primary": true,
+   "option_value_id": "ov_dd9cca8aa304e8667da67c57",
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "value",
+   "alt_en": "PETG HF — Black (33102)",
+   "alt_ar": "صورة PETG HF — Black (33102)",
+   "alt_ckb": "وێنەی PETG HF — Black (33102)"
+  },
+  {
+   "id": "pi_0bb51a7f80d536fb88cf7480",
+   "source_media_id": "37257776824456",
+   "source_url": "https://store.bblcdn.com/s7/default/834a8ad1816747b290e1d6c0ea018942/PETGHF_6.jpg",
+   "sort_order": 1,
+   "is_primary": false,
+   "option_value_id": "ov_0d2f88a775d9b044670bba1e",
+   "variant_id": null,
+   "via_variant_id": "pv_2ae6648287d6b3e0c80a47c9",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Refill",
+   "alt_ar": "صورة PETG HF — عبوة بدون بكرة",
+   "alt_ckb": "وێنەی PETG HF — پڕکردنەوە بەبێ ماسوورە"
+  },
+  {
+   "id": "pi_f60b3455de49244337ec6609",
+   "source_media_id": "37343406555272",
+   "source_url": "https://store.bblcdn.com/s7/default/74641acf3ac041bb8a93319a534f2096/PETG_HF_pic.jpg",
+   "sort_order": 2,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "general",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF"
+  },
+  {
+   "id": "pi_d116bc25ef2b312c59dda859",
+   "source_media_id": "762170226073677824",
+   "source_url": "https://store.bblcdn.com/s7/default/d9169957dc2f414dbbf555a00afa7ac8/In_the_Box_3.jpg",
+   "sort_order": 3,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "general",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF"
+  },
+  {
+   "id": "pi_f6fb6d478087f35f1fa42ea9",
+   "source_media_id": "37257776922760",
+   "source_url": "https://store.bblcdn.com/s7/default/7c949a22d4fb484da7aefd5d2abed7b0/PETGHF_7.jpg",
+   "sort_order": 4,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_979f4a0633e7129d87d59a30",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — White (33100) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — White (33100) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — White (33100) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_0216f6bec35db4a912b9fbcc",
+   "source_media_id": "37257776922760",
+   "source_url": "https://store.bblcdn.com/s7/default/7c949a22d4fb484da7aefd5d2abed7b0/PETGHF_7.jpg",
+   "sort_order": 5,
+   "is_primary": false,
+   "option_value_id": "ov_d6622eedcc03d3735a7a0bce",
+   "variant_id": null,
+   "via_variant_id": "pv_979f4a0633e7129d87d59a30",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — White (33100)",
+   "alt_ar": "صورة PETG HF — White (33100)",
+   "alt_ckb": "وێنەی PETG HF — White (33100)"
+  },
+  {
+   "id": "pi_2a41240a446cadd4107cfa67",
+   "source_media_id": "37288264302728",
+   "source_url": "https://store.bblcdn.com/s7/default/2167472e11724b8bb44afcc2e365a703/5_86b594d6-b4dd-498d-8adc-51ca350410e3.jpg",
+   "sort_order": 6,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_3690e04c6afff4b3254b2453",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Red (33200) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Red (33200) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Red (33200) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_e2552f11e7b8161e4e9a5e99",
+   "source_media_id": "37288264302728",
+   "source_url": "https://store.bblcdn.com/s7/default/2167472e11724b8bb44afcc2e365a703/5_86b594d6-b4dd-498d-8adc-51ca350410e3.jpg",
+   "sort_order": 7,
+   "is_primary": false,
+   "option_value_id": "ov_981dac9a1e22d5204c069ee3",
+   "variant_id": null,
+   "via_variant_id": "pv_3690e04c6afff4b3254b2453",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Red (33200)",
+   "alt_ar": "صورة PETG HF — Red (33200)",
+   "alt_ckb": "وێنەی PETG HF — Red (33200)"
+  },
+  {
+   "id": "pi_68701e94a286b2c3d97ed7df",
+   "source_media_id": "37257776988296",
+   "source_url": "https://store.bblcdn.com/s7/default/b63d30f16c0746abba10d7ea131b3227/PETGHF_1.jpg",
+   "sort_order": 8,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_942ecf56095fb6a6c6f4a479",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Gray (33101) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Gray (33101) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Gray (33101) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_9d5b6f94dd4dc7ad7f98f5a8",
+   "source_media_id": "37257776988296",
+   "source_url": "https://store.bblcdn.com/s7/default/b63d30f16c0746abba10d7ea131b3227/PETGHF_1.jpg",
+   "sort_order": 9,
+   "is_primary": false,
+   "option_value_id": "ov_37b553df8ffab7f05b1c2e05",
+   "variant_id": null,
+   "via_variant_id": "pv_942ecf56095fb6a6c6f4a479",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Gray (33101)",
+   "alt_ar": "صورة PETG HF — Gray (33101)",
+   "alt_ckb": "وێنەی PETG HF — Gray (33101)"
+  },
+  {
+   "id": "pi_be5b3ce3d7ef4441eaff5360",
+   "source_media_id": "38993861574792",
+   "source_url": "https://store.bblcdn.com/s7/default/d7a3410895784371a81c014019dd5c63/PETGHFNEWCOLOR_3.jpg",
+   "sort_order": 10,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_9d4cf214f6747ff0bbfc8104",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Dark Gray (33103) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Dark Gray (33103) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Dark Gray (33103) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_a1288fd581f7d39ff4b70850",
+   "source_media_id": "38993861574792",
+   "source_url": "https://store.bblcdn.com/s7/default/d7a3410895784371a81c014019dd5c63/PETGHFNEWCOLOR_3.jpg",
+   "sort_order": 11,
+   "is_primary": false,
+   "option_value_id": "ov_03b4a1616b231b38fec92037",
+   "variant_id": null,
+   "via_variant_id": "pv_9d4cf214f6747ff0bbfc8104",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Dark Gray (33103)",
+   "alt_ar": "صورة PETG HF — Dark Gray (33103)",
+   "alt_ckb": "وێنەی PETG HF — Dark Gray (33103)"
+  },
+  {
+   "id": "pi_e3d0bf7bf487c2c3994a4b6f",
+   "source_media_id": "38993866096776",
+   "source_url": "https://store.bblcdn.com/s7/default/dafd5b1c76024c6d8ee05be7f56886b7/PETGHFNEWCOLOR_5.jpg",
+   "sort_order": 12,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_34d41d67ad3c55251c7c7fc4",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Cream (33401) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Cream (33401) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Cream (33401) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_e2715db9e99073161ad37e40",
+   "source_media_id": "38993866096776",
+   "source_url": "https://store.bblcdn.com/s7/default/dafd5b1c76024c6d8ee05be7f56886b7/PETGHFNEWCOLOR_5.jpg",
+   "sort_order": 13,
+   "is_primary": false,
+   "option_value_id": "ov_4e79bfb5e2337fa09dfed692",
+   "variant_id": null,
+   "via_variant_id": "pv_34d41d67ad3c55251c7c7fc4",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Cream (33401)",
+   "alt_ar": "صورة PETG HF — Cream (33401)",
+   "alt_ckb": "وێنەی PETG HF — Cream (33401)"
+  },
+  {
+   "id": "pi_bad203f036c93c4cfdbc1782",
+   "source_media_id": "37257776857224",
+   "source_url": "https://store.bblcdn.com/s7/default/e6e2585de3cf45bdafcdc906b5c30e78/PETGHF_2.jpg",
+   "sort_order": 14,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_72ce9d22a36d1fc748884ab6",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Yellow (33400) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Yellow (33400) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Yellow (33400) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_657923a1a9974de511c8cf4d",
+   "source_media_id": "37257776857224",
+   "source_url": "https://store.bblcdn.com/s7/default/e6e2585de3cf45bdafcdc906b5c30e78/PETGHF_2.jpg",
+   "sort_order": 15,
+   "is_primary": false,
+   "option_value_id": "ov_be98a7448eac9874cdd8a48e",
+   "variant_id": null,
+   "via_variant_id": "pv_72ce9d22a36d1fc748884ab6",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Yellow (33400)",
+   "alt_ar": "صورة PETG HF — Yellow (33400)",
+   "alt_ckb": "وێنەی PETG HF — Yellow (33400)"
+  },
+  {
+   "id": "pi_d2e0956e9936bf6355cdf223",
+   "source_media_id": "37332045267080",
+   "source_url": "https://store.bblcdn.com/s7/default/39ba5147066448eaaf9bc997a25371c6/PETG_HF_Model_4_94e94a3a-9205-479e-8a88-330ee5dcb937.png",
+   "sort_order": 16,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "general",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF"
+  },
+  {
+   "id": "pi_2c6acad189860ae6efacdb9b",
+   "source_media_id": "37257776955528",
+   "source_url": "https://store.bblcdn.com/s7/default/d8d6f7ca45704fc09849fca8dc510c75/PETGHF_4.jpg",
+   "sort_order": 17,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_f8dbcf95182f045d0ba08772",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Orange (33300) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Orange (33300) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Orange (33300) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_32a24a35985a6ab20efa1fee",
+   "source_media_id": "37257776955528",
+   "source_url": "https://store.bblcdn.com/s7/default/d8d6f7ca45704fc09849fca8dc510c75/PETGHF_4.jpg",
+   "sort_order": 18,
+   "is_primary": false,
+   "option_value_id": "ov_1068e8074d7437391927e99b",
+   "variant_id": null,
+   "via_variant_id": "pv_f8dbcf95182f045d0ba08772",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Orange (33300)",
+   "alt_ar": "صورة PETG HF — Orange (33300)",
+   "alt_ckb": "وێنەی PETG HF — Orange (33300)"
+  },
+  {
+   "id": "pi_87e63ffeee5458f0a0db1bc4",
+   "source_media_id": "38993857020040",
+   "source_url": "https://store.bblcdn.com/s7/default/8462f8d707ff46b697da7361c2cdb6e7/PETGHFNEWCOLOR_1.jpg",
+   "sort_order": 19,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_c47a7e55f372d77470cc6081",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Peanut Brown (33801) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Peanut Brown (33801) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Peanut Brown (33801) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_4cb3fc7fbb55d22926f29d11",
+   "source_media_id": "38993857020040",
+   "source_url": "https://store.bblcdn.com/s7/default/8462f8d707ff46b697da7361c2cdb6e7/PETGHFNEWCOLOR_1.jpg",
+   "sort_order": 20,
+   "is_primary": false,
+   "option_value_id": "ov_ed62f2afc38cafd625f755ed",
+   "variant_id": null,
+   "via_variant_id": "pv_c47a7e55f372d77470cc6081",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Peanut Brown (33801)",
+   "alt_ar": "صورة PETG HF — Peanut Brown (33801)",
+   "alt_ckb": "وێنەی PETG HF — Peanut Brown (33801)"
+  },
+  {
+   "id": "pi_7e5f4943350ba8523f6d9b9f",
+   "source_media_id": "38993873174664",
+   "source_url": "https://store.bblcdn.com/s7/default/f61a217d0fbf4926b7c7ee89db2d9e97/PETGHFNEWCOLOR_4.jpg",
+   "sort_order": 21,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_10f34a06c34e04d69ef811c0",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Lime Green (33501) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Lime Green (33501) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Lime Green (33501) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_beb5b89cb94506c00c321c4e",
+   "source_media_id": "38993873174664",
+   "source_url": "https://store.bblcdn.com/s7/default/f61a217d0fbf4926b7c7ee89db2d9e97/PETGHFNEWCOLOR_4.jpg",
+   "sort_order": 22,
+   "is_primary": false,
+   "option_value_id": "ov_5d4a0f05a728347cc8576558",
+   "variant_id": null,
+   "via_variant_id": "pv_10f34a06c34e04d69ef811c0",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Lime Green (33501)",
+   "alt_ar": "صورة PETG HF — Lime Green (33501)",
+   "alt_ckb": "وێنەی PETG HF — Lime Green (33501)"
+  },
+  {
+   "id": "pi_119624f9ce095a7aff410a2d",
+   "source_media_id": "37257776791688",
+   "source_url": "https://store.bblcdn.com/s7/default/f6fd695db6484056b39eec780eaec2f2/PETGHF_3.jpg",
+   "sort_order": 23,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_3e91fccd02b63e00f0927441",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Green (33500) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Green (33500) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Green (33500) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_89839f82b22c296de47c3ca5",
+   "source_media_id": "37257776791688",
+   "source_url": "https://store.bblcdn.com/s7/default/f6fd695db6484056b39eec780eaec2f2/PETGHF_3.jpg",
+   "sort_order": 24,
+   "is_primary": false,
+   "option_value_id": "ov_1c50b993f8147a47bb512b4f",
+   "variant_id": null,
+   "via_variant_id": "pv_3e91fccd02b63e00f0927441",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Green (33500)",
+   "alt_ar": "صورة PETG HF — Green (33500)",
+   "alt_ckb": "وێنەی PETG HF — Green (33500)"
+  },
+  {
+   "id": "pi_652d3d0b00f6665ede762512",
+   "source_media_id": "38993845125256",
+   "source_url": "https://store.bblcdn.com/s7/default/6bebbfff173047e591f6cb045d259283/PETGHFNEWCOLOR_6.jpg",
+   "sort_order": 25,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_1411b30530643c12b420c37a",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Forest Green (33502) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Forest Green (33502) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Forest Green (33502) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_ce290c1f314ba77c624be460",
+   "source_media_id": "38993845125256",
+   "source_url": "https://store.bblcdn.com/s7/default/6bebbfff173047e591f6cb045d259283/PETGHFNEWCOLOR_6.jpg",
+   "sort_order": 26,
+   "is_primary": false,
+   "option_value_id": "ov_701827f474bc7e2570c4474e",
+   "variant_id": null,
+   "via_variant_id": "pv_1411b30530643c12b420c37a",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Forest Green (33502)",
+   "alt_ar": "صورة PETG HF — Forest Green (33502)",
+   "alt_ckb": "وێنەی PETG HF — Forest Green (33502)"
+  },
+  {
+   "id": "pi_f58e449b3b0ef7c09bdbcf26",
+   "source_media_id": "38993877500040",
+   "source_url": "https://store.bblcdn.com/s7/default/9e720394f3014a2784fd7992d6c49ec1/PETGHFNEWCOLOR_2.jpg",
+   "sort_order": 27,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_ab24af0eba5b35662bcba0bd",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Lake Blue (33601) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Lake Blue (33601) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Lake Blue (33601) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_1347a4c6f315ef178a9a954c",
+   "source_media_id": "38993877500040",
+   "source_url": "https://store.bblcdn.com/s7/default/9e720394f3014a2784fd7992d6c49ec1/PETGHFNEWCOLOR_2.jpg",
+   "sort_order": 28,
+   "is_primary": false,
+   "option_value_id": "ov_b8b25b541caee8092ea91dc8",
+   "variant_id": null,
+   "via_variant_id": "pv_ab24af0eba5b35662bcba0bd",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Lake Blue (33601)",
+   "alt_ar": "صورة PETG HF — Lake Blue (33601)",
+   "alt_ckb": "وێنەی PETG HF — Lake Blue (33601)"
+  },
+  {
+   "id": "pi_2b2295fbe96cc50871879e3b",
+   "source_media_id": "37257776889992",
+   "source_url": "https://store.bblcdn.com/s7/default/74a83c3b90a94a438ba1012d99405751/PETGHF_5.jpg",
+   "sort_order": 29,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_f9883d19ddf847d9afa3bc93",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PETG HF — Blue (33600) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PETG HF — Blue (33600) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PETG HF — Blue (33600) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_277b3bcaa06a121421ba4dd5",
+   "source_media_id": "37257776889992",
+   "source_url": "https://store.bblcdn.com/s7/default/74a83c3b90a94a438ba1012d99405751/PETGHF_5.jpg",
+   "sort_order": 30,
+   "is_primary": false,
+   "option_value_id": "ov_1f32f71328fc194d851f0e9d",
+   "variant_id": null,
+   "via_variant_id": "pv_f9883d19ddf847d9afa3bc93",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Blue (33600)",
+   "alt_ar": "صورة PETG HF — Blue (33600)",
+   "alt_ckb": "وێنەی PETG HF — Blue (33600)"
+  },
+  {
+   "id": "pi_9c0fc17dd577d36d7d9e3a19",
+   "source_media_id": "37257776889992",
+   "source_url": "https://store.bblcdn.com/s7/default/74a83c3b90a94a438ba1012d99405751/PETGHF_5.jpg",
+   "sort_order": 31,
+   "is_primary": false,
+   "option_value_id": "ov_69d17d3ff554fd18e546bcee",
+   "variant_id": null,
+   "via_variant_id": "pv_f9883d19ddf847d9afa3bc93",
+   "binding_rule": "representative",
+   "alt_en": "PETG HF — Filament with spool",
+   "alt_ar": "صورة PETG HF — مع بكرة",
+   "alt_ckb": "وێنەی PETG HF — لەگەڵ ماسوورە"
+  }
+ ],
+ "swatches": [
+  {
+   "value_id": "ov_dd9cca8aa304e8667da67c57",
+   "source_media_id": "swatch:564681894469070866",
+   "source_url": "https://store.bblcdn.com/s7/default/6c735633c22748908ff584f9f5e1de89/0cf39d0e4c6c43b38fef498561894508.png"
+  },
+  {
+   "value_id": "ov_d6622eedcc03d3735a7a0bce",
+   "source_media_id": "swatch:564681894469070867",
+   "source_url": "https://store.bblcdn.com/s7/default/4a7f9361225f4f69b388615e247f3b62/d0124e2bbb174c8ba1bad0675d35e37a.png"
+  },
+  {
+   "value_id": "ov_981dac9a1e22d5204c069ee3",
+   "source_media_id": "swatch:564681894469070864",
+   "source_url": "https://store.bblcdn.com/s7/default/709cf02acaca4145952913934f200a53/6f6460b12d9348e99b5070a8284c0409.png"
+  },
+  {
+   "value_id": "ov_37b553df8ffab7f05b1c2e05",
+   "source_media_id": "swatch:564681894469070868",
+   "source_url": "https://store.bblcdn.com/s7/default/5582df632ed74f38a00384ddb2c2064e/9a7dade47ad44a37a39325b7363a0370.png"
+  },
+  {
+   "value_id": "ov_03b4a1616b231b38fec92037",
+   "source_media_id": "swatch:564681894469070874",
+   "source_url": "https://store.bblcdn.com/s7/default/c5498dad6adb4a4eaadde859a7f997ea/1607ecea09a94ff7b3d985685aa31d54.png"
+  },
+  {
+   "value_id": "ov_4e79bfb5e2337fa09dfed692",
+   "source_media_id": "swatch:564681894469070875",
+   "source_url": "https://store.bblcdn.com/s7/default/13884494e0354d6f952db38ca365f3e0/61202de96c7c49ccab34f0cc001157ee.png"
+  },
+  {
+   "value_id": "ov_be98a7448eac9874cdd8a48e",
+   "source_media_id": "swatch:564681894469070869",
+   "source_url": "https://store.bblcdn.com/s7/default/58af1b6933954bd5af530072c5e9c5b1/884a185a0d6e4b58a9c055dcfabe7174.png"
+  },
+  {
+   "value_id": "ov_1068e8074d7437391927e99b",
+   "source_media_id": "swatch:564681894469070870",
+   "source_url": "https://store.bblcdn.com/s7/default/5c5e4de6b8424bb8b84793e8dcc9802e/bfa461028ea3467aa362bbe369a84500.png"
+  },
+  {
+   "value_id": "ov_ed62f2afc38cafd625f755ed",
+   "source_media_id": "swatch:564681894469070873",
+   "source_url": "https://store.bblcdn.com/s7/default/365fda6e85eb4d8896228f46a1d544b0/99c7222bb9d644df8f46109bb1a099da.png"
+  },
+  {
+   "value_id": "ov_5d4a0f05a728347cc8576558",
+   "source_media_id": "swatch:564681894469070876",
+   "source_url": "https://store.bblcdn.com/s7/default/153b1266f7334a3f8cce41e99924e32a/38812377e81940668994d607c5af121f.png"
+  },
+  {
+   "value_id": "ov_1c50b993f8147a47bb512b4f",
+   "source_media_id": "swatch:564681894469070871",
+   "source_url": "https://store.bblcdn.com/s7/default/f2b2a518b63248339b48fa4da8ed5c3e/aee675e95734414ca1e9b6f83ba6e7cf.png"
+  },
+  {
+   "value_id": "ov_701827f474bc7e2570c4474e",
+   "source_media_id": "swatch:564681894469070872",
+   "source_url": "https://store.bblcdn.com/s7/default/8620e8a63e7d46d2a488d7282c2b97fb/616eb09aec544622963c5f1a9fb6424a.png"
+  },
+  {
+   "value_id": "ov_b8b25b541caee8092ea91dc8",
+   "source_media_id": "swatch:564681894469070877",
+   "source_url": "https://store.bblcdn.com/s7/default/9d372967762642129819a39527033e1b/26cf49afc41b4a8eb01f53084a0aba3c.png"
+  },
+  {
+   "value_id": "ov_1f32f71328fc194d851f0e9d",
+   "source_media_id": "swatch:564681894469070865",
+   "source_url": "https://store.bblcdn.com/s7/default/945e8fad01b048b6b79c3c15859265b8/a3478612f8b24e47b12a3d86116de7a6.png"
+  }
+ ],
+ "content_blocks": [
+  {
+   "id": "cb_b07de67e6d1c5ba514bcffcc",
+   "order": 0,
+   "title_en": "PETG HF",
+   "body_en": "The PETG that prints as effortlessly as PLA",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_1ee10f6ce486956fe7a81bab",
+   "order": 1,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:060e6a1e1e8009197351b630",
+   "source_url": "https://store.bblcdn.com/s7/default/4c18b95251724464b92cc6ecd7726448/Banner_Media-1-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_bcae2cdf2dabb3a9ed9a8dc6",
+   "order": 2,
+   "title_en": "Designed for Speed",
+   "body_en": "Twice as fast as standard PETG*, PETG HF significantly boosts your productivity without compromising the quality of your prints.\n* The speed of PETG HF can be twice as fast compared to regular PETG, but achieving this speed is highly dependent on model size and geometry.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_5ee86a248047cc8efad2f730",
+   "order": 3,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:4e23f940bd1550776562e561",
+   "source_url": "https://store.bblcdn.com/s7/default/1133582e78174e16a56fa1ca8e829542/2026.mp4",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_28b22fee02c55a5255f00b17",
+   "order": 4,
+   "title_en": "Print Flawlessly with Minimal Tuning",
+   "body_en": "PETG HF excels in printability among PETG filaments with its higher adaptability for printers and printing settings, achieving ideal print results without fine-tuning parameters. Thanks to advanced formula optimization, PETG HF bids farewell to oozing and clumping, ensuring smoother prints with crisp details.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_86109b06370975acdfb43fbb",
+   "order": 5,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:083dad5fd1a8377ff063fa63",
+   "source_url": "https://store.bblcdn.com/s7/default/0f85e6ed86cb4f66bb2ab6eeccc8d8fe/Frame_1123864805-3-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_862160f5d30437d239b97a2f",
+   "order": 6,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:34abd9db9dbcd7f01e3ae20a",
+   "source_url": "https://store.bblcdn.com/s7/default/437775ecb1da460a8f9f47b64062192a/PC-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_4a5bf177d499d20173454ab5",
+   "order": 7,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:e4a0df78908051b745ae3719",
+   "source_url": "https://store.bblcdn.com/s7/default/36488f8a3fbf4d8fbeb81947b4a17ce0/Frame_1123864805-4-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_dc17970665525cb2de5b86a8",
+   "order": 8,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:0f96e09eaffdcacf818ac9c5",
+   "source_url": "https://store.bblcdn.com/s7/default/189c7009f0914ca9a434ecf205d1afd6/Frame_1123864806-4-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_5d474f4f461e67dc4c22f2df",
+   "order": 9,
+   "title_en": "Smooth, Soft Texture",
+   "body_en": "PETG HF provides a smooth texture and consistent gloss at any printing speed, ensuring uniformity and sharp details in every print.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_9803ea4f5fe7ee8bdf37db79",
+   "order": 10,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:7707bbc96ad69e319a3e9b09",
+   "source_url": "https://store.bblcdn.com/s7/default/19192cb00cff45748e1d92185d9776a0/Content_Block_Media-8-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_bc0fe1d439fc45fbd21be3d8",
+   "order": 11,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:a1f089b90a89851856f69183",
+   "source_url": "https://store.bblcdn.com/s7/default/6b10c879e9f049b4ac6165288150b2e5/Frame_1123864805-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_0535db43124e08902ddb3cc5",
+   "order": 12,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:1b4c1358be246e78fd348238",
+   "source_url": "https://store.bblcdn.com/s7/default/3a67559013bb4061ab336ea675a025ec/Frame_1123864806-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_cff4f7d28f7b5261526954ec",
+   "order": 13,
+   "title_en": "Ready for Outdoor Use",
+   "body_en": "PETG HF maintains the inherent strengths of regular PETG, providing superior resistance to water, UV, and temperatures. Tougher and more durable than PLA, with higher temperature resistance, it's the perfect choice for printing outdoor items such as planter pots, bird cages, watering cans, and automotive parts. Additionally, it's ideal for outdoor toys that require long-term exposure and the ability to withstand impacts, collisions, and falls.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 3"
+  },
+  {
+   "id": "cb_8303db1faf2d5986cf0a8d1f",
+   "order": 14,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:23ada4d647dd28d567cf73eb",
+   "source_url": "https://store.bblcdn.com/s7/default/aec925a6b8b240e18ee22f72c606f729/Frame_1123864805-1-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 3"
+  },
+  {
+   "id": "cb_5def395e6031b5ea8693d4db",
+   "order": 15,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:fa06d091f16d72ab3efa9f63",
+   "source_url": "https://store.bblcdn.com/s7/default/ddfa5396ed5e4ff4a7d92e7db368de59/Frame_1123864806-1-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 3"
+  },
+  {
+   "id": "cb_355b121bc3207c20748c0ae6",
+   "order": 16,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:c2a1b1f8ac94fc42efe4380e",
+   "source_url": "https://store.bblcdn.com/s7/default/d9a38f92c1b94de88d222d607b2e47a8/Frame_1123864805-2-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 3"
+  },
+  {
+   "id": "cb_c73617921ea3a20e3e1eccac",
+   "order": 17,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:20cac9eccbafb68c51509a43",
+   "source_url": "https://store.bblcdn.com/s7/default/79541ac6ec0448df899f728cc266e6b8/Frame_1123864806-2-tuya.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 3"
+  },
+  {
+   "id": "cb_47676ea20dc65c9c982d4445",
+   "order": 18,
+   "title_en": "RFID for Intelligent Printing",
+   "body_en": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System).",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_09a8acb5cfcd1fcc5b5d773a",
+   "order": 19,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:707ffd2d80cf44a99b77b829",
+   "source_url": "https://store.bblcdn.com/s7/default/7582b13ce2604750968dafbc244de91a/RFID_for_Intelligent_Printing-compressed.jpg",
+   "alt_en": "PETG HF",
+   "alt_ar": "صورة PETG HF",
+   "alt_ckb": "وێنەی PETG HF",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_6b9e90de27ba4c3314fd6d1f",
+   "order": 20,
+   "title_en": "FAQ",
+   "body_en": "1.Accessory Compatibility\nCompatible with all printers, AMS, build plate, and nozzles.\n\n2.Drying Recommendations\nDry before use to ensure the best print quality and consistent finish. PETG HF must be dried before use and remain moisture-free during the printing process, especially for longer print times (over 6 hours). For more details, please refer to: Filament drying instructions on WIKI.\n\n3.Refill Guidelines\nThe refill filament needs to be used with a spool. For detailed instructions on how to swap in the new filament using the Bambu Reusable Spool, please refer to the guide on WIKI.\n\n4.Safety Tips\nPlease store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.\nPlease keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.\nFor opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings.\nPlease print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.\nAs this filament is not food-grade, please avoid using finished prints for food storage or contact.\nAs this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "faq",
+   "section_path": "components[4]"
+  },
+  {
+   "id": "cb_98d67662d2fbeb8551b24de5",
+   "order": 21,
+   "title_en": "Highlights",
+   "body_en": "• Designed for Speed\n• Print Flawlessly with Minimal Tuning\n• Smooth, Soft Texture\n• Ready for Outdoor Use\n• Dry Out Before Use\n• PETG HF must be dried before use to achieve optimal print quality.\n• A new and improved PETG is available now!\n• Cautions for Use\n• Note:",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "P.productFeaturesModuleList"
+  }
+ ],
+ "specs": [
+  {
+   "id": "sv_6c2fec0fc6c6622b600613e2",
+   "key": "material.diameter",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "1.75 mm",
+   "value_num": 1.75,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 5",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 0
+  },
+  {
+   "id": "sv_58b3a6502d40ac746f1e99dc",
+   "key": "material.diameter_tolerance",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "± 0.03 mm",
+   "value_num": 0.03,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 5",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 1
+  },
+  {
+   "id": "sv_ac31287e6e41c2f0ce25fe77",
+   "key": "material.net_weight",
+   "group": "material",
+   "scope_kind": "option_value",
+   "scope_id": "ov_f4c671c3cd44304983f9a3a4",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Size",
+   "original_value": "1 kg",
+   "value_text": "1000 g",
+   "value_num": 1000,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g",
+   "status": "verified",
+   "confidence": "official_variant",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "option Size › 1 kg",
+   "source_excerpt": "1 kg",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 2
+  },
+  {
+   "id": "sv_85ea72a292104d9e73ba70a8",
+   "key": "material.density",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g/cm³",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/petg-hf",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 3
+  },
+  {
+   "id": "sv_827f6f88a320545e0eb6b76c",
+   "key": "print_settings.nozzle_temp",
+   "group": "print_settings",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "range",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "°C",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/petg-hf",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 4
+  }
+ ],
+ "documents": [
+  {
+   "id": "pd_180ec4ce34ac060d624a9283",
+   "kind": "tds",
+   "title_en": "Filament TDS",
+   "title_ar": "ورقة البيانات الفنية (TDS) — Filament TDS",
+   "title_ckb": "پەڕەی زانیاری تەکنیکی (TDS) — Filament TDS",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 0
+  },
+  {
+   "id": "pd_15c63152fad7e86a88418831",
+   "kind": "sds",
+   "title_en": "Filament MSDS",
+   "title_ar": "ورقة بيانات السلامة (SDS) — Filament MSDS",
+   "title_ckb": "پەڕەی زانیاری سەلامەتی (SDS) — Filament MSDS",
+   "url": "https://store.bblcdn.com/s7/default/859e223a3eeb4aea96dab858e497152b/SDS20250724G02_Bambu_PETG_HF.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 1
+  },
+  {
+   "id": "pd_59654dfcd5beb0f8f13276b3",
+   "kind": "certificate",
+   "title_en": "Filament RoHS",
+   "title_ar": "شهادة مطابقة — Filament RoHS",
+   "title_ckb": "بڕوانامەی گونجان — Filament RoHS",
+   "url": "https://store.bblcdn.com/8171d8bdd1ef402bb81196229fc40eaa.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 2
+  },
+  {
+   "id": "pd_ba7e0a0d62a9e172c62d5638",
+   "kind": "hex_codes",
+   "title_en": "Hex Code",
+   "title_ar": "رموز الألوان — Hex Code",
+   "title_ckb": "کۆدەکانی ڕەنگ — Hex Code",
+   "url": "https://store.bblcdn.com/s7/default/f9b2b5ac54aa4aabaf2d725e6a830045/PETG_HF_Hex_Code_Table.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 3
+  },
+  {
+   "id": "pd_84815bbdae18183592a6642b",
+   "kind": "wiki",
+   "title_en": "Filament drying instructions",
+   "title_ar": "ويكي Bambu Lab — Filament drying instructions",
+   "title_ckb": "ویکی Bambu Lab — Filament drying instructions",
+   "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+   "host": "wiki.bambulab.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 4
+  },
+  {
+   "id": "pd_ae9eba33048ab2921a90c132",
+   "kind": "wiki",
+   "title_en": "guide",
+   "title_ar": "ويكي Bambu Lab — guide",
+   "title_ckb": "ویکی Bambu Lab — guide",
+   "url": "https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool",
+   "host": "wiki.bambulab.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 5
+  }
+ ],
+ "relations": [
+  {
+   "id": "pr_1cc128c59d57eae722b67062",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "other",
+   "target_product_id": null,
+   "target_source": "",
+   "target_source_handle": "",
+   "target_family": "",
+   "target_label": "AMS Series",
+   "state": "unresolvable",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "All AMS Series Compatible"
+  }
+ ],
+ "external_ids": [
+  {
+   "scope_kind": "product",
+   "scope_id": "",
+   "id_type": "bambu_product_id",
+   "value": "8280001544328",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_f9883d19ddf847d9afa3bc93",
+   "id_type": "bambu_variant_id",
+   "value": "42735939420296",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_3690e04c6afff4b3254b2453",
+   "id_type": "bambu_variant_id",
+   "value": "42735939551368",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_c9352147f5f6628003e7f4b3",
+   "id_type": "bambu_variant_id",
+   "value": "42735939682440",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_2ae6648287d6b3e0c80a47c9",
+   "id_type": "bambu_variant_id",
+   "value": "42735939715208",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_942ecf56095fb6a6c6f4a479",
+   "id_type": "bambu_variant_id",
+   "value": "42735939747976",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_979f4a0633e7129d87d59a30",
+   "id_type": "bambu_variant_id",
+   "value": "42735939813512",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_9d4cf214f6747ff0bbfc8104",
+   "id_type": "bambu_variant_id",
+   "value": "654207405072093185",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_34d41d67ad3c55251c7c7fc4",
+   "id_type": "bambu_variant_id",
+   "value": "654207405072093191",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_f8dbcf95182f045d0ba08772",
+   "id_type": "bambu_variant_id",
+   "value": "654207405072093197",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_3e91fccd02b63e00f0927441",
+   "id_type": "bambu_variant_id",
+   "value": "654207405072093203",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_72ce9d22a36d1fc748884ab6",
+   "id_type": "bambu_variant_id",
+   "value": "654943233990885377",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_10f34a06c34e04d69ef811c0",
+   "id_type": "bambu_variant_id",
+   "value": "654943233990885383",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_1411b30530643c12b420c37a",
+   "id_type": "bambu_variant_id",
+   "value": "654943233990885389",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_ab24af0eba5b35662bcba0bd",
+   "id_type": "bambu_variant_id",
+   "value": "654943233990885395",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_c47a7e55f372d77470cc6081",
+   "id_type": "bambu_variant_id",
+   "value": "659540022699311104",
+   "searchable": false
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_dd9cca8aa304e8667da67c57",
+   "id_type": "color_code",
+   "value": "33102",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_d6622eedcc03d3735a7a0bce",
+   "id_type": "color_code",
+   "value": "33100",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_981dac9a1e22d5204c069ee3",
+   "id_type": "color_code",
+   "value": "33200",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_37b553df8ffab7f05b1c2e05",
+   "id_type": "color_code",
+   "value": "33101",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_03b4a1616b231b38fec92037",
+   "id_type": "color_code",
+   "value": "33103",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_4e79bfb5e2337fa09dfed692",
+   "id_type": "color_code",
+   "value": "33401",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_be98a7448eac9874cdd8a48e",
+   "id_type": "color_code",
+   "value": "33400",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_1068e8074d7437391927e99b",
+   "id_type": "color_code",
+   "value": "33300",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_ed62f2afc38cafd625f755ed",
+   "id_type": "color_code",
+   "value": "33801",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_5d4a0f05a728347cc8576558",
+   "id_type": "color_code",
+   "value": "33501",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_1c50b993f8147a47bb512b4f",
+   "id_type": "color_code",
+   "value": "33500",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_701827f474bc7e2570c4474e",
+   "id_type": "color_code",
+   "value": "33502",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_b8b25b541caee8092ea91dc8",
+   "id_type": "color_code",
+   "value": "33601",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_1f32f71328fc194d851f0e9d",
+   "id_type": "color_code",
+   "value": "33600",
+   "searchable": true
+  }
+ ],
+ "source_refs": [
+  {
+   "kind": "group",
+   "source_id": "10935428120712",
+   "levonis_id": "og_b887b235931654936b9ae0de",
+   "source_label": "Color",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070866",
+   "levonis_id": "ov_dd9cca8aa304e8667da67c57",
+   "source_label": "Black (33102)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070867",
+   "levonis_id": "ov_d6622eedcc03d3735a7a0bce",
+   "source_label": "White (33100)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070864",
+   "levonis_id": "ov_981dac9a1e22d5204c069ee3",
+   "source_label": "Red (33200)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070868",
+   "levonis_id": "ov_37b553df8ffab7f05b1c2e05",
+   "source_label": "Gray (33101)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070874",
+   "levonis_id": "ov_03b4a1616b231b38fec92037",
+   "source_label": "Dark Gray (33103)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070875",
+   "levonis_id": "ov_4e79bfb5e2337fa09dfed692",
+   "source_label": "Cream (33401)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070869",
+   "levonis_id": "ov_be98a7448eac9874cdd8a48e",
+   "source_label": "Yellow (33400)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070870",
+   "levonis_id": "ov_1068e8074d7437391927e99b",
+   "source_label": "Orange (33300)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070873",
+   "levonis_id": "ov_ed62f2afc38cafd625f755ed",
+   "source_label": "Peanut Brown (33801)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070876",
+   "levonis_id": "ov_5d4a0f05a728347cc8576558",
+   "source_label": "Lime Green (33501)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070871",
+   "levonis_id": "ov_1c50b993f8147a47bb512b4f",
+   "source_label": "Green (33500)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070872",
+   "levonis_id": "ov_701827f474bc7e2570c4474e",
+   "source_label": "Forest Green (33502)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070877",
+   "levonis_id": "ov_b8b25b541caee8092ea91dc8",
+   "source_label": "Lake Blue (33601)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070865",
+   "levonis_id": "ov_1f32f71328fc194d851f0e9d",
+   "source_label": "Blue (33600)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "10935428153480",
+   "levonis_id": "og_22b442d5f5b2155ba73f0fb2",
+   "source_label": "Type",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070878",
+   "levonis_id": "ov_0d2f88a775d9b044670bba1e",
+   "source_label": "Refill",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070879",
+   "levonis_id": "ov_69d17d3ff554fd18e546bcee",
+   "source_label": "Filament with spool",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "10935428186248",
+   "levonis_id": "og_1eeb9aeea9b97fa5c7e78a18",
+   "source_label": "Size",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681894469070880",
+   "levonis_id": "ov_f4c671c3cd44304983f9a3a4",
+   "source_label": "1 kg",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "42735939420296",
+   "levonis_id": "pv_f9883d19ddf847d9afa3bc93",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "42735939551368",
+   "levonis_id": "pv_3690e04c6afff4b3254b2453",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "42735939682440",
+   "levonis_id": "pv_c9352147f5f6628003e7f4b3",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "42735939715208",
+   "levonis_id": "pv_2ae6648287d6b3e0c80a47c9",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "42735939747976",
+   "levonis_id": "pv_942ecf56095fb6a6c6f4a479",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "42735939813512",
+   "levonis_id": "pv_979f4a0633e7129d87d59a30",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "654207405072093185",
+   "levonis_id": "pv_9d4cf214f6747ff0bbfc8104",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "654207405072093191",
+   "levonis_id": "pv_34d41d67ad3c55251c7c7fc4",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "654207405072093197",
+   "levonis_id": "pv_f8dbcf95182f045d0ba08772",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "654207405072093203",
+   "levonis_id": "pv_3e91fccd02b63e00f0927441",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "654943233990885377",
+   "levonis_id": "pv_72ce9d22a36d1fc748884ab6",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "654943233990885383",
+   "levonis_id": "pv_10f34a06c34e04d69ef811c0",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "654943233990885389",
+   "levonis_id": "pv_1411b30530643c12b420c37a",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "654943233990885395",
+   "levonis_id": "pv_ab24af0eba5b35662bcba0bd",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "659540022699311104",
+   "levonis_id": "pv_c47a7e55f372d77470cc6081",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776824456",
+   "levonis_id": "pi_fb5ada98376da4ed2176de22",
+   "source_label": "",
+   "binding_rule": "value",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776824456",
+   "levonis_id": "pi_0bb51a7f80d536fb88cf7480",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_2ae6648287d6b3e0c80a47c9"
+  },
+  {
+   "kind": "image",
+   "source_id": "37343406555272",
+   "levonis_id": "pi_f60b3455de49244337ec6609",
+   "source_label": "",
+   "binding_rule": "general",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "762170226073677824",
+   "levonis_id": "pi_d116bc25ef2b312c59dda859",
+   "source_label": "",
+   "binding_rule": "general",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776922760",
+   "levonis_id": "pi_f6fb6d478087f35f1fa42ea9",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776922760",
+   "levonis_id": "pi_0216f6bec35db4a912b9fbcc",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_979f4a0633e7129d87d59a30"
+  },
+  {
+   "kind": "image",
+   "source_id": "37288264302728",
+   "levonis_id": "pi_2a41240a446cadd4107cfa67",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37288264302728",
+   "levonis_id": "pi_e2552f11e7b8161e4e9a5e99",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_3690e04c6afff4b3254b2453"
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776988296",
+   "levonis_id": "pi_68701e94a286b2c3d97ed7df",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776988296",
+   "levonis_id": "pi_9d5b6f94dd4dc7ad7f98f5a8",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_942ecf56095fb6a6c6f4a479"
+  },
+  {
+   "kind": "image",
+   "source_id": "38993861574792",
+   "levonis_id": "pi_be5b3ce3d7ef4441eaff5360",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "38993861574792",
+   "levonis_id": "pi_a1288fd581f7d39ff4b70850",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_9d4cf214f6747ff0bbfc8104"
+  },
+  {
+   "kind": "image",
+   "source_id": "38993866096776",
+   "levonis_id": "pi_e3d0bf7bf487c2c3994a4b6f",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "38993866096776",
+   "levonis_id": "pi_e2715db9e99073161ad37e40",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_34d41d67ad3c55251c7c7fc4"
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776857224",
+   "levonis_id": "pi_bad203f036c93c4cfdbc1782",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776857224",
+   "levonis_id": "pi_657923a1a9974de511c8cf4d",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_72ce9d22a36d1fc748884ab6"
+  },
+  {
+   "kind": "image",
+   "source_id": "37332045267080",
+   "levonis_id": "pi_d2e0956e9936bf6355cdf223",
+   "source_label": "",
+   "binding_rule": "general",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776955528",
+   "levonis_id": "pi_2c6acad189860ae6efacdb9b",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776955528",
+   "levonis_id": "pi_32a24a35985a6ab20efa1fee",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_f8dbcf95182f045d0ba08772"
+  },
+  {
+   "kind": "image",
+   "source_id": "38993857020040",
+   "levonis_id": "pi_87e63ffeee5458f0a0db1bc4",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "38993857020040",
+   "levonis_id": "pi_4cb3fc7fbb55d22926f29d11",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_c47a7e55f372d77470cc6081"
+  },
+  {
+   "kind": "image",
+   "source_id": "38993873174664",
+   "levonis_id": "pi_7e5f4943350ba8523f6d9b9f",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "38993873174664",
+   "levonis_id": "pi_beb5b89cb94506c00c321c4e",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_10f34a06c34e04d69ef811c0"
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776791688",
+   "levonis_id": "pi_119624f9ce095a7aff410a2d",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776791688",
+   "levonis_id": "pi_89839f82b22c296de47c3ca5",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_3e91fccd02b63e00f0927441"
+  },
+  {
+   "kind": "image",
+   "source_id": "38993845125256",
+   "levonis_id": "pi_652d3d0b00f6665ede762512",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "38993845125256",
+   "levonis_id": "pi_ce290c1f314ba77c624be460",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_1411b30530643c12b420c37a"
+  },
+  {
+   "kind": "image",
+   "source_id": "38993877500040",
+   "levonis_id": "pi_f58e449b3b0ef7c09bdbcf26",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "38993877500040",
+   "levonis_id": "pi_1347a4c6f315ef178a9a954c",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_ab24af0eba5b35662bcba0bd"
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776889992",
+   "levonis_id": "pi_2b2295fbe96cc50871879e3b",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776889992",
+   "levonis_id": "pi_277b3bcaa06a121421ba4dd5",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_f9883d19ddf847d9afa3bc93"
+  },
+  {
+   "kind": "image",
+   "source_id": "37257776889992",
+   "levonis_id": "pi_9c0fc17dd577d36d7d9e3a19",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_f9883d19ddf847d9afa3bc93"
+  }
+ ],
+ "notes": [
+  {
+   "kind": "relation_unresolvable",
+   "field": "compatible_with"
+  }
+ ]
+}

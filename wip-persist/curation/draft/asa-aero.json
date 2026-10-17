@@ -1,0 +1,832 @@
+{
+  "handle": "asa-aero",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T13:01:45Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer page by page; pp.1-3 also as images): Basic Info, Specifications, Recommended Printing Settings (rows to Max Overhang Angle on p.1, Max Bridging Length and Support Material on p.2), Physical Properties, Mechanical Properties, Other Physical and Chemical Properties (p.3), Specimen Test, test specimen drawings, Disclaimer. Glass Transition Temperature and Crystallization Temperature read \"N/A\"."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/e897527e7a5c426cbd3b4c920c63e270/SDS20251127B02_Bambu_ASA_Aero.pdf",
+      "title": "Bambu ASA Aero Safety Data Sheet SDS20251127B02",
+      "retrieved_at": "2026-10-16T08:24:33Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read (text layer; p.4 also as an image). Section 3 (p.4) gives the composition; section 9 (pp.9-10) says \"No data available\" for melting point, density and every other physical datum; section 2 \"Not classified\"; section 14 \"Not hazardous goods\" (IMDG, DOT, ADR/RID, ICAO-TI/IATA)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "No row names ASA Aero. The generic \"ASA\" rows (1. Printer, 2. Nozzle, 3. AMS & AMS lite, Build Plate Settings 1 and 3, Storage) were read as corroboration only; no value is taken from them. Its HDT, impact and tensile columns are star ratings, not numbers."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "title": "ABS / ASA / PC Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "compat.*"
+      ],
+      "note": "ASA Aero overview, Key Properties (column \"ASA Aero\"), Hardware Compatibility (row \"ASA Aero\", which refers to the row above for printer and accessory compatibility), Filament Drying Parameters Reference Table (row \"ASA Aero\"), Printing Recommendations for Foamed Filament (ASA Aero) and Printing Air Models with ASA Aero (foaming table)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"ASA Aero\": drying recommended, desiccant \"Not required but recommended\", printer heatbed 90-100 °C 12 h, forced-air oven 80 °C 8 h, AMS 2 Pro \"Not compatible\", AMS HT 80 °C 8 h. The store page links this page from its Drying Recommendations FAQ."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/asa-aero-printing-guide",
+      "title": "ASA Aero Printing Guide",
+      "retrieved_at": "2026-10-16T08:26:27Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "compat.*"
+      ],
+      "note": "Whole page read: Important notes, Tips and Considerations for Slicing and Printing (build plates, fan, warping), the density and foaming tables (220-280 °C), slicing parameter settings and default profiles. The store page links it as \"ASA Aero Printing Guide\"."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/asa-aero",
+      "title": "Bambu Lab US store product page: ASA Aero",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections, FAQ, Download block. No spec table (format C)."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "acrylonitrile - styrene - acrylate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition acrylonitrile - styrene - acrylate",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Kept verbatim, as the class does with the TDS Composition cell. The TDS is headed \"ASA Aero\" (p.1) and the SDS product name is \"Bambu ASA Aero\" (p.2).",
+      "conflict": "The SDS (p.4, section 3) names a different main component: \"Poly(butyl acrylate-styrene-acrylic acid)\" 95-99 % by wt, CAS 141-32-2, plus an additive 1-5 % by wt; it names no acrylonitrile. The TDS value is kept; left to review."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\"). The tolerance stays the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681853637521413",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Scoped to the store page's only Net weight value \"1 kg\"; agrees with the store page row (option Size › 1 kg, 1000 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.99,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 0.99 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\"; the specimen form is not stated)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density. Printed parts are lighter because the filament foams: the ASA Aero Printing Guide and the ABS / ASA / PC wiki give a minimum print density from about 0.97 g/cm³ (220 °C) down to 0.45 g/cm³ (280 °C); those are printed-part values with no registry key and are not stored. The store page prose (\"Only 50%-75% the density of regular ASA prints\") is marketing and proves no number."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 204,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 204 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point."
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 80 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (the TDS row reads \"Vicar Softening Temperature\"; the specimen form is not stated)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 78,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 78 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value (the specimen form is not stated). The next row gives 85 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Not a disagreement: the ABS / ASA / PC wiki (Key Properties, \"Heat Resistance（HDT，0.45 MPaLoad）\", column \"ASA Aero\") gives 85 ℃, which matches the TDS 0.45 MPa row; this row keeps the 1.8 MPa value, as the class does."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 32,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 32 ± 4 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 85 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Z orientation: 21 ± 4 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 5.1,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 5.1% ± 1.6%",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 85 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Z orientation: 2.3% ± 0.9% (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1510,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 1510 ± 120 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 85 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Z orientation: 1220 ± 110 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 58,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 58 ± 6 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 85 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Z orientation: 24 ± 3 MPa (not stored). The ABS / ASA / PC wiki (Key Properties, \"Strength（Flexural Strength - XY）\", column \"ASA Aero\") agrees: 58 ± 6 MPa."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 32.0,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 32.0 ± 2.5 kJ/m²; 8.2 ± 1.6 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 85 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing). First value of the cell; the same cell gives 8.2 ± 1.6 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Z orientation: 3.4 ± 0.5 kJ/m² (not stored). The ABS / ASA / PC wiki (Key Properties, column \"ASA Aero\") agrees: \"Toughness（Impact Strength - XY）\" 32.0 ± 2.5 kJ/m² and \"Interlayer Adhesion（Impact Strength - Z）\" 3.4 ± 0.5 kJ/m². The store page prose (\"Tough with Good Impact Resistance\") proves no number."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 240,
+        "max": 280
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 240 - 280 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "The material-table wiki (2. Nozzle, generic row \"ASA\") gives the same 240 - 280 (±10 °C). The ASA Aero Printing Guide's foaming table spans 220 - 280 °C and the TDS specimens were printed at 225 °C; those are test and table conditions, not the recommended range. The store page states no nozzle temperature."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 80,
+        "max": 90
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 90 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Engineering Plate or High Temperature Plate, bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "conflict": "The material-table wiki gives 90 - 100 °C for ASA in general (Build Plate Settings 1, glue stick and liquid glue; and 3, Engineering, Smooth PEI / High-Temperature and Textured PEI plates); it has no ASA Aero row. The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 150 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 150 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented. The ASA Aero Printing Guide's preset sets wall and infill speeds to 80 mm/s (a slicer preset, not stored)."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0 - 80%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 80%",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate (Not Recommended)",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; the same cell marks Textured PEI Plate \"(Not Recommended)\", so it is left out; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "The ASA Aero Printing Guide agrees: \"Recommend to use Engineering Plate or Smooth PEI Plate. Not Recommend to use Textured PEI Plate\". The ABS / ASA / PC wiki (Hardware Compatibility, row \"ASA Aero\") says \"Recommended to use Smooth PEI Plate with glue application\"."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C，8 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 Series printer heatbed: 90 - 100 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "The drying wiki (Appendix I, row \"ASA Aero\": forced-air oven 80 °C, 8 h) and the ABS / ASA / PC wiki (drying table, row \"ASA Aero\": convection oven \"80 °C × 8 h\") agree."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C，8 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 80 °C. The same row gives 12 h on an X1 Series printer heatbed at 90 - 100 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "note": "The drying wiki (Appendix I, row \"ASA Aero\") and the ABS / ASA / PC wiki (row \"ASA Aero\") agree: oven 8 h; both give the printer heatbed 90 - 100 °C for 12 h."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681853637521412",
+        "value_text": "Filament with spool"
+      },
+      "value": "High Temperature Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/asa-aero",
+      "source_title": "Bambu Lab US store product page: ASA Aero",
+      "locator": "Product Features › bullet 4",
+      "quote": "Comes with High Temperature Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "note": "Unverified: an unlabelled store-page bullet. Scoped to the only Spool value \"Filament with spool\". The TDS (p.1, Specifications) gives \"Spool Material PC+ABS (Temperature resistance 90 °C)\" and \"Spool Size Diameter: 200 mm; Height: 67 mm\"."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/asa-aero",
+      "source_title": "Bambu Lab US store product page: ASA Aero",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "For feeding. Drying ASA Aero in the AMS 2 Pro is not supported: the drying wiki (Appendix I, row \"ASA Aero\") gives \"Not compatible\" in both AMS 2 Pro columns."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/asa-aero",
+      "source_title": "Bambu Lab US store product page: ASA Aero",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "AMS HT drying: 80 °C for 8 h in the drying wiki (Appendix I, row \"ASA Aero\"); the ABS / ASA / PC wiki (row \"ASA Aero\") gives \"80 °C × 12 h\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/asa-aero",
+      "source_title": "Bambu Lab US store product page: ASA Aero",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "The store page section \"RFID for Intelligent Printing\" says the printing parameters embedded in RFID \"can be read through our AMS (Automatic Material System)\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/asa-aero",
+      "source_title": "Bambu Lab US store product page: ASA Aero",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "AMS lite NOT Compatible",
+      "note": "The ABS / ASA / PC wiki (Hardware Compatibility) agrees: row \"ASA Aero\" Accessory Compatibility \"Same as above\", where the row above reads \"Not compatible with AMS lite\".",
+      "conflict": "The material-table wiki (3. AMS & AMS lite, generic row \"ASA\") gives \"Compatible\" in its combined \"AMS / AMS lite Compatibility\" column; it has no ASA Aero row. The product-specific statements are kept."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "Enclosed printer",
+      "target_family": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/asa-aero",
+      "source_title": "Bambu Lab US store product page: ASA Aero",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "Enclosure Printers Required",
+      "note": "No reviewed family id exists for enclosed printers. The ABS / ASA / PC wiki (Hardware Compatibility, row \"ASA Aero\" \"Same as above\") says \"Requires an enclosed printer\"; the ASA Aero Printing Guide says \"Print on a printer with an enclosed chamber\"; the store FAQ (3.Warping Prevention Tips, 4.Ventilation & Odor Notice) says \"use enclosed printers\". The TDS gives a chamber temperature of 45 - 60 °C."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "A models",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "source_title": "ABS / ASA / PC Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "locator": "Basic Filament Information › Hardware Compatibility › table › row \"ASA Aero\" › Printer Compatibility (\"Same as above\")",
+      "quote": "ABS / ASA / PC / PC FR | Requires an enclosed printer; not compatible with P1P or A models … ASA Aero | Same as above",
+      "note": "The source's words. The drying wiki names \"P1P / A1 / A2L / A1 mini\" as the open-frame printers, so the A models are the A1 Series (A1, A1 mini) and the A2 Series (A2L). No single reviewed family id covers both, so none is named."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "P1P",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "source_title": "ABS / ASA / PC Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "locator": "Basic Filament Information › Hardware Compatibility › table › row \"ASA Aero\" › Printer Compatibility (\"Same as above\")",
+      "quote": "ABS / ASA / PC / PC FR | Requires an enclosed printer; not compatible with P1P or A models … ASA Aero | Same as above",
+      "note": "P1P is not on the US store; compat-targets.json maps the label \"P1P\" to the existing Levonis model (levonis_existing_model)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/asa-aero",
+      "source_title": "Bambu Lab US store product page: ASA Aero",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/asa-aero",
+      "source_title": "Bambu Lab US store product page: ASA Aero",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "note": "The ABS / ASA / PC wiki (row \"ASA Aero\") says \"Compatible with 0.4 mm nozzle only; other nozzle sizes are not recommended\". The 0.6 / 0.8 mm hardened steel nozzle is a size option of several hotend products, so no single target handle is named.",
+      "conflict": "The TDS (p.1) \"Nozzle Size 0.4 (Recommended), 0.6, 0.8 mm\" lists 0.6 and 0.8 mm without naming a nozzle material; left to review."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Stainless Steel Nozzle 0.2 mm",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/asa-aero",
+      "source_title": "Bambu Lab US store product page: ASA Aero",
+      "retrieved_at": "2026-10-16T07:02:16Z",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "note": "The TDS Nozzle Size row lists no 0.2 mm nozzle and the ABS / ASA / PC wiki (row \"ASA Aero\") says \"Compatible with 0.4 mm nozzle only\". A nozzle size option, not a single store product: no target handle is named.",
+      "conflict": "The material-table wiki's generic \"ASA\" nozzle row gives \"Compatible\" for the 0.2 mm nozzle (ASA in general); the product-specific sources exclude it."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4 mm nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "source_title": "ABS / ASA / PC Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "locator": "Basic Filament Information › Hardware Compatibility › table › row \"ASA Aero\" › Nozzle Compatibility",
+      "quote": "Compatible with 0.4 mm nozzle only; other nozzle sizes are not recommended",
+      "note": "The TDS (p.1) marks 0.4 mm \"(Recommended)\" and the ASA Aero Printing Guide's parameters and test tables are for a 0.4 mm nozzle. A nozzle size, not a store product: no target handle is named.",
+      "conflict": "The TDS (p.1, Recommended Printing Settings) lists \"Nozzle Size 0.4 (Recommended), 0.6, 0.8 mm\"; the wiki calls sizes other than 0.4 mm not recommended and the store FAQ excludes the 0.6 / 0.8 mm hardened steel nozzles. No relation is written for 0.6 / 0.8 mm; left to review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate (Not Recommended)",
+      "note": "The ASA Aero Printing Guide: \"Recommend to use Engineering Plate or Smooth PEI Plate\". Bed surface preparation: glue (TDS p.1)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate (Not Recommended)",
+      "note": "The ASA Aero Printing Guide recommends the \"Smooth PEI Plate\" and the ABS / ASA / PC wiki (row \"ASA Aero\") says \"Recommended to use Smooth PEI Plate with glue application\"; the material-table wiki heads one column \"Bambu Smooth PEI / High-Temperature Plate\", which names the same plate."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Low-Temp Engineering Plate",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "source_title": "ABS / ASA / PC Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "locator": "Basic Filament Information › Hardware Compatibility › table › row \"ASA Aero\" › Build Plate Compatibility",
+      "quote": "Recommended to use Smooth PEI Plate with glue application; not compatible with Low-Temp Engineering Plate",
+      "note": "No store product carries this name, so no target handle is named."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Glue",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Surface Preparation",
+      "quote": "Bed Surface Preparation Glue",
+      "note": "Every source asks for glue: the store FAQ (3.Warping Prevention Tips) \"ensure the build plate is properly applied with glue\", the ASA Aero Printing Guide \"ensure the build plate is properly glued before printing\", the ABS / ASA / PC wiki (row \"ASA Aero\") \"Recommended to use Smooth PEI Plate with glue application\". Two store products fit (glue-stick-for-build-plate, liquid-glue-for-build-plate), so no single target handle is named. Reviewer: the wiki words it as a recommendation for ASA Aero (\"Glue application required\" for ABS / ASA / PC)."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: ASA Aero",
+      "retrieved_at": "2026-10-16T08:24:32Z",
+      "sha256": "c5f128401819ebcad88fbbd4818eea9b1ceda7b99e58ab43550672633dc8e851"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/e897527e7a5c426cbd3b4c920c63e270/SDS20251127B02_Bambu_ASA_Aero.pdf",
+      "title": "Bambu ASA Aero Safety Data Sheet SDS20251127B02",
+      "retrieved_at": "2026-10-16T08:24:33Z",
+      "sha256": "27c870bee36a3576019789e34dfce20de5e34bac75a9845473a6fe893911154d"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/asa-aero-printing-guide",
+      "title": "ASA Aero Printing Guide",
+      "retrieved_at": "2026-10-16T08:26:27Z",
+      "sha256": "aafa7eca2f9da13c62ef9bfadcbee8f3d70b483c345d373df619edbf5723835d"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "title": "ABS / ASA / PC Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "sha256": "6115bcf12079f6ac0b8f9024e38f61f13346b64f0b03fdfa61c980524a79b347"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness",
+    "thermal.glass_transition"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 21 ± 4 MPa, elongation 2.3% ± 0.9%, bending modulus 1220 ± 110 MPa, bending strength 24 ± 3 MPa, impact 3.4 ± 0.5 kJ/m²) are not stored. Density, melting, Vicat and HDT come from the TDS Physical Properties table and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows; the TDS does not state the specimen form for density, Vicat and HDT, and their test_condition says so.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 2010 ± 260 MPa, Z 1180 ± 210 MPa), melt index 1.56 ± 0.5 g/10 min (210 °C, 2.16 kg), crystallization temperature N/A, heat deflection temperature 85 °C at 0.45 MPa, saturated water absorption rate 0.80% (25 °C, 55% RH), spool material PC+ABS (temperature resistance 90 °C), spool size diameter 200 mm and height 67 mm, printing and storage humidity < 20% RH (sealed, with desiccant), nozzle size 0.4 (Recommended), 0.6, 0.8 mm (see the nozzle relations), bed surface preparation glue (see the glue relation), retraction length 0.8 - 1.4 mm, retraction speed 20 - 40 mm/s, chamber temperature 45 - 60 °C, max overhang angle ~ 70°, max bridging length ~ 40 mm, support material \"Turn on\", the X1 Series heatbed drying line (90 - 100 °C, 12 h), suggested annealing 80 to 90 °C for 6 to 12 hours (the TDS sentence says \"Bambu ASA\"), odor (\"Odorless\"), skin hazards, chemical stability, solubility, chemical resistance, flammability (\"Flammable\"), combustion products and their odor.",
+    "The TDS recommended chamber temperature (45 - 60 °C) is not written to thermal.chamber_temp: that key is a printer capability, not a filament print setting.",
+    "The TDS specimens were printed at a nozzle temperature of 225 °C, below the recommended 240 - 280 °C; the mechanical test_condition records it as written.",
+    "Composition disagreement left to review: the TDS (p.3) says \"acrylonitrile - styrene - acrylate\"; the SDS (p.4, section 3) lists \"Poly(butyl acrylate-styrene-acrylic acid)\" 95-99 % by wt with CAS 141-32-2 (the CAS number of n-butyl acrylate) and an additive 1-5 % by wt. material.type keeps the TDS cell.",
+    "SDS facts with no registry key are not stored: product name \"Bambu ASA Aero\", model \"B02-xx\", CLP \"Not classified\", no PBT/vPvB substance, no endocrine disruptors, conditions to avoid (\"Avoid fire, elevated temperatures. direct sunlight.\") and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO-TI/IATA) transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Source disagreements kept for review: bed temperature (TDS 80 - 90 °C vs the material-table wiki's generic ASA 90 - 100 °C); nozzle sizes (TDS 0.4 (Recommended), 0.6, 0.8 mm vs ABS / ASA / PC wiki \"Compatible with 0.4 mm nozzle only; other nozzle sizes are not recommended\" vs store FAQ excluding hardened steel 0.6 / 0.8 mm and stainless steel 0.2 mm vs the material-table wiki's generic ASA row, all sizes compatible); AMS HT drying time (drying wiki 8 h vs ABS / ASA / PC wiki 12 h); AMS lite (product sources \"not compatible\" vs the material-table wiki's generic ASA \"Compatible\" in its combined AMS / AMS lite column). The product TDS values and the product-specific statements are kept.",
+    "Textured PEI Plate: the TDS marks it \"(Not Recommended)\" and the ASA Aero Printing Guide says \"Not Recommend to use Textured PEI Plate\" (the first layer can stick too hard and tear). Neither a compatible_with nor a not_compatible_with relation is written: the sources call it not recommended, not incompatible.",
+    "The material-table wiki has no ASA Aero row; its generic ASA values (nozzle 240 - 280 °C, which agrees with the TDS; bed 90 - 100 °C; oven drying 80 ℃ for 8 h, which agrees) were used only as corroboration or recorded as disagreements.",
+    "The foaming tables (ASA Aero Printing Guide, 220 - 280 °C; ABS / ASA / PC wiki, 220 - 270 °C: minimum flow ratio, maximum volumetric expansion ratio, maximum foaming ratio, minimum print density 0.97 - 0.45 g/cm³; test: 0.4 mm nozzle, 80 mm/s, 80 × 10 × 4 mm³) and the recommended flow ratio 0.42 - 0.7 describe printed parts and slicer settings; no registry key holds them and they are not stored.",
+    "Marketing prose proves no number: \"Only 50%-75% the density of regular ASA prints\", \"as light as feather\", \"Tough with Good Impact Resistance\", \"Ultra-lightweight & Low Density\", \"Water & UV Resistance\" and \"Matte Finish For Easy Coloring\" (store page) are not stored as values.",
+    "Hex: the store page links no Hex Code document for ASA Aero and none was cached, so no published hex is curated for its only colour (White (46100)).",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/7f9aced52cd84d3aa6262a11c214ad9b.pdf) and the wiki page \"Common print quality problems and solutions\" (https://wiki.bambulab.com/en/knowledge-sharing/common-print-quality-problem); neither was cached or read, so safety.certifications is neither curated nor marked not_published.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 5); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store has no Refill value for ASA Aero (Spool group: \"Filament with spool\" only), so no spool requirement is recorded. The store FAQ and the ASA Aero Printing Guide say the filament is not food-contact grade and may release styrene at printing temperatures, and the TDS rates the filament \"Odorless\" while the store FAQ warns of \"Pungent and unpleasant odors\" during printing; no registry key holds these."
+  ]
+}

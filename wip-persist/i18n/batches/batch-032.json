@@ -1,0 +1,3120 @@
+{
+ "batch": 32,
+ "surface": "api",
+ "handles": [
+  "oil-impregnated-bronze-bushings",
+  "o-rings",
+  "3-pin-10mm-led-strip-connector-cable-with-sm-female-plug-for-rgb",
+  "usb-a-to-2-pin-8mm-solderless-quick-connector-for-white-led",
+  "3004-slim-micro-fan-5v-with-2pin-sh1-0",
+  "mxl-timing-belt",
+  "xl-timing-belts",
+  "high-torque-drive-timing-belt",
+  "rubber-gasket-seal-ring",
+  "50mm-ph2-0-to-sh1-0-conversion-wire",
+  "rectangular-magnetic-stickers",
+  "round-magnetic-stickers",
+  "rectangle-magnetic-stickers-with-round-corners",
+  "soft-magnetic-sheet-stickers",
+  "square-double-sided-foam-tape",
+  "silicone-tube",
+  "pu-tubes",
+  "round-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+  "plastic-button-ornaments-for-shoe-charms",
+  "rectangle-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+  "disc-countersunk-hole-magnet",
+  "suction-caps-with-hole",
+  "suction-caps-with-mushroom-head",
+  "pvc-suction-caps-with-flat-head",
+  "rubber-bands",
+  "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+  "cob-led-strip-light",
+  "remote-controlled-16-color-rgbw-puck-lights",
+  "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+  "card-shuffler",
+  "compact-multi-use-case-in-two-sizes",
+  "eyewear-parts-bundle",
+  "rectangular-embedded-electronic-digital-thermometer-hygrometer",
+  "ring-led-magnetic-control-switch-light",
+  "single-led-magnetic-control-switch-light",
+  "push-opener-bottle-opener",
+  "led-flame-tea-light-candle-set-warm-yellow",
+  "split-ring-keychain",
+  "pvc-tubes",
+  "clear-acrylic-rigid-tubes",
+  "plastic-hose-barb-fittings",
+  "endless-loop-express",
+  "mini-motorized-basketball-game",
+  "black-nylon-cord",
+  "extension-springs",
+  "magnets-for-make-my-sign",
+  "running-dinosaur-automaton",
+  "2-pin-8mm-l-shaped-led-strip-connectors",
+  "3-pin-10mm-l-shaped-led-strip-connectors",
+  "stemfie-electronics-components",
+  "pc4-m6-pneumatic-connector-for-ptfe-tube"
+ ],
+ "strings": [
+  {
+   "h": "94c7373619c9cb4d0f33616587e0859b70d89226e29d4e5a87a70f477ea3b4c7",
+   "en": "Easy to install in DIY models, maintenance free",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "oil-impregnated-bronze-bushings",
+    "title": "Oil Impregnated Bronze Bushings",
+    "field": "blocks[3].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4b949da888ffb2d98a58b05869013e658484985086d3b55c155e6930e16173f",
+   "en": "High thermal stability",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "oil-impregnated-bronze-bushings",
+    "title": "Oil Impregnated Bronze Bushings",
+    "field": "blocks[3].line[2]",
+    "near": "• Easy to install in DIY models, maintenance free"
+   },
+   "dict": null
+  },
+  {
+   "h": "b0378eea62d2fa51324205788d46f494fb3b2cc42d378eb2b2cdec9703a37fb2",
+   "en": "No electrostatic effect",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "oil-impregnated-bronze-bushings",
+    "title": "Oil Impregnated Bronze Bushings",
+    "field": "blocks[3].line[3]",
+    "near": "• High thermal stability"
+   },
+   "dict": null
+  },
+  {
+   "h": "8bec4db5156707372e388ea3c26477af49aaf176718f7ec7aee9ef2e22e4bf28",
+   "en": "Low wear rate and long service life",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "oil-impregnated-bronze-bushings",
+    "title": "Oil Impregnated Bronze Bushings",
+    "field": "blocks[3].line[4]",
+    "near": "• No electrostatic effect"
+   },
+   "dict": null
+  },
+  {
+   "h": "7db6534a9018ae63b8d4bdad8a9d0e886987d7447918dc0507db038367a74cc2",
+   "en": "Can be used in humid and corrosive environments",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "oil-impregnated-bronze-bushings",
+    "title": "Oil Impregnated Bronze Bushings",
+    "field": "blocks[3].line[5]",
+    "near": "• Low wear rate and long service life"
+   },
+   "dict": null
+  },
+  {
+   "h": "1834fbfae6d46e60f7a6a124966a3d3c27443c404596cbe661b35121a0b185c5",
+   "en": "Ensuring prevention of liquid and gas leaks, offering excellent sealing performance and durability",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "o-rings",
+    "title": "O Rings",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f0451a9fdc76b7f1a67666928fade2321c2e39be3345bdf40dd1e41b780210d",
+   "en": "Can be used for manufacturing various sealing components such as pistons, cylinders, and hydraulic cylinders",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "o-rings",
+    "title": "O Rings",
+    "field": "blocks[2].line[2]",
+    "near": "• Ensuring prevention of liquid and gas leaks, offering excellent sealing performance and durability"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa103e831c6dea7959d4908200499d12e2960a9d6575d99f3c5e65c963c3d7ea",
+   "en": "Red connected positive pole, black connected negative pole. Make sure the correct connection\"+\" \"-\" mark on the connector before powering on.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3-pin-10mm-led-strip-connector-cable-with-sm-female-plug-for-rgb",
+    "title": "3 Pin 10mm LED Strip Connector Cable with SM Female Plug for RGB",
+    "field": "blocks[0].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "d319cec592730433d8550ab0bde652a35ceeb7f5eb68beff80acf6a56440397f",
+   "en": "Quick connect, solderless, easy to install",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "3-pin-10mm-led-strip-connector-cable-with-sm-female-plug-for-rgb",
+    "title": "3 Pin 10mm LED Strip Connector Cable with SM Female Plug for RGB",
+    "field": "blocks[1].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "b141a210d6dfa682055234fa70284ecc130c5c1954f0e88166a3977ce47d9044",
+   "en": "Easy to DIY for led light accessory kit",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3-pin-10mm-led-strip-connector-cable-with-sm-female-plug-for-rgb",
+    "title": "3 Pin 10mm LED Strip Connector Cable with SM Female Plug for RGB",
+    "field": "blocks[1].line[2]",
+    "near": "• Quick connect, solderless, easy to install"
+   },
+   "dict": null
+  },
+  {
+   "h": "498bbe0127dcc58efd2eee9c174132f6e73987ae8f2a865b13409a8dc98c7f55",
+   "en": "Good flexibility, easy to bend",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "3-pin-10mm-led-strip-connector-cable-with-sm-female-plug-for-rgb",
+    "title": "3 Pin 10mm LED Strip Connector Cable with SM Female Plug for RGB",
+    "field": "blocks[1].line[3]",
+    "near": "• Easy to DIY for led light accessory kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "01a233d56b63ceae839bc146efe5a2d713c8210defab43270a7fb1428c3858f3",
+   "en": "The red wire is connected to the positive pole, and the black wire is connected to the negative pole. Make sure of the correct connection of the \"+\" and \"-\" marks on the connector before powering on.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "usb-a-to-2-pin-8mm-solderless-quick-connector-for-white-led",
+    "title": "USB-A to 2 Pin 8mm Solderless Quick Connector For White LED",
+    "field": "blocks[0].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b8fcbdd172d7c1d996ed525108bc73fa62b7e4773b548c17342e7a4b4cf25e4",
+   "en": "Easy to DIY as a led light accessory kit",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "usb-a-to-2-pin-8mm-solderless-quick-connector-for-white-led",
+    "title": "USB-A to 2 Pin 8mm Solderless Quick Connector For White LED",
+    "field": "blocks[1].line[2]",
+    "near": "• Quick connect, solderless, easy to install"
+   },
+   "dict": null
+  },
+  {
+   "h": "b78a1e2006612b6bf54048c890c9ded2ad8db046cff84ed32507eca3d51ac8fc",
+   "en": "The 3004 5V Slim Micro Fan can be combined with 3D printing models to achieve various functions, such as mini humidifiers, purifiers, etc.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3004-slim-micro-fan-5v-with-2pin-sh1-0",
+    "title": "3004 5V Slim Micro Fan with 2pin SH1.0",
+    "field": "blocks[2].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a617926c14b1e7af50dc26853a25db77ca7f4000afbdf2358f7a63237edd251",
+   "en": "Compared with the same size DC Fan, 3004 5V Slim Micro Fan has a higher air pressure, more suitable for cooling and other application scenarios.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3004-slim-micro-fan-5v-with-2pin-sh1-0",
+    "title": "3004 5V Slim Micro Fan with 2pin SH1.0",
+    "field": "blocks[2].line[2]",
+    "near": "The 3004 5V Slim Micro Fan can be combined with 3D printing models to achieve various functions, such as mini humidifiers, purifiers, etc."
+   },
+   "dict": null
+  },
+  {
+   "h": "b65f1ec3811c0ba472f22e090ef1d4f0eb04ef79091cbc21b72f85fed129b129",
+   "en": "Teeth Quantity",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "blocks[1].line[1].cell[2]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "386784649282d14db721a56a34bfd7d7ef0d2e48c84f5764fb36538643d11052",
+   "en": "H (mm) Belt Width",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "blocks[1].line[1].cell[3]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e4aac16d77a43d2ca0f150f814714082eeb71de0531c57c440ceba5bf8b05ac",
+   "en": "Small-sized trapezoidal teeth with high contact area and good meshing performance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "d19c0da17a7a20eaffb775a0a18a06dc570362b2ca785c0f3d9fccf680232cbb",
+   "en": "Suitable for light loads and precision drive systems",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "blocks[2].line[2]",
+    "near": "• Small-sized trapezoidal teeth with high contact area and good meshing performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "0dac560ccd240609c0786860078631225a67c69ef1f730ade5910bfd9e7982ce",
+   "en": "Pitch 2.032 mm (0.08 inch)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "blocks[2].line[3]",
+    "near": "• Suitable for light loads and precision drive systems"
+   },
+   "dict": null
+  },
+  {
+   "h": "16090d1f5901ec6927bdc419392cc11d752c3fc130b0ef9d98208dbfe7c1fa97",
+   "en": "Smooth, quiet performance, along with rugged durability and enhanced longevitys",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "blocks[2].line[4]",
+    "near": "• Pitch 2.032 mm (0.08 inch)"
+   },
+   "dict": null
+  },
+  {
+   "h": "0429835964b48483416fbdbbbeb05b4666b1f6477046608d23012f19976b6d50",
+   "en": "H(inch) Belt Width",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "xl-timing-belts",
+    "title": "XL Timing Belts",
+    "field": "blocks[1].line[1].cell[3]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "40591394550d7bd6d56833162c61ddb7fcf165ddf634193bc5250aabb2eb55f1",
+   "en": "Trapezoidal tooth shape for high contact area and good meshing performance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xl-timing-belts",
+    "title": "XL Timing Belts",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "02be09117769e69b5b72a1a9124ffa7b80b6b249657964e1bac775a61eb8e13e",
+   "en": "Pitch 5.08 mm (0.2 inch)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xl-timing-belts",
+    "title": "XL Timing Belts",
+    "field": "blocks[2].line[3]",
+    "near": "• Suitable for light loads and precision drive systems"
+   },
+   "dict": null
+  },
+  {
+   "h": "21108c8cdbde26b0ef974abf0560f8b2d60cb1b7ab02628b3b891454e0cb9547",
+   "en": "Smooth, quiet performance, along with rugged durability and enhanced longevity",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xl-timing-belts",
+    "title": "XL Timing Belts",
+    "field": "blocks[2].line[4]",
+    "near": "• Pitch 5.08 mm (0.2 inch)"
+   },
+   "dict": null
+  },
+  {
+   "h": "41cca013a0e4ee78d6c89a09369784f7ee2a94a486c67e95fe7f16d6a5e0cf5e",
+   "en": "Length（mm）",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "high-torque-drive-timing-belt",
+    "title": "HTD Timing Belt",
+    "field": "blocks[1].line[1].cell[2]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "6af11cc594045511b957642813d9a64b9df876e72faaed7f579726787dfe65c4",
+   "en": "Pitch",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "high-torque-drive-timing-belt",
+    "title": "HTD Timing Belt",
+    "field": "blocks[1].line[1].cell[3]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "02b577b1e2cecc1f3ca171836217dd8aead82e3b1a88b5251c864ad5fc4e1742",
+   "en": "Belt Width（mm）",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "high-torque-drive-timing-belt",
+    "title": "HTD Timing Belt",
+    "field": "blocks[1].line[1].cell[4]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f005a21531ce5ffbec64bf7a59d42eac0289506a3b243b59a77de9304b9180b",
+   "en": "Synchronizes the rotation of motors and components",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "high-torque-drive-timing-belt",
+    "title": "HTD Timing Belt",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "e60d930b240ea7ad95140288ea1d448485493402ec7aa7e94db256323715086f",
+   "en": "Arc tooth design provides higher torque transmission and better meshing, reducing tooth slippage",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "high-torque-drive-timing-belt",
+    "title": "HTD Timing Belt",
+    "field": "blocks[2].line[2]",
+    "near": "• Synchronizes the rotation of motors and components"
+   },
+   "dict": null
+  },
+  {
+   "h": "574982ecb207925b7bc582b57444607ac7b7a06292e70dda81ce2f27de5432ed",
+   "en": "For high load and high torque drive systems",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "high-torque-drive-timing-belt",
+    "title": "HTD Timing Belt",
+    "field": "blocks[2].line[3]",
+    "near": "• Arc tooth design provides higher torque transmission and better meshing, reducing tooth slippage"
+   },
+   "dict": null
+  },
+  {
+   "h": "cad12fcba56f15a6cfddef5e30df9ecf27dfe69bab793d1bc96554750bab1ad8",
+   "en": "Smooth, quiet, durable, and long-lasting",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "high-torque-drive-timing-belt",
+    "title": "HTD Timing Belt",
+    "field": "blocks[2].line[4]",
+    "near": "• For high load and high torque drive systems"
+   },
+   "dict": null
+  },
+  {
+   "h": "fc4a41a9c7b229f0e5437bbb7e62ce980977e6be70ec92e5d13f0ccc07e0e6fa",
+   "en": "Prevents leakage of liquids and gases, with excellent sealing performance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-gasket-seal-ring",
+    "title": "Rubber Gasket Seal Ring",
+    "field": "blocks[3].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "79ae2a1cf76bbe1e5bf88195bb014a2c2aad1b0bd5ba0e44d394ef6ef08e9b7c",
+   "en": "Used as foot pads or cushioning pads to reduce impact during movement",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-gasket-seal-ring",
+    "title": "Rubber Gasket Seal Ring",
+    "field": "blocks[3].line[2]",
+    "near": "• Prevents leakage of liquids and gases, with excellent sealing performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "be61289f3a2333f1e97c79f349a926c69bb7f767a66d22030b97e0ed485f5636",
+   "en": "Please hold the connector when plugging and unplugging, and do not forcefully twist the connectors to avoid wires loosening or detaching",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "50mm-ph2-0-to-sh1-0-conversion-wire",
+    "title": "50mm PH2.0 to SH1.0 Conversion Wire",
+    "field": "blocks[1].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ae2733dde84676f6d13ed87fc6fb399804e2b2e7d513dda58ff2a0a36a4408d",
+   "en": "W (mm) Width",
+   "kind": "block_cell",
+   "freq": 7,
+   "context": {
+    "handle": "rectangular-magnetic-stickers",
+    "title": "Rectangular Magnetic Stickers",
+    "field": "blocks[0].line[0].cell[1]",
+    "near": "CD001 | 20 | 20 | Square"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e008a644ad0f01fb0befc0d9682696adddf445f2e5592cda0d05363e05eb88d",
+   "en": "Easy to install, ideal for securing small and light items for a variety of DIY projects",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "rectangular-magnetic-stickers",
+    "title": "Rectangular Magnetic Stickers",
+    "field": "blocks[1].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "84026fcbbd597939992e36beb9b483f3a80e7e2740e18f99493628fe54dc2bc6",
+   "en": "Firmly bonded liner with strong magnetism",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-magnetic-stickers",
+    "title": "Rectangular Magnetic Stickers",
+    "field": "blocks[1].line[2]",
+    "near": "• Easy to install, ideal for securing small and light items for a variety of DIY projects"
+   },
+   "dict": null
+  },
+  {
+   "h": "5c360746b59328ae4388fe40b41058196add2b38bd52793b2c19f23a01be0f76",
+   "en": "Easy to bend and adjust shape, suitable for curved or irregular surfaces",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "rectangular-magnetic-stickers",
+    "title": "Rectangular Magnetic Stickers",
+    "field": "blocks[1].line[3]",
+    "near": "• Firmly bonded liner with strong magnetism"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b3473f1e6dab693f775a5221aed7248397c8b3581d405c3d22a1724e4182a09",
+   "en": "Right angled rectangles are suitable for fitting right angled edges without leaving any gaps",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-magnetic-stickers",
+    "title": "Rectangular Magnetic Stickers",
+    "field": "blocks[1].line[4]",
+    "near": "• Easy to bend and adjust shape, suitable for curved or irregular surfaces"
+   },
+   "dict": null
+  },
+  {
+   "h": "1cdfc29494ec07ff1c88cdffa0074550bd0a59a2097104375460e3a57d996b39",
+   "en": "Moderate magnetism for easy attachment and detachment",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "round-magnetic-stickers",
+    "title": "Round Magnetic Stickers",
+    "field": "blocks[1].line[2]",
+    "near": "• Easy to install, ideal for securing small and light items for a variety of DIY projects"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ea0ae18a86dc8d0b9bf826096611ea26de9bf4bf28a3a0bd4c843ea8815ce99",
+   "en": "Rounded contours for greater aesthetics",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "round-magnetic-stickers",
+    "title": "Round Magnetic Stickers",
+    "field": "blocks[1].line[4]",
+    "near": "• Easy to bend and adjust shape, suitable for curved or irregular surfaces"
+   },
+   "dict": null
+  },
+  {
+   "h": "3637df5dc1a5449685c65fd820f5e708840e45d7780af75f2185e5b342f7299c",
+   "en": "R (mm) Corner Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "rectangle-magnetic-stickers-with-round-corners",
+    "title": "Rectangle Magnetic Stickers with Round Corners",
+    "field": "blocks[0].line[0].cell[3]",
+    "near": "CD001 | 20 | 50 | 5"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea82901d3b62a9722243e53c58a5139640cd1dc7165ed7d1876cd33a7098cc0f",
+   "en": "Rounded corners for a more contoured fit",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangle-magnetic-stickers-with-round-corners",
+    "title": "Rectangle Magnetic Stickers with Round Corners",
+    "field": "blocks[1].line[4]",
+    "near": "• Easy to bend and adjust shape, suitable for curved or irregular surfaces"
+   },
+   "dict": null
+  },
+  {
+   "h": "56ad67dd357fd84fd97ecfdc59cb4b369abe1efcc88c2a3efb537a10c01ee300",
+   "en": "Moderate magnetism for easy attachment and removal",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "soft-magnetic-sheet-stickers",
+    "title": "Soft Magnetic Sheet Stickers",
+    "field": "blocks[1].line[2]",
+    "near": "• Easy to install, ideal for securing small and light items for a variety of DIY projects"
+   },
+   "dict": null
+  },
+  {
+   "h": "4d8675ff261deeb70d06ea7bd2be7a9f2467c677406a046e6fdfedd2a2ce63c1",
+   "en": "Back glue can be easily fixed to the parts",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "soft-magnetic-sheet-stickers",
+    "title": "Soft Magnetic Sheet Stickers",
+    "field": "blocks[1].line[3]",
+    "near": "• Moderate magnetism for easy attachment and removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "e40221537f781997955e2e55a49c5778ba2c74a767d38cd4a7818da8b961b791",
+   "en": "Durable and flexible design",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "soft-magnetic-sheet-stickers",
+    "title": "Soft Magnetic Sheet Stickers",
+    "field": "blocks[1].line[4]",
+    "near": "• Back glue can be easily fixed to the parts"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4a8d2f2e166ab0c84c0701887f78c5995dca464a15ce8ad7d5e28ea5e98ba38",
+   "en": "Rectangular Double-Sided Foam Tape – Strong, Reliable Adhesion for Precision Assembly. This rectangular double-sided foam tape is a practical solution for assembling 3D printed models, DIY projects, and everyday adhesive needs. Designed for strong bonding, it securely attaches components to a variety of surfaces while offering a light cushioning effect to minimize vibrations. Whether you’re working with metal, plastic, wood, or other materials, this tape provides consistent performance to meet your assembly demands. Easy to cut and apply, this tape simplifies your workflow and ensures a clean, professional finish. Ideal for hobbyists, makers, and professionals alike.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "325fe52e71c83f9cea14d796b36275ed23ccb4d057378a5cfc9c4836567b5f0b",
+   "en": "Mini Pro Case",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "blocks[0].line[3].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "4f04acbea01076fa460c238c6058212d7f42f394e61818609ea985f6a296f5be",
+   "en": "Jerrodh",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "blocks[0].line[3].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b170684f3766f86a3d0e1effce578d7cc22013be548396904d5defb8b93cdb4",
+   "en": "Long-lasting and strong",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "446ea1594c9f85797bf114f4c95ab6e83e7cadf935c1505b92ebf8b1b8b81414",
+   "en": "Ready-to-peel cut-to-size",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "blocks[2].line[2]",
+    "near": "• Long-lasting and strong"
+   },
+   "dict": null
+  },
+  {
+   "h": "39baaceb42ab6f4294a2bf6c7d11d1ba6a625b0a45f701341f77a3923ae14415",
+   "en": "Easy to bend and adjust shape",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "blocks[2].line[3]",
+    "near": "• Ready-to-peel cut-to-size"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb183537f4e0ea6715398d3c99604548389ba22a1b229fb8e96b0a221d810fcf",
+   "en": "Suitable for fitting right angled edges without leaving any gaps",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "blocks[2].line[4]",
+    "near": "• Easy to bend and adjust shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "e992054d6cdef5958dd10ee2513cd37b0f6209b50242dcf8a1f4d8ab96eccc71",
+   "en": "Adheres to a wide range of surfaces such as wood, glass, plastic, metal, etc.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "blocks[2].line[5]",
+    "near": "• Suitable for fitting right angled edges without leaving any gaps"
+   },
+   "dict": null
+  },
+  {
+   "h": "f40f002423f77b837198369adf4f8f38b72fc7597f6faec7e7574bd692a7f894",
+   "en": "ID (mm) Inner Diameter",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "silicone-tube",
+    "title": "Silicone Tubes",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "02ff75732c13801ac3d7d55156e8a6d1cc8acb45b9bf1e056d44a5f16ef73026",
+   "en": "OD (mm) Outer Diameter",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "silicone-tube",
+    "title": "Silicone Tubes",
+    "field": "blocks[1].line[1].cell[2]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "a1658a2518b0e4a567634ca90f55c9eb8865773eac5ca433707bc3c087a69a10",
+   "en": "Made of flexible and durable food-grade silicone",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-tube",
+    "title": "Silicone Tubes",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "aabcb9e28f30c769a641ef68e0ca8ae5e30d7f6f3f1af0d7442e41441eaab78a",
+   "en": "Non-toxic and odourless, environmentally friendly",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-tube",
+    "title": "Silicone Tubes",
+    "field": "blocks[2].line[2]",
+    "near": "• Made of flexible and durable food-grade silicone"
+   },
+   "dict": null
+  },
+  {
+   "h": "9795cd5aa98d6f9e5ddf194b8848b29fa971acf2f078609bddaea73709219810",
+   "en": "Products can pass the latest SGS REACH, RoHS, FDA, California 65 certification",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-tube",
+    "title": "Silicone Tubes",
+    "field": "blocks[2].line[3]",
+    "near": "• Non-toxic and odourless, environmentally friendly"
+   },
+   "dict": null
+  },
+  {
+   "h": "eea68fe9dc8b53dbd615a64390a3e857b829f4cd7e3a67432a5b16c82fbd061d",
+   "en": "Suitable for peristaltic pumps, corrosion and wear resistant",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-tube",
+    "title": "Silicone Tubes",
+    "field": "blocks[2].line[4]",
+    "near": "• Products can pass the latest SGS REACH, RoHS, FDA, California 65 certification"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6836bc9fc2ca30d1c5836fea9a9f5ba1143f3f4b99e54e66ec1cc7ceeee822a",
+   "en": "Transparent Blue",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "pu-tubes",
+    "title": "PU Tubes",
+    "field": "blocks[1].line[2].cell[3]",
+    "near": "Product ID | ID (mm) Inner Diameter | OD (mm) Outer Diameter | Color"
+   },
+   "dict": null
+  },
+  {
+   "h": "208e286292255601cac942d7942e808e0947e7ddc9469035cc60542299097640",
+   "en": "Translucent Blue",
+   "kind": "block_cell",
+   "freq": 5,
+   "context": {
+    "handle": "pu-tubes",
+    "title": "PU Tubes",
+    "field": "blocks[1].line[4].cell[3]",
+    "near": "RC002 | 2 | 4 | Transparent Blue"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c153645cb512e6f7da1415af139ebae8f7000c34b4d14d09fe7635def409654",
+   "en": "*Due to a labeling error in this batch of Translucent Blue PU tubes (RC001 & RC002 labeled as Transparent Silicone Tubes), the product is unaffected and can still be used as intended. We appreciate your understanding and support. If you have any questions, please feel free to contact us.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pu-tubes",
+    "title": "PU Tubes",
+    "field": "blocks[1].line[10]",
+    "near": "RC010 | 4 | 6 | Black"
+   },
+   "dict": null
+  },
+  {
+   "h": "bc8ee9bf9e24c8c99a3fd2dcbdd414275061c5734a6d468dd7b67f5a532caa57",
+   "en": "Strong stress tolerance",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pu-tubes",
+    "title": "PU Tubes",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "87cfda2dcd67a3337071e1ab2ca8e74779b18650d930002f979dfdbdf535a6d6",
+   "en": "Long service life",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pu-tubes",
+    "title": "PU Tubes",
+    "field": "blocks[2].line[2]",
+    "near": "• Strong stress tolerance"
+   },
+   "dict": null
+  },
+  {
+   "h": "fc788b034a5ad5d4fc74746ee789bd8af5d19f4b9c1a32e4f9f1b2d381236062",
+   "en": "Various colours available",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pu-tubes",
+    "title": "PU Tubes",
+    "field": "blocks[2].line[3]",
+    "near": "• Long service life"
+   },
+   "dict": null
+  },
+  {
+   "h": "1fa3792ac38c21e4c4946019549b377dd108d5f793d698371638cd36dde8c7f0",
+   "en": "Easy to install and suitable for transporting high pressure gases and liquids in a variety of DIY projects",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pu-tubes",
+    "title": "PU Tubes",
+    "field": "blocks[2].line[4]",
+    "near": "• Various colours available"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d7d20d421ec600044ea639382e310891ab45e4a855570e371dc10122fa89df9",
+   "en": "Features good temperature resistance of 220°F (104°C)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "round-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Round Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "a184672e0a4d31184c9c6a1cd50613f3dc9004d36295e0b482ceda75a33c3883",
+   "en": "Best suited for indoor and outdoor use",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "round-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Round Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "blocks[1].line[1].cell[2]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "90ea73bb4479a45b4f8ec823dfd41c359b0defcd6326059317ecb44cd14c6810",
+   "en": "The contact surface design of the plastic button ornaments for Shoe Charms ensures secure attachment to the shoe, aiming to prevent discomfort during extended wear of the assembled decoration. Additionally, separating the injection-molded buckle from the printed shoe charms provides greater freedom in 3D model sizes and allows for more flexible buckle designs. Please note that during use, side A should snugly fit against the foot, while side B is intended for connecting the design model.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-button-ornaments-for-shoe-charms",
+    "title": "Plastic Button Ornaments For Shoe Charms",
+    "field": "blocks[2].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c86571507ce138e08cd37e6b6d0c146f1a0e54f318fbfc7071fabdbc1bce93a",
+   "en": "A (mm) Snap Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-button-ornaments-for-shoe-charms",
+    "title": "Plastic Button Ornaments For Shoe Charms",
+    "field": "blocks[3].line[0].cell[1]",
+    "near": "HB001 | 12 | 10 | 3.5"
+   },
+   "dict": null
+  },
+  {
+   "h": "cd18980c4f0f3e1d4e9ab6530d892bd831e7c158f314f8af975c0991cea407c1",
+   "en": "B (mm) Disc Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-button-ornaments-for-shoe-charms",
+    "title": "Plastic Button Ornaments For Shoe Charms",
+    "field": "blocks[3].line[0].cell[2]",
+    "near": "HB001 | 12 | 10 | 3.5"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ace9a415b405daf35c6051ad5d9f454d0cbd596bc79a70ed87662fe641cba2b",
+   "en": "C (mm) Heights",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-button-ornaments-for-shoe-charms",
+    "title": "Plastic Button Ornaments For Shoe Charms",
+    "field": "blocks[3].line[0].cell[3]",
+    "near": "HB001 | 12 | 10 | 3.5"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e0afd0d12abb9de5fd8d73498aba41a652f6fd1cc60b8ce5ddb39d7c8d80159",
+   "en": "Lightweight and portable, sturdy and durable, waterproof and not easy to break",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-button-ornaments-for-shoe-charms",
+    "title": "Plastic Button Ornaments For Shoe Charms",
+    "field": "blocks[4].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "76e67fb407c93e72758dd7c6af3f24cd041a25a06b7d6c66835fdea0f849064d",
+   "en": "Bonds to ornament with glue, easy to install in your DIY model",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-button-ornaments-for-shoe-charms",
+    "title": "Plastic Button Ornaments For Shoe Charms",
+    "field": "blocks[4].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ab77c1d70f3daa2bf80299a77032f97fc78f619a98e0d014421184f12febd75",
+   "en": "Pixel Puzzle Maker is your gateway to nostalgic 8-bit style pixel art! With this innovative tool from MakerLab, you can effortlessly transform any image into a customizable pixelated graphic. What's more, you can automatically convert it into a printable colored pixel puzzle! Tailor the size and level of detail to your liking, and enjoy the convenience of marked color codes on the base plate for swift assembly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangle-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Rectangle Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "blocks[1].line[0]",
+    "near": "Freeze the moments worth recording in life, and transform them into pixel puzzles. Paired with Reclosable Fastener Mounting Tape, this is an excellent choice fo"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a8e4076bab1e2d68f5a837eb6f957ca6f17e4f5c2fc7de56c4f62ab5ee7b2e0",
+   "en": "Freeze the moments worth recording in life, and transform them into pixel puzzles. Paired with Reclosable Fastener Mounting Tape, this is an excellent choice for displaying Pixel Puzzle on a variety of surfaces, including metals, glass, and plastics. This innovative fastener combines convenience and durability, making it ideal for temporary and permanent applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangle-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Rectangle Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "blocks[1].line[1]",
+    "near": "Pixel Puzzle Maker is your gateway to nostalgic 8-bit style pixel art! With this innovative tool from MakerLab, you can effortlessly transform any image into a "
+   },
+   "dict": null
+  },
+  {
+   "h": "5971d364eee4e7e6c709928b60674caf5ddfe090d0eef75933ddabac2e2862c1",
+   "en": "The 3M™ Dual Lock Reclosable Fastener is easy to apply and reposition. It can be easily removed and reapplied without losing its adhesive properties. This feature allows for adjustments until you achieve the perfect placement for your Pixel Puzzle, no need to worry about leaving visible holes or marks. The Mushroom-shaped Heads interlocks securely, providing a robust bond that ensures that your Pixel Puzzle remains firmly in place, without worrying about it falling off.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangle-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Rectangle Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "blocks[1].line[2]",
+    "near": "Freeze the moments worth recording in life, and transform them into pixel puzzles. Paired with Reclosable Fastener Mounting Tape, this is an excellent choice fo"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0a1e80bb6dec104eba789471a1fb267a84f6f6bbc44075d5102e8a6a5f165ff",
+   "en": "How To Find It",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangle-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Rectangle Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "blocks[1].line[3]",
+    "near": "The 3M™ Dual Lock Reclosable Fastener is easy to apply and reposition. It can be easily removed and reapplied without losing its adhesive properties. This featu"
+   },
+   "dict": null
+  },
+  {
+   "h": "078cd7445aaf44ad0a147494ce5f826f7568a100782712adba0a90aef3c2d8e2",
+   "en": "d (mm) Inner Diameter",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "disc-countersunk-hole-magnet",
+    "title": "Disc Countersunk Hole Magnets",
+    "field": "blocks[2].line[0].cell[2]",
+    "near": "CC003 | 10 | 4 | 3"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a0e23ea14b5cd196bdb663d1d1d770a98a47d9d21d2cdda82ad41b1ef66c7ec",
+   "en": "W(mm) Thickness",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "disc-countersunk-hole-magnet",
+    "title": "Disc Countersunk Hole Magnets",
+    "field": "blocks[2].line[0].cell[3]",
+    "near": "CC003 | 10 | 4 | 3"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f0014d5496bfd6f58a9ba2d1d351a5311b0e4ef2d7e76feb80c885092a23c26",
+   "en": "High-Performance Magnetic Strength",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "disc-countersunk-hole-magnet",
+    "title": "Disc Countersunk Hole Magnets",
+    "field": "blocks[3].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "84aa404c8cb651de2b1a3b313e6a21de09ae23f2c850b1baf7970ba2faad98d4",
+   "en": "Corrosion-Resistant Coating",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "disc-countersunk-hole-magnet",
+    "title": "Disc Countersunk Hole Magnets",
+    "field": "blocks[3].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a20394c0bbd359bfca062eaf0cd33a4a14ecf856e78e99e7168fd4379ff7efa",
+   "en": "Lighter weight than Round Magnets",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "disc-countersunk-hole-magnet",
+    "title": "Disc Countersunk Hole Magnets",
+    "field": "blocks[3].line[1].cell[2]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "09b700f5bf63a9c3810387fd0b4a1e637da72de8c2edcf6b0ac166e3e5afb345",
+   "en": "Ring shape allows for easy installation",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "disc-countersunk-hole-magnet",
+    "title": "Disc Countersunk Hole Magnets",
+    "field": "blocks[3].line[1].cell[3]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ef0c36c6a2f165ab7fdaff5a48cdeb92a7d18535288fe1d196a9a5c95546180",
+   "en": "D (mm) Cap Diameter",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "suction-caps-with-hole",
+    "title": "Suction Caps with Hole",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "7373840ced90d09aa14cba5db13a8b90912c4535cba6810f1d6dfe807c68e424",
+   "en": "No hook, hole design allows easy hanging with a string",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "suction-caps-with-hole",
+    "title": "Suction Caps with Hole",
+    "field": "blocks[2].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "07b196e89b09d55d5a0eeb54ee6a02a8d0ce4ac1afdd97f2199dfe783dc9a340",
+   "en": "Suitable for securing lightweight items on any smooth surface",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "suction-caps-with-hole",
+    "title": "Suction Caps with Hole",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "112652345c1ce41f173367968a736d2e3946d65d804875ccb0f050aa86864d16",
+   "en": "Compact size, space saving",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "suction-caps-with-hole",
+    "title": "Suction Caps with Hole",
+    "field": "blocks[2].line[1].cell[2]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b0085674f9373d53d22cd75fdea125ce448c6efb1d5f3eaf3d3ce46ecac2fb7",
+   "en": "Hanging dolls, crafts, and holiday decorations (e.g., Halloween and Christmas decorations)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "suction-caps-with-hole",
+    "title": "Suction Caps with Hole",
+    "field": "blocks[2].line[2].cell[0]",
+    "near": "No hook, hole design allows easy hanging with a string | Suitable for securing lightweight items on any smooth surface | Compact size, space saving"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6b2dd8f3a2be7e38e86a8bd6adfbdfcc8f860541204490f1bdc13cf382c51ba",
+   "en": "Stronger suction, stable and reliable",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "suction-caps-with-hole",
+    "title": "Suction Caps with Hole",
+    "field": "blocks[2].line[2].cell[1]",
+    "near": "No hook, hole design allows easy hanging with a string | Suitable for securing lightweight items on any smooth surface | Compact size, space saving"
+   },
+   "dict": null
+  },
+  {
+   "h": "b84e669630a247b18092f4f58c31c44bd4804e44dd336901c87d2144b0709bdc",
+   "en": "Protruding mushroom head suction design for stronger suction, stable and reliable",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "suction-caps-with-mushroom-head",
+    "title": "Suction Caps with Mushroom Head",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "0970b7013e1cdafe09b2d7749c32a2df5dcd342691ae73be82c554a5d623eabe",
+   "en": "Flat head suction design, no hooks needed",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "pvc-suction-caps-with-flat-head",
+    "title": "PVC Suction Caps with Flat Head",
+    "field": "blocks[2].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "4d3c3b2a3776500c019f78b4553387c1616a8970a2de9f8515fe542c124a5edc",
+   "en": "Strong suction, stable and reliable",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "pvc-suction-caps-with-flat-head",
+    "title": "PVC Suction Caps with Flat Head",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "4d6cfd3c7f39a8c8eab5fa90c9dc2bef1c8ab852d47ef6b3f893ea64e72bc267",
+   "en": "Ideal for hanging various household and kitchen accessories, home and holiday decorations, such as fixing soap dishes, bathroom racks",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pvc-suction-caps-with-flat-head",
+    "title": "PVC Suction Caps with Flat Head",
+    "field": "blocks[2].line[2]",
+    "near": "Flat head suction design, no hooks needed | Strong suction, stable and reliable | Compact size, space saving"
+   },
+   "dict": null
+  },
+  {
+   "h": "533af34229d09fb34e44cf5c68ae1b966fd1ff6d43833213942814f6b53e2670",
+   "en": "The rubber bands offer reliable strength and pliability, it can be reused",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-bands",
+    "title": "Rubber Bands",
+    "field": "blocks[0].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "64ed2f40502e2402ed8e646030acecab97137f6246042436712f8fcd0f40bb88",
+   "en": "Made of quality natural rubber with elasticity",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-bands",
+    "title": "Rubber Bands",
+    "field": "blocks[0].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "57d216cb92a8120ea189190d53d65dc18baaf9ec0c966ec51c23cee6a0ed1246",
+   "en": "Designed to fix some tool or product",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-bands",
+    "title": "Rubber Bands",
+    "field": "blocks[0].line[1].cell[2]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a1c3d48b41cfd1190afc6da122a87165892b6a1067953c494c9700812fa70aa",
+   "en": "Channel Number",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "blocks[0].line[2].cell[2]",
+    "near": "3D Model Application Instruction"
+   },
+   "dict": null
+  },
+  {
+   "h": "f711f6890df7ae8339f6182254741b3a50d956a45778ac1691e274774cbb2b2a",
+   "en": "Wire Gauge",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "blocks[0].line[2].cell[3]",
+    "near": "3D Model Application Instruction"
+   },
+   "dict": null
+  },
+  {
+   "h": "69bbce7ea5bd905747f04194392c1bdf2bdbafb6f2c468063cac74e5c4b548b4",
+   "en": "Precision compact internal design with 360° rotation, preventing wire tangling and breakage",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "blocks[1].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "57aeff1febb41455d6e26311cea4cf78a256ee7f28d03f162da17ab044180bd9",
+   "en": "Featuring a V-groove design with military-grade wear-resistant gold treatment Stable, smooth, low-torque operation enables the transmission of multiple signals and power together",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa58ab86caeb6f4f16fe6560dbc10a928f9a040ae0d65cc86a34668ec426a316",
+   "en": "Ensures minimal resistance fluctuation and a long lifespan",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "blocks[1].line[1].cell[2]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "4b3a92d8f712208b122b15706d86323ed0c25c3584a601e2af53812b622bc29b",
+   "en": "The product's lifespan is strongly related to operating speed, working temperature, humidity, and load conditions",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "blocks[2].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e6d8e57fd55e3922c1d585ddd7af79fb166430b4617fdab1fa8971587c4c3ef",
+   "en": "Electrical noise is closely related to operating speed, current, and voltage",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "blocks[2].line[2]",
+    "near": "• The product's lifespan is strongly related to operating speed, working temperature, humidity, and load conditions"
+   },
+   "dict": null
+  },
+  {
+   "h": "afe63a9cd780594f18051d9c65ee95f097f81ce3552fd1c3bae2b0b854a3fa56",
+   "en": "Note: The model in the video may differ slightly from the model provided in the website link.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[1].line[1]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "887ccb69cf65194c626ce99df66d9f30671d9c23f79c5892322d23a5ade3cfcb",
+   "en": "Magnetic Mountain Lamp",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[1].line[3].cell[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "a10429233df7fe397361d149aded3e630efcf37901d783ce7532e4c505dce927",
+   "en": "@Akelyte",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[1].line[3].cell[1]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c10bb50b82d664c765b5d194e4d3ad74ee70f4803e100337b876abc0495625c",
+   "en": "@MaKim",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "Magnetic Mountain Lamp | @Akelyte | Magnetic Mountain Lamp | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca1ba1777bf611e16cb035fe13502b779398e8881267f418e519630d39c25458",
+   "en": "*Note: These models require additional Maker's Supply parts for full assembly. Please check the model link for the complete BOM list.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[1].line[5]",
+    "near": "Cyberpunk Dice Tower - High Detail Illuminated Model | @MaKim | Cyberpunk Dice Tower - High Detail Illuminated Model | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a6fe9f5089bfccc4e9428dab63e2faa982b1800a91d2cf9aa0ac2a755900c59",
+   "en": "The above model requires the use of a COB LED Strip Light. To complete the assembly of a full model, users need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[1].line[6]",
+    "near": "*Note: These models require additional Maker's Supply parts for full assembly. Please check the model link for the complete BOM list."
+   },
+   "dict": null
+  },
+  {
+   "h": "6ed1c63926ec6076c1056d4a4d9884d71fa24994dd8dafd967a6c3b924dfaa54",
+   "en": "Current (at 5V)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[2].line[0].cell[4]",
+    "near": "KA007 | 100 | 13.7 | 9.9 | 70mA"
+   },
+   "dict": null
+  },
+  {
+   "h": "5032a0a813900c3cb2565cae9d39f219b28ca41de68e118b948299d8c8fdd1c5",
+   "en": "Ensure the COB LED Strip Light is connected to the correct power supply. Using an incorrect power supply can damage the strip.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[3].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "69c561dac9665dba45d92a33fd6bd22e825e059ad111b7778b8bbff155a6c37a",
+   "en": "Proper heat management is crucial. Use heat sinks or other cooling methods to prevent overheating, which can reduce brightness and cause LED failure.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[3].line[2]",
+    "near": "• Ensure the COB LED Strip Light is connected to the correct power supply. Using an incorrect power supply can damage the strip."
+   },
+   "dict": null
+  },
+  {
+   "h": "d3f3d6652f9ce9a47cab5192286c09adead7d91da9ecc6e2f2e7a1233f007f06",
+   "en": "Ensure all electrical connections are secure and properly insulated. Regularly inspect connections to prevent short circuits or electrical shocks.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "blocks[3].line[3]",
+    "near": "• Proper heat management is crucial. Use heat sinks or other cooling methods to prevent overheating, which can reduce brightness and cause LED failure."
+   },
+   "dict": null
+  },
+  {
+   "h": "388cf6e329cfa0a9f2161e72e175414f39bc77682c31b5bc02609e390c95b173",
+   "en": "Remote-controlled 16-color RGBW puck lights are flexible lighting solutions that allow users to choose from a wide range of colors and adjust brightness easily. Ideal for accent lighting, they enhance various spaces, from bedrooms to stairways, providing both functionality and ambiance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "blocks[2].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1de9f7b68d7067e81281ecdd351ff8040338d8cb76d6e3c321706d0e738775c8",
+   "en": "Remote control makes it easy to adjust light brightness and mode",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "blocks[3].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "d48e0754db617806559c56834a48f88b3101bba6af1a55957bad5971e6c9f83b",
+   "en": "Supports 16 different color options to create the ideal atmosphere",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "blocks[3].line[2]",
+    "near": "• Remote control makes it easy to adjust light brightness and mode"
+   },
+   "dict": null
+  },
+  {
+   "h": "b0655b6482dbdac1bfbf8d3f0c650e23845d7733f5a3e288314d5acae4b4b429",
+   "en": "Energy-saving design with automatic shutoff helps reduce energy consumption",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "blocks[3].line[3]",
+    "near": "• Supports 16 different color options to create the ideal atmosphere"
+   },
+   "dict": null
+  },
+  {
+   "h": "98389972217804ed2bd83ff55240444e11f5feb4bfe4ff76915d63eb7cebfd91",
+   "en": "Requires three AAA batteries (batteries not included).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "blocks[4].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "0aeefb27d7983862b137f562e7791d0750a99eb4973c9df787d76e4115fc20a4",
+   "en": "Can be installed and fixed using double-sided adhesive pads.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "blocks[4].line[2]",
+    "near": "• Requires three AAA batteries (batteries not included)."
+   },
+   "dict": null
+  },
+  {
+   "h": "81eda61474bb4bd81485a3da04f2b404cdcc934199d4dbc18415c374bec32cc3",
+   "en": "You can install the light anywhere, just clean the surface before installation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "blocks[4].line[3]",
+    "near": "• Can be installed and fixed using double-sided adhesive pads."
+   },
+   "dict": null
+  },
+  {
+   "h": "9571105cd531c52cb8761eee8a90cbfdfe468496465a0e5608d065634d01731a",
+   "en": "The remote control operates via infrared (IR). Any light unit within the IR signal range and line of sight will respond. It is not possible to pair the remote with a single light only.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "blocks[4].line[4]",
+    "near": "• You can install the light anywhere, just clean the surface before installation."
+   },
+   "dict": null
+  },
+  {
+   "h": "00a3899e01e769a0237b4492d72a20abff925cd01f5311cc629b650b35d80174",
+   "en": "Product Application",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[2].line[0]",
+    "near": "This round hygrometer, when combined with a 3D-printed desiccant box, efficiently monitors the storage environment of your 3D printing materials."
+   },
+   "dict": null
+  },
+  {
+   "h": "f31c3ab1d0196558da88ff28ec8bbc48a6dc26e62cedea2acd3dd2633f11fc96",
+   "en": "This round hygrometer, when combined with a 3D-printed desiccant box, efficiently monitors the storage environment of your 3D printing materials.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[2].line[1]",
+    "near": "Product Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c4141898661d35436f2fa3aa39c29116009215c60f46b0d58e94178d0bbe0a7",
+   "en": "With the precisely designed AMS desiccant box, you can easily install the hygrometer in the designated position without any tilt, keeping humidity data clearly visible.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[2].line[2]",
+    "near": "This round hygrometer, when combined with a 3D-printed desiccant box, efficiently monitors the storage environment of your 3D printing materials."
+   },
+   "dict": null
+  },
+  {
+   "h": "a917d459162b844161f15e18b151f9eb00f27f07edefa1723658d1bf8174daac",
+   "en": "The model securely holds the hygrometer and allows for additional desiccant, maximizing material preservation while ensuring the hygrometer remains functional and accessible.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[2].line[3]",
+    "near": "With the precisely designed AMS desiccant box, you can easily install the hygrometer in the designated position without any tilt, keeping humidity data clearly "
+   },
+   "dict": null
+  },
+  {
+   "h": "ceb93c3ce3b236b666b44a2eb0a2d1d525ed1ab239410e945b773a676741b3d0",
+   "en": "Small, durable, and portable",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[4].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "7c5382784e4ae96724fd48178b8b72bede240b48eb4e816e7dd9aed1ed32cb41",
+   "en": "Monitor the temperature and humidity values",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[4].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "2402f0505fc9ddc1efcc09727a35991e4599f050b30fd32f72c99aace7add74a",
+   "en": "Fast response time,with a measurement cycle of 10 seconds",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[4].line[1].cell[2]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "b66610f3c895c562ec21f3d5046cd56402a0de857bedfc85a3f829357daef400",
+   "en": "Can be switched between Fahrenheit and Celsius with a double-click the ℃/℉ conversion button on the back",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[4].line[2].cell[0]",
+    "near": "Small, durable, and portable | Monitor the temperature and humidity values | Fast response time,with a measurement cycle of 10 seconds"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e57a0dc6e4c01a8e7e04a927d6a6e60e4bc0e45c5f15e5d74c325fdb2024e4c",
+   "en": "Rated voltage is DC 1.5V (1x LR44 button cell battery)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[4].line[2].cell[1]",
+    "near": "Small, durable, and portable | Monitor the temperature and humidity values | Fast response time,with a measurement cycle of 10 seconds"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f291e7920ce4316b8f61da1d2715742301fb3c0db5fe5043ccd6d9fd55ba605",
+   "en": "The device is rated for use in ambient temperatures from -10°C to 60°C, but the display operates reliably only between -5°C and 50°C. Using the device outside this display temperature range may cause slow response, screen lag, or other visual anomalies.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[5].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "2483396c2bfdbd0bccff693ecb3c94249dd80a3149c956396faca1a9b98778f0",
+   "en": "Avoid prolonged use or storage in extreme temperatures. Extended exposure to -10°C or below may cause moisture-sensitive components to freeze and sustain permanent damage. Similarly, continuous operation at 60°C or above can lead to gradual screen dimming, eventual blackouts, and potential damage to heat-sensitive parts. For optimal performance and longevity, avoid prolonged use in extreme temperatures.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[5].line[2]",
+    "near": "• The device is rated for use in ambient temperatures from -10°C to 60°C, but the display operates reliably only between -5°C and 50°C. Using the device outside"
+   },
+   "dict": null
+  },
+  {
+   "h": "4932e63bc2f01878d5ab922576106f4335f65dae58fce5290c57c0cebd5c5c04",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Card Shuffler. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "card-shuffler",
+    "title": "Card Shuffler Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b962a71f0ea0859b68387942a064ab9d25049010caad1cc10292a859c1109999",
+   "en": "To download the model files of the Card Shuffler and obtain detailed information, please visit the Card Shuffler on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "card-shuffler",
+    "title": "Card Shuffler Kit",
+    "field": "blocks[1].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e3cd34fd415a475bc817824604ba78cf241a9c883427d7805dcc53542af88c9b",
+   "en": "To download the model files of the Motorized Card Shuffler and obtain detailed information, please visit the Motorized Card Shuffler on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "card-shuffler",
+    "title": "Card Shuffler Kit",
+    "field": "blocks[2].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "142a138fecd1066003a4c5c432ce73e1c9f8f33b30a1e6cc04c6d7edfe062c93",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Multi-Use Case. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "compact-multi-use-case-in-two-sizes",
+    "title": "Compact Multi-Use Case",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8519fe6073bcc1f9ef4ce19fbe285bb3c8c1078c87c84edcd9c195e0b1a5b79",
+   "en": "To download the model files of the Compact Multi-Use Case and obtain detailed information, please visit the Compact Multi-Use Case on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "compact-multi-use-case-in-two-sizes",
+    "title": "Compact Multi-Use Case",
+    "field": "blocks[0].line[2]",
+    "near": "The product contains all the non-3D printed parts for assembling an entirely functional Multi-Use Case. To complete the work, you also need to download the mode"
+   },
+   "dict": null
+  },
+  {
+   "h": "086204b38cec35df0d4fd6cae8fb2ab44847bcabf88629ad4ad8a316332ea2b1",
+   "en": "The Eyewear Parts Bundle offers an innovative solution for both enthusiasts and professionals, allowing you to customize your sunglasses in your preferred colors.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eyewear-parts-bundle",
+    "title": "Eyewear Parts Bundle",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "11efe1dd81d2645d59902e305cb259732ab23f2bc4ee1cb0cf38e0a64de97340",
+   "en": "This kit includes a variety of essential components, and to complete the assembly, you'll need to download the model files and 3D print the remaining parts. Create your unique personalized sunglasses with ease!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eyewear-parts-bundle",
+    "title": "Eyewear Parts Bundle",
+    "field": "blocks[0].line[2]",
+    "near": "The Eyewear Parts Bundle offers an innovative solution for both enthusiasts and professionals, allowing you to customize your sunglasses in your preferred color"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b75fc6732e100216efb26dd60746575d5257f06da53781f39ee7a6a1af81318",
+   "en": "To download the model files and obtain detailed information, please visit the Eyewear Parts Bundle A01 and Eyewear Parts Bundle A02 on Makerworld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eyewear-parts-bundle",
+    "title": "Eyewear Parts Bundle",
+    "field": "blocks[0].line[3]",
+    "near": "This kit includes a variety of essential components, and to complete the assembly, you'll need to download the model files and 3D print the remaining parts. Cre"
+   },
+   "dict": null
+  },
+  {
+   "h": "cd4766730bbe862b3fc4673f3dd51e2979c12738fe8ca7dcc3e619ed42954991",
+   "en": "You can also use Bambu 3D Effect Sheet to unlock and customize your own Eyewear Parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eyewear-parts-bundle",
+    "title": "Eyewear Parts Bundle",
+    "field": "blocks[1].line[1]",
+    "near": "Eyewear Parts Bundle A01"
+   },
+   "dict": null
+  },
+  {
+   "h": "57de6dbc8dc2a5632ba9a6a57b377eb8bda3ed2788af912a5f13db2863da88fb",
+   "en": "L(mm) Length",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "rectangular-embedded-electronic-digital-thermometer-hygrometer",
+    "title": "Rectangular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e7db955d30345d8ecbb6616e8feaa616143c4898aeb1190e28ac268c9cdd122",
+   "en": "W(mm) Width",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-embedded-electronic-digital-thermometer-hygrometer",
+    "title": "Rectangular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[1].line[1].cell[2]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "800b630d1b85bffec27562de28f40446be14b56f85815af25b021532ec44f61e",
+   "en": "H(mm) Height",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-embedded-electronic-digital-thermometer-hygrometer",
+    "title": "Rectangular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[1].line[1].cell[3]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "8fa503b6c271e72ecdaa6abd83ad2b519ed2ec5edc7302e7765d2c41dd37ffbc",
+   "en": "This thermometer and hygrometer only displays temperature in Celsius (°C) and not in Fahrenheit (°F).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-embedded-electronic-digital-thermometer-hygrometer",
+    "title": "Rectangular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[3].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "53f447048ea0144633b4dd6af6928bddbfa1989d9ff1bf4ade7639e6382c23c3",
+   "en": "If you need a thermometer that can switch between Celsius and Fahrenheit, consider our Circular Thermometer Hygrometer.)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-embedded-electronic-digital-thermometer-hygrometer",
+    "title": "Rectangular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "blocks[3].line[2]",
+    "near": "• This thermometer and hygrometer only displays temperature in Celsius (°C) and not in Fahrenheit (°F)."
+   },
+   "dict": null
+  },
+  {
+   "h": "cb7393de2408cc3b24f9cd3c12436464c5f5b5446407e299497e69a0faace11c",
+   "en": "LED Candles with Magnetic Matches to \"light\" them",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "blocks[0].line[1].cell[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4bbf60e849fc00b27361f3f921e281c23c2ecf9f5800feca5db07a1acdfe2a5",
+   "en": "H (mm) Height",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "blocks[2].line[1].cell[2]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec7d56a01607001e6401366417c5e2eb00ffa0df17ca1a9a831e0b32c8f11bf7",
+   "en": "Blue",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "blocks[2].line[3].cell[3]",
+    "near": "KC002 | 18 | 6.5 | White"
+   },
+   "dict": {
+    "ar": "أزرق",
+    "ckb": "شین"
+   }
+  },
+  {
+   "h": "ba19e9c3d5f49882ddaafed4f286a8a81491150426d321179270e27e74a89097",
+   "en": "Red",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "blocks[2].line[4].cell[3]",
+    "near": "KC003 | 18 | 6.5 | Blue"
+   },
+   "dict": {
+    "ar": "أحمر",
+    "ckb": "سوور"
+   }
+  },
+  {
+   "h": "57877562dcfe7fb24bee8a083a190779ab8837302d756aed2225a3d1979db3a5",
+   "en": "Magnetic design with replaceable batteries ( 1 battery and 1 magnet (D8x2 mm Round Magnet) included )",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "blocks[3].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad538cbc3ca8b3683ee34ad9420470ffa0cc0445804d6d83ff3db429db5339ac",
+   "en": "Energy Efficient",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "blocks[3].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "d62514936e6fa811014a243b18bce080d20cf2074232aaab03f983d8aa64ae55",
+   "en": "Easy Operation",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "blocks[3].line[2].cell[0]",
+    "near": "Magnetic design with replaceable batteries ( 1 battery and 1 magnet (D8x2 mm Round Magnet) included ) | Energy Efficient"
+   },
+   "dict": null
+  },
+  {
+   "h": "c59b4a17a26f90a96d5df900093d3544b6d9ad37615d4e74fef14aa66cb6c2e4",
+   "en": "Adjustable lighting modes for different needs",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "blocks[3].line[2].cell[1]",
+    "near": "Magnetic design with replaceable batteries ( 1 battery and 1 magnet (D8x2 mm Round Magnet) included ) | Energy Efficient"
+   },
+   "dict": null
+  },
+  {
+   "h": "687537d827ec87cd481eab1f878f0a92158dde22ed48e5b29e24acacfea1ee81",
+   "en": "Please be aware that the device is programmed to automatically enter sleep mode after 10 minutes of operation.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "blocks[4].line[3]",
+    "near": "• This product contains small parts and poses a choking hazard. Do not ingest. If accidentally swallowed, seek immediate medical attention. Keep out of reach of"
+   },
+   "dict": null
+  },
+  {
+   "h": "a712b16874ff7d307d37f19446748a1115e4cab92e4b074c24356cef5d5481a1",
+   "en": "Note: The \"candle\" is equipped with different styles of magnetically controlled lights, and the \"match\" with a magnet can be used for interactive operation to light or extinguish the \"candle\".",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "single-led-magnetic-control-switch-light",
+    "title": "Single LED Magnetic Control Switch Light",
+    "field": "blocks[0].line[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "b0b9a3c57822503f10d94b77227548174d20f6ddc4d7c0ff809d0f7b917fb23c",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Push Opener (bottle opener）. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "push-opener-bottle-opener",
+    "title": "Push Opener (bottle opener)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1074264451209cd8eb596a207bc1ed93ff88fbff7f90a7180dfb765547e6f0f7",
+   "en": "To download the model files of the Push Opener (bottle opener) and obtain detailed information, please visit the Push Opener (bottle opener) on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "push-opener-bottle-opener",
+    "title": "Push Opener (bottle opener)",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "848e2f0cf39adb87a268efbe8ced4898260a2def2a90d711ac081ea2271d8a11",
+   "en": "Elevate your 3D printing projects with this Flame Tea Light Candle Set. Featuring a sleek casing and a candle-shaped light, it offers three customizable color tones: Warm Yellow, Cool White, and Warm White.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0f665074e746e930a090787b28d3e847ecb6d4f4cbc1191a2d920dc0708db05a",
+   "en": "Compact, user-friendly, and perfect for beginners, it’s an ideal choice to kickstart your 3D printing crafting journey. Great for creating lanterns, decorative lights, or other imaginative designs. This set provides endless possibilities for your creativity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[0].line[2]",
+    "near": "Elevate your 3D printing projects with this Flame Tea Light Candle Set. Featuring a sleek casing and a candle-shaped light, it offers three customizable color t"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb368915c2be62ece1eaa4ca843dd2103756c463ebdc24b492c2ec581cc7bdc5",
+   "en": "Christmas Tealight Star - Easy Fast Print",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[1].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "622a14ee262c9ab7cb72e1e247a4a07132725a41ea162ee30496d330c98c1757",
+   "en": "zajcus",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "1ec26f932d05eb80fa3d0af68a8d847b1b21f8d09e5d800eafa41bd69f4c80b4",
+   "en": "christmas hat",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[2].cell[0]",
+    "near": "Christmas Tealight Star - Easy Fast Print | zajcus | Christmas Tealight Star - Easy Fast Print"
+   },
+   "dict": null
+  },
+  {
+   "h": "192e3f28d63020c39c813c1293b1dbd6e8cb90bf8f2cc75520d1ce31d0411246",
+   "en": "SouthLab",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[2].cell[1]",
+    "near": "Christmas Tealight Star - Easy Fast Print | zajcus | Christmas Tealight Star - Easy Fast Print"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6b4c11fcba646734c7e38d759f0a1ad225d2e294c87246e15d92968a39aede4",
+   "en": "Cute Winter House Tea Light",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[3].cell[0]",
+    "near": "christmas hat | SouthLab | christmas hat"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f306fb4adafb589788a2059a010ab75ea52173343a6ad12d6330e0ab1acf486",
+   "en": "Advent Candles 4 LED",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[4].cell[0]",
+    "near": "Cute Winter House Tea Light | technerd | Cute Winter House Tea Light"
+   },
+   "dict": null
+  },
+  {
+   "h": "fcb36c2f996efc6d37241feda7a2de7d36056b215af7c0850533a794bd2a1494",
+   "en": "Hammelwade",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "Cute Winter House Tea Light | technerd | Cute Winter House Tea Light"
+   },
+   "dict": null
+  },
+  {
+   "h": "6635af87e2d48fdb12d895aa078a80cf8f1fe1929f99525fbd379d7f01061d09",
+   "en": "Meshed Snowman (Tealight)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[5].cell[0]",
+    "near": "Advent Candles 4 LED | Hammelwade | Advent Candles 4 LED"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2d81ed6c64a7072f4f00a515fc732aef47800ec87cf8a46ee95aaad8ecb0915",
+   "en": "Maxx_Design",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[5].cell[1]",
+    "near": "Advent Candles 4 LED | Hammelwade | Advent Candles 4 LED"
+   },
+   "dict": null
+  },
+  {
+   "h": "906b03d251a82c42d4328dfdb455121ca6ac92fd8342aa3421312447fb6ba9fe",
+   "en": "Frosty Glowman",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[6].cell[0]",
+    "near": "Meshed Snowman (Tealight) | Maxx_Design | Meshed Snowman (Tealight)"
+   },
+   "dict": null
+  },
+  {
+   "h": "42a61b6afc852bbe83acedbd38358a19fe8f67f6e2d78e46d4c75935ba4a6add",
+   "en": "trusteddev",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[6].cell[1]",
+    "near": "Meshed Snowman (Tealight) | Maxx_Design | Meshed Snowman (Tealight)"
+   },
+   "dict": null
+  },
+  {
+   "h": "2177aa14d15a4727304eb7aca9149b0c5e61c4fb8c7525269eb6ee0b0687095b",
+   "en": "Designer Heart Tea Light Holder",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[7].cell[0]",
+    "near": "Frosty Glowman | trusteddev | Frosty Glowman"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c2d09eb162cd2fe644079926e74c544b0f3a7857fd725103fc8eaf93a98bacf",
+   "en": "Maxx Design",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[7].cell[1]",
+    "near": "Frosty Glowman | trusteddev | Frosty Glowman"
+   },
+   "dict": null
+  },
+  {
+   "h": "dce2ae51dca33cfb45ef3629ccc32f39ba978280f0d936626ede064121b2161c",
+   "en": "Cuddly Friends: Valentine The Hippo",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[8].cell[0]",
+    "near": "Designer Heart Tea Light Holder | Maxx Design | Designer Heart Tea Light Holder"
+   },
+   "dict": null
+  },
+  {
+   "h": "9647c31ed50bfd52ccf28252b93fe16d058e9f52e32cc879d74dfee9bc4efdbe",
+   "en": "TomczukCustoms",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[8].cell[1]",
+    "near": "Designer Heart Tea Light Holder | Maxx Design | Designer Heart Tea Light Holder"
+   },
+   "dict": null
+  },
+  {
+   "h": "57bd3e48f9448cbcf61ccdc8695b6a5f4fe09794a57656bc58bccd67aa6a0534",
+   "en": "Lantern of the Undead",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[9].cell[0]",
+    "near": "Cuddly Friends: Valentine The Hippo | TomczukCustoms | Cuddly Friends: Valentine The Hippo"
+   },
+   "dict": null
+  },
+  {
+   "h": "5942ac59adbe609148804ca759485c47543d10f6de86002e76e5b66e4b6d7b1d",
+   "en": "StratoLab",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[1].line[9].cell[1]",
+    "near": "Cuddly Friends: Valentine The Hippo | TomczukCustoms | Cuddly Friends: Valentine The Hippo"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f20d5b68fcd89f3c38e96027385433cd7a4459a4bc958a77b4e73535afbbb46",
+   "en": "Make My Lantern NOW！",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[2].line[0]",
+    "near": "Combining the AI-powered tool with the Flame Tea Light Candle Set, it's now easy to create a unique lantern, just upload your favorite image and let our AI tran"
+   },
+   "dict": null
+  },
+  {
+   "h": "63fce0e513f32ec419ecc7cdf138360568de4bc57dac0285528c68717e9babde",
+   "en": "Combining the AI-powered tool with the Flame Tea Light Candle Set, it's now easy to create a unique lantern, just upload your favorite image and let our AI transform it into a stunning 3D-printable lantern design! Join Make My Lantern and create your lantern today!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[2].line[1]",
+    "near": "Make My Lantern NOW！"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9677fed9707f670346243d7c5306fe187d347ef9ef1331b236b607a6ea7e0cc",
+   "en": "<span class=\"lark-record-clipboard\" data-lark-record-data=\"{\"isCut\":false,\"rootId\":\"RqJPdg0RboHrtdxJtQ2co29Kn1b\",\"parentId\":\"RqJPdg0RboHrtdxJtQ2co29Kn1b\",\"blockIds\":[13,14],\"recordIds\":[\"V0zWdDjmqotwZYxJ95Cc7A4infd\",\"KmgydydY8oH4BQxYMRNcpbThnPb\"],\"recordMap\":{\"V0zWdDjmqotwZYxJ95Cc7A4infd\":{\"id\":\"V0zWdDjmqotwZYxJ95Cc7A4infd\",\"snapshot\":{\"type\":\"text\",\"parent_id\":\"RqJPdg0RboHrtdxJtQ2co29Kn1b\",\"comments\":[],\"revisions\":[],\"locked\":false,\"hidden\":false,\"author\":\"7436941571142926338\",\"children\":[],\"text\":{\"initialAttributedTexts\":{\"text\":{\"0\":\"Combining the AI-powered tool with the Flame Tea Light Candle Set, it's now easy to create a unique lantern, just upload your favourite image and let our AI transform it into a stunning 3D-printable lantern design!\"},\"attribs\":{\"0\":\"*0+13*0*1*2+q*0+45\"}},\"apool\":{\"numToAttrib\":{\"0\":[\"author\",\"7436941571142926338\"],\"1\":[\"bold\",\"true\"],\"2\":[\"link\",\"https%3A%2F%2Fus.store.bambulab.com%2Fproducts%2Fled-flame-tea-light-candle-set-warm-yellow%3F_pos%3D1%26_sid%3Da6b356486%26_ss%3Dr%26skr%3Dyes\"]},\"nextNum\":3}},\"align\":\"\",\"folded\":false}},\"KmgydydY8oH4BQxYMRNcpbThnPb\":{\"id\":\"KmgydydY8oH4BQxYMRNcpbThnPb\",\"snapshot\":{\"type\":\"text\",\"parent_id\":\"RqJPdg0RboHrtdxJtQ2co29Kn1b\",\"comments\":[],\"revisions\":[],\"locked\":false,\"hidden\":false,\"author\":\"7436941571142926338\",\"children\":[],\"text\":{\"initialAttributedTexts\":{\"text\":{\"0\":\"Join Make My Lantern and create your lantern today!\"},\"attribs\":{\"0\":\"*0+5*0*1*2+f*0+v\"}},\"apool\":{\"numToAttrib\":{\"0\":[\"author\",\"7436941571142926338\"],\"1\":[\"bold\",\"true\"],\"2\":[\"link\",\"https%3A%2F%2Fmakerworld.com%2Fmakerlab%2FmakeMyLantern%3Ffrom%3Dmakersupply\"]},\"nextNum\":3}},\"align\":\"\",\"folded\":false}},\"RqJPdg0RboHrtdxJtQ2co29Kn1b\":{\"id\":\"RqJPdg0RboHrtdxJtQ2co29Kn1b\",\"snapshot\":{\"type\":\"page\",\"parent_id\":\"\",\"comments\":null,\"revisions\":null,\"locked\":false,\"hidden\":false,\"author\":\"7436941571142926338\",\"children\":[\"FvNZdRbGEoYPlwxGEMKcDzAlnRf\",\"Wy0Hdk9TfoFL7qxMajIcML3Cnzg\",\"Izn0drzZHoCvLjx8HUzc4icNnIc\",\"Su72dN7tDoqnpSxp1dvcdZ3rnOb\",\"FTsidENrOoaIlAxM2PIc3Q6Tn9e\",\"MC38dlbzxoFZ86xabJ7ca3pLnyg\",\"UMPKdHOaCo5N7rxnY2FcMKYan53\",\"UijKdonKzo5DrtxTgZtcS7zqnre\",\"V0zWdDjmqotwZYxJ95Cc7A4infd\",\"KmgydydY8oH4BQxYMRNcpbThnPb\",\"TXjhdhkvOoa42vxISExc8TRFnVg\",\"UhmVdYEAdoo3plx7HySc6N03noi\",\"GOhodM231oSGKFxX6Umc8uYyn6e\",\"RJ5rdq7P1oSzNOxj4gTcSe4gnhe\",\"AMVRdj6OSonKHIx0miGcPMgsnV1\",\"Jb5pdTxnbo7oRVx4UTsc6cQIntg\",\"Jsp0diWEMo7Kw8xEp8ac20pkndd\",\"GYkNdXTVnogZP1x1aHdcxZJvnPb\",\"WqF5duTNaouOrQx8oQ7cWgggnBb\",\"KMcmdJHGwoENANxJFYKcLibrnIc\"],\"text\":{\"apool\":{\"nextNum\":1,\"numToAttrib\":{\"0\":[\"author\",\"7436941571142926338\"]}},\"initialAttributedTexts\":{\"attribs\":{\"0\":\"*0+q\"},\"text\":{\"0\":\"Flame Tea Light Candle Set\"}}},\"align\":\"\",\"doc_info\":{\"editors\":[\"7436941571142926338\",\"7120626754414182428\"],\"options\":[\"editors\",\"edit_time\"],\"deleted_editors\":[],\"option_modified\":null}}}},\"payloadMap\":{\"V0zWdDjmqotwZYxJ95Cc7A4infd\":{\"level\":1},\"KmgydydY8oH4BQxYMRNcpbThnPb\":{\"level\":1}},\"extra\":{\"channel\":\"saas\",\"pasteRandomId\":\"178a06d2-6178-459f-a0aa-0f104021e5e7\",\"mention_page_title\":{},\"external_mention_url\":{}},\"isKeepQuoteContainer\":false,\"selection\":[{\"id\":13,\"type\":\"text\",\"selection\":{\"start\":0,\"end\":214},\"recordId\":\"V0zWdDjmqotwZYxJ95Cc7A4infd\"},{\"id\":14,\"type\":\"text\",\"selection\":{\"start\":0,\"end\":51},\"recordId\":\"KmgydydY8oH4BQxYMRNcpbThnPb\"}],\"pasteFlag\":\"e4c66ab4-fc48-4d1a-97f2-cc61b7b12855\"}\" data-lark-record-format=\"docx/record\">",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[2].line[2]",
+    "near": "Combining the AI-powered tool with the Flame Tea Light Candle Set, it's now easy to create a unique lantern, just upload your favorite image and let our AI tran"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e12feb0f668b7f64eb1f0f3050fb50919b7474386fa3807c88ff4e402f1da72",
+   "en": "Warm Yellow",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[4].line[2].cell[3]",
+    "near": "Product ID | D (mm) Diameter | H (mm) Height | Color"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ade40e1be1b282a809d181a473a759a97606b7765c5f2c957e391c699eeedda",
+   "en": "Cold White",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[4].line[3].cell[3]",
+    "near": "KC008 | 37.2 | 36.6 | Warm Yellow"
+   },
+   "dict": null
+  },
+  {
+   "h": "1634aadb0add96b2c4ef251ef0cdfd4d9c3caa56e4733f13ca80b1955ce8c7df",
+   "en": "Create a warm ambiance in any room, widely used for weddings, parties, festivals, and decorating occasions",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[5].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "2788491b0a82fc06c6a20e2d192072c12ce20c518edfeb65e906306cd20d4c2d",
+   "en": "Realistic candle shape design for an authentic look",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[5].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "bbb4e7d12512a7a6fd28f9a853ff02da5e054f25bf895e589a047d89fcdd544b",
+   "en": "Convenient ON/OFF sliding switch located at the bottom for easy operation",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[5].line[2].cell[0]",
+    "near": "Create a warm ambiance in any room, widely used for weddings, parties, festivals, and decorating occasions | Realistic candle shape design for an authentic look"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f9868345d8eaa3817470ac156a77abfd55b718987de58c0611178f38c5bd108",
+   "en": "Pre-installed CR2032 battery provides approximately 100 hours of use, ensuring long-lasting performance",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "blocks[5].line[2].cell[1]",
+    "near": "Create a warm ambiance in any room, widely used for weddings, parties, festivals, and decorating occasions | Realistic candle shape design for an authentic look"
+   },
+   "dict": null
+  },
+  {
+   "h": "309671e8805af0821724ce4092c932df8e6ef3be2b1de32339b59d82c314c88c",
+   "en": "The following 3D printed models require a Split Ring Keychain. Purchase the keychains and customize your 3D model to your liking. Visit Maker Lab Images to Keychains.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ce16cfeaf1416c7d5415ad36da002f9627138a35e946f93d79ac454bcd867574",
+   "en": "Can be used for DIY works or key holders",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "f37cefe9f31c25fbaa9e1a85519530f664cb1fe155508f5e28102c1cea3c8573",
+   "en": "Special design and unique style",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[2]",
+    "near": "• Can be used for DIY works or key holders"
+   },
+   "dict": null
+  },
+  {
+   "h": "13f7e2404ec5be69b2630bcb5b73746ddb891cc14af104aa77d5050bd8c62758",
+   "en": "Durable and practical",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[3]",
+    "near": "• Special design and unique style"
+   },
+   "dict": null
+  },
+  {
+   "h": "fc6ce81c5300ec21e45bce9f15a2e2bf8b311759ca1f4c9efb7d524a4b755a92",
+   "en": "Uses an environmentally friendly electroplating process, compliant with ROHS environmental requirements",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[4]",
+    "near": "• Durable and practical"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d191bb98c194a7ab82e6db79db76b388cf744f51ceace555ec325a0a39e8af3",
+   "en": "Adorable Articulated Christmas Hippo (Toy, Keychain & Magnet)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[6].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "12289d1347c974928943d5a139000af076e872ea323e619eecc2c43a0983b131",
+   "en": "Valeria Momo & Mattia",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[6].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e91aff986e4c8eb00f84fe2cf261edbcff23faaa8dec515fc8baae2291f106b",
+   "en": "Love Bears (Magnetic Keychains)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[7].cell[0]",
+    "near": "Adorable Articulated Christmas Hippo (Toy, Keychain & Magnet) | Valeria Momo & Mattia | Adorable Articulated Christmas Hippo (Toy, Keychain & Magnet)"
+   },
+   "dict": null
+  },
+  {
+   "h": "48e2782cbbc34ebd17808d475317c7313c487ecdb6bde770c5c8785a09da1d94",
+   "en": "Cute Flexi Otter in Love, Valentines Day",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[8].cell[0]",
+    "near": "Love Bears (Magnetic Keychains) | Makerize3D | Love Bears (Magnetic Keychains)"
+   },
+   "dict": null
+  },
+  {
+   "h": "a46d9c5aaca044e6070c12c42e4fec7d0f64e21297196a501cecfcfd678a8dcf",
+   "en": "Custom Name Keyring",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[9].cell[0]",
+    "near": "Cute Flexi Otter in Love, Valentines Day | Valeria Momo & Mattia | Cute Flexi Otter in Love, Valentines Day"
+   },
+   "dict": null
+  },
+  {
+   "h": "c2dd5f0e31bb2ebd81504fe052981531b111e89e7c075d65515957af67c33364",
+   "en": "</haydenk🥭>",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "blocks[3].line[9].cell[1]",
+    "near": "Cute Flexi Otter in Love, Valentines Day | Valeria Momo & Mattia | Cute Flexi Otter in Love, Valentines Day"
+   },
+   "dict": null
+  },
+  {
+   "h": "a0370a3c26cf932ac2ee67073d6473e542df0f4e457a8f142978f7d1d6c4fea5",
+   "en": "Easy to install and suitable for transporting liquids in a variety of DIY projects",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pvc-tubes",
+    "title": "PVC Tubes",
+    "field": "blocks[2].line[4]",
+    "near": "• Various colours available"
+   },
+   "dict": null
+  },
+  {
+   "h": "9d1d2f868ab73bf5b200df3d572b94f3f33b91391a53f2cfb4e70ce60abd39b3",
+   "en": "Non-Toxic and Safe",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "clear-acrylic-rigid-tubes",
+    "title": "Clear Acrylic Rigid Tubes",
+    "field": "blocks[3].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "63e0f0e5b0e09a7d8d23f82a96f936029f0dcea5538d8bcf06a8325151145179",
+   "en": "High Transparency",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "clear-acrylic-rigid-tubes",
+    "title": "Clear Acrylic Rigid Tubes",
+    "field": "blocks[3].line[3]",
+    "near": "• Easy Maintenance"
+   },
+   "dict": null
+  },
+  {
+   "h": "57e5e4915de13026d576fa6c1e1b9f07df411d45d2a29e1e1e369488195a9a96",
+   "en": "Smooth Surface for easy cleaning",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "clear-acrylic-rigid-tubes",
+    "title": "Clear Acrylic Rigid Tubes",
+    "field": "blocks[3].line[4]",
+    "near": "• High Transparency"
+   },
+   "dict": null
+  },
+  {
+   "h": "42f0e98191f0e9c65f42da63d2febb289b763c7408a9cb47fef78cffdb8faa3f",
+   "en": "D (mm) Nominal Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-hose-barb-fittings",
+    "title": "Plastic Hose Barb Fittings",
+    "field": "blocks[2].line[0].cell[1]",
+    "near": "RC018 | 2.5 | Straight"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ee3acb37a9e619cef62471e09e797701d586e4ad94b5055368cdb490656dd56",
+   "en": "Y Type",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-hose-barb-fittings",
+    "title": "Plastic Hose Barb Fittings",
+    "field": "blocks[2].line[3].cell[2]",
+    "near": "RC019 | 3.5 | Straight"
+   },
+   "dict": null
+  },
+  {
+   "h": "019e9bcbd5a431fdbf7f056d88b0f77aaf62b84c7772c9ce5fd88cf93d1997a3",
+   "en": "Non-Toxic Material",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-hose-barb-fittings",
+    "title": "Plastic Hose Barb Fittings",
+    "field": "blocks[3].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "db6e9732ab957f89417d76d0dbb530507c1af08322adf51465b8c67e7779a800",
+   "en": "Barb design provides a tight and secure connection to tubes",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-hose-barb-fittings",
+    "title": "Plastic Hose Barb Fittings",
+    "field": "blocks[3].line[3]",
+    "near": "• Easy Installation"
+   },
+   "dict": null
+  },
+  {
+   "h": "08fc825f08da1714790fa1f4eacb3928db7f5802f9a3f4bb0f48c38b85c5637b",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Endless Loop Express. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "endless-loop-express",
+    "title": "Endless Loop Express (Extended Version)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "97ffc9f591a083d1f2fd15ce37d2f8387ee2b24ca967d92d506d99f8fed5c4ad",
+   "en": "To download the model files of the Endless Loop Express and obtain detailed information, please visit the Endless Loop Express on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "endless-loop-express",
+    "title": "Endless Loop Express (Extended Version)",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "90d62bc195410beb77e93f9812f891986f879ee0aa2cc18b620701634f4e7a73",
+   "en": "Please note that the Endless Loop Express does not come with batteries. Please bring your own AAA battery to power the Endless Loop Express.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "endless-loop-express",
+    "title": "Endless Loop Express (Extended Version)",
+    "field": "blocks[1].line[1]",
+    "near": "Notes"
+   },
+   "dict": null
+  },
+  {
+   "h": "31c27759652af21407730b97799d40a8b80d5f9d82b93994b5f8b483997ab167",
+   "en": "This product contains all the necessary hardware components for assembling a Mini Motorized Basketball Game. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-motorized-basketball-game",
+    "title": "Mini Motorized Basketball Game",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ee686ddc5522362f7ba0102e692805cb5e73f5e89de16a410fb9077e01666b8b",
+   "en": "To download the model files of Mini Motorized Basketball Game and obtain detailed information, please visit the Mini Motorized Basketball Game on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-motorized-basketball-game",
+    "title": "Mini Motorized Basketball Game",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "69d9281da40e82aa4b25a3a809539502af44127a9eb05faebe6c2e2cd4cc66f0",
+   "en": "Nylon rope is a highly durable and versatile material widely used in 3D printing models. It can be used to connect and secure different parts, providing reliable mechanical strength and flexibility, especially for complex models that require flexible connections. In addition, the flexibility and high-quality material properties of this nylon rope allow it to withstand prolonged stress without deforming or breaking, making it ideal for use in 3D printed components that need to be moved or movable, such as joints, pulley systems, and adjustable sections.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "black-nylon-cord",
+    "title": "Black Nylon Cord",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "24a3fc952565db620da70afa02e6147365c980b9f05e0717a38d17d5fecdcb47",
+   "en": "Neatly stored for your convenience",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "black-nylon-cord",
+    "title": "Black Nylon Cord",
+    "field": "blocks[1].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "6a0fefca7867e2b87ea12d954dd80449b01033acfce8f1cde274b89554f2d17e",
+   "en": "Durable and Strong: High-quality nylon for lasting use",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "black-nylon-cord",
+    "title": "Black Nylon Cord",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "41ca1e82cbd2073ff19e22d9b0080be86b497cfb212a08630eca6af1d10079cb",
+   "en": "Perfect for all crafting levels",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "black-nylon-cord",
+    "title": "Black Nylon Cord",
+    "field": "blocks[1].line[1].cell[2]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc13176d060f40ecd2f5461b09aa492a629b8a08c3ebc7d1e3866cb7a307122d",
+   "en": "If used under conditions exceeding the above temperature range, the load value may decrease due to usage conditions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extension-springs",
+    "title": "Extension Springs",
+    "field": "blocks[3].line[2]",
+    "near": "Temperature Range: Stainless Steel: -10°C to 100°C"
+   },
+   "dict": null
+  },
+  {
+   "h": "c862298f57829db7bfed13634c34133a5bcc564dac4266a03f2adf0cfc678770",
+   "en": "When used in environments with high and low temperature differences and humidity, such as outdoors, stainless steel products are recommended.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extension-springs",
+    "title": "Extension Springs",
+    "field": "blocks[3].line[3]",
+    "near": "• If used under conditions exceeding the above temperature range, the load value may decrease due to usage conditions."
+   },
+   "dict": null
+  },
+  {
+   "h": "35294b2cdf8b806396bb5b0189e59efe0173dc88fe235b52756048682bcca3b2",
+   "en": "If you plan to use Make My Sign in Maker Lab, consider these two magnets. They fit precisely into the holes in Make My Sign and can securely attach your creations to any magnetic surface. Visit Maker Lab Make My Sign to start your creation!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "magnets-for-make-my-sign",
+    "title": "Magnets for Make My Sign",
+    "field": "blocks[2].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8fdc5386f288b674679dc2d28f6d3b1094935f5431304c474cc34cf930985593",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Running Dinosaur Automaton. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "running-dinosaur-automaton",
+    "title": "Running Dinosaur Automaton",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c4e19f8a9ce1e00cc59e8571e5ba8b17f6200e07a5583171017b0f31717ac8f",
+   "en": "To download the model files of the Running Dinosaur Automaton and obtain detailed information, please visit the Running Dinosaur Automaton on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "running-dinosaur-automaton",
+    "title": "Running Dinosaur Automaton",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "d904b1c1e03506aeb39406255c1b3c59f6c49f6c951d96506600e1aabd10acb8",
+   "en": "Please note that this Running Dinosaur Automaton is powered via USB and conveniently connects to your computer or other USB powered device. You also have the option of purchasing a USB Speed Controller to adjust the speed at which the dinosaur runs as needed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "running-dinosaur-automaton",
+    "title": "Running Dinosaur Automaton",
+    "field": "blocks[1].line[1]",
+    "near": "Notes"
+   },
+   "dict": null
+  },
+  {
+   "h": "add241bf13af6c1bc2028db265e0b53be9e37d2e1c6cb3a54020ca95db20e589",
+   "en": "These connectors Only compatible with 2-pin 8mm LED Light Strip",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "blocks[0].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b40121bce34bcc8e2e978cf0016be08fc8e65525b82107fe443057f09438194",
+   "en": "No soldering required, connector makes your DIY safer and easier",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "blocks[0].line[2]",
+    "near": "• These connectors Only compatible with 2-pin 8mm LED Light Strip"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e1cb55bfeef48d4d6e0afe47c543f5b49f67f25b8587e4234704645e48ccec1",
+   "en": "Reduced light blockage with more transparent materials to provide better visibility",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "blocks[0].line[3]",
+    "near": "• No soldering required, connector makes your DIY safer and easier"
+   },
+   "dict": null
+  },
+  {
+   "h": "37acbdb42028f644bb14ce63a520658d18693ec45524a55ddc9686b85a991d38",
+   "en": "These connectors Only compatible with 3-pin 10mm LED Light Strip",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3-pin-10mm-l-shaped-led-strip-connectors",
+    "title": "3-pin 10mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "blocks[0].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "423a23df50000f1d4ee202523262349fb82fb79aaa1a84abb7b2d06e3a34ff3d",
+   "en": "The product contains all the non-3D printed parts for assembling various functional STEMFIE Projects. To complete the work, you also need to download the Compatible model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stemfie-electronics-components",
+    "title": "STEMFIE Projects",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "bd456b3656cd68315ace459c4d769ead215eada3097dfa2cf81104ce7e9f2181",
+   "en": "STEMFIE Bambu Lab DIY Electronics Demo",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "stemfie-electronics-components",
+    "title": "STEMFIE Projects",
+    "field": "blocks[0].line[4].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d6226f6c70f7f497732597b024dd07a9ca8d005240a4cb6d765c99303f942b6",
+   "en": "STEMFIE Infinity Gears",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "stemfie-electronics-components",
+    "title": "STEMFIE Projects",
+    "field": "blocks[0].line[5].cell[0]",
+    "near": "STEMFIE Bambu Lab DIY Electronics Demo | Stemfie3D | STEMFIE Bambu Lab DIY Electronics Demo"
+   },
+   "dict": null
+  },
+  {
+   "h": "6ba1740c40040f5a27d07668c0edb28b49d30e09935881cff9bf1d978aef7876",
+   "en": "Battery Pack BOX HLD AAAx4 6V SWT",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "stemfie-electronics-components",
+    "title": "STEMFIE Projects",
+    "field": "blocks[0].line[6].cell[0]",
+    "near": "STEMFIE Infinity Gears | Stemfie3D | STEMFIE Infinity Gears"
+   },
+   "dict": null
+  },
+  {
+   "h": "62764d280ac7251c67bf333c131f3f435088e542ae93a1ead740c02c0e430f1b",
+   "en": "This fitting is perfect for connecting both PTFE (Teflon) tubes, ensuring smooth and consistent flow during your DIY projects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "764e7110364620f568e63fd26a2ba75c8cc94bb3be1c9dc41aa03f61e9a65f93",
+   "en": "Verify that the fitting size matches the diameters of your PTFE (Teflon) tubes to ensure a proper fit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "blocks[2].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "77404136c9b9d1aed26b5fcfd2ca70ab5e47ddeaf244143fb90fd2c41ba2bc7f",
+   "en": "Ensure that the tubes are securely inserted into the fitting to prevent any disconnection or leaks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "blocks[2].line[2]",
+    "near": "• Verify that the fitting size matches the diameters of your PTFE (Teflon) tubes to ensure a proper fit."
+   },
+   "dict": null
+  },
+  {
+   "h": "e27bc4def4dbc9ab8b6e841e4323c3561cb760b45064a669a468d68d5e6a449b",
+   "en": "Regularly inspect the fitting and connected tubes for any signs of wear or damage, and replace them as necessary to maintain optimal performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "blocks[2].line[3]",
+    "near": "• Ensure that the tubes are securely inserted into the fitting to prevent any disconnection or leaks."
+   },
+   "dict": null
+  }
+ ]
+}

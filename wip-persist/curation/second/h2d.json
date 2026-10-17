@@ -1,0 +1,2289 @@
+{
+  "handle": "h2d",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T16:37:32Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "title": "H2D Spec Sheet",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*"
+      ],
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+      "title": "H2D Packaging List | Bambu Lab Wiki",
+      "keys": [
+        "package.contents",
+        "printing.included_build_plate"
+      ],
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "also": "relations (compatible_with / requires) and the per-version box lists"
+    },
+    {
+      "kind": "store_messages",
+      "url": "https://us.store.bambulab.com/products/h2d",
+      "title": "Bambu Lab H2D store page, messages bundle (messages.production.H2D)",
+      "keys": [
+        "electrical.voltage",
+        "electrical.max_power",
+        "package.length",
+        "package.width",
+        "package.height",
+        "shipment.gross_weight",
+        "printing.included_build_plate",
+        "printing.multi_color"
+      ],
+      "retrieved_at": "2026-10-16T06:52:55Z",
+      "also": "Specs Table No Collapse 220V / 110V, Physical Dimensions UK/US/Asia, Gross Weight UK/US/Asia, FAQ answers (relations), footnotes"
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/h2d",
+      "title": "Bambu Lab H2D store page",
+      "keys": [
+        "safety.certifications"
+      ],
+      "retrieved_at": "2026-10-16T06:52:55Z",
+      "also": "Product Features highlights (relations)"
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.technology",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Fused Deposition Modeling",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Printing Technology",
+      "quote": "Printing Technology Fused Deposition Modeling",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "325 × 320 × 325 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Body › Build Volume (W*D*H)",
+      "quote": "Single Nozzle Printing: 325*320*325 mm³ Dual Nozzle Printing: 300*320*325 mm³ Total Volume for Two Nozzles: 350*320*325 mm³",
+      "test_method": "",
+      "test_condition": "Single-nozzle printing (W×D×H). Dual-nozzle printing: 300 × 320 × 325 mm; total volume for two nozzles: 350 × 320 × 325 mm.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Aluminum, Steel, Plastic and Glass",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Body › Chassis & Shell",
+      "quote": "Chassis & Shell Aluminum, Steel, Plastic and Glass",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 492,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Physical Dimensions › Physical Dimensions",
+      "quote": "Physical Dimensions 492*514*626 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 514,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Physical Dimensions › Physical Dimensions",
+      "quote": "Physical Dimensions 492*514*626 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 626,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Physical Dimensions › Physical Dimensions",
+      "quote": "Physical Dimensions 492*514*626 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 31,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Physical Dimensions › Net Weight",
+      "quote": "Net Weight 31 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "extrusion.hotend",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "All Metal",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Toolhead › Hotend",
+      "quote": "Hotend All Metal",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "extrusion.extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Toolhead › Extruder Gear",
+      "quote": "Extruder Gear Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Toolhead › Nozzle",
+      "quote": "Nozzle Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Toolhead › Max Nozzle Temperature",
+      "quote": "Max Nozzle Temperature 350 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Toolhead › Included Nozzle Diameter",
+      "quote": "Included Nozzle Diameter 0.4 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Toolhead › Supported Nozzle Diameter",
+      "quote": "Supported Nozzle Diameter 0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Toolhead › Filament Diameter",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "extrusion.extruder_motor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Toolhead › Extruder Motor",
+      "quote": "Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "printing.build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI plate",
+        "Smooth PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 120,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Heatbed › Max Heatbed Temperature",
+      "quote": "Max Heatbed Temperature 120 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Speed › Max Speed of Toolhead",
+      "quote": "Max Speed of Toolhead 1000 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Speed › Max Acceleration of Toolhead",
+      "quote": "Max Acceleration of Toolhead 20,000 mm/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Speed › Max Flow for Hotend (Standard Flow Hotend)",
+      "quote": "40 mm³/s (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 °C printing temperature)",
+      "test_method": "Manufacturer test: 250 mm round model with a single outer wall",
+      "test_condition": "Standard Flow Hotend; Bambu Lab ABS; 280 °C printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "motion.max_flow_high_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Speed › Max Flow for Hotend (Optional High Flow Hotend)",
+      "quote": "65 mm³/s (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 °C printing temperature)",
+      "test_method": "Manufacturer test: 250 mm round model with a single outer wall",
+      "test_condition": "Optional High Flow Hotend; Bambu Lab ABS; 280 °C printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "thermal.chamber_heating",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Chamber Temperature Control › Active Chamber Heating",
+      "quote": "Active Chamber Heating Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "conflict_note": "Same fact as the store page row ('Supported'): the runner renders a boolean as 'Yes', so its text comparison records a difference; the values agree."
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Chamber Temperature Control › Max Temperature",
+      "quote": "Max Temperature 65 °C",
+      "test_method": "",
+      "test_condition": "Maximum chamber temperature with active chamber heating",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "safety.prefilter_grade",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "G3",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Air Purification › Pre-filter Grade",
+      "quote": "Pre-filter Grade G3",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "safety.hepa_grade",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H12",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Air Purification › HEPA Filter Grade",
+      "quote": "HEPA Filter Grade H12",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "safety.carbon_filter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Granulated Coconut Shell",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Air Purification › Activated Carbon Filter Type",
+      "quote": "Activated Carbon Filter Type Granulated Coconut Shell",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "thermal.part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Cooling › Part Cooling Fan",
+      "quote": "Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "thermal.aux_part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Cooling › Auxiliary Part Cooling Fan",
+      "quote": "Auxiliary Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "thermal.chamber_circulation_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Cooling › Chamber Heat Circulation Fan",
+      "quote": "Chamber Heat Circulation Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "thermal.hotend_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Cooling › Cooling Fan for Hotend",
+      "quote": "Cooling Fan for Hotend Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "thermal.control_board_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Cooling › Main Control Board Fan",
+      "quote": "Main Control Board Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "thermal.chamber_exhaust_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Cooling › Chamber Exhaust Fan",
+      "quote": "Chamber Exhaust Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "TPU",
+        "PVA",
+        "BVOH",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "PET",
+        "Carbon/Glass Fiber Reinforced PLA",
+        "Carbon/Glass Fiber Reinforced PETG",
+        "Carbon/Glass Fiber Reinforced PA",
+        "Carbon/Glass Fiber Reinforced PET",
+        "Carbon/Glass Fiber Reinforced PC",
+        "Carbon/Glass Fiber Reinforced ABS",
+        "Carbon/Glass Fiber Reinforced ASA",
+        "PPA-CF/GF",
+        "PPS",
+        "PPS-CF/GF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.1 › Supported Filament Type",
+      "quote": "PLA, PETG, TPU, PVA, BVOH, ABS, ASA, PC, PA, PET, Carbon/Glass Fiber Reinforced PLA, PETG, PA, PET, PC, ABS, ASA, PPA-CF/GF, PPS, PPS-CF/GF",
+      "test_method": "",
+      "test_condition": "Every listed type: Supported",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "conflict_note": "Same list as the store page row, itemised: the page parser keeps the whole cell as one item with the 'Supported' column appended; here the shared 'Carbon/Glass Fiber Reinforced' prefix is applied to the second line's PLA, PETG, PA, PET, PC, ABS, ASA (they repeat the first line's plain types). The page writes 'PPA CF/GF' and 'PPS CF/GF' without the hyphen."
+    },
+    {
+      "key": "printing.camera",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Sensor › Live View Camera",
+      "quote": "Live View Camera Built-in; 1920*1080",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "printing.camera_nozzle",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Sensor › Nozzle Camera",
+      "quote": "Nozzle Camera Built-in; 1920*1080",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "printing.camera_birdseye",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 3264*2448（Equipped with Laser Edition）",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Sensor › BirdsEye Camera",
+      "quote": "BirdsEye Camera Built-in; 3264*2448 （Equipped with Laser Edition)",
+      "test_method": "",
+      "test_condition": "H2D Laser Edition (H2D Laser Full Combo); the store page footnote adds that it can be added with the laser upgrade kit",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "printing.camera_toolhead",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Sensor › Toolhead Camera",
+      "quote": "Toolhead Camera Built-in; 1920*1080",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "printing.door_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Sensor › Door Sensor",
+      "quote": "Door Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "conflict_note": "Same fact as the store page row ('Supported'): the runner renders a boolean as 'Yes', so its text comparison records a difference; the values agree."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Sensor › Filament Run Out Sensor",
+      "quote": "Filament Run Out Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "conflict_note": "Same fact as the store page row ('Supported'): the runner renders a boolean as 'Yes', so its text comparison records a difference; the values agree."
+    },
+    {
+      "key": "printing.filament_tangle_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Sensor › Filament Tangle Sensor",
+      "quote": "Filament Tangle Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "conflict_note": "Same fact as the store page row ('Supported'): the runner renders a boolean as 'Yes', so its text comparison records a difference; the values agree."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Sensor › Filament Odometry",
+      "quote": "Filament Odometry Supported with AMS",
+      "test_method": "",
+      "test_condition": "Supported with AMS",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "conflict_note": "Same fact as the store page row ('Supported with AMS'): the runner renders a boolean as 'Yes', so its text comparison records a difference; the values agree."
+    },
+    {
+      "key": "printing.power_loss_recovery",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Sensor › Power Loss Recovery",
+      "quote": "Power Loss Recovery Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "conflict_note": "Same fact as the store page row ('Supported'): the runner renders a boolean as 'Yes', so its text comparison records a difference; the values agree."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200-240 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "UK and other version (200–240 V)",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "corroborated_by": {
+        "source_kind": "store_messages",
+        "source_url": "https://us.store.bambulab.com/products/h2d",
+        "locator": "messages.production.H2D.Specs Table No Collapse 220V › row 44",
+        "quote": "Voltage 200-240 VAC, 50/60 Hz"
+      }
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-120 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "UK and other version (200–240 V)",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2200,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electrical Requirements › Max Power*",
+      "quote": "Max Power* 2200 W@220 V / 1320 W@110 V",
+      "test_method": "",
+      "test_condition": "At 220 V; * the printer holds maximum power for no more than 3 minutes so the heatbed reaches temperature quickly",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "corroborated_by": {
+        "source_kind": "store_messages",
+        "source_url": "https://us.store.bambulab.com/products/h2d",
+        "locator": "messages.production.H2D.Specs Table No Collapse 220V › row 45",
+        "quote": "Max Power* 2200 W@220 V"
+      }
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1320,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electrical Requirements › Max Power*",
+      "quote": "Max Power* 2200 W@220 V / 1320 W@110 V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V), at 110 V; * the printer holds maximum power for no more than 3 minutes so the heatbed reaches temperature quickly",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "electrical.rated_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1050,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electrical Requirements › Average Power",
+      "quote": "Average Power 1050 W@220 V / 1050 W@110 V",
+      "test_method": "",
+      "test_condition": "Average power at 220 V",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "electrical.rated_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1050,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electrical Requirements › Average Power",
+      "quote": "Average Power 1050 W@220 V / 1050 W@110 V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V), average power at 110 V",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "5-inch 720*1280 Touchscreen",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electronics › Touchscreen",
+      "quote": "Touchscreen 5-inch 720*1280 Touchscreen",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "connectivity.storage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in 8 GB EMMC and USB Port",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electronics › Storage",
+      "quote": "Storage Built-in 8 GB EMMC and USB Port",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "connectivity.control_interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Touchscreen",
+        "mobile App",
+        "PC App"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electronics › Control Interface",
+      "quote": "Control Interface Touchscreen, mobile App, PC App",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "connectivity.npu",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "2 TOPS",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Electronics › Neural Processing Unit",
+      "quote": "Neural Processing Unit 2 TOPS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Studio, Bambu Suite, Bambu Handy / Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Software › Slicer & Software",
+      "quote": "Bambu Studio, Bambu Suite, Bambu Handy Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "MacOS",
+        "Windows"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Software › Supported Operating System",
+      "quote": "Supported Operating System MacOS, Windows",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Operating Frequency — 2412-2472 MHz, 5150-5850 MHz (FCC/CE) 2400-2483.5 MHz, 5150-5850 MHz (SRRC)\nWi-Fi Transmitter Power (EIRP) — 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) 5 GHz Band1/2: <23 dBm (FCC/CE/SRRC/MIC) 5 GHz Band3: <30 dBm (CE); <24 dBm (FCC) 5 GHz Band4: <23 dBm (FCC/SRRC); <14 dBm (CE)\nWi-Fi Protocol — IEEE 802.11 a/b/g/n",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › Wi-Fi › Operating Frequency; Wi-Fi Transmitter Power (EIRP); Wi-Fi Protocol",
+      "quote": "Operating Frequency 2412-2472 MHz, 5150-5850 MHz (FCC/CE) 2400-2483.5 MHz, 5150-5850 MHz (SRRC) … Wi-Fi Protocol IEEE 802.11 a/b/g/n",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "printing.working_area",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709382",
+        "id": "ov_67f744f95c8ec59ec77febc4",
+        "label": "10W"
+      },
+      "value": "310 mm × 270 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › 10W & 40W Laser Module › Engraving Area",
+      "quote": "10W: 310 mm * 270 mm; 40W: 310 mm * 250 mm",
+      "test_method": "",
+      "test_condition": "Laser engraving area with the 10W laser module (Laser Full Combo)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "printing.working_area",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709383",
+        "id": "ov_564659b4004a17387d52a5b3",
+        "label": "40W"
+      },
+      "value": "310 mm × 250 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "source_title": "H2D Spec Sheet",
+      "locator": "p.2 › 10W & 40W Laser Module › Engraving Area",
+      "quote": "10W: 310 mm * 270 mm; 40W: 310 mm * 250 mm",
+      "test_method": "",
+      "test_condition": "Laser engraving area with the 40W laser module (Laser Full Combo)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 620,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "source_title": "Bambu Lab H2D store page, messages bundle (messages.production.H2D)",
+      "locator": "messages.production.H2D.Physical Dimensions Asia",
+      "quote": "(Package Size: US Version: 580*605*750mm UK and other Version: 620*620*755mm)",
+      "test_method": "",
+      "test_condition": "UK and other version (200–240 V)",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 620,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "source_title": "Bambu Lab H2D store page, messages bundle (messages.production.H2D)",
+      "locator": "messages.production.H2D.Physical Dimensions Asia",
+      "quote": "(Package Size: US Version: 580*605*750mm UK and other Version: 620*620*755mm)",
+      "test_method": "",
+      "test_condition": "UK and other version (200–240 V)",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 755,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "source_title": "Bambu Lab H2D store page, messages bundle (messages.production.H2D)",
+      "locator": "messages.production.H2D.Physical Dimensions Asia",
+      "quote": "(Package Size: US Version: 580*605*750mm UK and other Version: 620*620*755mm)",
+      "test_method": "",
+      "test_condition": "UK and other version (200–240 V)",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709379",
+        "id": "ov_6d6bb035dcfbb74b8b706b10",
+        "label": "H2D"
+      },
+      "value": 38.5,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "source_title": "Bambu Lab H2D store page, messages bundle (messages.production.H2D)",
+      "locator": "messages.production.H2D.Gross Weight UK",
+      "quote": "Gross weight: H2D: 38.5 kg; H2D AMS Combo: 42.3 kg; H2D Laser Full Combo: 46.2 kg",
+      "test_method": "",
+      "test_condition": "UK and other version (200–240 V)",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709377",
+        "id": "ov_8474fb266e42a3130bb21c68",
+        "label": "H2D AMS Combo"
+      },
+      "value": 42.3,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "source_title": "Bambu Lab H2D store page, messages bundle (messages.production.H2D)",
+      "locator": "messages.production.H2D.Gross Weight UK",
+      "quote": "Gross weight: H2D: 38.5 kg; H2D AMS Combo: 42.3 kg; H2D Laser Full Combo: 46.2 kg",
+      "test_method": "",
+      "test_condition": "UK and other version (200–240 V)",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709378",
+        "id": "ov_4b1e334931480ce93bb86b00",
+        "label": "H2D Laser Full Combo"
+      },
+      "value": 46.2,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "source_title": "Bambu Lab H2D store page, messages bundle (messages.production.H2D)",
+      "locator": "messages.production.H2D.Gross Weight UK",
+      "quote": "Gross weight: H2D: 38.5 kg; H2D AMS Combo: 42.3 kg; H2D Laser Full Combo: 46.2 kg",
+      "test_method": "",
+      "test_condition": "UK and other version (200–240 V)",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Build Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "source_title": "Bambu Lab H2D store page, messages bundle (messages.production.H2D)",
+      "locator": "messages.production.H2D.Build Plate (What's in the box)",
+      "quote": "Textured PEI Build Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "key": "printing.multi_color",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Up to 25 colors: 24 AMS slots (4 AMS 2 Pro and 8 AMS HT) plus an external spool on the other hotend",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "source_title": "Bambu Lab H2D store page, messages bundle (messages.production.H2D)",
+      "locator": "messages.production.H2D.Answer three (FAQ 3)",
+      "quote": "The H2D supports a maximum of 4 AMS 2 Pro and 8 AMS HT connected simultaneously, a total of 12 units with 24 slots. … it can support up to 25 colors.",
+      "test_method": "",
+      "test_condition": "FAQ prose; extreme case: all AMS on one hotend, external spool on the other",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "EU RED Article 3.3(d)(e)",
+        "ETSI EN 303 645 V2.1.1:2020"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "source_title": "Bambu Lab H2D store page",
+      "locator": "Product Features (highlights) › bullet 9",
+      "quote": "Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020.",
+      "test_method": "",
+      "test_condition": "Cybersecurity compliance statement",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "evidence_kind": "description_text",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "locator": "messages.production.H2D.Answer three (FAQ 3)",
+      "quote": "The H2D supports a maximum of 4 AMS 2 Pro and 8 AMS HT connected simultaneously, a total of 12 units with 24 slots.",
+      "condition": "Up to 4 AMS 2 Pro",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "evidence_kind": "description_text",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "locator": "messages.production.H2D.Answer three (FAQ 3)",
+      "quote": "The H2D supports a maximum of 4 AMS 2 Pro and 8 AMS HT connected simultaneously, a total of 12 units with 24 slots.",
+      "condition": "Up to 8 AMS HT",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "evidence_kind": "description_text",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "locator": "messages.production.H2D.Answer four (FAQ 4)",
+      "quote": "The first-generation AMS has been confirmed to have full plug-and-play compatibility and can be used with the H2D for multi-color printing, but it does not support the AMS drying function.",
+      "condition": "First-generation AMS: plug-and-play for multi-colour printing; the AMS drying function is not supported",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "evidence_kind": "description_text",
+      "source_kind": "store_messages",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "locator": "messages.production.H2D.Answer four (FAQ 4)",
+      "quote": "Due to the fundamental differences in the feeding mechanism and buffering structure, the H2D does not support the AMS lite.",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter (FAZ013-N)",
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "locator": "Product Features (highlights) › bullet 8",
+      "quote": "* To connect more than 2 AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+      "condition": "Only to connect more than 2 AMS units (AMS 2 Pro, AMS HT)",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "622679274382356481",
+        "id": "ov_32c5e49e5d2044b2117eaa21",
+        "label": "Dual AMS 2 Pro Bundle"
+      },
+      "target_kind": "part",
+      "target_label": "external power adapter (for AMS 2 Pro used for drying)",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+      "locator": "Packing list › note after 'Other H2D AMS Combo options'",
+      "quote": "When the H2D is used with more than one AMS 2 Pro — some for multi-color printing and others for filament drying — the AMS 2 Pro units used for drying require an external power adapter",
+      "condition": "Only when more than one AMS 2 Pro is used and some of them dry filament while others print",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709379",
+        "id": "ov_6d6bb035dcfbb74b8b706b10",
+        "label": "H2D"
+      },
+      "target_kind": "laser_module",
+      "target_label": "Laser Upgrade Kit",
+      "evidence_kind": "spec_row",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "locator": "p.1 › Body › Laser Safety Windows; Air Assist Pump",
+      "quote": "Equipped on Laser Edition, normal H2D can upgrade through Laser Upgrade Kit",
+      "condition": "Upgrade of a non-laser H2D",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709377",
+        "id": "ov_8474fb266e42a3130bb21c68",
+        "label": "H2D AMS Combo"
+      },
+      "target_kind": "laser_module",
+      "target_label": "Laser Upgrade Kit",
+      "evidence_kind": "spec_row",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "locator": "p.1 › Body › Laser Safety Windows; Air Assist Pump",
+      "quote": "Equipped on Laser Edition, normal H2D can upgrade through Laser Upgrade Kit",
+      "condition": "Upgrade of a non-laser H2D",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Flow Hotend",
+      "evidence_kind": "spec_row",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "locator": "p.1 › Speed › Max Flow for Hotend (Optional High Flow Hotend)",
+      "quote": "Max Flow for Hotend (Optional High Flow Hotend)",
+      "condition": "Optional hotend",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "locator": "p.1 › Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "locator": "p.1 › Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "Air Purifier",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "locator": "footnotes (messages.production.H2D.footnotes)",
+      "quote": "Air Purifier is an optional equipment, buy at official store.",
+      "condition": "Optional equipment",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Vision Encoder",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d",
+      "locator": "footnotes (messages.production.H2D.footnotes)",
+      "quote": "The optional Vision Encoder is required for Motion Accuracy Enhancement.",
+      "condition": "Optional; needed for Motion Accuracy Enhancement",
+      "retrieved_at": "2026-10-16T06:52:55Z"
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709378",
+        "id": "ov_4b1e334931480ce93bb86b00",
+        "label": "H2D Laser Full Combo"
+      },
+      "items": [
+        {
+          "text": "H2D",
+          "qty": null
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null
+        },
+        {
+          "text": "Build Plate",
+          "qty": null,
+          "note": "Pre-installed on heatbed"
+        },
+        {
+          "text": "Safety Key",
+          "qty": 2,
+          "note": "one attached to the rear board, one in the Emergency Stop Button"
+        },
+        {
+          "text": "Cutting Module",
+          "qty": null,
+          "section": "Accessory Box › Cutting Module"
+        },
+        {
+          "text": "Pen Holder",
+          "qty": null,
+          "section": "Accessory Box › Cutting Module"
+        },
+        {
+          "text": "Pen Height Calibrator",
+          "qty": null,
+          "section": "Accessory Box › Cutting Module"
+        },
+        {
+          "text": "Pen Fixture",
+          "qty": null,
+          "section": "Accessory Box › Cutting Module"
+        },
+        {
+          "text": "Emergency Stop Button",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Bambu Bus Cable 6-pin",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Marker Pen",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Spool Holder",
+          "qty": null,
+          "section": "Accessory Box",
+          "note": "inside the rectangular accessory box"
+        },
+        {
+          "text": "0.4mm Nozzle",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Silicone Sock for Hotend",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "45° Fine-point Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Blocker",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Weeding Tool",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Scraper",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Spool Holder",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Laser Homing Area XY & Z Marker",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Rubber Screws for Chamber Exhaust Fan",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Camera Privacy Cover",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null
+        },
+        {
+          "text": "Desiccant",
+          "qty": null
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null
+        },
+        {
+          "text": "Disclaimer and safety guidelines",
+          "qty": null
+        },
+        {
+          "text": "Laser Platform",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Cutting Platform",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "StrongGrip Cutting Mat",
+          "qty": null,
+          "section": "Supply Box",
+          "note": "Pre-installed on Cutting Platform"
+        },
+        {
+          "text": "LightGrip Cutting Mat",
+          "qty": null,
+          "section": "Supply Box",
+          "note": "Pre-installed on Cutting Platform"
+        },
+        {
+          "text": "Laser Slats Pack",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Material Pins",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Basswood Plywood",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Cork Sheet",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Heat Transfer Vinyl",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Pearlescent White Greeting Card Set",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Rectangular PU Iron-on Patch",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Round Stainless Steel Tag (Large & Small)",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Brush",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Smoke Ventilation Pipe",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        },
+        {
+          "text": "Ventilation Pipe Adapter",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        },
+        {
+          "text": "Pipe Clamp",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        },
+        {
+          "text": "Screws for Ventilation Pipe Adapter",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        },
+        {
+          "text": "Air Pump Intake",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        }
+      ],
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+      "source_title": "H2D Packaging List | Bambu Lab Wiki",
+      "locator": "Packing list table › column 'H2D Laser Full Combo'",
+      "quote": "Safety Key*2（one attached to the rear board, one in the Emergency Stop Button.）",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "note": "The wiki says the type and quantity of accessories may change from time to time. The list names no laser module line; the store page's own box list names the 10W / 40W Laser Module."
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709377",
+        "id": "ov_8474fb266e42a3130bb21c68",
+        "label": "H2D AMS Combo"
+      },
+      "items": [
+        {
+          "text": "H2D",
+          "qty": null
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null
+        },
+        {
+          "text": "Build Plate",
+          "qty": null,
+          "note": "Pre-installed on heatbed"
+        },
+        {
+          "text": "Safety Key",
+          "qty": null,
+          "note": "attached to the rear board"
+        },
+        {
+          "text": "Spool Holder",
+          "qty": null
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "note": "in AMS"
+        },
+        {
+          "text": "Bambu Bus Cable 6-pin",
+          "qty": null,
+          "note": "in AMS"
+        },
+        {
+          "text": "0.4mm Nozzle",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Silicone Sock for Hotend",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Blocker",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Scraper",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Spool Holder",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Camera Privacy Cover",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Tool Box",
+          "note": "Some versions include a white grease"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null
+        },
+        {
+          "text": "Desiccant",
+          "qty": null
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null
+        },
+        {
+          "text": "Disclaimer and safety guidelines",
+          "qty": null
+        }
+      ],
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+      "source_title": "H2D Packaging List | Bambu Lab Wiki",
+      "locator": "Packing list table › column 'H2D AMS Combo'",
+      "quote": "The packing list below is for the H2D AMS Combo (Standard).",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "581025672340709379",
+        "id": "ov_6d6bb035dcfbb74b8b706b10",
+        "label": "H2D"
+      },
+      "items": [
+        {
+          "text": "H2D",
+          "qty": null
+        },
+        {
+          "text": "Build Plate",
+          "qty": null,
+          "note": "Pre-installed on heatbed"
+        },
+        {
+          "text": "Safety Key",
+          "qty": null,
+          "note": "attached to the rear board"
+        },
+        {
+          "text": "Spool Holder",
+          "qty": 2
+        },
+        {
+          "text": "Power Cord",
+          "qty": null
+        },
+        {
+          "text": "0.4mm Nozzle",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Silicone Sock for Hotend",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Blocker",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Scraper",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Spool Holder",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Camera Privacy Cover",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null
+        },
+        {
+          "text": "Desiccant",
+          "qty": null
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null
+        },
+        {
+          "text": "Disclaimer and safety guidelines",
+          "qty": null
+        }
+      ],
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+      "source_title": "H2D Packaging List | Bambu Lab Wiki",
+      "locator": "Packing list table › column 'H2D'",
+      "quote": "Spool Holder * 2",
+      "retrieved_at": "2026-10-16T08:21:14Z"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "622679274382356481",
+        "id": "ov_32c5e49e5d2044b2117eaa21",
+        "label": "Dual AMS 2 Pro Bundle"
+      },
+      "includes_scope": "H2D AMS Combo",
+      "items": [
+        {
+          "text": "Bambu AMS 2 Pro",
+          "qty": null,
+          "section": "Additional AMS 2 Pro"
+        },
+        {
+          "text": "Desiccant",
+          "qty": null,
+          "section": "Additional AMS 2 Pro"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null,
+          "section": "Additional AMS 2 Pro"
+        },
+        {
+          "text": "Bambu Bus Cable 6-pin",
+          "qty": null,
+          "section": "Additional AMS 2 Pro"
+        }
+      ],
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+      "source_title": "H2D Packaging List | Bambu Lab Wiki",
+      "locator": "Other H2D AMS Combo options › Dual AMS 2 Pro Bundle",
+      "quote": "Dual AMS 2 Pro Bundle = H2D Combo + AMS 2 Pro The AMS 2 Pro includes: Bambu AMS 2 Pro, Desiccant, PTFE Tube, and Bambu Bus Cable 6-pin.",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "note": "The H2D AMS Combo contents plus these items."
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "622679274382356482",
+        "id": "ov_9b779a80285e178d043bbed9",
+        "label": "AMS HT bundle"
+      },
+      "includes_scope": "H2D AMS Combo",
+      "items": [
+        {
+          "text": "Bambu AMS HT",
+          "qty": null,
+          "section": "Additional AMS HT"
+        },
+        {
+          "text": "Desiccant",
+          "qty": null,
+          "section": "Additional AMS HT"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null,
+          "section": "Additional AMS HT"
+        },
+        {
+          "text": "Bambu Bus Cable 6-pin",
+          "qty": null,
+          "section": "Additional AMS HT"
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "section": "Additional AMS HT",
+          "note": "for AMS HT only"
+        }
+      ],
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+      "source_title": "H2D Packaging List | Bambu Lab Wiki",
+      "locator": "Other H2D AMS Combo options › AMS HT bundle",
+      "quote": "AMS HT bundle = H2D Combo + AMS HT The AMS HT includes: Bambu AMS HT, Desiccant, PTFE Tube, Bambu Bus Cable 6-pin, and Power Cord (for AMS HT only).",
+      "retrieved_at": "2026-10-16T08:21:14Z",
+      "note": "The H2D AMS Combo contents plus these items."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+      "title": "H2D Spec Sheet"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+      "title": "H2D Packaging List"
+    }
+  ],
+  "not_published": [
+    "printing.layer_height",
+    "printing.unsupported_filament",
+    "printing.auto_leveling",
+    "printing.build_plate_material",
+    "electrical.current",
+    "electrical.standby_power",
+    "electrical.steady_state_power",
+    "connectivity.bluetooth",
+    "connectivity.ethernet",
+    "connectivity.motion_controller",
+    "connectivity.application_processor",
+    "connectivity.network_kill_switch",
+    "connectivity.removable_network_module",
+    "connectivity.network_access_control",
+    "physical.noise",
+    "package.weight",
+    "safety.voc_filtration",
+    "safety.particulate_filtration"
+  ]
+}

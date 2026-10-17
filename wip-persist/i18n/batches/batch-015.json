@@ -1,0 +1,3122 @@
+{
+ "batch": 15,
+ "surface": "api",
+ "handles": [
+  "filament-buffer",
+  "h2d",
+  "refurbished-bambu-lab-h2d-3d-printer",
+  "ams-2-pro",
+  "pla-basic-filament",
+  "bambu-hotend-a1-a2",
+  "bambu-textured-pei-plate",
+  "ams-2-pro-feeder-unit"
+ ],
+ "strings": [
+  {
+   "h": "d4b1ea5708dd532930a85188b45aff6f0a3ed458500c7577e0127a538eb0d100",
+   "en": "Overview",
+   "kind": "block_title",
+   "freq": 765,
+   "context": {
+    "handle": "filament-buffer",
+    "title": "Filament Buffer",
+    "field": "blocks[0].line[0]",
+    "near": "The Filament buffer is an accessory that is required in conjunction with a single AMS unit. Its function is to provide a buffering effect for the filament. The "
+   },
+   "dict": null
+  },
+  {
+   "h": "26b9d142e1df2166945c9f4bf457e94a41dfb2cedd908479407f1a43c9750001",
+   "en": "The Filament buffer is an accessory that is required in conjunction with a single AMS unit. Its function is to provide a buffering effect for the filament. The interface is 4-Pin cable with 3mm pitch with snap terminal input, 6-Pin cable with 3mm pitch open snap terminal output.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-buffer",
+    "title": "Filament Buffer",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8da2c49df39d91df7ecd199b92da7bf264f026242ccc69b08daeadfe587c45b",
+   "en": "Note",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "filament-buffer",
+    "title": "Filament Buffer",
+    "field": "blocks[1].line[0]",
+    "near": "For multiple AMS units, the AMS Hub is required instead of the Filament buffer."
+   },
+   "dict": null
+  },
+  {
+   "h": "c06e7789b9c11a1fe571a021018d2df5e7e3c1b7dd30357e6cdf0b36f57c9a63",
+   "en": "For multiple AMS units, the AMS Hub is required instead of the Filament buffer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-buffer",
+    "title": "Filament Buffer",
+    "field": "blocks[1].line[1]",
+    "near": "Note"
+   },
+   "dict": null
+  },
+  {
+   "h": "a488dd27cc1534c31394ed7339b4fbcf30d75dc2004ea29dc209034458acf906",
+   "en": "Rethink Personal Manufacturing",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu Lab H2D"
+   },
+   "dict": null
+  },
+  {
+   "h": "b788c732e391a5b7ff4e53e038a78a3e6641abf69e06cad3dcc89ae2a1e7228c",
+   "en": "Flexible and rigid, low cost and exotic materials in one print",
+   "kind": "block_title",
+   "freq": 4,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[1].line[0]",
+    "near": "Multi-material Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "1455148fedfd9e07f62564f0741bb52a026352bb3e522bcd56f06fcb76698249",
+   "en": "Multi-material Printing",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[1].line[1]",
+    "near": "Flexible and rigid, low cost and exotic materials in one print"
+   },
+   "dict": null
+  },
+  {
+   "h": "a167e203add23994eb9288822d43210dbc627ab056bf84e7a440604869fc5845",
+   "en": "Perfect supports with minimal waste, purging and reloading",
+   "kind": "block_title",
+   "freq": 4,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[2].line[0]",
+    "near": "Dedicated Support Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb07d9074c03a431dd039d5d5904608020b6b3574bca861c762afa2401948757",
+   "en": "Dedicated Support Material",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[2].line[1]",
+    "near": "Perfect supports with minimal waste, purging and reloading"
+   },
+   "dict": null
+  },
+  {
+   "h": "e331e08c4aed281015be504b81729b3e5248fb205b260113829a7bc55e866f9f",
+   "en": "Fast and efficient multi-color printing",
+   "kind": "block_title",
+   "freq": 4,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[3].line[0]",
+    "near": "Efficient Multi-color Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc816bdec98a69d12c9eeec519cfc98e7ba8d9e934d55982e4dad0a00f963701",
+   "en": "Efficient Multi-color Printing",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[3].line[1]",
+    "near": "Fast and efficient multi-color printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "73dea27adf03c0466ce8414e1529ae353560c9ae6d67751e6ad325acf2d6cf0f",
+   "en": "Combine flexible and rigid materials in a single print to create impressive interlocking structures and innovative designs beyond traditional manufacturing. Pairing high-performance materials with standard ones further reduces costs and boosts material efficiency by using premium materials only where necessary.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[4].line[1]",
+    "near": "Flexible and rigid, low cost and exotic materials in one print"
+   },
+   "dict": null
+  },
+  {
+   "h": "baeba562f528a571d0dfe52a78d198683a6f95198710a0a33143e53f0beafc80",
+   "en": "Print with support is no longer a headache. With H2D’s dual-nozzle setup, one nozzle can be reserved for dedicated support material, allowing secured print and perfect support interface.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[5].line[1]",
+    "near": "Perfect supports with minimal waste, purging and reloading"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6cde85c57c7e77e2fe774719245781d994089b4b2588e813ab1f80621975847",
+   "en": "Dual-nozzle printing reduces purge cycles in multi-color prints. H2D's smart algorithms optimize filament use, maximizing dual-nozzle efficiency to save time and materials.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[6].line[1]",
+    "near": "Fast and efficient multi-color printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "38df4d6991b6894c33fd964ae943c6d8a134eb83f513efce41c8b36a9cfcd533",
+   "en": "Laser",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[7].line[0]",
+    "near": "10W and 40W 455nm Laser for engraving & cutting"
+   },
+   "dict": {
+    "ar": "ليزر",
+    "ckb": "لەیزەر"
+   }
+  },
+  {
+   "h": "3acc90d890eac3382eb4ac14dd0fef26168f12c0c29f909c3262af8454436ca3",
+   "en": "10W and 40W 455nm Laser for engraving & cutting",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[7].line[1]",
+    "near": "Laser"
+   },
+   "dict": null
+  },
+  {
+   "h": "3208539cf989cf7e8407f524dbe9b77bdd5ee50f486c048dee1a2e024a7aceff",
+   "en": "Digital Cutting",
+   "kind": "block_title",
+   "freq": 6,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[8].line[0]",
+    "near": "Precise cutting on variety of materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c1e425134b6a87e1bc6291d994521ffd408dd79c0d5dc1a83aeeb108e735c31",
+   "en": "Precise cutting on variety of materials",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[8].line[1]",
+    "near": "Digital Cutting"
+   },
+   "dict": null
+  },
+  {
+   "h": "64793b0186688a0d405a4d96bed5d08fb92f43f65f3875cd4b222596e809d38a",
+   "en": "Pen Drawing",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[9].line[0]",
+    "near": "Drawing and writing"
+   },
+   "dict": null
+  },
+  {
+   "h": "5fd3269a29e28ee6583175e478fcb9ec966e56644ce419db55f934810b7a90a3",
+   "en": "Drawing and writing",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[9].line[1]",
+    "near": "Pen Drawing"
+   },
+   "dict": null
+  },
+  {
+   "h": "416cbf08af0862572e8fe2d95fcc7ee84f04e4c8bb27aeebf2a074fb6700a70c",
+   "en": "Live Spatial Alignment",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[10].line[0]",
+    "near": "What-You-See-Is-What-You-Get"
+   },
+   "dict": null
+  },
+  {
+   "h": "9745129bac715c704d60c725b796ced65c0b6c35dd850a7865dcd8d39acf778b",
+   "en": "What-You-See-Is-What-You-Get",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[10].line[1]",
+    "near": "Live Spatial Alignment"
+   },
+   "dict": null
+  },
+  {
+   "h": "a41cb12072e9a7939d242a800e89a1639037f0ab7a529663f9334c8e9cd61130",
+   "en": "The H2D’s BirdsEye camera, combined with computer vision algorithms, delivers top-view alignment accuracy up to 0.3mm. This advanced spatial alignment allows users to place the tool path at the right position on the material – truly \"what-you-see-is-what-you-get.\"*",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[10].line[2]",
+    "near": "What-You-See-Is-What-You-Get"
+   },
+   "dict": null
+  },
+  {
+   "h": "996674552a8a50f6f704ba1c25212591ff9b3a5cabe8b100e8943abec17b3294",
+   "en": "Auto Arrangement",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[10].line[3]",
+    "near": "The H2D’s BirdsEye camera, combined with computer vision algorithms, delivers top-view alignment accuracy up to 0.3mm. This advanced spatial alignment allows us"
+   },
+   "dict": null
+  },
+  {
+   "h": "39605033c1a4180e42c5ff1129cda471a59ed9a9d13620256dbb5d37639d475a",
+   "en": "Maximize material efficiency, minimize waste",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[11].line[0]",
+    "near": "Leveraging real-time images from the BirdsEye camera, Bambu Suite can automatically arrange your project according to the shape of your material, i.e left over "
+   },
+   "dict": null
+  },
+  {
+   "h": "2d6919e9656df5a8e0ba31f87e9d1938793eeaa43b4eb50c8009e192d713bb60",
+   "en": "Leveraging real-time images from the BirdsEye camera, Bambu Suite can automatically arrange your project according to the shape of your material, i.e left over plywood from the previous project. This feature helps you to get the most out of every material.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[11].line[1]",
+    "near": "Maximize material efficiency, minimize waste"
+   },
+   "dict": null
+  },
+  {
+   "h": "a22891c49c9c4905ca7602a618f4a5e7acb68ea6ace4a7fe00fddb011b97a64b",
+   "en": "Don’t Worry About Safety – We’ve Got You Covered",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[12].line[0]",
+    "near": "Laser Safety Windows"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea9aaa466d2c8acff8595afa850fbee0fdb2b858e6f4ce61b16d1cc192cef3e2",
+   "en": "Laser Safety Windows",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[12].line[1]",
+    "near": "Don’t Worry About Safety – We’ve Got You Covered"
+   },
+   "dict": null
+  },
+  {
+   "h": "12bf4feee5d30b95316fd3ba78ee103df9bdf891738a98d6277e312fb846a47e",
+   "en": "Operate and monitor laser projects safely without the need for goggles, thanks to our safety windows.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[12].line[2]",
+    "near": "Laser Safety Windows"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b1dcd9191095ed005ec08e7d0c63056eab010a16de52e349d53f57ff1ecdbbe",
+   "en": "Air Purifier",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[13].line[0]",
+    "near": "An optional air purifier ensures clean air, even during indoor laser operations.*"
+   },
+   "dict": null
+  },
+  {
+   "h": "33f7949e192e3d8fed6f516f9dccf9a833f33ddddd4db1ea24dba64e9abe7a09",
+   "en": "An optional air purifier ensures clean air, even during indoor laser operations.*",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[13].line[1]",
+    "near": "Air Purifier"
+   },
+   "dict": null
+  },
+  {
+   "h": "c1d45d9b2ef381d8acdb86ddbee3119ccda2bd9ee66d14719800b92998af12a3",
+   "en": "Don’t Worry About the Settings – We’ve Got It Covered",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[14].line[0]",
+    "near": "Full-auto Calibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "2bc7ff88aa2dd5333fb4d1ee7d7af76fef23eb9ec26fd7df55021404e011cf10",
+   "en": "Full-auto Calibration",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[14].line[1]",
+    "near": "Don’t Worry About the Settings – We’ve Got It Covered"
+   },
+   "dict": null
+  },
+  {
+   "h": "0cbdd450fc9c584033dda58b8ce751ffb6933fecbadaef0d2e9390b618c43b1a",
+   "en": "A single tap initiates automated laser focus verification and material measurement, eliminating manual adjustments.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[14].line[2]",
+    "near": "Full-auto Calibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "6c9f7e4bfa936a844c3499feb178a26771ff4add678e44ce7c1d3480c5e1b35d",
+   "en": "Material CodeSync",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[15].line[0]",
+    "near": "The H2D automatically scans the QR code on your material to load the perfect preset.*"
+   },
+   "dict": null
+  },
+  {
+   "h": "22d5a04ee029a6a14998da531aef5fa85c3a50426dbfb6de2160f22c3e8f1e91",
+   "en": "The H2D automatically scans the QR code on your material to load the perfect preset.*",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[15].line[1]",
+    "near": "Material CodeSync"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6ead18a5263adbfaa6274c17014bcb71eaa48331d2149e9a76202420605ba64",
+   "en": "A Serious Laser Machine",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[16].line[0]",
+    "near": "Air Assist"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a26ffcc09511c0f2d582762920f16b35a93caf63e43c96c7c66690b55085872",
+   "en": "Air Assist",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[16].line[1]",
+    "near": "A Serious Laser Machine"
+   },
+   "dict": null
+  },
+  {
+   "h": "a1c636fc85814ac80b6e9537e65c058e66cbc17078b4feba4a1be2179b7138ee",
+   "en": "Improve surface quality by directing high-speed air to cool the laser path, ensuring cleaner and more precise results.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[16].line[2]",
+    "near": "Air Assist"
+   },
+   "dict": null
+  },
+  {
+   "h": "e6432ea92fff04f6af1d568e31bfdde29369b15bbf1f39f95f54618992d889b9",
+   "en": "Contact-less 3D Mesh*",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[17].line[0]",
+    "near": "Advanced optical height measurement creates a detailed 3D mesh without physical contact, enabling precise laser work on curved surfaces."
+   },
+   "dict": null
+  },
+  {
+   "h": "51cd57bac5d848730b43565ded6f650c6c2ddb2a854d59478f4cbf455b5c3be6",
+   "en": "Advanced optical height measurement creates a detailed 3D mesh without physical contact, enabling precise laser work on curved surfaces.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[17].line[1]",
+    "near": "Contact-less 3D Mesh*"
+   },
+   "dict": null
+  },
+  {
+   "h": "a44cb12c6ba63680d820b555660fdb51b36671057380e5c5d6daa95cc38de49b",
+   "en": "Go Big, Go Fast, Go Precise",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[18].line[0]",
+    "near": "Our Secret Weapon:Vision Encoder"
+   },
+   "dict": null
+  },
+  {
+   "h": "0a7b83cc98b5d148bca04458a3c44612d21177d8ab820bd88c1aa09292a7290e",
+   "en": "Our Secret Weapon:Vision Encoder",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[18].line[1]",
+    "near": "Go Big, Go Fast, Go Precise"
+   },
+   "dict": null
+  },
+  {
+   "h": "f5c35895304e27e04007bb3f9e2ec32c1ed91c4d8615d97cbfa5a35ad5a40848",
+   "en": "50µm ultra-fine motion accuracy*",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[18].line[2]",
+    "near": "Our Secret Weapon:Vision Encoder"
+   },
+   "dict": null
+  },
+  {
+   "h": "668af35a7c30b18c11cf111a010a3af82803997df655c7fa3f8f550eec993731",
+   "en": "An ultra-accurate vision encoder plate, combined with 5µm resolution optical measurements to track and correct toolhead motion, enables the H2D to achieve consistent and reliable distance-independent 50μm motion accuracy across the entire workspace, one order of magnitude better than its predecessor. (*Vision Encoder sold separately)",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[18].line[3]",
+    "near": "50µm ultra-fine motion accuracy*"
+   },
+   "dict": null
+  },
+  {
+   "h": "894878f20b7ddb599d36e68a074acf1d0077e61ac1589c765d56b61c12847944",
+   "en": "King-size Work Zone",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[19].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b4d3fcb9486ba358392d5dd32c7b56643e7bee75669b8b54404bd1532b7beede",
+   "en": "Break free from size constraints",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[20].line[0]",
+    "near": "With a print volume up to 350mm×320mm×325mm*, creating large-scale projects has never been easier! From laser engraving on sizable objects to printing oversized"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b6403cec28b4b84bdf4dd3536cba3047717d8db4e4f864274292fe348d4620b",
+   "en": "With a print volume up to 350mm×320mm×325mm*, creating large-scale projects has never been easier! From laser engraving on sizable objects to printing oversized models, the expanded capacity empowers you to bring even your most ambitious ideas to life.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[20].line[1]",
+    "near": "Break free from size constraints"
+   },
+   "dict": null
+  },
+  {
+   "h": "467cbf60e9b16995e6af94378204d741552af02ffb116f81146ea66157ad2955",
+   "en": "350°C Hotend & 65°C Chamber Heating",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[21].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8fc534f0804b496805971208d942876a6f7128184928a8ba3042359643846c3e",
+   "en": "Unleash the full potential of high-performance materials",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[22].line[0]",
+    "near": "Equipped with 65°C active chamber heating and a high-temperature hotend reaching up to 350°C, the H2D delivers precise closed-loop temperature control. This adv"
+   },
+   "dict": null
+  },
+  {
+   "h": "e886cdbb739c58c9f35ab206f0bfa5d5e771ca22138bd82d693d00d70828fe40",
+   "en": "Equipped with 65°C active chamber heating and a high-temperature hotend reaching up to 350°C, the H2D delivers precise closed-loop temperature control. This advanced system effectively eliminates warping and deformation in high-performance materials, ensuring superior layer bonding and maximizing their full potential.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[22].line[1]",
+    "near": "Unleash the full potential of high-performance materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb92c643bbc7941c731e3f16c438f9239c9d197cea92ba8956e12426f7cfc06b",
+   "en": "REAL High-Flow Hotend*",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[23].line[0]",
+    "near": "Consistently print at 600mm/s with ease"
+   },
+   "dict": null
+  },
+  {
+   "h": "6bb78b862ffe629875f3bc7752c5fca954c14fb45b2a4e64afdc0995d451f593",
+   "en": "Consistently print at 600mm/s with ease",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[23].line[1]",
+    "near": "REAL High-Flow Hotend*"
+   },
+   "dict": null
+  },
+  {
+   "h": "3fa19e8204c036a3689d623ed8f90680e8977f0fcae9d827c18d926bb56cd129",
+   "en": "The H2D’s purpose-built high-flow hotend ensures reliable, high-speed printing at 600mm/s. Designed for consistent performance, it eliminates mid-print flow rate restrictions, enabling uninterrupted high-speed printing regardless of the print size or complexity.*",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[23].line[2]",
+    "near": "Consistently print at 600mm/s with ease"
+   },
+   "dict": null
+  },
+  {
+   "h": "a68d42d763a4bbec7ca78d9d96402378b3880e076282cd73099d950b1f31812a",
+   "en": "DynaSense Extruder",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[24].line[0]",
+    "near": "Intelligent sensing for precise extrusion control"
+   },
+   "dict": null
+  },
+  {
+   "h": "df7f82273447e5e64d00a7c8959daa2a1c69c3be4c7b8382ec4acd5f59b91a93",
+   "en": "Intelligent sensing for precise extrusion control",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[24].line[1]",
+    "near": "DynaSense Extruder"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d88b3fb957ae2b11f309f3e02bf56e11c2e0a38722c8eafef60c9ab6678f299",
+   "en": "Bambu Lab's proprietary PMSM servo architecture establishes an intelligent extrusion governance system. It executes 20kHz Torque/Resistance and position sampling to dynamically modulate electromagnetic torque vectors. Stabilizing extrusion and detecting filament grinding and clogging.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[24].line[2]",
+    "near": "Intelligent sensing for precise extrusion control"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a36e26e2fdaabf706e2d24ec0ac74f323a53e6120b162ce7dc13d92c0476a75",
+   "en": "A Smarter, Safer Experience",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[25].line[0]",
+    "near": "Nozzle Camera"
+   },
+   "dict": null
+  },
+  {
+   "h": "00873758bc151220e327d08c5e0aedc62c711e055462db34938f6ec57cb79b66",
+   "en": "Monitor extrusion at the nozzle tip",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[25].line[2]",
+    "near": "Nozzle Camera"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c6ca7112225f37051eeca6b7d00af482297a018d9690a227a157ead2612a332",
+   "en": "The H2D features an AI-backed nozzle camera with macro lens. This intelligent monitoring system continuously tracks extrusion patterns, immediately detecting material accumulation, filament deviations, and extrusion failures.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[25].line[3]",
+    "near": "Monitor extrusion at the nozzle tip"
+   },
+   "dict": null
+  },
+  {
+   "h": "528fd347a9d6cf750ec673cc7b6a4151577fed9dcbd4d602cbd5b8a8e8a2081d",
+   "en": "Pre-Flight Checklist by AI",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[25].line[4]",
+    "near": "The H2D features an AI-backed nozzle camera with macro lens. This intelligent monitoring system continuously tracks extrusion patterns, immediately detecting ma"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4ab9d1b611eda29357230d1d894c662e0e1f86caf87f4dcee98d6d928e7895c",
+   "en": "Peace of mind, every time you print",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[25].line[5]",
+    "near": "Pre-Flight Checklist by AI"
+   },
+   "dict": null
+  },
+  {
+   "h": "76ab30444a322e4366d278472b0733336405d6b48abce80cd02f7240483a32b0",
+   "en": "Prior to each operational cycle, H2D's vision system initiates a comprehensive pre-flight checklist: Chamber Integrity Scan – Detects debris across the entire print surface. Hardware Configuration Audit – Instantly identifies nozzle dimensions and build plate properties. Digital-Physical Alignment – Automatically verifies consistency between detected hardware specifications and active slicer parameters.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[25].line[6]",
+    "near": "Peace of mind, every time you print"
+   },
+   "dict": null
+  },
+  {
+   "h": "a03cea1ad3c24e77b24b1624df42d5d9c4793b09008142074148daf403f0eb46",
+   "en": "SOTA Filament Monitoring",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[25].line[7]",
+    "near": "Prior to each operational cycle, H2D's vision system initiates a comprehensive pre-flight checklist: Chamber Integrity Scan – Detects debris across the entire p"
+   },
+   "dict": null
+  },
+  {
+   "h": "86651d3a36ad9f28f3296c00f72e55b5c5157d105763169c7a98bf0487e0a89e",
+   "en": "15 sensors on one filament path",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[26].line[0]",
+    "near": "Unlike legacy systems with single filament run-out detectors, the H2D features comprehensive material flow monitoring. Throughout the AMS-to-nozzle path, 15 str"
+   },
+   "dict": null
+  },
+  {
+   "h": "9618b10aa0160df1d2d366fb8d0ddad7797a6d8e1c803e8f5e39d39a4127621d",
+   "en": "Unlike legacy systems with single filament run-out detectors, the H2D features comprehensive material flow monitoring. Throughout the AMS-to-nozzle path, 15 strategic sensors form an intelligent network, continuously tracking five key parameters: feeding velocity, tension, filament tip location, extruder thermal environment, and dynamic extrusion pressure. This establishes an industry-leading filament behavior control system.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[26].line[1]",
+    "near": "15 sensors on one filament path"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d8cd546b58d91c300d3149ef40b8d98d3061dc38f15ea937d2ed785a3f25771",
+   "en": "Learn More",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[26].line[2]",
+    "near": "Unlike legacy systems with single filament run-out detectors, the H2D features comprehensive material flow monitoring. Throughout the AMS-to-nozzle path, 15 str"
+   },
+   "dict": null
+  },
+  {
+   "h": "043d7f664efde4b373ce7f0766b21fb04e4b0b5a41b79b80393f107931eca7ad",
+   "en": "1.Can H2D be upgraded to H2D Laser Edition?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[1]",
+    "near": "FAQ"
+   },
+   "dict": null
+  },
+  {
+   "h": "f5d39a95c862dd141da435630d9c0125eeea4f33c35e69b986aebea6dcec857c",
+   "en": "The H2D laser full combo has a built-in air pump and air pipe on the back of the printer, and is pre-installed with a BirdsEye camera. The front door, left and right side Laser Protective Windows, and top cover are all designed with laser protection. The packaging list includes a laser module, a cutting module, a smoke exhaust pipe and its adapter, as well as an emergency stop button.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[2]",
+    "near": "1.Can H2D be upgraded to H2D Laser Edition?"
+   },
+   "dict": null
+  },
+  {
+   "h": "eee7ac62d5f4dcaa644b1af84c2d8b7320e4d6aba5132512641dc59eeedd5293",
+   "en": "We plan to launch a laser upgrade kit for the non-laser version of H2D.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[3]",
+    "near": "The H2D laser full combo has a built-in air pump and air pipe on the back of the printer, and is pre-installed with a BirdsEye camera. The front door, left and "
+   },
+   "dict": null
+  },
+  {
+   "h": "be6f62a01afa0ff942bf5437f6c928bb177b7ae4e2ee04dab4fcc2a98afd20ed",
+   "en": "It is important to note that the air pump in the upgrade kit is an external air pump, which has a different installation structure from the built-in air pump in the full set. When using it, it can only be installed externally and connected to the machine through an air tube.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[4]",
+    "near": "We plan to launch a laser upgrade kit for the non-laser version of H2D."
+   },
+   "dict": null
+  },
+  {
+   "h": "0db795b46b6df8f064ed12c49bb3621260ebf6f1a237e2f22a3eee692d2ebc53",
+   "en": "Upgrading the non-laser H2D to H2D Laser Edition through the laser upgrade kit retains identical product functions and performances as the H2D Laser Edition.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[5]",
+    "near": "It is important to note that the air pump in the upgrade kit is an external air pump, which has a different installation structure from the built-in air pump in"
+   },
+   "dict": null
+  },
+  {
+   "h": "18e0a728f40fae722eb16c2d3297433a90af7db9a6cd910b4a0a27e2ed84544b",
+   "en": "2.Are the left and right hotends exactly the same?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "35dc92848961f0c4505a79ba96e41c2747377940e8291a48d06c923f59a35c88",
+   "en": "Yes, the left and right hotends have identical structures and materials, and can be used interchangeably.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[8]",
+    "near": "2.Are the left and right hotends exactly the same?"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b7482a656c35f49e23ca8afa7015dad342977683ce0bab35cb4e3e29ec5515a",
+   "en": "3.What is the maximum number of AMS 2 Pro and AMS HT units that the H2D supports? How many colors can it print at most?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "11b5b8a312411a4c05f632969eac6a0b8fea5f32f561a948eda77f864ab1fb2d",
+   "en": "The H2D supports a maximum of 4 AMS 2 Pro and 8 AMS HT connected simultaneously, a total of 12 units with 24 slots.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[11]",
+    "near": "3.What is the maximum number of AMS 2 Pro and AMS HT units that the H2D supports? How many colors can it print at most?"
+   },
+   "dict": null
+  },
+  {
+   "h": "093710a3c10cf4d23337eee51b5d4d26cc662e1f13bfa9089d45cb20432d8f64",
+   "en": "Because H2D is a dual-hotend printer, and in the most extreme scenario, all AMS can be connected to one hotend while the other hotend uses an external spool holder, it can support up to 25 colors.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[12]",
+    "near": "The H2D supports a maximum of 4 AMS 2 Pro and 8 AMS HT connected simultaneously, a total of 12 units with 24 slots."
+   },
+   "dict": null
+  },
+  {
+   "h": "14112e7c896d05621dbd8a26e93ba89fac1b01c80fdbb6cce006426c716c655b",
+   "en": "4.Is H2D compatible with first generation AMS?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[14]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fce7a36ce9c83feb1e48755175766deedd2a7d210a971a675bf50396d42d7cef",
+   "en": "The first-generation AMS has been confirmed to have full plug-and-play compatibility and can be used with the H2D for multi-color printing, but it does not support the AMS drying function.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[15]",
+    "near": "4.Is H2D compatible with first generation AMS?"
+   },
+   "dict": null
+  },
+  {
+   "h": "6802edc79e9ae7ff8461f73f958537e8764ee0fd33117c1954d4e32117ff3b10",
+   "en": "Due to the fundamental differences in the feeding mechanism and buffering structure, the H2D does not support the AMS lite.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[16]",
+    "near": "The first-generation AMS has been confirmed to have full plug-and-play compatibility and can be used with the H2D for multi-color printing, but it does not supp"
+   },
+   "dict": null
+  },
+  {
+   "h": "9283bf45f1a2b3e9989397fbfd0e17f54ffb52691b9357120ab887d3a30767a5",
+   "en": "5.AMS 2 Pro is directly connected to the printer through the 6-pin ports, so what are the two 4-pin ports on the back of the printer used for?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[18]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dd1304ad8d96215367f413f915fd4721661880033b9e38621917d13e31f70f81",
+   "en": "The two 4-pin ports on the back are reserved for future expansion accessories. For example, to upgrade a non-laser version of the printer to a laser version, one of these ports can be used to connect an external air pump.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[19]",
+    "near": "5.AMS 2 Pro is directly connected to the printer through the 6-pin ports, so what are the two 4-pin ports on the back of the printer used for?"
+   },
+   "dict": null
+  },
+  {
+   "h": "2fc3d8b2bbb9b79f9eaa526c4efb460ed87a89370b6ded7ece2c46311a8e3971",
+   "en": "6.Can I use the A1 series Hotend on the H2D? Conversely, can H2D hotends be used on A1 series printers?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[21]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "16c19c35acdb5e4624d2b4078ea4b8a083057de64c659e6cb09978b1aa72d912",
+   "en": "Although the hotend of the H2D series is similar to the A1 hotend in structure , it is not exactly the same.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[22]",
+    "near": "6.Can I use the A1 series Hotend on the H2D? Conversely, can H2D hotends be used on A1 series printers?"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a372b456dfa851212c2f3c1752ad0d6263da6be8e062f3340821d2fe5ef8f42",
+   "en": "The H2D hotends are specifically designed for the H2D printer, offering optimized compatibility. For example, they support a larger maximum volumetric flow rate, lower clogging risk, more precise nozzle offset calibration between the left and right hotends, and automatic hotend type recognition via the live camera.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[23]",
+    "near": "Although the hotend of the H2D series is similar to the A1 hotend in structure , it is not exactly the same."
+   },
+   "dict": null
+  },
+  {
+   "h": "3f4919be631b71bbb2b1e43888a3361c60a3e00539b6f0cd1181f648de3560d4",
+   "en": "Therefore , to ensure you get the best print quality, we strongly recommend that you do not use the A1 hotend for H2D printers.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[24]",
+    "near": "The H2D hotends are specifically designed for the H2D printer, offering optimized compatibility. For example, they support a larger maximum volumetric flow rate"
+   },
+   "dict": null
+  },
+  {
+   "h": "37db10eb758e41159e5c1dd921fe323baf5be6f275f10272bea23e1132748952",
+   "en": "Purchasing additional H2D hotends for use on A1 printers is feasible. However, you will also need to use the H2D hotend silicone sock.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[25]",
+    "near": "Therefore , to ensure you get the best print quality, we strongly recommend that you do not use the A1 hotend for H2D printers."
+   },
+   "dict": null
+  },
+  {
+   "h": "ee7443e7ad6b55702f5a0c85253e12fef0c7e63b1ac3ea5d8aa992f86e9a4d00",
+   "en": "7.What are the differences between the 10W and 40W laser modules? How should I choose?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[27]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9428a105994d7be236f235c37ec1398844e9b3e8674c1addef6fc0c88a911185",
+   "en": "Both the 10W and 40W laser modules are blue light lasers that support processing a variety of materials, including wood, rubber, metal sheets, leather, dark acrylic, and stone. However, due to differences in power and size, there are the following distinctions:",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[28]",
+    "near": "7.What are the differences between the 10W and 40W laser modules? How should I choose?"
+   },
+   "dict": null
+  },
+  {
+   "h": "857b8bd1d0970a3e53babaf67a400d877a8df5449e2f6d2e1224aa017d62eeb3",
+   "en": "1.Maximum cutting thickness(For Basswood Plywood):",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[29]",
+    "near": "Both the 10W and 40W laser modules are blue light lasers that support processing a variety of materials, including wood, rubber, metal sheets, leather, dark acr"
+   },
+   "dict": null
+  },
+  {
+   "h": "10e1d1720a4b322a077ccf25bee6459b0f9357031dbf8fe7e6459d5fb1a6a8aa",
+   "en": "2.Maximum engraving speed(For Basswood Plywood):",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[32]",
+    "near": "40W laser module: 15mm;"
+   },
+   "dict": null
+  },
+  {
+   "h": "93056791733f1109196890ec75b7d1fc88f3b9ca1332ebeaa15eab3989015d20",
+   "en": "3.Processable Area:",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[35]",
+    "near": "40W laser module: 1000mm/s ；"
+   },
+   "dict": null
+  },
+  {
+   "h": "e91906ca514a46aae332fa258e78f54ad6769dcc2b93f31ed6754019feaa8548",
+   "en": "10W laser module: Maximum processing area X310mm * Y270mm, maximum processing height 280mm；",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[36]",
+    "near": "3.Processable Area:"
+   },
+   "dict": null
+  },
+  {
+   "h": "03d42fa43c0b5ea766046981eb997ae4fc0d1cf7444a741cceba2ce9f842d77f",
+   "en": "40W laser module: Maximum processing area X310mm * Y250mm, maximum processing height 265mm；",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[37]",
+    "near": "10W laser module: Maximum processing area X310mm * Y270mm, maximum processing height 280mm；"
+   },
+   "dict": null
+  },
+  {
+   "h": "866b94d5f68d24944f9f4660eb046f34d3e5b54becd0256c002f1a66120bfbb9",
+   "en": "8.Is a USB included as standard? What functions are affected without a USB?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[39]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fed2fb4830f7432461f8db10098f0ac6e830a762e7cd29f6b6ab478f33d71577",
+   "en": "The package does not include a standard USB flash drive. You can still initiate printing normally without a USB, as the printer has built-in storage space to run print files.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[40]",
+    "near": "8.Is a USB included as standard? What functions are affected without a USB?"
+   },
+   "dict": null
+  },
+  {
+   "h": "201a048f91afcd5dd667168024de982d0b6c1c26e920e4f95381caf4c39c3bf1",
+   "en": "However, without a USB inserted, the following functions will be affected:",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[41]",
+    "near": "The package does not include a standard USB flash drive. You can still initiate printing normally without a USB, as the printer has built-in storage space to ru"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea750d4d93b1f8e9a5ab68cfff3b8aca6d95abcc6db817eec4e8558531ae2ad8",
+   "en": "1. The recording and time-lapse photography functions can't be turned on;",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[42]",
+    "near": "However, without a USB inserted, the following functions will be affected:"
+   },
+   "dict": null
+  },
+  {
+   "h": "07ced1cadff1773b56c9c949d81489ccddb226eca5674653fdbbf5f43dc4a037",
+   "en": "2. Printing cannot be initiated through the LAN;",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[43]",
+    "near": "1. The recording and time-lapse photography functions can't be turned on;"
+   },
+   "dict": null
+  },
+  {
+   "h": "bf4fafcb1ef5eec89a5c160715e6207ffa6f67c8b537500d0de2d370abd05bf0",
+   "en": "3. Print files cannot be sent to the machine for storage through the studio;",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[44]",
+    "near": "2. Printing cannot be initiated through the LAN;"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c6bafee7372626425c638056b0ae9d2200a04184383941335832c7ebb68810f",
+   "en": "4. Log files cannot be exported;",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[45]",
+    "near": "3. Print files cannot be sent to the machine for storage through the studio;"
+   },
+   "dict": null
+  },
+  {
+   "h": "1ca02080a2fe4d98ce3f9b1fe0c8575fe93bb8237d87731e8c2a30f1308f64c7",
+   "en": "USB requirements: USB2.0 protocol or above (actual minimum write speed needs to be greater than 10M/s), supported file formats are FAT32 and exFAT. And the printer only supports mounting one USB, and cannot connect multiple USB via a USB hub.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[46]",
+    "near": "4. Log files cannot be exported;"
+   },
+   "dict": null
+  },
+  {
+   "h": "cca6f9d909ab2dc5e00ebacc310a05e3a79613fbe2981c681e8096e630167ea4",
+   "en": "9.Why can’t I freely select hotend for printing with the printer’s built-in files?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[48]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "22624d853f8fb77906229256d7b111eaddc6844e893114bfe44a34989b626611",
+   "en": "The hotend to be used for printing has already been determined when the model file is sliced. As for the built-in models, the right hotend has been selected during the slicing process, so it is impossible to change the hotend used for printing on the printer screen.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[49]",
+    "near": "9.Why can’t I freely select hotend for printing with the printer’s built-in files?"
+   },
+   "dict": null
+  },
+  {
+   "h": "ecd865f174681118246d16751416ac5c3a48ad775e9a130940eb96354c3690d7",
+   "en": "When you slice the file in Bambu Studio and send the print task , you can freely choose to use the left hotend or the right hotend. For some filaments, such as TPU and PPS/PPA-CF, it is recommended to use specific hotends for printing.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[50]",
+    "near": "The hotend to be used for printing has already been determined when the model file is sliced. As for the built-in models, the right hotend has been selected dur"
+   },
+   "dict": null
+  },
+  {
+   "h": "09b0098e0fb4d0310e391bb82abadd4c7a9103163725e2d5e988157e18521040",
+   "en": "For more details on H2D filament printing, please check the wiki.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[51]",
+    "near": "When you slice the file in Bambu Studio and send the print task , you can freely choose to use the left hotend or the right hotend. For some filaments, such as "
+   },
+   "dict": null
+  },
+  {
+   "h": "d664aef1bc436ea0914824ac795ccea21f2338804902f516a845cfbd13a16e3a",
+   "en": "10. Will the smoke and dust generated by laser operations affect my printer's precision and lifespan?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[53]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "72ade62c07e6ca3f1ae38e32ca658173f9371b26012ea071b0904d49d175720e",
+   "en": "H2D is equipped with an efficient exhaust system that effectively removes smoke and dust generated by laser operations, significantly reducing contamination. During R&D, we conducted rigorous testing to ensure that with regular machine cleaning, the impact of smoke and dust on performance and precision is negligible. For detailed cleaning instructions, please refer to: wiki",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[54]",
+    "near": "10. Will the smoke and dust generated by laser operations affect my printer's precision and lifespan?"
+   },
+   "dict": null
+  },
+  {
+   "h": "943cbaac55588045aa548c1521605991f0daa5fbd9e5b667c4dbb8aafe949cf4",
+   "en": "11. How can I improve the success rate and quality of TPU printing?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[56]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e1185987eccc8a350462637b20c6660eacf6f589aeef1c53c540562d2fa336b1",
+   "en": "Due to the flexible nature of TPU filaments, there are some operational issues that can arise during feeding and printing. To facilitate TPU printing, we have created a dedicated Wiki guide. Simply follow the instructions in the Wiki to successfully print with TPU filaments: wiki",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[57]",
+    "near": "11. How can I improve the success rate and quality of TPU printing?"
+   },
+   "dict": null
+  },
+  {
+   "h": "ef02791b07db8583d080896085f2de172ed0659c5a9fa3b7de91b0df23df9271",
+   "en": "12. Are there any special safety precautions I need to take when using the laser function?",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[59]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "252314ba92535a139f4b0e9f08b59580f6414b65f6a8ade195ef9b86544ac90a",
+   "en": "Because laser processing involves using high-energy lasers on potentially flammable materials, we strongly advise users not to leave the machine unattended during laser operations. Please maintain constant vigilance over the machine's operational status and ensure that there are no flammable or explosive materials in the machine's surroundings. For more information please refer to: wiki",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[60]",
+    "near": "12. Are there any special safety precautions I need to take when using the laser function?"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c98ecd480f22d8529b3b414f162ed6071156daee4e751d1208460d0bf714133",
+   "en": "For more information about H2D, refer to the official wiki.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[27].line[61]",
+    "near": "Because laser processing involves using high-energy lasers on potentially flammable materials, we strongly advise users not to leave the machine unattended duri"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e956fc8300f96f1a06d2c6576500494461c75978455912c3c2f279ac93ab7ff",
+   "en": "Dual-nozzle Multi-material 3D Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[28].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "e75db7bd636e0b3aa403f598394b58a13ae39458204b82dcc83947b0dc91edc0",
+   "en": "350*320*325 mm³ Print Volume",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[28].line[2]",
+    "near": "• Dual-nozzle Multi-material 3D Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "af9d5246d3010a3538b7ca3847ea1a9f78bd4ee56f315c6c49b46a96c1a0bb7f",
+   "en": "5μm Resolution Optical Motion Calibration",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[28].line[3]",
+    "near": "• 350*320*325 mm³ Print Volume"
+   },
+   "dict": null
+  },
+  {
+   "h": "098567633cffdc4354bb8b4823ca5c82bac5b7675719a58ffb57e1a6f2b5979b",
+   "en": "Closed-loop Servo Extruder",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[28].line[4]",
+    "near": "• 5μm Resolution Optical Motion Calibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac4d87edf35b7c7d1bbaf14f1bfc87d41472544dc50fec097c208723693a2e95",
+   "en": "350°C Nozzle & 65°C Active Chamber Heating",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[28].line[5]",
+    "near": "• Closed-loop Servo Extruder"
+   },
+   "dict": null
+  },
+  {
+   "h": "8df30d558e41ce4c6036bffd34c0fdce16f1641786ad3378aa078ff751e7eef6",
+   "en": "* To connect more than 2 AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[28].line[6]",
+    "near": "• 350°C Nozzle & 65°C Active Chamber Heating"
+   },
+   "dict": null
+  },
+  {
+   "h": "f339ca996a30fd0b8a2103b7345f945010668420dbb9348e267317338f63578d",
+   "en": "* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020. Learn more.",
+   "kind": "block_line",
+   "freq": 14,
+   "context": {
+    "handle": "h2d",
+    "title": "Bambu Lab H2D",
+    "field": "blocks[28].line[7]",
+    "near": "• * To connect more than 2 AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed."
+   },
+   "dict": null
+  },
+  {
+   "h": "4e7cca57f216ee7d35ced57076975442d4f0f32f89e245edfaf10a28d8a7fb6f",
+   "en": "Professionally function-tested, with defective components replaced as needed.",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "refurbished-bambu-lab-h2d-3d-printer",
+    "title": "[Refurbished] Bambu Lab H2D 3D Printer",
+    "field": "blocks[28].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b6e88364ec66744db4dd66467fd648bc0b15e13129f5be142fec160c0c79114",
+   "en": "Thoroughly cleaned and inspected (Cosmetic imperfections may remain and do not affect functionality).",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "refurbished-bambu-lab-h2d-3d-printer",
+    "title": "[Refurbished] Bambu Lab H2D 3D Printer",
+    "field": "blocks[28].line[2]",
+    "near": "• Professionally function-tested, with defective components replaced as needed."
+   },
+   "dict": null
+  },
+  {
+   "h": "1331cac82515f4faaca68d6240422ae99b4ef3fbc2f3e82bc04004440d446766",
+   "en": "Repackaged with all the original accessories — manual, cables, and box.",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "refurbished-bambu-lab-h2d-3d-printer",
+    "title": "[Refurbished] Bambu Lab H2D 3D Printer",
+    "field": "blocks[28].line[3]",
+    "near": "• Thoroughly cleaned and inspected (Cosmetic imperfections may remain and do not affect functionality)."
+   },
+   "dict": null
+  },
+  {
+   "h": "4cc6cfc24febbd666cae36a29792bdf70301765287031a9b0d910077531dce78",
+   "en": "Released for sale only after a final quality inspection. Click here for details.",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "refurbished-bambu-lab-h2d-3d-printer",
+    "title": "[Refurbished] Bambu Lab H2D 3D Printer",
+    "field": "blocks[28].line[4]",
+    "near": "• Repackaged with all the original accessories — manual, cables, and box."
+   },
+   "dict": null
+  },
+  {
+   "h": "5fcee675171bf56eae668332a21140bc6075cfd1401b8e9d74b9b6e1120d0321",
+   "en": "Every Bambu Lab Official Refurbished Product:",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "refurbished-bambu-lab-h2d-3d-printer",
+    "title": "[Refurbished] Bambu Lab H2D 3D Printer",
+    "field": "blocks[28].line[5]",
+    "near": "• Released for sale only after a final quality inspection. Click here for details."
+   },
+   "dict": null
+  },
+  {
+   "h": "0bba300219e4f9007c6836d9f32cb4373dd1485ebe5558af950f87332914699c",
+   "en": "24-Colors/Multi-material24-ColorsMulti-material",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[0].line[0]",
+    "near": "Serially connect up to 4 AMS 2 Pro & 8 AMS HT units, total of 24 filaments"
+   },
+   "dict": null
+  },
+  {
+   "h": "31341a0d52f52bfca734976e4a44bea2c871cd483e4d292ba11fccf089313d75",
+   "en": "Serially connect up to 4 AMS 2 Pro & 8 AMS HT units, total of 24 filaments",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[0].line[1]",
+    "near": "24-Colors/Multi-material24-ColorsMulti-material"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f2575bbba651124b616a8ba47a8afcd1e825da796ece4d8d41e5cb89b8600cc",
+   "en": "Electro-Magnetic Air Vent",
+   "kind": "block_title",
+   "freq": 5,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[1].line[0]",
+    "near": "Fast filament drying & air-tight filament storage"
+   },
+   "dict": null
+  },
+  {
+   "h": "7058ad78901de742e88ac1c4f609b274918ff3ace0f828cc13b76c5f977260d6",
+   "en": "Fast filament drying & air-tight filament storage",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[1].line[1]",
+    "near": "Electro-Magnetic Air Vent"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6b5036f27d2e56fc219668729f2936f0c47fe999626cfc54e91ea21e4217328",
+   "en": "65°C Drying",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[2].line[0]",
+    "near": "Up to 65°C drying temperature"
+   },
+   "dict": null
+  },
+  {
+   "h": "d6d0dea56960bf2fbc0ba0265fbc87bd5f05fd07b727d0ccc4ecd4572816ce34",
+   "en": "Up to 65°C drying temperature",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[2].line[1]",
+    "near": "65°C Drying"
+   },
+   "dict": null
+  },
+  {
+   "h": "c891f7b14851deb7d020504679156f9eeeb854de3b57a565a1f4174415062668",
+   "en": "Brushless Motor",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[3].line[0]",
+    "near": "60% faster feeding speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "345066469c36c1a1360085c48acc11a1f8216eae9410d328d503e028d90feb4a",
+   "en": "60% faster feeding speed",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[3].line[1]",
+    "near": "Brushless Motor"
+   },
+   "dict": null
+  },
+  {
+   "h": "59cef9b0163aadf2de0950ce76c806045b538017544ff79e5c4e770e3c9b2c2c",
+   "en": "Dry Filament Quickly and Intelligently",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[4].line[0]",
+    "near": "Electro-Magnetic Air Vent"
+   },
+   "dict": null
+  },
+  {
+   "h": "147e5636e646d3d32d2609305e2f3e541814f9d785032de1b2c2f67ef581091e",
+   "en": "Automated venting facilitates dehumidification during drying and ensures airtight sealing for weeks of high-quality printing.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[5].line[0]",
+    "near": "Auto-rotate Drying"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c942ce49d0c612583d782b41dfc748c51914cf0c3f43e5a3338278b029d5d55",
+   "en": "Auto-rotate Drying",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[5].line[1]",
+    "near": "Automated venting facilitates dehumidification during drying and ensures airtight sealing for weeks of high-quality printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "25f5fd87af9a4fb42bac5ce9f1a6decf052cd79e737c3aa41dbe709c39211ec2",
+   "en": "During the drying process, the filament spools rotate automatically to ensure more even drying.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[6].line[0]",
+    "near": "RFID Sync"
+   },
+   "dict": null
+  },
+  {
+   "h": "028bbec6f80ee6ac4be49cafca9b1dbaff1ff0d2ab86bd4cc76ed98974ef9b68",
+   "en": "RFID Sync",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[6].line[1]",
+    "near": "During the drying process, the filament spools rotate automatically to ensure more even drying."
+   },
+   "dict": null
+  },
+  {
+   "h": "ba459f0b2fb0970e44f5b005d67286c015625a1174c626cffa494907fb94aad6",
+   "en": "AMS 2 Pro uses RFID to auto-match drying settings for Bambu official filaments, no manual input needed.",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[7].line[0]",
+    "near": "Dry"
+   },
+   "dict": null
+  },
+  {
+   "h": "702ec3f256e47f56915eb1b7124bf51fef15846f57f0683144168467d9e76523",
+   "en": "Dry",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[7].line[1]",
+    "near": "AMS 2 Pro uses RFID to auto-match drying settings for Bambu official filaments, no manual input needed."
+   },
+   "dict": null
+  },
+  {
+   "h": "04624e44577eb80b8029250561386f7d99b5b089a70572ef4228695ea524de8f",
+   "en": "Moist",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[7].line[2]",
+    "near": "Dry"
+   },
+   "dict": null
+  },
+  {
+   "h": "f7e2c291c8a36e1dcbdadb3597532e3fd39814a4b02d77f6cf13cd665184cb47",
+   "en": "Bambu PETG Basic",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[7].line[3]",
+    "near": "Moist"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0b57425c8054cccce19e9fe79d6ce5e60e1d8f0f428b384a1e5aafc4febfe01",
+   "en": "Speed Up! Faster Multi-material Printing!",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[8].line[0]",
+    "near": "The powerful Bambu permanent magnet synchronous servo motor accelerates filament feeding by 60% for enhanced efficiency."
+   },
+   "dict": null
+  },
+  {
+   "h": "e8364427e7f5452ddd712a71d33d0f3391e0d293b7554b6f744edcf0c9f2d712",
+   "en": "The powerful Bambu permanent magnet synchronous servo motor accelerates filament feeding by 60% for enhanced efficiency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[8].line[1]",
+    "near": "Speed Up! Faster Multi-material Printing!"
+   },
+   "dict": null
+  },
+  {
+   "h": "b70c76f225270a2a3721b7c6d8042866612e3dfd78bbbd7d69fd4d9685e23f72",
+   "en": "Saves an average of 10 minutes per 100 filament changes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[9].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "57df96f3a8d0009ff42d80cd670b1f2eb7c222ba3fc865ff439e27983663d31b",
+   "en": "Faster multi-color printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[10].line[0]",
+    "near": "Xiaomi Su7 Ultra Prototype by @大匠"
+   },
+   "dict": null
+  },
+  {
+   "h": "e493138648401c5fe4da8e2318d1710a00ad562beac6da72f23336a8d16f7ccf",
+   "en": "Xiaomi Su7 Ultra Prototype by @大匠",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[10].line[1]",
+    "near": "Faster multi-color printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "70b800bcf8f1b417168bf9b0e32cbd4cdf9e9c2f7319661c2d728f68fe005b5e",
+   "en": "Evolved, Polished Design Details",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[11].line[0]",
+    "near": "Tool-Free Filament Tubes Access"
+   },
+   "dict": null
+  },
+  {
+   "h": "d530a0ef5e94a88a640f5367ed2637caded8a400bbe4ca72a7f171a5e8a6dede",
+   "en": "Tool-Free Filament Tubes Access",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[11].line[1]",
+    "near": "Evolved, Polished Design Details"
+   },
+   "dict": null
+  },
+  {
+   "h": "0309afb51f67c39518bddcf2a84064ceca14db32abdd27e8f5eb89ccfa2135d4",
+   "en": "Removing snapped filament from the first-gen AMS requires extracting all spools and disassembling the shell with two screws, taking 3-5 minutes. In contrast, the AMS 2 Pro offers direct, tool-free access to filament tubes from the top.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[12].line[0]",
+    "near": "Ceramic Inlet"
+   },
+   "dict": null
+  },
+  {
+   "h": "1fefb530e09e55fb3e578e40e964f6852381ac7b95a0675565da894c4fed3438",
+   "en": "Ceramic Inlet",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[12].line[1]",
+    "near": "Removing snapped filament from the first-gen AMS requires extracting all spools and disassembling the shell with two screws, taking 3-5 minutes. In contrast, th"
+   },
+   "dict": null
+  },
+  {
+   "h": "7afc45a13ae082304559d24ce68c8a0273031481a5f629e5e29f5f148de245bc",
+   "en": "Active Air Vent 65°C Filament Drying",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[13].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "f409a973f484334ce0c2db0df1a58d4fd05c7648b13144d6c85dd526eae517ab",
+   "en": "Air-tight Filament Storage",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[13].line[2]",
+    "near": "• Active Air Vent 65°C Filament Drying"
+   },
+   "dict": null
+  },
+  {
+   "h": "665e93bdfe55e6de7fcfb29d5f56df856978f107a708845349f63a5fc1a7b88e",
+   "en": "Up to 24-color/Multi-material Printing",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[13].line[3]",
+    "near": "• Air-tight Filament Storage"
+   },
+   "dict": null
+  },
+  {
+   "h": "88b5dbd0bcadca7157e83485717f1393771871678cd2ba5ee8f0bd102ef73b90",
+   "en": "Brushless Servo Feeding Motor",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[13].line[4]",
+    "near": "• Up to 24-color/Multi-material Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "df60d34c6829ca09bf84726d1c8337da9c17f9dd26464fc80aeddffd7d5b5c0c",
+   "en": "RFID filament sync",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[13].line[5]",
+    "near": "• Brushless Servo Feeding Motor"
+   },
+   "dict": null
+  },
+  {
+   "h": "0252579287b44383ba79a2e11d2253e0cbefc33527d86d6396c217ee0212f8b0",
+   "en": "Important notice",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[13].line[6]",
+    "near": "• RFID filament sync"
+   },
+   "dict": null
+  },
+  {
+   "h": "778e9142846e46f2fcf23030c821b74b9f8bd49f942c4cf5f925e0fd250c9309",
+   "en": "See the Multiple AMS Units Connection Guide for detailed setup instructions.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[13].line[7]",
+    "near": "• Important notice"
+   },
+   "dict": null
+  },
+  {
+   "h": "256e7236152d064a4a836ca76b7550ce58251831cf5acf9002d83577e3b77ac4",
+   "en": "Please note the product is the same among all variants, and the only difference is recommended accessories.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "field": "blocks[13].line[8]",
+    "near": "• See the Multiple AMS Units Connection Guide for detailed setup instructions."
+   },
+   "dict": null
+  },
+  {
+   "h": "11fb4ed5b8a3e09ab1028356bdd6e23e22699d6580f618076a8cf614d0bba269",
+   "en": "Stand Out, Never Dull",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Basic"
+   },
+   "dict": null
+  },
+  {
+   "h": "45240a5be05866c74ec8f1d01b7a0d8c8451d4e421c0624247770a326b432402",
+   "en": "Find the Perfect Color",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[1].line[0]",
+    "near": "With a palette of up to 30 colors, Bambu PLA Basic lets you find the perfect shade to bring flair to your projects. The colors remain consistent across prints, "
+   },
+   "dict": null
+  },
+  {
+   "h": "0d8576cc25c056a800e4a8e3851c78059137db416bce57b01868c888eaf0c9fc",
+   "en": "With a palette of up to 30 colors, Bambu PLA Basic lets you find the perfect shade to bring flair to your projects. The colors remain consistent across prints, ensuring a stunning and uniform finish every time.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[1].line[1]",
+    "near": "Find the Perfect Color"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c307bc74682c494b7be71fe14a13d16a34b378ccd8da9500962e1259a904220",
+   "en": "Your Worry-Free Start",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[2].line[0]",
+    "near": "Bambu PLA Basic, the easiest-to-use filament, delivers smooth printing right from the start. No complicated setups or calibrations needed. Ideal for both hobbyi"
+   },
+   "dict": null
+  },
+  {
+   "h": "cf0967dc03673060b3dabbf32cf51f00324184119f7bfcadfc071eba97da2b46",
+   "en": "Bambu PLA Basic, the easiest-to-use filament, delivers smooth printing right from the start. No complicated setups or calibrations needed. Ideal for both hobbyists and professionals seeking reliable, hassle-free results.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[2].line[1]",
+    "near": "Your Worry-Free Start"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d38c4f152dcf1ad3e763b3874b77be5d7c19b872fa177ac7bed1d58ea31c030",
+   "en": "Built Stronger, Faster and to Last Longer",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[3].line[0]",
+    "near": "With Bambu's exclusive fine-turned formulation based on 3D printing expertise and fine-turned settings, Bambu PLA Basic delivers stronger layer adhesion, enhanc"
+   },
+   "dict": null
+  },
+  {
+   "h": "5af87831098d0e85aa7ce569656d406682a6652fe7ad92b5c5a3cfc1872cc8f0",
+   "en": "With Bambu's exclusive fine-turned formulation based on 3D printing expertise and fine-turned settings, Bambu PLA Basic delivers stronger layer adhesion, enhanced impact resistance, and long-lasting durability compared to other standard PLA filaments on the market. Additionally, it reaches a print speed up to 258mm/s*, cutting your printing time without compromising quality.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[3].line[1]",
+    "near": "Built Stronger, Faster and to Last Longer"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd1af647993e9f7cc0ba13e3899d22fb9da747b1da57130d1aec8972951c8e53",
+   "en": "0.4mm nozzle, 0.4mm line width, 0.2mm layer height",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[3].line[2]",
+    "near": "With Bambu's exclusive fine-turned formulation based on 3D printing expertise and fine-turned settings, Bambu PLA Basic delivers stronger layer adhesion, enhanc"
+   },
+   "dict": null
+  },
+  {
+   "h": "140fc854cb1f68bf87837128f1e283b0743dad73031b330df6da1d22d58e9d79",
+   "en": "RFID for Intelligent Printing",
+   "kind": "block_title",
+   "freq": 39,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[4].line[0]",
+    "near": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+   },
+   "dict": null
+  },
+  {
+   "h": "1d6d9107aeaf79b3ff1575454eb02135b7d79953324dc0db42455c45051d40ee",
+   "en": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System).",
+   "kind": "block_line",
+   "freq": 38,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[4].line[1]",
+    "near": "RFID for Intelligent Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "413575b5c09c55f69e7f4a1c63473f2718bbc69c60eef6def5dc3e48bbf97572",
+   "en": "UL GREENGUARD certified. Cleaner air for indoor printing.",
+   "kind": "block_title",
+   "freq": 4,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[5].line[0]",
+    "near": "PLA Basic is certified to UL GREENGUARD (UL 2904), the recognized standard for 3D printer emissions. The particles and VOCs released measure below the levels of"
+   },
+   "dict": null
+  },
+  {
+   "h": "28535eaa9f52d1881902829272c397f4e40c3ebe6a324bb289da438e0d19c5e9",
+   "en": "PLA Basic is certified to UL GREENGUARD (UL 2904), the recognized standard for 3D printer emissions. The particles and VOCs released measure below the levels of an average kitchen, living room, or office—cleaner than the air you're already breathing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[5].line[1]",
+    "near": "UL GREENGUARD certified. Cleaner air for indoor printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "c32133d5b677ef86bb246bd42184039405d0f4ccf4a18c5935bac08cff9e7dd9",
+   "en": "1.Accessory Compatibility",
+   "kind": "faq_q",
+   "freq": 41,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[1]",
+    "near": "FAQ"
+   },
+   "dict": null
+  },
+  {
+   "h": "53d74b79c8d05e6f0f78046ab979eb2737312b0bb7b0138b080c6340af90fd8d",
+   "en": "Compatible with all printers, AMS, build plate, and nozzles.",
+   "kind": "faq_a",
+   "freq": 13,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "b77d5c0add4d541f245a5b7914c2db2215a58e8ad051c6a00f15d21c2439f362",
+   "en": "2.Drying Recommendations",
+   "kind": "faq_q",
+   "freq": 37,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[4]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9a10acae666926dac6dd66527edc2c676f9c985eaa5d87dae120fd6996a85581",
+   "en": "Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: Filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 21,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "a42fcd94e849bbe11cdc5855b4757c2177e57b0ad59a1996ea3dc453a3e836ee",
+   "en": "3.Refill Guidelines",
+   "kind": "faq_q",
+   "freq": 10,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "83e3d891e377f9e7326ea7c90e114e4a96f1213a4ea44f74619940b77fae8cb1",
+   "en": "The refill filament needs to be used with a spool. For detailed instructions on how to swap in the new filament using the Bambu Reusable Spool, please refer to the guide on WIKI.",
+   "kind": "faq_a",
+   "freq": 14,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[8]",
+    "near": "3.Refill Guidelines"
+   },
+   "dict": null
+  },
+  {
+   "h": "31bd3331527a270e705d46c1cc01c2046b45ddbe78a0767143997c3b9fa00801",
+   "en": "4.Safety Tips",
+   "kind": "faq_q",
+   "freq": 13,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6827e3327a051f32a5a00e338214c07cec7534fde970a2db693bf7b844522eec",
+   "en": "Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.",
+   "kind": "faq_a",
+   "freq": 36,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[11]",
+    "near": "4.Safety Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f8ff368cc4469c19f760b98c12c350fd32c3de3ce32042dd79dbcec59b16018",
+   "en": "Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.",
+   "kind": "faq_a",
+   "freq": 35,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[12]",
+    "near": "Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures."
+   },
+   "dict": null
+  },
+  {
+   "h": "d538631d4081e48335ed4e5ce7596dd6b64532a43a1ffb67dcbea1ae4fcbc828",
+   "en": "For opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings.",
+   "kind": "faq_a",
+   "freq": 29,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[13]",
+    "near": "Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking."
+   },
+   "dict": null
+  },
+  {
+   "h": "35f0bda8ab235cab023bdb28eb05af88dec40fa1c6004ba0cdd3645067d42c96",
+   "en": "Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.",
+   "kind": "faq_a",
+   "freq": 34,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[14]",
+    "near": "For opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings."
+   },
+   "dict": null
+  },
+  {
+   "h": "672dda8fe579f695f7a7a355c47472e6f48c27b65674a5b230eee26bfff4abdd",
+   "en": "As this filament is not food-grade, please avoid using finished prints for food storage or contact.",
+   "kind": "faq_a",
+   "freq": 33,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[6].line[15]",
+    "near": "Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system."
+   },
+   "dict": null
+  },
+  {
+   "h": "bbcf2f70d97f5d3e8b336ed1ff96e7012f278571c21ff02942f07d3681bb55a1",
+   "en": "Easy to Print & Beginner Friendly",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[7].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f102a4030b734202dc158b1119b0c68e3bf9020c137b765620b49f5f6218588",
+   "en": "Smooth Surface Finish",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[7].line[2]",
+    "near": "• Easy to Print & Beginner Friendly"
+   },
+   "dict": null
+  },
+  {
+   "h": "c59dbc2861acac4617922d03fd0ec01df940d323d29d4006f7ceb28d211232d8",
+   "en": "Biodegradable",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[7].line[3]",
+    "near": "• Smooth Surface Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "342545351da31fc329def3931f4b247e4f2f774342eed1d94987dbd55ce4c0aa",
+   "en": "Low indoor printing emissions, certified to UL GREENGUARD 2904",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[7].line[4]",
+    "near": "• Biodegradable"
+   },
+   "dict": null
+  },
+  {
+   "h": "3601d8f1ac9a2085338ef28f17fc533ef19be41b9b2e232f8c89420b8c7fb5e2",
+   "en": "Cautions for Use",
+   "kind": "block_line",
+   "freq": 54,
+   "context": {
+    "handle": "pla-basic-filament",
+    "title": "PLA Basic",
+    "field": "blocks[7].line[5]",
+    "near": "• Low indoor printing emissions, certified to UL GREENGUARD 2904"
+   },
+   "dict": null
+  },
+  {
+   "h": "262c758b5482781b1530065a5b3020f318ebdf2a5b5cd380b7564efe7d857060",
+   "en": "0.2mm Nozzle - Optimal Print Fineness",
+   "kind": "block_title",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[0].line[0]",
+    "near": "Smaller diameter extrudes thin filaments"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f7383ba29f5e4b48b4832657ea498cc6b0165842bc19d107c1754ac4d7f218b",
+   "en": "Smaller diameter extrudes thin filaments",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[0].line[1]",
+    "near": "0.2mm Nozzle - Optimal Print Fineness"
+   },
+   "dict": null
+  },
+  {
+   "h": "28289b4bcc56b00cd14a6f7437bc15ca9ad41565b00e4f4614f91d5a980b5a69",
+   "en": "High resolution on the horizontal print surface",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[0].line[2]",
+    "near": "Smaller diameter extrudes thin filaments"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b3c9e96fff6022a7379873040e36fb025d433ec95c6fb0e088a8d517f7236b4",
+   "en": "0.6mm and 0.8mm Nozzle - Faster Print Speed",
+   "kind": "block_title",
+   "freq": 7,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[1].line[0]",
+    "near": "Larger diameter extrudes more filaments per second, resulting in faster print speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "4bdf427a4bdf4ba8a0ad10d978a5c4dca1a62cc0f02e206a4195376c8fd8cf3f",
+   "en": "Larger diameter extrudes more filaments per second, resulting in faster print speed",
+   "kind": "block_line",
+   "freq": 7,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[1].line[1]",
+    "near": "0.6mm and 0.8mm Nozzle - Faster Print Speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "46e9290d9fb3805f44704fac12a815e0dcb975ffab2aa03bf9dc7fbe2c9ba46b",
+   "en": "Comparison of Different Nozzle Sizes",
+   "kind": "block_title",
+   "freq": 9,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[0]",
+    "near": "| 0.2 mm Nozzle | 0.4 mm Nozzle | 0.6 mm Nozzle | 0.8 mm Nozzle"
+   },
+   "dict": null
+  },
+  {
+   "h": "4743b4e4994dcc7ba4fc59d061805793c57117d5504d3d0cac5dc509693fa759",
+   "en": "0.4 mm Nozzle",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Comparison of Different Nozzle Sizes"
+   },
+   "dict": {
+    "ar": "فوهة 0.4 مم",
+    "ckb": "نۆزڵ 0.4 مم"
+   }
+  },
+  {
+   "h": "0897c2bdbee019033e7ba06bffc67c27291af457667a7ed3b0651479a1a8087a",
+   "en": "0.6 mm Nozzle",
+   "kind": "block_cell",
+   "freq": 10,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[1].cell[2]",
+    "near": "Comparison of Different Nozzle Sizes"
+   },
+   "dict": {
+    "ar": "فوهة 0.6 مم",
+    "ckb": "نۆزڵ 0.6 مم"
+   }
+  },
+  {
+   "h": "6a183c8ca7185a492beef72f4d385a4ec7c6085d0e71339a87e3e580e9e33c4f",
+   "en": "0.8 mm Nozzle",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[1].cell[3]",
+    "near": "Comparison of Different Nozzle Sizes"
+   },
+   "dict": {
+    "ar": "فوهة 0.8 مم",
+    "ckb": "نۆزڵ 0.8 مم"
+   }
+  },
+  {
+   "h": "961f24a07aeed416afb6e37336615d3867016e5ad55134d4861fb24f04b7411d",
+   "en": "Usage scenario",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[2].cell[0]",
+    "near": "| 0.2 mm Nozzle | 0.4 mm Nozzle | 0.6 mm Nozzle | 0.8 mm Nozzle"
+   },
+   "dict": null
+  },
+  {
+   "h": "785045dbad8282734264c06db35c3050671da41fbb3bf559329e73c2c9699149",
+   "en": "Perfect for small and intricate models, with precision that's worth the wait",
+   "kind": "block_cell",
+   "freq": 7,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[2].cell[1]",
+    "near": "| 0.2 mm Nozzle | 0.4 mm Nozzle | 0.6 mm Nozzle | 0.8 mm Nozzle"
+   },
+   "dict": null
+  },
+  {
+   "h": "e130eb669d6dff75626d1244c3047393b705ada5209674cadcbb9002f077d151",
+   "en": "Ideal for everyday use with the perfect balance of speed and quality",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[2].cell[2]",
+    "near": "| 0.2 mm Nozzle | 0.4 mm Nozzle | 0.6 mm Nozzle | 0.8 mm Nozzle"
+   },
+   "dict": null
+  },
+  {
+   "h": "7c23c221241ff6ae5e4dd8b18f436cb5a92c254be92bc32ff83fcd3fc2a9d3d6",
+   "en": "Faster speeds and capable of printing high-performance filaments, with some decrease in resolution",
+   "kind": "block_cell",
+   "freq": 16,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[2].cell[3]",
+    "near": "| 0.2 mm Nozzle | 0.4 mm Nozzle | 0.6 mm Nozzle | 0.8 mm Nozzle"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2ccec0126fbcc42e84f009a447145fe30110305fb19ad1568f3ce6a7f56a41d",
+   "en": "Commonly used for",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[3].cell[0]",
+    "near": "Usage scenario | Perfect for small and intricate models, with precision that's worth the wait | Ideal for everyday use with the perfect balance of speed and qua"
+   },
+   "dict": null
+  },
+  {
+   "h": "39568c1e90cc872c8d8a123b3ed7803b603ac642b97be7ffb5555778402909a9",
+   "en": "Miniature models Intricate logos Text Molds",
+   "kind": "block_cell",
+   "freq": 7,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[3].cell[1]",
+    "near": "Usage scenario | Perfect for small and intricate models, with precision that's worth the wait | Ideal for everyday use with the perfect balance of speed and qua"
+   },
+   "dict": null
+  },
+  {
+   "h": "97ffef888a92cd998a710c779c3dc76a859266e21a963126e5538fb8b3d3f9b4",
+   "en": "Toys Mechanical parts Decorative objects",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[3].cell[2]",
+    "near": "Usage scenario | Perfect for small and intricate models, with precision that's worth the wait | Ideal for everyday use with the perfect balance of speed and qua"
+   },
+   "dict": null
+  },
+  {
+   "h": "33cbb30352a083c09154a4e7a857b09c049f30b74152c52b52a2e476f942c872",
+   "en": "Large structural parts Functional parts for household Industrial or engineering parts High-strength models",
+   "kind": "block_cell",
+   "freq": 16,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[2].line[3].cell[3]",
+    "near": "Usage scenario | Perfect for small and intricate models, with precision that's worth the wait | Ideal for everyday use with the perfect balance of speed and qua"
+   },
+   "dict": null
+  },
+  {
+   "h": "b6cf8691eafb745a4396d32cbfe6e4eaa47352ab452a24f56bd5c57aae514829",
+   "en": "*The final display of 'Model Strength' & 'Model Fineness' depends on the results of the material testing.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-hotend-a1-a2",
+    "title": "Bambu Hotend - A1/A2",
+    "field": "blocks[3].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8ce6704fba8a33db068df84478d9b3d1af568294b164ebe04fa213f0a5df0f77",
+   "en": "Excellent First-layer Adhesion and Improved Durability",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[0].line[0]",
+    "near": "After optimizing the manufacturing process of the Bambu Texture PEI Plate, the durability of the plate is enhanced. Additionally, the adhesion between the print"
+   },
+   "dict": null
+  },
+  {
+   "h": "e61068df72578c047aeaeb56136424917f64f1b54d17cb5d7e7c1a95206117a9",
+   "en": "After optimizing the manufacturing process of the Bambu Texture PEI Plate, the durability of the plate is enhanced. Additionally, the adhesion between the prints and the plate is significantly improved, eliminating the need for adhesives.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[0].line[1]",
+    "near": "Excellent First-layer Adhesion and Improved Durability"
+   },
+   "dict": null
+  },
+  {
+   "h": "13ab3fece37c0cbfa94117579f5ab9ffa183485f347353a35b6eb832b37b6c51",
+   "en": "*In some situations, glue is required for very specific filaments",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[0].line[2]",
+    "near": "After optimizing the manufacturing process of the Bambu Texture PEI Plate, the durability of the plate is enhanced. Additionally, the adhesion between the print"
+   },
+   "dict": null
+  },
+  {
+   "h": "55d5a70742d1587674eb469f591a663b837f0ebfd34b7d6b76dfb53812a5d470",
+   "en": "Self-release when Cooled Down",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[1].line[0]",
+    "near": "PEI is an excellent material for 3D printing applications due to its ability to withstand the repeated heating and cooling cycles of a printer heatbed. Prints c"
+   },
+   "dict": null
+  },
+  {
+   "h": "e5cc8c9bb05e50d31419ab6b1ca63ba2c9ddf79d9ece6e1f703576fd9b6f72a9",
+   "en": "PEI is an excellent material for 3D printing applications due to its ability to withstand the repeated heating and cooling cycles of a printer heatbed. Prints come off easily when the temperature of the heatbed reaches room temperature, and we always recommend waiting until it reaches 35℃ or lower. If the print still adheres to the plate, simply bend the steel plate and the model will fall right into your hands.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[1].line[1]",
+    "near": "Self-release when Cooled Down"
+   },
+   "dict": null
+  },
+  {
+   "h": "aae6fbb2dce50fd32f176e5fc1a1a8260a2fbd5a1cb8aaf409ca9f5e744dc814",
+   "en": "Reliable Magnetic Adhesion to Prevent Warping",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[2].line[0]",
+    "near": "The Bambu Texture PEI Plate features a 0.5mm-thick stainless steel plate that enhances magnetic adhesion. This helps to prevent warping and ensure optimal print"
+   },
+   "dict": null
+  },
+  {
+   "h": "774684d1949404d51b37bb12cab849a29bf095fd98a7d5fd8a1b0851af570ac5",
+   "en": "The Bambu Texture PEI Plate features a 0.5mm-thick stainless steel plate that enhances magnetic adhesion. This helps to prevent warping and ensure optimal print quality during 3D printing, reducing the likelihood of the first layer detaching due to deformation. It also helps when printing larger models with materials that are prone to warping like ABS, PC and Nylon.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[2].line[1]",
+    "near": "Reliable Magnetic Adhesion to Prevent Warping"
+   },
+   "dict": null
+  },
+  {
+   "h": "e76f5d60989c6b647026884a12167cdde307bbb87752e3401703b0caf7357508",
+   "en": "Textured Surface Finish",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[3].line[0]",
+    "near": "Bambu Texture PEI Plate offers a one-of-a-kind first-layer surface. Through the application of a powder-coating process, this PEI Build Plate creates a rugged t"
+   },
+   "dict": null
+  },
+  {
+   "h": "37611d80cca4658a50234946800ae3920640210d122c03f655f27b5209513233",
+   "en": "Bambu Texture PEI Plate offers a one-of-a-kind first-layer surface. Through the application of a powder-coating process, this PEI Build Plate creates a rugged texture that adds a texture to your prints.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[3].line[1]",
+    "near": "Textured Surface Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a2e5f1acd69815bf0d741b83f789a7b612234d790e2d0532ea025143ae1a648",
+   "en": "Considerations",
+   "kind": "block_title",
+   "freq": 49,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[4].line[0]",
+    "near": "• Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve"
+   },
+   "dict": null
+  },
+  {
+   "h": "0fcd0b2cfa6bab6850e3f24cf7df371924d0ccd362652fc78c8c586bb99d2976",
+   "en": "Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve the most suitable level of adhesion.",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[4].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "62ba68b0a3b576097810863a93181f184d2526e70cf48870360dea442fc5a5b9",
+   "en": "Before auto-leveling, it is necessary to repeatedly rub the nozzle in the special wiping area of the build plate to completely remove any residual material at the tip of the nozzle. The coating in the special-designed wiping area will gradually become worn over time. This is normal and does not affect print quality or nozzle lifetime, so there is no need to worry about any quality issues.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[4].line[2]",
+    "near": "• Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve"
+   },
+   "dict": null
+  },
+  {
+   "h": "60269244912add5e29724585480cb3b4ff04091b99a35b4b3d13a22e768c5918",
+   "en": "Deposition of dust and grease on the build plate decrease adhesion. It is recommended to regularly clean the surface with detergent and water to maintain best adhesion.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[4].line[3]",
+    "near": "• Before auto-leveling, it is necessary to repeatedly rub the nozzle in the special wiping area of the build plate to completely remove any residual material at"
+   },
+   "dict": null
+  },
+  {
+   "h": "8394a47dffec87c2e2a30baa1bd0338aff9112d05fd4d1660d1aee03c86d02c9",
+   "en": "Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and can not be held responsible for any damage caused to plates as a result of using third-party glue on build plates. Do not clean the Textured PEI with Acetone, as it will damage the PEI surface.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[4].line[4]",
+    "near": "• Deposition of dust and grease on the build plate decrease adhesion. It is recommended to regularly clean the surface with detergent and water to maintain best"
+   },
+   "dict": null
+  },
+  {
+   "h": "e827ab797e0c5d844ce47ebab002bad2fa7ee3f9bb09f2d625e5fa0aa387f552",
+   "en": "Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and ensures a long lifetime of the product.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[4].line[5]",
+    "near": "• Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and can not be held responsible for any damage caused to plates as a re"
+   },
+   "dict": null
+  },
+  {
+   "h": "ab8a13a81d587a4ba18fa0ed4d50707ccec854f97b28cea98b8ded9596050d03",
+   "en": "Carefully sanding the surface with fine-grit (600 was recommended) sandpaper can help restore adhesion.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[4].line[6]",
+    "near": "• Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and ens"
+   },
+   "dict": null
+  },
+  {
+   "h": "3090bc20161f9dd9e4fcd33202023d788cffd66e76f56bc11ee1d58706add4bd",
+   "en": "The latest firmware brings significant improvements to the Bambu Textured PEI Plate calibration using the Micro Lidar, and it is now fully compatible with the automatic calibration process.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[4].line[7]",
+    "near": "• Carefully sanding the surface with fine-grit (600 was recommended) sandpaper can help restore adhesion."
+   },
+   "dict": null
+  },
+  {
+   "h": "6d5bacb798e02d2ece7f8e31cf6cf36e5dbec5a75909e877156409ce0f4f98a1",
+   "en": "The Textured PEI plate is considered a consumable part, which will degrade over time.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[4].line[8]",
+    "near": "• The latest firmware brings significant improvements to the Bambu Textured PEI Plate calibration using the Micro Lidar, and it is now fully compatible with the"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ae7d773595c7e7bcc12aeb225e892d472d7632e310ab1b36324cef0f8f36ca0",
+   "en": "Recommended Settings",
+   "kind": "block_title",
+   "freq": 9,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[0]",
+    "near": "Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements"
+   },
+   "dict": null
+  },
+  {
+   "h": "f71de42e1ebe6be7890f0b567af67a89b091f62261433b8d167f90efbb50a89f",
+   "en": "Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[1]",
+    "near": "Recommended Settings"
+   },
+   "dict": null
+  },
+  {
+   "h": "425f7317196531fb22086ad90abc8e752f3eee64b966ec3c10a285a95b163537",
+   "en": "Heatbed Temperature",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[2].cell[1]",
+    "near": "Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements"
+   },
+   "dict": null
+  },
+  {
+   "h": "2acf84bcf9bc57e9ab0eba31412de88f80607b0be2cb44af8f2ad30ab1ac4267",
+   "en": "Glue Stick Required?",
+   "kind": "block_cell",
+   "freq": 5,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[2].cell[2]",
+    "near": "Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements"
+   },
+   "dict": null
+  },
+  {
+   "h": "f91cfe156767dbca75f217d10c0fbbb651b3b44927c4672b8585e170f3318a81",
+   "en": "Upper Glass Cover Plate Removed?",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[2].cell[3]",
+    "near": "Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements"
+   },
+   "dict": null
+  },
+  {
+   "h": "baceb4afbf5d05f06f6b98d641b0da022a930714056e9d6657c59449c4097640",
+   "en": "PLA/PLA-CF/PLA-GF",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[3].cell[0]",
+    "near": "Materials | Heatbed Temperature | Glue Stick Required? | Upper Glass Cover Plate Removed?"
+   },
+   "dict": null
+  },
+  {
+   "h": "cd2beac0246720c17ace9bfed1fd90838dd6eb1a29a01c8b345da82f89f7f114",
+   "en": "ABS (not for A1 mini)",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[4].cell[0]",
+    "near": "PLA/PLA-CF/PLA-GF | 45~60℃ | No | Yes"
+   },
+   "dict": null
+  },
+  {
+   "h": "d84db05c06ae82b2d9a705f667fa83a5fb7f2b51a27d65bf46668d0db63366d6",
+   "en": "PETG/PETG-CF",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[5].cell[0]",
+    "near": "ABS (not for A1 mini) | 90~100℃ | Yes | No"
+   },
+   "dict": null
+  },
+  {
+   "h": "822d3270e5a40dc1b226f6bd4273d5c711ffbdbc35c495b05635f5637116e4f2",
+   "en": "PET-CF (not for A1 mini)",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[6].cell[0]",
+    "near": "PETG/PETG-CF | 60~80℃ | No | No"
+   },
+   "dict": null
+  },
+  {
+   "h": "facbf0063a288e908673463e9143f395e8372e0374c1d2201a0e90310274e550",
+   "en": "TPU 95A for AMS",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[8].cell[0]",
+    "near": "TPU 85A/90A | 35~ 45℃ | No | Yes"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9d83d31565e406766a7d5461965b2782b18a3057bcff636d969f14be40a12f0",
+   "en": "ASA (not for A1 mini)",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[9].cell[0]",
+    "near": "TPU 95A for AMS | 35~ 45 ℃ | No | Yes"
+   },
+   "dict": null
+  },
+  {
+   "h": "1599ba449457cb8c6699a84a2a3820e1b28f40b5e09d581f3994f74f73a743c0",
+   "en": "PC/PC-CF (not for A1 mini)",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[11].cell[0]",
+    "near": "PVA | 45~60℃ | No | Yes"
+   },
+   "dict": null
+  },
+  {
+   "h": "0279f757acd5d6d7ef5792ca7a15b8dc8e06959cc48c0292066cfe8a6c37901e",
+   "en": "PA/PA-CF/PAHT-CF (not for A1 mini)",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-textured-pei-plate",
+    "title": "Bambu Textured PEI Plate",
+    "field": "blocks[5].line[12].cell[0]",
+    "near": "PC/PC-CF (not for A1 mini) | 90~110℃ | Yes | No"
+   },
+   "dict": null
+  },
+  {
+   "h": "8ee5ed7c62951f2212eeeb8e99c68479b11fac03d8fa00c164ceb5225adb5852",
+   "en": "The AMS 2 Pro Feeder Unit is specially designed to support the AMS 2 Pro for printing multiple colors and materials. Ceramic-reinforced antiwear bushings are embedded in each feeder inlet to better protect the inlet from being worn by the filament after prolonged use. Each AMS 2 Pro has 4 feeder units, and each feeder unit has its own motor and gears to actively push the filament forward or wind it back to the spool.The AMS 2 Pro Feeder Unit has a sensor to detect filament. When a filament is inserted, the feeder unit will feed the filament automatically. When a filament needs to be wound back, the feeder unit will drive the AMS 2 Pro active support shaft to rotate the spool for filament winding.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-feeder-unit",
+    "title": "AMS 2 Pro Feeder Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  }
+ ]
+}

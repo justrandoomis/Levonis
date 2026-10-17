@@ -1,0 +1,1304 @@
+{
+  "handle": "r1",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T18:31:55Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "title": "Bambu Lab R1 Spec sheet",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*"
+      ],
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "also": "Every row of both pages (Processing, Measurement & Positioning, Automation, Safety, Physical & Power, Software, Connectivity); supported materials (relations)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/r1/manual/acc-in-the-box",
+      "title": "Packing List for the Bambu Lab R1",
+      "keys": [
+        "package.contents"
+      ],
+      "retrieved_at": "2026-10-16T08:25:35Z",
+      "also": "Accessories table (in_the_box)."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/r1",
+      "title": "Bambu Lab R1 store page",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*",
+        "package.contents"
+      ],
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "also": "Parsed payload (no spec rows); the 'R1 Specs' table and footnotes (flight row 162), the 'What's in the box' table (flight row 161), FAQ answers and accessory blocks (relations), Product Features highlights, messages bundle (no R1 namespace, no 220 V / 110 V R1 values)."
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.technology",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "55W CO2 laser",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Laser type",
+      "quote": "Laser type 55W CO2 laser",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Laser type' (not in the parsed payload: the extractor does not read the Specs richText).",
+      "note": "The sheet's row is 'Laser type'; the registry has no laser key, so the machine's technology row carries it."
+    },
+    {
+      "key": "printing.working_area",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "600 × 300 mm (standalone); 600 × 3000 mm with the Conveyor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Working area",
+      "quote": "Working area Standalone: 600×300mm With Conveyor: 600×3000mm",
+      "test_method": "",
+      "test_condition": "Standalone: 600 × 300 mm. With the Conveyor (Automatic Conveyor Feeder): 600 × 3000 mm.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Working area' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Max speed",
+      "quote": "Max speed 1000mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Max speed' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Max acceleration",
+      "quote": "Max acceleration 20000mm/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Max acceleration' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 940,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Dimensions",
+      "quote": "Dimensions 940×560×200mm",
+      "test_method": "",
+      "test_condition": "Machine dimensions as published (940 × 560 × 200 mm; order as written, lid closed).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Dimensions' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 560,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Dimensions",
+      "quote": "Dimensions 940×560×200mm",
+      "test_method": "",
+      "test_condition": "Machine dimensions as published (940 × 560 × 200 mm; order as written, lid closed).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Dimensions' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 200,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Dimensions",
+      "quote": "Dimensions 940×560×200mm",
+      "test_method": "",
+      "test_condition": "Machine dimensions as published (940 × 560 × 200 mm; order as written, lid closed).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Dimensions' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "physical.recommended_space",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "1140 × 860 × 750 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Space required",
+      "quote": "Standalone: W940 × D660 × H650mm (lid open). Allowing 100mm of clearance on the left, right, rear, and top: 1140 × 860 × 750mm.",
+      "test_method": "",
+      "test_condition": "Standalone, lid open (W940 × D660 × H650 mm) plus 100 mm clearance left, right, rear and top. With Riser Base: 1140 × 860 × 950 mm (W940 × D660 × H850 mm lid open). With Riser Base and Conveyor: the Riser Base footprint plus, in front, stock length − 400 mm and, behind, stock length − 550 mm.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Space required' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "777338703516315650",
+        "id": "ov_c26503c993326693afa538d6",
+        "value_text": "R1",
+        "group": "Version"
+      },
+      "value": 1095,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Package dimensions",
+      "quote": "Package dimensions 1095×725×310mm",
+      "test_method": "",
+      "test_condition": "The R1 machine's package. The bundles add the Riser Base, Conveyor and Rotary items (store 'What's in the box'); their packaging is not published.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Package dimensions' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "777338703516315650",
+        "id": "ov_c26503c993326693afa538d6",
+        "value_text": "R1",
+        "group": "Version"
+      },
+      "value": 725,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Package dimensions",
+      "quote": "Package dimensions 1095×725×310mm",
+      "test_method": "",
+      "test_condition": "The R1 machine's package. The bundles add the Riser Base, Conveyor and Rotary items (store 'What's in the box'); their packaging is not published.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Package dimensions' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "777338703516315650",
+        "id": "ov_c26503c993326693afa538d6",
+        "value_text": "R1",
+        "group": "Version"
+      },
+      "value": 310,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Package dimensions",
+      "quote": "Package dimensions 1095×725×310mm",
+      "test_method": "",
+      "test_condition": "The R1 machine's package. The bundles add the Riser Base, Conveyor and Rotary items (store 'What's in the box'); their packaging is not published.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Package dimensions' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 33500,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Weight",
+      "quote": "Weight 33.5kg",
+      "test_method": "",
+      "test_condition": "Published as 'Weight' only; the sheet does not say whether it is the net (machine) or the gross (packed) weight.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Weight' (not in the parsed payload: the extractor does not read the Specs richText).",
+      "note": "Unverified: the label is ambiguous (net or gross), and the registry's product.net_weight does not list laser_machine in appliesTo."
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 780,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Max input power",
+      "quote": "Max input power 780W",
+      "test_method": "",
+      "test_condition": "Universal input 100–240 VAC, 50/60 Hz (one value for every region).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Max input power' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100–240 VAC",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Input voltage",
+      "quote": "Input voltage 100–240 VAC, 50/60Hz",
+      "test_method": "",
+      "test_condition": "Universal input; no separate US 110 V or international 220 V version is published.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Input voltage' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Input voltage",
+      "quote": "Input voltage 100–240 VAC, 50/60Hz",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Input voltage' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "physical.operating_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "10 °C – 30 °C",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Physical & Power › Recommended operating temp",
+      "quote": "Recommended operating temp 10°C – 30°C",
+      "test_method": "",
+      "test_condition": "Recommended operating temperature.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Recommended operating temp' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Suite",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Software › Software",
+      "quote": "Software Bambu Suite",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Software' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Windows",
+        "macOS"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Software › OS",
+      "quote": "OS Windows, macOS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'OS' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-band Wi-Fi, IEEE 802.11 a/b/g/n/ac/ax; 2412–2472 MHz, 5150–5850 MHz (FCC/CE); 2400–2483.5 MHz, 5150–5850 MHz (SRRC); TX power (EIRP): 2.4 GHz <23 dBm (FCC), <20 dBm (CE/SRRC/MIC); 5 GHz Band 1/2 <23 dBm; Band 3 <30 dBm (CE) / <24 dBm (FCC); Band 4 <23 dBm (FCC/SRRC) / <14 dBm (CE)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Connectivity › Wireless; Wi-Fi frequency; Wi-Fi TX power (EIRP); Wi-Fi protocol",
+      "quote": "Wireless Dual-band Wi-Fi … Wi-Fi frequency 2412–2472MHz, 5150–5850MHz (FCC/CE) · 2400–2483.5MHz, 5150–5850MHz (SRRC) … Wi-Fi protocol IEEE 802.11 a/b/g/n/ac/ax",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, rows 'Wireless', 'Wi-Fi frequency', 'Wi-Fi TX power (EIRP)', 'Wi-Fi protocol' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "connectivity.interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "USB",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Connectivity › USB",
+      "quote": "USB Supported",
+      "test_method": "",
+      "test_condition": "The sheet says only 'USB: Supported' (port use not stated).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'USB' (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Class 1 laser safety"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.2 › Safety › Safety certification",
+      "quote": "Safety certification Class 1 laser safety",
+      "test_method": "",
+      "test_condition": "Class 1 in standard enclosed use. Store spec footnote 3: with the riser base or the auto-feed accessory the enclosure is no longer complete and the machine becomes a Class 4 device, requiring CO2 laser-safety eyewear, for trained professional use only.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "store_page_check": "Agrees with the store page 'R1 Specs' table, row 'Safety certification' (footnote 3) (not in the parsed payload: the extractor does not read the Specs richText)."
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Touchscreen",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[4] › 'Tricky setup? Solved.' (usage step)",
+      "quote": "R1 puts a touchscreen right on the machine.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "note": "Product prose, not a spec-table row: kept unverified. The spec sheet has no display row."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "777338703516315650",
+        "id": "ov_c26503c993326693afa538d6",
+        "value_text": "R1",
+        "group": "Version"
+      },
+      "value": [
+        "R1 × 1",
+        "Power Cord × 1",
+        "Smoke Ventilation Hose × 1",
+        "Smoke Ventilation Fan × 1",
+        "Anti-freeze × 1",
+        "Funnel × 1",
+        "Allen Key × 1",
+        "Safety Key (Pre-installed) × 1",
+        "Laser Alignment Sensor × 1",
+        "Material Pin × 1",
+        "Calibration Board × 1",
+        "Lubricant Grease × 2",
+        "Lubricant Oil × 1",
+        "Clear Acrylic × 1",
+        "Basswood Plywood × 1"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[6] 'What's in the box' table (flight row 161) › column 'R1'",
+      "quote": "R1 1 · Power Cord 1 · Smoke Ventilation Hose 1 · Smoke Ventilation Fan 1 · Anti-freeze 1 · Funnel 1 · Allen Key 1 · Lubricant Grease 2 · Riser Base - · Automatic Conveyor Feeder -",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "note": "Wiki packing list agrees on the shared accessories; it names 'H2.0 & H1.5 Allen Keys' where the store table lists 'Allen Key × 1', and 'Lubricant Oil & Grease' as one entry."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "777368103003684865",
+        "id": "ov_3a4a61cc0dbefcd77c13e3bb",
+        "value_text": "R1 Long Material Bundle",
+        "group": "Version"
+      },
+      "value": [
+        "R1 × 1",
+        "Power Cord × 1",
+        "Smoke Ventilation Hose × 1",
+        "Smoke Ventilation Fan × 1",
+        "Anti-freeze × 1",
+        "Funnel × 1",
+        "Allen Key × 1",
+        "Safety Key (Pre-installed) × 1",
+        "Laser Alignment Sensor × 1",
+        "Material Pin × 1",
+        "Calibration Board × 1",
+        "Lubricant Grease × 2",
+        "Lubricant Oil × 1",
+        "Clear Acrylic × 1",
+        "Basswood Plywood × 1",
+        "Riser Base × 1",
+        "Automatic Conveyor Feeder × 1"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[6] 'What's in the box' table (flight row 161) › column 'R1 Long Material Bundle'",
+      "quote": "Riser Base 1 · Automatic Conveyor Feeder 1 · Rotary Attachment - · Rotary Attachment Bracket - (column 'R1 Long Material Bundle')",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "note": "Wiki packing list agrees on the shared accessories; it names 'H2.0 & H1.5 Allen Keys' where the store table lists 'Allen Key × 1', and 'Lubricant Oil & Grease' as one entry."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "777368103003684866",
+        "id": "ov_a8c105f28cd30da9466a576a",
+        "value_text": "R1 Long Material & Rotary Bundle",
+        "group": "Version"
+      },
+      "value": [
+        "R1 × 1",
+        "Power Cord × 1",
+        "Smoke Ventilation Hose × 1",
+        "Smoke Ventilation Fan × 1",
+        "Anti-freeze × 1",
+        "Funnel × 1",
+        "Allen Key × 1",
+        "Safety Key (Pre-installed) × 1",
+        "Laser Alignment Sensor × 1",
+        "Material Pin × 1",
+        "Calibration Board × 1",
+        "Lubricant Grease × 2",
+        "Lubricant Oil × 1",
+        "Clear Acrylic × 1",
+        "Basswood Plywood × 1",
+        "Riser Base × 1",
+        "Automatic Conveyor Feeder × 1",
+        "Rotary Attachment × 1",
+        "Rotary Attachment Bracket × 1"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[6] 'What's in the box' table (flight row 161) › column 'R1 Long Material & Rotary Bundle'",
+      "quote": "Riser Base 1 · Automatic Conveyor Feeder 1 · Rotary Attachment 1 · Rotary Attachment Bracket 1 (column 'R1 Long Material & Rotary Bundle')",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "note": "Wiki packing list agrees on the shared accessories; it names 'H2.0 & H1.5 Allen Keys' where the store table lists 'Allen Key × 1', and 'Lubricant Oil & Grease' as one entry."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Riser Base",
+      "target_source_handle": "riser-base",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[4] › 'Go taller. Rounder. Longer. Thicker.' › item 'Riser Base'",
+      "quote": "Raises R1 to create clearance for taller objects. Also required for the Conveyor and Rotary.",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "condition": "Included in both bundles. Store spec footnote 3: with the riser base the machine becomes Class 4."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Automatic Conveyor Feeder",
+      "target_source_handle": "automatic-conveyor-feeder",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[4] › 'Go taller. Rounder. Longer. Thicker.' › item 'Conveyor'",
+      "quote": "Automatically feeds long stock through R1, letting you cut and engrave boards up to 3 meters long.",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "condition": "Requires the Riser Base. Included in both bundles. Store spec footnote 3: with the auto-feed accessory the machine becomes Class 4."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Lab Rotary Attachment",
+      "target_source_handle": "rotary-attachment",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[4] › 'Go taller. Rounder. Longer. Thicker.' › item 'Rotary Attachment'",
+      "quote": "Rotates round objects for full 360° engraving on bottles, bowls, cups, and more. Requires the Riser Base.",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "condition": "Requires the Riser Base; included (with its bracket) in the R1 Long Material & Rotary Bundle."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Focusing Lens - Medium & Long Focal",
+      "target_source_handle": "focusing-lens-medium-long-focal",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[4] › 'Go taller. Rounder. Longer. Thicker.' › item 'Focus lenses (Medium / Long)'",
+      "quote": "Greater depth of focus for cleaner cuts through thicker materials — up to 20 mm with the long-focus lens.",
+      "retrieved_at": "2026-10-16T06:57:52Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Focusing Lens - Short Focal",
+      "target_source_handle": "focusing-lens-short-focal",
+      "evidence_kind": "faq",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[8] FAQ › question 1",
+      "quote": "Short Focal Length (S): Standard.Smaller spot size, better detail performance;",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "condition": "The standard lens."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "Bambu Lab Purifier E1 Pro",
+      "target_source_handle": "bambu-lab-purifier-e1-pro",
+      "evidence_kind": "faq",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[8] FAQ › question 5",
+      "quote": "We recommend using the Bambu Lab E1 Pro Purifier, which links with the R1 Laser Cutter to filter smoke and particles generated during laser operation",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "condition": "Recommended; links with the R1 (smart function)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "Smoke Purifier",
+      "target_source_handle": "smoke-purifier",
+      "evidence_kind": "faq",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[8] FAQ › question 5",
+      "quote": "The Bambu Lab Smoke Purifier is structurally compatible with the R1, but it lacks the smart function.",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "condition": "Structurally compatible only: no smart linkage; controlled manually with its power switch and speed knob."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "Auto Fire Extinguishing System",
+      "target_source_handle": "auto-fire-extinguishing-system",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[7] 'R1 Specs' › Safety interlocks (footnote 4)",
+      "quote": "Auto fire extinguishing⁴ … 4. Requires the Auto Fire Extinguishing System, sold separately.",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "condition": "Needed for the auto fire extinguishing interlock; sold separately (not in any version's box)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Wood",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Cut & engrave: wood, acrylic (incl. clear acrylic), leather, fabric, paper, EVA foam, shell",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Cut and engrave. Store spec footnote 1: all references to wood refer to plywood."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Acrylic (incl. clear acrylic)",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Cut & engrave: wood, acrylic (incl. clear acrylic), leather, fabric, paper, EVA foam, shell",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Cut and engrave."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Leather",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Cut & engrave: wood, acrylic (incl. clear acrylic), leather, fabric, paper, EVA foam, shell",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Cut and engrave."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Fabric",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Cut & engrave: wood, acrylic (incl. clear acrylic), leather, fabric, paper, EVA foam, shell",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Cut and engrave."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Paper",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Cut & engrave: wood, acrylic (incl. clear acrylic), leather, fabric, paper, EVA foam, shell",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Cut and engrave."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "EVA foam",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Cut & engrave: wood, acrylic (incl. clear acrylic), leather, fabric, paper, EVA foam, shell",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Cut and engrave."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Shell",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Cut & engrave: wood, acrylic (incl. clear acrylic), leather, fabric, paper, EVA foam, shell",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Cut and engrave."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Coated metal",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Engrave only: coated metal (bare metal cannot be engraved), glass, ceramic",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Engrave only (no cutting)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Glass",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Engrave only: coated metal (bare metal cannot be engraved), glass, ceramic",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Engrave only (no cutting)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Ceramic",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Engrave only: coated metal (bare metal cannot be engraved), glass, ceramic",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Engrave only (no cutting)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Bare (uncoated) metal",
+      "evidence_kind": "spec_table",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "source_title": "Bambu Lab R1 Spec sheet",
+      "locator": "p.1 › Processing › Supported materials",
+      "quote": "Engrave only: coated metal (bare metal cannot be engraved), glass, ceramic",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "condition": "Cannot be engraved. FAQ 4 also warns: do not process uncoated metals or similar reflective materials."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "777338703516315650",
+        "id": "ov_c26503c993326693afa538d6",
+        "value_text": "R1",
+        "group": "Version"
+      },
+      "section": "What's in the box — R1",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[6] 'What's in the box' table (flight row 161) › column 'R1'",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "items": [
+        {
+          "text": "R1",
+          "qty": 1
+        },
+        {
+          "text": "Power Cord",
+          "qty": 1
+        },
+        {
+          "text": "Smoke Ventilation Hose",
+          "qty": 1
+        },
+        {
+          "text": "Smoke Ventilation Fan",
+          "qty": 1
+        },
+        {
+          "text": "Anti-freeze",
+          "qty": 1
+        },
+        {
+          "text": "Funnel",
+          "qty": 1
+        },
+        {
+          "text": "Allen Key",
+          "qty": 1
+        },
+        {
+          "text": "Safety Key (Pre-installed)",
+          "qty": 1
+        },
+        {
+          "text": "Laser Alignment Sensor",
+          "qty": 1
+        },
+        {
+          "text": "Material Pin",
+          "qty": 1
+        },
+        {
+          "text": "Calibration Board",
+          "qty": 1
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": 2
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": 1
+        },
+        {
+          "text": "Clear Acrylic",
+          "qty": 1
+        },
+        {
+          "text": "Basswood Plywood",
+          "qty": 1
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "777368103003684865",
+        "id": "ov_3a4a61cc0dbefcd77c13e3bb",
+        "value_text": "R1 Long Material Bundle",
+        "group": "Version"
+      },
+      "section": "What's in the box — R1 Long Material Bundle",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[6] 'What's in the box' table (flight row 161) › column 'R1 Long Material Bundle'",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "items": [
+        {
+          "text": "R1",
+          "qty": 1
+        },
+        {
+          "text": "Power Cord",
+          "qty": 1
+        },
+        {
+          "text": "Smoke Ventilation Hose",
+          "qty": 1
+        },
+        {
+          "text": "Smoke Ventilation Fan",
+          "qty": 1
+        },
+        {
+          "text": "Anti-freeze",
+          "qty": 1
+        },
+        {
+          "text": "Funnel",
+          "qty": 1
+        },
+        {
+          "text": "Allen Key",
+          "qty": 1
+        },
+        {
+          "text": "Safety Key (Pre-installed)",
+          "qty": 1
+        },
+        {
+          "text": "Laser Alignment Sensor",
+          "qty": 1
+        },
+        {
+          "text": "Material Pin",
+          "qty": 1
+        },
+        {
+          "text": "Calibration Board",
+          "qty": 1
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": 2
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": 1
+        },
+        {
+          "text": "Clear Acrylic",
+          "qty": 1
+        },
+        {
+          "text": "Basswood Plywood",
+          "qty": 1
+        },
+        {
+          "text": "Riser Base",
+          "qty": 1
+        },
+        {
+          "text": "Automatic Conveyor Feeder",
+          "qty": 1
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "777368103003684866",
+        "id": "ov_a8c105f28cd30da9466a576a",
+        "value_text": "R1 Long Material & Rotary Bundle",
+        "group": "Version"
+      },
+      "section": "What's in the box — R1 Long Material & Rotary Bundle",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/r1",
+      "source_title": "Bambu Lab R1 store page",
+      "locator": "description › components[6] 'What's in the box' table (flight row 161) › column 'R1 Long Material & Rotary Bundle'",
+      "retrieved_at": "2026-10-16T06:57:52Z",
+      "items": [
+        {
+          "text": "R1",
+          "qty": 1
+        },
+        {
+          "text": "Power Cord",
+          "qty": 1
+        },
+        {
+          "text": "Smoke Ventilation Hose",
+          "qty": 1
+        },
+        {
+          "text": "Smoke Ventilation Fan",
+          "qty": 1
+        },
+        {
+          "text": "Anti-freeze",
+          "qty": 1
+        },
+        {
+          "text": "Funnel",
+          "qty": 1
+        },
+        {
+          "text": "Allen Key",
+          "qty": 1
+        },
+        {
+          "text": "Safety Key (Pre-installed)",
+          "qty": 1
+        },
+        {
+          "text": "Laser Alignment Sensor",
+          "qty": 1
+        },
+        {
+          "text": "Material Pin",
+          "qty": 1
+        },
+        {
+          "text": "Calibration Board",
+          "qty": 1
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": 2
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": 1
+        },
+        {
+          "text": "Clear Acrylic",
+          "qty": 1
+        },
+        {
+          "text": "Basswood Plywood",
+          "qty": 1
+        },
+        {
+          "text": "Riser Base",
+          "qty": 1
+        },
+        {
+          "text": "Automatic Conveyor Feeder",
+          "qty": 1
+        },
+        {
+          "text": "Rotary Attachment",
+          "qty": 1
+        },
+        {
+          "text": "Rotary Attachment Bracket",
+          "qty": 1
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "section": "Accessories Introduction (accessories in the R1 package)",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/r1/manual/acc-in-the-box",
+      "source_title": "Packing List for the Bambu Lab R1",
+      "locator": "¶ Accessories Introduction (table, rows 1–12)",
+      "retrieved_at": "2026-10-16T08:25:35Z",
+      "note": "Accessories only (the machine itself is not a row); quantities not given. Same for every version per the store table.",
+      "items": [
+        {
+          "text": "Power Cord",
+          "qty": null
+        },
+        {
+          "text": "Smoke Ventilation Hose",
+          "qty": null
+        },
+        {
+          "text": "Smoke Ventilation Fan",
+          "qty": null
+        },
+        {
+          "text": "Anti-freeze",
+          "qty": null
+        },
+        {
+          "text": "Funnel",
+          "qty": null
+        },
+        {
+          "text": "H2.0 & H1.5 Allen Keys",
+          "qty": null
+        },
+        {
+          "text": "Safety Key",
+          "qty": null,
+          "note": "Pre-installed"
+        },
+        {
+          "text": "Laser Alignment Sensor",
+          "qty": null
+        },
+        {
+          "text": "Material Pin",
+          "qty": null
+        },
+        {
+          "text": "Calibration Board",
+          "qty": null
+        },
+        {
+          "text": "Lubricant Oil & Grease",
+          "qty": null
+        },
+        {
+          "text": "Basswood Plywood & Clear Acrylic Sheet",
+          "qty": null
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+      "title": "Bambu Lab R1 Spec sheet",
+      "language": "en",
+      "published_on": "2026-09-21",
+      "retrieved_at": "2026-10-16T08:22:44Z",
+      "sha256": "a1f387492ad67bc984e756799a9e341a8c52d9f4412800bf7479390dd1eb9c9f",
+      "note": "The store page's 'Download PDF' button in the R1 Specs block; the builder did not collect it (downloadButton is outside the extractor's read list). Two pages, printed page numbers 14 and 15."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/r1/manual/acc-in-the-box",
+      "title": "Packing List for the Bambu Lab R1",
+      "language": "en",
+      "published_on": "2026-09-22",
+      "retrieved_at": "2026-10-16T08:25:35Z"
+    }
+  ],
+  "not_published": [
+    "electrical.rated_power",
+    "electrical.current",
+    "electrical.standby_power",
+    "connectivity.bluetooth",
+    "physical.chassis",
+    "physical.noise"
+  ]
+}

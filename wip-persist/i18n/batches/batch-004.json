@@ -1,0 +1,3312 @@
+{
+ "batch": 4,
+ "surface": "page",
+ "handles": [
+  "4-piece-needle-file-set",
+  "maker-s-supply-hand-drill-kit",
+  "auto-fire-extinguishing-system",
+  "maker-s-supply-flush-cutter",
+  "maker-s-supply-professional-trimming-tool-kit",
+  "maker-s-supply-precision-cutter",
+  "maker-s-supply-esd-stainless-steel-tweezers-set",
+  "air-filter-for-external-exhaust-fan-kit",
+  "external-exhaust-fan-kit-p2s",
+  "laser-module",
+  "mag-alloy-scraper",
+  "floating-damper-feet",
+  "rotary-attachment",
+  "mini-heat-press",
+  "tpu-feed-assist-module",
+  "filament-track-switch",
+  "maker-s-supply-long-nose-pliers",
+  "accessory-box-a2l",
+  "print-finishing-kit",
+  "printer-maintenance-kit",
+  "external-exhaust-fan-bundle-x2d",
+  "focusing-lens-medium-long-focal",
+  "material-pin-r1",
+  "installation-bracket-for-rotary-attachment",
+  "guide-rail-extension",
+  "vision-encoder-r1",
+  "riser-base",
+  "automatic-conveyor-feeder",
+  "front-housing-assembly-x1-series",
+  "high-resolution-screen",
+  "glass-cover-plate",
+  "control-board-fan",
+  "chamber-temperature-regulator-fan",
+  "cooling-fan-for-hotend-x1c",
+  "thermistor-x1c",
+  "ceramic-heater-x1c",
+  "bambu-bus-cable",
+  "bambu-usb-c-cable",
+  "nozzle-wiper-x1-p1-series",
+  "bambu-scraper-3-pcs",
+  "activated-carbon-air-filter-x1-p1-series",
+  "replacement-filament-cutter",
+  "chamber-camera-x1-series",
+  "display-connector-flex-cable",
+  "hardened-steel-extruder-unit-x1-series",
+  "ams-driven-support-shaft-assembly",
+  "ams-active-support-shaft-assembly",
+  "ams-active-extrusion-wheel-assembly",
+  "front-glass-door"
+ ],
+ "strings": [
+  {
+   "h": "7718e2a4f34fe27c0542902d9739bf68179b54071c7f24d8af75fc349335976f",
+   "en": "Included Files",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.included_files].label",
+    "near": "Flat, Half-Round, Triangular，Round"
+   },
+   "dict": null
+  },
+  {
+   "h": "95d1403baf023cf318d6adb6efce0136cce6e869c628465e8e679b2f0af7f972",
+   "en": "Flat, Half-Round, Triangular，Round",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.included_files]",
+    "near": "Included Files"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa04ae3d5198bd40ecd7b91e5180b808dec7c9c8242ba5f06a103ecd2d1eac5b",
+   "en": "Handle",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.handle].label",
+    "near": "PVC non-slip"
+   },
+   "dict": null
+  },
+  {
+   "h": "34d2326aed0f36253734dec19501271c21887caa2cbb0a114c1b642bc7d5e27f",
+   "en": "PVC non-slip",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.handle]",
+    "near": "Handle"
+   },
+   "dict": null
+  },
+  {
+   "h": "0905f7f59021c2a85f1c0a50d7c252a3e6c6ee006514f01d7264097f1fd4337a",
+   "en": "Surface",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.surface].label",
+    "near": "Sandblasted"
+   },
+   "dict": null
+  },
+  {
+   "h": "0568a7c9e710e90525775902d9829b7c5226df03e463da354c82fbf70c04bac0",
+   "en": "Sandblasted",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.surface]",
+    "near": "Surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d8d7f635f09488829bafa8517dc0821b25d579c8a6e97607514243c7d3d8461",
+   "en": "Effective Filing Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.effective_filing_length].label",
+    "near": "63 ± 2 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "e8534bf5363a6069f335aff577f81c08f907158b0d11fbad2b97d64a47c08746",
+   "en": "Overall Length",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.overall_length].label",
+    "near": "140 ± 2 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "c9880547a6e968199951a33e0c9c52b449d719817fc8dfa48ae2b874b23fcbe2",
+   "en": "Tooth Density",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.tooth_density].label",
+    "near": "Fine teeth (240 grit), ~23 teeth per cm"
+   },
+   "dict": null
+  },
+  {
+   "h": "70efd4f988b603a9ed363c94f4f242f10976526d948ed4c9ab0c94d9aedd8607",
+   "en": "Fine teeth (240 grit), ~23 teeth per cm",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "specs[x.tooth_density]",
+    "near": "Tooth Density"
+   },
+   "dict": null
+  },
+  {
+   "h": "5c045f1fb3c885e02469a1aae84df88ae8ad5c7ecd7333ff420b61667fa6e4ac",
+   "en": "Main Materials",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.main_materials].label",
+    "near": "Anodized Aluminum Alloy"
+   },
+   "dict": null
+  },
+  {
+   "h": "949edbf08c78aedec4e499ba0ca11b25dd1ee2af76eff2ddad5b59029339e50f",
+   "en": "Anodized Aluminum Alloy",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.main_materials]",
+    "near": "Main Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "7088bc93346125374d8c63a7ee753aa60a884b39c4f901f4053807c722dc24b3",
+   "en": "Tungsten Steel",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.tungsten_steel].label",
+    "near": "Aluminum Handle + Tungsten-Steel Bit Set"
+   },
+   "dict": null
+  },
+  {
+   "h": "1898288f22353f977dcc06c56e907751159323260e9961b4eaf35ff52dfb2fa6",
+   "en": "Aluminum Handle + Tungsten-Steel Bit Set",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.tungsten_steel]",
+    "near": "Tungsten Steel"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a694d28722603f18120be4cb7a7153bdf5950a2c4e9a5332c26bf72da08d398",
+   "en": "Bit Compatibility",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.bit_compatibility].label",
+    "near": "0.3–3.2 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "bfd8da17a816d6940ca376cbdaaf4d03dde997b26ff376d13f535085ecb8d737",
+   "en": "Bit diameters: 1 / 1.2 / 1.5 / 1.8 / 2 / 2.1 / 2.5 / 2.6 / 3 / 3.1 mm",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.bit_diameters_1_1_2_1_5_1_8_2_2_1_2_5_2_6_3_3_1_mm].label",
+    "near": "Same as individual components"
+   },
+   "dict": null
+  },
+  {
+   "h": "5228d530d80d7024beafc47839a7adb1192a523d503f082da6aadc3d927ba3e8",
+   "en": "Same as individual components",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.bit_diameters_1_1_2_1_5_1_8_2_2_1_2_5_2_6_3_3_1_mm]",
+    "near": "Bit diameters: 1 / 1.2 / 1.5 / 1.8 / 2 / 2.1 / 2.5 / 2.6 / 3 / 3.1 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "43b2bcf95f2ed4cd95bfdbefcc504a6693cee976985e8249882ef2a6cf14ca42",
+   "en": "Effective Bit Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.effective_bit_length].label",
+    "near": "—"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a9d1056afb1f054c6767cdaf609a1021128da3c9ac0f32f27d5c27c96918cda",
+   "en": "Clamping Method",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.clamping_method].label",
+    "near": "Manual thread-tightened chuck"
+   },
+   "dict": null
+  },
+  {
+   "h": "5598db71cf6b75b97eb1fc56d3a5e84918dfc63399e640ba4e65978461ccc8f5",
+   "en": "Manual thread-tightened chuck",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.clamping_method]",
+    "near": "Clamping Method"
+   },
+   "dict": null
+  },
+  {
+   "h": "47d64e79d5ef5d0244476635c55ca2a12fabedadb260d4eb3a83ca05803f201c",
+   "en": "Special Design",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.special_design].label",
+    "near": "Rear bearing for smoother rotation"
+   },
+   "dict": null
+  },
+  {
+   "h": "f9135393bacfb34916935f93126d3c2e4b486940f78a654afcfd36c444eced81",
+   "en": "Rear bearing for smoother rotation",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.special_design]",
+    "near": "Special Design"
+   },
+   "dict": null
+  },
+  {
+   "h": "c245acd7a1211cc5b9d137c7bfbb82cdf5287b98ad5afc21fce3e98d606ed34e",
+   "en": "Color-coded rings + laser size marking",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.color_coded_rings_laser_size_marking].label",
+    "near": "Combination of both features"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff87e79e2af4cb39c166c28c291a12960356f0cb97ff20f5c77f1fea2a65bc20",
+   "en": "Combination of both features",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.color_coded_rings_laser_size_marking]",
+    "near": "Color-coded rings + laser size marking"
+   },
+   "dict": null
+  },
+  {
+   "h": "366fb9322d8e6ad67666aa988e1e31ae4ca867d2ca9bb4a27e52c7104a255a4d",
+   "en": "Recommended Use",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.recommended_use].label",
+    "near": "Manual drilling, enlarging holes"
+   },
+   "dict": null
+  },
+  {
+   "h": "71464540eccd89ded7b18ede731fc5584ea8f52d8149ec3cddc4bc0ae58aa35e",
+   "en": "Manual drilling, enlarging holes",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.recommended_use]",
+    "near": "Recommended Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "bebecd87c0d16194d861addb30d6871dd7545c55a664a0a52636f6b3cdc4d523",
+   "en": "Precision hole adjustment on plastics, silicone, PCB",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.precision_hole_adjustment_on_plastics_silicone_pcb].label",
+    "near": "All-in-one solution for model drilling"
+   },
+   "dict": null
+  },
+  {
+   "h": "4d832e4b839755128061c0cc78059e53041d8440b7332711f292ea32eef016ac",
+   "en": "All-in-one solution for model drilling",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.precision_hole_adjustment_on_plastics_silicone_pcb]",
+    "near": "Precision hole adjustment on plastics, silicone, PCB"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ed26b197a1aea3ed85f69a33341a6689b58877386342880cb9d71aae1829ded",
+   "en": "Included Items",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.included_items].label",
+    "near": "1 × Handle"
+   },
+   "dict": null
+  },
+  {
+   "h": "be053c9bd04cdfa192d4b4f2bee3503ef2f61bdcfca20c610b61eee354e4068b",
+   "en": "1 × Handle",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.included_items]",
+    "near": "Included Items"
+   },
+   "dict": null
+  },
+  {
+   "h": "a78399cf4fb722bc68c78811c8a60c737ca6725c63596446051dacab451ce5eb",
+   "en": "10 × Drill Bits",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.10_drill_bits].label",
+    "near": "1 Handle + 10 Drill Bits"
+   },
+   "dict": null
+  },
+  {
+   "h": "b80b79cecb78d631c6a631ac5b536e25025f66c444ca398208c0f19c6b75baa3",
+   "en": "1 Handle + 10 Drill Bits",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "specs[x.10_drill_bits]",
+    "near": "10 × Drill Bits"
+   },
+   "dict": null
+  },
+  {
+   "h": "f310a2bcee6f7c5e80ee37da91eb152177f0d2fb50738fd2fd184a00bf45669f",
+   "en": "For installation, please refer to the Auto Fire Extinguishing System installation guide on the Bambu Lab Wiki: H2 Series and R1. For a visual walkthrough, we also recommend watching the step-by-step installation video.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "95a2cfaee2948391329ddc6fa7dac9489cd512acf64399bf0b39633087573fda",
+   "en": "Blade Material",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "specs[x.blade_material].label",
+    "near": "Cr-V Alloy Spring Steel"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a81d331d90836b58966c4bbe7a5bbbfb1d0dbd7f8d2a4e839cffdd098ad9183",
+   "en": "Cr-V Alloy Spring Steel",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "specs[x.blade_material]",
+    "near": "Blade Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "499262dcaa9fd772110f441659bee53c44fd4e875956f7e8934653c620ee9c2b",
+   "en": "Cutting Edge Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "specs[x.cutting_edge_length].label",
+    "near": "12 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "75c52ca476d4567c56300261ff0581a997e643973f443bec9301bc844dc96de7",
+   "en": "Non-slip PVC handle",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "specs[part.handle_material]",
+    "near": "Handle material"
+   },
+   "dict": null
+  },
+  {
+   "h": "782a6681bbb5555833e303081b7e15a4793484e76ebacc65dd28280aa1fab8bf",
+   "en": "Blade Design",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "specs[x.blade_design].label",
+    "near": "Single-bevel blade"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5f4c1e7186b8552f2de19194dd69cc4b3593d7c310a1db2ab5850f9dde8cbb5",
+   "en": "Single-bevel blade",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "specs[x.blade_design]",
+    "near": "Blade Design"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ecc7110b1f2ee9c92a89b386a1228e32a5e627f246b75b38c05a4bc2588b3e6",
+   "en": "Max Cutting Capacity",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "specs[x.max_cutting_capacity].label",
+    "near": "Plastic parts up to 2.5 mm in diameter"
+   },
+   "dict": null
+  },
+  {
+   "h": "f5982bdfce6bd9d43e9ba30743aa84e0a0155a47fbc71f62ad33d0d30ef800a6",
+   "en": "Plastic parts up to 2.5 mm in diameter",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "specs[x.max_cutting_capacity]",
+    "near": "Max Cutting Capacity"
+   },
+   "dict": null
+  },
+  {
+   "h": "1871fdda9fe32279c8e4bc67879362c0c5740172c0cdf0a30bf2001c7ec3d7f0",
+   "en": "HSS M2",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "specs[x.blade_material]",
+    "near": "Blade Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "75d22d1056f8c36dff0e70403c5640331a39494571a01896b5317199ba4e2f54",
+   "en": "Blade Thickness",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "specs[x.blade_thickness].label",
+    "near": "0.2 mm (Tip) ~ 2 mm (Base)"
+   },
+   "dict": null
+  },
+  {
+   "h": "16e116681858491a331b143f496b645fa3b44156bf72868998758037adbe29eb",
+   "en": "0.2 mm (Tip) ~ 2 mm (Base)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "specs[x.blade_thickness]",
+    "near": "Blade Thickness"
+   },
+   "dict": null
+  },
+  {
+   "h": "418a0cf54c8dab53733f2fce66e47ef25911d17028f492d837e093e256b4a3eb",
+   "en": "Handle Dimensions",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "specs[x.handle_dimensions].label",
+    "near": "&Oslash;18 mm (D) × 133 mm (L)"
+   },
+   "dict": null
+  },
+  {
+   "h": "b69e4448ea774df320a6fb958878413c7015083c5ced7043fdcb575801212d81",
+   "en": "&Oslash;18 mm (D) × 133 mm (L)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "specs[x.handle_dimensions]",
+    "near": "Handle Dimensions"
+   },
+   "dict": null
+  },
+  {
+   "h": "8f12bbc8d9cef2953846931ec6d298d5cd0fac5bc1301ddd0fa891f06750d315",
+   "en": "Max Cutting Width",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "specs[x.max_cutting_width].label",
+    "near": "2 ~ 3mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "283c5ea4df9a7d45dd1f7e1d5f6ff91fbd1d003045e6f9b78d07eea3eb904d1e",
+   "en": "Blade Length",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "specs[x.blade_length].label",
+    "near": "8 mm (BK series) / 13 mm (BS series)"
+   },
+   "dict": null
+  },
+  {
+   "h": "01473509e003c1728059936dd8083a63833857f356cff589cb3317731e72798c",
+   "en": "8 mm (BK series) / 13 mm (BS series)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "specs[x.blade_length]",
+    "near": "Blade Length"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe1e314fa1c58a6791ed605e75891cfe50ca96f3ada35edc7b819ea8b48f0b3a",
+   "en": "3 pcs",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[2].line[1].cell[3]",
+    "near": "Blade Model | Dimensions (W × L × T) | Recommended Use | Quantity"
+   },
+   "dict": {
+    "ar": "3 قطعة",
+    "ckb": "3 دانە"
+   }
+  },
+  {
+   "h": "b763c3bd47da0f5f495d6a1a5356964274c52c7e4d398564dcc052bf99f627c1",
+   "en": "2 pcs",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[2].line[2].cell[3]",
+    "near": "BK1010 | 9 × 43 × 3.2 mm | For fine edge trimming on most materials (e.g., Plastics, Wood, etc.) | 3 pcs"
+   },
+   "dict": {
+    "ar": "2 قطعة",
+    "ckb": "2 دانە"
+   }
+  },
+  {
+   "h": "2add291e2d244a0667e48a79b9ca86305616c1a3fd89d3872f452bd8c2dd7a25",
+   "en": "Usage Instructions",
+   "kind": "usage_title",
+   "freq": 3,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "78d62a21c71067a266a14f9789238501cd9342d0a967aa651cc0651dd1765108",
+   "en": "Step 1: Press the locking button and slide it forward.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "usage[0].body.line[0]",
+    "near": "Step 2: Open the blade compartment."
+   },
+   "dict": null
+  },
+  {
+   "h": "5254a08ba58f51bddcde89d9d0d4d60b27f205e502a84e86e2cbfd92854b34b4",
+   "en": "Step 2: Open the blade compartment.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "usage[0].body.line[1]",
+    "near": "Step 1: Press the locking button and slide it forward."
+   },
+   "dict": null
+  },
+  {
+   "h": "580e3e9d67b1b9b7b429065a71b7196622ce91b6d2082adedccbdffcc2acac01",
+   "en": "Step 3: Remove the old blade.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "usage[0].body.line[2]",
+    "near": "Step 2: Open the blade compartment."
+   },
+   "dict": null
+  },
+  {
+   "h": "c9ad1d89cbb158f7985a745ce34fbf6e4e486d8c4e82836137b393511176465c",
+   "en": "Step 4: Insert a new blade and close the compartment firmly.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "usage[0].body.line[3]",
+    "near": "Step 3: Remove the old blade."
+   },
+   "dict": null
+  },
+  {
+   "h": "0dab84c4cf0d8b8d4d77d0be76d34b7d9e4e174b44b9f7be904f9f3b5936dfbf",
+   "en": "QA009: ABS + PC / QA010: Zinc Alloy",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "specs[physical.chassis]",
+    "near": "Chassis & shell"
+   },
+   "dict": null
+  },
+  {
+   "h": "54110c96a77cb9e0857ae6d66918ae77accd98754c7561235c13d043fd99a09c",
+   "en": "SK2 + CR",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "specs[x.blade_material]",
+    "near": "Blade Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "dea5a64df790f15b7b16c024c0fead247f9cf65246c84d6bae07451e0ac85f6a",
+   "en": "Cutter Body Dimensions",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "specs[x.cutter_body_dimensions].label",
+    "near": "9x75 MM"
+   },
+   "dict": null
+  },
+  {
+   "h": "718e68da33d1023b8888e51c8b357a22dda2b202edc44df99034fd046bb265b7",
+   "en": "Max Extension Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "specs[x.max_extension_length].label",
+    "near": "QA009: 60 MM / QA010: 70 MM"
+   },
+   "dict": null
+  },
+  {
+   "h": "0fc44681ecf3333d0f4efc07bede6dd2077d906ee50e888b0b51a3cc5b4ebe5c",
+   "en": "Blade Hardness",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "specs[x.blade_hardness].label",
+    "near": "≥60HRC"
+   },
+   "dict": null
+  },
+  {
+   "h": "356ceb6627da4379f716de6cb05c361acb296ee1f72818b56aa7b8b1936820c9",
+   "en": "Blade Angle",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "specs[x.blade_angle].label",
+    "near": "30°"
+   },
+   "dict": null
+  },
+  {
+   "h": "9b845438d23ced0d0ee424c5360dcbef3fbc9665be048869d8407c82712e67f3",
+   "en": "Tip Thickness",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "specs[x.tip_thickness].label",
+    "near": "1.5 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "b332c3492d5eb10a118eb6d8b0dcd689bc2477ce2ae16b303753b942b54377bc",
+   "en": "Configuration",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "specs[x.configuration].label",
+    "near": "3-Piece Set"
+   },
+   "dict": null
+  },
+  {
+   "h": "126f5ba4cdf2f0a83e455e1424a4730581379d269260716f385f26fa79c953d9",
+   "en": "3-Piece Set",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "specs[x.configuration]",
+    "near": "Configuration"
+   },
+   "dict": null
+  },
+  {
+   "h": "808a355f6b3362e50ace74e8ca410dd5d9e5be0c0ba1de0ffe5137d965ba0f45",
+   "en": "Plastic, Aluminum, Copper",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "air-filter-for-external-exhaust-fan-kit",
+    "title": "External Exhaust Air Filter",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4d85899b0475abb8960bc166aa318caa2b9450ed184099fdecd086bd0e1ffd0",
+   "en": "Air Filter",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "air-filter-for-external-exhaust-fan-kit",
+    "title": "External Exhaust Air Filter",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e404b03ec811aa5c9d352f2794303ed5985d1037311b5671f2e2359a1f55dc1f",
+   "en": "Metalc",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "4950b303ead2900002afd1732a21f9492266cb114f0af9c32fadafea8d2e9913",
+   "en": "For updated rear panel P2S onwer: No extra rear panel needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "67976ca5fa7e8ba36487ab531d6544939e57ce88b3327f3a3f0b410ca9a0145a",
+   "en": "External Exhaust Fan",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "14e09dfa9355e066898877bc6c919200eaf68451e16cd800232f46a181c9dcfa",
+   "en": "External Exhaust Fan Circuit Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a239696494720c263a933ba3bc9d1d13822711eb53f65237961ce5fd4f5e8e35",
+   "en": "6-Pin Cable",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b59425534762e7bcec543908dbe9197815f332a7b2b4d279b9df68091f69badb",
+   "en": "BT2-5 Screw",
+   "kind": "box_item",
+   "freq": 26,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f77bfc938c49eaf92d2506aa292f21021f129d362c999450ff4111aa53d61cd9",
+   "en": "M3×6 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4607760f79f75812984c0821745da477dacf7ea88a5b16a5808f70367586cfca",
+   "en": "Foam",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "29c35d5582b7f9af25fa0aa8b2258fdf64e9cf1d447f931b7aaa72862c15ea00",
+   "en": "1. 10 W Laser Module - 1 pcs 2. Laser Lens - 1 pcs 3. User manual - 1 pcs",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "laser-module",
+    "title": "Laser Module",
+    "field": "specs[x.1_10_w_laser_module_1_pcs_2_laser_lens_1_pcs_3_user_manual_1_pcs].label",
+    "near": "1. 40 W Laser Module - 1 pcs / 2. Laser Lens - 1 pcs / 3. User manual - 1 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "6042317cf415666c3cd14a4599b339f3b5a01a9260b34c5af7b33b1ada424891",
+   "en": "1. 40 W Laser Module - 1 pcs / 2. Laser Lens - 1 pcs / 3. User manual - 1 pcs",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "laser-module",
+    "title": "Laser Module",
+    "field": "specs[x.1_10_w_laser_module_1_pcs_2_laser_lens_1_pcs_3_user_manual_1_pcs]",
+    "near": "1. 10 W Laser Module - 1 pcs 2. Laser Lens - 1 pcs 3. User manual - 1 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "3dcc22de3b9f56cdcc17bb3d3ec122788602fad1c5f28571650a6a7998d66b82",
+   "en": "Aluminum alloy",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "a0b43df06f52085e62ab592a6adc991e32fadfa13f51c7692ba1c1720b5663d2",
+   "en": "Silver",
+   "kind": "spec_value_text",
+   "freq": 68,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "فضي",
+    "ckb": "زیوی"
+   }
+  },
+  {
+   "h": "58c0664bcc9a25bbd7b7bd4148aae06ad9da43b5ee9dfd08b266d11ef24f855b",
+   "en": "Extra Blade",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6981004b7682236522b547c566fc2fbe9451d77d582fc506c38802a32406bcac",
+   "en": "Adhesive-Backed Steel Plate",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "de36c61624d20a0c49237f1550aeb685c42d1923f4494a170bf79ef11f20e9d0",
+   "en": "Grey, Black",
+   "kind": "spec_value_text",
+   "freq": 40,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "رمادي، أسود",
+    "ckb": "خۆڵەمێشی، ڕەش"
+   }
+  },
+  {
+   "h": "3567f3ff1dc561b91f4f2ec04b61aac24010b9f5f52936e0d0326b7bb52bde8c",
+   "en": "Please refer to the installation guides for the Rotary Attachment on Bambu Lab Wiki:",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "usage[0].body.line[0]",
+    "near": "H2 Series (Laser): Bambu Lab Wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "dea5c87709d3671694e6c8ff42afa58b2c07f54fa36af9943a495dcb620f0df1",
+   "en": "H2 Series (Laser): Bambu Lab Wiki",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "usage[0].body.line[1]",
+    "near": "Please refer to the installation guides for the Rotary Attachment on Bambu Lab Wiki:"
+   },
+   "dict": null
+  },
+  {
+   "h": "16d40fe023fab3aa3652e8d0cd7d4d4c5e3dfe6a805c819ea132da28e8b804fa",
+   "en": "R1: Bambu Lab Wiki",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "usage[0].body.line[2]",
+    "near": "H2 Series (Laser): Bambu Lab Wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "d270cbf490a4331d24fa2b6a9073be5d7cc295462a1c65ebfd4f5f55a070ee16",
+   "en": "Elevate your DIY projects with this mobile-sized Mini Heat Press, specifically engineered for unusually small or unique heat transfer projects like caps, shoes, and intricate garments.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1ae49990f67059ab930d599d6b50713b2a6609ba17bdd96203341e25874303fe",
+   "en": "Please refer to the installation guide for the TPU Feed Assist Module available on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-feed-assist-module",
+    "title": "TPU Feed Assist Module",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "71c9b49a7dd087950d36bfd4ec79c0add490f474be0abf37e3550e79f560a7b4",
+   "en": "Please refer to the installation guide for the Filament Track Switch available on Bambu Lab Wiki. For a visual walkthrough, we also recommend watching the step-by-step installation video.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a0457b5e0d621f4bcaa598ffd8b908d738303ac7642984880be50cade5119c8a",
+   "en": "H2D requires a firmware upgrade to support the filament track switch",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "e230b4c3dd9bea3125cd9e9fe6d6bc1199874df1a2e1e69d5a7134127795ff6f",
+   "en": "H2C requires a firmware upgrade to support the filament track switch",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "c11d3c7477a3958d79fa7a2b6a9971af012809c0d6c74780645536c9270674b1",
+   "en": "filament track switch disassembly and troubleshooting guide",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "documents[1]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "b55858250d6dbf34f620e8ab98e12d64688f2bcaf78b739d7aa65156a8f26b8e",
+   "en": "Jaw Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "specs[x.jaw_length].label",
+    "near": "25 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "b8f455273ff9daa9825df28b689d259caa2fcf382558a0c60b4163c9123461be",
+   "en": "Surface resistance <10⁶Ω",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "specs[x.esd_protection]",
+    "near": "ESD Protection"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b8d2bf7475ed68024dcb4247abb1b9520c0ea2a7d54a8fa782511834c757147",
+   "en": "High-carbon alloy steel with nickel-plated ESD coating",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "specs[physical.chassis]",
+    "near": "Chassis & shell"
+   },
+   "dict": null
+  },
+  {
+   "h": "2fcd6c6ed6691cbc72788938ab3e567874278133274647e9d20628c631e26518",
+   "en": "Anti-slip TPE grip",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "specs[part.handle_material]",
+    "near": "Handle material"
+   },
+   "dict": null
+  },
+  {
+   "h": "38f75b366ee107f31a7930e109654be664d35a7e45541c495eb24da476d8fe00",
+   "en": "Spring-Assisted Opening",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "specs[x.spring_assisted_opening].label",
+    "near": "Yes"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7cc4c78ec6e7f812e214f4fcc2b571c329980e96c7232f88e02627a8f7b7206",
+   "en": "Learn more about Accessory Box for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dedba0d014c2c28e2247f12c5cdff2080cd62c90462eb5de109d28e7839e2d01",
+   "en": "White, Yellow, Black",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أبيض، أصفر، أسود",
+    "ckb": "سپی، زەرد، ڕەش"
+   }
+  },
+  {
+   "h": "08b9b59cdef33542a8a4f8880a741dc4f771c9b1b4aefa6121629c438a7de29c",
+   "en": "Z-Axis Motor Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9adcf23e16f5dd2411c368c6eb8ca9bb53b0dbaaeccbb09b04c828a5ee0319fa",
+   "en": "Heatbed Scraper",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "eee542eb5a01d69ca4450322c07b376ec69ee402571629bb3d6001000562bdaa",
+   "en": "Filament Cutter",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9456c4b64184d05be3109ce97eabc84ff16a2b4619938ec031c6527f105dbcec",
+   "en": "Soft Footpad",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4c116cf5eb7f8c6a7338cc90a520be07406529ae523c42d5ec7a2bda3771fc7",
+   "en": "H1.5 Screwdriver",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "616d44ad6063583304eef6afd0a96a7908768ffb830c2450a44682deaf85dcd3",
+   "en": "H2.0 Screwdriver",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cac73db8ebef09101e94db0b4af38a349242734a7cc0472a3953f4b49bcbdc54",
+   "en": "AMS Fixing Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[9]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "59105428bbcdbbb2262dcc82acd4d7b4d1bb44523c3127bb2851b806bfa9003a",
+   "en": "Base Locking Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[10]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5cef9efc5a51577d27d045f698fa2f06552a12ba308a7555e73a50fbd569a5e1",
+   "en": "Heatbed Mounting Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[11]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7b566428c27a0eaf71a3fa443fb76a393e667d8da0b0cbac66180831db15797",
+   "en": "Integrated Cable Mounting Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[12]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e5c5fbc979e60f2cf62c3ea70a5cd2be8c34ba43628305b92eb21d328cdaaf95",
+   "en": "Purge Wiper Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[13]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e2ed34db81470c0d4df7e53d81176e05e75745c2634c7883d152535466ad1bf8",
+   "en": "Heatbed Scraper Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[14]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e2eab65e937131ded379c6fc0ba406c868e852beddb1850a0d6841e8881c4536",
+   "en": "AMS Base Bracket Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[15]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b68dd00234cd39290b20cbe5952c27954c0e79592ed01192cf04dcc1f7fa3370",
+   "en": "Top Frame Handle Pivot Screws",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "box[16]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "06bcde8960859f111e492f4d1277240f48b8da107724c4bf74fea5949b3a7c6f",
+   "en": "Includes: Mag-Alloy Scraper, 4-piece Needle File Set, Professional Deburring Kit, Flush Cutter Ideal for: Every 3D printing user — from first print to daily workflow Solves: Part removal, support removal, deburring, and edge cleanup",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "821145452ea8b5995c53f5c579810e5347b754466559982ce72613ddd5d2c89f",
+   "en": "Includes: Print Finishing Kit + Screwdriver Kit + ESD Stainless Steel Tweezers Set + Complete Hand Drill Kit Ideal for: Makers building mechanical parts, articulated models, and custom DIY mods Solves: Screw fastening, hole drilling & reaming, and small-part assembly",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "193dacff6b6a46637befeb1ce32b0255fafd3d4498387e0ee276e16d0a9228b0",
+   "en": "Includes: Print Finishing Kit + 100W USB-C Smart Soldering Iron Kit Ideal for: Engineering makers ready to build functional parts Solves: An all-in-one solution for heat-setting metal inserts into 3D printed parts, giving your prints metal-grade thread strength for repeated assembly and disassembly",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "c82c1093d265666fbf3980899626e8a4d0f3e7e703947cf60559dc728c932c4b",
+   "en": "Includes: Print Finishing Kit + Heat-Stake Nut Tool Tip Set Ideal for: Engineering makers who already own soldering iron Solves: For prints that need frequent assembly and disassembly — heat-set metal inserts deliver true metal-grade thread strength, so you can screw in and out again and again without stripping the plastic ⚠️ A compatible soldering iron kit and Heat-Insert Nuts in the matching size are required (sold separately).",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "24865dbc7cc183ce6de788446ae12fc0d926ad4e9b927624ba2a6ca2d966cd06",
+   "en": "Includes: Print Finishing Kit + A3 Durable Cutting Mat + Professional Metallic Cutter Set Ideal for: Figure painters, scale modelers, and miniature hobbyists who obsess over the details Solves: Precision trimming, clean part separation, and fine detail work",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "974039028a4c0b135727871ca4aa75d431ed04393895d8593d27e92c123a267b",
+   "en": "The Silicone Sock for Hotend is made from high-quality silicone for higher temperature resistance (rated to 300°C printing temperatures).Ensuring optimal thermal insulation and tear resistance, the silicone sock also provides the nozzle with long-lasting protection from cooling air and plastic adhesion.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5bed6016014001601d3d6700405bd9e5a864a3d074c1d9eefa9423d19fc2593b",
+   "en": "X2D External Exhaust Fan",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-bundle-x2d",
+    "title": "External Exhaust Fan Bundle - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4805c547699e5bc45abe3376f10659bde5bc2ced93fc4d3ede38792abdcc053f",
+   "en": "Please refer to the installation guide on the Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 73,
+   "context": {
+    "handle": "focusing-lens-medium-long-focal",
+    "title": "Focusing Lens - Medium & Long Focal",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f1559725cce91a418667bcf41a4c6850d6d7fa4b7d95b08609d8a3018d7ec9bb",
+   "en": "Focusing Lens",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "focusing-lens-medium-long-focal",
+    "title": "Focusing Lens - Medium & Long Focal",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4cbb3cb5ce5fe0f47bfdc79146ca21989233abb52f0009c3a063498e507c236",
+   "en": "M2.5-5 Screw",
+   "kind": "box_item",
+   "freq": 8,
+   "context": {
+    "handle": "focusing-lens-medium-long-focal",
+    "title": "Focusing Lens - Medium & Long Focal",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2242ba16af844fb62e7316aefba254360908648cc0202d05d4b3b2922f8ca291",
+   "en": "Cleaning Cloth",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "focusing-lens-medium-long-focal",
+    "title": "Focusing Lens - Medium & Long Focal",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0913b6c68f0cb95b0d646115015a0461d0dfef5fdf9d63403042e6c811f29148",
+   "en": "Material Fixing Clip",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "material-pin-r1",
+    "title": "Material Pin - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d01597c35329fe924ddaf91a94a9eec271b73036769460fc80ec329ffd2fe95",
+   "en": "Rotary Axis Assembly Mounting Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "installation-bracket-for-rotary-attachment",
+    "title": "Installation Bracket for Rotary Attachment",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc8bd88282a6b2f2675148b3039be6e97f87d1057a1ff8c76f0820f833c47633",
+   "en": "Riser Frame Screwdriver",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "installation-bracket-for-rotary-attachment",
+    "title": "Installation Bracket for Rotary Attachment",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e959191aa1e709840379a686b677cd91207749bff30ec21e01e1c81df95fa636",
+   "en": "M3-21.5 Screw",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "installation-bracket-for-rotary-attachment",
+    "title": "Installation Bracket for Rotary Attachment",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb52d013fce2d94a702150cd4ba0f59f23aacf77117bd39e7472f99828139cfd",
+   "en": "Extension Rail",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "guide-rail-extension",
+    "title": "Guide Rail Extension",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2bce92d31d6f7aa095b6746936af5ba32c5283d2142bf7a9c16513e02e18e43",
+   "en": "Extension Rail Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "guide-rail-extension",
+    "title": "Guide Rail Extension",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f7c87e979c5fe1f6cac89dd3642e444d89f661c8d63aaf7bd90d3a404f701297",
+   "en": "Hex Screwdriver",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "guide-rail-extension",
+    "title": "Guide Rail Extension",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb5376cfee7d1e7027420b381443d8dba2b3ca94b78294cde101ce4ece581296",
+   "en": "1. Motion accuracy can change over time due to usage, relocation, and environmental conditions, including:",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "usage[0].body.line[0]",
+    "near": "• Ambient temperature fluctuations"
+   },
+   "dict": null
+  },
+  {
+   "h": "507e079a1a4ac9065b82daca86a39a9c07ea62f47ebb3273a8ccfe045da9618d",
+   "en": "Structural micro-deformations caused by vibration or relocation",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "usage[0].body.line[2]",
+    "near": "• Ambient temperature fluctuations"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c868fd8f1363556de09e14c43b989659e44cd1678e2b0c82e63481dc5af6b39",
+   "en": "Mechanical wear over time",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "usage[0].body.line[3]",
+    "near": "• Structural micro-deformations caused by vibration or relocation"
+   },
+   "dict": null
+  },
+  {
+   "h": "e3dc4c166a6747fe13a94a4f4f6aff89d717b993880ef9b73363e379c356a3fd",
+   "en": "For applications requiring sustained high accuracy, we recommend recalibrating every two weeks.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "usage[0].body.line[4]",
+    "near": "• Mechanical wear over time"
+   },
+   "dict": null
+  },
+  {
+   "h": "367316ead9da08e65ab8e133099a3ded79cd5930fc97afb84953f414dba3b2da",
+   "en": "2. The Vision Encoder is used only for motion accuracy calibration. Remove and store it properly after calibration.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "usage[0].body.line[5]",
+    "near": "For applications requiring sustained high accuracy, we recommend recalibrating every two weeks."
+   },
+   "dict": null
+  },
+  {
+   "h": "db2d4e7114b3bab93b27936e9749f79a9b490bca13c44da26ea30a693b9eeed9",
+   "en": "The transparent protective film has been removed from the Vision Encoder before first use.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "usage[0].body.line[7]",
+    "near": "3. Before calibrating with Bambu Lab Vision Encoder, please ensure the following:"
+   },
+   "dict": null
+  },
+  {
+   "h": "a818419750885a26bcf16218705205cb7d99342c443a759be747e67bb12ab1a3",
+   "en": "The toolhead camera is functioning properly and the lens is clean.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "usage[0].body.line[8]",
+    "near": "• The transparent protective film has been removed from the Vision Encoder before first use."
+   },
+   "dict": null
+  },
+  {
+   "h": "8829444f6bb392890c5078e0f5053695e67043aa11b7fbb58068ac493342f823",
+   "en": "The work area is clear of debris.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "usage[0].body.line[9]",
+    "near": "• The toolhead camera is functioning properly and the lens is clean."
+   },
+   "dict": null
+  },
+  {
+   "h": "3dd6da3d69f89461e424fc13a3ebe40989026f8a4847e9e5f82963f7abb3595e",
+   "en": "The Vision Encoder surface is clean, with all grid patterns clearly visible.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "usage[0].body.line[10]",
+    "near": "• The work area is clear of debris."
+   },
+   "dict": null
+  },
+  {
+   "h": "c84b2bb17b37c87900c380c382173de6189b89a627cf7d8f400d3ce7d41031dd",
+   "en": "For more installation guidance on the Riser Base, please refer to Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e59d38030e04aea1fa778aeb2b47c9f064ce257f1f40ab664fd171ff8cc70800",
+   "en": "Max. Workpiece Height",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "specs[x.max_workpiece_height].label",
+    "near": "248 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "d49ec630c1624b42841240cf2eeba16b504956f8558c0e42cb7797a372327da8",
+   "en": "Riser Interlock",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "specs[x.riser_interlock].label",
+    "near": "Front door open detection: Supported / Front upper door open detection: Supported / Rear door open detection: Supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "44694b72059d5c7d56d1e8f00b6ce214c6a6c0db0c9fbd69228a79d1d3898db3",
+   "en": "Front door open detection: Supported / Front upper door open detection: Supported / Rear door open detection: Supported",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "specs[x.riser_interlock]",
+    "near": "Riser Interlock"
+   },
+   "dict": null
+  },
+  {
+   "h": "8f63b27c205a60a1a2244b045d606716573f5313b9caeda3bbe9fd0a056405f8",
+   "en": "Flame Detection Sensor",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "specs[x.flame_detection_sensor].label",
+    "near": "4 built-in flame sensors"
+   },
+   "dict": null
+  },
+  {
+   "h": "8908dfffd70899090e4529c684c5d7165d95ba86e609fd4b75590842af50d4da",
+   "en": "4 built-in flame sensors",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "specs[x.flame_detection_sensor]",
+    "near": "Flame Detection Sensor"
+   },
+   "dict": null
+  },
+  {
+   "h": "002ef0b9b37aa5d9493645e5343d4dedab8392b1d3c8d41f1d4db2abbbbf63b6",
+   "en": "Powered via 8-pin cable connected to the R1",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "specs[electrical.voltage]",
+    "near": "Voltage"
+   },
+   "dict": null
+  },
+  {
+   "h": "60b318f78fe214c323ee11666c53b16abddebaaa502d50559018b772dea742b4",
+   "en": "R1: 600*300 mm / With Conveyor: 600*3000 mm",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "specs[printing.working_area]",
+    "near": "Working area"
+   },
+   "dict": null
+  },
+  {
+   "h": "073d458d63dfea8a2c8984a5ff6cff9e30bfbcc451a334930f1e42b14118566d",
+   "en": "Before use, please follow the Auto-Passthrough Processing Guide to correctly install the Riser and Conveyor.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c78d0dffa7e3419b232fa6de6d53998243efed3b726f6c3f7c94d3a609bb690d",
+   "en": "Applicable to",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "specs[x.applicable_to].label",
+    "near": "Bambu Lab R1"
+   },
+   "dict": null
+  },
+  {
+   "h": "49419a963b5402e93eb1c24dedfb77baef7165b00a78963355fb7cbb59a8bdb7",
+   "en": "Max. Workpiece Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "specs[x.max_workpiece_size].label",
+    "near": "Guide rail only, no extension: / 450 mm < length < 1500 mm / Guide rail + 1 extension: / 450 mm < length < 2000 mm / Guide rail + 2 extensions: / 450 mm < lengt"
+   },
+   "dict": null
+  },
+  {
+   "h": "94a6ce3f943b6079f575934cf1a68cd2c649aa06db4ff22d8667cea7c3a3e95d",
+   "en": "Guide rail only, no extension: / 450 mm < length < 1500 mm / Guide rail + 1 extension: / 450 mm < length < 2000 mm / Guide rail + 2 extensions: / 450 mm < length < 2500 mm / Guide rail + 3 extensions: / 450 mm < length < 33000 mm",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "specs[x.max_workpiece_size]",
+    "near": "Max. Workpiece Size"
+   },
+   "dict": null
+  },
+  {
+   "h": "73827fea8fa14f218686aa5c7ad79e8539ea579be7b5a76fc7357cd2cce88b0b",
+   "en": "Max. Processing Speed",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "specs[x.max_processing_speed].label",
+    "near": "Laser Fill / Laser Image: 1000 mm/s / Laser Line / Laser Cut: 200 mm/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7c80f3e99f91b465a18b94c73972e2e0e2583bb38ddf4ba1ae1fa4272ef341c",
+   "en": "Laser Fill / Laser Image: 1000 mm/s / Laser Line / Laser Cut: 200 mm/s",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "specs[x.max_processing_speed]",
+    "near": "Max. Processing Speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "d41f88263709d92c004e6e403b7445b005dda6561c29ac62b47ba28822433d3e",
+   "en": "Powered via 6-pin cable connected to the R1 riser base",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "specs[electrical.voltage]",
+    "near": "Voltage"
+   },
+   "dict": null
+  },
+  {
+   "h": "2a6ed7bf8bbf8e9c4dbecb51c9bf31b387e712d9f30c8e79549ab707944d858f",
+   "en": "The function of the front housing assembly is mainly to cool the printed part so that it can be shaped.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "front-housing-assembly-x1-series",
+    "title": "Front Housing Assembly - X1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "668a654067497e1015993fc075bc1f14245508a52223e7719157c5eec511c487",
+   "en": "Learn more about the replacement of front housing assembly for X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "front-housing-assembly-x1-series",
+    "title": "Front Housing Assembly - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e01714e768a69b96a9759873e00356e1e5198d54915858127166bc3db17b8c48",
+   "en": "Plastic, Metal, Rubber, Printing Circuit Board",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "front-housing-assembly-x1-series",
+    "title": "Front Housing Assembly - X1 Series",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "3fe0233ec767199cc3794f84e0db6a327f985b8320774d3396caf34a0c7e9d10",
+   "en": "The high-resolution screen is a 5-inch 1280*720 touch screen, that you can use to control the printer. It is only suitable for Bambu Lab X1 series. We hope you enjoy the clear visuals on our screen. Compatibility: X1 Series Exclusive",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ede900db4b7875610961b0aa032ea64a7ed370e66fd20d39eff4b89ff244655d",
+   "en": "Learn more about the installation process of the high-resolution screen for X1 series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f124a75b29d712002bf2bf6dccec07c800a466e2df3808eb283e754280c2f783",
+   "en": "Micro SD card",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "specs[part.external_interface]",
+    "near": "External interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "707570e838e6a810370bbc1c7cfb43fdfa3c64d9b6f6a6989f82c6f9326bb489",
+   "en": "Screen resolution",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "specs[x.screen_resolution].label",
+    "near": "720*1280"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d147af415ac39eb382911e66ef4324ddbf6724bd8bfd97e80d1a4219aa3a4e2",
+   "en": "Capacitive Touchscreen",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "specs[connectivity.display]",
+    "near": "Display"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9f527dacd544cd66b0501447c34a4e4e1b6664424d7d4a03062d65bf1e4b4f1",
+   "en": "Screen size",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "specs[x.screen_size].label",
+    "near": "5 inches°"
+   },
+   "dict": null
+  },
+  {
+   "h": "c1fa6d7da767c82436b1a844e085dd7f701a6f9b9e6285ceb0e62a61965b5a0c",
+   "en": "5 inches°",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "specs[x.screen_size]",
+    "near": "Screen size"
+   },
+   "dict": null
+  },
+  {
+   "h": "97e2a68a86601efc41c664c788d9e515ad07c6b80236e5fcdf90f08703955e9c",
+   "en": "Product size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "specs[x.product_size].label",
+    "near": "127.1mm*78.8mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "cdab52acc58c0bba046f21f4a64a2a4a0942030b175de647bc78eeabccf97e54",
+   "en": "Plastics, printed circuit boards",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "5696c00984b6bdad5dcfe1ec075e0775162ad715bedc89654942909b136ae9ba",
+   "en": "Please place the glass cover plate over the printer. Compatibility: X1 Series Exclusive Glass Cover Plate Technical Specifications Materials Plastic, glass Package Weight 1.29kg Package Size 430*407*37 mm Color Transparent",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "glass-cover-plate",
+    "title": "Glass Cover Plate",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8bb15238b83b49094851c22fdf1fdbc87aea482d2a3444a870627ccdde35fd84",
+   "en": "Plastic, glass",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "glass-cover-plate",
+    "title": "Glass Cover Plate",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "a31b3dc1e68c4809b98e351d1c846e81d89c950639f2c469568d195da05f3dfc",
+   "en": "The control board fan is used to cool the control board to prevent the control board from overheating and shutting down.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "control-board-fan",
+    "title": "Control Board Fan",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dc68c9c14206238251bbfc98a5332af35b2e31d8acf72ce22eb9dfabb8064be1",
+   "en": "For X1 Series: Bambu Lab Wiki",
+   "kind": "usage_body",
+   "freq": 4,
+   "context": {
+    "handle": "control-board-fan",
+    "title": "Control Board Fan",
+    "field": "usage[0].body.line[0]",
+    "near": "For P1P (Enclosure): Bambu Lab Wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7859f3f374412c41525b9c4ba0dc8e6bd3bbb80c364b8d84a04061b05a5b243",
+   "en": "For P1P (Enclosure): Bambu Lab Wiki",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "control-board-fan",
+    "title": "Control Board Fan",
+    "field": "usage[0].body.line[1]",
+    "near": "For X1 Series: Bambu Lab Wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "43d330ff7919ddce7119883e669ba0f8acbd65409ae45eb3a9d29cb855fbf452",
+   "en": "Plastic, Metal, Rubber",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "control-board-fan",
+    "title": "Control Board Fan",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "ffbef275d4c759c2295a1d97a9d071ac92269c3a965d33a3d7b9d47f57489151",
+   "en": "4000 rpm/min",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "control-board-fan",
+    "title": "Control Board Fan",
+    "field": "specs[part.rated_speed]",
+    "near": "Rated speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "62a4a8e9e17edbc0173e28fe91a7f369dcdaf41c15c3dfd02ef1bb711d4c1614",
+   "en": "3.68 CFM",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "control-board-fan",
+    "title": "Control Board Fan",
+    "field": "specs[part.max_air_flow]",
+    "near": "Max air flow"
+   },
+   "dict": null
+  },
+  {
+   "h": "09236528a9edb981f644e906e13f76efdd3a3629c3aaa1566fb9a03e0693c3f1",
+   "en": "20000 hrs at 40℃",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "control-board-fan",
+    "title": "Control Board Fan",
+    "field": "specs[part.expected_life]",
+    "near": "Expected life"
+   },
+   "dict": null
+  },
+  {
+   "h": "35386e1e5df5d24e4588edeecb189f448d9bfc03dff677b9228b0aff816d4c4f",
+   "en": "The chamber temperature regulator fan is used to control the temperature and to&nbsp;help filter air inside the chassis.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-temperature-regulator-fan",
+    "title": "Chamber Temperature Regulator Fan",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "19e573e30fbef2150a51169f24932fec5f25475d4deab63ea41f47d3ba7a5d11",
+   "en": "4800 rpm/min",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-temperature-regulator-fan",
+    "title": "Chamber Temperature Regulator Fan",
+    "field": "specs[part.rated_speed]",
+    "near": "Rated speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "b355f99a03e4132addf9cc7c27494c9f5e7344ccffb8415587dd247ab0d61223",
+   "en": "92.56 CFM",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-temperature-regulator-fan",
+    "title": "Chamber Temperature Regulator Fan",
+    "field": "specs[part.max_air_flow]",
+    "near": "Max air flow"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa2557aa860ccc4ec0c9a61f19d5f66535dd5571a0f5a9cf622942ab970f467b",
+   "en": "The cooling fan is used for cooling and reducing the temperature of the ceramic heater for hotend. In addition, the cooling fan for our hotend has an auto-shutoff after being locked at rated voltage for 1-3 seconds. The circuit attempts to restart in 2 to 6 seconds. There is no damage after 72 hours of locking.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "76041db1391237692d3292f66074f6647960e9c5281158b6cf033fdba9d021e6",
+   "en": "Learn more about the replacement of cooling fan for hotend for X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9ac0ae2f57dae790d20c6f72e64428b4dcccbde0134d3d95286cc9f4557a173f",
+   "en": "15500 rpm/min",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "specs[part.rated_speed]",
+    "near": "Rated speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "2354c6367d1fdfa0426bfbe98e3c2f7af1a5e1b53bb77292740c3dfcedfb4be2",
+   "en": "2.96 CFM",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "specs[part.max_air_flow]",
+    "near": "Max air flow"
+   },
+   "dict": null
+  },
+  {
+   "h": "f93964721f0c34d42de7ac2b39d2ee22e5f25e7200ab3129ab70384b50257d25",
+   "en": "50000 hrs at 40℃",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "specs[part.expected_life]",
+    "near": "Expected life"
+   },
+   "dict": null
+  },
+  {
+   "h": "840e1e18771ea9952f359149a0795b702fd0e80295465f92c8ab43781958758c",
+   "en": "Cooling Fan for Hotend - X1 Series",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "321ced199489ce692331785832cacfbe5cba7676f1c4c7d83ccfba7afea9db28",
+   "en": "MG2.5-15 Screws",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "56df372f8d5076c3b2d9734a4984dd6a9ab2738a1a8ea8110199fa43d8d5629c",
+   "en": "The thermistor has highly accurate temperature measurement and reliable structural design, which is for use with&nbsp;Bambu nozzle assemblies only.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "thermistor-x1c",
+    "title": "Thermistor 3 pcs - X1C",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3c6bec76fa3e810b161ba7654c2fe65b712b8e2f8dab3a846969877bac42f5b9",
+   "en": "Learn more about the replacement of thermistor on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "thermistor-x1c",
+    "title": "Thermistor 3 pcs - X1C",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "34412fc15b46ca82abedf7f377aef0531e374b4ba27ee9d1092bf8935b814cfe",
+   "en": "Plastic, Metal, Glass",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "thermistor-x1c",
+    "title": "Thermistor 3 pcs - X1C",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "4fa94e55d82a558eb304da0f64e9a6ce4b41c338f0c939011af767e53c47956e",
+   "en": "Thermistor",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "thermistor-x1c",
+    "title": "Thermistor 3 pcs - X1C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1ce6bcbec294463d9c4cf2b11c8bd03a300bf11b45c05dce8707f3e371dff699",
+   "en": "Thermal Grease",
+   "kind": "box_item",
+   "freq": 6,
+   "context": {
+    "handle": "thermistor-x1c",
+    "title": "Thermistor 3 pcs - X1C",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "966d7b6f5d27a0bcc7894d9bb14d6fe3a0071c9fc9f07e03b99e2cf5e1e7fb79",
+   "en": "Retaining Clip",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "thermistor-x1c",
+    "title": "Thermistor 3 pcs - X1C",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e845e8f9793a9ff4cfdba9f3beb04a0c5ae082473149887eb4b60f37ef5d363d",
+   "en": "The ceramic heater can heat the nozzle up to 300℃, which is&nbsp;for use with Bambu nozzle assemblies only.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ceramic-heater-x1c",
+    "title": "Ceramic Heater 3 pcs - X1C",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fb5423e3b472d74ce20c00e07e40173ffe78d6d10f88289a37b643d44997a2b2",
+   "en": "Learn more about the replacement of ceramic heater on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ceramic-heater-x1c",
+    "title": "Ceramic Heater 3 pcs - X1C",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c2d3abf5e7574e239504909dc18f2373ca1ba60352f7700c4e2e02a8bb64e007",
+   "en": "Heating Power",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "ceramic-heater-x1c",
+    "title": "Ceramic Heater 3 pcs - X1C",
+    "field": "specs[x.heating_power].label",
+    "near": "48 W"
+   },
+   "dict": null
+  },
+  {
+   "h": "40711f5e6767f7920bbf9c8d5b4f341ef9d258cdb25a9233b12dd8c92979f98a",
+   "en": "Plastic, Metal, Ceramic",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "ceramic-heater-x1c",
+    "title": "Ceramic Heater 3 pcs - X1C",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "bf42dace6798f1fba090fbd372cd440772dc59566b480ae3532274007836b5a4",
+   "en": "Ceramic Heater",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ceramic-heater-x1c",
+    "title": "Ceramic Heater 3 pcs - X1C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7b68c9d470f6d6700bf8ad9f627509ce150f6ea9ccecc86d922404964950e4a",
+   "en": "Bambu bus cable is only suitable for use with Bambu Lab X1 series printers. Compatibility: X1 Series, P1P",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-bus-cable",
+    "title": "Bambu Bus Cable",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "400ad9e806483a548bfa6ac193be70d5534ec83892c9724462b30f5fcfcf5d62",
+   "en": "The Bambu Lab USB-C cable is installed in the towing chain and is only suitable for Bambu Lab X1 series printers. Compatibility: X1 Series Exclusive Bambu USB-C Cable Technical Specifications Materials Plastic, metal Package Weight 30 g Package Size 200*145*4 mm Color Black",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-usb-c-cable",
+    "title": "Bambu USB-C Cable - X1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2dddb24e277913930f7657f94707126990d4ecb26fcbd26daa6a1943b5bcd52d",
+   "en": "Learn more about the replacement of the USB-C Cable on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-usb-c-cable",
+    "title": "Bambu USB-C Cable - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0f4826f824d24d7c582c8dcf463b2806e1124a96c7d5a5e6303ddc404b86ad8d",
+   "en": "Plastic, metal",
+   "kind": "spec_value_text",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-usb-c-cable",
+    "title": "Bambu USB-C Cable - X1 Series",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "f5128d58eb164419f328860da3d25ce173d308f121f99ad7a1246ffebba2148c",
+   "en": "The Nozzle Wiper is used to clean up the waste overflowing from the nozzle of the printer. It consists of PP elastic structure, PTFE tube, and a lock screw.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-wiper-x1-p1-series",
+    "title": "Nozzle Wiper - X1/P1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "75d7cda8e032f7e9568370867d7533accfd97e127a7c7afe071568c1a1db2e74",
+   "en": "Learn more about the replacement of nozzle wiper on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-wiper-x1-p1-series",
+    "title": "Nozzle Wiper - X1/P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c01c1758c54c42f79de4b010db96803c74bb517c311293aa752448044e5bf20e",
+   "en": "Nozzle Wiper",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-wiper-x1-p1-series",
+    "title": "Nozzle Wiper - X1/P1 Series",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "bffc37e6f145d68d6a101eb0b3c5d8d31dea2a69bd70a63801d2d4ef3741034f",
+   "en": "Prolonging the lifetime of the build plate is to use a sharp scraper for releasing the model from the printing surface. After the plate has cooled down, gently slide the scraper underneath one of the corners of the model. Then, carefully bend the sheet to remove the model.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-scraper-3-pcs",
+    "title": "Bambu Scraper 3 pcs",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1e95a4f8ca48a238c0465a31db4b4fec9e77436aa89256eb89f27356f710e684",
+   "en": "How to print your Scraper grip?",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-scraper-3-pcs",
+    "title": "Bambu Scraper 3 pcs",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ffbe56ccd269bfdc22ad209bb02ff543d82ec4474a5099909e1e0388b728f1f8",
+   "en": "Bambu Lab 3D printer comes with scraper models. Print 'Scraper grip' from the built-in files! Here is the STL Model！",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-scraper-3-pcs",
+    "title": "Bambu Scraper 3 pcs",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "48e973bc239f2ded6e254fdc86df91a03a193f0dda4534ab6681b36507421030",
+   "en": "SK5 steel",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-scraper-3-pcs",
+    "title": "Bambu Scraper 3 pcs",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "34096704209393b385849d847c1cba048fe59a1a0520a49a8df60e329169bfd9",
+   "en": "Bambu scraper",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-scraper-3-pcs",
+    "title": "Bambu Scraper 3 pcs",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fc69cb414c4d51ee6a773b2f4d2260dbe25fb24b169e00abb04acb2491749e82",
+   "en": "STL Model！",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-scraper-3-pcs",
+    "title": "Bambu Scraper 3 pcs",
+    "field": "documents[0]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec6507f15fd67abf28f020443130e3f140ebc658fd1d82ce5d7b057c59890a91",
+   "en": "Melt extrusion printers will generate VOCs while printing because the heating temperature of ABS, PC, PA and other materials is relatively high, resulting in more VOCs. Materials such as PLA with lower melting points produce much fewer VOCs during printing.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "activated-carbon-air-filter-x1-p1-series",
+    "title": "Activated Carbon Air Filter - X1/P1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "112f3ccb1b36a86a2b35cdf18599408a58b599e19f7073241d78ee588eb1e9fd",
+   "en": "Instruction",
+   "kind": "usage_title",
+   "freq": 23,
+   "context": {
+    "handle": "activated-carbon-air-filter-x1-p1-series",
+    "title": "Activated Carbon Air Filter - X1/P1 Series",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cf99ce9cb3e0a273ce1d2b68c6dbe74c1c4133cdec1713f2669d2050eb2613a5",
+   "en": "Learn more about the Activated Carbon Air Filter on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "activated-carbon-air-filter-x1-p1-series",
+    "title": "Activated Carbon Air Filter - X1/P1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c803710302d5769d8fcd51958c516ff27f2a3c5ad9373c348d1d180c04a74624",
+   "en": "Function",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "activated-carbon-air-filter-x1-p1-series",
+    "title": "Activated Carbon Air Filter - X1/P1 Series",
+    "field": "specs[x.function].label",
+    "near": "Used to absorb volatile organic compounds"
+   },
+   "dict": null
+  },
+  {
+   "h": "3366c3b62f24d342c1b59661641da04d96451bdc2293d0f81dd8adbde1b9b41e",
+   "en": "Used to absorb volatile organic compounds",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "activated-carbon-air-filter-x1-p1-series",
+    "title": "Activated Carbon Air Filter - X1/P1 Series",
+    "field": "specs[x.function]",
+    "near": "Function"
+   },
+   "dict": null
+  },
+  {
+   "h": "34332a6675931b750ce3309f879a530997b6a6e4159b054cf10ab426f6559393",
+   "en": "1440 hours (60 days) cumulative printing time",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "activated-carbon-air-filter-x1-p1-series",
+    "title": "Activated Carbon Air Filter - X1/P1 Series",
+    "field": "specs[x.working_life]",
+    "near": "Working Life"
+   },
+   "dict": null
+  },
+  {
+   "h": "059b3b46226f3ff031d3658152646158b281c65c70b95ffc23630f359265bc05",
+   "en": "Paper box, activated carbon",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "activated-carbon-air-filter-x1-p1-series",
+    "title": "Activated Carbon Air Filter - X1/P1 Series",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "75e526ab6c9c254357a9148f68051953c2eead6dd417109f93f5678d0e95b550",
+   "en": "The filament can be cut to prevent the supplies from clogging. When used with AMS, it assists with multi-material switching.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "replacement-filament-cutter",
+    "title": "Replacement Filament Cutter",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d443344e62c69f3cb7633748ef8aa6e8c62fb98c10e851bfc6af6663465a8e4f",
+   "en": "Learn more about Replacement Filament Cutter on Bambu Lab Wiki:",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "replacement-filament-cutter",
+    "title": "Replacement Filament Cutter",
+    "field": "usage[0].body.line[0]",
+    "near": "X1 Series/P1 Series"
+   },
+   "dict": null
+  },
+  {
+   "h": "a47834efb4a7e54fd45577b3c6088cf35cefeab3dc5291481f5b9e7467e1d1e1",
+   "en": "Filament Cutter Unit",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "replacement-filament-cutter",
+    "title": "Replacement Filament Cutter",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "abd459ae8e645e41a04d4069c7a4df2912519014bffbedeefa9daabe8f16e8ea",
+   "en": "The chamber camera is included by default in the X1-Carbon and is an optional upgrade that you can install for the X1. The chamber camera has three functions, which are Remote Livestreams, Spaghetti Detection and Time-lapses respectively.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "72e803ba605b22b909f5ca59cecf83b5221363c8423a150e4632132632e20ae4",
+   "en": "Learn more about the replacement of the chamber camera on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5608c2a19433a83e78e41839e7532b25697b27cbe416718c1cb0c7810ce3eb53",
+   "en": "FOV",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "specs[x.fov].label",
+    "near": "110°"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad1ff6309403d5f28c1c1e9fd5ecbfec69155d6c1de48692aa04b163d5a43465",
+   "en": "Resolution Ratio",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "specs[x.resolution_ratio].label",
+    "near": "1920*1080"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac3e88496779bf8a9fbe1d7d603eb8e0d236b83ebc1eb427cf97a10d100ce4e7",
+   "en": "FN",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "specs[x.fn].label",
+    "near": "2.6"
+   },
+   "dict": null
+  },
+  {
+   "h": "68e19e4ca3a5670a9f2af8b18a5b437332601a9660565681abf4555d5e67c32d",
+   "en": "Frame rate",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "specs[x.frame_rate].label",
+    "near": "30 fps"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e119b2325ce6d1d7603dbe5a9e1d63ed3859e7c0f006581ba520f1cf8a9d748",
+   "en": "30 fps",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "specs[x.frame_rate]",
+    "near": "Frame rate"
+   },
+   "dict": null
+  },
+  {
+   "h": "83300489bcb1136e4603c2e4b370dac62acc82e5545b13bdca48406baf354ee1",
+   "en": "The Display Connector Flex Cable is used to connect the motherboard and high-resolution screen. Its function is to transmit SD card data and display images between the screen and printer.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "display-connector-flex-cable",
+    "title": "Display Connector Flex Cable - X1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c2651e2c14b9233660ba0723a97e2be3b7703868ff7e36a5c99e718758a0c120",
+   "en": "Learn more about the replacement of the display connect flex cable on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "display-connector-flex-cable",
+    "title": "Display Connector Flex Cable - X1 Series",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e0d1c1be2458478eaf8eac2318ba6792a3218e7beb7726719293129d4ede1c46",
+   "en": "Cable length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "display-connector-flex-cable",
+    "title": "Display Connector Flex Cable - X1 Series",
+    "field": "specs[x.cable_length].label",
+    "near": "265 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "04ca6473e0b7f15d12afb985543048c399dfcc3a23a7e1150b7e38bfccdae82d",
+   "en": "The Bambu Hardened Steel Extruder Unit is driven by hardened steel double gears to increase extrusion force, to prevent slippage and to be more abrasion resistant.It's not only suitable for common 3D printing filaments but also for engineering filaments like carbon fiber nylon, glass fiber nylon, etc. It also supports the filament break detection.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-unit-x1-series",
+    "title": "Hardened Steel Extruder Unit - X1C",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8eeac6c274a8bff6399ef08bc6e0d7f89f97d42936c37f7a853d013860682e7d",
+   "en": "Learn more about the replacement of hardened steel extruder unit for X1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-unit-x1-series",
+    "title": "Hardened Steel Extruder Unit - X1C",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fe1901bcd812deb3ab31f126b7721340d7b30c06d171a829d012aa7087f972a7",
+   "en": "Reduction Ratio",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "hardened-steel-extruder-unit-x1-series",
+    "title": "Hardened Steel Extruder Unit - X1C",
+    "field": "specs[x.reduction_ratio].label",
+    "near": "9 : 53"
+   },
+   "dict": null
+  },
+  {
+   "h": "6364eb67e6aa0a0941c4e1397e55bfcc377d95861b59deaa1747fa7111e94dbb",
+   "en": "Supported Filament Diameter",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "hardened-steel-extruder-unit-x1-series",
+    "title": "Hardened Steel Extruder Unit - X1C",
+    "field": "specs[x.supported_filament_diameter].label",
+    "near": "1.75 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "15ac1a025c601f9e7eda3d8a8a47ebdf42e442c821e53c6c1390ed8bdabd09b3",
+   "en": "PET-CF, PAHT-CF, PA6-CF, PLA-CF, PETG-CF, PLA, PETG, ABS, ASA, PC, TPU",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "hardened-steel-extruder-unit-x1-series",
+    "title": "Hardened Steel Extruder Unit - X1C",
+    "field": "spec_groups.sg_bambu_official[printing.supported_filament]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0b2096e10d937c6b90653fd803f7e12d616338aca8cdf3a2eb33337d29a535b",
+   "en": "Hardened Steel Extruder Unit - X1 Series",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-unit-x1-series",
+    "title": "Hardened Steel Extruder Unit - X1C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "68d30c099bb264c9ae22b2eb9002a570a2f29fdbc033cdcddcb14b5784258b71",
+   "en": "Bambu Lab AMS Driven Support Shaft Assembly is a roller for supporting the filament spool.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-driven-support-shaft-assembly",
+    "title": "AMS Driven Support Shaft Assembly",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "da4b5d64aa91555393e210b567c6ef2d28431624c645ac6951cd4cb7b313fdd7",
+   "en": "Bambu Lab AMS Active Support Shaft Assembly is a roller for supporting the filament spool and also for actively driving the spool to roll.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-active-support-shaft-assembly",
+    "title": "AMS Active Support Shaft Assembly",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e13ca4e815f6d3bd3a65e13f4362a7129b839da7e624e425c02a8910d20a603f",
+   "en": "Learn more about the replacement of active support shaft on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-active-support-shaft-assembly",
+    "title": "AMS Active Support Shaft Assembly",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cbb71dd5e7b26733fce451e3b31ac4994be815b962a68dcc169ef51e979bcc84",
+   "en": "Plastic, Silicone Rubber, Metal",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-active-support-shaft-assembly",
+    "title": "AMS Active Support Shaft Assembly",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a19a57933a24e8a79bd5f0d2ca6aff4ed5347a50ba246885fe7c0fe96d5ac22",
+   "en": "Black, Silver",
+   "kind": "spec_value_text",
+   "freq": 19,
+   "context": {
+    "handle": "ams-active-support-shaft-assembly",
+    "title": "AMS Active Support Shaft Assembly",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أسود، فضي",
+    "ckb": "ڕەش، زیوی"
+   }
+  },
+  {
+   "h": "81f42abc208fbf9e3fd18cce9118c4b98f6697c49588e4bf9889560b1ea7d4a6",
+   "en": "Bambu Lab AMS Active Extrusion Wheel Assembly is a friction wheel assembly for actively driving the filament forward.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-active-extrusion-wheel-assembly",
+    "title": "AMS Active Extrusion Wheel Assembly",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3a5467e8c5adeeabf22c3d58a0bee5354799f1c081040a8dd224874bca5913de",
+   "en": "Learn more about the replacement of extrusion wheel on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-active-extrusion-wheel-assembly",
+    "title": "AMS Active Extrusion Wheel Assembly",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "81cbd1f6444ed9a9374286c507e2a3d35a6f73c06f35378f62abdce4f6e9e122",
+   "en": "The purpose of the front glass door is to keep the inside of the printer closed, thus providing protection for the printing process while also insulating the enclosure for high-temperature printing. Compatibility: X1 Series Exclusive",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "front-glass-door",
+    "title": "Front Glass Door",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5fe4950621b774027a40c8bc053a6fe48156a9b349074630a1016a07e9504885",
+   "en": "The P1S and X1C use the same specification for the front glass door. If you want to install a front glass door on P1P, you need to install the front door mounting kit and replace the front cover of the P1S (filling the gap) at the same time.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "front-glass-door",
+    "title": "Front Glass Door",
+    "field": "usage[0].body.line[0]",
+    "near": "Related WIKI links are available:"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e69879a0103b4e307763e3537cb972d9ed930b7528763b7df509ef7fc57cfa6",
+   "en": "Related WIKI links are available:",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "front-glass-door",
+    "title": "Front Glass Door",
+    "field": "usage[0].body.line[1]",
+    "near": "The P1S and X1C use the same specification for the front glass door. If you want to install a front glass door on P1P, you need to install the front door mounti"
+   },
+   "dict": null
+  },
+  {
+   "h": "c30259f7211d57fc20fcad784581a01653bf8bade83c405060d9f2394905efaa",
+   "en": "Front Glass Door installation tutorial",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "front-glass-door",
+    "title": "Front Glass Door",
+    "field": "usage[0].body.line[2]",
+    "near": "Related WIKI links are available:"
+   },
+   "dict": null
+  },
+  {
+   "h": "abf4f965c5f701aafcfca8d6ccadaee5308d0a81b631169e2d3fcef5f784b643",
+   "en": "Front Door Mounting Kit installation tutorial",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "front-glass-door",
+    "title": "Front Glass Door",
+    "field": "usage[0].body.line[3]",
+    "near": "Front Glass Door installation tutorial"
+   },
+   "dict": null
+  },
+  {
+   "h": "263ff943d94e40e5c27c3e7a8b35f0ae01e1157f0e1c632909afb042358b72c3",
+   "en": "Gray transparent",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "front-glass-door",
+    "title": "Front Glass Door",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": null
+  },
+  {
+   "h": "155255bbcb3633e581ce5570f95a3a598d6401b6d92b98647c2b23a3c7c1cf95",
+   "en": "Screws",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "front-glass-door",
+    "title": "Front Glass Door",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  }
+ ]
+}

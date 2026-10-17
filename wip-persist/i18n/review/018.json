@@ -1,0 +1,21 @@
+{
+  "batch": 18,
+  "compared": 40,
+  "meaning_disagreements": 0,
+  "fixed": 0,
+  "sample": "40 of 202 strings (handles p2s, h2c), batch index floor(i*202/40) for i=0..39 (every 5th string). They were translated independently into rev018/mine.json before out/018.json was opened.",
+  "sample_indices": [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 101, 106, 111, 116, 121, 126, 131, 136, 141, 146, 151, 156, 161, 166, 171, 176, 181, 186, 191, 196],
+  "notes": [
+    "Result: none of the 40 strings differ in meaning. out/018.json is byte-identical to the file as delivered (backup: rev018/out-018.before.json). The side-by-side comparison is in rev018/side-by-side.txt.",
+    "Validator: packages/catalog/src/bambuImport/i18n.ts validateTranslationRow (levonis-i18n worktree), with names.json and IDENTITY, run through rev018/val.mts. All 197 translated rows of out/018.json pass, and so do my 40 independent rows. The 5 keep rows are reviewer handles and a creator-model title shown under images (Califryburger, The Duty Printer, War_Poodle, DerangedKangaru, P51 Mustang). 'The Duty Printer' sits in the same attribution slot (blocks[n].line[0]) as the other handles, so it is a name and keep is correct.",
+    "Script scan of the whole file: no ckb slot contains an Arabic-only letter (ة ى ي ك) or an Arabic article. No ar slot contains the Persian/Sorani ک or ی. No ckb repeats the Arabic. The only row where many words are shared is row 89, a list of creator project names that correctly stay English. No bidi control characters and no price, stock or shipping words.",
+    "Row 201 (H2C footnote): the Latin comma in 'AMS 2 Pro, AMS HT' inside the Arabic and Sorani text looks like a breach of house rule 6. It is not a defect: names.json lists 'AMS 2 Pro, AMS HT' as one protected name, and the validator refuses the row (NAME_TRANSLATED) if the comma is changed to «،». I tried that fix, saw the refusal and reverted it. The row is unchanged.",
+    "Mixed-script consistency (not a meaning issue): rows 3, 75, 176 and 178 keep '<model> series' in Latin inside the Arabic and Sorani text ('P-series', 'XPA series', 'H2 series'). This treats them like the protected 'H2 Series' names (glossary: X1 Series …). The glossary translates only a bare lower-case 'series' («سلسلة» / «زنجیرە»), so writing «سلسلة H2» / «زنجیرەی H2» would also be valid, because the name check is case-sensitive and the token H2 survives either way. Pick one rule across all batches. Rows 184 and 187 add the English feature name in brackets after an Arabic gloss, e.g. «وضع المطوّر (Developer mode)». This is correct.",
+    "Row 126: the Arabic gives 'seamless enclosure' as «هيكلها المغلق بإحكام» (tightly closed). The Sorani «ژوورە داخراوە بێ درزەکەی» says 'seamless' literally. The fact is the same (a closed, sealed enclosure), so this is wording only.",
+    "Row 40: the Sorani «ڕێژەی چوارچێوەی بەرز» gives 'frame rate' with چوارچێوە, a physical frame or border. «ڕێژەی وێنەی بەرز» is more idiomatic for video, but the meaning is still clear. This is wording only.",
+    "Row 75: 'XPA series' is shorthand for the X/P/A printer series. Both translations keep 'XPA' verbatim and do not expand it. This is correct, because expanding it would be an interpretation the English does not state.",
+    "Footnote and limitation rows outside the sample were read for dropped facts: 69, 72, 73, 74, 76, 84, 86, 91, 118, 157, 163, 175, 184, 185, 187, 189 and 201. Every condition, 'must', 'not included / purchased separately', 'limited by filament type' and the '(2026)' date is kept in both languages.",
+    "Owner report «التوافق مكرر» (compatibility repeated): no string in batch 18 repeats a sentence. The 5 compatibility strings (75, 80, 165, 173, 176) each state compatibility once.",
+    "All other differences are style only. Examples: «ما كان ينبغي أن ينجح الأمر» vs «لم يكن من المفترض أن تنجح»; «فحص ما قبل التشغيل» vs «الفحص المسبق قبل الطباعة» for 'Pre-Flight'; «باقة»/«پاکەتی» added as the head noun before the 'H2C AMS Combo/Laser Full Combo' name in row 156, which is correct and leaves the name verbatim."
+  ]
+}

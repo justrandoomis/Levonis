@@ -1,0 +1,3360 @@
+{
+ "batch": 9,
+ "surface": "page",
+ "handles": [
+  "filament-cutter-stopper-x2d",
+  "front-cover-x2d",
+  "left-side-panel-x2d",
+  "right-side-panel-x2d",
+  "rear-panel-x2d",
+  "usb-c-cable-x2d",
+  "filament-buffer-x2d",
+  "chamber-heater-unit-x2d",
+  "tube-organizer-x2d",
+  "chamber-temperature-sensor-x2d",
+  "heatbed-x2d",
+  "power-supply-x2d",
+  "printer-cable-pack-x2d",
+  "x-axis-assembly-x2d",
+  "xy-belt-x2d",
+  "screen-x2d",
+  "screen-rear-housing-with-hinge-x2d",
+  "inner-lining-x2d",
+  "cable-chain-x2d",
+  "air-filter-x2d",
+  "nozzle-wiping-plate-x2d",
+  "x-axis-motor-a2l",
+  "y-axis-top-cover-a2l",
+  "y-belt-a2l",
+  "y-axis-tensioner-pulley-a2l",
+  "z-axis-motor-a2l",
+  "z-belt-a2l",
+  "4-pin-6-pin-connection-board-a2l",
+  "printer-frame-a2l",
+  "toolhead-front-cover-a2l",
+  "y-axis-motor-a2l",
+  "toolhead-cable-a2l",
+  "power-switch-assembly-a2l",
+  "printer-cable-pack-a2l",
+  "filament-sensor-unit-a2l",
+  "screws-kit-a2l",
+  "toolhead-filament-hub-a2l",
+  "extruder-unit-a2l",
+  "base-housing-assembly-a2l",
+  "cutting-module-adapter-board-a2l",
+  "hotend-heating-assembly-a2l",
+  "supportive-footpad-a2l",
+  "nozzle-wiper-a2l",
+  "spool-holder-a2l",
+  "ptfe-tube-connector-a2l",
+  "ptfe-tube-inlet-connector-a2l",
+  "heatbed-unit-a2l",
+  "mainboard-a2l",
+  "ac-board-a2l",
+  "power-supply-a2l",
+  "base-housing-a2l",
+  "bottom-cover-a2l",
+  "toolhead-board-a2l",
+  "extruder-unit-front-cover-a2l",
+  "extruder-gear-assembly-a2l",
+  "filament-cutter-lever-a2l",
+  "extruder-rear-cover-a2l",
+  "cooling-fan-for-hotend-a2l",
+  "nozzle-eddy-sensor-a2l",
+  "toolhead-rear-housing-a2l",
+  "x-belt-a2l",
+  "toolhead-block-a2l",
+  "live-view-camera-a2l",
+  "x-axis-motor-cover-a2l",
+  "x-axis-assembly-a2l",
+  "end-cap-a2l",
+  "purge-wiper-a2l",
+  "cleaning-wipes-50-pcs",
+  "x-axis-assembly-r1",
+  "idler-pack-r1",
+  "conveyor-cable-set",
+  "conveyor-pinch-roller-mount",
+  "support-roller-assembly",
+  "conveyor-guide-rail",
+  "8-pin-cable-r1",
+  "riser-base-smoke-curtain",
+  "riser-base-front-rear-panels",
+  "riser-base-cable-set",
+  "riser-base-left-assembly",
+  "riser-base-right-assembly",
+  "air-assist-nozzle-r1",
+  "laser-alignment-sensor-fpc-r1",
+  "reflective-mirror-assembly-r1",
+  "control-button-board-r1",
+  "smoke-ventilation-fan-r1",
+  "water-inlet-plug-r1",
+  "power-supply-r1",
+  "ventilation-fan-mounting-base-r1",
+  "power-filter-protecter",
+  "radiator-fan-r1",
+  "smoke-curtain-r1"
+ ],
+ "strings": [
+  {
+   "h": "87a69d88b22a373ad35542a35cedefdf784a3a82dc607eeba3d338e03285ddfb",
+   "en": "Cutter Pusher Assembly *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-stopper-x2d",
+    "title": "Filament Cutter Stopper - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b76e8138a8cb5eb8c66eec2fa03e0805f3e78221a4496911a45988d5c23d0933",
+   "en": "Metal Pin",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-stopper-x2d",
+    "title": "Filament Cutter Stopper - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "11859f9dbe2218818eb78a3e365019131c4be3bfe90c26ed1916785ebe979ded",
+   "en": "ST3x8 Screw",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "filament-cutter-stopper-x2d",
+    "title": "Filament Cutter Stopper - X2D",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cfbca886e4b277288d94ada4d31582e724e31fdf4deb72bc011c89daad5a9ca3",
+   "en": "Front Cover (with Wi-Fi Antenna) *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "front-cover-x2d",
+    "title": "Front Cover - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "188f5bd6d94dfbf60029108e2a1a1fc32b778c84215d794a4a2fdb298f93556d",
+   "en": "ST3x6 Screw",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "front-cover-x2d",
+    "title": "Front Cover - X2D",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6cec5b94fa90d99160fc1ee2e76cbcc1cf76c58d0b25b2e61b0829cc809d4020",
+   "en": "Left Panel *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "left-side-panel-x2d",
+    "title": "Left Side Panel - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "711a16e43252918802b4a0e642eb1fe196caf80b796e4297d9450f2a55b7534f",
+   "en": "Top Foam Strip",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "left-side-panel-x2d",
+    "title": "Left Side Panel - X2D",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "160e9ff981d837a1dce5f5f84431b0333c8216ec35bc160a5efbcc0b1dacc490",
+   "en": "Right Panel",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "right-side-panel-x2d",
+    "title": "Right Side Panel - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a40cba699d8b1e7a2c6e05f5a28e63ed80833521b9969af518cf42c11c39b058",
+   "en": "Rear Panel *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "rear-panel-x2d",
+    "title": "Rear Panel - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b69c6e4f036b228e93cdebfc30ea8c7c9ec38460e769a945250a2bd2a6daf38a",
+   "en": "BT3x6 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "rear-panel-x2d",
+    "title": "Rear Panel - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a1c3e663be69fb5c8a6e9b1f610b32682f08321e3de9f662532088bc2bf1034",
+   "en": "ST3x4.5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "rear-panel-x2d",
+    "title": "Rear Panel - X2D",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "99ec0290a0ba2606df27920313a86fb016c10ec5154e1590517a060801b9ee92",
+   "en": "USB-C Data Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "usb-c-cable-x2d",
+    "title": "USB-C Cable - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ec7888c5793cf1e2b0f8b4b32a42d124b8554e4c2a22cec465138cabc921786",
+   "en": "ST3x23 Shoulder Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "filament-buffer-x2d",
+    "title": "Filament Buffer - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d5070c88a26b8f39823d9f699cb745868efa85aca489609fa8dec700f6fb76c3",
+   "en": "BT3 x 22 Shoulder Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-heater-unit-x2d",
+    "title": "Chamber Heater Unit - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b459d88da5cab0d2875cbbfb23afe2f866fc928f6bdb2bb92b321d2c635b7dc8",
+   "en": "Cable Chain Clips *2;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "tube-organizer-x2d",
+    "title": "Tube Organizer - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "26e6d49575e2271f423bb480c3ed4e21b1c6d142bdd4457b32c60c07887aa880",
+   "en": "Rubber Rings",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "tube-organizer-x2d",
+    "title": "Tube Organizer - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d15937fd55af9e526cb26bd89f76283f2d5c55cb8b89f125912b1dab91647ae4",
+   "en": "Chamber Temperature Sensor *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-temperature-sensor-x2d",
+    "title": "Chamber Temperature Sensor - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "17665b82e7698a04a1bb87074703a5866d35a7c2702529eaa75f87b4ea57422f",
+   "en": "Cable Clips",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-x2d",
+    "title": "Heatbed - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "56d00afe5f98b9f4b29bbc18ac22d2e59b347646f63edf16ce458965a1831a4a",
+   "en": "Power Supply (150W) *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-supply-x2d",
+    "title": "Power Supply - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ec898a72fcd3d7d892de559bde820cc74e37180f56d871feb0a068ad546c228",
+   "en": "Remote Extruder Motor Cable *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-x2d",
+    "title": "Printer Cable Pack - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ab846ecb1eed3f8c7d039118e742269bde48ce4cdd6488609a3e67297b7f8728",
+   "en": "NTC Extension Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-x2d",
+    "title": "Printer Cable Pack - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb1012655cdebc62e16efd22b07e6587d7c14d23b2bb8e5eab48b060e7db7850",
+   "en": "LED Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-x2d",
+    "title": "Printer Cable Pack - X2D",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d1285795d0e019cc93d9b10325a9d27d2df13f50d2f5e63cf00025a4f09b03e9",
+   "en": "X-Axis Assembly *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-x2d",
+    "title": "X-Axis Assembly - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "874851225af868e3afbb4c5bcf45b387244383d6c392ab07ad8c07056031d1c7",
+   "en": "XY Belts",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-x2d",
+    "title": "XY Belt - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c23ff20e0bdf79a8658be19fa8e48c2f704d28983aaec4334366cadd91cc906e",
+   "en": "Belt Buckles",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-x2d",
+    "title": "XY Belt - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e56137e21d3222a2e3135fc3458286fc3fb6b2e2c679e9ae28db268fe982af7",
+   "en": "Screen",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "screen-x2d",
+    "title": "Screen - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": {
+    "ar": "الشاشة",
+    "ckb": "شاشە"
+   }
+  },
+  {
+   "h": "6323ee2900167fb4a7968fbcdbbff3c191082694d8b91cca6f3f3328ad5ae835",
+   "en": "Screen Rear Housing with Hinge *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "screen-rear-housing-with-hinge-x2d",
+    "title": "Screen Rear Housing with Hinge - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f47cfe4167d855ff7fd7ca0d68c48188f40400f0c9fce788fea1a47043dbba1",
+   "en": "Interior Liner",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "inner-lining-x2d",
+    "title": "Inner Lining - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "42c190f97a5831da2f86f0d70b91b40603265f199c5d69a72f13230dfa9e2e24",
+   "en": "Cable Chain (with Carrier Base) *1;",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "cable-chain-x2d",
+    "title": "Cable Chain - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e53a24716fbb8b83d703f4e1e91c7ef7f85636188519e3f1f090d08407662f75",
+   "en": "Chain Link (2 sections)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "cable-chain-x2d",
+    "title": "Cable Chain - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b7b5d3fdc75b65e1044b110c7fa1d16ab9db0155480ccd3fbd274983f353478",
+   "en": "Chain Clips",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "cable-chain-x2d",
+    "title": "Cable Chain - X2D",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6a97db619d48d401441027e4dcba3b8586d738f91c981fb967326755025d86ef",
+   "en": "Plastic, activated carbon",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "air-filter-x2d",
+    "title": "Air Filter - X2D",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "9345bdb678c51aca8d9c9c891ad4108b86fb3a5938e21cc73a35e71d3f50b127",
+   "en": "Wiping Steel Sheet",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-wiping-plate-x2d",
+    "title": "Nozzle Wiping Plate - X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4eaf18dfc43be0218fa2fd4266c176b213382771adcb6fe04b40105806c89909",
+   "en": "Calibration Sticker",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-wiping-plate-x2d",
+    "title": "Nozzle Wiping Plate - X2D",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "23e09063646effbdec807804e009792f7ed3f7aa7cd894bb0066070b33655d65",
+   "en": "Learn more about X-Axis Motor for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-motor-a2l",
+    "title": "X-Axis Motor - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5eeb154c11b2f963b9979da06ffaca761a5516f796e6d0dd501d1af0f023cf60",
+   "en": "X-Axis Motor",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-motor-a2l",
+    "title": "X-Axis Motor - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d9f592b0747ba3a50b769a9db71fd2e972d0f88de127c9998f2214d7296702d",
+   "en": "Learn more about Y-Axis Top Cover for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-top-cover-a2l",
+    "title": "Y-Axis Top Cover - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b9e1a96828f014fdad7e3702121945fe17d18e942a619428a458572f9047a3ce",
+   "en": "Y-Axis Top Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-top-cover-a2l",
+    "title": "Y-Axis Top Cover - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1b72857bf9094603525c2965bfd18ff399207fa48b3921a6f3d63047f7eea59",
+   "en": "Learn more about Y Belt for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "y-belt-a2l",
+    "title": "Y Belt - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e2e98614a8f55762d0a1329cb55ae77a5514b0d05df1770b8b21f1d9e390dff0",
+   "en": "Rubber, Metal",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "y-belt-a2l",
+    "title": "Y Belt - A2L",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e76ed76108e9c2830d3028b1cfa0d4afa81146fa8a8e932983b68ee76cafc4d",
+   "en": "ST3x5 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "y-belt-a2l",
+    "title": "Y Belt - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "424794930b48d5cf20f74f048f9cfc8b0449608b9f9a32d76ead05b001bab8f3",
+   "en": "Y Belt Fixing Block",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-belt-a2l",
+    "title": "Y Belt - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ee3ffadf1f808e9723eff0396ab4420c0b73151d154f5d7768ece55eeab6d3b",
+   "en": "Learn more about Y-Axis Tensioner Pulley for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-tensioner-pulley-a2l",
+    "title": "Y-Axis Tensioner Pulley - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "804813fdc8653763e20e711871052d98bfe8dd3cc7880b502e80d662137e03c6",
+   "en": "Y-Axis Tensioner Pulley Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-tensioner-pulley-a2l",
+    "title": "Y-Axis Tensioner Pulley - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4afb50ee3329aa2b3ac267a3d7bca2016df26017ba2a1f76a4b29d8b47c26295",
+   "en": "BT3x12 Screw",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "y-axis-tensioner-pulley-a2l",
+    "title": "Y-Axis Tensioner Pulley - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "bd41340243ea7c97e2dc4c0b149f73bf83999428972d2bc331152133074fc307",
+   "en": "Spring Sheet",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-tensioner-pulley-a2l",
+    "title": "Y-Axis Tensioner Pulley - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c5144ecd2b96c832806b271709cb30c6692a5ffcf7c60810047c76458dce0582",
+   "en": "Learn more about Z-Axis Motor for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-motor-a2l",
+    "title": "Z-Axis Motor - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e5cea130f36a03de72d2d6a182ba6519eea269ae33a626aa7e506db51cc175ac",
+   "en": "Z-Axis Motor",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "z-axis-motor-a2l",
+    "title": "Z-Axis Motor - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb6b02eabb496cd283234bcf74b9b51b8e57a4b96f13fa89afae1e390b6e7ef1",
+   "en": "Z-Axis Motor Cable",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "z-axis-motor-a2l",
+    "title": "Z-Axis Motor - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e71853e0a5d39f5cb0992b4d1f82b4f3458b0e04aa04211dd09d3647ab1da6e0",
+   "en": "Learn more about Z Belt for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt-a2l",
+    "title": "Z Belt - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ebad3e51ff2011968f9e539d424efc8eeda5f40264eb84be2c83057a0a309f3a",
+   "en": "Learn more about 4-pin/6-pin Connection Board for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "4-pin-6-pin-connection-board-a2l",
+    "title": "4-pin/6-pin Connection Board - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "afae38ba148d533a3a55695c54afc3c4eab43ae81f879927e5399ed74067f525",
+   "en": "Circuit Board",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "4-pin-6-pin-connection-board-a2l",
+    "title": "4-pin/6-pin Connection Board - A2L",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "6bf9a1dbe3c7c1bc20e70d11ef705898df983682e0c7719feee8ff4ecf9fbc61",
+   "en": "4/6-pin Interface Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "4-pin-6-pin-connection-board-a2l",
+    "title": "4-pin/6-pin Connection Board - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "18e9777e407eabee3803ad1b2b84e3e687bc08f9dc0c046f7c4069dc74532ee5",
+   "en": "Connection Cable",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "4-pin-6-pin-connection-board-a2l",
+    "title": "4-pin/6-pin Connection Board - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f79d5dc01f2b7baeab4cf92d3768fbf3706afd985c7ba8fed58734eab5922eb",
+   "en": "Learn more about Printer Frame for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "printer-frame-a2l",
+    "title": "Printer Frame - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8b8e27c3bc77cfa3bbe58247185d154af2157b9ca2248b1003addd19d62ea043",
+   "en": "Silver, Gray",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "printer-frame-a2l",
+    "title": "Printer Frame - A2L",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "فضي، رمادي",
+    "ckb": "زیوی، خۆڵەمێشی"
+   }
+  },
+  {
+   "h": "4da55adcc5563fe0126354d831e8754aa5b2123ec3047cccd5c21bea177bf2fd",
+   "en": "Printer Frame",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-frame-a2l",
+    "title": "Printer Frame - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "25c4da7cc2459ce46fda151f47910fd93ae11f14e45589b13e9e928d75c53898",
+   "en": "M4x22 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-frame-a2l",
+    "title": "Printer Frame - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "edac5f7cd7200756974a0dd8428d0236713dc5a25e0491768749ee6e3a8b7fe6",
+   "en": "Learn more about Toolhead Front Cover for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-front-cover-a2l",
+    "title": "Toolhead Front Cover - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e59501272c750fdaaddd792b46199cdb6ff4452715395ba1e122fba93e9714b0",
+   "en": "Learn more about Y-Axis Motor for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-motor-a2l",
+    "title": "Y-Axis Motor - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1896fd3efe7fc2f6572d3a04187f534128ca54de9d4fea7cbb3fe8e88730a035",
+   "en": "Y-Axis Motor",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "y-axis-motor-a2l",
+    "title": "Y-Axis Motor - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "96542652a4c771450fdcf35f720226ae3f94086aa3203e841c648f377684c37c",
+   "en": "Y-Axis Motor Cable",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "y-axis-motor-a2l",
+    "title": "Y-Axis Motor - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d76c760f5e4c5c6a362191a047ea552db737c58f3d1f59d66b04eaef2ab253c",
+   "en": "M3x5.5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-motor-a2l",
+    "title": "Y-Axis Motor - A2L",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d24480d6156cd9f9c182532a5ffa3ecf75577ad57c81e2f737a4890aef03553",
+   "en": "Motor Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-motor-a2l",
+    "title": "Y-Axis Motor - A2L",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d42dac14e1ffb5059064de943b13ea896b807b4e2495684c16e43e8402af79a4",
+   "en": "Y-Axis Motor Bearing Mount",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-motor-a2l",
+    "title": "Y-Axis Motor - A2L",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5b1b009f94c864e12169618902058c7f5922c69ce402a7d50b5b59066313dc7e",
+   "en": "Learn more about Toolhead Cable for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-cable-a2l",
+    "title": "Toolhead Cable - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1fb3955c618861ef23da2255071632db829db67bf3b8fbb8763de28702eccb18",
+   "en": "Plastic, Metal, Circuit Board",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-cable-a2l",
+    "title": "Toolhead Cable - A2L",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9092c0bd821b68b9059506e3ad354d8023b18311a06bc4b8fac5c6ebf0221a3",
+   "en": "Toolhead Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-cable-a2l",
+    "title": "Toolhead Cable - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a9c877c716b1f97f0eba5265e773585279ea26f670bf9e5b682dbb2dde8b45c6",
+   "en": "Toolhead Adapter Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-cable-a2l",
+    "title": "Toolhead Cable - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c591ecef9b81f48d470a4d0c569819c7f0c96c19038c79b27f7da47e3c6273d",
+   "en": "Adapter Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-cable-a2l",
+    "title": "Toolhead Cable - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "53d84081d25f4833fdc1a7abafeff5d9c1b4bbcc814a06b2fbb34c6bbafe069d",
+   "en": "BT1.6x6 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "toolhead-cable-a2l",
+    "title": "Toolhead Cable - A2L",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e218e48c674ac1a7c2420d0559aa3f2d6a1336c67095342449c03e157a6e5c9",
+   "en": "Learn more about Power Switch Assembly for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-switch-assembly-a2l",
+    "title": "Power Switch Assembly - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c99aaaa35f021a7a4783324f8a85cf23748153ebeb2be093f0a25247fc706a78",
+   "en": "Power Switch Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-switch-assembly-a2l",
+    "title": "Power Switch Assembly - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5db650bd1c638e1f3b5c810bdb024c3ee037a6df4745c5df808309306d8f1d0a",
+   "en": "Learn more about Printer Cable Pack for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-a2l",
+    "title": "Printer Cable Pack - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b70c235b82a98ef2685e380015c263f307823431e05004b5a37e48a7c6623563",
+   "en": "AMS Interface Board Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-a2l",
+    "title": "Printer Cable Pack - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "dcfe18fbfce6b7073f3e26450703b5f0ed7d56029ffcb9ea7adfca456687db95",
+   "en": "AC Board to Mainboard Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-a2l",
+    "title": "Printer Cable Pack - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "755cb10d557648bd5a2ef37efa9549c48340615c53e9ffa774b82d6910c2f273",
+   "en": "Waste Bin Hall Sensor Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-a2l",
+    "title": "Printer Cable Pack - A2L",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "85e09eb0658185154176fdd5793b75790c9ef34784c4a2aedde11c6aa33f9add",
+   "en": "AC Power Cable",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "printer-cable-pack-a2l",
+    "title": "Printer Cable Pack - A2L",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "679e708d3825efadb524edf0f9931e7b65eaace17e4ce348e36f0a6a42509ddb",
+   "en": "Learn more about Filament Sensor for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-unit-a2l",
+    "title": "Filament Sensor Unit - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "21d6c272f2d6cd56397182dee01429b72580a19ac3251305e1a7cb42cbe16130",
+   "en": "Plastic, Circuit Board",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-unit-a2l",
+    "title": "Filament Sensor Unit - A2L",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "c72015d8b7667fe08dd0c26cd7ae5e600c7fa604302c7121b4d3cf9cd17eb3aa",
+   "en": "Filament Hall Sensor Board Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-unit-a2l",
+    "title": "Filament Sensor Unit - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "183dc2a3d98a4a17086ad990624849dc02021877aaea82212a2b19ecf1157693",
+   "en": "BT2.6x6 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-unit-a2l",
+    "title": "Filament Sensor Unit - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc479fd904a0b240ada09adfd08eff0cde85b6f8fdc13cf6bc1d45838dc59e39",
+   "en": "Cable Harness",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-unit-a2l",
+    "title": "Filament Sensor Unit - A2L",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d56d999c44f80f55e0d8fb7038922ef50ee6f094694a212470e8452dc85a7d93",
+   "en": "3g Lubricant",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "filament-sensor-unit-a2l",
+    "title": "Filament Sensor Unit - A2L",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b11c39ac2152c8318d86518dde1c61b634c6ffc4755080aec37170775649d2a",
+   "en": "Learn more about Printer Screws Kit for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a2l",
+    "title": "Screws Kit - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3706b721268f8aecf729113bb2ecb8edf86477052537baa0465c7bddeee03882",
+   "en": "BT1.6-6 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a2l",
+    "title": "Screws Kit - A2L",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "36dc0837497155d20cfe7a2166ae9f53da08d59d0b47ef389a27e8f583fa30d2",
+   "en": "M4-22 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "screws-kit-a2l",
+    "title": "Screws Kit - A2L",
+    "field": "box[8]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f8be88f1a5aa530b87fc023ddda9a49f11c66e1842bfa8e8b4cfb498b53fca15",
+   "en": "M4-7 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a2l",
+    "title": "Screws Kit - A2L",
+    "field": "box[9]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "92dbb8c825f36c178fc84b646336926d8f03b2a76e2ebf58405753f69ad39182",
+   "en": "Learn more about Toolhead Filament Hub for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-filament-hub-a2l",
+    "title": "Toolhead Filament Hub - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d203908433694dab82bbd30f343c8db28b848c930238262ab78e532c14f8ca44",
+   "en": "Toolhead Filament Hub Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-filament-hub-a2l",
+    "title": "Toolhead Filament Hub - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2a3b1cc9ea7cef60dea03c6519d03e3ae959defc4e9696fc38afca9578277d36",
+   "en": "Learn more about Extruder Unit for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-unit-a2l",
+    "title": "Extruder Unit - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c0d3d9c59f3314e515211346489aac33054586ad27643dad4924fe5830c419e8",
+   "en": "Extruder Unit Assembly (with Extruder Motor)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-unit-a2l",
+    "title": "Extruder Unit - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4d45eec6f871f48d2394df97b92219bd998f5be0fe022429cf5261112e2336a9",
+   "en": "BT2.3x7 Screw",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "extruder-unit-a2l",
+    "title": "Extruder Unit - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "275ffac7fc85f4deb76a38551afcf0070ee3921ff18bf5d0c542e1ec5df5f367",
+   "en": "Learn more about Base Housing Assembly for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "base-housing-assembly-a2l",
+    "title": "Base Housing Assembly - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b444a2a0cfb735a4bb72d5cb4e888fc68680a7b83347dc7892ef55e864b64ce0",
+   "en": "White, Gray",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "base-housing-assembly-a2l",
+    "title": "Base Housing Assembly - A2L",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أبيض، رمادي",
+    "ckb": "سپی، خۆڵەمێشی"
+   }
+  },
+  {
+   "h": "db5b8e4a44d5a982d05245cdfefef5e8e20a91d06dd1776047346e08bce9506e",
+   "en": "Base Housing Assembly (including Base & Bottom Cover)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "base-housing-assembly-a2l",
+    "title": "Base Housing Assembly - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e790735373a06b5fe211eee38aba0ba1b03716ee7aba6b132e0599ec8fbccacb",
+   "en": "Learn more about Cutting Module Adapter Board for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-module-adapter-board-a2l",
+    "title": "Cutting Module Adapter Board - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "15ba2608335119e7d13b0908e016906320a80fc1f81032b8dc1c661ed7aaa1be",
+   "en": "Cutting Module Adapter Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-module-adapter-board-a2l",
+    "title": "Cutting Module Adapter Board - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "47edbdebb4409ae27e6317b3ce69d1979790ebe177bf15f2d35a07fd3443f774",
+   "en": "Learn more about Hotend Heating Assembly for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-heating-assembly-a2l",
+    "title": "Hotend Heating Assembly - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cd1b7fb91b71f34dd43befc6922c3eb4de3eda3e4dff4c0002dbf376ee9ba57e",
+   "en": "White, Silver, Black",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-heating-assembly-a2l",
+    "title": "Hotend Heating Assembly - A2L",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أبيض، فضي، أسود",
+    "ckb": "سپی، زیوی، ڕەش"
+   }
+  },
+  {
+   "h": "a4b3cd81b07548c8ecc2ed7e6a5dcccdda9d997b5a47b1a9cf8f53edfc525f7a",
+   "en": "M3x10 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-heating-assembly-a2l",
+    "title": "Hotend Heating Assembly - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "10c9a6e7eefc53a4f128ffe7455fed41d81d8f0bb9753026ba060bad2844419b",
+   "en": "Learn more about Supportive Footpad for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "supportive-footpad-a2l",
+    "title": "Supportive Footpad - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "69cabe5443069fea4e3fbea0289fff086c48953126ffd36a38292f96613a0e2a",
+   "en": "Supportive Footpad Set",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "supportive-footpad-a2l",
+    "title": "Supportive Footpad - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b04a2917aa7627b84c9527488d2bec3310a808a9f45155c07fdfa2139adfdc11",
+   "en": "Hard Footpad",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "supportive-footpad-a2l",
+    "title": "Supportive Footpad - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f701ca33296bffeac06090d5bd02f574e17deaad237fe12466b59099e579147f",
+   "en": "Gantry Footpad (Square)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "supportive-footpad-a2l",
+    "title": "Supportive Footpad - A2L",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6c3236a2c05c01305d05dc9fcacc45578430a24bc32bb84df050176628bbbf8c",
+   "en": "Gantry Footpad (Long)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "supportive-footpad-a2l",
+    "title": "Supportive Footpad - A2L",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cd89fa595604e98a35af7495dafdf7e19d7fbade0f11426cce5f1f7fb11b07b8",
+   "en": "Learn more about Nozzle Wiper for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-wiper-a2l",
+    "title": "Nozzle Wiper - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a263c3115c49ef673c9bf69d9e2a83115dc7974a6a3f8db7bc31f969f48cc24c",
+   "en": "Nozzle Wiper Silicone",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-wiper-a2l",
+    "title": "Nozzle Wiper - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7711b3a15681af70cbf6bb493ffb34b51187f552adfb603eb4960357365c5038",
+   "en": "Nozzle Wiper Steel Blade",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-wiper-a2l",
+    "title": "Nozzle Wiper - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "bcdfe2b7aa8a1824f9fdda22c53970a84b14f693da3be572d62d70d29a61623c",
+   "en": "Learn more about Spool Holder for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-a2l",
+    "title": "Spool Holder - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "bc0cf174dd4df237421be7484d88ef444b123d8cb98648dfccb797bdfab4145c",
+   "en": "Spool Holder (with PTFE Inlet Coupler)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-a2l",
+    "title": "Spool Holder - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "52dbf257b3518805022188a748eb7a2ae3f8c0c7be75cb471c1861abe9eee7d7",
+   "en": "Learn more about PTFE Tube Connector for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-connector-a2l",
+    "title": "PTFE Tube Connector - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "df3fe384918b9816ce4acd10151c85e57e2064044bf6911bbc529c5d9f79604e",
+   "en": "PTFE Inlet Coupler",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-connector-a2l",
+    "title": "PTFE Tube Connector - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "21e6f520c4fdfad9a4b4d0bf92bf7c37459426665c9af55948d107452980a9ae",
+   "en": "Mounting Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-connector-a2l",
+    "title": "PTFE Tube Connector - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "35efbe8dbc89d882369d756dc23579d78b3513af25e7c75271ef26fe4437a1c0",
+   "en": "Learn more about Inlet Connector for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-inlet-connector-a2l",
+    "title": "PTFE Tube Inlet Connector - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9b3a844942cb29a5f230138ffa776144b9c9f426bc531f349001b3df806ffcbb",
+   "en": "PTFE Tube Inlet Coupler",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-inlet-connector-a2l",
+    "title": "PTFE Tube Inlet Connector - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b72f5fc9cceb428f18415d18e3736d76e4be0400919aaa900452f209828c44e3",
+   "en": "Learn more about Heatbed Unit for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-a2l",
+    "title": "Heatbed Unit - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6552b89ec287a40a6f0dbdfa381ba5f7dbb418111fb4abde84ed2143e78200e0",
+   "en": "M4x7 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-a2l",
+    "title": "Heatbed Unit - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "17edba8101452721be867414e442b55f889cbd34209175bce390f3ced5b9066f",
+   "en": "Learn more about Mainboard for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mainboard-a2l",
+    "title": "Mainboard - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0016056a628ba0730c3b41ec186d12471ad0781720a543b22979b2aa8519b417",
+   "en": "Circuit Board, Plastic",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "mainboard-a2l",
+    "title": "Mainboard - A2L",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "c88d450e79203433be3ff664a49c5f4f033e64bf5e9604a7bd8794ab8072ee9a",
+   "en": "Mainboard (with Heatsink & WiFi Antenna)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "mainboard-a2l",
+    "title": "Mainboard - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6def1b9cbe351573bc5add20da93b8a6d88397da697259384edd91e8168903ce",
+   "en": "Thermal Grease 5g",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "mainboard-a2l",
+    "title": "Mainboard - A2L",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "46ddc5a5fd9b2a6f88a7952ad1407a7e53abc211f79de5d641c57fc85633bcf8",
+   "en": "Learn more about AC Board for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ac-board-a2l",
+    "title": "AC Board - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a02d4cacc3e184acae6f0c4ad98485458acaa203db25f247192f7db91eef9723",
+   "en": "AC Board (with Housing)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ac-board-a2l",
+    "title": "AC Board - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "983c78a30be9de543bb809de5d384b44e17621a16b57b7d1e2ec39e91bbb68dc",
+   "en": "Learn more about Power Supply for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-supply-a2l",
+    "title": "Power Supply - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "02e3cccf200bd4dc6651417427dcbdbf082c8546346ac658d9dccc9b02d7ac4b",
+   "en": "Power Supply Unit",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-supply-a2l",
+    "title": "Power Supply - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2870582da7fe7752bfdcc2e7c10d6f1184b6ebc34d9b5c9c0ee46da88f491f3f",
+   "en": "Learn more about Base Housing for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "base-housing-a2l",
+    "title": "Base Housing - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "431f4c439fdd0dd236f1df01d0c30031d946e95b7a2a9f3c98cecc41780b6fb5",
+   "en": "Base Housing",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "base-housing-a2l",
+    "title": "Base Housing - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ac4d7745e00c7cae5a02dc3e62aa8716c8a60aae4fcaa0bb35e5479b10e6634",
+   "en": "Learn more about Bottom Cover for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bottom-cover-a2l",
+    "title": "Bottom Cover - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fae22fe976289770c9e58aaf8040811a667f312977bc4dc071c558ea1b839468",
+   "en": "Bottom Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "bottom-cover-a2l",
+    "title": "Bottom Cover - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "759db1afc032abe204cab38f6dbf3e2faf96013a5d4ad475f89f60ce832c3fa0",
+   "en": "Learn more about Toolhead Board for A2L on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 17,
+   "context": {
+    "handle": "toolhead-board-a2l",
+    "title": "Toolhead Board - A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e9322ebc84cb4e8bf40d2a034352fc2eb922806e43752805590c44f09cd0cbea",
+   "en": "Toolhead Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-board-a2l",
+    "title": "Toolhead Board - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "363c6c2f84d223d8468cbccfb2ec54b5de2045c693e8372fddffaf89ef8d5c9a",
+   "en": "Mylar Sheet",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-board-a2l",
+    "title": "Toolhead Board - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f7dfa1f3de27036bb5076728e961297b4ece55e90b541e88f884ea8baa52890c",
+   "en": "Rotary Decorative Part",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-unit-front-cover-a2l",
+    "title": "Extruder Unit Front Cover - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f5dab555a7bee29120c7e41a42553d1e109c7ecc9cb8be2c50cdce23beb93e6a",
+   "en": "Yellow, White",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-gear-assembly-a2l",
+    "title": "Extruder Gear Assembly - A2L",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أصفر، أبيض",
+    "ckb": "زەرد، سپی"
+   }
+  },
+  {
+   "h": "86a82df43a5f88b4032d960e8008a0a9306b63083b0c7ceb49012a494abc1c54",
+   "en": "Extruder Gear Assembly (Drive Gear)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-gear-assembly-a2l",
+    "title": "Extruder Gear Assembly - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3701a7cbd18c131b417ac15005f44c521f1d798535f24ec90d8d231bfe0b3586",
+   "en": "Extruder Gear Assembly (Driven Gear)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-gear-assembly-a2l",
+    "title": "Extruder Gear Assembly - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d77875a7b83e4d4b7b77b0f4561ae43071ea2cc21f096e2c607c1aa30bc72b40",
+   "en": "Spring Pressure Washer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-gear-assembly-a2l",
+    "title": "Extruder Gear Assembly - A2L",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f9dbf3dd18fd0c38a499d5be23fcb2abca498b153641376503497f6eab2ac06",
+   "en": "M3x11 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-gear-assembly-a2l",
+    "title": "Extruder Gear Assembly - A2L",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2222b5eee852c81930698dbc3f90a8199079951ee90a7b78b520cda403d516c",
+   "en": "2g Lubricant",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-gear-assembly-a2l",
+    "title": "Extruder Gear Assembly - A2L",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e1af97847ec194c28bdacb84882b3deaa65d3de20c924e904c06d11da7ccfb94",
+   "en": "Snap Ring",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-lever-a2l",
+    "title": "Filament Cutter Lever - A2L",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ed7a4133269d4b39cfd884929f627d5d8623bdd4da5935bb35b8c66a5e53b0e1",
+   "en": "Extruder Rear Cover (with Bearing)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-rear-cover-a2l",
+    "title": "Extruder Rear Cover - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c2673e789e6c24f7738ec4145f0aef3d8fb2a804a797e02f62447ee32fe5f275",
+   "en": "BT2x4 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "cooling-fan-for-hotend-a2l",
+    "title": "Cooling Fan for Hotend - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9bad393cf8ae34ca9fa6409ceb1082d6ff8bdcfdd69ca041b2034dd7345b1cd8",
+   "en": "Nozzle Eddy Sensor Coil",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-eddy-sensor-a2l",
+    "title": "Nozzle Eddy Sensor - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "75465976891b7d4518c1317b84d075d34869023ca6cd0029b0b4a5b56511e405",
+   "en": "Cable Routing Slide (Left)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-rear-housing-a2l",
+    "title": "Toolhead Rear Housing - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5757cb03e28c7de2a7312c7e31c21514a84502e68af91a9c6f1ed02f338e05fd",
+   "en": "Cable Routing Slide (Right)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-rear-housing-a2l",
+    "title": "Toolhead Rear Housing - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "42d264d0cb2d03f863be58c0e29ae11b4523d66b4c0d0acf21b8e2042de7a702",
+   "en": "Rubber, Plastic, Metal",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "x-belt-a2l",
+    "title": "X Belt - A2L",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "8395bddbb3930dd6be9a3450bdfd4c4ed3467c08604898a6e75695ced8a51446",
+   "en": "Belt Mounting Base",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-belt-a2l",
+    "title": "X Belt - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1bcd17f243dc8b81d21d8b70937819957d85f13694fe1148bcf70c49b3a69e4",
+   "en": "Tension Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-belt-a2l",
+    "title": "X Belt - A2L",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b3f8fe84b8a725331b88bbbdea796ff43207933755ed841715e0c55ec663ada",
+   "en": "Metal Washer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-belt-a2l",
+    "title": "X Belt - A2L",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ee7b4271a4bfe8718283c79616fce1ed01f851dec6878d20f647f54c9d5b0b82",
+   "en": ",Plastic",
+   "kind": "spec_value_text",
+   "freq": 6,
+   "context": {
+    "handle": "toolhead-block-a2l",
+    "title": "Toolhead Block - A2L",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "7ad1fd6143d2a48f1acee91c9e4c172937dcd3a528feb4e9fd00ce92074fe40e",
+   "en": "Toolhead Block",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-block-a2l",
+    "title": "Toolhead Block - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4a107b85851dd5d108a0456aa00ccc6b5d01e32c6da532679ea7cbc5c37fa94",
+   "en": "USB Camera Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-a2l",
+    "title": "Live View Camera - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a17f965d4e8a4331d6417e8195c39728d0a5c97dbf46dedadc759454e6fb598",
+   "en": "X-Axis Motor Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-motor-cover-a2l",
+    "title": "X-Axis Motor Cover - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a7dad94ac1f79993cec109da4a085fb8ec0b371c8c99b4dc0a50b80f39a23a00",
+   "en": "X-Axis Motor Front Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-motor-cover-a2l",
+    "title": "X-Axis Motor Cover - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cddadc4571d0179c54362cc4508743007f4472266d158d7cc2db11cb956762f0",
+   "en": "X-Axis Motor Rear Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-motor-cover-a2l",
+    "title": "X-Axis Motor Cover - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "086948e561ff0eeb7272aeb9a6fd35e1d1c4899ea88ef1a0d5f5fb6a9699bb55",
+   "en": "X-Axis Motor Base",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-motor-cover-a2l",
+    "title": "X-Axis Motor Cover - A2L",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c5db1d079ed612b611b98d93073557981ba65c6ae6649141c4ed84828d3cab5d",
+   "en": "Cable Pressing Clip",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-motor-cover-a2l",
+    "title": "X-Axis Motor Cover - A2L",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6a840a37d8a76adef113126712923e6c84f4520b6f8627777b94350f45cb5f9",
+   "en": "ST3x10 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-motor-cover-a2l",
+    "title": "X-Axis Motor Cover - A2L",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "af3d94fff110e7ce5825182f99fa41391033a51506ebb16d75b03efe934673e2",
+   "en": "X-Axis Assembly Linear Rail",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-a2l",
+    "title": "X-Axis Assembly - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5269603bece74117b2e64491b67ba0973ff9e14d81859dbc8494ea6c3e48cd3d",
+   "en": "3g Lubricating Oil",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-a2l",
+    "title": "X-Axis Assembly - A2L",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e902173a08d3227cf779ff5191768e70e55965d2ca83a09ef0b6cd8ec45de85",
+   "en": "End Cap",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "end-cap-a2l",
+    "title": "End Cap - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4dfff37548eec911841980f815200b1e9384eea4e0f2662c13eeb071f7c76ed2",
+   "en": "Purge Wiper Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a2l",
+    "title": "Purge Wiper - A2L",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "54a2cad22382f0c4c65150b3f8f831a0ce23399242ce611377d988d723996e59",
+   "en": "Purge Wiper Cable Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a2l",
+    "title": "Purge Wiper - A2L",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "161fa5610bd94a3b1c06c3f4fd84fda1595068e4a84c6132d63c145ebafaa1e5",
+   "en": "M3x12 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a2l",
+    "title": "Purge Wiper - A2L",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "737a2ff3557fd2390c6fc42358fcbfab37342c8a45cf4043d1ad13d1073e04da",
+   "en": "Please learn more about how to use the Cleaning Wipes on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cleaning-wipes-50-pcs",
+    "title": "Cleaning Wipes (50 pcs)",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b1b2d70a60ee9eb944dcccb86903a90f8318f7072394b828ed768add5e40e019",
+   "en": "Spunlace nonwoven fabric and other materials",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cleaning-wipes-50-pcs",
+    "title": "Cleaning Wipes (50 pcs)",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "724cfd9a62e1c146be2ec4c5f619a5c67adaa050d5d9642bbd8d949f5a0e1b82",
+   "en": "Shelf Life",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cleaning-wipes-50-pcs",
+    "title": "Cleaning Wipes (50 pcs)",
+    "field": "specs[x.shelf_life].label",
+    "near": "2 years"
+   },
+   "dict": {
+    "ar": "مدة الصلاحية",
+    "ckb": "ماوەی بەکارهێنان"
+   }
+  },
+  {
+   "h": "7dab2372ff909b063d57bf1e7ac4212c333337fcd47e30f7791d189a63c912db",
+   "en": "2 years",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cleaning-wipes-50-pcs",
+    "title": "Cleaning Wipes (50 pcs)",
+    "field": "specs[x.shelf_life]",
+    "near": "Shelf Life"
+   },
+   "dict": {
+    "ar": "2 سنة",
+    "ckb": "2 ساڵ"
+   }
+  },
+  {
+   "h": "e52ff2c2c172952ce552948780903aaeda7ec91afa630df6bebb54b00216dc4c",
+   "en": "Lubricating Grease",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2f45740d2ac8025d940f1aecdbae4e424d6602276a6fbab7c1c56ed22eb753cf",
+   "en": "Timing Belt",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "dccd12259e408ba084a7d2c2472dd6edb7f493459f7a2193d3b943025dbd2008",
+   "en": "Timing Belt Clip",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fc0966e6cde9b5e15d7f03b68bf86514d5143c37a1ef947c5fbfd1fb911c94a1",
+   "en": "Timing Belt Clip Teeth",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "398ab38b831bac91722d73e31f90fc6dd61a4cd029d30f280e2e4904c700c183",
+   "en": "Drag Chain Support Rod",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e2e3ce932535a3b7a908f75cf00521b23c8332f713bf40b3298bd550a663ed5",
+   "en": "X Drag Chain Limit Plate",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7ef3d6f7d6b47f8d0a44ee2d5aea5c4f7b5fb99ed43efaeb5d2fc7c4e423153a",
+   "en": "M3×5.5 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[8]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5cc6675344a8b43cb778b8a23ebd5ae5708a8fdb4e4c77261fb168c1880a8b1a",
+   "en": "ST3×4.5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[10]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a40ec1a0273d0bba34025d69752cbd40337f6a8bb4bddd119ff973720f64a1c",
+   "en": "ST3×8 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[11]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f6d8187f169db4ae6172fbd387efabcd1447ee44f269779fb8c9ebdaa9ef132",
+   "en": "ST3×3 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-r1",
+    "title": "X-axis Assembly - R1",
+    "field": "box[12]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "506343e5d01a74aa19d21e59cd4b5d44a33351a037f47fac70a006895cf6ae80",
+   "en": "Idler Kit",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "idler-pack-r1",
+    "title": "Idler Pack - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c1497ad160751bd0301944e9a92ac0fe9c8e9f7d7bd72f32977b33f5c8eddf3d",
+   "en": "6-Pin Connector Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-cable-set",
+    "title": "Conveyor Cable Set",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "93379633d81a346a1748359424ed7755525cbf4f74cff3b01e1e7ead04592d8c",
+   "en": "Auto-Feed Mainboard",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-cable-set",
+    "title": "Conveyor Cable Set",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "de0127bbc2eb208657861d1c5c2abcce744fdab7e7e0e09d888e0b57510dd49b",
+   "en": "Thermal Pad",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-cable-set",
+    "title": "Conveyor Cable Set",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb3b5711e6ad8e26e04dc11dd0f4d067bec4d39352b801741ec6cdd1828a0b95",
+   "en": "Silica Gel Desiccant",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-cable-set",
+    "title": "Conveyor Cable Set",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "27f4a0834335c898aa2b07d9ee7d59904e548cbf7eb9b357831efa0b65eb1bc6",
+   "en": "M3-4.5 Screw *3 - 6-Pin Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-cable-set",
+    "title": "Conveyor Cable Set",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "97a438b8f17ff97a56666c44388db69013e32c24d1390657540ae1420b2e1b0f",
+   "en": "4-Pin Cable",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "conveyor-cable-set",
+    "title": "Conveyor Cable Set",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c408a5dce1dff214a8993a19dc8cce92adb5730e3c945c3266d32abbfc42f0da",
+   "en": "Ground Wire",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-cable-set",
+    "title": "Conveyor Cable Set",
+    "field": "box[7]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "357a1ff6eb1b9408ba18c3e2c27c0e3973a7c912c79511716e8d9448523f705f",
+   "en": "BT2-5.5 Screw *2 (Lock Interface Board)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-cable-set",
+    "title": "Conveyor Cable Set",
+    "field": "box[8]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ae3b93c2f87f9fd79683e9b32a827e45c48bff42c8dd95282c42a860dfe97ee",
+   "en": "BT2-5.5 Screw *6 (Lock Board)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-cable-set",
+    "title": "Conveyor Cable Set",
+    "field": "box[9]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "73f8e3fa4fd9ecdb9f09a5af56cbbe65175fb6324e8a1a26e57b99ed769ff559",
+   "en": "Crossbeam Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-pinch-roller-mount",
+    "title": "Conveyor Pinch Roller Mount",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9015b59e0192956103cfe442f57167e2ec54914f716c7ed4959a4578adf8c487",
+   "en": "Assembly Buffer",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "conveyor-pinch-roller-mount",
+    "title": "Conveyor Pinch Roller Mount",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d054da27b3f971658caf68ecf10f0c7446916f80d15e96d6ff557029f62eb77f",
+   "en": "MK3-5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-pinch-roller-mount",
+    "title": "Conveyor Pinch Roller Mount",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f13c511a84780e40e83ca43552012b82fa598ec9a8484d84632c51e8b38f4a9",
+   "en": "M2-2 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-pinch-roller-mount",
+    "title": "Conveyor Pinch Roller Mount",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0cfe567072370516757f6187e9aac60b491f367949768c150fe2540335fd04aa",
+   "en": "Roller Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "support-roller-assembly",
+    "title": "Support Roller Assembly",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "dbfde077be48a7c213fafb9cee03679401e25062b63fd7c8a46fee4e6003507e",
+   "en": "Feed Guide Rail",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-guide-rail",
+    "title": "Conveyor Guide Rail",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3b448950c9b812381174803e1916632173f6f1b17ff9265c73e833a99556e67",
+   "en": "M3-18 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-guide-rail",
+    "title": "Conveyor Guide Rail",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1dad0a09ab7430a33fbaf2bce08bfa869239d5455bce37c5609acaede3399e5f",
+   "en": "Diagonal Brace Rod",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-guide-rail",
+    "title": "Conveyor Guide Rail",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "34f55b9414e40b632a0f76e98f8a54df0ab33f480261e59774e6742fc17bc9fe",
+   "en": "8-Pin Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "8-pin-cable-r1",
+    "title": "8-pin Cable - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f281b078612b8faa95d22e387e9c38b3090c667f4732f780644f6bdfc154386b",
+   "en": "Smoke Blocking Curtain",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base-smoke-curtain",
+    "title": "Riser Base Smoke Curtain",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c6ffc71b1fb9921f67de14ed18511fa2b0fd1d73e3896c511a09839ca29ed41",
+   "en": "Riser Frame Front Door",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base-front-rear-panels",
+    "title": "Riser Base Front & Rear Panels",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "362f3bf0f51f9f19ca8e494502985c93fac6bf9bfa1397860c444719d2713242",
+   "en": "Riser Frame Rear Door",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base-front-rear-panels",
+    "title": "Riser Base Front & Rear Panels",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "78e4922f6b04b0a30b1a4d3efdbc55354ed28bc5e4261b019e80a776d6294fa1",
+   "en": "Interface Board",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "riser-base-cable-set",
+    "title": "Riser Base Cable Set",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "29432470638f87de6c55e0ce219117e509b92884cefea467de96bff9d3b24749",
+   "en": "M2-5.5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base-cable-set",
+    "title": "Riser Base Cable Set",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "09edafddd082c1702a452b2dc87f0e50db376296e9d5d6ccdcd447314313d9ed",
+   "en": "Left Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base-left-assembly",
+    "title": "Riser Base Left Assembly",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e28d4108ebef3ab2db8ab24a1c0bafb25f005ba5ea0802ab6fb616e51b4960f5",
+   "en": "Assembly Buffer Stopper",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base-left-assembly",
+    "title": "Riser Base Left Assembly",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f6db3d5e87019a0caf3d79651dc61e64b8ae330e82607f3c1ae906f4dd3d793",
+   "en": "Right Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base-right-assembly",
+    "title": "Riser Base Right Assembly",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a619f975e1724d5e3ee02aaf12053e722fef64082ba6da3af1f5c59784868b6e",
+   "en": "M3-8-8-H5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base-right-assembly",
+    "title": "Riser Base Right Assembly",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5646a85233b4be3594d4aadc8496bdfe3591c067ffa1ca5458de8635cf7044ef",
+   "en": "O-Ring",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "air-assist-nozzle-r1",
+    "title": "Air-assist Nozzle - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "15d1f67ec276552ff69ff81b811f5e3e27c50854bf9db7f3346cded17112e09c",
+   "en": "Flat Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-alignment-sensor-fpc-r1",
+    "title": "Laser Alignment Sensor FPC - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6177618147879177f1a585b630b45d5306d450890a14a48b3cfc472188f4be8c",
+   "en": "Baffle",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-alignment-sensor-fpc-r1",
+    "title": "Laser Alignment Sensor FPC - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c0cba6620482f6065ac25b8c4b2b134a68b0dbbfde6bbf1042e96a1353166eed",
+   "en": "M2×5.5 Screw 3",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-alignment-sensor-fpc-r1",
+    "title": "Laser Alignment Sensor FPC - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d71ddc6ac09e41f7200d6689ac0c81eec6e734d28e96f53d6d6fa96733ad72a8",
+   "en": "M1.62 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-alignment-sensor-fpc-r1",
+    "title": "Laser Alignment Sensor FPC - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "170145ba68802d09731c5cad51147e0353ce5c7a9a5377bed98da2bf8725d6cc",
+   "en": "Reflector Mirror Module Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-assembly-r1",
+    "title": "Reflective Mirror Assembly - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "23e7482cd7f8287342fe45fa147f46729a954f269d383eac884f786654abc524",
+   "en": "N8A-Y-Axis Second Reflection Clip",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-assembly-r1",
+    "title": "Reflective Mirror Assembly - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a998d858ec3c6b5d1cc7a35060cee880972e25fb07aaa29474cf366ba6d15c2",
+   "en": "N8A-REF1 Adapter",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-assembly-r1",
+    "title": "Reflective Mirror Assembly - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7c14a420e4b7ada70b2a7b460148d9c8220d868f809033836044dedd479527ab",
+   "en": "N8A-REF Light-Blocking Post",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-assembly-r1",
+    "title": "Reflective Mirror Assembly - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb32de7e24e877fd0f26c3e59d0d06458d4a83142f4398fa20fb237d126b92d9",
+   "en": "N8A-REF2 Support 1",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-assembly-r1",
+    "title": "Reflective Mirror Assembly - R1",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c014e687ce3469a3fb62893286e70478a9d4518d7dda7bdf94c3668081db57ba",
+   "en": "M2.5 77 Screw 1",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-assembly-r1",
+    "title": "Reflective Mirror Assembly - R1",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "696100801ffcffc61bc21f57931cef91c21e24effa0ff6d41ce1ed69c0311fa7",
+   "en": "M2.5 55 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-assembly-r1",
+    "title": "Reflective Mirror Assembly - R1",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6074c552c90e07ef01f614a6b2f0bdfb0f046556d741ecb9c084c4a5f9d8d5f",
+   "en": "First Reflector Mirror Module Connecting Wire",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-assembly-r1",
+    "title": "Reflective Mirror Assembly - R1",
+    "field": "box[7]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9b4a2efb1f52a727ee586597e60040751de5826f7fde4b787cf6da6718ea1eb5",
+   "en": "Second Reflector Mirror Module Connecting Wire",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-assembly-r1",
+    "title": "Reflective Mirror Assembly - R1",
+    "field": "box[8]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb212217335d076d32a4eec39a64e32ea62e4f07f6f1556a8e79cdd3cffc8744",
+   "en": "Button Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "control-button-board-r1",
+    "title": "Control Button Board - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "62596d4e91df8f0dd2c891debf58534a887d18340fbcc4529609d22b4f9d3b3c",
+   "en": "Plastic Self-Tapping Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "control-button-board-r1",
+    "title": "Control Button Board - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "85f4c46a2bacfb060aa81494de63a2034d9510d682bf836cc5e445d029e21388",
+   "en": "FFC Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "control-button-board-r1",
+    "title": "Control Button Board - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8f0b1cae4bfbdc9914b8366cfc630090c137c9f61922e668b7b74a2b788b507",
+   "en": "Exhaust Fan",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-ventilation-fan-r1",
+    "title": "Smoke Ventilation Fan - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a8a5c91492b1fe39a52298e7f070c7c44c61857802c2812c905bc802ded8fe1",
+   "en": "EPE Rear Exhaust Fan 1",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-ventilation-fan-r1",
+    "title": "Smoke Ventilation Fan - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "99d4195686dc26320f174ec6d758035e2f771ca9114ed5253423bbb8e78ec4b9",
+   "en": "EPE Rear Exhaust Fan 2",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-ventilation-fan-r1",
+    "title": "Smoke Ventilation Fan - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a8f8bcd1d359376c7c377a61a0e79057e0952d96c0ebbcfa7bea5f23cd845bd3",
+   "en": "Water Inlet Plug",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "water-inlet-plug-r1",
+    "title": "Water Inlet Plug - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b5db61f72142597bd235d17c6fbb01b966ac21b6b5abda06404cb4d2f9ace15",
+   "en": "Power Supply",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-supply-r1",
+    "title": "Power Supply - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": {
+    "ar": "مزود الطاقة",
+    "ckb": "دابینکەری وزە"
+   }
+  },
+  {
+   "h": "d84ecd6f56f904038a29c0a43dbff5a8b10fa6b905635feb7ee7d0868af70a30",
+   "en": "M3-4.5 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "power-supply-r1",
+    "title": "Power Supply - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0b95196b99ff68b9dedfb7d0d1f27f96766a8603a220e66cd192f28d7d34bc6",
+   "en": "Filter Board to Laser Ground Wire",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-supply-r1",
+    "title": "Power Supply - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa4318134ce9d177e226720da15d29e5fafbb982a2f13e761554e6351893c403",
+   "en": "Filter Board to Laser L Wire 1",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-supply-r1",
+    "title": "Power Supply - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4913625205af1d71d17b3a653e887101d53db902d5d18f72c4394a325266fbe",
+   "en": "Filter Board to Laser L Wire 2",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-supply-r1",
+    "title": "Power Supply - R1",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6dc6451fff7ec7f4d352eccebe892ca9c71cdf147d3b53c92a5483bde16695ac",
+   "en": "Filter Board to Laser N Wire 1",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-supply-r1",
+    "title": "Power Supply - R1",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d74a7719b61cca0a720fa5b3f39e7204799e84049b6366cf30a836d690f2ae08",
+   "en": "Red Anti-Static Foam",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-supply-r1",
+    "title": "Power Supply - R1",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fda5c07fb7904722899bbb853b0179c907b55bb24690cd1a811a094be3d1feaf",
+   "en": "External Exhaust Fan-to-Air Duct Connector",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ventilation-fan-mounting-base-r1",
+    "title": "Ventilation Fan Mounting Base - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "51c71011ec1c4d29cd3093504e4aa7b2c71736c01e06aa37465223bc58585406",
+   "en": "Filter Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-filter-protecter",
+    "title": "Power Filter & Protecter - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea5617d41326dcaa218bbc12fbd8952a525806b7a492fa26a75cf9e9a307665f",
+   "en": "Desiccant",
+   "kind": "box_item",
+   "freq": 10,
+   "context": {
+    "handle": "power-filter-protecter",
+    "title": "Power Filter & Protecter - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb8dadbb1316bc9fb88acfe0d72e4f0628580f6f09853ef01f90213b80239661",
+   "en": "ST3-4.5 Screw",
+   "kind": "box_item",
+   "freq": 5,
+   "context": {
+    "handle": "power-filter-protecter",
+    "title": "Power Filter & Protecter - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e2919bbef454b02d95e962fce0cfee0a8a06a9f81a8034b0923e0c1dd3c76c61",
+   "en": "Power Cord",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-filter-protecter",
+    "title": "Power Filter & Protecter - R1",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "46967e678af2c93008a08fab602d130ecf44f4e209877527f633fddd6c707059",
+   "en": "Isolation Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-filter-protecter",
+    "title": "Power Filter & Protecter - R1",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6bf41253144cee0474aa794a38f41db0005aec3177ffdf1556aef336e005c0c8",
+   "en": "Filter Board Buffer + Buffer Top Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-filter-protecter",
+    "title": "Power Filter & Protecter - R1",
+    "field": "box[7]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "faa9ff37289d27a2d54df01f8040f6f0800fa23714fd440fcbd01f1d58222e9d",
+   "en": "Lock Whole-Machine Frame",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-filter-protecter",
+    "title": "Power Filter & Protecter - R1",
+    "field": "box[8]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "33562472dfddb821f74bb0ae12c3f47e9d89c4c85ae1f38f30176184397a1456",
+   "en": "Liquid Cooling Fan",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "radiator-fan-r1",
+    "title": "Radiator Fan - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "760816c417f1a13366429ce958b7d0e7d830ade13aeecc913b2e5091d9c2b3a9",
+   "en": "Fan Buffer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "radiator-fan-r1",
+    "title": "Radiator Fan - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "bfe38facc3ed4fd4e7871099a8b1b615705d259f06025fab10f496dd92e1a264",
+   "en": "Fan Buffer Top Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "radiator-fan-r1",
+    "title": "Radiator Fan - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4cda2bc5325f90e212e82999c7c1a3d673425c486a891812fbd2cae81e11bad",
+   "en": "ST3-5.5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "radiator-fan-r1",
+    "title": "Radiator Fan - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fddde37e7359dffd584e1246ebb5fbaaaa8dc5275d794a68a5516a9c7dcc3d84",
+   "en": "Sealing Soft Rubber - Front",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-curtain-r1",
+    "title": "Smoke Curtain - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea2fe64f2cc270a4a53d24cff41e79d75643fe062a1afde82f26e096c6413fb6",
+   "en": "Sealing Soft Rubber - Rear",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-curtain-r1",
+    "title": "Smoke Curtain - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  }
+ ]
+}

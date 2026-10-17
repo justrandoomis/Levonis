@@ -1,0 +1,1595 @@
+{
+  "handle": "tungsten-carbide-nozzle-h2-p2s",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T15:15:30Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "title": "Bambu Lab US store product page: Tungsten Carbide Hotend - H2/P2S/X2D",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "product.*",
+        "package.*",
+        "motion.max_flow",
+        "part.*",
+        "extrusion.*",
+        "electrical.*",
+        "compat.statement",
+        "variant.note",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "The P0 corpus copy, parsed with the package (extractPage + buildImportPayload with the manifest row). Product Specifications: Max. Printing Temp. 350 ℃, Length 49.2 mm, Packaging Weight 0.026 kg, Packaging Size 60*60*30 mm (all kept by the deterministic layer; this file repeats only the 350 ℃, from the wiki, and it agrees). In the Box: \"Tungsten Carbide Nozzle *1\". No width, height, net weight, filament diameter or electrical value. Its \"HRA 90\" hardness (features, overview) has no registry key for a hotend (mechanical.hardness is a filament key), and \"50% increase in lifespan\", \"up to 62.5% higher max volumetric speed\" and \"up to 30%\" time saving are marketing prose: not stored. \"Not recommended\" cells get no relation: PLA Silk+ at Standard Flow 0.6 mm; PLA Silk+ at Standard Flow 0.8 mm; PLA Silk Dual Color at Standard Flow 0.6 mm; PLA Silk Dual Color at Standard Flow 0.8 mm; PLA Silk at Standard Flow 0.6 mm; PLA Silk at Standard Flow 0.8 mm; PLA-CF at High Flow 0.4 mm; PLA Aero at Standard Flow 0.6 mm; PLA Aero at Standard Flow 0.8 mm; PETG-CF at High Flow 0.4 mm; ASA Aero at Standard Flow 0.6 mm; ASA Aero at Standard Flow 0.8 mm; ASA-CF at High Flow 0.4 mm; TPU 85A at Standard Flow 0.6 mm; TPU 85A at Standard Flow 0.8 mm; TPU 90A at Standard Flow 0.4 mm; TPU 90A at Standard Flow 0.6 mm; TPU 90A at Standard Flow 0.8 mm; PAHT-CF at High Flow 0.4 mm; PA6-CF at High Flow 0.4 mm; PA6-GF at High Flow 0.4 mm."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "printing.layer_height",
+        "product.*",
+        "package.*",
+        "part.*",
+        "motion.max_flow",
+        "extrusion.*",
+        "electrical.*",
+        "compat.statement",
+        "variant.note",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "Read in full from the cached HTML (the cached .txt omits the tab panels). The \"Tungsten Carbide Nozzle\" panel (purchase links \"Tungsten Carbide Nozzle - Standard & High Flow\") and the Nozzle-Printer Compatibility rows \"Tungsten Carbide Nozzle\" and \"High Flow Tungsten Carbide Nozzle\" name this product. Its \"Size: 0.4mm/ 0.6mm/ 0.8mm\" agrees with the page's Size values (diameter and material stay with those option values, official_variant). It states no dimensions, weight, flow rate or electrical value for this product; its \"significantly less wear\" sentence and the feature bullets (\"HRA 90 Tougher nozzle\", \"Save Up to 30% of Your Time\") prove no number."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "compat.statement",
+        "printing.layer_height",
+        "motion.max_flow"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "Linked from the store page. A general guide for every Bambu nozzle (columns 0.2/0.4/0.6/0.8 mm Nozzle and 0.4/0.6/0.8 mm High flow nozzle), not for the Tungsten Carbide nozzle, so none of its rows is stored as a spec of this product; it is used only to flag disagreements with the page's two Filament Compatibility tables (conflict notes on TPU 85A, TPU 90A, PET-CF, PPA-CF and PPS-CF). Where the page is stricter than the wiki and says \"Not recommended\" (PLA Silk+/Silk Dual Color/Silk/PLA Aero/ASA Aero at Standard Flow 0.6/0.8 mm; TPU 85A and TPU 90A at Standard Flow), no relation is recorded. Its 0.4 mm hardened steel advice (layer height 0.15–0.3 mm, about 100 mm/s) is for fibre-filled filaments on hardened steel only; not stored."
+    }
+  ],
+  "specs": [
+    {
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Tungsten Carbide Nozzle › Max. Printing Temp",
+      "quote": "Purchase link: Tungsten Carbide Nozzle - Standard & High Flow | Compatibility: H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D | Max. Printing Temp: 350 ℃",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The panel's purchase links name this product (eu.store handle tungsten-carbide-hotend-h2-p2s-x2d, title \"Tungsten Carbide Hotend - H2/P2S/X2D\"; US handle tungsten-carbide-nozzle-h2-p2s) and cover both Standard Flow and High Flow. Agrees with the store page's Product Specifications (\"Max. Printing Temp. | 350 ℃\"), which the deterministic layer keeps as official_page."
+    },
+    {
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Tungsten Carbide Nozzle › Compatibility",
+      "quote": "Compatibility: H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The Nozzle-Printer Compatibility table gives the same printers for both rows of this product (\"Tungsten Carbide Nozzle | H2D, H2S, H2C, P2S, X2D\"; \"High Flow Tungsten Carbide Nozzle | H2D, H2S, H2C, P2S, X2D\").",
+      "conflict": "Replaces the store page's compatibility text (deterministic compat.statement, unverified, official_page), which joins the HF section's four dual-nozzle notes to the Compatibility line \"H2 Series/P2S/X2D\". The printers agree; the wiki adds the hotend positions (store Important Notice: \"Compatible with both left and right hotends on H2D\", \"On H2C, this hotend is supported only on the Left (Lifting) Hotend\"). The wiki does not name the H2D Pro, which the store's \"H2 Series\" covers through compat-targets.json."
+    },
+    {
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657373128582598661",
+        "value_text": "0.4mm Tungsten Carbide"
+      },
+      "value": {
+        "min": 0.1,
+        "max": 0.3
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.4 mm\" › Layer heights",
+      "quote": "0.1 mm to 0.3 mm (25-75% of nozzle diameter), with 0.2 mm being standard.",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter (both flow types), not a specification published for this product; kept unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446337",
+        "value_text": "0.6mm Tungsten Carbide"
+      },
+      "value": {
+        "min": 0.15,
+        "max": 0.45
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.6 mm\" › Layer heights",
+      "quote": "0.15 mm to 0.45 mm (25-75% of nozzle diameter), with 0.3-0.4 mm being common.",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter (both flow types), not a specification published for this product; kept unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446338",
+        "value_text": "0.8mm Tungsten Carbide"
+      },
+      "value": {
+        "min": 0.2,
+        "max": 0.6
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.8 mm\" › Layer heights",
+      "quote": "0.2 mm to 0.6 mm (25-75% of nozzle diameter), with 0.4-0.5 mm being typical.",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter (both flow types), not a specification published for this product; kept unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "Filament: PLA Basic",
+      "region": "",
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › High Flow › \"Real High Flow: Save Up to 30% of Your Time\" › table › rows \"High Flow Tungsten Carbide Nozzle Nozzle (0.4/0.6/0.8mm)\" › column \"PLA Basic\"",
+      "quote": "| PLA Basic | PLA Matte | PETG HF … High Flow Tungsten Carbide Nozzle Nozzle (0.4mm) | 40 mm³/s | 48 mm³/s | 32 mm³/s … (0.6mm) | 40 mm³/s … (0.8mm) | 40 mm³/s",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "PLA Basic reads 40 mm³/s for all three High Flow sizes. Other columns: 0.4 mm PLA Matte 48, PETG HF 32; 0.6 mm and 0.8 mm 40 and 40. The table sits in the marketing description and states no test conditions (footnote 1 belongs to the \"62.5%\" claim: ABS, Ø240mm single-wall cylinder, 280℃), so the value is kept unverified with the filament as its condition. The deterministic parse records no motion.max_flow."
+    },
+    {
+      "test_method": "",
+      "test_condition": "Filament: PLA Basic",
+      "region": "",
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "720441565723688960",
+        "value_text": "Standard Flow / X2D / 0.4mm Tungsten Carbide"
+      },
+      "value": 24,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › High Flow › \"Real High Flow: Save Up to 30% of Your Time\" › table › row \"Tungsten Carbide Nozzle (0.4mm)\" › column \"PLA Basic\"",
+      "quote": "| PLA Basic | PLA Matte | PETG HF … Tungsten Carbide Nozzle (0.4mm) | 24 mm³/s | 28 mm³/s | 24 mm³/s",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "The row is the standard-flow nozzle (the page's SF tables name it \"Tungsten Carbide Nozzle\"); only its 0.4 mm size is in the table, so the value is scoped to the Standard Flow + 0.4 mm variants. Other columns: PLA Matte 28, PETG HF 24. Marketing description without test conditions: unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "Filament: PLA Basic",
+      "region": "",
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "682705527743418408",
+        "value_text": "Standard Flow / P2S / 0.4mm Tungsten Carbide"
+      },
+      "value": 24,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › High Flow › \"Real High Flow: Save Up to 30% of Your Time\" › table › row \"Tungsten Carbide Nozzle (0.4mm)\" › column \"PLA Basic\"",
+      "quote": "| PLA Basic | PLA Matte | PETG HF … Tungsten Carbide Nozzle (0.4mm) | 24 mm³/s | 28 mm³/s | 24 mm³/s",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "The row is the standard-flow nozzle (the page's SF tables name it \"Tungsten Carbide Nozzle\"); only its 0.4 mm size is in the table, so the value is scoped to the Standard Flow + 0.4 mm variants. Other columns: PLA Matte 28, PETG HF 24. Marketing description without test conditions: unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "Filament: PLA Basic",
+      "region": "",
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "682705527743418426",
+        "value_text": "Standard Flow / H2C (Left) / 0.4mm Tungsten Carbide"
+      },
+      "value": 24,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › High Flow › \"Real High Flow: Save Up to 30% of Your Time\" › table › row \"Tungsten Carbide Nozzle (0.4mm)\" › column \"PLA Basic\"",
+      "quote": "| PLA Basic | PLA Matte | PETG HF … Tungsten Carbide Nozzle (0.4mm) | 24 mm³/s | 28 mm³/s | 24 mm³/s",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "The row is the standard-flow nozzle (the page's SF tables name it \"Tungsten Carbide Nozzle\"); only its 0.4 mm size is in the table, so the value is scoped to the Standard Flow + 0.4 mm variants. Other columns: PLA Matte 28, PETG HF 24. Marketing description without test conditions: unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "Filament: PLA Basic",
+      "region": "",
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "682705527743418390",
+        "value_text": "Standard Flow / H2S / 0.4mm Tungsten Carbide"
+      },
+      "value": 24,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › High Flow › \"Real High Flow: Save Up to 30% of Your Time\" › table › row \"Tungsten Carbide Nozzle (0.4mm)\" › column \"PLA Basic\"",
+      "quote": "| PLA Basic | PLA Matte | PETG HF … Tungsten Carbide Nozzle (0.4mm) | 24 mm³/s | 28 mm³/s | 24 mm³/s",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "The row is the standard-flow nozzle (the page's SF tables name it \"Tungsten Carbide Nozzle\"); only its 0.4 mm size is in the table, so the value is scoped to the Standard Flow + 0.4 mm variants. Other columns: PLA Matte 28, PETG HF 24. Marketing description without test conditions: unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "Filament: PLA Basic",
+      "region": "",
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "682705527743418372",
+        "value_text": "Standard Flow / H2D / 0.4mm Tungsten Carbide"
+      },
+      "value": 24,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › High Flow › \"Real High Flow: Save Up to 30% of Your Time\" › table › row \"Tungsten Carbide Nozzle (0.4mm)\" › column \"PLA Basic\"",
+      "quote": "| PLA Basic | PLA Matte | PETG HF … Tungsten Carbide Nozzle (0.4mm) | 24 mm³/s | 28 mm³/s | 24 mm³/s",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "The row is the standard-flow nozzle (the page's SF tables name it \"Tungsten Carbide Nozzle\"); only its 0.4 mm size is in the table, so the value is scoped to the Standard Flow + 0.4 mm variants. Other columns: PLA Matte 28, PETG HF 24. Marketing description without test conditions: unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "key": "variant.note",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657373128582598657",
+        "value_text": "H2D"
+      },
+      "value": "Fits both the left and the right hotend of the H2D. The H2 dual-nozzle function currently supports only nozzles of the same size.",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Product Features › Important Notice › items 1–2",
+      "quote": "1. Currently, the H2 Dual-Nozzle function only supports nozzles of the same size. 2. Compatible with both left and right hotends on H2D.",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "The wiki panel agrees (\"H2D (both left and right hotend)\"). Prose of the official page: unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "key": "variant.note",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667303701171994625",
+        "value_text": "H2C (Left)"
+      },
+      "value": "On the H2C this hotend is supported only on the left (lifting) hotend. The H2 dual-nozzle function currently supports only nozzles of the same size.",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Product Features › Important Notice › items 1 and 3",
+      "quote": "1. Currently, the H2 Dual-Nozzle function only supports nozzles of the same size. … 3. On H2C, this hotend is supported only on the Left (Lifting) Hotend.",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "The option value itself reads \"H2C (Left)\"; the wiki panel agrees (\"H2C (left hotend)\"). Prose of the official page: unverified."
+    },
+    {
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "key": "variant.note",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "value": "PET-CF, PPA-CF and PPS-CF are supported only on the left-side Liftable Hotend.",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › notes below the table › note 4",
+      "quote": "4. PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend.",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "Matches the HF table cells \"√(Only for Left Hotend)\" for these three filaments; the SF table marks them with a plain \"√\". Notes 1–2 (AMS on the right-side Fixed Hotend; support material on the Liftable Hotend) are general dual-nozzle usage advice and note 3 (\"TPU85A is only supported on the right-side Fixed Hotend …\") contradicts this page's own tables (TPU 85A \"X\"), so they are not stored."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Tungsten Carbide Nozzle › Compatibility; Nozzle-Printer Compatibility › rows \"Tungsten Carbide Nozzle\" and \"High Flow Tungsten Carbide Nozzle\"",
+      "quote": "Compatibility: H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D … Tungsten Carbide Nozzle | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "target_kind": "family",
+      "target_label": "H2D",
+      "target_family": "model_h2d",
+      "target_source_handle": "h2d",
+      "note": "The panel says \"both left and right hotend\" (store Important Notice: \"Compatible with both left and right hotends on H2D.\"). compat-targets.json label \"H2D\" (family model_h2d: h2d and its refurbished listing). The wiki does not name the H2D Pro."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Tungsten Carbide Nozzle › Compatibility; Nozzle-Printer Compatibility › rows \"Tungsten Carbide Nozzle\" and \"High Flow Tungsten Carbide Nozzle\"",
+      "quote": "Compatibility: H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D … Tungsten Carbide Nozzle | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "target_kind": "family",
+      "target_label": "H2D",
+      "target_family": "model_h2d",
+      "target_source_handle": "refurbished-bambu-lab-h2d-3d-printer",
+      "note": "The panel says \"both left and right hotend\" (store Important Notice: \"Compatible with both left and right hotends on H2D.\"). compat-targets.json label \"H2D\" (family model_h2d: h2d and its refurbished listing). The wiki does not name the H2D Pro."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Tungsten Carbide Nozzle › Compatibility; Nozzle-Printer Compatibility › rows \"Tungsten Carbide Nozzle\" and \"High Flow Tungsten Carbide Nozzle\"",
+      "quote": "Compatibility: H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D … Tungsten Carbide Nozzle | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "target_kind": "printer",
+      "target_label": "H2S",
+      "target_source_handle": "h2s",
+      "note": "compat-targets.json label \"H2S\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Tungsten Carbide Nozzle › Compatibility; Nozzle-Printer Compatibility › rows \"Tungsten Carbide Nozzle\" and \"High Flow Tungsten Carbide Nozzle\"",
+      "quote": "Compatibility: H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D … Tungsten Carbide Nozzle | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "target_kind": "printer",
+      "target_label": "H2C",
+      "target_source_handle": "h2c",
+      "note": "Left hotend only: the panel says \"H2C (left hotend)\", the store option is \"H2C (Left)\" and the Important Notice says \"On H2C, this hotend is supported only on the Left (Lifting) Hotend.\" compat-targets.json label \"H2C\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Tungsten Carbide Nozzle › Compatibility; Nozzle-Printer Compatibility › rows \"Tungsten Carbide Nozzle\" and \"High Flow Tungsten Carbide Nozzle\"",
+      "quote": "Compatibility: H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D … Tungsten Carbide Nozzle | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_family": "model_p2s",
+      "target_source_handle": "p2s",
+      "note": "compat-targets.json label \"P2S\" (family model_p2s: p2s and its refurbished listing)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Tungsten Carbide Nozzle › Compatibility; Nozzle-Printer Compatibility › rows \"Tungsten Carbide Nozzle\" and \"High Flow Tungsten Carbide Nozzle\"",
+      "quote": "Compatibility: H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D … Tungsten Carbide Nozzle | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_family": "model_p2s",
+      "target_source_handle": "refurbished-bambu-lab-p2s-3d-printer",
+      "note": "compat-targets.json label \"P2S\" (family model_p2s: p2s and its refurbished listing)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Tungsten Carbide Nozzle › Compatibility; Nozzle-Printer Compatibility › rows \"Tungsten Carbide Nozzle\" and \"High Flow Tungsten Carbide Nozzle\"",
+      "quote": "Compatibility: H2D (both left and right hotend), H2S, H2C (left hotend), P2S, X2D … Tungsten Carbide Nozzle | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "target_source_handle": "x2d",
+      "note": "compat-targets.json label \"X2D\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 1 (PLA Basic) › all six columns",
+      "quote": "PLA Basic | √ | √ | √ … PLA Basic | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 2 (PLA Matte) › all six columns",
+      "quote": "PLA Matte | √ | √ | √ … PLA Matte | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 3 (PLA Basic Gradient) › all six columns",
+      "quote": "PLA Basic Gradient | √ | √ | √ … PLA Basic Gradient | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 4 (PLA Silk+) › all three columns",
+      "quote": "PLA Silk+ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657373128582598661",
+        "value_text": "0.4mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 4 (PLA Silk+) › 0.4 mm columns",
+      "quote": "PLA Silk+ | √ | Not recommended | Not recommended … PLA Silk+ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 5 (PLA Silk Dual Color) › all three columns",
+      "quote": "PLA Silk Dual Color | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657373128582598661",
+        "value_text": "0.4mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 5 (PLA Silk Dual Color) › 0.4 mm columns",
+      "quote": "PLA Silk Dual Color | √ | Not recommended | Not recommended … PLA Silk Dual Color | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 6 (PLA Silk) › all three columns",
+      "quote": "PLA Silk | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657373128582598661",
+        "value_text": "0.4mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 6 (PLA Silk) › 0.4 mm columns",
+      "quote": "PLA Silk | √ | Not recommended | Not recommended … PLA Silk | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 7 (PLA Metal) › all six columns",
+      "quote": "PLA Metal | √ | √ | √ … PLA Metal | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 8 (PLA Marble) › all six columns",
+      "quote": "PLA Marble | √ | √ | √ … PLA Marble | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 9 (PLA Sparkle) › all six columns",
+      "quote": "PLA Sparkle | √ | √ | √ … PLA Sparkle | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 10 (PLA Wood) › all six columns",
+      "quote": "PLA Wood | √ | √ | √ … PLA Wood | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 11 (PLA Galaxy) › all six columns",
+      "quote": "PLA Galaxy | √ | √ | √ … PLA Galaxy | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 12 (PLA Glow) › all six columns",
+      "quote": "PLA Glow | √ | √ | √ … PLA Glow | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418370",
+        "value_text": "Standard Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF Filament Compatibility › row 13 (PLA-CF) › all three columns",
+      "quote": "PLA-CF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446337",
+        "value_text": "0.6mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 13 (PLA-CF) › 0.6 mm columns",
+      "quote": "PLA-CF | √ | √ | √ … PLA-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446338",
+        "value_text": "0.8mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 13 (PLA-CF) › 0.8 mm columns",
+      "quote": "PLA-CF | √ | √ | √ … PLA-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 14 (PLA Aero) › all three columns",
+      "quote": "PLA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657373128582598661",
+        "value_text": "0.4mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 14 (PLA Aero) › 0.4 mm columns",
+      "quote": "PLA Aero | √ | Not recommended | Not recommended … PLA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 15 (PETG HF) › all six columns",
+      "quote": "PETG HF | √ | √ | √ … PETG HF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 16 (PETG Translucent) › all six columns",
+      "quote": "PETG Translucent | √ | √ | √ … PETG Translucent | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418370",
+        "value_text": "Standard Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF Filament Compatibility › row 17 (PETG-CF) › all three columns",
+      "quote": "PETG-CF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446337",
+        "value_text": "0.6mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 17 (PETG-CF) › 0.6 mm columns",
+      "quote": "PETG-CF | √ | √ | √ … PETG-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446338",
+        "value_text": "0.8mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 17 (PETG-CF) › 0.8 mm columns",
+      "quote": "PETG-CF | √ | √ | √ … PETG-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 18 (ABS) › all six columns",
+      "quote": "ABS | √ | √ | √ … ABS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 19 (ABS-GF) › all six columns",
+      "quote": "ABS-GF | √ | √ | √ … ABS-GF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 20 (ASA) › all six columns",
+      "quote": "ASA | √ | √ | √ … ASA | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "ASA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 21 (ASA Aero) › all three columns",
+      "quote": "ASA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657373128582598661",
+        "value_text": "0.4mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "ASA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 21 (ASA Aero) › 0.4 mm columns",
+      "quote": "ASA Aero | √ | Not recommended | Not recommended … ASA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418370",
+        "value_text": "Standard Flow"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF Filament Compatibility › row 22 (ASA-CF) › all three columns",
+      "quote": "ASA-CF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446337",
+        "value_text": "0.6mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 22 (ASA-CF) › 0.6 mm columns",
+      "quote": "ASA-CF | √ | √ | √ … ASA-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446338",
+        "value_text": "0.8mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 22 (ASA-CF) › 0.8 mm columns",
+      "quote": "ASA-CF | √ | √ | √ … ASA-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 23 (PC) › all six columns",
+      "quote": "PC | √ | √ | √ … PC | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 24 (PC FR) › all six columns",
+      "quote": "PC FR | √ | √ | √ … PC FR | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 25 (TPU for AMS) › all six columns",
+      "quote": "TPU for AMS | √ | √ | √ … TPU for AMS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 26 (TPU 95A HF) › all six columns",
+      "quote": "TPU 95A HF | √ | √ | √ … TPU 95A HF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 27 (TPU 85A) › all three columns",
+      "quote": "TPU 85A | X | X | X",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "conflict": "The material-table wiki (Nozzle table, row \"TPU 85A\") says \"Not Compatible\" / \"Not Recommended\" / \"Not Recommended\" for the general 0.4 / 0.6 / 0.8 mm high flow nozzle; this page's own table for the High Flow Tungsten Carbide Nozzle says \"X\" for all three, which is kept."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "657373128582598661",
+        "value_text": "0.4mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 27 (TPU 85A) › 0.4 mm columns",
+      "quote": "TPU 85A | X | Not recommended | Not recommended … TPU 85A | X | X | X",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "conflict": "The material-table wiki (Nozzle table, row \"TPU 85A\") says \"Compatible\" for the general 0.4 mm nozzle and \"Not Compatible\" for the 0.4 mm high flow nozzle; this page's own tables say \"X\" for both 0.4 mm Tungsten Carbide nozzles, which is kept."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 90A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 28 (TPU 90A) › all three columns",
+      "quote": "TPU 90A | X | X | X",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "conflict": "The material-table wiki (Nozzle table, row \"TPU 90A\") says \"Not Recommended\" / \"Not Recommended\" / \"Not Recommended\" for the general 0.4 / 0.6 / 0.8 mm high flow nozzle; this page's own table for the High Flow Tungsten Carbide Nozzle says \"X\" for all three, which is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418370",
+        "value_text": "Standard Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF Filament Compatibility › row 29 (PAHT-CF) › all three columns",
+      "quote": "PAHT-CF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446337",
+        "value_text": "0.6mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 29 (PAHT-CF) › 0.6 mm columns",
+      "quote": "PAHT-CF | √ | √ | √ … PAHT-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446338",
+        "value_text": "0.8mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 29 (PAHT-CF) › 0.8 mm columns",
+      "quote": "PAHT-CF | √ | √ | √ … PAHT-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418370",
+        "value_text": "Standard Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF Filament Compatibility › row 30 (PET-CF) › all three columns",
+      "quote": "PET-CF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 30 (PET-CF) › all three columns",
+      "quote": "PET-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "Every High Flow cell says \"√(Only for Left Hotend)\"; the page's note 4 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend.\" The SF table marks the Standard Flow sizes with a plain \"√\" (separate relation).",
+      "conflict": "The material-table wiki (Nozzle table, row \"PET-CF/GF\", column \"0.4 mm High flow nozzle\") says \"Not Recommended\" for the general 0.4 mm high flow nozzle, where this page says \"√(Only for Left Hotend)\" for the 0.4 mm High Flow Tungsten Carbide Nozzle. The page's own table is kept; the 0.6/0.8 mm columns agree (\"Compatible\", \"Compatible\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418370",
+        "value_text": "Standard Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF Filament Compatibility › row 31 (PA6-CF) › all three columns",
+      "quote": "PA6-CF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446337",
+        "value_text": "0.6mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 31 (PA6-CF) › 0.6 mm columns",
+      "quote": "PA6-CF | √ | √ | √ … PA6-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446338",
+        "value_text": "0.8mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 31 (PA6-CF) › 0.8 mm columns",
+      "quote": "PA6-CF | √ | √ | √ … PA6-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418370",
+        "value_text": "Standard Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF Filament Compatibility › row 32 (PPA-CF) › all three columns",
+      "quote": "PPA-CF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 32 (PPA-CF) › all three columns",
+      "quote": "PPA-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "Every High Flow cell says \"√(Only for Left Hotend)\"; the page's note 4 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend.\" The SF table marks the Standard Flow sizes with a plain \"√\" (separate relation).",
+      "conflict": "The material-table wiki (Nozzle table, row \"PPA-CF/GF\", column \"0.4 mm High flow nozzle\") says \"Not Recommended\" for the general 0.4 mm high flow nozzle, where this page says \"√(Only for Left Hotend)\" for the 0.4 mm High Flow Tungsten Carbide Nozzle. The page's own table is kept; the 0.6/0.8 mm columns agree (\"Compatible\", \"Compatible\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418370",
+        "value_text": "Standard Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF Filament Compatibility › row 33 (PPS-CF) › all three columns",
+      "quote": "PPS-CF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418371",
+        "value_text": "High Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › HF Filament Compatibility › row 33 (PPS-CF) › all three columns",
+      "quote": "PPS-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "note": "Every High Flow cell says \"√(Only for Left Hotend)\"; the page's note 4 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend.\" The SF table marks the Standard Flow sizes with a plain \"√\" (separate relation).",
+      "conflict": "The material-table wiki (Nozzle table, row \"PPS-CF/GF\", column \"0.4 mm High flow nozzle\") says \"Not Recommended\" for the general 0.4 mm high flow nozzle, where this page says \"√(Only for Left Hotend)\" for the 0.4 mm High Flow Tungsten Carbide Nozzle. The page's own table is kept; the 0.6/0.8 mm columns agree (\"Compatible\", \"Compatible\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 34 (Support for ABS) › all six columns",
+      "quote": "Support for ABS | √ | √ | √ … Support for ABS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 35 (Support for PLA/PETG) › all six columns",
+      "quote": "Support for PLA/PETG | √ | √ | √ … Support for PLA/PETG | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 36 (Support for PA/PET) › all six columns",
+      "quote": "Support for PA/PET | √ | √ | √ … Support for PA/PET | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 37 (Support for PLA (New Version)) › all six columns",
+      "quote": "Support for PLA (New Version) | √ | √ | √ … Support for PLA (New Version) | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 38 (PVA) › all six columns",
+      "quote": "PVA | √ | √ | √ … PVA | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "682705527743418370",
+        "value_text": "Standard Flow"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF Filament Compatibility › row 39 (PA6-GF) › all three columns",
+      "quote": "PA6-GF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446337",
+        "value_text": "0.6mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 39 (PA6-GF) › 0.6 mm columns",
+      "quote": "PA6-GF | √ | √ | √ … PA6-GF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "670764305714446338",
+        "value_text": "0.8mm Tungsten Carbide"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › SF and HF Filament Compatibility › row 39 (PA6-GF) › 0.8 mm columns",
+      "quote": "PA6-GF | √ | √ | √ … PA6-GF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:46Z"
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tungsten-carbide-nozzle-h2-p2s",
+      "source_title": "Tungsten Carbide Hotend - H2/P2S/X2D (store page)",
+      "retrieved_at": "2026-10-16T07:07:46Z",
+      "locator": "Description › In the Box › paragraph 1",
+      "quote": "- Tungsten Carbide Nozzle *1",
+      "items": [
+        {
+          "text": "Tungsten Carbide Nozzle",
+          "qty": 1,
+          "section": ""
+        }
+      ],
+      "note": "One list for every version (it follows the HF table but is not tied to a flow type). The deterministic layer already writes it as package.contents (verified, official_page)."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles",
+      "text": "Introduction to Bambu Nozzles",
+      "note": "Not linked from the store page; the §F nozzles page. Its Tungsten Carbide Nozzle panel and its Nozzle-Printer Compatibility table name this product."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "note": "Linked from the store page (\"Learn more about filament compatibility on Bambu Lab Wiki.\"); the builder already records it (same id, so the merge does not add it twice)."
+    }
+  ],
+  "not_published": [
+    "product.width",
+    "product.height",
+    "product.net_weight"
+  ]
+}

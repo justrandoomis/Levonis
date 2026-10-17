@@ -1,0 +1,1426 @@
+[
+ {
+  "h": "119f448a1b9ef6c7c914e95a0fed4816d5e54598f236e97ea4b0b57685105fec",
+  "en": "The Wireless Charger Kit contains all the non-3D printed parts for assembling an entirely functional A1 mini Wireless Charger or an Air Force Command Headquarters Wireless Charger. To complete the work, you need to download the model files and 3D print the parts.",
+  "ar": "يحتوي Wireless Charger Kit على جميع القطع غير المطبوعة (non-3D printed) اللازمة لتجميع A1 mini Wireless Charger أو Air Force Command Headquarters Wireless Charger بشكل يعمل بالكامل. ولإكمال العمل، يجب تنزيل ملفات النموذج وطباعة القطع بطابعة 3D.",
+  "ckb": "ئەم کیتە (Wireless Charger Kit) هەموو پارچە نەچاپکراوەکانی (non-3D printed) تێدایە کە بۆ پێکەوەنانی بارگاویکەرێکی بێتەلی تەواو کارای A1 mini Wireless Charger یان Air Force Command Headquarters Wireless Charger پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکان بە چاپکەری 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "660abe375102d856c65ad6faac390362559f47d129e4a0de9a415479130a6fa7",
+  "en": "To download the model files and obtain detailed information, please visit A1 mini Wireless Charger or Air Force Command Headquarters on Makerworld.",
+  "ar": "لتنزيل ملفات النموذج والحصول على معلومات مفصّلة، يرجى زيارة صفحة A1 mini Wireless Charger أو Air Force Command Headquarters على Makerworld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل و وەرگرتنی زانیاریی ورد، تکایە سەردانی پەڕەی A1 mini Wireless Charger یان Air Force Command Headquarters لە Makerworld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "49059224153184fde1636b4a91f4734fdf8301a6c74b66155370f5d4c88ef6cf",
+  "en": "Compatible Models",
+  "ar": "النماذج المتوافقة",
+  "ckb": "مۆدێلە گونجاوەکان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "c6b6a71ac899e4f8937b0f0896a11170aa2d3a120fa476ec5048b2bda4eba0bd",
+  "en": "Creators",
+  "ar": "المصمّمون",
+  "ckb": "دروستکەران",
+  "kind": "block_cell"
+ },
+ {
+  "h": "8992f1c87cb89bbad310b78ad3e56d520bf1ea1ce57609fc19894fdf14e7870f",
+  "en": "Model Links",
+  "ar": "روابط النماذج",
+  "ckb": "بەستەرەکانی مۆدێل",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9ee6825786996f0b170ebd9b963f0a640369baae7a0d6ad84a0fc812c6f2076c",
+  "en": "30 3D print",
+  "ar": "30 3D print",
+  "ckb": "30 3D print",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "d7b75a1afbcaef1df3e817a382458b96d6e8a930cc9277eb98ef66b1994dcdb5",
+  "en": "A1 mini Wireless Charger is here! We have designed an adorable wireless charger model based on the appearance of our A1 mini 3D Printer.",
+  "ar": "وصل A1 mini Wireless Charger! صمّمنا نموذج شاحن لاسلكي لطيفًا مستوحى من مظهر طابعة 3D من طراز A1 mini الخاصة بنا.",
+  "ckb": "ئەوەتا A1 mini Wireless Charger هات! بە پشتبەستن بە ڕواڵەتی چاپکەری 3D لە جۆری A1 mini کە بەرهەمی خۆمانە، مۆدێلێکی بارگاویکەری بێتەلی جوانکیلەمان دیزاین کردووە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "99ea430322abbdfaa363dfe3f5a65c2555e523a3d5a6af36378a1440eb585d20",
+  "en": "Simply connect a Type-C cable to the wireless charger to power it on. Then place your phone on the wireless charging plate to start the charging process.",
+  "ar": "ما عليك سوى توصيل كابل Type-C بالشاحن اللاسلكي لتشغيله. ثم ضع هاتفك على قاعدة الشحن اللاسلكي لبدء عملية الشحن.",
+  "ckb": "تەنها کێبڵێکی Type-C بە بارگاویکەرە بێتەلەکەوە ببەستە بۆ ئەوەی هەڵبکرێت. پاشان مۆبایلەکەت لەسەر پلێتی بارگاویکردنی بێتەل دابنێ بۆ دەستپێکردنی پرۆسەی بارگاویکردن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ff42375be08392d8221142db5aa2e78b4f84f3dcfd33aed18288a331850d9f24",
+  "en": "Once the charging starts, the Z-axis will simulate the printing process by moving up and down for one cycle. During this time, the LOGO light and indicator light will light up.",
+  "ar": "بمجرد بدء الشحن، سيحاكي محور Z عملية الطباعة بالتحرك صعودًا ونزولًا لدورة واحدة. وخلال ذلك، يضيء ضوء الشعار (LOGO) وضوء المؤشر.",
+  "ckb": "کاتێک بارگاویکردن دەست پێدەکات، تەوەری Z بە جووڵەی بۆ سەرەوە و خوارەوە بۆ یەک خول، پرۆسەی چاپ لاسایی دەکاتەوە. لەم ماوەیەدا، ڕووناکیی لۆگۆ (LOGO) و ڕووناکیی نیشاندەر هەڵدەبن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9927e1d2bd372240c305ad318c28ff48e9c7ed2cf85d81d30103fddd4b1f850c",
+  "en": "You can use the Make My Sign function on Makerworld to customize your own nameplate for your A1 mini wireless charger. To learn more about the nameplate customization, please visit A1 mini Wireless Charger on Makerworld.",
+  "ar": "يمكنك استخدام ميزة Make My Sign على Makerworld لتخصيص لوحة الاسم الخاصة بك لشاحن A1 mini اللاسلكي. ولمعرفة المزيد عن تخصيص لوحة الاسم، يرجى زيارة صفحة A1 mini Wireless Charger على Makerworld.",
+  "ckb": "دەتوانیت تایبەتمەندیی Make My Sign لە Makerworld بەکاربهێنیت بۆ دروستکردنی تابلۆی ناوی تایبەت بە خۆت بۆ بارگاویکەری بێتەلی A1 mini. بۆ زانیاریی زیاتر دەربارەی تایبەتکردنی تابلۆی ناو، تکایە سەردانی پەڕەی A1 mini Wireless Charger لە Makerworld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "da87efd3d4f7964fb3cadb5c45222a48f072b0b5b65aa8ae2a8b2f2b65fb560a",
+  "en": "To accommodate different phones and filaments, we have specially designed two power modes (high/low) to avoid phone overheating and heat deflection of printed parts.",
+  "ar": "لتلائم الهواتف والفلامنتات المختلفة، صمّمنا خصيصًا وضعَي طاقة (مرتفع/منخفض) لتجنّب ارتفاع حرارة الهاتف المفرط وتشوّه القطع المطبوعة بفعل الحرارة.",
+  "ckb": "بۆ گونجان لەگەڵ مۆبایل و فیلامێنتی جیاواز، بە تایبەتی دوو دۆخی وزەمان (بەرز/نزم) دیزاین کردووە بۆ ڕێگریکردن لە گەرمبوونی زیادەی مۆبایل و لاربوونەوەی پارچە چاپکراوەکان بەهۆی گەرمییەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "02bd4ac5f80e53712211b6eda55e17fc85f042fa742e3240971a8388696933fa",
+  "en": "We have also engineered two different drive modes (mode 1 and mode 2) for the A1 mini wireless charger to adapt to varying levels of friction generated during the Z-axis movement. (This friction is caused by differences in filament materials and printing tolerances)",
+  "ar": "كما صمّمنا وضعَي تشغيل مختلفين (الوضع 1 والوضع 2) لشاحن A1 mini اللاسلكي للتكيّف مع المستويات المتفاوتة من الاحتكاك الناتج أثناء حركة محور Z. (ينتج هذا الاحتكاك عن اختلاف مواد الفلامنت وتفاوتات الطباعة)",
+  "ckb": "هەروەها دوو دۆخی جووڵاندنی جیاوازمان (دۆخی 1 و دۆخی 2) بۆ بارگاویکەری بێتەلی A1 mini دروست کردووە بۆ ئەوەی لەگەڵ ئاستە جیاوازەکانی ئەو لێکخشانەی لە کاتی جووڵەی تەوەری Z دروست دەبێت بگونجێت. (ئەم لێکخشانە بەهۆی جیاوازیی کەرەستەی فیلامێنت و تۆڵێرانسی چاپەوە دروست دەبێت)",
+  "kind": "block_line"
+ },
+ {
+  "h": "203d51c5e7d9b2568e5210f092f6b01568d10c02b517c7cca07a783270545032",
+  "en": "Mode 1 (default mode)",
+  "ar": "الوضع 1 (الوضع الافتراضي)",
+  "ckb": "دۆخی 1 (دۆخی بنەڕەتی)",
+  "kind": "block_title"
+ },
+ {
+  "h": "f013b73694c68a20beab1671db0b1bc6390b3c9334ee74713f4f1da3f59c9043",
+  "en": "Lights: Highlight for 10s and then stay lit at normal brightness",
+  "ar": "الأضواء: إضاءة ساطعة لمدة 10 ثوانٍ ثم تبقى مضاءة بسطوع عادي",
+  "ckb": "ڕووناکییەکان: بۆ ماوەی 10 چرکە ڕووناکیی بەهێز، پاشان بە ڕووناکیی ئاسایی داگیرساو دەمێنێتەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "868001dd79e02014f3adffbd93c1c5d8fbb8a6026bbcd4ff00e2f4c46ba347ae",
+  "en": "Motor: Back-and-forth motion for one cycle",
+  "ar": "المحرك: حركة ذهابًا وإيابًا لدورة واحدة",
+  "ckb": "بزوێنەر: جووڵەی هاتوچۆ بۆ یەک خول",
+  "kind": "block_line"
+ },
+ {
+  "h": "1cb324350e6c2ee42ddd2afd0063625b72d6ca51172e3de177a587c81e6a369f",
+  "en": "Compatible Model: A1 mini Wireless Charger",
+  "ar": "النموذج المتوافق: A1 mini Wireless Charger",
+  "ckb": "مۆدێلی گونجاو: A1 mini Wireless Charger",
+  "kind": "block_line"
+ },
+ {
+  "h": "2dc711ba48ae77dceb8cca2e9393d52de54d4b20cbe2638511b2afcf52160ad9",
+  "en": "Mode 2",
+  "ar": "الوضع 2",
+  "ckb": "دۆخی 2",
+  "kind": "block_title"
+ },
+ {
+  "h": "8df6575b71377876b9cdd6cb9b7431aaaad05c7bac3ae19c7d3638f7c829bb33",
+  "en": "Motor: Back-and-forth motion for one cycle with greater power (adapt to varying levels of friction generated during the Z-axis movement)",
+  "ar": "المحرك: حركة ذهابًا وإيابًا لدورة واحدة بقوة أكبر (للتكيّف مع المستويات المتفاوتة من الاحتكاك الناتج أثناء حركة محور Z)",
+  "ckb": "بزوێنەر: جووڵەی هاتوچۆ بۆ یەک خول بە هێزی زیاتر (بۆ گونجان لەگەڵ ئاستە جیاوازەکانی ئەو لێکخشانەی لە کاتی جووڵەی تەوەری Z دروست دەبێت)",
+  "kind": "block_line"
+ },
+ {
+  "h": "af4dbf485c6b490cb39e2e3cd2e3f00354327a6b805dafcd8e09964e3f33bc4b",
+  "en": "Mode 3",
+  "ar": "الوضع 3",
+  "ckb": "دۆخی 3",
+  "kind": "block_title"
+ },
+ {
+  "h": "497cadef5cbc663ad97f26e3096242f9f2ab6e54b368cbeb2b25f98f06874fc8",
+  "en": "Lights: Continuous breathing light",
+  "ar": "الأضواء: إضاءة نابضة (تنفّس) مستمرة",
+  "ckb": "ڕووناکییەکان: ڕووناکیی هەناسەیی بەردەوام",
+  "kind": "block_line"
+ },
+ {
+  "h": "2ca55bcc50213d8d21f513d2fae5531891613298e6591eeff8e0e769486a963a",
+  "en": "Motor: Continuous back-and-forth motion",
+  "ar": "المحرك: حركة ذهابًا وإيابًا مستمرة",
+  "ckb": "بزوێنەر: جووڵەی هاتوچۆی بەردەوام",
+  "kind": "block_line"
+ },
+ {
+  "h": "f5a37bf82955fd61face4ea1632558c9c0867accd58bce06a2cb7026d1d75caa",
+  "en": "Compatible Model: Air Force Command Headquarters",
+  "ar": "النموذج المتوافق: Air Force Command Headquarters",
+  "ckb": "مۆدێلی گونجاو: Air Force Command Headquarters",
+  "kind": "block_line"
+ },
+ {
+  "h": "4b87f3416c67c6fc04c03d715e03e0239092a20ab837608b609d60a34428e71a",
+  "en": "Mode 4",
+  "ar": "الوضع 4",
+  "ckb": "دۆخی 4",
+  "kind": "block_title"
+ },
+ {
+  "h": "53d6bbf395bd98456dcb74952c5f059cb8642a46cadecc2dccc6a4b15070eb00",
+  "en": "Motor: Continuous one-way motion",
+  "ar": "المحرك: حركة مستمرة في اتجاه واحد",
+  "ckb": "بزوێنەر: جووڵەی یەک ئاراستەی بەردەوام",
+  "kind": "block_line"
+ },
+ {
+  "h": "b108a13d1a5b9d42a163a90486f4beba0fd21c16d47ea0987b4201353e71058c",
+  "en": "Mode 5",
+  "ar": "الوضع 5",
+  "ckb": "دۆخی 5",
+  "kind": "block_title"
+ },
+ {
+  "h": "680ffc06eda1b6ad2e7a80f67141ea1e3d4664d9250d0781e54de5c4a0741c86",
+  "en": "Lights: Breathing light for 10s",
+  "ar": "الأضواء: إضاءة نابضة (تنفّس) لمدة 10 ثوانٍ",
+  "ckb": "ڕووناکییەکان: ڕووناکیی هەناسەیی بۆ ماوەی 10 چرکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "6c6d497057dea16152908a4b93649bd101d75e3717372fe32e85d670118079b0",
+  "en": "Motor: Back-and-forth motion for 10s",
+  "ar": "المحرك: حركة ذهابًا وإيابًا لمدة 10 ثوانٍ",
+  "ckb": "بزوێنەر: جووڵەی هاتوچۆ بۆ ماوەی 10 چرکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "1a5ed9176de25727bfb797a8f92d3e06da1b883666fdb1106ccea1a09ff6ab17",
+  "en": "Mode 6",
+  "ar": "الوضع 6",
+  "ckb": "دۆخی 6",
+  "kind": "block_title"
+ },
+ {
+  "h": "4d6cf0086451024d9d64d017c4418d3e5f0007eaa050292b4072d6921ef10ab1",
+  "en": "Motor: One-way motion for 10s",
+  "ar": "المحرك: حركة في اتجاه واحد لمدة 10 ثوانٍ",
+  "ckb": "بزوێنەر: جووڵەی یەک ئاراستە بۆ ماوەی 10 چرکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "864063b1ac676f5feaf4a1c2393adfc308b246504ed54f61534a7be9b9dcf5e7",
+  "en": "Mode 7",
+  "ar": "الوضع 7",
+  "ckb": "دۆخی 7",
+  "kind": "block_title"
+ },
+ {
+  "h": "9589ef333933290d13ffd06fcdc1c544c1de1600253676dab101d06d01509cb1",
+  "en": "Lights: OFF",
+  "ar": "الأضواء: مطفأة",
+  "ckb": "ڕووناکییەکان: کوژاوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "4cda054edc72e8f997032e4bbc6e80f940232d7fe3421317506fcf0a6c8a5f67",
+  "en": "Motor: OFF",
+  "ar": "المحرك: مطفأ",
+  "ckb": "بزوێنەر: کوژاوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "b5715e32f83c795f0880fb606f18fb5eb19ff255dbb1acda3ff90d674fd9e01a",
+  "en": "Compatible Model: A1 mini Wireless Charger, Air Force Command Headquarters",
+  "ar": "النموذج المتوافق: A1 mini Wireless Charger، Air Force Command Headquarters",
+  "ckb": "مۆدێلی گونجاو: A1 mini Wireless Charger، Air Force Command Headquarters",
+  "kind": "block_line"
+ },
+ {
+  "h": "18786940ec538ef1c78ee325f06b25dd4de63b135f4050ac39319462c2cb49f5",
+  "en": "Lights",
+  "ar": "الأضواء",
+  "ckb": "ڕووناکییەکان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "adeb8a5507944ec8649020058f1df568a806b7319324815a243a8e6a4a5af15e",
+  "en": "Compatible Model",
+  "ar": "النموذج المتوافق",
+  "ckb": "مۆدێلی گونجاو",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5340502f2b25c379b879583555fcde1a7dc7da62f5760158a4b8d19bbe75cf36",
+  "en": "Mode 1",
+  "ar": "الوضع 1",
+  "ckb": "دۆخی 1",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e929de85f93d967305f959566fbabd766eb183d9f8d47535fbffaeeaf4391064",
+  "en": "Highlight for 10s and then stay lit at normal brightness",
+  "ar": "إضاءة ساطعة لمدة 10 ثوانٍ ثم تبقى مضاءة بسطوع عادي",
+  "ckb": "ڕووناکیی بەهێز بۆ ماوەی 10 چرکە، پاشان بە ڕووناکیی ئاسایی داگیرساو دەمێنێتەوە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "03cd8d2157edc0b8242de74ad95d136e8274723c7ede1a8e8a0240b59f3e152b",
+  "en": "Back-and-forth motion for one cycle",
+  "ar": "حركة ذهابًا وإيابًا لدورة واحدة",
+  "ckb": "جووڵەی هاتوچۆ بۆ یەک خول",
+  "kind": "block_cell"
+ },
+ {
+  "h": "1387940397d34913af26eec26c95b8234bc5facef71d8712d2f6ee9752b14b66",
+  "en": "Back-and-forth motion for one cycle with greater power",
+  "ar": "حركة ذهابًا وإيابًا لدورة واحدة بقوة أكبر",
+  "ckb": "جووڵەی هاتوچۆ بۆ یەک خول بە هێزی زیاتر",
+  "kind": "block_cell"
+ },
+ {
+  "h": "87c070d3dfd4fac61d1d2ffc22f16527f7b7ac5f6fe1d1b332fd570a26daeca5",
+  "en": "Continuous breathing light",
+  "ar": "إضاءة نابضة (تنفّس) مستمرة",
+  "ckb": "ڕووناکیی هەناسەیی بەردەوام",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0c1b77aa046ca28789b4eaf29f90d2f08578db25a19906d8f4c697ef3cd99225",
+  "en": "Continuous back-and-forth motion",
+  "ar": "حركة ذهابًا وإيابًا مستمرة",
+  "ckb": "جووڵەی هاتوچۆی بەردەوام",
+  "kind": "block_cell"
+ },
+ {
+  "h": "7ea22ae742b151bc0f55631378bd919aee585e26945225192d53d7f521fb3e0c",
+  "en": "Continuous one-way motion",
+  "ar": "حركة مستمرة في اتجاه واحد",
+  "ckb": "جووڵەی یەک ئاراستەی بەردەوام",
+  "kind": "block_cell"
+ },
+ {
+  "h": "606de8be2ee211418fdcb8c8d91d8995d1c798b5af8e4625eeb77540a948a7c0",
+  "en": "Breathing light for 10s",
+  "ar": "إضاءة نابضة (تنفّس) لمدة 10 ثوانٍ",
+  "ckb": "ڕووناکیی هەناسەیی بۆ ماوەی 10 چرکە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "1f7e14cfe103ca42267364f76a3f37a1039c1560153429b5a1d22a2608448dda",
+  "en": "Back-and-forth motion for 10s",
+  "ar": "حركة ذهابًا وإيابًا لمدة 10 ثوانٍ",
+  "ckb": "جووڵەی هاتوچۆ بۆ ماوەی 10 چرکە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "1f9d5bd3852627cfc697b868aa6dbdda38bd33a0d8dd173374bc55686347a81a",
+  "en": "One-way motion for 10s",
+  "ar": "حركة في اتجاه واحد لمدة 10 ثوانٍ",
+  "ckb": "جووڵەی یەک ئاراستە بۆ ماوەی 10 چرکە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "38cca6bea010af8adaf4be7d270456fa9adef8c0252db91f2767c607d077319b",
+  "en": "OFF",
+  "ar": "مطفأ",
+  "ckb": "کوژاوە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e4134e092c0868134a55d983e7db42ee81f6672b7e6a305a8c1a1331c9a3e0d1",
+  "en": "A1 mini Wireless Charger Air Force Command Headquarters",
+  "ar": "A1 mini Wireless Charger Air Force Command Headquarters",
+  "ckb": "A1 mini Wireless Charger Air Force Command Headquarters",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "5bdda2a86c928085be08e70ad8cea3ef875b0ceee284bb95fb54a429dfdb1442",
+  "en": "Please note that the product does not include the 3D printed parts as shown in the main image.",
+  "ar": "يرجى ملاحظة أن المنتج لا يتضمن القطع المطبوعة بطابعة 3D الظاهرة في الصورة الرئيسية.",
+  "ckb": "تکایە ئاگاداربە کە بەرهەمەکە ئەو پارچە چاپکراوانەی 3D لەخۆ ناگرێت کە لە وێنە سەرەکییەکەدا دیارن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ed7f8d5c2bb6f202fde1df9d4e5d6ca8c6879a08e32f9404b4c7b03c99bec9b6",
+  "en": "All-around performance right out of the box",
+  "ar": "أداء متكامل فور إخراجها من العلبة",
+  "ckb": "کارایی گشتگیر ڕاستەوخۆ دوای دەرهێنان لە سندوق",
+  "kind": "block_title"
+ },
+ {
+  "h": "090590536f00f0adcb3965abe71cc1e102d9c25805154a4e3f582b6a100f7eec",
+  "en": "It just works right out of the box. You don't have to mess with it, just simply hit print, and the printer will handle all the calibrations (Auto-Bed Leveling, Vibration compensation) for you. Enjoy trouble-free printing every time with your P1S.",
+  "ar": "تعمل ببساطة فور إخراجها من العلبة. لا حاجة للعبث بها، فقط اضغط على زر الطباعة، وستتولّى الطابعة جميع عمليات المعايرة (التسوية التلقائية للصفيحة، وتعويض الاهتزاز) نيابةً عنك. استمتع بطباعة خالية من المتاعب في كل مرة مع P1S.",
+  "ckb": "ڕاستەوخۆ دوای دەرهێنان لە سندوق کار دەکات. پێویست ناکات دەستکاریی بکەیت، تەنها دوگمەی چاپ دابگرە و چاپکەرەکە هەموو کالیبرەکردنەکان (ڕێکخستنی خۆکاری پلێت، قەرەبووکردنەوەی لەرینەوە) لە جیاتی تۆ ئەنجام دەدات. هەموو جارێک لەگەڵ P1S چێژ لە چاپکردنی بێ کێشە وەربگرە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "40848a046d7b99c4324ef52b2a9576177b7df5dd5d590a748eb74d2ba510cd78",
+  "en": "Multi-color capability",
+  "ar": "إمكانية تعدد الألوان",
+  "ckb": "توانای فرەڕەنگ",
+  "kind": "block_title"
+ },
+ {
+  "h": "6a97b3c3c3540787c91280dc43431afa2a8e81e3f681e7b288a8a37da7d5ae9f",
+  "en": "Get the AMS combo to unleash Multi-color printing capability. (up to 16-color if you stack up 4 AMS units). Purchase additional AMS units for more colors.",
+  "ar": "احصل على باقة AMS (combo) لإطلاق إمكانية الطباعة متعددة الألوان. (حتى 16 لونًا عند تكديس 4 وحدات AMS). اشترِ وحدات AMS إضافية للحصول على ألوان أكثر.",
+  "ckb": "کۆمبۆی AMS وەربگرە بۆ ئەوەی توانای چاپی فرەڕەنگ بکەیتەوە. (تا 16 ڕەنگ ئەگەر 4 یەکەی AMS لەسەر یەک دابنێیت). یەکەی زیادەی AMS بکڕە بۆ ڕەنگی زیاتر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5335882f9f95c95ea0af7d600645b8fcaa2dd5241fdf73bd2cabf2afb6652358",
+  "en": "Print fast with exceptional quality",
+  "ar": "اطبع بسرعة وبجودة استثنائية",
+  "ckb": "بە خێرایی و بە جۆرایەتییەکی نایاب چاپ بکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "ca294f2f9ed53b15f6fef935fb31babbdf7d89483f6903d9052bf06c6631cbab",
+  "en": "Cutting-edge control algorithm with the help of vibration compensation and pressure advance, bringing you lightning-fast print speed without compromising on quality.",
+  "ar": "خوارزمية تحكّم متطورة بمساعدة تعويض الاهتزاز وتقديم الضغط (Pressure Advance)، تمنحك سرعة طباعة فائقة كالبرق دون التنازل عن الجودة.",
+  "ckb": "ئەلگۆریتمی کۆنترۆڵی پێشکەوتوو بە یارمەتیی قەرەبووکردنەوەی لەرینەوە و پێشخستنی پەستان (Pressure Advance)، کە خێرایی چاپی وەک بروسکەت پێدەبەخشێت بێ قوربانیدان بە جۆرایەتی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5972f90a9a9a16c4c8684383156df411086a36f2ebb7b6ab8bbe98de5a27b910",
+  "en": "15-Minute Rapid Setup: From unboxing to your first print in just 15 minutes.",
+  "ar": "إعداد سريع (15-Minute): من فتح العلبة إلى أول طبعة لك في 15 دقيقة فقط.",
+  "ckb": "دامەزراندنی خێرا (15-Minute): لە کردنەوەی سندوقەوە تا یەکەم چاپت تەنها لە 15 خولەکدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d0b60cb02982deaf8c736029597500df656295e567afbc5a7969e51c982749ad",
+  "en": "Fully Enclosed Design: Print engineering-grade filaments safely and with total consistency.",
+  "ar": "تصميم مغلق بالكامل: اطبع الفلامنتات الهندسية بأمان وبثبات تام.",
+  "ckb": "دیزاینی تەواو داخراو: فیلامێنتە ئەندازیارییەکان بە سەلامەتی و بە جێگیرییەکی تەواو چاپ بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c919fedf1f359576359eab203b61fa869c177cd5d61fab96a7a94a1a9f8ed093",
+  "en": "Multi-Color Versatility: Unlock limitless creativity with AMS-powered multi-material printing.",
+  "ar": "تنوّع متعدد الألوان: أطلِق إبداعًا بلا حدود مع الطباعة متعددة المواد بنظام AMS.",
+  "ckb": "فرەلایەنیی فرەڕەنگ: داهێنانی بێسنوور بکەرەوە بە چاپی فرەکەرەستە کە سیستەمی AMS هێزی پێدەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "24d3fdfe14a9245e9d238cb93e6447f78d7713048361a27b2108116647ac916f",
+  "en": "Farm-Grade Reliability: Proven performance and uptime, trusted by professional print farms.",
+  "ar": "موثوقية بمستوى مزارع الطباعة: أداء ووقت تشغيل مُثبَتان، تعتمد عليهما مزارع الطباعة الاحترافية.",
+  "ckb": "متمانەپێکراویی ئاستی کێڵگەی چاپ: کارایی و بەردەوامیی کارکردنی سەلمێنراو، کە کێڵگە پیشەییەکانی چاپ متمانەیان پێیەتی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "55a9183e5e4213ee2d15a6ee3bb25f52551806acfbe794abafd7ae1f2f40133d",
+  "en": "Full-Scale Volume: A generous 256 × 256 × 256 mm³ build space for your large projects.",
+  "ar": "حجم كامل: مساحة طباعة واسعة تبلغ 256 × 256 × 256 mm³ لمشاريعك الكبيرة.",
+  "ckb": "قەبارەی تەواو: بۆشاییەکی چاپی فراوانی 256 × 256 × 256 mm³ بۆ پڕۆژە گەورەکانت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a922214816077a06c3a606b1c58bdc46dfd1e10bff875e583b649b3623660266",
+  "en": "Bambu Lab A1 mini Combo",
+  "ar": "Bambu Lab A1 mini Combo",
+  "ckb": "Bambu Lab A1 mini Combo",
+  "kind": "block_title",
+  "keep": true
+ },
+ {
+  "h": "0bf7ce37ff8079373fa25441ee41f0312ae40d48100f11ab5a1cc7d643fef22a",
+  "en": "Multi-Color Printing",
+  "ar": "طباعة متعددة الألوان",
+  "ckb": "چاپی فرەڕەنگ",
+  "kind": "block_line"
+ },
+ {
+  "h": "debb61b84b8ee5c434634ebd821a6440c9bcb58625b83c3e079b74a78eb235b5",
+  "en": "Plug-N-Play",
+  "ar": "وصّل وشغّل",
+  "ckb": "بیبەستە و کاری پێبکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "d9013b229b52fe95b5999afd02e41ec408d269d4579a13851b37a222696722f3",
+  "en": "Active Flow Rate Compensation",
+  "ar": "تعويض نشط لمعدل التدفق",
+  "ckb": "قەرەبووکردنەوەی چالاکی ڕێژەی ڕۆیشتن",
+  "kind": "block_line"
+ },
+ {
+  "h": "2af1e365c8a9ba2d09a4481c2a178fea3e709f0287c6a46be24cf6bf214f35ba",
+  "en": "Full Auto Calibration",
+  "ar": "معايرة تلقائية بالكامل",
+  "ckb": "کالیبرەکردنی تەواو خۆکار",
+  "kind": "block_line"
+ },
+ {
+  "h": "12350bb1671965c430c492f4c86aa6e1a4cd470cd3e76ef63142c9a1ed810186",
+  "en": "Active Motor Noise Cancelling",
+  "ar": "إلغاء نشط لضجيج المحرك",
+  "ckb": "لابردنی چالاکی دەنگەدەنگی بزوێنەر",
+  "kind": "block_line"
+ },
+ {
+  "h": "473118ea303200b0f32edbb11e7ee3af45ee0f39ebabb25163d2cb233c233e95",
+  "en": "High Speed Precision",
+  "ar": "دقة بسرعة عالية",
+  "ckb": "وردی لە خێرایی بەرزدا",
+  "kind": "block_line"
+ },
+ {
+  "h": "f900e1abb5de6c30aa351e5c013d78b700ab48e65b81fbb898ecef80ae9c5414",
+  "en": "The all-new AMS lite is elegant and reliable, making multi-color 3D printing accessible to everyone.",
+  "ar": "يأتي AMS lite الجديد كليًا بتصميم أنيق وأداء موثوق، ليجعل الطباعة 3D متعددة الألوان في متناول الجميع.",
+  "ckb": "سیستەمی بە تەواوی نوێی AMS lite جوان و متمانەپێکراوە، و چاپی فرەڕەنگی 3D بۆ هەمووان دەستڕاگەیشتوو دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7182bbbea056018a7ca2df96aae6260447e391f1362e28666dc625ffee07de04",
+  "en": "The A1 mini revolutionizes flow control in 3D printing. It utilizes a high-resolution, high-frequency eddy current sensor to measure the pressure in the nozzle. Our algorithm actively compensates the flow rate according to the readings to extrude with accuracy.",
+  "ar": "تُحدث A1 mini ثورة في التحكم بالتدفق في الطباعة 3D، إذ تستخدم حساس تيار دوّامي عالي الدقة وعالي التردد لقياس الضغط داخل النوزل. وتعوّض الخوارزمية الخاصة بنا معدل التدفق بشكل نشط وفقًا للقراءات لتحقيق بثق دقيق.",
+  "ckb": "چاپکەری A1 mini شۆڕشێک لە کۆنترۆڵی ڕۆیشتن لە بواری چاپی 3D دەکات. هەستەوەرێکی جەریانی ئێدیی ڕوونیی بەرز و لەرەلەری بەرز بەکاردەهێنێت بۆ پێوانی پەستان لە ناو نۆزڵدا. ئەلگۆریتمەکەمان بە شێوەی چالاک ڕێژەی ڕۆیشتن بەپێی خوێندنەوەکان قەرەبوو دەکاتەوە بۆ ئەوەی پاڵنان بە وردی ئەنجام بدرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "40fd57a6517640f926001149e1c4db81a8b8703e8231b0b7fdbf1b1153359548",
+  "en": "The A1 mini handles various calibrations all by itself. It meticulously calibrates the Z-offset, bed-level, vibration resonance and nozzle pressure for EVERY print job, automatically.",
+  "ar": "تتولّى A1 mini مختلف عمليات المعايرة بنفسها بالكامل، فهي تعاير بدقة متناهية وتلقائيًا إزاحة محور Z ومستوى السرير ورنين الاهتزاز وضغط النوزل في كل مهمة طباعة دون استثناء.",
+  "ckb": "چاپکەری A1 mini بە تەنها خۆی کالیبرەکردنە جۆراوجۆرەکان ئەنجام دەدات. بە وردییەکی زۆر و بە شێوەی خۆکار، لادانی تەوەری Z، ئاستی بێد، ڕەزۆنانسی لەرینەوە و پەستانی نۆزڵ بۆ هەموو کارێکی چاپ بەبێ جیاوازی کالیبرە دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "11be5e7967e665207a3d1450fb848c1b0eb7564e660006bffd34a7cc2ba653c5",
+  "en": "The A1 mini comes to you pre-assembled, pre-squared, and pre-tuned with precision. It only takes about 20 minutes to set up for your first print.",
+  "ar": "تصلك A1 mini مُجمَّعة مسبقًا، ومضبوطة الزوايا مسبقًا، ومعايَرة بدقة مسبقًا. ولا يستغرق إعدادها لأول طبعة سوى نحو 20 دقيقة.",
+  "ckb": "چاپکەری A1 mini پێشتر پێکەوەنراو، گۆشەکانی پێشتر ڕێکخراو و پێشتر بە وردی ڕێکخراو دەگاتە دەستت. تەنها نزیکەی 20 خولەکی دەوێت بۆ ئامادەکردنی بۆ یەکەم چاپت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "afefd3a8b41d731490eaaf6526a09ac593b6d023b3daaa665c5fd66293e168b3",
+  "en": "The A1 mini can calibrate parameters to match tiny individual differences between each drive motor. This compensates for the unwanted harshness of motor noise.",
+  "ar": "تستطيع A1 mini معايرة المعاملات لتتوافق مع الفروق الفردية الدقيقة بين كل محرك تشغيل وآخر، وهذا يعوّض الخشونة غير المرغوبة في ضجيج المحرك.",
+  "ckb": "چاپکەری A1 mini دەتوانێت پارامیتەرەکان کالیبرە بکات بۆ ئەوەی لەگەڵ جیاوازییە تاکەکەسییە بچووکەکانی نێوان هەر بزوێنەرێکی جووڵێنەر بگونجێن. ئەمەش زبریی نەخوازراوی دەنگەدەنگی بزوێنەر قەرەبوو دەکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7d8ef62a2434b9fe2bdde6308334812a686524f8595cf61b216382d23a4c3b84",
+  "en": "Bed Slinger, with CoreXY Speed And Quality（High-Speed Precision）",
+  "ar": "طابعة بسرير متحرك (Bed Slinger) بسرعة وجودة CoreXY (دقة بسرعة عالية)",
+  "ckb": "چاپکەری بێدی جووڵاو (Bed Slinger) بە خێرایی و جۆرایەتیی CoreXY (وردی لە خێرایی بەرزدا)",
+  "kind": "block_title"
+ },
+ {
+  "h": "6282e7c7aa2c9c5814edf22bd094857ba5cc2fd61a7a1b84547b13f81a5bbdcc",
+  "en": "Full-metal Rails, rigid frame, nozzle pressure sensor, accelerometers, powerful MCU, and above all, an advanced motion control system that utilizes these features to print a 14-minute benchy with quality and following all the speed benchy rules straight out of the box without using specialized filaments.",
+  "ar": "سكك معدنية بالكامل، وإطار صلب، وحساس لضغط النوزل، ومقاييس تسارع، ووحدة تحكم دقيقة (MCU) قوية، والأهم من ذلك كله نظام متقدم للتحكم بالحركة يستثمر هذه المزايا لطباعة نموذج Benchy في 14 دقيقة بجودة جيدة، مع الالتزام بجميع قواعد Speed Benchy، مباشرةً بعد إخراجها من العلبة ودون استخدام فلامنتات خاصة.",
+  "ckb": "ڕێڕەوی تەواو کانزا، چوارچێوەی ڕەق، هەستەوەری پەستانی نۆزڵ، خێرابوونپێوەکان، کۆنترۆڵەرێکی بچووکی (MCU) بەهێز، و لە سەرووی هەمووشیانەوە، سیستەمێکی پێشکەوتووی کۆنترۆڵی جووڵە کە ئەم تایبەتمەندییانە بەکاردەهێنێت بۆ چاپکردنی مۆدێلی Benchy لە 14 خولەکدا بە جۆرایەتییەکی باش و بە پەیڕەوکردنی هەموو یاساکانی Speed Benchy، ڕاستەوخۆ دوای دەرهێنان لە سندوق و بێ بەکارهێنانی فیلامێنتی تایبەت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "44c19b4bb503150bf816a7e7bc6cf97035a7104cb5abd38a3d8922f27c818556",
+  "en": "Sync with Bambu Studio and Bambu Handy",
+  "ar": "مزامنة مع Bambu Studio وBambu Handy",
+  "ckb": "هاوکاتکردن لەگەڵ Bambu Studio و Bambu Handy",
+  "kind": "block_title"
+ },
+ {
+  "h": "64ac197ecfc62caa2927079e36fc80f7316e3464b5bc258c14c68688d4b7f852",
+  "en": "Remote control and monitor your printer on Bambu Studio or Bambu Handy. Through the built-in camera, you can also record timelapse videos.",
+  "ar": "تحكّم بطابعتك وراقبها عن بُعد عبر Bambu Studio أو Bambu Handy. ويمكنك أيضًا تسجيل فيديوهات بفاصل زمني (timelapse) عبر الكاميرا المدمجة.",
+  "ckb": "لە ڕێگەی Bambu Studio یان Bambu Handy لە دوورەوە چاپکەرەکەت کۆنترۆڵ بکە و چاودێری بکە. هەروەها لە ڕێگەی کامێرا ناوخۆییەکەوە دەتوانیت ڤیدیۆی کاتی خێراکراو (timelapse) تۆمار بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "490595b7c0e0cae5afe11db2473e0f0443204328d6794a60d8e03416f07754ce",
+  "en": "Full-Auto Calibration: Absolutely no manual tuning.",
+  "ar": "معايرة تلقائية بالكامل: لا حاجة لأي ضبط يدوي على الإطلاق.",
+  "ckb": "کالیبرەکردنی تەواو خۆکار: هیچ ڕێکخستنێکی دەستی پێویست نییە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0c8d1c0a5b6a649f129179f54935890041980c980cdee142313432b5b090702f",
+  "en": "Seamless Multi-Color Printing (Combo Version): Experience limitless creativity with AMS-powered material handling.",
+  "ar": "طباعة متعددة الألوان بسلاسة (إصدار Combo): استمتع بإبداع بلا حدود مع إدارة المواد بنظام AMS.",
+  "ckb": "چاپی فرەڕەنگی بێکێشە (وەشانی Combo): داهێنانی بێسنوور ئەزموون بکە بە مامەڵەکردنی کەرەستە کە سیستەمی AMS هێزی پێدەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1ec7e6eda08b0b67125d6ed90f5f6cfcdc2fe2046ce7cbe84f9b2d3b630745e8",
+  "en": "49dB Whisper-Quiet Operation: Print in peace with a noise level as low as a quiet library.",
+  "ar": "تشغيل هادئ كالهمس بمستوى 49dB: اطبع براحة بمستوى ضجيج منخفض كهدوء مكتبة ساكنة.",
+  "ckb": "کارکردنی بێدەنگ وەک چرپە بە 49dB: بە ئارامی چاپ بکە بە ئاستێکی دەنگەدەنگ کە هێندەی کتێبخانەیەکی بێدەنگ نزمە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "23794ac76e74188cde7404d3728176310919b50a9e4d0d1d0c07c89923f6c187",
+  "en": "Best-In-Class Print Quality: Pro-grade precision & surfaces that set the industry standard.",
+  "ar": "أفضل جودة طباعة في فئتها: دقة وأسطح بمستوى احترافي تضع معيار الصناعة.",
+  "ckb": "باشترین جۆرایەتیی چاپ لە پۆلەکەیدا: وردی و ڕووکاری ئاستی پیشەیی کە ستانداردی پیشەسازی دادەنێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "615eb8c621dabeaedc93ca33fb32c6b4b14af621cab39a3f21badb7b85e4d478",
+  "en": "One-Click MakerWorld Integration: Find your next project and start printing instantly.",
+  "ar": "تكامل مع MakerWorld بنقرة واحدة: اعثر على مشروعك التالي وابدأ الطباعة فورًا.",
+  "ckb": "یەکخستن لەگەڵ MakerWorld بە یەک کرتە: پڕۆژەی داهاتووت بدۆزەرەوە و دەستبەجێ دەست بە چاپ بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "feaa27d8aa02371d8e785fc109ffbb13d210127a9451f0d95ef2d0aea76319ef",
+  "en": "Compact Footprint: Blends in to your desk setup.",
+  "ar": "حجم مدمج: تندمج بسلاسة مع تجهيزات مكتبك.",
+  "ckb": "شوێنگرتنی بچووک: بە ئاسانی لەگەڵ ڕێکخستنی مێزەکەت دەگونجێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7f96d29b5470eff47193dbd2cf33fdb7a4eee504edb67d4b4b64d6a00bdcd029",
+  "en": "* To connect the A1 mini printer to the AMS/ AMS 2 Pro/ AMS HT, an AMS HUB (SA013) accessory is needed.",
+  "ar": "* لتوصيل طابعة A1 mini بوحدة AMS أو AMS 2 Pro أو AMS HT، يلزم ملحق AMS HUB (SA013).",
+  "ckb": "* بۆ بەستنی چاپکەری A1 mini بە AMS، AMS 2 Pro یان AMS HT، پێویستت بە پێداویستیی AMS HUB (SA013) هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9bf6986c9c92f2b00154677e26cc76c79c84754b2a883b17d08d3f9827228a72",
+  "en": "Why Choose Bambu Lab A1",
+  "ar": "لماذا تختار Bambu Lab A1",
+  "ckb": "بۆچی Bambu Lab A1 هەڵبژێریت",
+  "kind": "block_title"
+ },
+ {
+  "h": "732412aa2dcec0f1a86f0e6701dbf0ab9ab18bd01035f0e13bf934b2a751e58f",
+  "en": "Multi-color Printing - The most reliable multi-color system",
+  "ar": "الطباعة متعددة الألوان - أكثر أنظمة تعدد الألوان موثوقية",
+  "ckb": "چاپی فرەڕەنگ - متمانەپێکراوترین سیستەمی فرەڕەنگ",
+  "kind": "block_line"
+ },
+ {
+  "h": "e9288d8e4dffcade636c0c45587e8654f026a07108dcd7e67b51ffb3fcbe2f78",
+  "en": "Full-auto Calibration - You don't have to do ANY manual tuning",
+  "ar": "معايرة تلقائية بالكامل - لن تحتاج إلى أي ضبط يدوي على الإطلاق",
+  "ckb": "کالیبرەکردنی تەواو خۆکار - پێویست ناکات هیچ ڕێکخستنێکی دەستی بکەیت",
+  "kind": "block_line"
+ },
+ {
+  "h": "3d9f39fb6348c6a5799cd0353b4abbcabe70e8806e473c8e3b8a72572cd6a049",
+  "en": "Large Print Volume - Print a helmet in 1-piece",
+  "ar": "حجم طباعة كبير - اطبع خوذة كاملة في 1 قطعة",
+  "ckb": "قەبارەی چاپی گەورە - کڵاوێکی پاراستن بە 1 پارچە چاپ بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e619668fe5eb8c42fdc54478ce6461e73e946e79dd09ca088757fac5e020441",
+  "en": "1-click to Print - As easy as your copier",
+  "ar": "اطبع بـ 1 نقرة - بسهولة جهاز الاستنساخ لديك",
+  "ckb": "چاپ بە 1 کرتە - هێندەی ئامێری کۆپییەکەت ئاسانە",
+  "kind": "block_line"
+ },
+ {
+  "h": "5cf792cc6d1f9a6c6a3b473e68e9a173630cf685c78f782c135aea912d2f8944",
+  "en": "Reliable High Speed - Finish your project on time, every time",
+  "ar": "سرعة عالية موثوقة - أنجز مشروعك في الوقت المحدد، في كل مرة",
+  "ckb": "خێرایی بەرزی متمانەپێکراو - پڕۆژەکەت لە کاتی خۆیدا تەواو بکە، هەموو جارێک",
+  "kind": "block_line"
+ },
+ {
+  "h": "4a200f5dc361ee6a7cefe979d0c4c5d7ff80e5152835239f7ec779f92385298e",
+  "en": "Active Flow Control - Smooth surfaces, sharp edges",
+  "ar": "تحكّم نشط بالتدفق - أسطح ملساء وحواف حادة",
+  "ckb": "کۆنترۆڵی چالاکی ڕۆیشتن - ڕووی لووس و لێواری تیژ",
+  "kind": "block_line"
+ },
+ {
+  "h": "f9a43b3972502405f6244fb84417045118d6f158b5ccdf13144404dd061016e0",
+  "en": "1-click printing with MakerWorld",
+  "ar": "الطباعة بـ 1 نقرة عبر MakerWorld",
+  "ckb": "چاپکردن بە 1 کرتە لە ڕێگەی MakerWorld",
+  "kind": "block_title"
+ },
+ {
+  "h": "df0e9e12e9e6b2e0b3a5f289b83fa25e01099aa69fe7dc95ba6c3f82562cec6a",
+  "en": "Print Like A PRO From Your Very First Use",
+  "ar": "اطبع كالمحترفين منذ أول استخدام",
+  "ckb": "هەر لە یەکەم بەکارهێنانەوە وەک پیشەگەرێک چاپ بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "e4c570e9860521b288a1ac043cf2517da5e3d25fd73fc2741722e865c571b777",
+  "en": "Start printing with a few clicks on your phone, no need to worry about the tedious settings.",
+  "ar": "ابدأ الطباعة ببضع نقرات على هاتفك، دون القلق بشأن الإعدادات المملّة.",
+  "ckb": "بە چەند کرتەیەک لەسەر مۆبایلەکەت دەست بە چاپ بکە، پێویست ناکات خەمی ڕێکخستنە بێزارکەرەکانت هەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d68f988c9579bf9dd769068c26ba899e28edd7367c47f0a1af144596ce3e1b0d",
+  "en": "Browse endless selections of high-quality models tailored to your printers on MakerWorld!",
+  "ar": "تصفّح تشكيلة لا تنتهي من النماذج عالية الجودة المصمّمة خصيصًا لطابعاتك على MakerWorld!",
+  "ckb": "لە MakerWorld بژاردەیەکی بێکۆتایی لە مۆدێلی جۆرایەتی بەرز ببینە کە بۆ چاپکەرەکانت گونجێنراون!",
+  "kind": "block_line"
+ },
+ {
+  "h": "e9f846005f8c33bb2da7a06886c8a3f09883c53097fb3a289e38a67f4a7e525f",
+  "en": "Absolutely Hassle-free",
+  "ar": "بلا أي متاعب على الإطلاق",
+  "ckb": "بە تەواوی بێ گرفت",
+  "kind": "block_line"
+ },
+ {
+  "h": "0c70edd29b68e88db6a0a2dcb8ccc4c504ea74a2801643d8fd48ee3755c15b52",
+  "en": "A1 handles various calibrations all by itself. It meticulously calibrates the Z-offset, bed-level, vibration resonance and nozzle pressure for EVERY print job, automatically.",
+  "ar": "تتولّى A1 مختلف عمليات المعايرة بنفسها بالكامل، فهي تعاير بدقة متناهية وتلقائيًا إزاحة محور Z ومستوى السرير ورنين الاهتزاز وضغط النوزل في كل مهمة طباعة دون استثناء.",
+  "ckb": "چاپکەری A1 بە تەنها خۆی کالیبرەکردنە جۆراوجۆرەکان ئەنجام دەدات. بە وردییەکی زۆر و بە شێوەی خۆکار، لادانی تەوەری Z، ئاستی بێد، ڕەزۆنانسی لەرینەوە و پەستانی نۆزڵ بۆ هەموو کارێکی چاپ بەبێ جیاوازی کالیبرە دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a9444f69be2893b90388edb5dbc4eb929152f650b0b0b413c5fe3e43ba681a20",
+  "en": "AMS Multi-color Printing",
+  "ar": "طباعة متعددة الألوان بنظام AMS",
+  "ckb": "چاپی فرەڕەنگ بە سیستەمی AMS",
+  "kind": "block_line"
+ },
+ {
+  "h": "214d7d4deb1fa8387d05b2f5dab47fb35834760742bfdbb679a8f31e3c8e5b4e",
+  "en": "The Most Reliable Multi-color System",
+  "ar": "نظام تعدد الألوان الأكثر موثوقية",
+  "ckb": "متمانەپێکراوترین سیستەمی فرەڕەنگ",
+  "kind": "block_line"
+ },
+ {
+  "h": "d19091eee32d103dd34ae29584f3506480a9d4525ff33ac1bdf84f328ad00d3a",
+  "en": "The AMS lite has been recognized as the most reliable multi-color 3D printing solution. It also features RFID-sync to automatically match the best print settings for your Bambu filaments, delivering perfect print quality without manual tuning of the filament profile.",
+  "ar": "حظي AMS lite بالاعتراف بوصفه الحل الأكثر موثوقية للطباعة 3D متعددة الألوان. كما يتميّز بالمزامنة عبر RFID التي تطابق تلقائيًا أفضل إعدادات الطباعة مع فلامنتات Bambu لديك، ما يمنحك جودة طباعة مثالية دون ضبط يدوي لملف تعريف الفلامنت.",
+  "ckb": "سیستەمی AMS lite وەک متمانەپێکراوترین چارەسەری چاپی فرەڕەنگی 3D ناسراوە. هەروەها هاوکاتکردن بە RFID لەخۆدەگرێت بۆ ئەوەی بە شێوەی خۆکار باشترین ڕێکخستنەکانی چاپ بۆ ئەو فیلامێنتانەی Bambu کە بەکاریان دەهێنیت هەڵبژێرێت، و جۆرایەتیی چاپی تەواو دابین دەکات بێ ئەوەی پێویست بە ڕێکخستنی دەستیی پرۆفایلی فیلامێنت بێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "69b499bd71b2cb452a4c236dbf05655531d062de5b5ffc507bba1b50341f6b78",
+  "en": "High-speed Precision",
+  "ar": "دقة بسرعة عالية",
+  "ckb": "وردی لە خێرایی بەرزدا",
+  "kind": "block_line"
+ },
+ {
+  "h": "cf6b944ecaa766570f6eb3a61f650af425127f0ebd7bfb305119581e09380247",
+  "en": "The High-speed You Can Truly Rely On",
+  "ar": "سرعة عالية يمكنك الاعتماد عليها حقًا",
+  "ckb": "خێراییەکی بەرز کە بە ڕاستی دەتوانیت پشتی پێ ببەستیت",
+  "kind": "block_line"
+ },
+ {
+  "h": "0a5219933a7c13504783b4c7de0f9c247620c767f91a70d0e390bffc0727a878",
+  "en": "A1 is equipped with low-drag linear rails, a powerful MCU,accelerometers, a nozzle pressure sensor, and an advanced motion control system that maximizes their potential. Its high-speed performance is built on a solid foundation, ensuring consistent reliability with stable and uniform output for every print.",
+  "ar": "زُوّدت A1 بسكك خطية منخفضة الاحتكاك، ووحدة تحكم دقيقة (MCU) قوية، ومقاييس تسارع، وحساس لضغط النوزل، ونظام متقدم للتحكم بالحركة يستثمر كامل إمكاناتها. ويقوم أداؤها عالي السرعة على أساس متين، ما يضمن موثوقية ثابتة مع مخرجات مستقرة ومتجانسة في كل طبعة.",
+  "ckb": "چاپکەری A1 ڕێڕەوی هێڵیی کەم لێکخشان، کۆنترۆڵەرێکی بچووکی (MCU) بەهێز، خێرابوونپێوەکان، هەستەوەری پەستانی نۆزڵ و سیستەمێکی پێشکەوتووی کۆنترۆڵی جووڵەی تێدایە کە توانای ئەمانە بە تەواوی بەکاردەهێنێت. کارایی خێرایی بەرزی لەسەر بنەمایەکی پتەو دامەزراوە، کە متمانەپێکراوییەکی بەردەوام لەگەڵ دەرئەنجامێکی جێگیر و یەکسان بۆ هەموو چاپێک دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d63c09410d59913835854eedf99b1369882510d5094b2e89df6849d63c8c87d2",
+  "en": "Intelligent Print Monitoring",
+  "ar": "مراقبة ذكية للطباعة",
+  "ckb": "چاودێریی زیرەکی چاپ",
+  "kind": "block_line"
+ },
+ {
+  "h": "8d63706566307ca87fec8d9a8456ec9e565990ac7b74751236cca54539ecbfb3",
+  "en": "Put Your Printing On Autopilot",
+  "ar": "ضع طباعتك على وضع الطيار الآلي",
+  "ckb": "چاپکردنەکەت بخەرە سەر دۆخی پایلۆتی خۆکار",
+  "kind": "block_line"
+ },
+ {
+  "h": "d51418c557dcbee3c30f0a58b62a410339fd199e345d2026403f8c8a1c11ebfa",
+  "en": "3D printing is a complex task where many things can go wrong. The A1 is equipped with a comprehensive print status monitoring system to help keep the print job in check.",
+  "ar": "الطباعة 3D مهمة معقّدة قد يحدث فيها خطأ في أمور كثيرة. وقد زُوّدت A1 بنظام شامل لمراقبة حالة الطباعة يساعد على إبقاء مهمة الطباعة تحت السيطرة.",
+  "ckb": "چاپی 3D کارێکی ئاڵۆزە کە زۆر شت تێیدا لەوانەیە هەڵە بچێت. چاپکەری A1 سیستەمێکی گشتگیری چاودێریکردنی دۆخی چاپی تێدایە بۆ ئەوەی یارمەتی بدات کاری چاپ لەژێر کۆنترۆڵدا بمێنێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "63d9426df3763123187ff5120cf45d3e3e8058e7f304b307491c31a95945cb37",
+  "en": "Full-size Print Volume",
+  "ar": "حجم طباعة بالحجم الكامل",
+  "ckb": "قەبارەی چاپی تەواو",
+  "kind": "block_line"
+ },
+ {
+  "h": "92d1bf106539b25a2a7f685b8f0d9bfb2a6a546cdae851e208c7914f8e4d35cc",
+  "en": "Generous Space for You to Expand Your Fantasy",
+  "ar": "مساحة واسعة لتُطلق العنان لخيالك",
+  "ckb": "بۆشاییەکی فراوان بۆ ئەوەی خەیاڵت فراوان بکەیت",
+  "kind": "block_line"
+ },
+ {
+  "h": "ef000a86e424dd62f99772e9e39154f190a0d21b93d402142a3378018535f585",
+  "en": "A1 features 256mm*256mm*256mm build volume, bigger than most of the entry-level printers. Print a helmet in one go, we got you.",
+  "ar": "تتميّز A1 بحجم طباعة يبلغ 256mm*256mm*256mm، وهو أكبر من معظم الطابعات المخصّصة للمبتدئين. اطبع خوذة دفعة واحدة، نحن نتكفّل بذلك.",
+  "ckb": "قەبارەی چاپی A1 دەگاتە 256mm*256mm*256mm، کە گەورەترە لە زۆربەی چاپکەرەکانی ئاستی سەرەتایی. کڵاوێکی پاراستن بە یەکجار چاپ بکە، ئێمە لەگەڵتین.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ef2c79421eddc13d1427a7dedc39602148daea387e59c9e430e9d06c9a8e1f75",
+  "en": "Active Motor Noise Canceling",
+  "ar": "إلغاء نشط لضجيج المحرك",
+  "ckb": "لابردنی چالاکی دەنگەدەنگی بزوێنەر",
+  "kind": "block_line"
+ },
+ {
+  "h": "a9ef5a59bd7c1a86a9a553c5ae009346fca5ac401e45a7d908f2fd060b8135e3",
+  "en": "Print Silently",
+  "ar": "اطبع بهدوء",
+  "ckb": "بە بێدەنگی چاپ بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "152e8f0e7003591ab93976af8e4125d3fee92148c5039ba9439a1b32ad6f9378",
+  "en": "The A1 can calibrate parameters to match tiny individual differences between each drive motor. This compensates for the unwanted harshness of motor noise.",
+  "ar": "تستطيع A1 معايرة المعاملات لتتوافق مع الفروق الفردية الدقيقة بين كل محرك تشغيل وآخر، وهذا يعوّض الخشونة غير المرغوبة في ضجيج المحرك.",
+  "ckb": "چاپکەری A1 دەتوانێت پارامیتەرەکان کالیبرە بکات بۆ ئەوەی لەگەڵ جیاوازییە تاکەکەسییە بچووکەکانی نێوان هەر بزوێنەرێکی جووڵێنەر بگونجێن. ئەمەش زبریی نەخوازراوی دەنگەدەنگی بزوێنەر قەرەبوو دەکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a019b12983cc31e12ebf51d329cc5c49b1cd9c8f4850b72642cf223bd8d16488",
+  "en": "Connected with Privacy in Mind",
+  "ar": "اتصال يراعي خصوصيتك",
+  "ckb": "پەیوەستبوون بە ڕەچاوکردنی نهێنیپارێزی",
+  "kind": "block_line"
+ },
+ {
+  "h": "aea2a37e06b164a613383458ffa043d25aa1bd667162118a44aa6be828a4603c",
+  "en": "Start & Control on Whatever Device You Prefer",
+  "ar": "ابدأ وتحكّم من أي جهاز تفضّله",
+  "ckb": "لە هەر ئامێرێک کە پێت باشە دەست پێ بکە و کۆنترۆڵ بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "faa952528077150573aec66a682ab9ccecb16ada4b746ae2888cc524fce17fcf",
+  "en": "Not only can you connect your A1 to any device you prefer through Bambu Cloud Service, but you can also do so through LAN-only mode. We offer fully customizable connection options to match your privacy preferences.",
+  "ar": "لا يقتصر الأمر على إمكانية توصيل A1 بأي جهاز تفضّله عبر خدمة Bambu Cloud، بل يمكنك أيضًا فعل ذلك عبر وضع الشبكة المحلية فقط (LAN-only). نوفّر خيارات اتصال قابلة للتخصيص بالكامل لتناسب تفضيلاتك في الخصوصية.",
+  "ckb": "نەک تەنها دەتوانیت لە ڕێگەی خزمەتگوزاریی Bambu Cloud چاپکەری A1 بە هەر ئامێرێک کە پێت باشە ببەستیت، بەڵکو هەروەها دەتوانیت لە ڕێگەی دۆخی تەنها تۆڕی ناوخۆیی (LAN-only) ئەمە بکەیت. ئێمە بژاردەی پەیوەندیی تەواو قابیلی ڕێکخستن پێشکەش دەکەین بۆ ئەوەی لەگەڵ ئارەزووەکانی نهێنیپارێزیت بگونجێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2aa9da9039991860640ab5e307c8c19f2a1e37b85faeaa1ff6faba8c76c17b9b",
+  "en": "Explore More About A1",
+  "ar": "اكتشف المزيد عن A1",
+  "ckb": "زیاتر دەربارەی A1 بزانە",
+  "kind": "block_title"
+ },
+ {
+  "h": "e318e2fd2ad68a92055a102d803926c1d6087bbadc8d976b151a9280c30f99ad",
+  "en": "The NEW Bambu Lab A1!",
+  "ar": "الطابعة الجديدة Bambu Lab A1!",
+  "ckb": "چاپکەری نوێی Bambu Lab A1!",
+  "kind": "block_line"
+ },
+ {
+  "h": "49aa9ec5b617a57337c4c781983a366c06b7842821c99784c3e10734a68e8920",
+  "en": "Bambu Lab A1 Review - ARE YOU HAPPY about this?!",
+  "ar": "مراجعة Bambu Lab A1 - هل أنت سعيد بهذا؟!",
+  "ckb": "پێداچوونەوەی Bambu Lab A1 - ئایا لەمە دڵخۆشیت؟!",
+  "kind": "block_line"
+ },
+ {
+  "h": "cb9dbc43bd191946623507a24908b58bb65bf2b01059f220ec2e1e90ca3417ac",
+  "en": "Bambu Lab A1 detailed test - ‘Just works’ 3D printing for",
+  "ar": "اختبار مفصّل لطابعة Bambu Lab A1 - طباعة 3D «تعمل ببساطة» من أجل",
+  "ckb": "تاقیکردنەوەی وردی Bambu Lab A1 - چاپی 3D کە «ڕاستەوخۆ کار دەکات» بۆ",
+  "kind": "block_line"
+ },
+ {
+  "h": "76ddbf56c053e38e87b80dd2ed4cddbf8c412b461702228ed293f4653c27e85c",
+  "en": "Bambu Lab A1 - First Impressions",
+  "ar": "الانطباعات الأولى عن Bambu Lab A1",
+  "ckb": "یەکەم سەرنجەکان دەربارەی Bambu Lab A1",
+  "kind": "block_line"
+ },
+ {
+  "h": "88587921d5e3ae897f6637b66362928eb013fdc4f32e3f72c7b659a2ac3bf650",
+  "en": "Diving Into Bambu Labs Newest 3d",
+  "ar": "نظرة معمّقة على أحدث 3d من Bambu Labs",
+  "ckb": "قووڵبوونەوە لە نوێترین 3d لە Bambu Labs",
+  "kind": "block_line"
+ },
+ {
+  "h": "be6ac15ba6855bb569bc749e90ab32cc111af88ecffaa672f88f4ca6e1b1e4a6",
+  "en": "NEW 👉 Bambu Lab A1 - DETAILED REVIEW (Full Analysis &amp;",
+  "ar": "جديد 👉 Bambu Lab A1 - مراجعة مفصّلة (تحليل كامل و",
+  "ckb": "نوێ 👉 Bambu Lab A1 - پێداچوونەوەی ورد (شیکاریی تەواو و",
+  "kind": "block_line"
+ },
+ {
+  "h": "1ad1458fae890c9e0d41f6bde641d323575756d864e68658ffa6d1ded5c4ecf3",
+  "en": "Comparison with A1 Mini)",
+  "ar": "مقارنة مع A1 Mini)",
+  "ckb": "بەراوردکردن لەگەڵ A1 Mini)",
+  "kind": "block_line"
+ },
+ {
+  "h": "fb1f0bb210bcd55d06d368cdb8d41d9fee20e3dc641e00e8bef142e6148b61f9",
+  "en": "Bambu Lab A1 - First Looks and Amazing 3D Printing",
+  "ar": "نظرة أولى على Bambu Lab A1 وطباعة 3D مذهلة",
+  "ckb": "یەکەم سەیرکردنی Bambu Lab A1 و چاپکردنێکی سەرسوڕهێنەری 3D",
+  "kind": "block_line"
+ },
+ {
+  "h": "385b9d9293a03ae1a882a9f3bc77389278a9e9fb1427c0d1ef3ddce69604c451",
+  "en": "Results!",
+  "ar": "النتائج!",
+  "ckb": "ئەنجامەکان!",
+  "kind": "block_line"
+ },
+ {
+  "h": "99775e12330bc5d7b5c81565965f459391aba658fde130b2709e7e1402c4737f",
+  "en": "1. Do you have an official unboxing guide?",
+  "ar": "1. هل لديكم دليل رسمي لفتح العلبة؟",
+  "ckb": "1. ئایا ڕێبەرێکی فەرمیتان بۆ کردنەوەی سندوق هەیە؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "bb9084a9dd748c72cf805ff59532be27b0594c8500f7c98250c107e7022cb066",
+  "en": "A: Yes, please refer to this",
+  "ar": "ج: نعم، يرجى الرجوع إلى",
+  "ckb": "وەڵام: بەڵێ، تکایە بگەڕێوە بۆ ئەم",
+  "kind": "faq_a"
+ },
+ {
+  "h": "320e2365bbb6bcf1f7b968041a2e00b1f95eeddb0c2af4dd591e1de550248d9b",
+  "en": "wiki link",
+  "ar": "رابط الويكي هذا",
+  "ckb": "بەستەری ویکییە",
+  "kind": "faq_a"
+ },
+ {
+  "h": "92d1354e1cb28ec86faf48cfd4ed97219d8d056ef0dcd9236d3070cf51f616fd",
+  "en": "for the unboxing video guide.",
+  "ar": "للاطلاع على دليل فيديو فتح العلبة.",
+  "ckb": "بۆ ڕێبەری ڤیدیۆیی کردنەوەی سندوق.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "35117881d175d10a0e96c2493e5b99027a8bd2745cce207081586da22c46c167",
+  "en": "2. What is the maximum print size of the A1?",
+  "ar": "2. ما أقصى حجم طباعة لطابعة A1؟",
+  "ckb": "2. زۆرترین قەبارەی چاپی A1 چەندە؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "195be4aaf0fa7d03148cf3fd5b0b4cb97d930ca36212d19a30838fbe11d3cc6c",
+  "en": "A: 256 * 256 *256 mm³. For more details, please check",
+  "ar": "ج: 256 * 256 * 256 mm³. لمزيد من التفاصيل، يرجى مراجعة",
+  "ckb": "وەڵام: 256 * 256 * 256 mm³. بۆ وردەکاریی زیاتر، تکایە سەیر بکە",
+  "kind": "faq_a"
+ },
+ {
+  "h": "dd1d122956efde29d2011224d59be74d13f0c13d18b7c82c66aa0bea294bf720",
+  "en": "here.",
+  "ar": "هنا.",
+  "ckb": "لێرە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "7d56183554a301007a5186bbaa9b3c3f4b1240cf9f772128b73981ce1e0f9fcc",
+  "en": "3. What Filaments can A1 Print?",
+  "ar": "3. ما الفلامنتات التي يمكن لطابعة A1 طباعتها؟",
+  "ckb": "3. چاپکەری A1 دەتوانێت چ فیلامێنتێک چاپ بکات؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "c19bb921d86e1235e03d626d3ecbcd4d18aa0a850770aec7c16a58850f8c0798",
+  "en": "A: 1. Low-temperature filaments such as PLA, PETG, TPU,",
+  "ar": "ج: 1. الفلامنتات منخفضة الحرارة مثل PLA وPETG وTPU،",
+  "ckb": "وەڵام: 1. فیلامێنتی پلەی گەرمیی نزم وەک PLA، PETG، TPU،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "56dbe7b14c945d9fa4ad445d241811b04cf5b61dc37882d73a642e514150854a",
+  "en": "and support materials for PLA and PETG (Support for PLA,",
+  "ar": "ومواد الدعامات الخاصة بـ PLA وPETG (Support for PLA،",
+  "ckb": "و کەرەستەی پاڵپشت بۆ PLA و PETG (Support for PLA،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a749fbea48b85156faa50589921c5f6d7efd7fad01d4381a6646243203d08a9b",
+  "en": "PVA, HIPS, etc.).",
+  "ar": "وكذلك PVA وHIPS وغيرها).",
+  "ckb": "هەروەها PVA، HIPS و هتد).",
+  "kind": "faq_a"
+ },
+ {
+  "h": "2a891eead1c5bfdde3f741431a776138b8c4684d31fed5ee61cd1a5418446a44",
+  "en": "2. Conventional high-temperature filaments such as ABS,",
+  "ar": "2. الفلامنتات التقليدية عالية الحرارة مثل ABS،",
+  "ckb": "2. فیلامێنتی ئاسایی پلەی گەرمیی بەرز وەک ABS،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "141ca37c7462b74c3f8d0fe273a22a63c856a29cb545143c0dc8f6c489adb2b2",
+  "en": "ASA, PC, PA, PA-CF/GF, PET-CF/GF, PPA-CF/GF, etc.",
+  "ar": "وASA وPC وPA وPA-CF/GF وPET-CF/GF وPPA-CF/GF وغيرها.",
+  "ckb": "هەروەها ASA، PC، PA، PA-CF/GF، PET-CF/GF، PPA-CF/GF و هتد.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "805e8e74140bc4aeb2fcd3c3e1d1d09d03d595433d781bbf43d9cde2e6eeddeb",
+  "en": "Kind Reminder:",
+  "ar": "تذكير ودّي:",
+  "ckb": "بیرخستنەوەیەکی دۆستانە:",
+  "kind": "faq_a"
+ },
+ {
+  "h": "81017dcae95c70d2760b08178b857b5c7314e291aca9725fb7878686e61b20cc",
+  "en": "The standard nozzle is made of stainless steel. When",
+  "ar": "النوزل القياسي مصنوع من الفولاذ المقاوم للصدأ. عند",
+  "ckb": "نۆزڵە ستانداردەکە لە پۆڵای زەنگنەگر دروستکراوە. کاتێک",
+  "kind": "faq_a"
+ },
+ {
+  "h": "1af6f2734ef6f1b70cddb002fe433f76f524dc8c2d0f20b6cbed45843f8776d8",
+  "en": "printing filaments containing hard particles (CF, GF,",
+  "ar": "طباعة فلامنتات تحتوي على جزيئات صلبة (CF وGF",
+  "ckb": "فیلامێنتێک چاپ دەکەیت کە گەردیلەی ڕەقی تێدایە (CF، GF،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "7e2a7762925641dedbf6dbcfcd6efcd640e3d22ac2dba323f3bb20fc01f5696b",
+  "en": "etc.) such as PLA-CF/GF, PLA Glow-in-the-dark, PETG-CF/GF",
+  "ar": "وغيرها) مثل PLA-CF/GF وPLA Glow-in-the-dark وPETG-CF/GF",
+  "ckb": "و هتد) وەک PLA-CF/GF، PLA Glow-in-the-dark، PETG-CF/GF",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a7ff1cabdb1b6ea509e6b68250f85d725680461504221013bcb02d8a71223d3a",
+  "en": "and PAHT-CF/GF, it is necessary to replace the nozzle with",
+  "ar": "وPAHT-CF/GF، يجب استبدال النوزل بآخر مصنوع من",
+  "ckb": "و PAHT-CF/GF، پێویستە نۆزڵەکە بگۆڕیت بە نۆزڵێکی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3ab699b98170124b59d98c0f72899ccd73c7adfc5f2ca01b800868043f22aa5e",
+  "en": "hardened steel to prevent excessive wear.",
+  "ar": "الفولاذ المقسّى لمنع التآكل المفرط.",
+  "ckb": "پۆڵای ڕەقکراو بۆ ڕێگریکردن لە سووانی زیادە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a821193175b3e367c51a5c3bccc73761da9dd16bcc286e6f8709b9b8244ac29a",
+  "en": "Due to the A1's open-frame design and lower chamber",
+  "ar": "بسبب تصميم A1 ذي الإطار المفتوح وانخفاض درجة حرارة",
+  "ckb": "بەهۆی دیزاینی چوارچێوە کراوەی A1 و نزمیی پلەی گەرمیی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "5e8805f881eed76c2207900c51766adfe69c4d5f6bb178973e1e9d938d02e494",
+  "en": "temperature, there is a risk of reduced interlayer",
+  "ar": "حجرة الطباعة، هناك خطر من انخفاض متانة الترابط بين",
+  "ckb": "ژووری چاپ، مەترسیی ئەوە هەیە کە بەهێزیی نێوان",
+  "kind": "faq_a"
+ },
+ {
+  "h": "38e725799440520af16f19ac0b9e346e2bb1913cd2c31328de78c7f715beb789",
+  "en": "strength and increased warping for large-sized models and",
+  "ar": "الطبقات وزيادة التقوّس في النماذج كبيرة الحجم",
+  "ckb": "چینەکان کەم بێتەوە و چەمانەوەی لێوار زیاد بێت لە مۆدێلە قەبارە گەورەکان و",
+  "kind": "faq_a"
+ },
+ {
+  "h": "49fb129d7a46681e8b7db2879bc74b01209048a3bd752771688ff4068bb143d7",
+  "en": "models with high filling density when using conventional",
+  "ar": "والنماذج ذات كثافة الحشوة الداخلية العالية عند استخدام الفلامنتات التقليدية",
+  "ckb": "ئەو مۆدێلانەی چڕیی پڕکەرەوەی ناوەوەیان بەرزە، کاتێک فیلامێنتی ئاسایی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "f664344ca1b50e95fe0b9029e117359d9911cf5f354b75f229cb47e76c815a0d",
+  "en": "high-temperature filaments such as ABS, ASA, PC, PA,",
+  "ar": "عالية الحرارة مثل ABS وASA وPC وPA،",
+  "ckb": "پلەی گەرمیی بەرز وەک ABS، ASA، PC، PA،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "d43dcd0206ba02a92147979cc4084bfc46bc96dddb1f6d89f61476198ee579c3",
+  "en": "PA-CF/GF, PET-CF/GF, PPA-CF/GF, etc. on the A1. However,",
+  "ar": "وPA-CF/GF وPET-CF/GF وPPA-CF/GF وغيرها على طابعة A1. ومع ذلك،",
+  "ckb": "هەروەها PA-CF/GF، PET-CF/GF، PPA-CF/GF و هتد لەسەر A1 بەکاردەهێنرێن. بەڵام،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "ed362123d861f0758d2238712fa5a1ec42314ec5694fbfed67b8499fdeeb4340",
+  "en": "these high-temperature filaments can be used on the A1 to",
+  "ar": "يمكن استخدام هذه الفلامنتات عالية الحرارة على طابعة A1",
+  "ckb": "دەتوانرێت ئەم فیلامێنتانەی پلەی گەرمیی بەرز لەسەر A1 بەکاربهێنرێن بۆ",
+  "kind": "faq_a"
+ },
+ {
+  "h": "e79a93d30d6492c92c74e75067b654b19ed6b971edbc33b78b9dbd4918c3c1b8",
+  "en": "print small-sized models with low filling density. The",
+  "ar": "لطباعة نماذج صغيرة الحجم ذات كثافة حشوة داخلية منخفضة.",
+  "ckb": "چاپکردنی مۆدێلی قەبارە بچووک بە چڕیی پڕکەرەوەی ناوەوەی نزم.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "69d1e3f963cef83f68a381a82c1a6ea51e95852ce4ff08503530d6d4385ea79b",
+  "en": "printing results may vary depending on the filaments' dry",
+  "ar": "وقد تختلف نتائج الطباعة بحسب حالة الفلامنت من حيث الجفاف",
+  "ckb": "ئەنجامەکانی چاپ لەوانەیە جیاواز بن بەپێی دۆخی وشکی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "4ef74ff21c06a7adbe3a0f965e2e7e1a930a43362bbf4107c35293f0d5c0748a",
+  "en": "and wet state, the characteristics of the model itself,",
+  "ar": "والرطوبة، وخصائص النموذج نفسه،",
+  "ckb": "و شێداریی فیلامێنتەکان، تایبەتمەندییەکانی خودی مۆدێلەکە،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "31fbe698d41fd436fbcbe5d0875824df05833bd77f69a4b9d697bc511b28522c",
+  "en": "printing parameters, and the ambient temperature. For more",
+  "ar": "وإعدادات الطباعة، ودرجة الحرارة المحيطة. لمزيد من",
+  "ckb": "ڕێکخستنەکانی چاپ و پلەی گەرمیی ژینگەی دەوروبەر. بۆ",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3b9a24fd03dcee84ab5683a63823bcce02de22762a74c544a02830be5eeacf99",
+  "en": "details, please check",
+  "ar": "التفاصيل، يرجى مراجعة",
+  "ckb": "وردەکاریی زیاتر، تکایە سەیر بکە",
+  "kind": "faq_a"
+ },
+ {
+  "h": "0e61c35dd1682df7b7a43546dee886c0321ff25bc980f8c7860b01726bd21771",
+  "en": "4. Is it OK to enclose the A1?",
+  "ar": "4. هل يمكن وضع طابعة A1 داخل هيكل مغلق؟",
+  "ckb": "4. ئایا دەکرێت A1 لە ناو ژووری داخراودا دابنرێت؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "b4d0257cf5e68bd6b7b886ecd56d58a3dcb2dc74e404ec6ae6cf9bbc7bba2378",
+  "en": "A: We don't recommend enclosing the A1. For more details,",
+  "ar": "ج: لا نوصي بوضع طابعة A1 داخل هيكل مغلق. لمزيد من التفاصيل،",
+  "ckb": "وەڵام: پێشنیار ناکەین A1 لە ناو ژووری داخراودا دابنرێت. بۆ وردەکاریی زیاتر،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "768fc989b4ee038e843205b60568075548b9ace860979b7a48f0168fcbf146c4",
+  "en": "please check",
+  "ar": "يرجى مراجعة",
+  "ckb": "تکایە سەیر بکە",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3d15dfbc52b046b7529e4b6abd9e33d97bcf654c8757d889e7da31a045949c8b",
+  "en": "5. Can you use multiple AMS lite units with the A1 for up to 16 color prints?",
+  "ar": "5. هل يمكن استخدام عدة وحدات AMS lite مع A1 للطباعة بما يصل إلى 16 لونًا؟",
+  "ckb": "5. ئایا دەتوانرێت چەند یەکەیەکی AMS lite لەگەڵ A1 بەکاربهێنرێت بۆ چاپی تا 16 ڕەنگ؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "36689df195dd726a5c284c07b1fbeeda39d5d6e3f3ca270fceedca84afc65aca",
+  "en": "A: The A1 can only support one AMS lite, which means it",
+  "ar": "ج: تدعم A1 وحدة AMS lite واحدة فقط، ما يعني أنها",
+  "ckb": "وەڵام: A1 تەنها پشتگیریی یەک AMS lite دەکات، واتە",
+  "kind": "faq_a"
+ },
+ {
+  "h": "131aa29ad7c7791446614f9e9e9ae2e767564b3836bd2c667610516fd3fc232c",
+  "en": "can print with a maximum of 4 colors. For more details,",
+  "ar": "تستطيع الطباعة بـ 4 ألوان كحد أقصى. لمزيد من التفاصيل،",
+  "ckb": "دەتوانێت بە زۆرترین 4 ڕەنگ چاپ بکات. بۆ وردەکاریی زیاتر،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "801518cdf9b0b02755c759d7584169f984986c41ad49ce53c799a99a483125e9",
+  "en": "6. Can I use the AMS on the A1?",
+  "ar": "6. هل يمكنني استخدام وحدة AMS مع A1؟",
+  "ckb": "6. ئایا دەتوانم یەکەی AMS لەگەڵ A1 بەکاربهێنم؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "faf735a31be2efab1eee58e34b5a5a73c4ef613f4ebe854818c68c304dd3c7c9",
+  "en": "A: Yes. To connect the printer to the AMS, an AMS HUB (SA013) accessory is needed. The AMS hub accessory is specifically designed for A1-series 3D printers, serving as a standardized hub for seamless connectivity and integrated functionality between the AMS, AMS 2 Pro, and AMS HT.",
+  "ar": "ج: نعم. لتوصيل الطابعة بوحدة AMS، يلزم ملحق AMS HUB (SA013). صُمّم ملحق موزّع AMS هذا خصيصًا لطابعات 3D من A1-series، ويعمل كموزّع قياسي يوفّر اتصالًا سلسًا ووظائف متكاملة بين AMS وAMS 2 Pro وAMS HT.",
+  "ckb": "وەڵام: بەڵێ. بۆ بەستنی چاپکەرەکە بە یەکەی AMS، پێویستت بە پێداویستیی AMS HUB (SA013) هەیە. ئەم پێداویستییەی دابەشکەری AMS بە تایبەتی بۆ چاپکەرەکانی 3D لە A1-series دیزاین کراوە، و وەک دابەشکەرێکی ستاندارد کار دەکات بۆ پەیوەندیی بێکێشە و ئەرکی یەکگرتوو لە نێوان AMS، AMS 2 Pro و AMS HT.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "27fe93bda35a4d80c301d0f8dad0ece5d2c463c8ae6f3f716ed18708d07e6c84",
+  "en": "7. Can AMS lite be mounted on the beam of the A1 to reduce space occupation? If so,how should I proceed with the operation?",
+  "ar": "7. هل يمكن تركيب AMS lite على عارضة طابعة A1 لتقليل المساحة التي تشغلها؟ وإذا كان ذلك ممكنًا، فكيف أنفّذ العملية؟",
+  "ckb": "7. ئایا دەکرێت AMS lite لەسەر کاریتەی A1 دابمەزرێت بۆ کەمکردنەوەی ئەو شوێنەی دەیگرێت؟ ئەگەر بەڵێ، چۆن ئەم کارە ئەنجام بدەم؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "f2d254a01952f1f17d361175424a1d4b0f78b95105febd575443cd00974cb5b1",
+  "en": "A: Please visit our",
+  "ar": "ج: يرجى زيارة",
+  "ckb": "وەڵام: تکایە سەردانی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3863b52758629d361dcb492319acb6a7217bc44f79f91c1e72cc83e57d94e878",
+  "en": "MakerWorld model website,",
+  "ar": "موقع نماذجنا على MakerWorld،",
+  "ckb": "ماڵپەڕی مۆدێلەکانمان لە MakerWorld بکە،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "db90255283ca68a752658aff422411f05ec9cbb2e652fbedc9fb5250eadbcb68",
+  "en": "where you will be able to find the model supports,",
+  "ar": "حيث ستجد نموذج الدعامات،",
+  "ckb": "کە لەوێ دەتوانیت مۆدێلی پاڵپشتەکان،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "909a19c0fc88467a4f7483544ab79fa8708370cb34b5cdb5eab36f5170b80a9d",
+  "en": "installation tutorial, and purchase links for accessory",
+  "ar": "وشرح التركيب، وروابط شراء براغي",
+  "ckb": "ڕێنمایی دامەزراندن و بەستەری کڕینی بورغییەکانی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "da53ac4ea14b3ea23fe1223b96d6705d0a98dd8de56dda0dcfde2a7b8f54fe29",
+  "en": "screws. Additionally, you can also refer to our",
+  "ar": "الملحقات. ويمكنك أيضًا الرجوع إلى",
+  "ckb": "پێداویستی بدۆزیتەوە. هەروەها دەتوانیت بگەڕێیتەوە بۆ",
+  "kind": "faq_a"
+ },
+ {
+  "h": "1c6449e95f4c25c3d7f05eba2b47674dc2ccd8403e49fc531393a41e0e385851",
+  "en": "wiki page",
+  "ar": "صفحة الويكي الخاصة بنا",
+  "ckb": "پەڕەی ویکییەکەمان",
+  "kind": "faq_a"
+ },
+ {
+  "h": "273ffacc0cb31fb541027a69482c97b082f4f62d040792ff2c84cf47c76b26c1",
+  "en": "for more related information.",
+  "ar": "للحصول على مزيد من المعلومات ذات الصلة.",
+  "ckb": "بۆ زانیاریی پەیوەندیداری زیاتر.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "df5a5e688bd29c396fa75f575617125b5afdb9a2ba944e843792ba233fcfd9ee",
+  "en": "For more details, please check",
+  "ar": "لمزيد من التفاصيل، يرجى مراجعة",
+  "ckb": "بۆ وردەکاریی زیاتر، تکایە سەیر بکە",
+  "kind": "faq_a"
+ },
+ {
+  "h": "08764022e2b45b03cdacdea7205272cce05bfa16af9ec6c8bf1c94b0160b2914",
+  "en": "8. If I install AMS lite on the beam, will the filament spool slide down, or will it affect the accuracy of vibration compensation?",
+  "ar": "8. إذا ركّبت AMS lite على العارضة، فهل ستنزلق بكرة الفلامنت (spool) إلى الأسفل، أم سيؤثر ذلك على دقة تعويض الاهتزاز؟",
+  "ckb": "8. ئەگەر AMS lite لەسەر کاریتەکە دابمەزرێنم، ئایا ماسوورەی فیلامێنت (spool) بەرەو خوارەوە دەخلیسکێت، یان کاریگەری لەسەر وردیی قەرەبووکردنەوەی لەرینەوە دەبێت؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "06acb6f225ce93528e04c4c9da66ae4e524e4a40a824c6103587fba348813220",
+  "en": "A: As long as the AMS lite is correctly installed, the",
+  "ar": "ج: ما دام AMS lite مركّبًا بشكل صحيح، فإن",
+  "ckb": "وەڵام: هەتا AMS lite بە دروستی دامەزرابێت،",
+  "kind": "faq_a"
+ },
+ {
+  "h": "d0dced6c434373277457d19025623e2b1b11f5ed952862896f90354f9fa7d0ae",
+  "en": "filament spool should not slide down, even if the previous",
+  "ar": "بكرة الفلامنت (spool) لن تنزلق إلى الأسفل، حتى لو كانت",
+  "ckb": "ماسوورەی فیلامێنت (spool) نابێت بەرەو خوارەوە بخلیسکێت، تەنانەت ئەگەر",
+  "kind": "faq_a"
+ },
+ {
+  "h": "136452fa8ebb43bb8dff6c27e7e4f2ac692dd15d530ec373cceedb0b5320d502",
+  "en": "two spools have a certain forward tilt angle.",
+  "ar": "البكرتان السابقتان مائلتين إلى الأمام بزاوية معيّنة.",
+  "ckb": "دوو ماسوورەکەی پێشوو بە گۆشەیەکی دیاریکراو بەرەو پێشەوە لار بن.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "c009d6d27cf5d8db54c844eca47e259747ade99c862e2d8437b53ae87430214d",
+  "en": "Additionally, to avoid affecting the accuracy of vibration",
+  "ar": "إضافةً إلى ذلك، ولتجنّب التأثير على دقة تعويض",
+  "ckb": "هەروەها، بۆ ئەوەی کاریگەری لەسەر وردیی قەرەبووکردنەوەی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "0d33c678dc863d6583a3a7f706b02d6f031ae726dd46ce7b86cdd8ed91b77690",
+  "en": "compensation, you can add reinforcement to the column. For",
+  "ar": "الاهتزاز، يمكنك إضافة تدعيم إلى العمود. لمزيد",
+  "ckb": "لەرینەوە دروست نەبێت، دەتوانیت ستوونەکە بەهێز بکەیت. بۆ",
+  "kind": "faq_a"
+ },
+ {
+  "h": "7d6c7b4114aaceb51239ac8eccdb7caffb88791f0ec452813d1a37c088a20c90",
+  "en": "more details, please check",
+  "ar": "من التفاصيل، يرجى مراجعة",
+  "ckb": "وردەکاریی زیاتر، تکایە سەیر بکە",
+  "kind": "faq_a"
+ },
+ {
+  "h": "ed28a1d94bbe6aa5d6240bd5e20fac49a2913f49fe167845dbbfcca98d16802b",
+  "en": "9. Will you sell official refurbished A1 printers?",
+  "ar": "9. هل ستبيعون طابعات A1 مجدّدة رسمية؟",
+  "ckb": "9. ئایا چاپکەرە نوێکراوە فەرمییەکانی A1 دەفرۆشن؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "2cfba23656cb239e560ddfa6e1db539ee87c16694407ed0db64ee8e359e07835",
+  "en": "A: Currently, Factory Refurbished A1 units are only",
+  "ar": "ج: حاليًا، تُطرح وحدات A1 المجدّدة في المصنع للبيع",
+  "ckb": "وەڵام: لە ئێستادا، یەکە نوێکراوەکانی A1 لە کارگەدا تەنها",
+  "kind": "faq_a"
+ },
+ {
+  "h": "6e4bb07d50310807f6ddb998f2957a18b2eeaff2baef4543ad545c5a04ae8555",
+  "en": "available for sale within the Chinese domestic market. There",
+  "ar": "داخل السوق المحلية الصينية فقط. ولا توجد",
+  "ckb": "لە بازاڕی ناوخۆی چین بۆ فرۆشتن هەن. هیچ",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3e4bc6fdeb8be99e3c69e6245eb75096f33ed6b05f77c66dce37a84e51df944a",
+  "en": "are no plans for overseas sales of Factory Refurbished units",
+  "ar": "أي خطط لبيع الوحدات المجدّدة في المصنع في الأسواق الخارجية",
+  "ckb": "پلانێک نییە بۆ فرۆشتنی یەکە نوێکراوەکانی کارگە لە دەرەوەی وڵات",
+  "kind": "faq_a"
+ },
+ {
+  "h": "7091b69cd104a2cf602e0e846af63d890046470134bc1dd1e6e0c18be987c04a",
+  "en": "at this time.",
+  "ar": "في الوقت الحالي.",
+  "ckb": "لەم کاتەدا.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "dd9c62b8cc1a08e3f2495a47306f2418fded6fd9a0628020ef8418efa0977b7c",
+  "en": "For your reference, all Refurbished units will have an \"R\"",
+  "ar": "للعلم، ستحمل جميع الوحدات المجدّدة علامة \"R\"",
+  "ckb": "بۆ زانیاریت، لەسەر هەموو یەکە نوێکراوەکان نیشانەی \"R\"",
+  "kind": "faq_a"
+ },
+ {
+  "h": "f33ec40da993eca3f49a3a0c62ece107f9c5354df314e1447ca81b60883eee7f",
+  "en": "mark located on the back of the Base Housing, near the power",
+  "ar": "تقع في الجهة الخلفية من غلاف القاعدة، بالقرب من قابس سلك",
+  "ckb": "هەیە کە لە پشتی بەرگی بنکەکەدایە، نزیک فیشی وایەری",
+  "kind": "faq_a"
+ },
+ {
+  "h": "bb922a20f358d6384db607b79f1252b054a370b26993890e9d6ac36c1523ce41",
+  "en": "cord plug.For more details, please check",
+  "ar": "الطاقة. لمزيد من التفاصيل، يرجى مراجعة",
+  "ckb": "کارەبا. بۆ وردەکاریی زیاتر، تکایە سەیر بکە",
+  "kind": "faq_a"
+ },
+ {
+  "h": "39022eb510d46770b3a0cba897585a37580f99b80922ee83b8d133d312285806",
+  "en": "10. Are the A1 3D printers currently available for sale from the same batch that was recalled in January 2024?",
+  "ar": "10. هل طابعات 3D من طراز A1 المعروضة للبيع حاليًا من الدفعة نفسها التي تم استدعاؤها في كانون الثاني 2024؟",
+  "ckb": "10. ئایا ئەو چاپکەرانەی 3D لە جۆری A1 کە ئێستا دەفرۆشرێن، لە هەمان ئەو وەجبەیەن کە لە کانوونی دووەمی 2024 گەڕێندرانەوە؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "37cac29a61b9152f93284d1fd2d0e69645e6f42adc13ddf0acb62eb5e421a390",
+  "en": "A: No,they aren't. A1 3D printers sold after January 30,",
+  "ar": "ج: لا. فطابعات 3D من طراز A1 التي بيعت بعد 30 كانون الثاني",
+  "ckb": "وەڵام: نەخێر. چاپکەرەکانی 3D لە جۆری A1 کە دوای 30ی کانوونی دووەمی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "6d79af597dcd8243c0df5f61eaeb99fd0f4bde282fd6a4e95f791566750bc4c7",
+  "en": "2024 are not from the same batch as those recalled",
+  "ar": "2024 ليست من الدفعة نفسها التي تم استدعاؤها",
+  "ckb": "2024 فرۆشراون، لە هەمان وەجبەی ئەوانە نین کە گەڕێندرانەوە",
+  "kind": "faq_a"
+ },
+ {
+  "h": "52f78d5695f985a2d118eedfc4c1985339891b999119ed2026f764c4ed03b96f",
+  "en": "before.They already contain all the necessary fixes to",
+  "ar": "من قبل. فهي تتضمن بالفعل جميع الإصلاحات اللازمة",
+  "ckb": "پێشتر. ئەمانە هەموو چارەسەرە پێویستەکانیان تێدایە بۆ",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a394ec9cce1fe370591e10d0554d9e7b98156fbaf60ac1113748fdfd88e80864",
+  "en": "mitigate the heatbed cable issue which caused the recall.",
+  "ar": "للحدّ من مشكلة كابل السرير الساخن التي تسببت في الاستدعاء.",
+  "ckb": "کەمکردنەوەی کێشەی کێبڵی بێدی گەرم کە بووە هۆی گەڕاندنەوەکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "7ee9453da30b9109d62af5bbce59242620b742f35f2ec279b3d4fc43310e0d7a",
+  "en": "Full-Scale Build Volume: A spacious 256 × 256 × 256 mm³ canvas for your big ideas.",
+  "ar": "حجم طباعة كامل: مساحة رحبة تبلغ 256 × 256 × 256 mm³ لأفكارك الكبيرة.",
+  "ckb": "قەبارەی چاپی تەواو: بۆشاییەکی فراوانی 256 × 256 × 256 mm³ بۆ بیرۆکە گەورەکانت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "02b4ae2c30bfbc32af40b557d1b99a06557ff79a85f6f8408433ce869886134c",
+  "en": "The upgraded heatbed cable features Kevlar reinforcement, thicker insulation, softer copper, optimized wire winding interval, Nylon sleeving and an extended strain relief.",
+  "ar": "يتميّز كابل السرير الساخن المطوَّر بتدعيم من الكيفلار (Kevlar)، وعزل أسمك، ونحاس أكثر ليونة، وتباعد محسّن في لفّ الأسلاك، وغلاف من النايلون، وواقي شدّ ممتد.",
+  "ckb": "کێبڵی نوێکراوەی بێدی گەرم بەهێزکردن بە Kevlar، عازلی ئەستوورتر، مسی نەرمتر، مەودای باشترکراوی پێچانەوەی وایەر، بەرگی نایلۆن و پارێزەری ڕاکێشانی درێژکراوەی تێدایە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c857ad0c1d3fe95db0c20acc1a2e00ef29e8fa20b39b394ed8dcbd6e8effe46a",
+  "en": "* To connect the A1 printer to the AMS/ AMS 2 Pro/ AMS HT, an AMS HUB (SA013) accessory is needed.",
+  "ar": "* لتوصيل طابعة A1 بوحدة AMS أو AMS 2 Pro أو AMS HT، يلزم ملحق AMS HUB (SA013).",
+  "ckb": "* بۆ بەستنی چاپکەری A1 بە AMS، AMS 2 Pro یان AMS HT، پێویستت بە پێداویستیی AMS HUB (SA013) هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "19d89fabb1e4fba05af7178c3dd1d11c6432175e8c42367bb86910ade6f84066",
+  "en": "350℃ (662°F) High-Temperature Dual Nozzle Printing",
+  "ar": "طباعة بنوزل مزدوج بحرارة عالية تبلغ 350℃ (662°F)",
+  "ckb": "چاپی دوو نۆزڵی بە پلەی گەرمیی بەرزی 350℃ (662°F)",
+  "kind": "block_line"
+ },
+ {
+  "h": "4a9699795dad50826e40d0e39f9a08a73bca1fbfbde3f2b7022aee0b56f8e470",
+  "en": "Auxiliary Extruder Cooling Fan",
+  "ar": "مروحة تبريد مساعدة للدافع",
+  "ckb": "پانکەی ساردکەرەوەی یاریدەدەری پاڵنەر",
+  "kind": "block_line"
+ },
+ {
+  "h": "5a9d83aa665de081904fba2215e70c1d4e2bf12e4e36ef7965637b6c649ef77b",
+  "en": "Tungsten Carbide Super Durable Nozzle",
+  "ar": "نوزل فائق المتانة من كربيد التنغستن",
+  "ckb": "نۆزڵی زۆر بەرگەگر لە کاربایدی تەنگستن",
+  "kind": "block_line"
+ },
+ {
+  "h": "7b584406caaae4165db73e67ec6381afb5651b8b6e7b2912b891b8321f9b229b",
+  "en": "65℃ (149°F) Active Chamber Heating",
+  "ar": "تسخين نشط لحجرة الطباعة بحرارة 65℃ (149°F)",
+  "ckb": "گەرمکردنی چالاکی ژووری چاپ بە 65℃ (149°F)",
+  "kind": "block_line"
+ },
+ {
+  "h": "9597d9ef176043a1dc37dd44bca7288ba4e1486d6d5d853f6fd6930ad67516bf",
+  "en": "50um Motion Accuracy",
+  "ar": "دقة حركة 50um",
+  "ckb": "وردیی جووڵەی 50um",
+  "kind": "block_line"
+ },
+ {
+  "h": "8d8af8362c779a37511113b7f132f84bbc8a60d6082c288d3faead0ae1d16977",
+  "en": "Ethernet Connection",
+  "ar": "اتصال Ethernet",
+  "ckb": "پەیوەندیی Ethernet",
+  "kind": "block_line"
+ },
+ {
+  "h": "355792e10527a7f029cad9c1d0ab2e1c7c1d67caca492c0e0763d6fdd1e0f282",
+  "en": "Physical Network Killswitch",
+  "ar": "مفتاح فعلي لفصل الشبكة",
+  "ckb": "کلیلی فیزیکیی پچڕاندنی تۆڕ",
+  "kind": "block_line"
+ },
+ {
+  "h": "9064bd5f42ad38104215e8b372020e92e3b402471a7a818eff0ca7f77da6737c",
+  "en": "WPA2-Enterprise Wi-Fi Authentication",
+  "ar": "مصادقة Wi-Fi بمعيار WPA2-Enterprise",
+  "ckb": "پشتڕاستکردنەوەی Wi-Fi بە پێوەری WPA2-Enterprise",
+  "kind": "block_line"
+ },
+ {
+  "h": "65875fcab80c947c5ddc22175ef47b0a6efa1bee367ae98383eaa82792acdc4a",
+  "en": "Adaptive Air Circulation & HEPA Filtering",
+  "ar": "تدوير هواء تكيّفي وترشيح HEPA",
+  "ckb": "سووڕاندنەوەی خۆگونجێنی هەوا و پاڵاوتنی HEPA",
+  "kind": "block_line"
+ }
+]

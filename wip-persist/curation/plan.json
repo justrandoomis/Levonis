@@ -1,0 +1,3003 @@
+{
+ "h2d": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+    "why": "store page link: TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "refurbished-bambu-lab-h2d-3d-printer": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/4731f4c55a/e8f62a86f5f24c42a764d3d528303526/TDS.pdf",
+    "why": "store page link: TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/h2/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "ams-2-pro": {
+  "type": "ams",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+    "why": "store page link: TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams-2-pro/manual/intro-and-connection-guide",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams-2-pro/manual/drying-function",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "pla-basic-filament": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/6e47ce4e48b54b20b3afd3be7539ac27/SDS20250724A00_Bambu_PLA_Basic.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/1084369ef84345bbaa5d704a492954e0/Bambu_PLA_Basic_Hex_Code.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://cdn.shopify.com/s/files/1/0573/5320/7868/files/Bambu_PLA_Basic_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/d3a3d8d0a6ff44ad8c2098062569c460/2501A89116A_PLA_Basic-POPS.pdf",
+    "text": "Filament POPs",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/0f1d708b89414a568035f05a99d45974/2501A89118A_PLA_Basic_-CP65.pdf",
+    "text": "Filament CP65",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/b2dcc30798af47b79595b00d2600b8f4/2501A89117A_PLA_Basic-TSCA.pdf",
+    "text": "Filament TSCA",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/000b9da1b4fd468c8122319ed8371fe4/2501A89114A_PLA_Basic-SVHC.pdf",
+    "text": "Filament SVHC",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/cb6529eb16a642759314f3ebd58e510b/2501A89115A_PLA_Basic__PAHS.pdf",
+    "text": "Filament PAHs",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/ab385dbf28074b54a181f802f7643164/EN71-3.pdf",
+    "text": "EN71-3",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "bambu-hotend-a1-a2": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-textured-pei-plate": {
+  "type": "build_plate",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (build plate settings section)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+    "why": "build plates page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "p1s": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/0ee32e36b56d4c6fa57380ced46fb212.pdf",
+    "why": "store page link: Download P1S TDS"
+   },
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+    "why": "store page link: technical specifications"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/p1/manual/p1s-acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "a1-mini": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+    "why": "store page link: Download A1 mini TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "a1": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/be1cfa84d0bd42dfb72d44cd16c1c907/A1_Spec_EN_1214.pdf",
+    "why": "not linked by this page; linked by refurbished-a1 and bambu-lab-a1-combo-starter-kit"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/a1/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "h2d-pro": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/h2d-pro/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "h2s": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+    "why": "store page link: TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/h2s/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "p2s": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+    "why": "store page link: TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "h2c": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+    "why": "store page link: TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/h2c/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "x2d": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+    "why": "store page link: Spec (page_builder config)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/x2d/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "a2l": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+    "why": "store page link: Spec (page_builder config)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/a2l/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "refurbished-p1s": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/0ee32e36b56d4c6fa57380ced46fb212.pdf",
+    "why": "store page link: Download P1S TDS"
+   },
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+    "why": "store page link: technical specifications"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/p1/manual/p1s-acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "refurbished-a1": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/be1cfa84d0bd42dfb72d44cd16c1c907/A1_Spec_EN_1214.pdf",
+    "why": "store page link: Download A1 TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/a1/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "refurbished-x1c": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://public-cdn.bambulab.com/store/X1-Carbon%20tech%20specs.pdf",
+    "why": "store page link: Download X1C TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/x1/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "refurbished-bambu-lab-p2s-3d-printer": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+    "why": "store page link: TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-lab-a1-combo-starter-kit": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/be1cfa84d0bd42dfb72d44cd16c1c907/A1_Spec_EN_1214.pdf",
+    "why": "store page link: Download A1 TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/a1/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-lab-p2s-combo-starter-kit": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+    "why": "store page link: TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-lab-x2d-combo-starter-kit": {
+  "type": "printer",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+    "why": "store page link: Spec (page_builder config)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/x2d/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "ams-multicolor-printing": {
+  "type": "ams",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams/manual/ams-function-introduction",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/x1/manual/intro-ams",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "ams-lite": {
+  "type": "ams",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams-lite",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "ams-ht": {
+  "type": "ams",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s3/default/90d5df1b83c54e848dec0db1bf597027/HT_EN.pdf",
+    "why": "store page link: TDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams-ht/manual/intro-and-connection-guide",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/ams-2-pro/manual/drying-function",
+    "why": "store-linked / product wiki page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "r1": {
+  "type": "laser_machine",
+  "docs": [
+   {
+    "kind": "spec_pdf",
+    "url": "https://store.bblcdn.com/s7/kpwam/2d002a0570c24569802b564d05f425b2/R1_Spec.pdf",
+    "why": "store page link: Spec (page_builder config)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/r1/manual/acc-in-the-box",
+    "why": "\u00a7F acc-in-the-box"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "support-for-pa-pet": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/bdb2423e515640f5be007524d58c62a6/SDS20250723S03_Bambu_Support_for_PAPET.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/support",
+    "why": "\u00a7F /en/filament/support"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/bf35c3ce0472420599ad3703e7b71e8a.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pc-filament": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/a52afdccddfd448583d119587122c8c5.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/4606ae672ba843c3944661016aa8f349/SDS20251127C00_Bambu_PC.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/e6a6c5416fc440d88639172ff9e546ac/PC_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+    "why": "\u00a7F /en/filament/abs_asa_pc"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/48b9ce9b1c1440489846d7ea78aaeeff.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "abs-filament": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/56cffb6bd13040b0b2dd357ad6a987b5/SDS20250724B00_Bambu_ABS.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/a7d9f82d874c453cbbc1bb0efb82dd42/Bambu_ABS_Hex_Code_(1).pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+    "why": "\u00a7F /en/filament/abs_asa_pc"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/d5819343c6f64960816359062604017a/Bambu_ABS_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-matte": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/5697d821ae3a4020a89530d4d3162de7/SDS20250724A01_Bambu_PLA_Matte.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/0d30076831474a6c9bfc8fe96e0df8d1.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/624c6756ef07462ba7a618e4574c6156/2501A89132A_PLA_Matte_A01-P4_SVHC.pdf",
+    "text": "Filament SVHC",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/0363bfe9f01d43ce8ad2e2bd9dc922a5/2501A89314A_PLA_Matte__A01-P4_PAHS.pdf",
+    "text": "Filament PAHs",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/9e63c4f7125d4496b754402ffbd08d48/2501A89316A_PLA_Matte_A01-P4_TSCA.pdf",
+    "text": "Filament TSCA",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/796829098ba04f84a2cee6e94b334262/2501A89315A_PLA_Matte__A01-P4_POPS.pdf",
+    "text": "Filament POPs",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/e7c056c9bfa747888778fa99669b824a/2501A89317A_PLA_Matte_A01-P4_CP65.pdf",
+    "text": "Filament CP65",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/bba49099b2424d6b9ea03820042ba266/PLA_Matte_EN_71.pdf",
+    "text": "EN71-3",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-sparkle": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/87526cb8bcce4898b578797781045e57/SDS20251127A08_Bambu_PLA_Sparkle.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/088f0999da0c419a9630876c48842088.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-metal": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/c6c28a13ba294c6f9fe62755ec9188fa.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/df673b4fa28e4a74aebd1aa1979ade85/SDS20250724A02_Bambu_PLA_Metal.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/5e89111c48cb487f88b561ef16aa9175/PLA_Metal_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/536ea9c19e434e78b3d8d4171baf8aef.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-marble": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/b81e083c7d1f4e2182ef749d48f9ec86.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/521017bdac214ff4a53b0eb765333571/SDS20251127A07_Bambu_PLA_Marble.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/89394d4bbaff4f519bf5b9c3e7c7fcac/PLA_Marble_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/1ff1a5ed13714099903ea56349d9a65f.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-cf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/19e99252c17a4812aed4a206e1308618/SDS20260701A50_Bambu_PLA_CF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/927b92a153514ded9e49b6c40ab85d79.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "paht-cf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/2a1e4b730beb4c2baf680d927f95e7a5/SDS20260701N04_Bambu_PAHT-CF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+    "why": "\u00a7F /en/filament/asacf_pahtcf"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/40190d6568d7406bacb58b3bcb09b783.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "petg-cf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/b8ed09c39c5545b19882c05c37b19c96/SDS20260701G50_Bambu_PETG_CF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/2b5c536e5f824b6d80484c3bcfdfbb17/PETG-CF_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/petg",
+    "why": "\u00a7F /en/filament/petg"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/87dee4bc82c64829b94c0a8d6e55e23c.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-cmyk-lithophane": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "pet-cf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/e71aee2e21bc43dd9e482fa1d32a6aab/SDS20260701T01_Bambu_PET_CF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+    "why": "\u00a7F /en/filament/petcf_ppacf"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/54b1c5ae4f094655b838bb1f45f58453.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-basic-gradient": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_Gradient_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Basic_MSDS.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/21e9ad53c97a46dd9bd58e5dd1bc93ac/PLA_Basic_Gradient_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://cdn.shopify.com/s/files/1/0573/5320/7868/files/Bambu_PLA_Basic_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "asa-filament": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/10a896db93e04636a9f70b841867e7e6/SDS20251127B01_Bambu_ASA.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+    "why": "\u00a7F /en/filament/abs_asa_pc"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/94d2da6ca64b4d0e9c1e48faca32c89e.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-aero": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/cbc8b808aaf84ead9bb3b0b9b43e66af.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/3d202a3c9d2d4fe19b7317aa50b4eee0/SDS20251127A11_Bambu_PLA_Aero.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/c60370b45f9c4f628df6f5f69eeb4601.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pa6-cf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/20b45bf29b0142d8b13fae213eda751a/SDS20260701N05_Bambu_PA6-CF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+    "why": "\u00a7F /en/filament/petcf_ppacf"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/7985ae545d8f4ecaa58e02f8d014f091.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "tpu-95a-hf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/74dc918e3eb543238582c8d9084c3ce0/SDS20251127U01_Bambu_TPU_95A_HF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/6ec4738ccb144e8880cfec81a4cb6665/TPU_95A_HF_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/925d913ab89b4707990b5c00cc239c52.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": [
+   "wiki_family_page_none_published (no /en/filament/<family> page for TPU in the wiki sitemap)"
+  ]
+ },
+ "pla-glow": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/4a35986db81f466fa7ff4f84344ef57a/SDS20251127A12_Bambu_PLA_Glow.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/2c7b9c30a9014c65bb4aeacd9c70e6af.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-silk-multi-color": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk_Dual_Color_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s1/default/805aa06ac0aa426db6ac3141eb326d8a/SDS20251127A05_Bambu_PLA_Silk.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s1/default/7e3a5dec148b468d862d96593d01d624/PLA_Silk_Mutil-color_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://cdn.shopify.com/s/files/1/0573/5320/7868/files/Bambu_PLA_Silk_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "petg-translucent": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/aaf0e506c3774aed9822643efce9550b/SDS20251127G01_Bambu_PETG_Translucent.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/petg",
+    "why": "\u00a7F /en/filament/petg"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/45e0bfd4faf34c3db8a0f3a1ed264727.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-galaxy": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/8f0b6b2741e3498689c2c7706374c482.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/e8bf44e889fb43779bd040bd9ae9ff4b/SDS20251127A15_Bambu_PLA_Galaxy.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/dcb05d280a474fb095adfee359c13574/PLA_Galaxy_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/f3d62272f8f1484b84edb469e63a4292.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pva": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/69b4bf7b69f844f3a26062752279763b/SDS20251127S04_Bambu_PVA.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/support",
+    "why": "\u00a7F /en/filament/support"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/pva-printing-guide",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/5a9005351ca8426b8fa2b1b61c8ef4fc/RoHS_report_Bambu_PVA.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pa6-gf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/6e5c31b749084a07b1045dc2e74225ca/SDS20260701N08_Bambu_PA6-GF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/59bf6c3e0af14df380b9c69c40b02772/PA6-GF_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+    "why": "\u00a7F /en/filament/absgf_pa6gf"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s5/default/b2dc06336623429facff535fbf463b3d.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "asa-aero": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s1/default/02b005fdf02d450084e3128f7cf0c36f/Bambu_ASA_Aero_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/e897527e7a5c426cbd3b4c920c63e270/SDS20251127B02_Bambu_ASA_Aero.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+    "why": "\u00a7F /en/filament/abs_asa_pc"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/asa-aero-printing-guide",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/7f9aced52cd84d3aa6262a11c214ad9b.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "abs-gf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/d438af84fa83457ca415f43ad2356d73/SDS20260701B50_Bambu_ABS_GF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/7d0175cb776b415e94eec1a8c7ffbf54/ABS-GF_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+    "why": "\u00a7F /en/filament/absgf_pa6gf"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/a2559301970043ae8748881b99d4c751.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "support-for-pla-petg": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/273bd776882e46518c6341a60ec091fa/SDS20250723S05_Bambu_Support_for_PLA_PETG.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/support",
+    "why": "\u00a7F /en/filament/support"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/85b0296f5ef74f0982819b0aabf0af7b.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "support-for-abs": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/3de1308c7f99453d827115f85da3ec3f/SDS20250723S06_Bambu_Support_for_ABS.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/support",
+    "why": "\u00a7F /en/filament/support"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/support-for-abs",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/9479a16b0736487386ab500723e6c6cb.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "petg-hf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/859e223a3eeb4aea96dab858e497152b/SDS20250724G02_Bambu_PETG_HF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/f9b2b5ac54aa4aabaf2d725e6a830045/PETG_HF_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/petg",
+    "why": "\u00a7F /en/filament/petg"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/8171d8bdd1ef402bb81196229fc40eaa.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "ppa-cf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/05b0e4ca5ee14a4cb378cfa48df24f91.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/57a4c9f99a9649c89c4e4563e74cede5/SDS20260701N06_Bambu_PPA-CF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+    "why": "\u00a7F /en/filament/petcf_ppacf"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/6b1ccb25e33d43b487daba5f3813deed.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pps-cf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/26f4f40359484040a8660c9150a90fc0.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/24171852de804b9d8770a49c9a9dac98/SDS20260701T02_Bambu_PPS-CF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+    "why": "\u00a7F /en/filament/petcf_ppacf"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/3f42b5fbe07140a48b6ce699494d423d.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s4/default/324268b60e52447c8ffe46893d9ab50c.pdf",
+    "text": "UL 94 Test Report",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "asa-cf": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/49cbb7bc9b7047fbb1c34a43fb209871/SDS20260701B51_Bambu_ASA_CF.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+    "why": "\u00a7F /en/filament/asacf_pahtcf"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/a7676855216f4ea2b41e625c8b5a8cac/Bambu_ASA-CF_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "tpu-for-ams": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/7bd498c436d3479ba3160d9271fbd911/SDS20250723SU02_Bambu_TPU_for_AMS.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s5/default/b6cbfa38f55a4094ba59a66ff9577c07.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": [
+   "wiki_family_page_none_published (no /en/filament/<family> page for TPU in the wiki sitemap)"
+  ]
+ },
+ "pla-wood": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/d6c961ed06964581815e31ec1816e254/SDS20250723SA16_Bambu_PLA_Wood.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/312a35d5cdce4fc5a76692955b493a82/PLA_Wood_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s5/default/413722048c504e38854120a0a89b14c2.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-silk-upgrade": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/312c9c05c7274ef3bb6f21c949ae4c2b/SDS20250928A06_Bambu_PLA_Silk.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s4/default/93498d4068154749a8744f9cb662b857/Bambu_PLA_Silk_upgrade_ROHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pc-fr": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s1/default/4adf3c9827a0475d8777e9b8cfd11fbe.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/6193891bd51e4a5d806125e1d6117583/SDS20250724C01_Bambu_PC_FR.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/9fc931c1464542df9c5fc5d9f6f9bf4b/PC_FR_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+    "why": "\u00a7F /en/filament/abs_asa_pc"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/8f1f399e5f7f4101980977fc59f34687.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/a7ac91acf11b41bea0883615f46ed557.pdf",
+    "text": "Filament UL 94 Test Report",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "tpu-85a-tpu-90a": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+    "why": "store page link: TPU 90A Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_Filament_TPU_90A_MSDS.pdf",
+    "why": "store page link: TPU 90A Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+    "why": "store page link: TPU 90A Hex Code"
+   },
+   {
+    "kind": "tds",
+    "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_85A_Technical_Data_Sheet_a7233668-497b-487f-af8a-3adb49fafaa1.pdf",
+    "why": "store page link: TPU 85A Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_Filament_TPU_85A_MSDS.pdf",
+    "why": "store page link: TPU 85A Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/c910d98d275f470ba1a3eb5639d7c81f/Bambu_TPU_85A_Hex_Code.pdf",
+    "why": "store page link: TPU 85A Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/tpu-85a-90a",
+    "why": "TPU family page (store-linked)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_Filament_TPU_90A_RoHS.pdf",
+    "text": "TPU 90A Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_Filament_TPU_85A_RoHS.pdf",
+    "text": "TPU 85A Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "support-for-pla-new": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s2/default/200ef29f5cd04b20ba6c2c86f0cc3ec0/Bambus_Support_for_PLA_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/b7f580064c0142be919de0225299a008/SDS20250928S02_Bambu_Support_for_PLA.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/support",
+    "why": "\u00a7F /en/filament/support"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s2/default/2c70364d5ac142568d2a6bc1fc2cd088/Bambu_Support_For_PLA_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-translucent": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/8a9bc9278da74ee4bd5490bae9fb634d/SDS20250928A17_Bambu_PLA_Translucent.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/369b7d0c17804f9d8a4402a121dd8d1d/Bambu_PLA_Translucent_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-tough-upgrade": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/30f19d222fad4e9e8a07f4b81b89c05f/SDS20250928A10_Bambu_PLA_Tough.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/99010e5feaf343c59a358bef3e4c3eea/Bambu_PLA_Tough_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-basic-beginner-s-filament-pack": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/6e47ce4e48b54b20b3afd3be7539ac27/SDS20250724A00_Bambu_PLA_Basic.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s2/default/787658cda148401e87a7f1c64508ae88/Bambu_PLA_Basic_4_pack_Hex_Code.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://cdn.shopify.com/s/files/1/0573/5320/7868/files/Bambu_PLA_Basic_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/d3a3d8d0a6ff44ad8c2098062569c460/2501A89116A_PLA_Basic-POPS.pdf",
+    "text": "Filament POPs",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/0f1d708b89414a568035f05a99d45974/2501A89118A_PLA_Basic_-CP65.pdf",
+    "text": "Filament CP65",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/b2dcc30798af47b79595b00d2600b8f4/2501A89117A_PLA_Basic-TSCA.pdf",
+    "text": "Filament TSCA",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/000b9da1b4fd468c8122319ed8371fe4/2501A89114A_PLA_Basic-SVHC.pdf",
+    "text": "Filament SVHC",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/cb6529eb16a642759314f3ebd58e510b/2501A89115A_PLA_Basic__PAHS.pdf",
+    "text": "Filament PAHs",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/ab385dbf28074b54a181f802f7643164/EN71-3.pdf",
+    "text": "EN71-3",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "petg-basic": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s1/default/cb94589bf7994fdcbfa833badefae9cd/Bambu_PETG_Basic_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s1/default/ff262dc7e9344319aee7abc006466e98/SDS20251017G00_Bambu_PETG_Basic.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/7260019fb4b243ce9b1963d51fc24e83/PETG_Basic_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/petg",
+    "why": "\u00a7F /en/filament/petg"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/a0e7c5b2c47a4f6bb0e43763c16b60e7/PETG_Basic_RoHs.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/2a7eb46c409e43a2972fa721a7378380/POPS.pdf",
+    "text": "Filament POPs",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/0305367bdb9840d48c50f1e56318d7f5/CP65.pdf",
+    "text": "Filament CP65",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/46fb18d9af1a423cbdfa545c7e90281f/TSCA.pdf",
+    "text": "Filament TSCA",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/3ce3e4a59fcd45bca41fccbab776e578/SVHC.pdf",
+    "text": "Filament SVHC",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/f20387c91e21492882c78b8dde9da6b4/REACH_17.pdf",
+    "text": "Filament PAHs",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s1/default/7ed0d53750d84b78bbf9339371590825/PETG_Basic_EN_71.pdf",
+    "text": "EN71-3",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-pure": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/be522eeca49c4bbb8824a89b9f9bf872/SDS20260206A19_Bambu_PLA_Pure.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/cb680ec8a366477b9379e2fe1eba98e9/Bambu_PLA_Pure_Hex_Code.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla-pure",
+    "why": "\u00a7F /en/filament/pla-pure"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/82789b66d501474797af593274bc97cd/Bambu_PLA_Pure_ROHS_REACH_PAHS_POPS_TSCA_CP65.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/660378233c314fe2bd9981d35c5ed1ad/Bambu_PLA_Pure_EU_Food_Contact_EN.pdf",
+    "text": "EU 10/2011 Food Contact Report",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   },
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/079ff4b0c05446ba80fc4aa9923653f2/Bambu_PLA_Pure_EU_Toy_Safety_EN.pdf",
+    "text": "EN 71-3 Toy Safety Report",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "pla-basic-color-trial-set": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/6e47ce4e48b54b20b3afd3be7539ac27/SDS20250724A00_Bambu_PLA_Basic.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.eu/s8/default/d05d60f466004b049144c5d152f21c69/Bambu_PLA_Basic_Color_Trial_Set_Hex_Code.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://cdn.shopify.com/s/files/1/0573/5320/7868/files/Bambu_PLA_Basic_RoHS.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "petg-matte": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "tds",
+    "url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+    "why": "store page link: Filament TDS"
+   },
+   {
+    "kind": "sds",
+    "url": "https://store.bblcdn.com/s7/default/7cc6d511d4284684855d15c59c824cca/SDS20260701G03_Bambu_PETG_Matte.pdf",
+    "why": "store page link: Filament MSDS"
+   },
+   {
+    "kind": "hex",
+    "url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+    "why": "store page link: Hex Code"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/petg",
+    "why": "\u00a7F /en/filament/petg"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [
+   {
+    "kind": "certificate",
+    "url": "https://store.bblcdn.com/s7/default/0f611d04e95043a1ba4fbcb6db22a287/2601Q46345A_G03-xx_Rohs.pdf",
+    "text": "Filament RoHS",
+    "reason": "compliance certificate / third-party test report: not a spec source for \u00a7F (link only)"
+   }
+  ],
+  "missing": []
+ },
+ "halloween-filament-special-combo": {
+  "type": "filament",
+  "docs": [],
+  "skipped": [],
+  "missing": [
+   "page_withdrawn"
+  ]
+ },
+ "hwb-pumpkinfamily": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "hwb-hauntedhouse": {
+  "type": "filament",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament/pla",
+    "why": "\u00a7F /en/filament/pla"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "why": "drying settings (store-linked on most filament pages)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-hotend-x1c": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-hotend-p1-series": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-high-flow-hotend-h2-p2s-x2d": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-hotend-h2-p2s": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   },
+   {
+    "kind": "tracker",
+    "url": "https://e.bambulab.com/t?c=C9yyGafjxivjlQgH",
+    "why": "tracker link: Bambu Lab Wiki"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "obxidian-high-flow-hotend": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/accessories/e3d-hotend",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "hotends-combo-h2-series": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "tungsten-carbide-nozzle-h2-p2s": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "h2c-induction-hotend-right": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/h2c/manual/induction-hotend-system-workflow",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "vortek-utility-hotends-bundle": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/h2c/manual/induction-hotend-system-workflow",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "h2d-tpu-high-flow-kit": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "hotend-expansion-kit": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "multi-size-hotends-kit": {
+  "type": "hotend",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+    "why": "\u00a7F nozzles page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (store-linked)"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-smooth-pei-plate": {
+  "type": "build_plate",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (build plate settings section)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+    "why": "build plates page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-dual-texture-pei-plate": {
+  "type": "build_plate",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (build plate settings section)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+    "why": "build plates page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-3d-effect-plate": {
+  "type": "build_plate",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (build plate settings section)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+    "why": "build plates page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/3d-effect-sheets",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-cool-plate-supertack": {
+  "type": "build_plate",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (build plate settings section)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+    "why": "build plates page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "bambu-engineering-plate": {
+  "type": "build_plate",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (build plate settings section)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+    "why": "build plates page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "3d-effect-plate-full-combo": {
+  "type": "build_plate",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (build plate settings section)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+    "why": "build plates page"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/3d-effect-sheets",
+    "why": "store-linked / product wiki page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ },
+ "build-plate-combo": {
+  "type": "build_plate",
+  "docs": [
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+    "why": "\u00a7F material table (build plate settings section)"
+   },
+   {
+    "kind": "wiki",
+    "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+    "why": "build plates page"
+   }
+  ],
+  "skipped": [],
+  "missing": []
+ }
+}

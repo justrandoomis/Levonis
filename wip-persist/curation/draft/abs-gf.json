@@ -1,0 +1,880 @@
+{
+  "handle": "abs-gf",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T13:11:39Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer, page by page): Basic Info, Specifications and Recommended Printing Settings (p.1), Physical and Mechanical Properties (p.2), Other Physical and Chemical Properties and Specimen Test (p.3), test charts and Disclaimer (pp.4-5). Glass Transition Temperature and Crystallization Temperature read \"N/A\". No filament length, hardness or diameter tolerance is given. No certification is named."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/d438af84fa83457ca415f43ad2356d73/SDS20260701B50_Bambu_ABS_GF.pdf",
+      "title": "Bambu ABS GF Safety Data Sheet SDS20260701B50",
+      "retrieved_at": "2026-10-16T08:24:36Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 19 pages read. Section 1 (p.2): product name \"Bambu ABS GF\", model \"B50-xx\". Section 2 (p.3): not classified under (EC) No 1272/2008. Section 3 (p.4): ABS 80-90 % by wt, glass fibre 10-20 % by wt. Section 8 (pp.8-9): fibre-debris handling warning, gloves advised. Section 9 (pp.9-10): \"No data available\" for melting point, density and every other physical datum. Section 14 (pp.13-14): not hazardous goods (IMDG, DOT, ADR/RID, ICAO/IATA). Section 15 (p.16): SVHC not listed. No certification is named."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/7d0175cb776b415e94eec1a8c7ffbf54/ABS-GF_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: ABS-GF",
+      "retrieved_at": "2026-10-16T08:24:37Z",
+      "keys": [],
+      "note": "One page, 6 colours in a 2-column grid: read for the published hex codes (the \"hex\" list), not for spec keys. The table names colours without colour codes, so each is matched to the store value of the same colour name; all 6 have a store value."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, glue, build-plate and storage tables. Rows naming ABS-GF: 1. Printer (enclosed printer), 2. Nozzle (row \"ABS-GF\"), 3. AMS & AMS lite (row \"ABS-GF\"), the liquid-glue bullet. The bed-temperature, plate and storage tables have no ABS-GF row. Star ratings are not numbers. Used as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "compat.*"
+      ],
+      "note": "Filament Overview comparison table (column \"ABS-GF\"), Hardware Compatibility table (row \"ABS-GF\", which refers to the PA6-GF row with \"Same as above\" for printers and accessories), Filament Drying table (row \"ABS-GF\"), Device Preparation (liquid glue), Advanced Adjustments 1 (speed and volumetric-flow table, row \"ABS-GF\")."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"ASA-CF, ABS-GF\"; Appendix II (drying precautions, storage humidity)."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/abs-gf",
+      "title": "Bambu Lab US store product page: ABS-GF",
+      "retrieved_at": "2026-10-16T07:02:27Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections (two \"Parameters Comparison\" tables, rendered as content, not as spec rows), FAQ (1-5), documents."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Acrylonitrile - butadiene - styrene, glass fiber",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Acrylonitrile - butadiene - styrene, glass fiber",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The SDS (p.4, section 3) gives \"Acrylonitrile butadiene styrene\" 80-90 % by wt (CAS 9003-56-9) and \"Glass fibre\" 10-20 % by wt. The store page's comparison table (column \"ABS-GF\", row \"Composition\") reads the same words as the TDS."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "Agrees with the store page (Product Features › bullet 6: \"Diameter: 1.75mm +/- 0.03mm\"). The tolerance stays the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681790882344978",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "Scoped to the store page's only Size value \"1 kg\"; agrees with the store page row (option Size › 1 kg, 1000 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.08,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.08 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The SDS (p.9, section 9) says \"Density : No data available.\"; the TDS value is kept. The store page states no density (its row is not_found)."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 202,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 202 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The SDS (p.9, section 9) says \"Melting Point : No data available.\"; the TDS value is kept."
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 103,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.2, Physical Properties › Vicat Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 103 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (TDS \"Physical Properties\"; the row reads \"Vicar Softening Temperature\"; the specimen form is not stated for this row)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 88,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row, ISO 75 1.8 MPa)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 88 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value (TDS \"Physical Properties\"; the specimen form is not stated for this row). The next row gives 99 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The 0.45 MPa row (99 °C) agrees with the store page's two comparison tables (\"Heat Resistance (HDT, 0.45 MPa)\" 99 °C, column \"ABS-GF\") and the glass-fibre wiki (Filament Overview, \"Heat Resistance（HDT，0.45 MPaLoad）\" 99 ℃). The registry has one HDT key per scope; the 1.8 MPa row is stored, as for every other curated filament, so the stored 88 °C is a different load, not a disagreement."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 36,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 36 ± 3 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 270 °C, bed 80 °C, 150 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The Z row gives 29 ± 3 MPa. Young's Modulus (X-Y) 3160 ± 170 MPa and (Z) 2250 ± 130 MPa (ISO 527, GB/T 1040) have no registry key."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 6.3,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 6.3% ± 1.2%",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 270 °C, bed 80 °C, 150 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The Z row gives 2.3% ± 0.8%."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2860,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2860 ± 130 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 270 °C, bed 80 °C, 150 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The Z row gives 1970 ± 110 MPa. The store page's comparison tables agree: \"Stiffness (Bending Modulus - XY)\" 2860 MPa (column \"ABS-GF\")."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 68,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 68 ± 4 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 270 °C, bed 80 °C, 150 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The Z row gives 46 ± 3 MPa. The store page's comparison tables agree (\"Strength (Bending Strength - XY)\" 68 MPa, \"Layer Strength (Bending Strength - Z)\" 46 MPa, column \"ABS-GF\"), and so does the glass-fibre wiki (\"Strength （Flexural Strength - XY）\" 68 Mpa, column \"ABS-GF\")."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 14.5,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 14.5 ± 1.5 kJ/m²; 4.2 ± 1.1 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 270 °C, bed 80 °C, 150 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing). First value of the cell; the same cell gives 4.2 ± 1.1 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The Z row gives 5.3 ± 1.4 kJ/m². The store page's comparison table agrees (\"Toughness (Impact Strength - XY)\" 14.5 kJ/m², \"Layer Adhesion (Impact Strength - Z)\" 5.3 kJ/m², column \"ABS-GF\"), and so does the glass-fibre wiki (14.5 KJ/m² and 5.3 KJ/m², column \"ABS-GF\")."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 240,
+        "max": 280
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 240 - 280 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "Agrees with the material-table wiki (2. Nozzle, row \"ABS-GF\": nozzle temperature 240 - 280, given as ±10 °C). The store page states no nozzle temperature (its row is not_found)."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 80,
+        "max": 100
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 100 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Engineering Plate, High Temperature Plate or Textured PEI Plate; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The wikis give no ABS-GF bed temperature row (the material-table glue and plate tables list ABS, not ABS-GF). The store FAQ (4.Warping Prevention Tips) advises a \"higher heatbed temperature\" without a number."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 180 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 180 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented. The glass-fibre wiki (Advanced Adjustments 1, speed table) agrees: \"ABS-GF | ＜180 mm/s | 12 mm³/s\" (its suggested maximum volumetric flow has no filament key); the same section also says, for surface quality, \"The recommended printing speed should not exceed 100 mm/s.\""
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0 - 80%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 80%",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "The glass-fibre wiki (Hardware Compatibility, row \"ABS-GF\") adds \"It is recommended to use the Smooth PEI Plate with glue applied for printing.\" and \"Not compatible with the Cool Plate SuperTack.\""
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C，8 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 Series printer heatbed: 90 - 100 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "Agreed by the glass-fibre wiki (Filament Drying table, row \"ABS-GF\": convection oven \"80 °C, 8h\", AMS HT \"80 °C, 8h\") and the drying wiki (Appendix I, row \"ASA-CF, ABS-GF\": forced-air oven 80 °C, 8 h; AMS HT 80 °C, 8 h; AMS 2 Pro \"Not compatible\")."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C，8 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 80 °C. The same row gives 12 h on an X1 Series printer heatbed at 90 - 100 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "note": "Agreed by the glass-fibre wiki (convection oven \"80 °C, 8h\") and the drying wiki (forced-air oven 8 h). For the heated bed the glass-fibre wiki gives \"90 - 100 °C, 8h\", while the TDS and the drying wiki (Appendix I, \"ASA-CF, ABS-GF\": bed 90-100 °C, 12 h) give 12 h; the heated-bed time is not stored."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681790882344977",
+        "value_text": "Filament with spool"
+      },
+      "value": "High Temperature Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/abs-gf",
+      "source_title": "Bambu Lab US store product page: ABS-GF",
+      "locator": "Product Features › bullet 5",
+      "quote": "Comes with High Temperature Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:02:27Z",
+      "note": "Unverified: an unlabelled store-page bullet. Scoped to the only Type value \"Filament with spool\". The TDS (p.1, Specifications) gives \"Spool Material PC+ABS (Temperature resistance 90 °C)\" and \"Spool Size Diameter: 200 mm; Height: 67 mm\"."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "White (41100)",
+      "source_value_id": "564681790882344974",
+      "hex": "#FFFFFF",
+      "source_url": "https://store.bblcdn.com/s7/default/7d0175cb776b415e94eec1a8c7ffbf54/ABS-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: ABS-GF",
+      "locator": "p.1, row 1, column 1",
+      "quote": "White Hex:#FFFFFF",
+      "retrieved_at": "2026-10-16T08:24:37Z"
+    },
+    {
+      "value_text": "Gray (41102)",
+      "source_value_id": "564681790882344975",
+      "hex": "#C6C6C6",
+      "source_url": "https://store.bblcdn.com/s7/default/7d0175cb776b415e94eec1a8c7ffbf54/ABS-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: ABS-GF",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Gray Hex:#C6C6C6",
+      "retrieved_at": "2026-10-16T08:24:37Z"
+    },
+    {
+      "value_text": "Orange (41300)",
+      "source_value_id": "564681790882344969",
+      "hex": "#F48438",
+      "source_url": "https://store.bblcdn.com/s7/default/7d0175cb776b415e94eec1a8c7ffbf54/ABS-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: ABS-GF",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Orange Hex:#F48438",
+      "retrieved_at": "2026-10-16T08:24:37Z"
+    },
+    {
+      "value_text": "Red (41200)",
+      "source_value_id": "564681790882344971",
+      "hex": "#E83100",
+      "source_url": "https://store.bblcdn.com/s7/default/7d0175cb776b415e94eec1a8c7ffbf54/ABS-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: ABS-GF",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Red Hex:#E83100",
+      "retrieved_at": "2026-10-16T08:24:37Z"
+    },
+    {
+      "value_text": "Blue (41600)",
+      "source_value_id": "564681790882344973",
+      "hex": "#0C3B95",
+      "source_url": "https://store.bblcdn.com/s7/default/7d0175cb776b415e94eec1a8c7ffbf54/ABS-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: ABS-GF",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Blue Hex:#0C3B95",
+      "retrieved_at": "2026-10-16T08:24:37Z"
+    },
+    {
+      "value_text": "Black (41101)",
+      "source_value_id": "564681790882344976",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s7/default/7d0175cb776b415e94eec1a8c7ffbf54/ABS-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: ABS-GF",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Black Hex:#000000",
+      "retrieved_at": "2026-10-16T08:24:37Z"
+    }
+  ],
+  "relations": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/abs-gf",
+      "source_title": "Bambu Lab US store product page: ABS-GF",
+      "retrieved_at": "2026-10-16T07:02:27Z",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "Feeding compatibility. Drying ABS-GF inside the AMS 2 Pro is a different matter: the drying wiki (Appendix I, row \"ASA-CF, ABS-GF\") gives AMS 2 Pro \"Not compatible\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/abs-gf",
+      "source_title": "Bambu Lab US store product page: ABS-GF",
+      "retrieved_at": "2026-10-16T07:02:27Z",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "AMS HT drying of ABS-GF: 80 °C, 8 h (glass-fibre wiki, Filament Drying table; drying wiki, Appendix I)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/abs-gf",
+      "source_title": "Bambu Lab US store product page: ABS-GF",
+      "retrieved_at": "2026-10-16T07:02:27Z",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "The material-table wiki (3. AMS & AMS lite, row \"ABS-GF\") gives \"AMS: Compatible\"; the page's own \"RFID for Intelligent Printing\" section says the parameters \"can be read through our AMS (Automatic Material System)\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/abs-gf",
+      "source_title": "Bambu Lab US store product page: ABS-GF",
+      "retrieved_at": "2026-10-16T07:02:27Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS lite NOT Compatible",
+      "note": "Agreed by the glass-fibre wiki (Hardware Compatibility, row \"ABS-GF\", Accessory Compatibility \"Same as above\", i.e. the PA6-GF row's \"not compatible with AMS lite\").",
+      "conflict": "The material-table wiki (3. AMS & AMS lite, row \"ABS-GF\") gives the weaker \"AMS lite: Not Recommended\"; the product-specific statements are kept."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/abs-gf",
+      "source_title": "Bambu Lab US store product page: ABS-GF",
+      "retrieved_at": "2026-10-16T07:02:27Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "0.2 mm Nozzle NOT Compatible",
+      "note": "Agreed by the store FAQ (\"Hotend with Stainless Steel Nozzle 0.2 mm\"), the material-table wiki (2. Nozzle, row \"ABS-GF\": 0.2 mm \"Not Compatible\"; \"Do not use a 0.2 mm nozzle. The clogging risk is extremely high.\") and the glass-fibre wiki (row \"ABS-GF\": \"0.4mm or larger\"). compat-targets.json lists \"0.2 mm Nozzle\" as reviewed-unresolvable (component concept), so no target handle is named."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/abs-gf",
+      "source_title": "Bambu Lab US store product page: ABS-GF",
+      "retrieved_at": "2026-10-16T07:02:27Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "note": "Agreed by the glass-fibre wiki (Hardware Compatibility, row \"ABS-GF\", Build Plate Compatibility: \"Not compatible with the Cool Plate SuperTack.\")."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "Hardened Steel or Tungsten Carbide nozzle (0.4 mm or larger)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "source_title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "locator": "Hardware Compatibility › table › row \"ABS-GF\" › Nozzle Compatibility",
+      "quote": "0.4mm or larger - Hardened Steel or Tungsten Carbide nozzles, including high-flow types",
+      "note": "The material-table wiki agrees (2. Nozzle, row \"ABS-GF\", \"Is it necessary to use hardened steel nozzles?\": \"Required\"; for glass-fibre materials including ABS-CF/GF: \"Do not use a stainless steel or brass nozzle\"). No single store product is \"a hardened steel nozzle\", so no target handle is named."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "0.4, 0.6 (recommended), 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6 ( recommended ), 0.8 mm",
+      "note": "The nozzle must be hardened steel or tungsten carbide (see the requires relation). The glass-fibre wiki includes high-flow types and its Tip says \"Using a 0.6 mm nozzle is recommended\"; the material-table wiki (row \"ABS-GF\") gives 0.4, 0.6 and 0.8 mm and 0.4, 0.6 and 0.8 mm high flow all \"Compatible\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "Liquid Glue",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "source_title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "locator": "Hardware Compatibility › table › row \"ABS-GF\" › Build Plate Compatibility",
+      "quote": "Requires applying liquid glue for printing;",
+      "note": "Agreed by the glass-fibre wiki (Device Preparation: \"ABS-GF: Use Bambu Lab liquid glue.\"), the material-table wiki (\"Use Bambu Lab Liquid Glue for ABS-GF printing.\") and the TDS (p.1, \"Bed Surface Preparation Glue\")."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "With glue (TDS \"Bed Surface Preparation Glue\")."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\"; the glass-fibre wiki: \"It is recommended to use the Smooth PEI Plate with glue applied for printing.\""
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "With glue (TDS \"Bed Surface Preparation Glue\")."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "requires",
+      "target_kind": "family",
+      "target_label": "Enclosed printer",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/abs-gf",
+      "source_title": "Bambu Lab US store product page: ABS-GF",
+      "retrieved_at": "2026-10-16T07:02:27Z",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "Enclosure Printers Required",
+      "note": "The glass-fibre wiki (Hardware Compatibility, row \"ABS-GF\", Printer Compatibility \"Same as above\", i.e. the PA6-GF row's \"Requires an enclosed printer\"), the material-table wiki (1. Printer: \"Enclosed printer (Bambu H2 Series, X2D, P2S, X1, X1C, P1S, etc.)\" for ABS-GF; 3. AMS & AMS lite, row \"ABS-GF\": enclosed printer \"Recommended\") and the store FAQ (3.Ventilation & Odor Notice, 4.Warping Prevention Tips) agree. No reviewed compat target exists for \"enclosed printers\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "family",
+      "target_label": "A1 models",
+      "target_source_handle": "",
+      "target_family": "a1_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "source_title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "locator": "Hardware Compatibility › table › Printer Compatibility: row \"ABS-GF\" reads \"Same as above\", i.e. the cell of row \"PA6-GF\"",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 models",
+      "note": "The ABS-GF row inherits the PA6-GF row's printer cell (\"Same as above\"). The material-table wiki rates ABS-GF \"Not Recommended\" on open-frame printers (A Series, P1P, etc.). Whether \"A1 models\" includes the A1 mini follows the a1_series family rule (owner question P0-1)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "printer",
+      "target_label": "P1P",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "source_title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "locator": "Hardware Compatibility › table › Printer Compatibility: row \"ABS-GF\" reads \"Same as above\", i.e. the cell of row \"PA6-GF\"",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 models",
+      "note": "P1P is not sold on the store; compat-targets.json resolves \"P1P\" to the existing Levonis model."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/69f0758087c943f8a0a87bffa6dc901b.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: ABS-GF",
+      "retrieved_at": "2026-10-16T08:24:35Z",
+      "sha256": "0d506ed63d1c831a9cb0645ecba3fc0ec4cba09614df2d0f3a957f00cb103b44"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/d438af84fa83457ca415f43ad2356d73/SDS20260701B50_Bambu_ABS_GF.pdf",
+      "title": "Bambu ABS GF Safety Data Sheet SDS20260701B50",
+      "retrieved_at": "2026-10-16T08:24:36Z",
+      "sha256": "ad2e8598e8e160be8d4c4fad6a909a8531deaf250cd212bed7cc094b2f0dd1a1"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/7d0175cb776b415e94eec1a8c7ffbf54/ABS-GF_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: ABS-GF",
+      "retrieved_at": "2026-10-16T08:24:37Z",
+      "sha256": "6f47480b700f6cb0951a5fa1d3565fc00f381a59361f343403ea1ca178cbfd2c"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "sha256": "1373cd2a23bb42fb3573d4d9015cfbba76fe59345de76a288ed56f908eb6164b"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness",
+    "thermal.glass_transition"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values (Mechanical Properties; specimens printed at nozzle 270 °C, bed 80 °C, 150 mm/s, 100% infill, annealed and dried at 80 °C for 12 h before testing); the registry has one key per scope, so the Z values (tensile 29 ± 3 MPa, elongation 2.3% ± 0.8%, bending modulus 1970 ± 110 MPa, bending strength 46 ± 3 MPa, impact 5.3 ± 1.4 kJ/m²) are not stored. Density, melting, Vicat and HDT come from the TDS Physical Properties table and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 3160 ± 170 MPa, Z 2250 ± 130 MPa), melt index (7.56 ± 1.4 g/10 min at 210 °C, 2.16 kg), crystallization temperature (N/A), heat deflection temperature 99 °C at 0.45 MPa, saturated water absorption rate (0.53% at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed, with desiccant), retraction length (0.8 - 1.4 mm) and speed (20 - 40 mm/s), chamber temperature (45 - 60 °C), max overhang angle (~ 70°), max bridging length (~ 40 mm), support material (\"Turn on\"), spool material (PC+ABS, temperature resistance 90 °C), spool size (diameter 200 mm, height 67 mm), suggested annealing of prints (80 to 90 °C, 6 to 12 hours), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products.",
+    "The TDS recommended chamber temperature (45 - 60 °C) is not written to thermal.chamber_temp: that key is a printer capability, not a filament print setting.",
+    "SDS facts with no registry key are not stored: product name \"Bambu ABS GF\", model \"B50-xx\", CLP \"Not classified\", the section 8 fibre handling warning (gloves when loading/unloading, cutting or sanding), and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO-TI / IATA) transport. Its section 8 reads \"carbon fiber-reinforced filament （Glass fiber-reinforced filament)\", a wording slip in the SDS; its page 1 gives \"No.: SDS20260701B50\" but \"Report Number : SDS20250724B50\". Its section 9 \"No data available\" for melting point and density does not override the TDS.",
+    "Store page consistency: the parsed store page gives material.diameter 1.75 mm and material.net_weight 1000 g (1 kg); both agree with the TDS. The page's two \"Parameters Comparison\" tables (content blocks, not parsed as spec rows) give for ABS-GF: bending modulus XY 2860 MPa, bending strength XY 68 MPa and Z 46 MPa, impact strength XY 14.5 kJ/m² and Z 5.3 kJ/m², HDT (0.45 MPa) 99 °C, saturated water absorption 0.53, composition \"Acrylonitrile - butadiene - styrene, glass fiber\"; every one agrees with the TDS. (The same tables give regular ABS a bending strength XY of 64 MPa in one and 62 MPa in the other; that is the ABS product's matter.)",
+    "Source disagreements kept for review: heated-bed drying time (glass-fibre wiki \"90 - 100 °C, 8h\" vs TDS \"X1 Series Printer Heatbed: 90 - 100 °C, 12 h\" and drying wiki 12 h; not stored); AMS lite (store page and glass-fibre wiki \"not compatible\" vs material-table wiki \"Not Recommended\"; the relation keeps \"not compatible\" with a conflict note).",
+    "not_published: the TDS states \"N/A\" for the glass transition temperature; filament length and hardness are stated in none of the documents searched.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/a2559301970043ae8748881b99d4c751.pdf) that was not cached; safety.certifications is left to review and is not marked not_published."
+  ]
+}

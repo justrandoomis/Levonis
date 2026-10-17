@@ -1,0 +1,883 @@
+{
+  "handle": "bambu-cool-plate-supertack",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T15:59:34Z",
+  "searched": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "keys": [
+        "product.*",
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "package.contents",
+        "compat.statement",
+        "safety.certifications"
+      ],
+      "note": "Cached copy read in full (HTML): intro, Compatible Models table and its three notes, Build Plate Features, Installation Steps, removal, Notes on use, Filament printing recommendations, For X1 Series. No weight, thickness, temperature limit or packing list."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "keys": [
+        "product.*",
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "package.contents",
+        "compat.statement",
+        "safety.certifications"
+      ],
+      "note": "Cached copy read in full (HTML, including the tabbed \"Build Plate Types\" panels the text extract drops): Build Plate (dimensions table, types list, Important Notice on two plate generations) and the Cool Plate SuperTack tab with its FAQs."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "part.max_temperature",
+        "compat.statement"
+      ],
+      "note": "Cached copy read in full. Its plate table has a \"Bambu Cool Plate / PLA Plate\" column (the earlier Cool Plate: PETG \"Not recommended\") and never names the Cool Plate SuperTack, so no value is taken from it for this product and it is not listed as a document."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/bambu-cool-plate-supertack",
+      "title": "Bambu Cool Plate SuperTack Series (store page)",
+      "retrieved_at": "2026-10-16T07:09:25Z",
+      "keys": [
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "product.*",
+        "package.*",
+        "compat.statement"
+      ],
+      "note": "Corpus copy parsed with extractPage/buildImportPayload: Product Specifications (6 rows), Product Features and Notice, description (comparison table, removal, Considerations, installation), options and variant descriptions."
+    }
+  ],
+  "specs": [
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313729",
+        "value_text": "A2L"
+      },
+      "value": 330,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "First number of the Dimensions cell (the class convention: first → product.length). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313729",
+        "value_text": "A2L"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Second number of the Dimensions cell (the class convention: second → product.width). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313730",
+        "value_text": "X2D"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "First number of the Dimensions cell (the class convention: first → product.length). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313730",
+        "value_text": "X2D"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Second number of the Dimensions cell (the class convention: second → product.width). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313731",
+        "value_text": "P2S"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "First number of the Dimensions cell (the class convention: first → product.length). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313731",
+        "value_text": "P2S"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Second number of the Dimensions cell (the class convention: second → product.width). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313732",
+        "value_text": "H2C"
+      },
+      "value": 330,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "First number of the Dimensions cell (the class convention: first → product.length). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313732",
+        "value_text": "H2C"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Second number of the Dimensions cell (the class convention: second → product.width). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313733",
+        "value_text": "H2S"
+      },
+      "value": 350,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "First number of the Dimensions cell (the class convention: first → product.length). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313733",
+        "value_text": "H2S"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Second number of the Dimensions cell (the class convention: second → product.width). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313734",
+        "value_text": "H2D"
+      },
+      "value": 350,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "First number of the Dimensions cell (the class convention: first → product.length). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313734",
+        "value_text": "H2D"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Second number of the Dimensions cell (the class convention: second → product.width). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313735",
+        "value_text": "A1"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "First number of the Dimensions cell (the class convention: first → product.length). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313735",
+        "value_text": "A1"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Second number of the Dimensions cell (the class convention: second → product.width). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "688227257515360256",
+        "value_text": "P1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "First number of the Dimensions cell (the class convention: first → product.length). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "688227257515360256",
+        "value_text": "P1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Second number of the Dimensions cell (the class convention: second → product.width). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313736",
+        "value_text": "X1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "First number of the Dimensions cell (the class convention: first → product.length). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313736",
+        "value_text": "X1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "Plate size as the wiki's \"Dimensions\" column gives it (the store page gives the same figures as \"Usable Print Size\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Second number of the Dimensions cell (the class convention: second → product.width). The plates wiki's general \"Build Plate Dimensions\" table gives the same row, and the store page's \"Usable Print Size\" row (X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm) agrees."
+    },
+    {
+      "key": "part.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Cool Plate SuperTack",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Types › list item 5",
+      "quote": "Currently, Bambu Lab build plates mainly include the following types: … Cool Plate SuperTack",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "part.surface_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Finely textured surface that approaches a smooth, glossy finish",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Cool Plate SuperTack tab › paragraph 1",
+      "quote": "The Cool Plate SuperTack features a finely textured surface that approaches a smooth, glossy finish.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Value worded from the quote. The store page says the coating gives the print's bottom surface \"a smooth and matte texture\" (the print, not the plate): no conflict."
+    },
+    {
+      "key": "part.surface_treatment",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "SuperTack coating",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Bambu Cool Plate SuperTack › paragraph 1",
+      "quote": "Bambu Cool Plate SuperTack is made by coating a spring steel sheet with SuperTack",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Value worded from the quote. The store page row \"Material | Specially Designed Coating / Spring Steel Plate\" (part.material, verified on the page) says the same in other words; it is not overwritten."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Bambu Cool Plate SuperTack › paragraph 1",
+      "quote": "Bambu Cool Plate SuperTack is made by coating a spring steel sheet with SuperTack and is suitable for PLA and PETG filaments.",
+      "test_method": "",
+      "test_condition": "PLA and PETG only (plates wiki: \"This plate is designed only for printing PLA and PETG. Using any other materials may damage the surface coating.\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "Agrees with the plates wiki (Cool Plate SuperTack tab, Note) and the store page feature bullet \"Designed for PLA and PETG\". Exceptions the same sources give: Bambu PLA Silk is not recommended; printing PLA/PETG support may damage the plate (print a raft layer first)."
+    },
+    {
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "TPU",
+        "Bambu PLA Silk"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Notes › Filament printing recommendations › bullets 1–2",
+      "quote": "Do not print with TPU filament, as it will damage the build plate. … we do not recommend using Bambu PLA Silk material on the SuperTack build plate.",
+      "test_method": "",
+      "test_condition": "TPU: do not print (damages the plate). Bambu PLA Silk: not recommended (its strong adhesion may damage printed models)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page Considerations say the same (\"Do NOT print with TPU filament …\"; \"we do not recommend using Bambu PLA Silk material …\"). For third-party PLA Silk both sources say to select the Generic PLA Silk preset in Bambu Studio and evaluate compatibility."
+    },
+    {
+      "key": "part.max_temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 120,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack Series (store page)",
+      "locator": "Product Specifications › row 3 (Surface Temperature Resistance)",
+      "quote": "Surface Temperature Resistance | Up to 120℃",
+      "test_method": "",
+      "test_condition": "Surface temperature resistance of the plate",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:25Z",
+      "note": "The registry has no synonym for \"Surface Temperature Resistance\", so the page row stays x.surface_temperature_resistance (\"Up to 120℃\"); this row types the same fact. Same value: agrees. The wiki pages give no temperature limit."
+    },
+    {
+      "key": "part.life_cycle",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Consumable part, will degrade over time",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack Series (store page)",
+      "locator": "Description › Considerations › bullet 5, sentence 1",
+      "quote": "Bambu Cool Plate SuperTack is considered a consumable part, which will degrade over time.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:25Z",
+      "note": "Value worded from the quote. Only the first sentence of the bullet: the two warranty sentences after it are withheld by the page builder as owner-only manufacturer_terms.warranty_note (L-19) and are not curated."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313729",
+        "value_text": "A2L"
+      },
+      "target_kind": "printer",
+      "target_label": "A2L",
+      "target_source_handle": "a2l",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page sells this plate with the Printer Model option \"A2L\". The store page offers this printer with the \"Cool Plate SuperTack Pro\" options."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313730",
+        "value_text": "X2D"
+      },
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "target_source_handle": "x2d",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page sells this plate with the Printer Model option \"X2D\". SuperTack wiki note 1: the original 256×256 mm SuperTack lacks the plate recognition of second-generation models; \"P2S and X2D printers can still use the original SuperTack normally—they just can't recognize its type\" (select \"Resolved\" or disable plate detection). Store page (this option's description and the Notice): \"For X2D and P2S users, please disable the Build Plate Position Detection … when printing with the Cool Plate SuperTack to avoid error reports.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313731",
+        "value_text": "P2S"
+      },
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_source_handle": "p2s",
+      "target_family": "model_p2s",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page sells this plate with the Printer Model option \"P2S\". SuperTack wiki note 1: the original 256×256 mm SuperTack lacks the plate recognition of second-generation models; \"P2S and X2D printers can still use the original SuperTack normally—they just can't recognize its type\" (select \"Resolved\" or disable plate detection). Store page (this option's description and the Notice): \"For X2D and P2S users, please disable the Build Plate Position Detection … when printing with the Cool Plate SuperTack to avoid error reports.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313732",
+        "value_text": "H2C"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C",
+      "target_source_handle": "h2c",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 2",
+      "quote": "330*320 mm | H2C / A2L",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page sells this plate with the Printer Model option \"H2C\". The store page offers this printer with the \"Cool Plate SuperTack Pro\" options."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313733",
+        "value_text": "H2S"
+      },
+      "target_kind": "printer",
+      "target_label": "H2S",
+      "target_source_handle": "h2s",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page sells this plate with the Printer Model option \"H2S\". The store page offers this printer with the \"Cool Plate SuperTack Pro\" options."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313734",
+        "value_text": "H2D"
+      },
+      "target_kind": "family",
+      "target_label": "H2D",
+      "target_source_handle": "h2d",
+      "target_family": "model_h2d",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page sells this plate with the Printer Model option \"H2D\". The store page offers this printer with the \"Cool Plate SuperTack Pro\" options."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313735",
+        "value_text": "A1"
+      },
+      "target_kind": "family",
+      "target_label": "A1",
+      "target_source_handle": "a1",
+      "target_family": "model_a1",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page sells this plate with the Printer Model option \"A1\". SuperTack wiki note 3: \"A1 and P1 Series printers can use the SuperTack Pro normally.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "688227257515360256",
+        "value_text": "P1 Series"
+      },
+      "target_kind": "family",
+      "target_label": "P1 Series",
+      "target_source_handle": "p1s",
+      "target_family": "p1_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page sells this plate with the Printer Model option \"P1 Series\". SuperTack wiki note 3: \"A1 and P1 Series printers can use the SuperTack Pro normally.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761786077194313736",
+        "value_text": "X1 Series"
+      },
+      "target_kind": "family",
+      "target_label": "X1 Series",
+      "target_source_handle": "refurbished-x1c",
+      "target_family": "x1_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack | Bambu Lab Wiki",
+      "locator": "Compatible Models › table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:27:15Z",
+      "note": "The store page sells this plate with the Printer Model option \"X1 Series\". SuperTack wiki \"For X1 Series\": the plate's QR code recognition is still being optimized for X1, X1C and X1E; X1 users are advised to disable the build plate position detection feature and wait for the firmware update. Wiki note 2: X1 Series printers can use the SuperTack Pro normally but cannot recognize its type."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack Series (store page)",
+      "locator": "Product Features › bullet 4",
+      "quote": "Designed for PLA and PETG",
+      "retrieved_at": "2026-10-16T07:09:25Z",
+      "note": "SuperTack wiki: \"suitable for PLA and PETG filaments\". Bed temperature: store page comparison table \"PLA | 65℃ | 45℃\" (Textured PEI | SuperTack); plates wiki: \"Even at a low bed temperature of just 40 °C, PLA prints adhere firmly to the plate\". No glue needed (\"SuperTack provides good adhesion without adhesive\"). Bambu PLA Silk is not recommended (see not_compatible_with)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack Series (store page)",
+      "locator": "Product Features › bullet 4",
+      "quote": "Designed for PLA and PETG",
+      "retrieved_at": "2026-10-16T07:09:25Z",
+      "note": "SuperTack wiki: \"suitable for PLA and PETG filaments\". Plates wiki: \"for the 2nd-generation Cool Plate SuperTack, PETG only requires a bed temperature of 55–60 °C\"; on printers that still share 1st/2nd-generation parameters (such as the X/P series) \"the recommended bed temperature may still be around 65 °C\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "TPU",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack Series (store page)",
+      "locator": "Description › Considerations › bullet 2",
+      "quote": "Do NOT print with TPU filament, as it will damage the build plate.",
+      "retrieved_at": "2026-10-16T07:09:25Z",
+      "note": "The SuperTack wiki (Notes › Filament printing recommendations › bullet 1) says the same."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Bambu PLA Silk",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-cool-plate-supertack",
+      "source_title": "Bambu Cool Plate SuperTack Series (store page)",
+      "locator": "Description › Considerations › bullet 7",
+      "quote": "Therefore, we do not recommend using Bambu PLA Silk material on the SuperTack build plate.",
+      "retrieved_at": "2026-10-16T07:09:25Z",
+      "note": "Not recommended rather than forbidden: \"Bambu PLA Silk material exhibits strong adhesion on the SuperTack build plate, which may damage printed models.\" Third-party PLA Silk: select the Generic PLA Silk preset in Bambu Studio and evaluate. The SuperTack wiki (Filament printing recommendations › bullet 2) says the same."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/bambu-cool-plate-supertack",
+      "title": "Bambu Cool Plate SuperTack",
+      "text": "Bambu Cool Plate SuperTack",
+      "retrieved_at": "2026-10-16T08:27:15Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates",
+      "text": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/PLA/PETG-with-bambu-bool-plate-supertack",
+      "title": "How to print Support for PLA/PETG with Bambu Cool Plate SuperTack",
+      "text": "How to print Support for PLA/PETG with Bambu Cool Plate SuperTack",
+      "note": "Linked from both wiki pages (SuperTack wiki \"refer to this wiki\"; plates wiki Further Reading); not cached, so not read for specs."
+    }
+  ],
+  "not_published": [
+    "product.net_weight",
+    "package.contents"
+  ],
+  "notes": [
+    "Sizes per printer come from the SuperTack wiki \"Compatible Models\" table (350*320 mm H2D / H2S; 330*320 mm H2C / A2L; 256*256 mm X2D / P2S / P1 Series / X1 Series / A1); the plates wiki's general dimensions table gives the same rows. Stored as product.length/product.width per Printer Model option. They agree with the store page's \"Usable Print Size\" row.",
+    "Material: the page row \"Specially Designed Coating / Spring Steel Plate\" (part.material, verified) stays; the wiki's \"coating a spring steel sheet with SuperTack\" says the same, so the coating name is curated as part.surface_treatment instead of rewording part.material.",
+    "Thickness: only the store page gives it (\"Coating - 0.05mm / Steel Plate - 0.4mm\"); left to the page row (unverified; its value_num 0.05 is the coating layer). No curated thickness.",
+    "Packaging Size / Packaging Weight: the page labels its segments by printer groups (\"X1C/P1P/P1S/A1/P2S/X2D\", \"H2D/H2S\", \"H2C/A2L\"), not by the option values, and the \"+ Mag-Alloy Scraper\" bundle options share the same Printer Model values with no figures of their own, so scoping the plate-only box per Printer Model option would also attribute it to the bundles. Not curated; the page rows stay unverified at product scope. No net weight is published.",
+    "Generations: the SuperTack wiki says the 256×256 mm plate exists as the original and the SuperTack Pro (updated QR code identification); the store page offers \"Cool Plate SuperTack\" options for X2D / P2S / A1 / P1 Series / X1 Series and \"Cool Plate SuperTack Pro\" options for A2L / H2C / H2S / H2D, and does not say which 256 mm generation it ships. No generation-specific spec or relation is written; the plate-detection advice is kept in the printer relations' notes and as the page's variant.note rows.",
+    "A1 mini: the SuperTack wiki's Installation Steps pictures include an \"A1 mini\" row, but its Compatible Models table, the plates wiki and the store page offer no A1 mini size, so no A1 mini relation is written.",
+    "Marketing prose not stored as numbers: \"less than 20% adhesion loss after 300 prints\" (test with PLA Basic on the A1) and the energy-saving claims.",
+    "Bed temperatures (PLA 45℃ on the store comparison table, 40 °C in the plates wiki; PETG 55–60 °C for the 2nd-generation plate, around 65 °C on the X/P series) have no registry key for a plate (print_settings.* applies to filament only); they are kept in the material relations' notes. Removal aid \"heat the plate on the heatbed to 50°C\" is a usage step on the page.",
+    "Glue: \"SuperTack provides good adhesion without adhesive\", so no requires relation is written.",
+    "No in-the-box list: neither the store page nor the wiki gives an official packing list. The \"+ Mag-Alloy Scraper\" options name a bundled scraper in the option text only; no includes relation (outside the curated relation kinds) and no in_the_box entry are written.",
+    "The wiki video https://public-cdn.bblmw.com/wiki/accessory/Bambu-Cool-Plate-SuperTack-en.mp4 is on a host outside the document allow-list, so it is not listed as a document."
+  ]
+}

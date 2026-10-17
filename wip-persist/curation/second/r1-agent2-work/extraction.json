@@ -1,0 +1,1393 @@
+{
+ "sourceProductId": "777338703507927040",
+ "handle": "r1",
+ "canonicalUrl": "https://us.store.bambulab.com/products/r1",
+ "title": "Bambu Lab R1",
+ "seoMetaDescription": "55W desktop CO2 laser cutter and engraver. Precise, easy to use, unbeatable price. 30-day price protection, 2-year warranty & 30-day returns at official store.",
+ "route": "777329586458394624>777329657887391744>777329706679709696",
+ "isFilament": false,
+ "groups": [
+  {
+   "propertyKeyId": "777338703516315649",
+   "propertyKey": "Variant",
+   "type": 4,
+   "title": "Variants",
+   "position": 1,
+   "values": [
+    {
+     "id": "777338703516315650",
+     "value": "R1",
+     "selectedDefault": true,
+     "colorUrl": ""
+    },
+    {
+     "id": "777368103003684865",
+     "value": "R1 Long Material Bundle",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "777368103003684866",
+     "value": "R1 Long Material & Rotary Bundle",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  }
+ ],
+ "skus": [
+  {
+   "id": "777338703516315651",
+   "props": [
+    {
+     "propertyKeyId": "777338703516315649",
+     "propertyKey": "Variant",
+     "value": "R1"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "779237543009861632",
+    "url": "https://store.bblcdn.com/s7/default/50bd225d502044e990056496945f9461/4.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "777368103003684867",
+   "props": [
+    {
+     "propertyKeyId": "777338703516315649",
+     "propertyKey": "Variant",
+     "value": "R1 Long Material Bundle"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "778136145228746752",
+    "url": "https://store.bblcdn.com/s7/kpwam/858d04c9a6f14f758dc90a3fdf06986c/R1_Long_Material_Bundle-1-compressed.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "777368103003684871",
+   "props": [
+    {
+     "propertyKeyId": "777338703516315649",
+     "propertyKey": "Variant",
+     "value": "R1 Long Material & Rotary Bundle"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "778062442642030592",
+    "url": "https://store.bblcdn.com/s7/kpwam/f9ed0ed237404623b26a92b409515e24/R1_Long_Material_Rotary_Bundle-1-compressed.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  }
+ ],
+ "gallery": [
+  {
+   "resourceFileId": "779237543009861632",
+   "url": "https://store.bblcdn.com/s7/default/50bd225d502044e990056496945f9461/4.jpg"
+  },
+  {
+   "resourceFileId": "779237542514933760",
+   "url": "https://store.bblcdn.com/s7/default/6a79ab1c3e4045168987e706427bf430/2.jpg"
+  },
+  {
+   "resourceFileId": "778136145228746752",
+   "url": "https://store.bblcdn.com/s7/kpwam/858d04c9a6f14f758dc90a3fdf06986c/R1_Long_Material_Bundle-1-compressed.jpg"
+  },
+  {
+   "resourceFileId": "778062442642030592",
+   "url": "https://store.bblcdn.com/s7/kpwam/f9ed0ed237404623b26a92b409515e24/R1_Long_Material_Rotary_Bundle-1-compressed.jpg"
+  },
+  {
+   "resourceFileId": "779237543076954112",
+   "url": "https://store.bblcdn.com/s7/default/676e0e90bed94c6c97c76894913613fa/3.jpg"
+  },
+  {
+   "resourceFileId": "779237542783352832",
+   "url": "https://store.bblcdn.com/s7/default/b1ba81d8ccda4f6d94fcee350873f392/6.jpg"
+  },
+  {
+   "resourceFileId": "779237542787563520",
+   "url": "https://store.bblcdn.com/s7/default/904ec9d1730d49e18bcf6cf7b70f5b06/8.jpg"
+  },
+  {
+   "resourceFileId": "779237542842089472",
+   "url": "https://store.bblcdn.com/s7/default/bfaefa72ef344f9f9332ea7716de01b6/1.jpg"
+  },
+  {
+   "resourceFileId": "779237542896599040",
+   "url": "https://store.bblcdn.com/s7/default/468809a29224457089fff039c95b20f2/7.jpg"
+  },
+  {
+   "resourceFileId": "779237542993068032",
+   "url": "https://store.bblcdn.com/s7/default/b9527d4207bc4617804aa03135ab5569/5.jpg"
+  },
+  {
+   "resourceFileId": "778136145404903424",
+   "url": "https://store.bblcdn.com/s7/kpwam/db647a2af7c54352881c74d7dbc6b265/chu-chuang-tu-8-compressed.jpg"
+  }
+ ],
+ "featuresTitle": "",
+ "features": [
+  {
+   "title": "Product Features",
+   "html": "<ul>\n<li><strong>55W CO2 Laser:</strong> Cut and engrave wood, clear acrylic, leather, and more, with materials up to 20 mm thick in a single pass.</li>\n<li><strong>Large Work Area: </strong>600 &times; 300 mm, or up to 3000 mm long stock with the Conveyor.</li>\n<li><strong>Auto Laser Alignment:</strong> Hands-free optical path calibration in about a minute. No thermal paper, no test shots.</li>\n<li><strong>TriSense System:</strong> Cameras, lasers and XY encoders combined for positioning accuracy within 0.2 mm.</li>\n<li><strong>Vibration Compensation:</strong> Cancels residual shake after a turn for clean, crisp lines.</li>\n<li><strong>High-Speed Engraving:</strong> Up to 1000 mm/s with 20,000 mm/s&sup2; acceleration.</li>\n<li><strong>Class 1 Laser Safety:</strong> Fully enclosed beam in normal use, with lid-stop, flame detection and emergency stop.</li>\n</ul>"
+  }
+ ],
+ "videos": [],
+ "description": {
+  "kind": "page_builder",
+  "config": {
+   "schemaVersion": "1.0",
+   "templateId": "tpl-1789525856335",
+   "components": [
+    {
+     "id": "banner_1769586364304_vqxqeutvi",
+     "type": "banner",
+     "variant": "banner_1",
+     "name": "Banner",
+     "anchor": {
+      "enabled": true,
+      "name": "Overview",
+      "id": "banner_1769586364304_vqxqeutvi"
+     },
+     "modules": {
+      "media": {
+       "pc": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/kpwam/8de5449ede1b44ac9eaf476d02d4fea6/Property_1PC-compressed.jpg",
+        "naturalWidth": 5120,
+        "naturalHeight": 1600
+       },
+       "mo": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/kpwam/97f73eea26464895813f11dcc4f5d377/property-1-mo-tuya.jpg",
+        "naturalWidth": 2048,
+        "naturalHeight": 1334
+       }
+      },
+      "typeStyles": {
+       "content": {
+        "title": "Big job. Light work.",
+        "subtitle": "Bambu Lab R1"
+       }
+      }
+     }
+    },
+    {
+     "id": "chapter_1772591793102_newun4njk",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "Chapter Module 1",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-6",
+      "id": "chapter_1772591793102_newun4njk"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "",
+        "description": ""
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1772591808943_hkue4vg4y",
+       "type": "content_block",
+       "variant": "content-block-22",
+       "name": "Why Choose",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1772591808943_hkue4vg4y"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Why Choose Bambu Lab R1",
+          "button": {
+           "type": "link",
+           "text": ""
+          }
+         }
+        },
+        "featureConfig": {}
+       }
+      },
+      {
+       "id": "content_block_1772591906442_k4s6bod9q",
+       "type": "content_block",
+       "variant": "content-block-10",
+       "name": "Dual Nozzle System.",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1772591906442_k4s6bod9q"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "See what R1 can make.",
+          "button": {
+           "type": "link",
+           "text": ""
+          }
+         }
+        },
+        "featureConfig": {
+         "items": [
+          {
+           "title": "PlayDeck – Modular Play Table & Stool Set @janberrydesign",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/04bd3c3709c1479d8e5456e1c7daacc0/SizeWebNum01compressed.jpg",
+             "naturalWidth": 1578,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/7a66df3fe0b84f9ca140e9b740d457c8/1.jpg",
+             "naturalWidth": 614,
+             "naturalHeight": 600
+            }
+           },
+           "id": "comp_1786949440444_faw30kiwc"
+          },
+          {
+           "title": "Crystal Canyon Mine – Marble Run @Daniel4d",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/cbf46b5dc56940378a2391cf358cbcbb/SizeWeNum02compressed.jpg",
+             "naturalWidth": 1578,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/163c3c0570454e76b6444b7296e8fa4b/2.jpg",
+             "naturalWidth": 614,
+             "naturalHeight": 600
+            }
+           },
+           "id": "comp_1786949440444_hcy43x2w0"
+          },
+          {
+           "title": "Prairie Lamp @Makim",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/56b77b4bf54d4a04a5e48a2bb6c0ab76/SizeWebNumompressed.jpg",
+             "naturalWidth": 1578,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/9352a7f1dfe24b9d8906294056a58884/3.jpg",
+             "naturalWidth": 614,
+             "naturalHeight": 600
+            }
+           },
+           "id": "comp_1786949440444_8t0ygw8ky"
+          },
+          {
+           "title": "Sunflower Painting @miyabi",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/fe20cc2573c24a4abab68bef02e29371/SizeWebNum04compressed.jpg",
+             "naturalWidth": 1578,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/e13c1fcc3d424a8d81ff7b8e18f0387e/4.jpg",
+             "naturalWidth": 614,
+             "naturalHeight": 600
+            }
+           },
+           "id": "comp_1786949440444_qrclnhq0j"
+          },
+          {
+           "title": "Thundercloud – Layered Acrylic Lamp @Daniel4d",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/3631d08557744a5da09b6af8b6521d16/SizeWebNum05compressed.jpg",
+             "naturalWidth": 1578,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/4cc54750913a427cb509b6d04abf83d1/5.jpg",
+             "naturalWidth": 614,
+             "naturalHeight": 600
+            }
+           },
+           "id": "comp_1786949440444_olvhhpv8x"
+          },
+          {
+           "title": "Layered Clock @Bambu Lab",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/5caacaf522ca4376af3c41de5cd29977/SizeWebNum06compressed.jpg",
+             "naturalWidth": 1578,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/12160630a30b466cb684ebbd697fbd04/6.jpg",
+             "naturalWidth": 614,
+             "naturalHeight": 600
+            }
+           },
+           "id": "comp_1789547461372_ep9kt4502"
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "chapter_1769592976147_xpezb3mcg",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "Chapter Module 2",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-5",
+      "id": "chapter_1769592976147_xpezb3mcg"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "",
+        "description": ""
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1769599287782_t58dttept",
+       "type": "content_block",
+       "variant": "content-block-4",
+       "name": "Finer. Sharper",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1769599287782_t58dttept"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "CO₂ laser. Wood to glass. Tabletop decor to furniture.",
+          "button": {
+           "type": "link",
+           "text": ""
+          }
+         }
+        },
+        "featureConfig": {
+         "tabs": [
+          {
+           "name": "Makes laser work easy",
+           "description": "A 55W CO₂ laser with Bambu Lab's proven motion control, making laser work faster, finer, and easier.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/9fcf038df507488c9342bca575a45e9c/N8-Web_1.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/ac819ee6dd174d42b772f4d644995062/Laser_SP.mp4",
+             "naturalWidth": 1344,
+             "naturalHeight": 1040
+            }
+           },
+           "id": "comp_1786949596630_1zx960olx"
+          },
+          {
+           "name": "Thick cuts with one pass",
+           "description": "The 55W CO₂ laser cuts up to 18 mm walnut and 20 mm acrylic¹ in a single pass — fast, clean, and without the extra passes that slow you down.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/cf12fa1fcf9d4f23a7df5dead69902ab/PC.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/e4726c17b46143fca85ece015348cbb1/qiegesp.mp4",
+             "naturalWidth": 1344,
+             "naturalHeight": 1040
+            }
+           },
+           "id": "comp_1786949596630_cjl2332h7"
+          },
+          {
+           "name": "Go furniture-scale",
+           "description": "With the auto-feed conveyor³, R1 handles material up to 3 meters long. Pass-through feeding and deep cutting turn full-length panels into tables, shelving and furniture.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/217c8c2519484f7b9fb67474cf6a0858/pc.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/b6dcb2fbe1ac4f51971d76bb4bfd7214/bigmo.mp4",
+             "naturalWidth": 1344,
+             "naturalHeight": 1040
+            }
+           },
+           "id": "comp_1786949596630_lcflfegyy"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1772589320231_0t3ni0xve",
+       "type": "content_block",
+       "variant": "content-block-17",
+       "name": "Cool Mode",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1772589320231_0t3ni0xve"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Bring out the best in every material.",
+          "description": "Powered by a 55W CO₂ laser, R1 works across a wide range of materials — from wood and acrylic to glass, leather, fabric, and more — each bringing its own character to the piece.",
+          "button": {
+           "type": "popup",
+           "text": "Full material list"
+          }
+         }
+        },
+        "featureConfig": {
+         "items": [
+          {
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/df0347d497aa492e827ffc9055cde03b/1.jpg",
+             "naturalWidth": 846,
+             "naturalHeight": 750
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/62300dfc420e4ff3942d2e7248ddce4c/One_laser._More_materials..jpg",
+             "naturalWidth": 312,
+             "naturalHeight": 277
+            }
+           },
+           "description": "Wood",
+           "link": "",
+           "id": "comp_1786949596630_7qrhqgnc0"
+          },
+          {
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/d84069a8bf1946f6bd20f4d323ed4088/Property_1Clear_acrylic-compressed.jpg",
+             "naturalWidth": 846,
+             "naturalHeight": 750
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/7ee69dda19ad49d991da7c983daee250/One_laser._More_materials.-1.jpg",
+             "naturalWidth": 312,
+             "naturalHeight": 277
+            }
+           },
+           "description": "Transparent acrylic",
+           "link": "",
+           "id": "comp_1786949596630_op8srumoe"
+          },
+          {
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/ed75559b19bc41d991fb29a16d52f8bf/Property_1Glass-compressed.jpg",
+             "naturalWidth": 846,
+             "naturalHeight": 750
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/7c9ff1f0d97e46438ed09dc1235c3604/One_laser._More_materials.-2.jpg",
+             "naturalWidth": 312,
+             "naturalHeight": 277
+            }
+           },
+           "description": "Glass",
+           "link": "",
+           "id": "comp_1786949596630_ohsc5pvlb"
+          },
+          {
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/82e0b970e98b4853936b5e4c1bb2d057/Property_1Fabric-compressed.jpg",
+             "naturalWidth": 846,
+             "naturalHeight": 750
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/9d1cb47bf1794c0c8dddf5197c0c2100/One_laser._More_materials.-5.jpg",
+             "naturalWidth": 312,
+             "naturalHeight": 277
+            }
+           },
+           "description": "Fabric",
+           "link": "",
+           "id": "comp_1786949596630_ooqkv0dfx"
+          },
+          {
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/d6ff0d8afe2b44289534eb3564742c6f/Property_1Leather-compressed.jpg",
+             "naturalWidth": 846,
+             "naturalHeight": 750
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/05c92e4e1125413bbde71c67d8b8294e/One_laser._More_materials.-3.jpg",
+             "naturalWidth": 312,
+             "naturalHeight": 277
+            }
+           },
+           "description": "Leather",
+           "link": "",
+           "id": "comp_1786949596630_dpvue4vcd"
+          },
+          {
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/8d14153008ab48058418e4afb740a0da/Property_1Anodized_aluminum-compressed.jpg",
+             "naturalWidth": 846,
+             "naturalHeight": 750
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/4d2321d78b864b7f914c02e20ac215b1/One_laser._More_materials.-4.jpg",
+             "naturalWidth": 312,
+             "naturalHeight": 277
+            }
+           },
+           "description": "Anodized aluminum",
+           "link": "",
+           "id": "comp_1786949596630_cc9mnqeo6"
+          },
+          {
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/23200d8044114796a862cc716894fe5f/Property_1Slate-compressed.jpg",
+             "naturalWidth": 846,
+             "naturalHeight": 750
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/46068959354d47f983311873ac7e8cd1/One_laser._More_materials.-6.jpg",
+             "naturalWidth": 312,
+             "naturalHeight": 277
+            }
+           },
+           "description": "Slate",
+           "link": "",
+           "id": "comp_1786949596630_6pd6c0a8x"
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "chapter_1772592232496_78mf0p834",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "Chapter Module 3",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-4",
+      "id": "chapter_1772592232496_78mf0p834"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "",
+        "description": ""
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1772592316566_8uyf0n04r",
+       "type": "content_block",
+       "variant": "content-block-4",
+       "name": "Compensation",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-3",
+        "id": "content_block_1772592316566_8uyf0n04r"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "What you mark is what you cut.",
+          "button": {
+           "type": "link",
+           "text": ""
+          }
+         }
+        },
+        "featureConfig": {
+         "tabs": [
+          {
+           "name": "Trisense System",
+           "description": "Drop in your workpiece — crooked, curved, or tiny. R1 locates it, reads the surface, and tracks every move as it works, so every line lands exactly where you set it. This is TriSense. What you mark is what you cut.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/ca84e0c820ec426c93297457a7c86516/EN_PC.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 1200
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/42df5262dec24e1a8aa613d7eab48943/EN_MO.mp4",
+             "naturalWidth": 654,
+             "naturalHeight": 654
+            }
+           },
+           "id": "comp_1786949115949_0aoye1ram"
+          },
+          {
+           "name": "Follows the curve",
+           "description": "From curved cups and spheres to uneven surfaces. Height sensing follows every rise and fall to keep the engraving sharp and consistent across the entire surface.⁴",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/7c0dd5c350894f12b67c025f6cf6f3a8/1_1.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 1200
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/a6fbcc58514742b9af036ecbaacbd983/1MO.mp4",
+             "naturalWidth": 654,
+             "naturalHeight": 654
+            }
+           },
+           "id": "comp_1786949837675_x4ws7tkbq"
+          },
+          {
+           "name": "Accurate on clear materials",
+           "description": "R1 keeps surface measurement accurate even on transparent materials like glass and clear acrylic, so engraving stays precisely placed.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/3f7783b205db4d3e833a72d7063ff72d/2_1.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 1200
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/87cc9d13a6a54081bc8c8fa8a8ff5e06/2MO.mp4",
+             "naturalWidth": 654,
+             "naturalHeight": 654
+            }
+           },
+           "id": "comp_1786949837675_or48whn66"
+          },
+          {
+           "name": "Finds the tiny stuff",
+           "description": "The Toolhead Camera pinpoints small objects and places fine detail exactly where you want it.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/e0c06b2cd6b048989098b20b03a45048/3.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 1200
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/3b67ca3244b14793a5b27f65e58c10c6/3MO.mp4",
+             "naturalWidth": 654,
+             "naturalHeight": 654
+            }
+           },
+           "id": "comp_1786949837675_8k8rtjabu"
+          },
+          {
+           "name": "Traces the line",
+           "description": "Cut around a printed design, trim a sticker, or follow a drawn outline. The Toolhead Camera traces the edge and keeps the cut precisely on path.\n",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/0d2be898ff7f4f8188947dacbc735891/4_1.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 1200
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/43f7d71ab0964392bbbe0bfe9b0224f7/4MO.mp4",
+             "naturalWidth": 654,
+             "naturalHeight": 654
+            }
+           },
+           "id": "comp_1786949837675_gi1bi7re2"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1786949706866_9b3u39fjs",
+       "type": "content_block",
+       "variant": "content-block-4",
+       "name": "Content Block-2",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1786949706866_9b3u39fjs"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "The motion control that keeps our printers precise. Now in R1.",
+          "button": {
+           "type": "link",
+           "text": ""
+          }
+         }
+        },
+        "featureConfig": {
+         "tabs": [
+          {
+           "name": "Vibration Compensation",
+           "description": "When the toolhead changes direction, a split-second shake can ripple the line that follows. R1's vibration compensation cancels it out, keeping lines crisp right out of the turn — the same technology as in our 3D printers.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/a63d605b0d1e4a33b48712050c86cb36/pcpc2.mp4",
+             "naturalWidth": 1900,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/a294ac53158340d3a68d35df76123420/2en.mp4",
+             "naturalWidth": 788,
+             "naturalHeight": 960
+            }
+           },
+           "id": "comp_1786949837675_hfm5mrtqm"
+          },
+          {
+           "name": "Even tone at 1000mm/s",
+           "description": "Higher speeds usually mean shallower engraving. R1 compensates as it moves, keeping engraving depth consistent at up to 1,000 mm/s — while completing the same job nearly 3× as fast.²",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/9cc4952d9f9443708d36dae0a9fedd7e/pc.mp4",
+             "naturalWidth": 1900,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/b71bc7cf3f5c4b6a98a82ef880379055/mo.mp4",
+             "naturalWidth": 788,
+             "naturalHeight": 960
+            }
+           },
+           "id": "comp_1786949837675_xvg8slp40"
+          },
+          {
+           "name": "Vision Encoder",
+           "description": "Mechanical accuracy can drift with use. The Vision Encoder⁵ corrects for it, keeping absolute motion accuracy within 0.1 mm across the full work area. Draw 300 mm. Cut 300 mm.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/6d3aa6b90bae4c4a96ff3fdbae5318f3/pc.mp4",
+             "naturalWidth": 1900,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/6180257b0d25405e8b646b70efccc046/mo.mp4",
+             "naturalWidth": 788,
+             "naturalHeight": 960
+            }
+           },
+           "id": "comp_1786949837675_lm6t3g22l"
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "chapter_1772592368439_buk2myzg4",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "Chapter Module 4",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-5",
+      "id": "chapter_1772592368439_buk2myzg4"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "",
+        "description": ""
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1772592372867_3x8gsl8es",
+       "type": "content_block",
+       "variant": "content-block-4",
+       "name": "AI keeps every print on track.",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1772592372867_3x8gsl8es"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Tricky setup? Solved.",
+          "button": {
+           "type": "link",
+           "text": ""
+          }
+         }
+        },
+        "featureConfig": {
+         "tabs": [
+          {
+           "name": "Auto Laser Alignment",
+           "description": "Usually, aligning the optical path meant test shots, manual adjustments, and trial and error — with no telling how long it might take. With R1, that chore comes down to one small sensor. Mount the Laser Alignment Sensor on the toolhead, and it measures the beam, detects the misalignment, and corrects the path automatically, in just one minute.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/a5708d1434114e978fd3e883198ad4fd/size-web-num-1.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/7c733feceb92438d83f37762cf6a3d3b/size-sp-num-1.mp4",
+             "naturalWidth": 1344,
+             "naturalHeight": 720
+            }
+           },
+           "id": "comp_1786949115949_uyofhxx3i"
+          },
+          {
+           "name": "Follow it on the screen",
+           "description": "R1 puts a touchscreen right on the machine. Follow every job in real time, watch the optical path calibrate, and check the machine's health status — all without a computer.",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/38f67b5277654d9c81364e8cb909b431/size-web-num-2.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/78587e59e8a24830a238f9aef8a7c5f5/size-sp-num-2.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 720
+            }
+           },
+           "id": "comp_1786949115949_3478ssgh3"
+          },
+          {
+           "name": "Material, recognized",
+           "description": "R1 recognizes Bambu Lab material automatically and applies the right power and speed, so you can skip test grids and manual parameter setup.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/6092699463f945f6bdf0cbc3077cf9d5/pcen.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/466dae6765db4a3bbceece7441c5698c/moen.mp4",
+             "naturalWidth": 1792,
+             "naturalHeight": 960
+            }
+           },
+           "id": "comp_1786949115949_rwp2unkbc"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1786950256425_3i7c0s6sv",
+       "type": "content_block",
+       "variant": "content-block-4",
+       "name": "Content Block-3",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-3",
+        "id": "content_block_1786950256425_3i7c0s6sv"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Safer by design.  \nMade for everyday spaces.",
+          "button": {
+           "type": "link",
+           "text": ""
+          }
+         }
+        },
+        "featureConfig": {
+         "tabs": [
+          {
+           "name": "Crossflow Ventilation",
+           "description": "Most lasers rely on a single exhaust fan. R1 brings fresh air in from one side and exhausts smoke from the other, creating a steady crossflow through the entire chamber.",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/e7bee7cdea424135845d1db5059a2506/pc.mp4",
+             "naturalWidth": 2400,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/kpwam/af01f6d2b2924b3c9c394875b01f21cb/MO.mp4",
+             "naturalWidth": 1344,
+             "naturalHeight": 400
+            }
+           },
+           "id": "comp_1786950393015_wgm7h7lm2"
+          },
+          {
+           "name": "Class 1 laser safety",
+           "description": "R1 is Class 1 under IEC 60825-1 in standard enclosed use. Laser radiation stays contained inside the enclosure, so no safety goggles or dedicated laser room are needed.⁷",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/f4d2c380bf944bf8bbaa21b56cebf4a0/Class_1_laser_safety..jpg",
+             "naturalWidth": 3600,
+             "naturalHeight": 1440
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/3ec351b86e39458397f7f597ab7f53e6/Class_1_laser_safety._MO-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 400
+            }
+           },
+           "id": "comp_1786950393015_c04w6wclj"
+          },
+          {
+           "name": "Lid-open stop",
+           "description": "Open the lid and the laser stops immediately. It stays disabled while the lid is open.",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/20bec793a1c2407093af046a98f1cc18/Lid-open_stop-compressed.jpg",
+             "naturalWidth": 3600,
+             "naturalHeight": 1440
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/48a9b196822f4db6b9f830391443bb47/Lid-open_stop__MO.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 400
+            }
+           },
+           "id": "comp_1786950393015_kis3gjeuv"
+          },
+          {
+           "name": "Flame detection",
+           "description": "Built-in sensors continuously watch for signs of flame and respond as soon as one is detected.",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/dcc6c171e7cb42fb872396bd8c7a906e/Flame_detection-compressed.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/b1337121a2fc44f8a495b4bca39d3c0b/Flame_detection_MO.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 400
+            }
+           },
+           "id": "comp_1786950393015_me4nmow40"
+          },
+          {
+           "name": "Emergency stop",
+           "description": "One press cuts power to the machine immediately.",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/03a6598e2c3a4ff2bfdba728d818cc6b/Emergency_stop.jpg",
+             "naturalWidth": 3600,
+             "naturalHeight": 1440
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/d95b89c3fa2649e3a772cf77beb06c00/Emergency_stop_MO-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 400
+            }
+           },
+           "id": "comp_1789552667958_ph93hl7hb"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1772592374158_sdyolqzq3",
+       "type": "content_block",
+       "variant": "content-block-15",
+       "name": "Fully-equipped",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1772592374158_sdyolqzq3"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Same work area. Smaller footprint.",
+          "description": "R1 delivers the same working area as a typical CO₂ laser while taking up about a third less space.⁸",
+          "button": {
+           "type": "link",
+           "text": ""
+          }
+         }
+        },
+        "featureConfig": {
+         "description": ""
+        }
+       }
+      },
+      {
+       "id": "content_block_1787033016558_isj2qu6x9",
+       "type": "content_block",
+       "variant": "content-block-7",
+       "name": "Content Block-5",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-5",
+        "id": "content_block_1787033016558_isj2qu6x9"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "E1 Pro Air Purifier. Cleaner air, back in the room.",
+          "description": "Built for R1, E1 Pro⁶ connects directly to R1's exhaust outlet and pulls smoke out at the source. Multiple filter layers, with activated carbon, catch smoke and fine particles and reduce odors.",
+          "button": {
+           "type": "link",
+           "text": "Learn more"
+          }
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/08f86a8127a945ba994a3bc2ae597750/E1P-compressed.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 960
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/d813b4a26a0444088ece832c6620a9eb/E1PMO-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 720
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1787033207165_7m4jd1c43"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1786950433089_wgomxh6hm",
+       "type": "content_block",
+       "variant": "content-block-13",
+       "name": "Content Block-4",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-4",
+        "id": "content_block_1786950433089_wgomxh6hm"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Go taller. Rounder. Longer. Thicker.",
+          "description": "Add the setup you need for taller objects, round pieces, thicker stock, and extra-long boards.³",
+          "button": {
+           "type": "link",
+           "text": ""
+          }
+         }
+        },
+        "featureConfig": {
+         "items": [
+          {
+           "title": "Riser Base",
+           "description": "<div>\n<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\">Raises R1 to create clearance for taller objects. Also required for the Conveyor and Rotary. </span><br><a href=\"../../../../products/riser-base\" target=\"_blank\" rel=\"noopener\"><span style=\"color: #000000;\">Learn more.</span></a></div>\n</div>\n</div>",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/665365adf3e64fdd9a745e1f68a3a468/Num1-compressed.jpg",
+             "naturalWidth": 768,
+             "naturalHeight": 800
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/a003bf96966a4c7ebd798a9530130b46/Bundle.jpg",
+             "naturalWidth": 518,
+             "naturalHeight": 540
+            }
+           },
+           "id": "comp_1786950518588_ymdldtzkz"
+          },
+          {
+           "title": "Conveyor",
+           "description": "<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\">Automatically feeds long stock through R1, letting you cut and engrave boards up to 3 meters long. <br></span><a href=\"../../../../products/automatic-conveyor-feeder\" target=\"_blank\" rel=\"noopener\"><span style=\"color: #000000;\">Learn more.</span></a></div>\n</div>\n</div>\n</div>",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/dc752b2400bc46c4bf0807facfe08579/Num2-compressed.jpg",
+             "naturalWidth": 768,
+             "naturalHeight": 800
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/2b8dede50df64e93a56913f4f3326794/Bundle-1.jpg",
+             "naturalWidth": 518,
+             "naturalHeight": 540
+            }
+           },
+           "id": "comp_1786950518588_po1tpxb8c"
+          },
+          {
+           "title": "Rotary Attachment",
+           "description": "<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\">Rotates round objects for full 360&deg; engraving on bottles, bowls, cups, and more. Requires the Riser Base. </span><br><a href=\"../../../../products/rotary-attachment\" target=\"_blank\" rel=\"noopener\"><span style=\"color: #000000;\">Learn more.</span></a></div>\n</div>\n</div>\n</div>",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/bb164326a2b84df5ae7015626503afb5/Num3-compressed.jpg",
+             "naturalWidth": 768,
+             "naturalHeight": 800
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/b11bcd5a98fb430fa51554be4030eb67/Bundle-2.jpg",
+             "naturalWidth": 518,
+             "naturalHeight": 540
+            }
+           },
+           "id": "comp_1786950518588_cesdt2uuc"
+          },
+          {
+           "title": "Focus lenses (Medium / Long)",
+           "description": "<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\">Greater depth of focus for cleaner cuts through thicker materials &mdash; up to 20 mm with the long-focus lens. <br></span><a href=\"../../../../products/focusing-lens-medium-long-focal\" target=\"_blank\" rel=\"noopener\"><span style=\"color: #000000;\">Learn more.</span></a></div>\n</div>\n</div>\n</div>",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/7531b4fd78244597aa68e13fa084259d/Num4-compressed.jpg",
+             "naturalWidth": 768,
+             "naturalHeight": 800
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/kpwam/1a8eb5fe41064248bcec0ac2e3f819d9/Bundle-3.jpg",
+             "naturalWidth": 518,
+             "naturalHeight": 540
+            }
+           },
+           "id": "comp_1786950518588_d3z9wqgbg"
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "content_block_1772592579916_r6qce43ji",
+     "type": "content_block",
+     "variant": "content-block-15",
+     "name": "Open Box",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-8",
+      "id": "content_block_1772592579916_r6qce43ji"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Unboxing Video",
+        "button": {
+         "type": "link",
+         "text": ""
+        }
+       }
+      },
+      "featureConfig": {
+       "description": ""
+      }
+     }
+    },
+    {
+     "id": "content_block_1772592634934_jcgf7az9u",
+     "type": "content_block",
+     "variant": "content-block-18",
+     "name": "What In Box",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-9",
+      "id": "content_block_1772592634934_jcgf7az9u"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "What's in the box",
+        "button": {
+         "type": "link",
+         "text": ""
+        }
+       }
+      },
+      "featureConfig": {
+       "description": ""
+      }
+     }
+    },
+    {
+     "id": "content_block_1772592770171_2tyacvam4",
+     "type": "content_block",
+     "variant": "content-block-19",
+     "name": "Specs",
+     "anchor": {
+      "enabled": true,
+      "name": "Specs",
+      "id": "content_block_1772592770171_2tyacvam4"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "R1 Specs",
+        "button": {
+         "type": "link",
+         "text": ""
+        }
+       }
+      },
+      "featureConfig": {}
+     }
+    },
+    {
+     "id": "content_block_1772592841702_fa7b047ut",
+     "type": "content_block",
+     "variant": "content-block-21",
+     "name": "FAQ",
+     "anchor": {
+      "enabled": true,
+      "name": "FAQ",
+      "id": "content_block_1772592841702_fa7b047ut"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "FAQ",
+        "button": {
+         "type": "link",
+         "text": ""
+        }
+       }
+      },
+      "featureConfig": {
+       "faqs": [
+        {
+         "question": "1.What are the differences between focusing lenses of different specifications?",
+         "answer": "<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\">Focusing lenses with different focal lengths will produce different sizes of focused spots and different effective depths of field:</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\"><span style=\"color: #000000;\">Short Focal Length (S): Standard.Smaller spot size, better detail performance;</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\"><span style=\"color: #000000;\">Medium Focal Length (M): A good balance of precision, speed, and cutting capability;</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"3\" data-line=\"true\"><span style=\"color: #000000;\">Long Focal Length (L): Longer depth of field, suitable for cutting thicker materials.</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"4\" data-line=\"true\"><span style=\"color: #000000;\">Please refer to </span><a href=\"https://wiki.bambulab.com/en/r1/manual/focusing-lens-guide\" target=\"_blank\" rel=\"noopener\"><span style=\"color: #000000;\">Focusing Lens Guide</span></a><span style=\"color: #000000;\"> for more information.</span></div>\n</div>",
+         "id": "comp_1786949115949_qtrqb88n8"
+        },
+        {
+         "question": "2.When does the R1 require optical path calibration?",
+         "answer": "<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\">Optical path calibration is recommended in the following situations:</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\"><span style=\"color: #000000;\">1. When using the machine for the first time;</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\"><span style=\"color: #000000;\">2. After moving, impacting, or subjecting the machine to severe vibration;</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"3\" data-line=\"true\"><span style=\"color: #000000;\">3. After replacing components such as the laser tube or lenses;</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"4\" data-line=\"true\"><span style=\"color: #000000;\">4. When cutting/engraving results noticeably degrade;</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"5\" data-line=\"true\"><span style=\"color: #000000;\"><strong>Regular Maintenance:</strong></span><span style=\"color: #000000;\"> It is recommended to adjust monthly to maintain optimal processing performance.</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"6\" data-line=\"true\"><span style=\"color: #000000;\">For specific steps on optical path calibration, please refer to </span><a href=\"https://wiki.bambulab.com/en/r1/manual/laser-alignment-guide\" target=\"_blank\" rel=\"noopener\"><span style=\"color: #000000;\">\"Optical Path Calibration Guide\"</span></a><span style=\"color: #000000;\">.</span></div>\n</div>",
+         "id": "comp_1786949115949_yqnuuyh1x"
+        },
+        {
+         "question": "3.What are the differences in processing capabilities between the R1 and H2 series laser modules?",
+         "answer": "<div class=\"text-bbl-grey-13\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\"><span class=\"text-bbl-grey-13\">The core difference in processing capabilities between the R1 and H2 series laser modules lies in their different laser types, with variations in processing techniques, material compatibility, processing parameters, and special functions.<br><br></span></span>\n<table class=\"text-bbl-grey-13\">\n<tbody>\n<tr class=\"border border-solid border-bbl-grey-10\">\n<td class=\"border border-solid border-bbl-grey-10 p-2\">&nbsp;</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\"><strong>R1</strong></span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\"><strong>H2 Series</strong></span></div>\n</div>\n</td>\n</tr>\n<tr class=\"border border-solid border-bbl-grey-10\">\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\"><strong>Laser Type and Basic Parameters</strong></span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Equipped with a 55 W CO₂ laser, with a processing laser wavelength of 9 &mu;m ~ 11 &mu;m. The entire machine's laser safety class is Class 1.</span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Equipped with a 10 W/40 W semiconductor laser, with a laser wavelength of 455 nm blue light (engraving laser) + 850 nm infrared light (height-measuring laser). The entire machine's laser safety class is Class 1.</span></div>\n</div>\n</td>\n</tr>\n<tr class=\"border border-solid border-bbl-grey-10\">\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\"><strong>Processing Mode</strong></span></div>\n</div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Flat processing, curved surface processing, cylindrical processing, rotary processing, roller feed processing</span></div>\n</div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Flat surface processing, curved surface processing, cylindrical processing, rotary processing</span></div>\n</div>\n</td>\n</tr>\n<tr class=\"border border-solid border-bbl-grey-10\">\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\"><strong>Processing Materials</strong></span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Can </span><span class=\"text-bbl-grey-13\"><strong>cut</strong></span><span class=\"text-bbl-grey-13\"> and </span><span class=\"text-bbl-grey-13\"><strong>engrave</strong></span><span class=\"text-bbl-grey-13\"> full-color acrylic (including transparent acrylic), wood, leather, textiles, paper, EVA foam, shell pieces, etc., but </span><span class=\"text-bbl-grey-13\"><strong>only engrave</strong></span><span class=\"text-bbl-grey-13\"> coated metal, glass, and ceramics.</span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Can process wood, rubber, metal sheets, leather, dark acrylic, stone, etc. Only supports processing of opaque acrylic, cannot process transparent acrylic.</span></div>\n</div>\n</td>\n</tr>\n<tr class=\"border border-solid border-bbl-grey-10\">\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\"><strong>Processing Area &amp; Height</strong></span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Maximum standalone processing area: 600 mm &times; 300 mm; extendable to 600 mm &times; 3000 mm with a roller feeder. Overall processing height range: 0-58 mm; up to 248 mm with the height-increasing base.</span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">With the 10W laser module mounted, the maximum processing area is 310 mm &times; 270 mm, and the maximum processing height is 280 mm With the 40W laser module mounted, the maximum processing area is 310 mm &times; 250 mm, and the maximum processing height is 265 mm</span></div>\n</div>\n</td>\n</tr>\n<tr class=\"border border-solid border-bbl-grey-10\">\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\"><strong>Max. Engraving Speed</strong></span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Maximum engraving speed is 1000 mm/s</span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">10 W laser module: maximum engraving speed 400 mm/s 40 W laser module: maximum engraving speed 1000 mm/s</span></div>\n</div>\n</td>\n</tr>\n<tr class=\"border border-solid border-bbl-grey-10\">\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\"><strong>Special Features</strong></span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Supports automatic optical path calibration, autofocus, batch engraving, flame detection, temperature detection, door opening detection, offline processing optimization, etc.</span></div>\n</div>\n</td>\n<td class=\"border border-solid border-bbl-grey-10 p-2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span class=\"text-bbl-grey-13\">Only supports flame detection, temperature detection, door opening detection, etc.</span></div>\n</div>\n</td>\n</tr>\n</tbody>\n</table>\n</div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">&nbsp;</div>\n</div>\n</div>",
+         "id": "comp_1786949115949_b4kg1mhkj"
+        },
+        {
+         "question": "4.Which materials are not recommended for processing?",
+         "answer": "<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\">1. Exercise caution when processing highly reflective materials. Do not process uncoated metals or similar materials to avoid product damage or other accidental injury.</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\"><span style=\"color: #000000;\">2. Exercise caution when processing any materials that may release harmful gases (e.g., acrylic). Always ensure the smoke exhaust channel is clear, the surrounding area is well-ventilated, and strictly adhere to local environmental laws and regulations regarding harmful gas emissions.</span></div>\n</div>",
+         "id": "comp_1786949115949_b18bbkabq"
+        },
+        {
+         "question": "5.Which Bambu Lab air purifier is the R1 compatible with? Are older models compatible?",
+         "answer": "<div style=\"font-size: 13px;\">\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><span style=\"color: #000000;\">We recommend using the Bambu Lab E1 Pro Purifier, which links with the R1 Laser Cutter to filter smoke and particles generated during laser operation through its particle filter cotton, high-performance filters, and high-iodine-value activated carbon.</span></div>\n<div style=\"white-space: pre;\" data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\"><span style=\"color: #000000;\">The Bambu Lab Smoke Purifier is structurally compatible with the R1, but it lacks the smart function. It is manually controlled using the power switch and speed adjustment knob on the unit.</span></div>\n</div>",
+         "id": "comp_1786949115949_vnyzi00kb"
+        }
+       ]
+      }
+     }
+    }
+   ]
+  }
+ },
+ "jsonld": {
+  "productGroupId": "777338703507927040",
+  "variantSkus": [
+   "777338703516315651",
+   "777368103003684867",
+   "777368103003684871"
+  ],
+  "brand": "Bambu Lab"
+ }
+}

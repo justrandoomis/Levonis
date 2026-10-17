@@ -1,0 +1,3839 @@
+{
+ "version": 1,
+ "entries": [
+  {
+   "en": "brand",
+   "ar": "العلامة التجارية",
+   "ckb": "مارکە",
+   "source": "dictionary"
+  },
+  {
+   "en": "model",
+   "ar": "الموديل",
+   "ckb": "مۆدێل",
+   "source": "dictionary"
+  },
+  {
+   "en": "technology",
+   "ar": "التقنية",
+   "ckb": "تەکنەلۆژیا",
+   "source": "dictionary"
+  },
+  {
+   "en": "printing technology",
+   "ar": "تقنية الطباعة",
+   "ckb": "تەکنەلۆژیای چاپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "printer",
+   "ar": "طابعة",
+   "ckb": "پرینتەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "3d printer",
+   "ar": "طابعة ثلاثية الأبعاد",
+   "ckb": "پرینتەری سێ ڕەهەندی",
+   "source": "dictionary"
+  },
+  {
+   "en": "resin printer",
+   "ar": "طابعة ريزن",
+   "ckb": "پرینتەری ڕەزین",
+   "source": "dictionary"
+  },
+  {
+   "en": "build volume",
+   "ar": "حجم الطباعة",
+   "ckb": "قەبارەی چاپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "build size",
+   "ar": "حجم الطباعة",
+   "ckb": "قەبارەی چاپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "build plate",
+   "ar": "منصة الطباعة",
+   "ckb": "پلێتی چاپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "print speed",
+   "ar": "سرعة الطباعة",
+   "ckb": "خێرایی چاپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "max speed",
+   "ar": "أقصى سرعة",
+   "ckb": "بەرزترین خێرایی",
+   "source": "dictionary"
+  },
+  {
+   "en": "maximum speed",
+   "ar": "أقصى سرعة",
+   "ckb": "بەرزترین خێرایی",
+   "source": "dictionary"
+  },
+  {
+   "en": "layer height",
+   "ar": "ارتفاع الطبقة",
+   "ckb": "بەرزی چین",
+   "source": "dictionary"
+  },
+  {
+   "en": "resolution",
+   "ar": "الدقة",
+   "ckb": "ڕوونی",
+   "source": "dictionary"
+  },
+  {
+   "en": "nozzle",
+   "ar": "الفوهة",
+   "ckb": "نۆزڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "nozzle diameter",
+   "ar": "قطر الفوهة",
+   "ckb": "تیرەی نۆزڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "nozzle temperature",
+   "ar": "حرارة الفوهة",
+   "ckb": "پلەی گەرمی نۆزڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "bed temperature",
+   "ar": "حرارة السرير",
+   "ckb": "پلەی گەرمی بێد",
+   "source": "dictionary"
+  },
+  {
+   "en": "heated bed",
+   "ar": "سرير ساخن",
+   "ckb": "بێدی گەرم",
+   "source": "dictionary"
+  },
+  {
+   "en": "filament diameter",
+   "ar": "قطر الفلامنت",
+   "ckb": "تیرەی فیلامێنت",
+   "source": "dictionary"
+  },
+  {
+   "en": "filament",
+   "ar": "فلامنت",
+   "ckb": "فیلامێنت",
+   "source": "dictionary"
+  },
+  {
+   "en": "resin",
+   "ar": "ريزن",
+   "ckb": "ڕەزین",
+   "source": "dictionary"
+  },
+  {
+   "en": "supported materials",
+   "ar": "المواد المدعومة",
+   "ckb": "کەرەستە پشتگیریکراوەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "compatible materials",
+   "ar": "المواد المتوافقة",
+   "ckb": "کەرەستە گونجاوەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "compatibility",
+   "ar": "التوافق",
+   "ckb": "گونجان",
+   "source": "dictionary"
+  },
+  {
+   "en": "compatible with",
+   "ar": "متوافق مع",
+   "ckb": "گونجاوە لەگەڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "connectivity",
+   "ar": "الاتصال",
+   "ckb": "پەیوەندی",
+   "source": "dictionary"
+  },
+  {
+   "en": "power",
+   "ar": "الطاقة",
+   "ckb": "وزە",
+   "source": "dictionary"
+  },
+  {
+   "en": "power supply",
+   "ar": "مزود الطاقة",
+   "ckb": "دابینکەری وزە",
+   "source": "dictionary"
+  },
+  {
+   "en": "input voltage",
+   "ar": "جهد الدخل",
+   "ckb": "ڤۆڵتاژی چوونەژوورەوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "rated power",
+   "ar": "القدرة القصوى",
+   "ckb": "وزەی ناوزەد",
+   "source": "dictionary"
+  },
+  {
+   "en": "dimensions",
+   "ar": "الأبعاد",
+   "ckb": "ڕەهەندەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "product dimensions",
+   "ar": "أبعاد المنتج",
+   "ckb": "ڕەهەندی بەرهەم",
+   "source": "dictionary"
+  },
+  {
+   "en": "package dimensions",
+   "ar": "أبعاد العبوة",
+   "ckb": "ڕەهەندی پاکێت",
+   "source": "dictionary"
+  },
+  {
+   "en": "weight",
+   "ar": "الوزن",
+   "ckb": "کێش",
+   "source": "dictionary"
+  },
+  {
+   "en": "net weight",
+   "ar": "الوزن الصافي",
+   "ckb": "کێشی ڕەها",
+   "source": "dictionary"
+  },
+  {
+   "en": "gross weight",
+   "ar": "الوزن الإجمالي",
+   "ckb": "کێشی گشتی",
+   "source": "dictionary"
+  },
+  {
+   "en": "screen",
+   "ar": "الشاشة",
+   "ckb": "شاشە",
+   "source": "dictionary"
+  },
+  {
+   "en": "display",
+   "ar": "الشاشة",
+   "ckb": "شاشە",
+   "source": "dictionary"
+  },
+  {
+   "en": "touchscreen",
+   "ar": "شاشة لمس",
+   "ckb": "شاشەی دەستلێدان",
+   "source": "dictionary"
+  },
+  {
+   "en": "camera",
+   "ar": "كاميرا",
+   "ckb": "کامێرا",
+   "source": "dictionary"
+  },
+  {
+   "en": "noise level",
+   "ar": "مستوى الضوضاء",
+   "ckb": "ئاستی دەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "operating system",
+   "ar": "نظام التشغيل",
+   "ckb": "سیستەمی کارپێکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "software",
+   "ar": "البرنامج",
+   "ckb": "نەرمەکاڵا",
+   "source": "dictionary"
+  },
+  {
+   "en": "firmware",
+   "ar": "البرنامج الثابت",
+   "ckb": "فێرموێر",
+   "source": "dictionary"
+  },
+  {
+   "en": "auto leveling",
+   "ar": "التسوية التلقائية",
+   "ckb": "هاوسەنگکردنی خۆکار",
+   "source": "dictionary"
+  },
+  {
+   "en": "enclosure",
+   "ar": "الهيكل المغلق",
+   "ckb": "ژووری داخراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "multi-color",
+   "ar": "متعدد الألوان",
+   "ckb": "فرەڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "multi color",
+   "ar": "متعدد الألوان",
+   "ckb": "فرەڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "single color",
+   "ar": "لون واحد",
+   "ckb": "یەک ڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "resin (msla)",
+   "ar": "ريزن (MSLA)",
+   "ckb": "ڕەزین (MSLA)",
+   "source": "dictionary"
+  },
+  {
+   "en": "other",
+   "ar": "أخرى",
+   "ckb": "هی تر",
+   "source": "dictionary"
+  },
+  {
+   "en": "camera frame rate",
+   "ar": "معدل إطارات الكاميرا",
+   "ckb": "ڕێژەی چوارچێوەی کامێرا",
+   "source": "dictionary"
+  },
+  {
+   "en": "camera resolution",
+   "ar": "دقة الكاميرا",
+   "ckb": "ڕوونی کامێرا",
+   "source": "dictionary"
+  },
+  {
+   "en": "nozzle material",
+   "ar": "مادة الفوهة",
+   "ckb": "کەرەستەی نۆزڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "ams compatibility",
+   "ar": "التوافق مع AMS",
+   "ckb": "گونجان لەگەڵ AMS",
+   "source": "dictionary"
+  },
+  {
+   "en": "lcd size",
+   "ar": "مقاس شاشة LCD",
+   "ckb": "قەبارەی شاشەی LCD",
+   "source": "dictionary"
+  },
+  {
+   "en": "lcd resolution",
+   "ar": "دقة شاشة LCD",
+   "ckb": "ڕوونی شاشەی LCD",
+   "source": "dictionary"
+  },
+  {
+   "en": "uv power",
+   "ar": "قدرة UV",
+   "ckb": "وزەی UV",
+   "source": "dictionary"
+  },
+  {
+   "en": "slicer software",
+   "ar": "برنامج التقطيع",
+   "ckb": "نەرمەکاڵای سلایسەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "companion app",
+   "ar": "التطبيق المرافق",
+   "ckb": "ئەپی هاوڕێ",
+   "source": "dictionary"
+  },
+  {
+   "en": "assembly",
+   "ar": "التجميع",
+   "ckb": "پێکەوەنان",
+   "source": "dictionary"
+  },
+  {
+   "en": "pre-assembled",
+   "ar": "مجمّع مسبقًا",
+   "ckb": "پێشتر پێکەوەنراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "partially assembled",
+   "ar": "مجمّع جزئيًا",
+   "ckb": "بەشێکی پێکەوەنراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "kit",
+   "ar": "طقم",
+   "ckb": "کیت",
+   "source": "dictionary"
+  },
+  {
+   "en": "max nozzle temperature",
+   "ar": "أقصى حرارة للفوهة",
+   "ckb": "بەرزترین پلەی گەرمی نۆزڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "max bed temperature",
+   "ar": "أقصى حرارة لسرير الطباعة",
+   "ckb": "بەرزترین پلەی گەرمی بێدی چاپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "extruders",
+   "ar": "عدد الباثقات",
+   "ckb": "ژمارەی ئێکسترودەرەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "enclosed",
+   "ar": "هيكل مغلق",
+   "ckb": "داخراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "multi-colour support",
+   "ar": "دعم تعدد الألوان",
+   "ckb": "پشتگیری فرەڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "motion system",
+   "ar": "نظام الحركة",
+   "ckb": "سیستەمی جووڵە",
+   "source": "dictionary"
+  },
+  {
+   "en": "max flow rate",
+   "ar": "أقصى معدل تدفق",
+   "ckb": "بەرزترین ڕێژەی ڕەوتن",
+   "source": "dictionary"
+  },
+  {
+   "en": "maximum acceleration",
+   "ar": "أقصى تسارع",
+   "ckb": "بەرزترین خێراکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "supported nozzle sizes",
+   "ar": "مقاسات الفوهة المدعومة",
+   "ckb": "قەبارە پشتگیریکراوەکانی نۆزڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "filament sensor",
+   "ar": "حساس الفلامنت",
+   "ckb": "هەستەوەری فیلامێنت",
+   "source": "dictionary"
+  },
+  {
+   "en": "power-loss recovery",
+   "ar": "الاستئناف بعد انقطاع الكهرباء",
+   "ckb": "گەڕاندنەوە دوای بڕانی کارەبا",
+   "source": "dictionary"
+  },
+  {
+   "en": "supported filaments",
+   "ar": "الفلامنتات المدعومة",
+   "ckb": "فیلامێنتە پشتگیریکراوەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "xy resolution",
+   "ar": "دقة XY",
+   "ckb": "وردی XY",
+   "source": "dictionary"
+  },
+  {
+   "en": "layer height range",
+   "ar": "نطاق ارتفاع الطبقة",
+   "ckb": "مەودای بەرزی چین",
+   "source": "dictionary"
+  },
+  {
+   "en": "light source",
+   "ar": "مصدر الضوء",
+   "ckb": "سەرچاوەی ڕووناکی",
+   "source": "dictionary"
+  },
+  {
+   "en": "exposure time",
+   "ar": "زمن التعريض",
+   "ckb": "ماوەی ڕووناکخستن",
+   "source": "dictionary"
+  },
+  {
+   "en": "release film",
+   "ar": "غشاء الفصل",
+   "ckb": "فیلمی جیاکردنەوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "release year",
+   "ar": "سنة الإصدار",
+   "ckb": "ساڵی دەرچوون",
+   "source": "dictionary"
+  },
+  {
+   "en": "required skill level",
+   "ar": "مستوى الخبرة المطلوب",
+   "ckb": "ئاستی شارەزایی پێویست",
+   "source": "dictionary"
+  },
+  {
+   "en": "beginner",
+   "ar": "مبتدئ",
+   "ckb": "دەستپێکەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "intermediate",
+   "ar": "متوسط",
+   "ckb": "ناوەندی",
+   "source": "dictionary"
+  },
+  {
+   "en": "advanced",
+   "ar": "متقدم",
+   "ckb": "پێشکەوتوو",
+   "source": "dictionary"
+  },
+  {
+   "en": "professional",
+   "ar": "احترافي",
+   "ckb": "پیشەیی",
+   "source": "dictionary"
+  },
+  {
+   "en": "air filtration",
+   "ar": "تنقية الهواء",
+   "ckb": "پاڵاوتنی هەوا",
+   "source": "dictionary"
+  },
+  {
+   "en": "none",
+   "ar": "لا يوجد",
+   "ckb": "نییە",
+   "source": "dictionary"
+  },
+  {
+   "en": "activated carbon",
+   "ar": "كربون منشّط",
+   "ckb": "کاربۆنی چالاککراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "hepa + activated carbon",
+   "ar": "HEPA + كربون منشّط",
+   "ckb": "HEPA + کاربۆنی چالاککراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "external exhaust port",
+   "ar": "منفذ عادم خارجي",
+   "ckb": "دەرگای دەرکردنی هەوا بۆ دەرەوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "optional add-on",
+   "ar": "إضافة اختيارية",
+   "ckb": "زیادکراوی ئارەزوومەندانە",
+   "source": "dictionary"
+  },
+  {
+   "en": "ambient operating temperature",
+   "ar": "حرارة الغرفة المناسبة للتشغيل",
+   "ckb": "پلەی گەرمی ژوور بۆ کارکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "max chamber temperature",
+   "ar": "أقصى حرارة للغرفة",
+   "ckb": "بەرزترین پلەی گەرمی ژوورەکە",
+   "source": "dictionary"
+  },
+  {
+   "en": "maximum colours",
+   "ar": "أقصى عدد ألوان",
+   "ckb": "زۆرترین ژمارەی ڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "thermal runaway protection",
+   "ar": "الحماية من الانفلات الحراري",
+   "ckb": "پاراستن لە دەرچوونی گەرمی",
+   "source": "dictionary"
+  },
+  {
+   "en": "extruder drive type",
+   "ar": "نظام الإكسترودر",
+   "ckb": "جۆری سیستەمی ئێکسترودەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "direct drive",
+   "ar": "دفع مباشر",
+   "ckb": "ڕاستەوخۆ",
+   "source": "dictionary"
+  },
+  {
+   "en": "hotend construction",
+   "ar": "تركيب الهوت إند",
+   "ckb": "پێکهاتەی هۆت ئێند",
+   "source": "dictionary"
+  },
+  {
+   "en": "all-metal",
+   "ar": "معدني بالكامل",
+   "ckb": "تەواو مەعدەنی",
+   "source": "dictionary"
+  },
+  {
+   "en": "ptfe-lined",
+   "ar": "مبطّن بـ PTFE",
+   "ckb": "بە PTFE ڕووپۆشکراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "bi-metal heat break",
+   "ar": "فاصل حراري ثنائي المعدن",
+   "ckb": "بڕەری گەرمی دوو مەعدەنی",
+   "source": "dictionary"
+  },
+  {
+   "en": "brass",
+   "ar": "نحاس أصفر",
+   "ckb": "برنج",
+   "source": "dictionary"
+  },
+  {
+   "en": "hardened steel",
+   "ar": "فولاذ مقسّى",
+   "ckb": "پۆڵای ڕەقکراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "stainless steel",
+   "ar": "فولاذ مقاوم للصدأ",
+   "ckb": "پۆڵای زەنگ‌نەگر",
+   "source": "dictionary"
+  },
+  {
+   "en": "tungsten carbide",
+   "ar": "كربيد التنغستن",
+   "ckb": "کاربایدی تەنگستن",
+   "source": "dictionary"
+  },
+  {
+   "en": "coated / other",
+   "ar": "مطلي / أخرى",
+   "ckb": "ڕووپۆشکراو / هیتر",
+   "source": "dictionary"
+  },
+  {
+   "en": "auxiliary part cooling",
+   "ar": "مروحة تبريد إضافية للقطعة",
+   "ckb": "فێنککەرەوەی زیادەی پارچە",
+   "source": "dictionary"
+  },
+  {
+   "en": "axis guidance",
+   "ar": "نظام توجيه المحاور",
+   "ckb": "سیستەمی ڕێنمایی تەوەرەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "linear rails (all axes)",
+   "ar": "قضبان خطية (كل المحاور)",
+   "ckb": "ڕێڕەوی هێڵی (هەموو تەوەرەکان)",
+   "source": "dictionary"
+  },
+  {
+   "en": "linear rails (x/y only)",
+   "ar": "قضبان خطية (X/Y فقط)",
+   "ckb": "ڕێڕەوی هێڵی (تەنها X/Y)",
+   "source": "dictionary"
+  },
+  {
+   "en": "linear rods + bearings",
+   "ar": "أعمدة خطية + رولمان",
+   "ckb": "چەقی هێڵی + بەرینگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "pom wheels on extrusion",
+   "ar": "بكرات POM على قضبان الألمنيوم",
+   "ckb": "چەرخی POM لەسەر ئەلەمنیۆم",
+   "source": "dictionary"
+  },
+  {
+   "en": "mixed / other",
+   "ar": "مختلط / أخرى",
+   "ckb": "تێکەڵ / هیتر",
+   "source": "dictionary"
+  },
+  {
+   "en": "levelling sensor",
+   "ar": "نوع حساس التسوية",
+   "ckb": "جۆری هەستەوەری هاوسەنگکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "strain gauge / load cell",
+   "ar": "حساس ضغط (Load cell)",
+   "ckb": "هەستەوەری فشار (Load cell)",
+   "source": "dictionary"
+  },
+  {
+   "en": "inductive probe",
+   "ar": "مجس حثّي",
+   "ckb": "هەستەوەری ئیندەکتیڤ",
+   "source": "dictionary"
+  },
+  {
+   "en": "bltouch / touch probe",
+   "ar": "مجس لمسي BLTouch",
+   "ckb": "هەستەوەری بەرکەوتەی BLTouch",
+   "source": "dictionary"
+  },
+  {
+   "en": "eddy current",
+   "ar": "تيار دوّامي",
+   "ckb": "جەریانی ئێدی",
+   "source": "dictionary"
+  },
+  {
+   "en": "piezo",
+   "ar": "بيزو",
+   "ckb": "پیزۆ",
+   "source": "dictionary"
+  },
+  {
+   "en": "manual (no probe)",
+   "ar": "يدوي (بدون مجس)",
+   "ckb": "دەستی (بێ هەستەوەر)",
+   "source": "dictionary"
+  },
+  {
+   "en": "minimum layer height",
+   "ar": "أقل ارتفاع للطبقة",
+   "ckb": "نزمترین بەرزی چین",
+   "source": "dictionary"
+  },
+  {
+   "en": "proprietary",
+   "ar": "خاص بالشركة",
+   "ckb": "تایبەت بە کۆمپانیا",
+   "source": "dictionary"
+  },
+  {
+   "en": "print failure detection",
+   "ar": "كشف فشل الطباعة",
+   "ckb": "دۆزینەوەی شکستی چاپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "screen type",
+   "ar": "نوع الشاشة",
+   "ckb": "جۆری شاشە",
+   "source": "dictionary"
+  },
+  {
+   "en": "monochrome lcd",
+   "ar": "شاشة أحادية اللون",
+   "ckb": "شاشەی تاک‌ڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "colour lcd",
+   "ar": "شاشة ملوّنة",
+   "ckb": "شاشەی ڕەنگاوڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "lcd (unspecified)",
+   "ar": "شاشة LCD (غير محددة)",
+   "ckb": "شاشەی LCD (دیارینەکراو)",
+   "source": "dictionary"
+  },
+  {
+   "en": "screen rated life",
+   "ar": "العمر الافتراضي للشاشة",
+   "ckb": "تەمەنی پێشبینیکراوی شاشە",
+   "source": "dictionary"
+  },
+  {
+   "en": "z-axis accuracy",
+   "ar": "دقة محور Z",
+   "ckb": "وردی تەوەری Z",
+   "source": "dictionary"
+  },
+  {
+   "en": "max vertical print speed",
+   "ar": "أقصى سرعة طباعة عمودية",
+   "ckb": "بەرزترین خێرایی چاپی ستوونی",
+   "source": "dictionary"
+  },
+  {
+   "en": "layer release mechanism",
+   "ar": "آلية فصل الطبقة",
+   "ckb": "میکانیزمی جیاکردنەوەی چین",
+   "source": "dictionary"
+  },
+  {
+   "en": "tilt release",
+   "ar": "فصل بالإمالة",
+   "ckb": "جیاکردنەوە بە لارکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "standard lift-and-peel",
+   "ar": "رفع وفصل تقليدي",
+   "ckb": "بەرزکردنەوە و جیاکردنەوەی ئاسایی",
+   "source": "dictionary"
+  },
+  {
+   "en": "rotary / roller release",
+   "ar": "فصل دوّار",
+   "ckb": "جیاکردنەوەی سووڕاوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "build plate levelling",
+   "ar": "تسوية منصة الطباعة",
+   "ckb": "هاوسەنگکردنی پلێتی چاپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "levelling-free",
+   "ar": "بدون تسوية",
+   "ckb": "بێ هاوسەنگکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "auto levelling",
+   "ar": "تسوية تلقائية",
+   "ckb": "هاوسەنگکردنی خۆکار",
+   "source": "dictionary"
+  },
+  {
+   "en": "manual 4-point",
+   "ar": "تسوية يدوية بأربع نقاط",
+   "ckb": "هاوسەنگکردنی دەستی بە چوار خاڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "manual 2-point",
+   "ar": "تسوية يدوية بنقطتين",
+   "ckb": "هاوسەنگکردنی دەستی بە دوو خاڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "fits models",
+   "ar": "الموديلات المتوافقة",
+   "ckb": "گونجاوە بۆ مۆدێلەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "installation",
+   "ar": "التركيب",
+   "ckb": "دامەزراندن",
+   "source": "dictionary"
+  },
+  {
+   "en": "use case",
+   "ar": "حالة الاستخدام",
+   "ckb": "شێوازی بەکارهێنان",
+   "source": "dictionary"
+  },
+  {
+   "en": "voltage",
+   "ar": "الجهد الكهربائي",
+   "ckb": "ڤۆڵتاژ",
+   "source": "dictionary"
+  },
+  {
+   "en": "current",
+   "ar": "التيار الكهربائي",
+   "ckb": "تێپەڕبوونی کارەبا",
+   "source": "dictionary"
+  },
+  {
+   "en": "interface",
+   "ar": "الواجهة",
+   "ckb": "ڕووکار",
+   "source": "dictionary"
+  },
+  {
+   "en": "thread",
+   "ar": "سنّ اللولب",
+   "ckb": "قەبارەی پێچ",
+   "source": "dictionary"
+  },
+  {
+   "en": "colour hex",
+   "ar": "رمز اللون HEX",
+   "ckb": "کۆدی HEXی ڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "certifications",
+   "ar": "الشهادات",
+   "ckb": "بڕوانامەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "not applicable",
+   "ar": "لا ينطبق",
+   "ckb": "پەیوەندی نییە",
+   "source": "dictionary"
+  },
+  {
+   "en": "operating temperature",
+   "ar": "درجة حرارة التشغيل",
+   "ckb": "پلەی گەرمی کارکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "spool type",
+   "ar": "نوع البكرة",
+   "ckb": "جۆری بۆبین",
+   "source": "dictionary"
+  },
+  {
+   "en": "family",
+   "ar": "العائلة",
+   "ckb": "خێزان",
+   "source": "dictionary"
+  },
+  {
+   "en": "with spool",
+   "ar": "مع بكرة",
+   "ckb": "لەگەڵ بۆبین",
+   "source": "dictionary"
+  },
+  {
+   "en": "refill",
+   "ar": "تعبئة",
+   "ckb": "پڕکردنەوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "cardboard",
+   "ar": "كرتون",
+   "ckb": "کارتۆن",
+   "source": "dictionary"
+  },
+  {
+   "en": "wavelength",
+   "ar": "الطول الموجي",
+   "ckb": "درێژی شەپۆل",
+   "source": "dictionary"
+  },
+  {
+   "en": "pieces",
+   "ar": "قطع",
+   "ckb": "دانەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "assembly time",
+   "ar": "وقت التجميع",
+   "ckb": "ماوەی پێکەوەنان",
+   "source": "dictionary"
+  },
+  {
+   "en": "age rating",
+   "ar": "الفئة العمرية",
+   "ckb": "پۆلێنی تەمەن",
+   "source": "dictionary"
+  },
+  {
+   "en": "battery",
+   "ar": "البطارية",
+   "ckb": "باتری",
+   "source": "dictionary"
+  },
+  {
+   "en": "control range",
+   "ar": "نطاق التحكم",
+   "ckb": "مەودای کۆنترۆڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "channels",
+   "ar": "القنوات",
+   "ckb": "کەناڵەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "material",
+   "ar": "المادة",
+   "ckb": "کەرەستە",
+   "source": "dictionary"
+  },
+  {
+   "en": "material type",
+   "ar": "نوع المادة",
+   "ckb": "جۆری کەرەستە",
+   "source": "dictionary"
+  },
+  {
+   "en": "diameter",
+   "ar": "القطر",
+   "ckb": "تیرە",
+   "source": "dictionary"
+  },
+  {
+   "en": "tolerance",
+   "ar": "التفاوت",
+   "ckb": "تۆڵێرانس",
+   "source": "dictionary"
+  },
+  {
+   "en": "color",
+   "ar": "اللون",
+   "ckb": "ڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "colour",
+   "ar": "اللون",
+   "ckb": "ڕەنگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "colors",
+   "ar": "الألوان",
+   "ckb": "ڕەنگەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "finish",
+   "ar": "التشطيب",
+   "ckb": "کۆتایی ڕووکار",
+   "source": "dictionary"
+  },
+  {
+   "en": "density",
+   "ar": "الكثافة",
+   "ckb": "چڕی",
+   "source": "dictionary"
+  },
+  {
+   "en": "hardness",
+   "ar": "الصلابة",
+   "ckb": "ڕەقی",
+   "source": "dictionary"
+  },
+  {
+   "en": "drying",
+   "ar": "التجفيف",
+   "ckb": "وشککردنەوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "storage",
+   "ar": "التخزين",
+   "ckb": "هەڵگرتن",
+   "source": "dictionary"
+  },
+  {
+   "en": "shelf life",
+   "ar": "مدة الصلاحية",
+   "ckb": "ماوەی بەکارهێنان",
+   "source": "dictionary"
+  },
+  {
+   "en": "printing temperature",
+   "ar": "حرارة الطباعة",
+   "ckb": "پلەی گەرمی چاپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "processing mode",
+   "ar": "نمط المعالجة",
+   "ckb": "دۆخی پرۆسێسکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "laser material",
+   "ar": "مادة ليزر",
+   "ckb": "کەرەستەی لەیزەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "blade cutting material",
+   "ar": "مادة قص بشفرة",
+   "ckb": "کەرەستەی بڕین بە تیغ",
+   "source": "dictionary"
+  },
+  {
+   "en": "quantity",
+   "ar": "الكمية",
+   "ckb": "بڕ",
+   "source": "dictionary"
+  },
+  {
+   "en": "quantity per pack",
+   "ar": "الكمية في العبوة",
+   "ckb": "بڕ لە پاکێتدا",
+   "source": "dictionary"
+  },
+  {
+   "en": "contents",
+   "ar": "المحتويات",
+   "ckb": "ناوەڕۆک",
+   "source": "dictionary"
+  },
+  {
+   "en": "in the box",
+   "ar": "محتويات العلبة",
+   "ckb": "ناوەڕۆکی سندوق",
+   "source": "dictionary"
+  },
+  {
+   "en": "what's in the box",
+   "ar": "محتويات العلبة",
+   "ckb": "ناوەڕۆکی سندوق",
+   "source": "dictionary"
+  },
+  {
+   "en": "package contents",
+   "ar": "محتويات العبوة",
+   "ckb": "ناوەڕۆکی پاکێت",
+   "source": "dictionary"
+  },
+  {
+   "en": "thickness",
+   "ar": "السماكة",
+   "ckb": "ئەستووری",
+   "source": "dictionary"
+  },
+  {
+   "en": "length",
+   "ar": "الطول",
+   "ckb": "درێژی",
+   "source": "dictionary"
+  },
+  {
+   "en": "width",
+   "ar": "العرض",
+   "ckb": "پانی",
+   "source": "dictionary"
+  },
+  {
+   "en": "height",
+   "ar": "الارتفاع",
+   "ckb": "بەرزی",
+   "source": "dictionary"
+  },
+  {
+   "en": "size",
+   "ar": "المقاس",
+   "ckb": "قەبارە",
+   "source": "dictionary"
+  },
+  {
+   "en": "capacity",
+   "ar": "السعة",
+   "ckb": "توانا",
+   "source": "dictionary"
+  },
+  {
+   "en": "volume",
+   "ar": "الحجم",
+   "ckb": "قەبارە",
+   "source": "dictionary"
+  },
+  {
+   "en": "warranty",
+   "ar": "الضمان",
+   "ckb": "گەرەنتی",
+   "source": "dictionary"
+  },
+  {
+   "en": "warranty period",
+   "ar": "مدة الضمان",
+   "ckb": "ماوەی گەرەنتی",
+   "source": "dictionary"
+  },
+  {
+   "en": "origin",
+   "ar": "بلد المنشأ",
+   "ckb": "وڵاتی بەرهەمهێنان",
+   "source": "dictionary"
+  },
+  {
+   "en": "made in",
+   "ar": "صنع في",
+   "ckb": "دروستکراوە لە",
+   "source": "dictionary"
+  },
+  {
+   "en": "sku",
+   "ar": "رمز المنتج",
+   "ckb": "کۆدی بەرهەم",
+   "source": "dictionary"
+  },
+  {
+   "en": "availability",
+   "ar": "التوفر",
+   "ckb": "بەردەستی",
+   "source": "dictionary"
+  },
+  {
+   "en": "lead time",
+   "ar": "مدة التجهيز",
+   "ckb": "ماوەی ئامادەکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "preparation time",
+   "ar": "مدة التجهيز",
+   "ckb": "ماوەی ئامادەکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "processing time",
+   "ar": "مدة المعالجة",
+   "ckb": "ماوەی پرۆسێسکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "delivery time",
+   "ar": "مدة التوصيل",
+   "ckb": "ماوەی گەیاندن",
+   "source": "dictionary"
+  },
+  {
+   "en": "shipping time",
+   "ar": "مدة الشحن",
+   "ckb": "ماوەی گواستنەوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "estimated delivery",
+   "ar": "التوصيل المتوقع",
+   "ckb": "گەیاندنی چاوەڕوانکراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "estimated arrival",
+   "ar": "الوصول المتوقع",
+   "ckb": "گەیشتنی چاوەڕوانکراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "ready to ship",
+   "ar": "جاهز للشحن",
+   "ckb": "ئامادەیە بۆ ناردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "made to order",
+   "ar": "يُصنع عند الطلب",
+   "ckb": "بە داواکاری دروست دەکرێت",
+   "source": "dictionary"
+  },
+  {
+   "en": "ships worldwide",
+   "ar": "يُشحن إلى جميع الدول",
+   "ckb": "بۆ هەموو جیهان دەنێردرێت",
+   "source": "dictionary"
+  },
+  {
+   "en": "air freight",
+   "ar": "شحن جوي",
+   "ckb": "گواستنەوەی ئاسمانی",
+   "source": "dictionary"
+  },
+  {
+   "en": "sea freight",
+   "ar": "شحن بحري",
+   "ckb": "گواستنەوەی دەریایی",
+   "source": "dictionary"
+  },
+  {
+   "en": "land freight",
+   "ar": "شحن بري",
+   "ckb": "گواستنەوەی وشکانی",
+   "source": "dictionary"
+  },
+  {
+   "en": "in stock",
+   "ar": "متوفر",
+   "ckb": "بەردەستە",
+   "source": "dictionary"
+  },
+  {
+   "en": "out of stock",
+   "ar": "غير متوفر",
+   "ckb": "نەماوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "pre-order",
+   "ar": "طلب مسبق",
+   "ckb": "داواکاری پێشوەخت",
+   "source": "dictionary"
+  },
+  {
+   "en": "preorder",
+   "ar": "طلب مسبق",
+   "ckb": "داواکاری پێشوەخت",
+   "source": "dictionary"
+  },
+  {
+   "en": "bundle",
+   "ar": "باقة",
+   "ckb": "کۆمبۆ",
+   "source": "dictionary"
+  },
+  {
+   "en": "new",
+   "ar": "جديد",
+   "ckb": "نوێ",
+   "source": "dictionary"
+  },
+  {
+   "en": "new arrival",
+   "ar": "وصل حديثًا",
+   "ckb": "نوێ گەیشتوو",
+   "source": "dictionary"
+  },
+  {
+   "en": "special offer",
+   "ar": "عرض خاص",
+   "ckb": "ئۆفەری تایبەت",
+   "source": "dictionary"
+  },
+  {
+   "en": "best seller",
+   "ar": "الأكثر مبيعًا",
+   "ckb": "زۆرترین فرۆش",
+   "source": "dictionary"
+  },
+  {
+   "en": "free shipping",
+   "ar": "توصيل مجاني",
+   "ckb": "گەیاندنی بێبەرامبەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "accessories",
+   "ar": "الإكسسوارات",
+   "ckb": "ئێکسسوار",
+   "source": "dictionary"
+  },
+  {
+   "en": "spare parts",
+   "ar": "قطع غيار",
+   "ckb": "پارچەی یەدەگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "tools",
+   "ar": "أدوات",
+   "ckb": "ئامرازەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "model kit",
+   "ar": "طقم مجسم",
+   "ckb": "کیتی مۆدێل",
+   "source": "dictionary"
+  },
+  {
+   "en": "black",
+   "ar": "أسود",
+   "ckb": "ڕەش",
+   "source": "dictionary"
+  },
+  {
+   "en": "white",
+   "ar": "أبيض",
+   "ckb": "سپی",
+   "source": "dictionary"
+  },
+  {
+   "en": "red",
+   "ar": "أحمر",
+   "ckb": "سوور",
+   "source": "dictionary"
+  },
+  {
+   "en": "blue",
+   "ar": "أزرق",
+   "ckb": "شین",
+   "source": "dictionary"
+  },
+  {
+   "en": "green",
+   "ar": "أخضر",
+   "ckb": "سەوز",
+   "source": "dictionary"
+  },
+  {
+   "en": "yellow",
+   "ar": "أصفر",
+   "ckb": "زەرد",
+   "source": "dictionary"
+  },
+  {
+   "en": "orange",
+   "ar": "برتقالي",
+   "ckb": "پرتەقاڵی",
+   "source": "dictionary"
+  },
+  {
+   "en": "purple",
+   "ar": "بنفسجي",
+   "ckb": "مۆر",
+   "source": "dictionary"
+  },
+  {
+   "en": "pink",
+   "ar": "وردي",
+   "ckb": "پەمەیی",
+   "source": "dictionary"
+  },
+  {
+   "en": "grey",
+   "ar": "رمادي",
+   "ckb": "خۆڵەمێشی",
+   "source": "dictionary"
+  },
+  {
+   "en": "gray",
+   "ar": "رمادي",
+   "ckb": "خۆڵەمێشی",
+   "source": "dictionary"
+  },
+  {
+   "en": "silver",
+   "ar": "فضي",
+   "ckb": "زیوی",
+   "source": "dictionary"
+  },
+  {
+   "en": "gold",
+   "ar": "ذهبي",
+   "ckb": "زێڕین",
+   "source": "dictionary"
+  },
+  {
+   "en": "brown",
+   "ar": "بني",
+   "ckb": "قاوەیی",
+   "source": "dictionary"
+  },
+  {
+   "en": "transparent",
+   "ar": "شفاف",
+   "ckb": "ڕوون",
+   "source": "dictionary"
+  },
+  {
+   "en": "clear",
+   "ar": "شفاف",
+   "ckb": "ڕوون",
+   "source": "dictionary"
+  },
+  {
+   "en": "wood",
+   "ar": "خشب",
+   "ckb": "دار",
+   "source": "dictionary"
+  },
+  {
+   "en": "acrylic",
+   "ar": "أكريليك",
+   "ckb": "ئاکریلیک",
+   "source": "dictionary"
+  },
+  {
+   "en": "metal",
+   "ar": "معدن",
+   "ckb": "کانزا",
+   "source": "dictionary"
+  },
+  {
+   "en": "paper",
+   "ar": "ورق",
+   "ckb": "کاغەز",
+   "source": "dictionary"
+  },
+  {
+   "en": "sticker",
+   "ar": "ملصق",
+   "ckb": "ستیکەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "vinyl",
+   "ar": "فينيل",
+   "ckb": "ڤاینل",
+   "source": "dictionary"
+  },
+  {
+   "en": "yes",
+   "ar": "نعم",
+   "ckb": "بەڵێ",
+   "source": "dictionary"
+  },
+  {
+   "en": "no",
+   "ar": "لا",
+   "ckb": "نەخێر",
+   "source": "dictionary"
+  },
+  {
+   "en": "included",
+   "ar": "مشمول",
+   "ckb": "لەخۆدەگرێت",
+   "source": "dictionary"
+  },
+  {
+   "en": "not included",
+   "ar": "غير مشمول",
+   "ckb": "لەخۆناگرێت",
+   "source": "dictionary"
+  },
+  {
+   "en": "optional",
+   "ar": "اختياري",
+   "ckb": "ئارەزوومەندانە",
+   "source": "dictionary"
+  },
+  {
+   "en": "standard",
+   "ar": "قياسي",
+   "ckb": "ستاندارد",
+   "source": "dictionary"
+  },
+  {
+   "en": "supported",
+   "ar": "مدعوم",
+   "ckb": "پشتگیریکراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "not supported",
+   "ar": "غير مدعوم",
+   "ckb": "پشتگیری نەکراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "automatic",
+   "ar": "تلقائي",
+   "ckb": "خۆکار",
+   "source": "dictionary"
+  },
+  {
+   "en": "manual",
+   "ar": "يدوي",
+   "ckb": "دەستی",
+   "source": "dictionary"
+  },
+  {
+   "en": "small",
+   "ar": "صغير",
+   "ckb": "بچووک",
+   "source": "dictionary"
+  },
+  {
+   "en": "medium",
+   "ar": "متوسط",
+   "ckb": "ناوەند",
+   "source": "dictionary"
+  },
+  {
+   "en": "large",
+   "ar": "كبير",
+   "ckb": "گەورە",
+   "source": "dictionary"
+  },
+  {
+   "en": "left",
+   "ar": "يسار",
+   "ckb": "چەپ",
+   "source": "dictionary"
+  },
+  {
+   "en": "right",
+   "ar": "يمين",
+   "ckb": "ڕاست",
+   "source": "dictionary"
+  },
+  {
+   "en": "eu",
+   "ar": "الاتحاد الأوروبي",
+   "ckb": "یەکێتی ئەوروپا",
+   "source": "dictionary"
+  },
+  {
+   "en": "us",
+   "ar": "الولايات المتحدة",
+   "ckb": "ئەمریکا",
+   "source": "dictionary"
+  },
+  {
+   "en": "uk",
+   "ar": "المملكة المتحدة",
+   "ckb": "بەریتانیا",
+   "source": "dictionary"
+  },
+  {
+   "en": "power factor",
+   "ar": "معامل القدرة",
+   "ckb": "فاکتەری وزە",
+   "source": "dictionary"
+  },
+  {
+   "en": "power consumption",
+   "ar": "استهلاك الطاقة",
+   "ckb": "خەرجکردنی وزە",
+   "source": "dictionary"
+  },
+  {
+   "en": "typical printing power",
+   "ar": "القدرة أثناء الطباعة",
+   "ckb": "وزە لە کاتی چاپدا",
+   "source": "dictionary"
+  },
+  {
+   "en": "heated bed power",
+   "ar": "قدرة السرير الساخن",
+   "ckb": "وزەی بێدی گەرم",
+   "source": "dictionary"
+  },
+  {
+   "en": "standby power",
+   "ar": "قدرة وضع الانتظار",
+   "ckb": "وزە لە دۆخی چاوەڕوانیدا",
+   "source": "dictionary"
+  },
+  {
+   "en": "mains frequency",
+   "ar": "تردد الكهرباء",
+   "ckb": "فرێکوێنسی کارەبا",
+   "source": "dictionary"
+  },
+  {
+   "en": "mains voltage",
+   "ar": "جهد الشبكة",
+   "ckb": "ڤۆڵتاژی تۆڕ",
+   "source": "dictionary"
+  },
+  {
+   "en": "runtime",
+   "ar": "مدة التشغيل",
+   "ckb": "ماوەی کارکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "backup time",
+   "ar": "مدة الاحتياطي",
+   "ckb": "ماوەی یەدەگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "transfer time",
+   "ar": "زمن التحويل",
+   "ckb": "کاتی گۆڕینەوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "uninterruptible power supply",
+   "ar": "مزوّد طاقة غير منقطع",
+   "ckb": "دابینکەری وزەی نەپساوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "online ups",
+   "ar": "UPS أونلاين",
+   "ckb": "UPSی ئۆنلاین",
+   "source": "dictionary"
+  },
+  {
+   "en": "offline ups",
+   "ar": "UPS أوفلاين",
+   "ckb": "UPSی ئۆفلاین",
+   "source": "dictionary"
+  },
+  {
+   "en": "line-interactive ups",
+   "ar": "UPS أوفلاين تفاعلي",
+   "ckb": "UPSی ئۆفلاینی کارلێککەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "line interactive",
+   "ar": "تفاعلي مع الخط",
+   "ckb": "کارلێککەر لەگەڵ هێڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "line-interactive",
+   "ar": "تفاعلي مع الخط",
+   "ckb": "کارلێککەر لەگەڵ هێڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "double conversion",
+   "ar": "تحويل مزدوج",
+   "ckb": "گۆڕینی دووجارە",
+   "source": "dictionary"
+  },
+  {
+   "en": "battery backup",
+   "ar": "بطارية احتياطية",
+   "ckb": "باتریی یەدەگ",
+   "source": "dictionary"
+  },
+  {
+   "en": "voltage regulator",
+   "ar": "منظّم جهد",
+   "ckb": "ڕێکخەری ڤۆڵتاژ",
+   "source": "dictionary"
+  },
+  {
+   "en": "power cut",
+   "ar": "انقطاع الكهرباء",
+   "ckb": "بڕانی کارەبا",
+   "source": "dictionary"
+  },
+  {
+   "en": "laser",
+   "ar": "ليزر",
+   "ckb": "لەیزەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "laser source",
+   "ar": "مصدر الليزر",
+   "ckb": "سەرچاوەی لەیزەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "co2 laser",
+   "ar": "ليزر CO2",
+   "ckb": "لەیزەری CO2",
+   "source": "dictionary"
+  },
+  {
+   "en": "diode laser",
+   "ar": "ليزر دايود",
+   "ckb": "لەیزەری دایۆد",
+   "source": "dictionary"
+  },
+  {
+   "en": "infrared laser",
+   "ar": "ليزر تحت أحمر",
+   "ckb": "لەیزەری ژێرسوور",
+   "source": "dictionary"
+  },
+  {
+   "en": "fiber laser",
+   "ar": "ليزر فايبر",
+   "ckb": "لەیزەری فایبەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "laser power",
+   "ar": "قدرة الليزر",
+   "ckb": "وزەی لەیزەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "laser wavelength",
+   "ar": "الطول الموجي لليزر",
+   "ckb": "درێژی شەپۆلی لەیزەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "work area",
+   "ar": "مساحة العمل",
+   "ckb": "ڕووبەری کار",
+   "source": "dictionary"
+  },
+  {
+   "en": "max material thickness",
+   "ar": "أقصى سماكة للمادة",
+   "ckb": "زۆرترین ئەستووری کەرەستە",
+   "source": "dictionary"
+  },
+  {
+   "en": "engraving speed",
+   "ar": "سرعة الحفر",
+   "ckb": "خێرایی هەڵکۆڵین",
+   "source": "dictionary"
+  },
+  {
+   "en": "cutting speed",
+   "ar": "سرعة القص",
+   "ckb": "خێرایی بڕین",
+   "source": "dictionary"
+  },
+  {
+   "en": "positioning accuracy",
+   "ar": "دقة التموضع",
+   "ckb": "وردی دیاریکردنی شوێن",
+   "source": "dictionary"
+  },
+  {
+   "en": "auto focus",
+   "ar": "التركيز التلقائي",
+   "ckb": "فۆکەسی خۆکار",
+   "source": "dictionary"
+  },
+  {
+   "en": "rotary axis",
+   "ar": "المحور الدوّار",
+   "ckb": "تەوەری سووڕاوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "laser safety class",
+   "ar": "فئة أمان الليزر",
+   "ckb": "پۆلی سەلامەتی لەیزەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "fully enclosed",
+   "ar": "مغلق بالكامل",
+   "ckb": "تەواو داخراو",
+   "source": "dictionary"
+  },
+  {
+   "en": "open frame",
+   "ar": "هيكل مفتوح",
+   "ckb": "چوارچێوەی کراوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "open frame + optional enclosure",
+   "ar": "هيكل مفتوح + غطاء اختياري",
+   "ckb": "چوارچێوەی کراوە + داپۆشەری ئارەزوومەندانە",
+   "source": "dictionary"
+  },
+  {
+   "en": "fume extraction",
+   "ar": "شفط الأدخنة",
+   "ckb": "ڕاکێشانی دووکەڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "built-in filter",
+   "ar": "فلتر مدمج",
+   "ckb": "فلتەری ناوەکی",
+   "source": "dictionary"
+  },
+  {
+   "en": "exhaust fan + duct",
+   "ar": "مروحة شفط + خرطوم",
+   "ckb": "پەنکەی دەرکردن + لوولە",
+   "source": "dictionary"
+  },
+  {
+   "en": "external filter unit",
+   "ar": "وحدة فلترة خارجية",
+   "ckb": "یەکەی پاڵاوتنی دەرەکی",
+   "source": "dictionary"
+  },
+  {
+   "en": "emergency stop",
+   "ar": "زر الإيقاف الطارئ",
+   "ckb": "دوگمەی وەستانی خێرا",
+   "source": "dictionary"
+  },
+  {
+   "en": "flame detection",
+   "ar": "كشف اللهب",
+   "ckb": "دۆزینەوەی گڕ",
+   "source": "dictionary"
+  },
+  {
+   "en": "tilt detection",
+   "ar": "كشف الإمالة",
+   "ckb": "دۆزینەوەی لارکردن",
+   "source": "dictionary"
+  },
+  {
+   "en": "lid safety interlock",
+   "ar": "قفل أمان الغطاء",
+   "ckb": "قفڵی سەلامەتی داپۆشەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "laser accessory type",
+   "ar": "نوع ملحق الليزر",
+   "ckb": "جۆری پێداویستی لەیزەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "focal length",
+   "ar": "البعد البؤري",
+   "ckb": "درێژی فۆکەس",
+   "source": "dictionary"
+  },
+  {
+   "en": "filter rated life",
+   "ar": "العمر الافتراضي للفلتر",
+   "ckb": "تەمەنی پێشبینیکراوی فلتەر",
+   "source": "dictionary"
+  },
+  {
+   "en": "rotary max diameter",
+   "ar": "أقصى قطر للمحور الدوّار",
+   "ckb": "زۆرترین تیرەی تەوەری سووڕاوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "work surface size",
+   "ar": "مقاس سطح العمل",
+   "ckb": "قەبارەی ڕووی کار",
+   "source": "dictionary"
+  },
+  {
+   "en": "substrate",
+   "ar": "المادة الأساس",
+   "ckb": "کەرەستەی بنەڕەت",
+   "source": "dictionary"
+  },
+  {
+   "en": "plywood",
+   "ar": "خشب أبلكاش",
+   "ckb": "ئەبلەکاش",
+   "source": "dictionary"
+  },
+  {
+   "en": "leather",
+   "ar": "جلد",
+   "ckb": "چەرم",
+   "source": "dictionary"
+  },
+  {
+   "en": "fabric",
+   "ar": "قماش",
+   "ckb": "قوماش",
+   "source": "dictionary"
+  },
+  {
+   "en": "glass",
+   "ar": "زجاج",
+   "ckb": "شووشە",
+   "source": "dictionary"
+  },
+  {
+   "en": "stone",
+   "ar": "حجر",
+   "ckb": "بەرد",
+   "source": "dictionary"
+  },
+  {
+   "en": "sheet length",
+   "ar": "طول اللوح",
+   "ckb": "درێژی تەختە",
+   "source": "dictionary"
+  },
+  {
+   "en": "sheet width",
+   "ar": "عرض اللوح",
+   "ckb": "پانی تەختە",
+   "source": "dictionary"
+  },
+  {
+   "en": "sheet thickness",
+   "ar": "سماكة اللوح",
+   "ckb": "ئەستووری تەختە",
+   "source": "dictionary"
+  },
+  {
+   "en": "sheet weight",
+   "ar": "وزن اللوح",
+   "ckb": "کێشی تەختە",
+   "source": "dictionary"
+  },
+  {
+   "en": "sheets per pack",
+   "ar": "عدد الألواح في العبوة",
+   "ckb": "ژمارەی تەختە لە پاکێتدا",
+   "source": "dictionary"
+  },
+  {
+   "en": "coating",
+   "ar": "الطلاء",
+   "ckb": "ڕووپۆش",
+   "source": "dictionary"
+  },
+  {
+   "en": "engravable",
+   "ar": "قابل للحفر",
+   "ckb": "شیاوی هەڵکۆڵین",
+   "source": "dictionary"
+  },
+  {
+   "en": "cuttable",
+   "ar": "قابل للقص",
+   "ckb": "شیاوی بڕین",
+   "source": "dictionary"
+  },
+  {
+   "en": "adhesive backing",
+   "ar": "ظهر لاصق",
+   "ckb": "پشتی چەسپاو",
+   "source": "dictionary"
+  },
+  {
+   "en": "media format",
+   "ar": "شكل المادة",
+   "ckb": "شێوەی کەرەستە",
+   "source": "dictionary"
+  },
+  {
+   "en": "roll",
+   "ar": "لفة",
+   "ckb": "ڕۆڵ",
+   "source": "dictionary"
+  },
+  {
+   "en": "flat sheet",
+   "ar": "لوح مسطح",
+   "ckb": "تەختەی تەخت",
+   "source": "dictionary"
+  },
+  {
+   "en": "media width",
+   "ar": "عرض المادة",
+   "ckb": "پانی کەرەستە",
+   "source": "dictionary"
+  },
+  {
+   "en": "media length",
+   "ar": "طول المادة",
+   "ckb": "درێژی کەرەستە",
+   "source": "dictionary"
+  },
+  {
+   "en": "media thickness",
+   "ar": "سماكة المادة",
+   "ckb": "ئەستووری کەرەستە",
+   "source": "dictionary"
+  },
+  {
+   "en": "recommended blade depth",
+   "ar": "عمق الشفرة الموصى به",
+   "ckb": "قووڵایی پێشنیارکراوی تیغ",
+   "source": "dictionary"
+  },
+  {
+   "en": "backing liner",
+   "ar": "الورق الفاصل",
+   "ckb": "کاغەزی جیاکەرەوە",
+   "source": "dictionary"
+  },
+  {
+   "en": "weeding difficulty",
+   "ar": "صعوبة إزالة الزوائد",
+   "ckb": "ئاستەمی لابردنی زیادەکان",
+   "source": "dictionary"
+  },
+  {
+   "en": "easy",
+   "ar": "سهل",
+   "ckb": "ئاسان",
+   "source": "dictionary"
+  },
+  {
+   "en": "moderate",
+   "ar": "متوسط",
+   "ckb": "مامناوەند",
+   "source": "dictionary"
+  },
+  {
+   "en": "difficult",
+   "ar": "صعب",
+   "ckb": "ئەستەم",
+   "source": "dictionary"
+  },
+  {
+   "en": "Printing technology",
+   "ar": "تقنية الطباعة",
+   "ckb": "تەکنەلۆژیای چاپ",
+   "source": "spec:printing.technology"
+  },
+  {
+   "en": "Build volume",
+   "ar": "حجم الطباعة",
+   "ckb": "قەبارەی چاپ",
+   "source": "spec:printing.build_volume"
+  },
+  {
+   "en": "Layer height",
+   "ar": "ارتفاع الطبقة",
+   "ckb": "بەرزیی چین",
+   "source": "spec:printing.layer_height"
+  },
+  {
+   "en": "Build plate",
+   "ar": "صفيحة الطباعة",
+   "ckb": "پلێتی چاپ",
+   "source": "spec:printing.build_plate"
+  },
+  {
+   "en": "Supported filament",
+   "ar": "الخيوط المدعومة",
+   "ckb": "فیلامێنتە پشتگیریکراوەکان",
+   "source": "spec:printing.supported_filament"
+  },
+  {
+   "en": "Filament not supported",
+   "ar": "خيوط غير مدعومة",
+   "ckb": "فیلامێنتە پشتگیرینەکراوەکان",
+   "source": "spec:printing.unsupported_filament"
+  },
+  {
+   "en": "Monitoring camera",
+   "ar": "كاميرا المراقبة",
+   "ckb": "کامێرای چاودێری",
+   "source": "spec:printing.camera"
+  },
+  {
+   "en": "Toolhead camera",
+   "ar": "كاميرا رأس الطباعة",
+   "ckb": "کامێرای سەری چاپ",
+   "source": "spec:printing.camera_toolhead"
+  },
+  {
+   "en": "Nozzle camera",
+   "ar": "كاميرا النوزل",
+   "ckb": "کامێرای نۆزڵ",
+   "source": "spec:printing.camera_nozzle"
+  },
+  {
+   "en": "BirdsEye camera",
+   "ar": "كاميرا BirdsEye",
+   "ckb": "کامێرای BirdsEye",
+   "source": "spec:printing.camera_birdseye"
+  },
+  {
+   "en": "Filament run-out sensor",
+   "ar": "حساس نفاد الخيط",
+   "ckb": "هەستەوەری تەواوبوونی فیلامێنت",
+   "source": "spec:printing.filament_runout_sensor"
+  },
+  {
+   "en": "Filament odometry",
+   "ar": "قياس طول الخيط",
+   "ckb": "پێوانی درێژیی فیلامێنت",
+   "source": "spec:printing.filament_odometry"
+  },
+  {
+   "en": "Power loss recovery",
+   "ar": "الاستئناف بعد انقطاع الكهرباء",
+   "ckb": "بەردەوامبوونەوە دوای بڕانی کارەبا",
+   "source": "spec:printing.power_loss_recovery"
+  },
+  {
+   "en": "Filament tangle sensor",
+   "ar": "حساس تشابك الخيط",
+   "ckb": "هەستەوەری ئاڵۆزبوونی فیلامێنت",
+   "source": "spec:printing.filament_tangle_sensor"
+  },
+  {
+   "en": "Automatic bed levelling",
+   "ar": "التسوية التلقائية",
+   "ckb": "ڕێکخستنی خۆکاری پلێت",
+   "source": "spec:printing.auto_leveling"
+  },
+  {
+   "en": "Multi-colour printing",
+   "ar": "الطباعة متعددة الألوان",
+   "ckb": "چاپی فرەڕەنگ",
+   "source": "spec:printing.multi_color"
+  },
+  {
+   "en": "Max toolhead speed",
+   "ar": "أقصى سرعة لرأس الطباعة",
+   "ckb": "زۆرترین خێرایی سەری چاپ",
+   "source": "spec:motion.max_speed"
+  },
+  {
+   "en": "Max toolhead acceleration",
+   "ar": "أقصى تسارع لرأس الطباعة",
+   "ckb": "زۆرترین خێرابوونی سەری چاپ",
+   "source": "spec:motion.max_acceleration"
+  },
+  {
+   "en": "Max volumetric flow",
+   "ar": "أقصى معدل تدفق",
+   "ckb": "زۆرترین ڕێژەی ڕۆیشتن",
+   "source": "spec:motion.max_flow"
+  },
+  {
+   "en": "Max volumetric flow (high-flow hotend)",
+   "ar": "أقصى معدل تدفق مع رأس صهر عالي التدفق",
+   "ckb": "زۆرترین ڕێژەی ڕۆیشتن بە سەری تواندنەوەی ڕۆیشتنی بەرز",
+   "source": "spec:motion.max_flow_high_flow"
+  },
+  {
+   "en": "Hotend",
+   "ar": "رأس الصهر (Hotend)",
+   "ckb": "سەری تواندنەوە (Hotend)",
+   "source": "spec:extrusion.hotend"
+  },
+  {
+   "en": "Extruder gear",
+   "ar": "ترس الدافع",
+   "ckb": "چەرخی پاڵنەر",
+   "source": "spec:extrusion.extruder_gear"
+  },
+  {
+   "en": "Nozzle material",
+   "ar": "مادة النوزل",
+   "ckb": "کەرەستەی نۆزڵ",
+   "source": "spec:extrusion.nozzle_material"
+  },
+  {
+   "en": "Included nozzle diameter",
+   "ar": "قطر النوزل المرفق",
+   "ckb": "تیرەی نۆزڵی لەگەڵدا",
+   "source": "spec:extrusion.nozzle_diameter"
+  },
+  {
+   "en": "Supported nozzle diameters",
+   "ar": "أقطار النوزل المدعومة",
+   "ckb": "تیرەکانی نۆزڵی پشتگیریکراو",
+   "source": "spec:extrusion.supported_nozzle_diameters"
+  },
+  {
+   "en": "Filament diameter",
+   "ar": "قطر الخيط",
+   "ckb": "تیرەی فیلامێنت",
+   "source": "spec:extrusion.filament_diameter"
+  },
+  {
+   "en": "Extruder motor",
+   "ar": "محرك الدافع",
+   "ckb": "بزوێنەری پاڵنەر",
+   "source": "spec:extrusion.extruder_motor"
+  },
+  {
+   "en": "Max nozzle temperature",
+   "ar": "أقصى حرارة للنوزل",
+   "ckb": "زۆرترین پلەی گەرمیی نۆزڵ",
+   "source": "spec:thermal.max_nozzle_temp"
+  },
+  {
+   "en": "Max build plate temperature",
+   "ar": "أقصى حرارة لصفيحة الطباعة",
+   "ckb": "زۆرترین پلەی گەرمیی پلێتی چاپ",
+   "source": "spec:thermal.max_bed_temp"
+  },
+  {
+   "en": "Chamber temperature",
+   "ar": "حرارة حجرة الطباعة",
+   "ckb": "پلەی گەرمیی ژووری چاپ",
+   "source": "spec:thermal.chamber_temp"
+  },
+  {
+   "en": "Active chamber heating",
+   "ar": "تسخين نشط لحجرة الطباعة",
+   "ckb": "گەرمکردنی چالاکی ژووری چاپ",
+   "source": "spec:thermal.chamber_heating"
+  },
+  {
+   "en": "Heat deflection temperature",
+   "ar": "درجة حرارة الانحراف الحراري",
+   "ckb": "پلەی گەرمیی لاربوونەوە",
+   "source": "spec:thermal.heat_deflection_temp"
+  },
+  {
+   "en": "Vicat softening temperature",
+   "ar": "درجة حرارة تليّن فيكات",
+   "ckb": "پلەی نەرمبوونی ڤیکات",
+   "source": "spec:thermal.vicat_softening"
+  },
+  {
+   "en": "Melting temperature",
+   "ar": "درجة الانصهار",
+   "ckb": "پلەی توانەوە",
+   "source": "spec:thermal.melting_temp"
+  },
+  {
+   "en": "Glass transition temperature",
+   "ar": "درجة التحول الزجاجي",
+   "ckb": "پلەی گۆڕانی شووشەیی",
+   "source": "spec:thermal.glass_transition"
+  },
+  {
+   "en": "Voltage",
+   "ar": "الجهد الكهربائي",
+   "ckb": "ڤۆڵتیە",
+   "source": "spec:electrical.voltage"
+  },
+  {
+   "en": "Max power",
+   "ar": "أقصى قدرة",
+   "ckb": "زۆرترین توانا",
+   "source": "spec:electrical.max_power"
+  },
+  {
+   "en": "Rated power",
+   "ar": "القدرة المقدّرة",
+   "ckb": "توانای دیاریکراو",
+   "source": "spec:electrical.rated_power"
+  },
+  {
+   "en": "Current",
+   "ar": "التيار",
+   "ckb": "تەزوو",
+   "source": "spec:electrical.current"
+  },
+  {
+   "en": "Frequency",
+   "ar": "التردد",
+   "ckb": "لەرەلەر",
+   "source": "spec:electrical.frequency"
+  },
+  {
+   "en": "Battery",
+   "ar": "البطارية",
+   "ckb": "پاتری",
+   "source": "spec:electrical.battery"
+  },
+  {
+   "en": "Connector",
+   "ar": "الموصل",
+   "ckb": "گەیەنەر",
+   "source": "spec:electrical.connector"
+  },
+  {
+   "en": "Standby power",
+   "ar": "قدرة الاستعداد",
+   "ckb": "توانای چاوەڕوانی",
+   "source": "spec:electrical.standby_power"
+  },
+  {
+   "en": "Wi-Fi",
+   "ar": "الواي فاي",
+   "ckb": "وایفای",
+   "source": "spec:connectivity.wifi"
+  },
+  {
+   "en": "Bluetooth",
+   "ar": "البلوتوث",
+   "ckb": "بلووتووس",
+   "source": "spec:connectivity.bluetooth"
+  },
+  {
+   "en": "Storage",
+   "ar": "وسائط التخزين",
+   "ckb": "بیرگە",
+   "source": "spec:connectivity.storage"
+  },
+  {
+   "en": "Display",
+   "ar": "الشاشة",
+   "ckb": "شاشە",
+   "source": "spec:connectivity.display"
+  },
+  {
+   "en": "Interfaces",
+   "ar": "المنافذ",
+   "ckb": "دەرچەکان",
+   "source": "spec:connectivity.interface"
+  },
+  {
+   "en": "Chassis & shell",
+   "ar": "الهيكل والغلاف",
+   "ckb": "چوارچێوە و ڕووپۆش",
+   "source": "spec:physical.chassis"
+  },
+  {
+   "en": "Recommended space",
+   "ar": "المساحة الموصى بها",
+   "ckb": "ئەو شوێنەی پێشنیار دەکرێت",
+   "source": "spec:physical.recommended_space"
+  },
+  {
+   "en": "Noise level",
+   "ar": "مستوى الضجيج",
+   "ckb": "ئاستی دەنگەدەنگ",
+   "source": "spec:physical.noise"
+  },
+  {
+   "en": "Operating temperature",
+   "ar": "حرارة التشغيل",
+   "ckb": "پلەی گەرمیی کارکردن",
+   "source": "spec:physical.operating_temp"
+  },
+  {
+   "en": "Product length",
+   "ar": "طول المنتج",
+   "ckb": "درێژیی بەرهەم",
+   "source": "spec:product.length"
+  },
+  {
+   "en": "Product width",
+   "ar": "عرض المنتج",
+   "ckb": "پانیی بەرهەم",
+   "source": "spec:product.width"
+  },
+  {
+   "en": "Product height",
+   "ar": "ارتفاع المنتج",
+   "ckb": "بەرزیی بەرهەم",
+   "source": "spec:product.height"
+  },
+  {
+   "en": "Net weight",
+   "ar": "الوزن الصافي",
+   "ckb": "کێشی پوخت",
+   "source": "spec:product.net_weight"
+  },
+  {
+   "en": "Package weight",
+   "ar": "وزن العبوة",
+   "ckb": "کێشی پاکەت",
+   "source": "spec:package.weight"
+  },
+  {
+   "en": "Package length",
+   "ar": "طول العبوة",
+   "ckb": "درێژیی پاکەت",
+   "source": "spec:package.length"
+  },
+  {
+   "en": "Package width",
+   "ar": "عرض العبوة",
+   "ckb": "پانیی پاکەت",
+   "source": "spec:package.width"
+  },
+  {
+   "en": "Package height",
+   "ar": "ارتفاع العبوة",
+   "ckb": "بەرزیی پاکەت",
+   "source": "spec:package.height"
+  },
+  {
+   "en": "Package volume (m³)",
+   "ar": "حجم العبوة (م³)",
+   "ckb": "قەبارەی پاکەت (م³)",
+   "source": "spec:package.volume_m3"
+  },
+  {
+   "en": "Shipment gross weight",
+   "ar": "الوزن الإجمالي للشحنة",
+   "ckb": "کێشی گشتی بارەکە",
+   "source": "spec:shipment.gross_weight"
+  },
+  {
+   "en": "Pieces per carton",
+   "ar": "عدد القطع في الكرتونة",
+   "ckb": "ژمارەی پارچە لە کارتۆنێکدا",
+   "source": "spec:carton.pieces"
+  },
+  {
+   "en": "Carton length",
+   "ar": "طول الكرتونة",
+   "ckb": "درێژیی کارتۆن",
+   "source": "spec:carton.length"
+  },
+  {
+   "en": "Carton width",
+   "ar": "عرض الكرتونة",
+   "ckb": "پانیی کارتۆن",
+   "source": "spec:carton.width"
+  },
+  {
+   "en": "Carton height",
+   "ar": "ارتفاع الكرتونة",
+   "ckb": "بەرزیی کارتۆن",
+   "source": "spec:carton.height"
+  },
+  {
+   "en": "Carton weight",
+   "ar": "وزن الكرتونة",
+   "ckb": "کێشی کارتۆن",
+   "source": "spec:carton.weight"
+  },
+  {
+   "en": "In the box",
+   "ar": "محتويات العلبة",
+   "ckb": "ناوەڕۆکی سندوق",
+   "source": "spec:package.contents"
+  },
+  {
+   "en": "Material",
+   "ar": "نوع المادة",
+   "ckb": "جۆری کەرەستە",
+   "source": "spec:material.type"
+  },
+  {
+   "en": "Diameter",
+   "ar": "القطر",
+   "ckb": "تیرە",
+   "source": "spec:material.diameter"
+  },
+  {
+   "en": "Diameter tolerance",
+   "ar": "تفاوت القطر المسموح",
+   "ckb": "ڕێژەی جیاوازیی تیرە",
+   "source": "spec:material.diameter_tolerance"
+  },
+  {
+   "en": "Net weight",
+   "ar": "الوزن الصافي",
+   "ckb": "کێشی پوخت",
+   "source": "spec:material.net_weight"
+  },
+  {
+   "en": "Density",
+   "ar": "الكثافة",
+   "ckb": "چڕی",
+   "source": "spec:material.density"
+  },
+  {
+   "en": "Spool",
+   "ar": "نوع البكرة",
+   "ckb": "جۆری ماسوورە",
+   "source": "spec:material.spool_type"
+  },
+  {
+   "en": "Filament length",
+   "ar": "طول الخيط",
+   "ckb": "درێژیی فیلامێنت",
+   "source": "spec:material.length"
+  },
+  {
+   "en": "Tensile strength",
+   "ar": "مقاومة الشد",
+   "ckb": "بەرگەی ڕاکێشان",
+   "source": "spec:mechanical.tensile_strength"
+  },
+  {
+   "en": "Elongation at break",
+   "ar": "الاستطالة عند الكسر",
+   "ckb": "درێژبوونەوە لە کاتی شکاندا",
+   "source": "spec:mechanical.elongation_at_break"
+  },
+  {
+   "en": "Flexural strength",
+   "ar": "مقاومة الانحناء",
+   "ckb": "بەرگەی چەمانەوە",
+   "source": "spec:mechanical.flexural_strength"
+  },
+  {
+   "en": "Flexural modulus",
+   "ar": "معامل الانحناء",
+   "ckb": "هاوکۆلکەی چەمانەوە",
+   "source": "spec:mechanical.flexural_modulus"
+  },
+  {
+   "en": "Impact strength",
+   "ar": "مقاومة الصدمات",
+   "ckb": "بەرگەی لێدان",
+   "source": "spec:mechanical.impact_strength"
+  },
+  {
+   "en": "Hardness",
+   "ar": "الصلادة",
+   "ckb": "ڕەقی",
+   "source": "spec:mechanical.hardness"
+  },
+  {
+   "en": "Nozzle temperature",
+   "ar": "حرارة النوزل",
+   "ckb": "پلەی گەرمیی نۆزڵ",
+   "source": "spec:print_settings.nozzle_temp"
+  },
+  {
+   "en": "Build plate temperature",
+   "ar": "حرارة صفيحة الطباعة",
+   "ckb": "پلەی گەرمیی پلێتی چاپ",
+   "source": "spec:print_settings.bed_temp"
+  },
+  {
+   "en": "Print speed",
+   "ar": "سرعة الطباعة",
+   "ckb": "خێرایی چاپ",
+   "source": "spec:print_settings.print_speed"
+  },
+  {
+   "en": "Cooling fan speed",
+   "ar": "سرعة المروحة",
+   "ckb": "خێرایی پانکەی ساردکەرەوە",
+   "source": "spec:print_settings.fan_speed"
+  },
+  {
+   "en": "Recommended build plate",
+   "ar": "الصفيحة الموصى بها",
+   "ckb": "پلێتی پێشنیارکراو",
+   "source": "spec:print_settings.recommended_plate"
+  },
+  {
+   "en": "Drying temperature",
+   "ar": "حرارة التجفيف",
+   "ckb": "پلەی گەرمیی وشککردنەوە",
+   "source": "spec:drying.temperature"
+  },
+  {
+   "en": "Drying time",
+   "ar": "مدة التجفيف",
+   "ckb": "ماوەی وشککردنەوە",
+   "source": "spec:drying.time"
+  },
+  {
+   "en": "Certifications",
+   "ar": "الشهادات",
+   "ckb": "بڕوانامەکان",
+   "source": "spec:safety.certifications"
+  },
+  {
+   "en": "Filament slots",
+   "ar": "عدد فتحات الخيوط",
+   "ckb": "ژمارەی شوێنی فیلامێنت",
+   "source": "spec:ams.slots"
+  },
+  {
+   "en": "Max units per printer",
+   "ar": "أقصى عدد للوحدات",
+   "ckb": "زۆرترین ژمارەی یەکە بۆ هەر چاپکەرێک",
+   "source": "spec:ams.max_units"
+  },
+  {
+   "en": "Materials",
+   "ar": "المواد",
+   "ckb": "کەرەستەکان",
+   "source": "spec:part.material"
+  },
+  {
+   "en": "Colour",
+   "ar": "اللون",
+   "ckb": "ڕەنگ",
+   "source": "spec:part.color"
+  },
+  {
+   "en": "Nozzle diameter",
+   "ar": "قطر النوزل",
+   "ckb": "تیرەی نۆزڵ",
+   "source": "spec:nozzle.diameter"
+  },
+  {
+   "en": "Nozzle material",
+   "ar": "مادة النوزل",
+   "ckb": "کەرەستەی نۆزڵ",
+   "source": "spec:nozzle.material"
+  },
+  {
+   "en": "Compatibility",
+   "ar": "التوافق",
+   "ckb": "گونجاوی",
+   "source": "spec:compat.statement"
+  },
+  {
+   "en": "Model",
+   "ar": "الطراز",
+   "ckb": "مۆدێل",
+   "source": "spec:identity.model"
+  },
+  {
+   "en": "Series",
+   "ar": "السلسلة",
+   "ckb": "زنجیرە",
+   "source": "spec:identity.series"
+  },
+  {
+   "en": "Family",
+   "ar": "العائلة",
+   "ckb": "خێزان",
+   "source": "spec:identity.family"
+  },
+  {
+   "en": "Manufacturer's warranty note",
+   "ar": "ملاحظة ضمان من الشركة المصنّعة",
+   "ckb": "تێبینیی گەرەنتیی بەرهەمهێنەر",
+   "source": "spec:manufacturer_terms.warranty_note"
+  },
+  {
+   "en": "Option note",
+   "ar": "ملاحظة الخيار",
+   "ckb": "تێبینیی هەڵبژاردە",
+   "source": "spec:variant.note"
+  },
+  {
+   "en": "Electrical requirements",
+   "ar": "المتطلبات الكهربائية",
+   "ckb": "پێداویستییە کارەباییەکان",
+   "source": "spec:electrical.requirements"
+  },
+  {
+   "en": "Steady-state power",
+   "ar": "القدرة في التشغيل المستقر",
+   "ckb": "توانا لە کارکردنی جێگیردا",
+   "source": "spec:electrical.steady_state_power"
+  },
+  {
+   "en": "Main extruder gear",
+   "ar": "ترس الدافع الرئيسي",
+   "ckb": "چەرخی پاڵنەری سەرەکی",
+   "source": "spec:extrusion.main_extruder_gear"
+  },
+  {
+   "en": "Main extruder motor",
+   "ar": "محرك الدافع الرئيسي",
+   "ckb": "بزوێنەری پاڵنەری سەرەکی",
+   "source": "spec:extrusion.main_extruder_motor"
+  },
+  {
+   "en": "Auxiliary extruder gear",
+   "ar": "ترس الدافع المساعد",
+   "ckb": "چەرخی پاڵنەری یاریدەدەر",
+   "source": "spec:extrusion.aux_extruder_gear"
+  },
+  {
+   "en": "Auxiliary extruder motor",
+   "ar": "محرك الدافع المساعد",
+   "ckb": "بزوێنەری پاڵنەری یاریدەدەر",
+   "source": "spec:extrusion.aux_extruder_motor"
+  },
+  {
+   "en": "Main hotend filaments",
+   "ar": "خيوط رأس الصهر الرئيسي",
+   "ckb": "فیلامێنتەکانی سەری تواندنەوەی سەرەکی",
+   "source": "spec:printing.filament_main_hotend"
+  },
+  {
+   "en": "Auxiliary hotend filaments",
+   "ar": "خيوط رأس الصهر المساعد",
+   "ckb": "فیلامێنتەکانی سەری تواندنەوەی یاریدەدەر",
+   "source": "spec:printing.filament_aux_hotend"
+  },
+  {
+   "en": "Auxiliary hotend filaments (print with caution)",
+   "ar": "خيوط رأس الصهر المساعد (بحذر)",
+   "ckb": "فیلامێنتەکانی سەری تواندنەوەی یاریدەدەر (بە ئاگاییەوە)",
+   "source": "spec:printing.filament_aux_hotend_caution"
+  },
+  {
+   "en": "Working area",
+   "ar": "مساحة العمل",
+   "ckb": "ڕووبەری کار",
+   "source": "spec:printing.working_area"
+  },
+  {
+   "en": "Usable print size",
+   "ar": "مساحة الطباعة القابلة للاستخدام",
+   "ckb": "ڕووبەری چاپی بەکارهاتوو",
+   "source": "spec:printing.usable_print_size"
+  },
+  {
+   "en": "Included build plate",
+   "ar": "صفيحة الطباعة المرفقة",
+   "ckb": "پلێتی چاپی لەگەڵدا",
+   "source": "spec:printing.included_build_plate"
+  },
+  {
+   "en": "Build plate material",
+   "ar": "مادة صفيحة الطباعة",
+   "ckb": "کەرەستەی پلێتی چاپ",
+   "source": "spec:printing.build_plate_material"
+  },
+  {
+   "en": "Door sensor",
+   "ar": "حساس الباب",
+   "ckb": "هەستەوەری دەرگا",
+   "source": "spec:printing.door_sensor"
+  },
+  {
+   "en": "Filament cutter",
+   "ar": "قاطع الخيط",
+   "ckb": "بڕەری فیلامێنت",
+   "source": "spec:printing.filament_cutter"
+  },
+  {
+   "en": "Outer frame",
+   "ar": "الإطار الخارجي",
+   "ckb": "چوارچێوەی دەرەوە",
+   "source": "spec:physical.outer_frame"
+  },
+  {
+   "en": "Software",
+   "ar": "البرمجيات",
+   "ckb": "نەرمەکاڵا",
+   "source": "spec:connectivity.software"
+  },
+  {
+   "en": "Supported operating systems",
+   "ar": "أنظمة التشغيل المدعومة",
+   "ckb": "سیستەمە کارپێکەرە پشتگیریکراوەکان",
+   "source": "spec:connectivity.operating_systems"
+  },
+  {
+   "en": "Control interface",
+   "ar": "واجهة التحكم",
+   "ckb": "ڕووکاری کۆنترۆڵ",
+   "source": "spec:connectivity.control_interface"
+  },
+  {
+   "en": "Neural processing unit",
+   "ar": "وحدة المعالجة العصبية (NPU)",
+   "ckb": "یەکەی پرۆسێسکردنی دەماری (NPU)",
+   "source": "spec:connectivity.npu"
+  },
+  {
+   "en": "Motion controller",
+   "ar": "وحدة التحكم بالحركة",
+   "ckb": "کۆنترۆڵکەری جووڵە",
+   "source": "spec:connectivity.motion_controller"
+  },
+  {
+   "en": "Application processor",
+   "ar": "المعالج الرئيسي",
+   "ckb": "پرۆسێسەری سەرەکی",
+   "source": "spec:connectivity.application_processor"
+  },
+  {
+   "en": "Ethernet",
+   "ar": "منفذ إيثرنت",
+   "ckb": "ئیسەرنێت",
+   "source": "spec:connectivity.ethernet"
+  },
+  {
+   "en": "Wireless network",
+   "ar": "الشبكة اللاسلكية",
+   "ckb": "تۆڕی بێتەل",
+   "source": "spec:connectivity.wireless_network"
+  },
+  {
+   "en": "Network kill switch",
+   "ar": "مفتاح فصل الشبكة",
+   "ckb": "کلیلی پچڕاندنی تۆڕ",
+   "source": "spec:connectivity.network_kill_switch"
+  },
+  {
+   "en": "Removable network module",
+   "ar": "وحدة شبكة قابلة للإزالة",
+   "ckb": "مۆدیولی تۆڕی لابراو",
+   "source": "spec:connectivity.removable_network_module"
+  },
+  {
+   "en": "802.1X network access control",
+   "ar": "التحكم بالوصول إلى الشبكة (802.1X)",
+   "ckb": "کۆنترۆڵی چوونەناو تۆڕ (802.1X)",
+   "source": "spec:connectivity.network_access_control"
+  },
+  {
+   "en": "Part cooling fan",
+   "ar": "مروحة تبريد القطعة المطبوعة",
+   "ckb": "پانکەی ساردکردنەوەی پارچەی چاپکراو",
+   "source": "spec:thermal.part_cooling_fan"
+  },
+  {
+   "en": "Auxiliary part cooling fan",
+   "ar": "مروحة التبريد المساعدة",
+   "ckb": "پانکەی ساردکردنەوەی یاریدەدەر",
+   "source": "spec:thermal.aux_part_cooling_fan"
+  },
+  {
+   "en": "Hotend cooling fan",
+   "ar": "مروحة تبريد رأس الصهر",
+   "ckb": "پانکەی ساردکردنەوەی سەری تواندنەوە",
+   "source": "spec:thermal.hotend_fan"
+  },
+  {
+   "en": "Chamber heat circulation fan",
+   "ar": "مروحة تدوير حرارة الحجرة",
+   "ckb": "پانکەی سووڕاندنەوەی گەرمیی ژووری چاپ",
+   "source": "spec:thermal.chamber_circulation_fan"
+  },
+  {
+   "en": "Main control board fan",
+   "ar": "مروحة لوحة التحكم الرئيسية",
+   "ckb": "پانکەی تەختەی کۆنترۆڵی سەرەکی",
+   "source": "spec:thermal.control_board_fan"
+  },
+  {
+   "en": "Chamber exhaust fan",
+   "ar": "مروحة شفط هواء الحجرة",
+   "ckb": "پانکەی دەرکردنی هەوای ژووری چاپ",
+   "source": "spec:thermal.chamber_exhaust_fan"
+  },
+  {
+   "en": "Pre-filter grade",
+   "ar": "درجة المرشح الأولي",
+   "ckb": "پلەی فلتەری سەرەتایی",
+   "source": "spec:safety.prefilter_grade"
+  },
+  {
+   "en": "HEPA filter grade",
+   "ar": "درجة مرشح HEPA",
+   "ckb": "پلەی فلتەری HEPA",
+   "source": "spec:safety.hepa_grade"
+  },
+  {
+   "en": "Activated carbon filter type",
+   "ar": "نوع مرشح الكربون المنشّط",
+   "ckb": "جۆری فلتەری کاربۆنی چالاککراو",
+   "source": "spec:safety.carbon_filter"
+  },
+  {
+   "en": "VOC filtration",
+   "ar": "ترشيح المركبات العضوية المتطايرة (VOC)",
+   "ckb": "پاڵاوتنی پێکهاتە ئۆرگانییە بەهەڵمبووەکان (VOC)",
+   "source": "spec:safety.voc_filtration"
+  },
+  {
+   "en": "Particulate matter filtration",
+   "ar": "ترشيح الجسيمات الدقيقة",
+   "ckb": "پاڵاوتنی گەردیلە وردەکان",
+   "source": "spec:safety.particulate_filtration"
+  },
+  {
+   "en": "Shape",
+   "ar": "الشكل",
+   "ckb": "شێوە",
+   "source": "spec:part.shape"
+  },
+  {
+   "en": "Type",
+   "ar": "النوع",
+   "ckb": "جۆر",
+   "source": "spec:part.type"
+  },
+  {
+   "en": "Style",
+   "ar": "الطراز",
+   "ckb": "شێواز",
+   "source": "spec:part.style"
+  },
+  {
+   "en": "Feature",
+   "ar": "الميزة",
+   "ckb": "تایبەتمەندی",
+   "source": "spec:part.feature"
+  },
+  {
+   "en": "Surface treatment",
+   "ar": "المعالجة السطحية",
+   "ckb": "چارەسەری ڕووکار",
+   "source": "spec:part.surface_treatment"
+  },
+  {
+   "en": "Surface type",
+   "ar": "نوع السطح",
+   "ckb": "جۆری ڕووکار",
+   "source": "spec:part.surface_type"
+  },
+  {
+   "en": "Thread type",
+   "ar": "نوع السنّ",
+   "ckb": "جۆری پێچ",
+   "source": "spec:part.thread_type"
+  },
+  {
+   "en": "Screw type",
+   "ar": "نوع البرغي",
+   "ckb": "جۆری بورغی",
+   "source": "spec:part.screw_type"
+  },
+  {
+   "en": "Mounting hole shape",
+   "ar": "شكل فتحة الرأس",
+   "ckb": "شێوەی کونی سەری بورغی",
+   "source": "spec:part.drive_shape"
+  },
+  {
+   "en": "Fastener type",
+   "ar": "نوع أداة التثبيت",
+   "ckb": "جۆری بەستەر",
+   "source": "spec:part.fastener_type"
+  },
+  {
+   "en": "Pin type",
+   "ar": "نوع الدبوس",
+   "ckb": "جۆری پین",
+   "source": "spec:part.pin_type"
+  },
+  {
+   "en": "End shape",
+   "ar": "شكل الطرف",
+   "ckb": "شێوەی سەر",
+   "source": "spec:part.end_shape"
+  },
+  {
+   "en": "Mount type",
+   "ar": "طريقة التثبيت",
+   "ckb": "شێوازی دامەزراندن",
+   "source": "spec:part.mount_type"
+  },
+  {
+   "en": "Bearing type",
+   "ar": "نوع المحمل",
+   "ckb": "جۆری بێرینگ",
+   "source": "spec:part.bearing_type"
+  },
+  {
+   "en": "Bearing construction",
+   "ar": "بنية المحمل",
+   "ckb": "پێکهاتەی بێرینگ",
+   "source": "spec:part.bearing_construction"
+  },
+  {
+   "en": "Ball bearing profile",
+   "ar": "مقطع المحمل الكروي",
+   "ckb": "پرۆفایلی بێرینگی تۆپەڵەیی",
+   "source": "spec:part.ball_bearing_profile"
+  },
+  {
+   "en": "Inner and outer ring material",
+   "ar": "مادة الحلقتين الداخلية والخارجية",
+   "ckb": "کەرەستەی ئەڵقەی ناوەوە و دەرەوە",
+   "source": "spec:part.ring_material"
+  },
+  {
+   "en": "Cage material",
+   "ar": "مادة القفص",
+   "ckb": "کەرەستەی قەفەس",
+   "source": "spec:part.cage_material"
+  },
+  {
+   "en": "Ball type",
+   "ar": "نوع الكرات",
+   "ckb": "جۆری تۆپەڵەکان",
+   "source": "spec:part.ball_type"
+  },
+  {
+   "en": "Direction of magnetization",
+   "ar": "اتجاه المغنطة",
+   "ckb": "ئاراستەی موگناتیسکردن",
+   "source": "spec:part.magnetization"
+  },
+  {
+   "en": "Magnet grade",
+   "ar": "درجة المغناطيس",
+   "ckb": "پلەی موگناتیس",
+   "source": "spec:part.magnet_grade"
+  },
+  {
+   "en": "Front material",
+   "ar": "مادة الوجه الأمامي",
+   "ckb": "کەرەستەی ڕووی پێشەوە",
+   "source": "spec:part.front_material"
+  },
+  {
+   "en": "Back material",
+   "ar": "مادة الوجه الخلفي",
+   "ckb": "کەرەستەی ڕووی پشتەوە",
+   "source": "spec:part.back_material"
+  },
+  {
+   "en": "Handle material",
+   "ar": "مادة المقبض",
+   "ckb": "کەرەستەی دەسک",
+   "source": "spec:part.handle_material"
+  },
+  {
+   "en": "Teeth type",
+   "ar": "نوع الأسنان",
+   "ckb": "جۆری ددانەکان",
+   "source": "spec:part.teeth_type"
+  },
+  {
+   "en": "Thickness",
+   "ar": "السماكة",
+   "ckb": "ئەستووری",
+   "source": "spec:physical.thickness"
+  },
+  {
+   "en": "Pieces per pack",
+   "ar": "عدد القطع في العبوة",
+   "ckb": "ژمارەی پارچە لە هەر پاکەتێکدا",
+   "source": "spec:contents.pieces"
+  },
+  {
+   "en": "Capacity",
+   "ar": "السعة",
+   "ckb": "توانای گرتن",
+   "source": "spec:part.capacity"
+  },
+  {
+   "en": "Cable width",
+   "ar": "عرض الكابل",
+   "ckb": "پانیی کێبڵ",
+   "source": "spec:part.cable_width"
+  },
+  {
+   "en": "Lanyard circumference",
+   "ar": "محيط حبل التعليق",
+   "ckb": "دەوری پەتی هەڵواسین",
+   "source": "spec:part.lanyard_circumference"
+  },
+  {
+   "en": "Temperature range",
+   "ar": "نطاق درجة الحرارة",
+   "ckb": "مەودای پلەی گەرمی",
+   "source": "spec:part.temperature_range"
+  },
+  {
+   "en": "Max temperature",
+   "ar": "أقصى درجة حرارة",
+   "ckb": "زۆرترین پلەی گەرمی",
+   "source": "spec:part.max_temperature"
+  },
+  {
+   "en": "Humidity",
+   "ar": "الرطوبة",
+   "ckb": "شێ",
+   "source": "spec:part.humidity"
+  },
+  {
+   "en": "Expected life",
+   "ar": "العمر التشغيلي المتوقع",
+   "ckb": "تەمەنی کارکردنی چاوەڕوانکراو",
+   "source": "spec:part.expected_life"
+  },
+  {
+   "en": "Life cycle",
+   "ar": "العمر الافتراضي",
+   "ckb": "تەمەنی بەکارهێنان",
+   "source": "spec:part.life_cycle"
+  },
+  {
+   "en": "Rated speed",
+   "ar": "السرعة المقدّرة",
+   "ckb": "خێرایی دیاریکراو",
+   "source": "spec:part.rated_speed"
+  },
+  {
+   "en": "Max air flow",
+   "ar": "أقصى تدفق للهواء",
+   "ckb": "زۆرترین ڕۆیشتنی هەوا",
+   "source": "spec:part.max_air_flow"
+  },
+  {
+   "en": "Number of LEDs",
+   "ar": "عدد مصابيح LED",
+   "ckb": "ژمارەی گڵۆپە LEDەکان",
+   "source": "spec:part.led_count"
+  },
+  {
+   "en": "LED board type",
+   "ar": "نوع لوحة LED",
+   "ckb": "جۆری تەختەی LED",
+   "source": "spec:part.led_board_type"
+  },
+  {
+   "en": "Power source",
+   "ar": "مصدر الطاقة",
+   "ckb": "سەرچاوەی وزە",
+   "source": "spec:part.power_source"
+  },
+  {
+   "en": "Connection",
+   "ar": "طريقة الاتصال",
+   "ckb": "شێوازی پەیوەندی",
+   "source": "spec:part.connection"
+  },
+  {
+   "en": "External interface",
+   "ar": "المنفذ الخارجي",
+   "ckb": "دەرچەی دەرەکی",
+   "source": "spec:part.external_interface"
+  },
+  {
+   "en": "Compatible platforms",
+   "ar": "الأجهزة المتوافقة",
+   "ckb": "ئامێرە گونجاوەکان",
+   "source": "spec:part.platforms"
+  },
+  {
+   "en": "Sensor type",
+   "ar": "نوع الحساس",
+   "ckb": "جۆری هەستەوەر",
+   "source": "spec:part.sensor_type"
+  },
+  {
+   "en": "Buttons",
+   "ar": "الأزرار",
+   "ckb": "دوگمەکان",
+   "source": "spec:part.buttons"
+  },
+  {
+   "en": "DPI",
+   "ar": "دقة الماوس (DPI)",
+   "ckb": "وردیی ماوس (DPI)",
+   "source": "spec:part.dpi"
+  },
+  {
+   "en": "Rate of fire",
+   "ar": "معدل الإطلاق",
+   "ckb": "خێرایی تەقاندن",
+   "source": "spec:part.rate_of_fire"
+  },
+  {
+   "en": "Screen aspect ratio",
+   "ar": "نسبة أبعاد الشاشة",
+   "ckb": "ڕێژەی درێژی و پانیی شاشە",
+   "source": "spec:part.screen_ratio"
+  },
+  {
+   "en": "Rotating angle",
+   "ar": "زاوية الدوران",
+   "ckb": "گۆشەی سووڕانەوە",
+   "source": "spec:part.rotating_angle"
+  },
+  {
+   "en": "LCD type",
+   "ar": "نوع شاشة LCD",
+   "ckb": "جۆری شاشەی LCD",
+   "source": "spec:part.lcd_type"
+  },
+  {
+   "en": "Module power consumption",
+   "ar": "استهلاك الوحدة للطاقة",
+   "ckb": "بەکارهێنانی وزەی مۆدیول",
+   "source": "spec:part.module_power"
+  },
+  {
+   "en": "Recommended viewing direction",
+   "ar": "اتجاه الرؤية الموصى به",
+   "ckb": "ئاراستەی بینینی پێشنیارکراو",
+   "source": "spec:part.viewing_direction"
+  },
+  {
+   "en": "Backlight type",
+   "ar": "نوع الإضاءة الخلفية",
+   "ckb": "جۆری ڕووناکیی پشتەوە",
+   "source": "spec:part.backlight"
+  },
+  {
+   "en": "Viewing area (W × H)",
+   "ar": "مساحة العرض (العرض × الارتفاع)",
+   "ckb": "ڕووبەری بینین (پانی × بەرزی)",
+   "source": "spec:part.viewing_area"
+  },
+  {
+   "en": "Active area (W × H)",
+   "ar": "المساحة الفعّالة (العرض × الارتفاع)",
+   "ckb": "ڕووبەری چالاک (پانی × بەرزی)",
+   "source": "spec:part.active_area"
+  },
+  {
+   "en": "Resolution",
+   "ar": "الدقة",
+   "ckb": "ڕوونی",
+   "source": "spec:part.resolution"
+  },
+  {
+   "en": "Display colours",
+   "ar": "ألوان الشاشة",
+   "ckb": "ڕەنگەکانی شاشە",
+   "source": "spec:part.display_colours"
+  },
+  {
+   "en": "Contrast ratio",
+   "ar": "نسبة التباين",
+   "ckb": "ڕێژەی جیاوازیی ڕووناکی",
+   "source": "spec:part.contrast_ratio"
+  },
+  {
+   "en": "Surface luminance",
+   "ar": "سطوع السطح",
+   "ckb": "درەوشانەوەی ڕووکار",
+   "source": "spec:part.luminance"
+  },
+  {
+   "en": "Luminance uniformity",
+   "ar": "تجانس السطوع",
+   "ckb": "یەکسانیی درەوشانەوە",
+   "source": "spec:part.luminance_uniformity"
+  },
+  {
+   "en": "Viewing angle range",
+   "ar": "نطاق زاوية الرؤية",
+   "ckb": "مەودای گۆشەی بینین",
+   "source": "spec:part.viewing_angle"
+  },
+  {
+   "en": "Model & series",
+   "ar": "الطراز والسلسلة",
+   "ckb": "مۆدێل و زنجیرە",
+   "source": "group:identity"
+  },
+  {
+   "en": "Printing",
+   "ar": "الطباعة",
+   "ckb": "تایبەتمەندییەکانی چاپ",
+   "source": "group:printing"
+  },
+  {
+   "en": "Motion & speed",
+   "ar": "الحركة والسرعة",
+   "ckb": "جووڵە و خێرایی",
+   "source": "group:motion"
+  },
+  {
+   "en": "Extruder & hotend",
+   "ar": "البثق ورأس الطباعة",
+   "ckb": "پاڵنەر و سەری چاپ",
+   "source": "group:extrusion"
+  },
+  {
+   "en": "Nozzle",
+   "ar": "النوزل",
+   "ckb": "نۆزڵ",
+   "source": "group:nozzle"
+  },
+  {
+   "en": "Temperatures",
+   "ar": "درجات الحرارة",
+   "ckb": "پلەکانی گەرمی",
+   "source": "group:thermal"
+  },
+  {
+   "en": "Material",
+   "ar": "المادة",
+   "ckb": "کەرەستە",
+   "source": "group:material"
+  },
+  {
+   "en": "Print settings",
+   "ar": "إعدادات الطباعة",
+   "ckb": "ڕێکخستنەکانی چاپ",
+   "source": "group:print_settings"
+  },
+  {
+   "en": "Drying",
+   "ar": "التجفيف",
+   "ckb": "وشککردنەوە",
+   "source": "group:drying"
+  },
+  {
+   "en": "Mechanical properties",
+   "ar": "الخصائص الميكانيكية",
+   "ckb": "تایبەتمەندییە میکانیکییەکان",
+   "source": "group:mechanical"
+  },
+  {
+   "en": "Electrical",
+   "ar": "الكهرباء",
+   "ckb": "کارەبا",
+   "source": "group:electrical"
+  },
+  {
+   "en": "Connectivity & storage",
+   "ar": "الاتصال والتخزين",
+   "ckb": "پەیوەندیکردن و بیرگە",
+   "source": "group:connectivity"
+  },
+  {
+   "en": "Body & environment",
+   "ar": "الهيكل وبيئة التشغيل",
+   "ckb": "جەستە و ژینگەی کارکردن",
+   "source": "group:physical"
+  },
+  {
+   "en": "AMS",
+   "ar": "نظام AMS",
+   "ckb": "سیستەمی AMS",
+   "source": "group:ams"
+  },
+  {
+   "en": "Part",
+   "ar": "القطعة",
+   "ckb": "پارچە",
+   "source": "group:part"
+  },
+  {
+   "en": "Contents & quantity",
+   "ar": "المحتويات والكمية",
+   "ckb": "ناوەڕۆک و ژمارە",
+   "source": "group:contents"
+  },
+  {
+   "en": "Compatibility",
+   "ar": "التوافق",
+   "ckb": "گونجاوی لەگەڵ ئامێرەکان",
+   "source": "group:compat"
+  },
+  {
+   "en": "Safety & certifications",
+   "ar": "السلامة والشهادات",
+   "ckb": "سەلامەتی و بڕوانامەکان",
+   "source": "group:safety"
+  },
+  {
+   "en": "Option notes",
+   "ar": "ملاحظات الخيارات",
+   "ckb": "تێبینییەکانی هەڵبژاردە",
+   "source": "group:variant"
+  },
+  {
+   "en": "Other specifications",
+   "ar": "مواصفات أخرى",
+   "ckb": "تایبەتمەندییەکانی تر",
+   "source": "group:other"
+  },
+  {
+   "en": "Highlights",
+   "ar": "أبرز المزايا",
+   "ckb": "تایبەتمەندییە سەرەکییەکان",
+   "source": "block:highlights"
+  },
+  {
+   "en": "FAQ",
+   "ar": "الأسئلة الشائعة",
+   "ckb": "پرسیارە باوەکان",
+   "source": "block:faq"
+  },
+  {
+   "en": "Comparison",
+   "ar": "مقارنة",
+   "ckb": "بەراوردکردن",
+   "source": "block:comparison"
+  },
+  {
+   "en": "User manual",
+   "ar": "دليل الاستخدام",
+   "ckb": "ڕێبەری بەکارهێنان",
+   "source": "document:manual"
+  },
+  {
+   "en": "Quick start guide",
+   "ar": "دليل البدء السريع",
+   "ckb": "ڕێبەری دەستپێکی خێرا",
+   "source": "document:quick_start"
+  },
+  {
+   "en": "Installation guide",
+   "ar": "دليل التركيب",
+   "ckb": "ڕێبەری دامەزراندن",
+   "source": "document:installation"
+  },
+  {
+   "en": "Technical data sheet (TDS)",
+   "ar": "ورقة البيانات الفنية (TDS)",
+   "ckb": "پەڕەی زانیاری تەکنیکی (TDS)",
+   "source": "document:tds"
+  },
+  {
+   "en": "Safety data sheet (SDS)",
+   "ar": "ورقة بيانات السلامة (SDS)",
+   "ckb": "پەڕەی زانیاری سەلامەتی (SDS)",
+   "source": "document:sds"
+  },
+  {
+   "en": "Compliance certificate",
+   "ar": "شهادة مطابقة",
+   "ckb": "بڕوانامەی گونجان",
+   "source": "document:certificate"
+  },
+  {
+   "en": "Colour codes",
+   "ar": "رموز الألوان",
+   "ckb": "کۆدەکانی ڕەنگ",
+   "source": "document:hex_codes"
+  },
+  {
+   "en": "Specification sheet",
+   "ar": "ورقة المواصفات",
+   "ckb": "پەڕەی تایبەتمەندییەکان",
+   "source": "document:spec_sheet"
+  },
+  {
+   "en": "Bambu Lab Wiki",
+   "ar": "ويكي Bambu Lab",
+   "ckb": "ویکی Bambu Lab",
+   "source": "document:wiki"
+  },
+  {
+   "en": "FAQ",
+   "ar": "الأسئلة الشائعة",
+   "ckb": "پرسیارە باوەکان",
+   "source": "document:faq"
+  },
+  {
+   "en": "Guide",
+   "ar": "دليل",
+   "ckb": "ڕێبەر",
+   "source": "document:guide"
+  },
+  {
+   "en": "Video",
+   "ar": "فيديو",
+   "ckb": "ڤیدیۆ",
+   "source": "document:video"
+  },
+  {
+   "en": "Model file",
+   "ar": "ملف نموذج",
+   "ckb": "فایلی مۆدێل",
+   "source": "document:model_file"
+  },
+  {
+   "en": "Link",
+   "ar": "رابط",
+   "ckb": "بەستەر",
+   "source": "document:other"
+  },
+  {
+   "en": "Not in the sources checked",
+   "ar": "غير متوفر في المصادر التي رُوجعت",
+   "ckb": "لەو سەرچاوانەی پشکنران نییە",
+   "source": "state:not_found"
+  },
+  {
+   "en": "Not published by the manufacturer",
+   "ar": "لم تنشره الشركة المصنّعة",
+   "ckb": "لەلایەن بەرهەمهێنەرەوە بڵاو نەکراوەتەوە",
+   "source": "state:not_published"
+  },
+  {
+   "en": "Not applicable",
+   "ar": "لا ينطبق",
+   "ckb": "پەیوەندی پێوە نییە",
+   "source": "state:not_applicable"
+  },
+  {
+   "en": "Not available",
+   "ar": "غير متوفر",
+   "ckb": "بەردەست نییە",
+   "source": "state:unknown"
+  },
+  {
+   "en": "Unverified",
+   "ar": "غير مؤكَّد",
+   "ckb": "پشتڕاست نەکراوەتەوە",
+   "source": "state:unverified"
+  },
+  {
+   "en": "Black",
+   "ar": "أسود",
+   "ckb": "ڕەش",
+   "source": "colour:black"
+  },
+  {
+   "en": "White",
+   "ar": "أبيض",
+   "ckb": "سپی",
+   "source": "colour:white"
+  },
+  {
+   "en": "Grey",
+   "ar": "رمادي",
+   "ckb": "خۆڵەمێشی",
+   "source": "colour:grey"
+  },
+  {
+   "en": "Red",
+   "ar": "أحمر",
+   "ckb": "سوور",
+   "source": "colour:red"
+  },
+  {
+   "en": "Orange",
+   "ar": "برتقالي",
+   "ckb": "پرتەقاڵی",
+   "source": "colour:orange"
+  },
+  {
+   "en": "Yellow",
+   "ar": "أصفر",
+   "ckb": "زەرد",
+   "source": "colour:yellow"
+  },
+  {
+   "en": "Green",
+   "ar": "أخضر",
+   "ckb": "سەوز",
+   "source": "colour:green"
+  },
+  {
+   "en": "Blue",
+   "ar": "أزرق",
+   "ckb": "شین",
+   "source": "colour:blue"
+  },
+  {
+   "en": "Purple",
+   "ar": "بنفسجي",
+   "ckb": "مۆر",
+   "source": "colour:purple"
+  },
+  {
+   "en": "Pink",
+   "ar": "وردي",
+   "ckb": "پەمەیی",
+   "source": "colour:pink"
+  },
+  {
+   "en": "Brown",
+   "ar": "بني",
+   "ckb": "قاوەیی",
+   "source": "colour:brown"
+  },
+  {
+   "en": "Beige",
+   "ar": "بيج",
+   "ckb": "بێژ",
+   "source": "colour:beige"
+  },
+  {
+   "en": "Gold",
+   "ar": "ذهبي",
+   "ckb": "زێڕین",
+   "source": "colour:gold"
+  },
+  {
+   "en": "Silver",
+   "ar": "فضي",
+   "ckb": "زیوی",
+   "source": "colour:silver"
+  },
+  {
+   "en": "Transparent",
+   "ar": "شفاف",
+   "ckb": "ڕوون",
+   "source": "colour:transparent"
+  },
+  {
+   "en": "Multicolour",
+   "ar": "متعدد الألوان",
+   "ckb": "فرەڕەنگ",
+   "source": "colour:multicolour"
+  },
+  {
+   "en": "Factory-refurbished printers",
+   "ar": "طابعات مجدَّدة من المصنع",
+   "ckb": "چاپکەرە نوێکراوەکانی کارگە",
+   "source": "section:factory-refurbished-printers"
+  },
+  {
+   "en": "AMS & filament feeding",
+   "ar": "أنظمة تغذية المواد (AMS)",
+   "ckb": "سیستەمەکانی پێدانی کەرەستە (AMS)",
+   "source": "section:ams-filament-feeding"
+  },
+  {
+   "en": "Printer accessories & add-ons",
+   "ar": "ملحقات وإضافات الطابعات",
+   "ckb": "پێداویستی و زیادکراوەکانی چاپکەر",
+   "source": "section:printer-accessories-add-ons"
+  },
+  {
+   "en": "ABS & ASA",
+   "ar": "ABS وASA",
+   "ckb": "ABS و ASA",
+   "source": "section:abs-asa"
+  },
+  {
+   "en": "Engineering materials",
+   "ar": "مواد هندسية",
+   "ckb": "کەرەستەی ئەندازیاری",
+   "source": "section:engineering-materials"
+  },
+  {
+   "en": "Support materials",
+   "ar": "مواد الدعم",
+   "ckb": "کەرەستەی پاڵپشت",
+   "source": "section:support-materials"
+  },
+  {
+   "en": "Fibre-reinforced",
+   "ar": "مواد مقوّاة بالألياف",
+   "ckb": "کەرەستەی بەهێزکراو بە ڕیشاڵ",
+   "source": "section:fibre-reinforced"
+  },
+  {
+   "en": "Filament packs & bundles",
+   "ar": "باقات ومجموعات الفلامنت",
+   "ckb": "پاکێج و کۆمەڵەکانی فیلامێنت",
+   "source": "section:filament-packs-bundles"
+  },
+  {
+   "en": "Filament accessories",
+   "ar": "ملحقات الفلامنت",
+   "ckb": "پێداویستی فیلامێنت",
+   "source": "section:filament-accessories"
+  },
+  {
+   "en": "X1 & P1 series parts",
+   "ar": "قطع غيار سلسلة X1 وP1",
+   "ckb": "پارچە یەدەگەکانی زنجیرەی X1 و P1",
+   "source": "section:x1-p1-series-parts"
+  },
+  {
+   "en": "A1 & A2L series parts",
+   "ar": "قطع غيار سلسلة A1 وA2L",
+   "ckb": "پارچە یەدەگەکانی زنجیرەی A1 و A2L",
+   "source": "section:a1-a2l-series-parts"
+  },
+  {
+   "en": "H2 series parts",
+   "ar": "قطع غيار سلسلة H2",
+   "ckb": "پارچە یەدەگەکانی زنجیرەی H2",
+   "source": "section:h2-series-parts"
+  },
+  {
+   "en": "P2S & X2D parts",
+   "ar": "قطع غيار P2S وX2D",
+   "ckb": "پارچە یەدەگەکانی P2S و X2D",
+   "source": "section:p2s-x2d-parts"
+  },
+  {
+   "en": "AMS parts",
+   "ar": "قطع غيار AMS",
+   "ckb": "پارچە یەدەگەکانی AMS",
+   "source": "section:ams-parts"
+  },
+  {
+   "en": "R1 laser parts",
+   "ar": "قطع غيار ليزر R1",
+   "ckb": "پارچە یەدەگەکانی لەیزەری R1",
+   "source": "section:r1-laser-parts"
+  },
+  {
+   "en": "Parts for all series",
+   "ar": "قطع صيانة لكل السلاسل",
+   "ckb": "پارچەی چاککردنەوە بۆ هەموو زنجیرەکان",
+   "source": "section:parts-for-all-series"
+  },
+  {
+   "en": "Bundles & kits",
+   "ar": "الحزم والمجموعات",
+   "ckb": "کۆمەڵە و پاکێجەکان",
+   "source": "section:bundles-kits"
+  },
+  {
+   "en": "acrylic",
+   "ar": "اكريليك",
+   "ckb": "ئاکریلیک",
+   "source": "search_synonym"
+  },
+  {
+   "en": "cf",
+   "ar": "الياف كربون",
+   "ckb": "ڕیشاڵی کاربۆن",
+   "source": "search_synonym"
+  },
+  {
+   "en": "cyberbrick",
+   "ar": "سايبر بريك",
+   "ckb": "سایبەربریک",
+   "source": "search_synonym"
+  },
+  {
+   "en": "fan",
+   "ar": "مروحة",
+   "ckb": "پانکە",
+   "source": "search_synonym"
+  },
+  {
+   "en": "gf",
+   "ar": "الياف زجاج",
+   "ckb": "ڕیشاڵی شووشە",
+   "source": "search_synonym"
+  },
+  {
+   "en": "hotend",
+   "ar": "هوت اند",
+   "ckb": "هۆتئێند",
+   "source": "search_synonym"
+  },
+  {
+   "en": "laser",
+   "ar": "ليزر",
+   "ckb": "لەیزەر",
+   "source": "search_synonym"
+  },
+  {
+   "en": "magnet",
+   "ar": "مغناطيس",
+   "ckb": "موگناتیس",
+   "source": "search_synonym"
+  },
+  {
+   "en": "motor",
+   "ar": "محرك",
+   "ckb": "بزوێنەر",
+   "source": "search_synonym"
+  },
+  {
+   "en": "plate",
+   "ar": "صفيحة طباعة",
+   "ckb": "پلێتی چاپ",
+   "source": "search_synonym"
+  },
+  {
+   "en": "refill",
+   "ar": "عبوة بدون بكرة",
+   "ckb": "پڕکردنەوە",
+   "source": "search_synonym"
+  },
+  {
+   "en": "screw",
+   "ar": "براغي",
+   "ckb": "بڕغی",
+   "source": "search_synonym"
+  },
+  {
+   "en": "series",
+   "ar": "سلسلة",
+   "ckb": "زنجیرە",
+   "source": "search_synonym"
+  },
+  {
+   "en": "spool",
+   "ar": "مع بكرة",
+   "ckb": "ماسوورە",
+   "source": "search_synonym"
+  },
+  {
+   "en": "support",
+   "ar": "دعامات",
+   "ckb": "پاڵپشت",
+   "source": "search_synonym"
+  },
+  {
+   "en": "vinyl",
+   "ar": "فينيل",
+   "ckb": "ڤاینل",
+   "source": "search_synonym"
+  }
+ ]
+}

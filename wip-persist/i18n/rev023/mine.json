@@ -1,0 +1,287 @@
+[
+ {
+  "i": 0,
+  "h": "537dd19f4132442dd2722313abd8146607101497e206050ae7bcdbf258e2d769",
+  "en": "Bambu PLA Pure",
+  "ar": "Bambu PLA Pure",
+  "ckb": "Bambu PLA Pure",
+  "keep": true
+ },
+ {
+  "i": 6,
+  "h": "ebe24517949b1d7c1d1157f7ca85853751b1675163c512d5520e3b8f6b5a0619",
+  "en": "Content Block-3",
+  "ar": "Content Block-3",
+  "ckb": "Content Block-3",
+  "keep": true
+ },
+ {
+  "i": 12,
+  "h": "0d0fb872ce3108296d85b46ca24175f42f947d9d30e7f1d57a79052a6905855f",
+  "en": "Bambu PLA Pure has passed testing against applicable requirements of Commission Regulation (EU) No 10/2011, the European Union's regulation on plastics intended to come into contact with food. That purity is what makes PLA Pure right for the things you use most: kids' toys, household tools, and the small objects that live close to your hands.",
+  "ar": "اجتاز Bambu PLA Pure الاختبارات وفق المتطلبات المعمول بها في لائحة المفوضية (EU) No 10/2011، وهي لائحة الاتحاد الأوروبي الخاصة بالمواد البلاستيكية المعدّة لملامسة الطعام. وهذا النقاء هو ما يجعل PLA Pure مناسبًا للأشياء التي تستخدمها أكثر من غيرها: ألعاب الأطفال، والأدوات المنزلية، والأشياء الصغيرة التي تبقى قريبة من يديك.",
+  "ckb": "Bambu PLA Pure تاقیکردنەوەی بەپێی پێداویستییە پەیوەندیدارەکانی ڕێسای کۆمیسیۆن (EU) No 10/2011 تێپەڕاندووە، کە ڕێسای یەکێتیی ئەوروپایە بۆ ئەو پلاستیکانەی بۆ بەرکەوتن لەگەڵ خۆراک دروستکراون. هەر ئەم پاکییەیە کە PLA Pure گونجاو دەکات بۆ ئەو شتانەی زۆرترین بەکاریان دەهێنیت: یاریی منداڵان، ئامرازەکانی ماڵەوە، و ئەو شتە بچووکانەی هەمیشە نزیکی دەستتن."
+ },
+ {
+  "i": 18,
+  "h": "e314510b781b5b64ceafedf72996ea8b0c232dfd147440ab5587a125e93ec68a",
+  "en": "Content Block-7",
+  "ar": "Content Block-7",
+  "ckb": "Content Block-7",
+  "keep": true
+ },
+ {
+  "i": 24,
+  "h": "cccd520ad224d25b6b58d9a7578e688ffa7ce376a5cb6749a08aa1b0eb87d8e6",
+  "en": "Bambu PLA Pure is specifically developed for FDM 3D printing with both emission safety and contact safety in mind. When used with its default profile, it delivers excellent print quality and supports contact-safe performance. Because real-world use can vary across environments, conditions, and workflows, applications requiring a higher level of contact safety should follow additional guidance.",
+  "ar": "طُوِّر Bambu PLA Pure خصيصًا للطباعة 3D بتقنية FDM مع مراعاة سلامة الانبعاثات وسلامة الملامسة معًا. وعند استخدامه مع ملف الإعدادات الافتراضي، يقدّم جودة طباعة ممتازة ويدعم أداءً آمنًا عند الملامسة. ولأن الاستخدام الفعلي قد يختلف باختلاف البيئات والظروف وطرق العمل، فإن الاستخدامات التي تتطلب مستوى أعلى من سلامة الملامسة يجب أن تتبع إرشادات إضافية.",
+  "ckb": "Bambu PLA Pure بە تایبەتی بۆ چاپی 3D بە تەکنیکی FDM پەرەی پێدراوە، بە ڕەچاوکردنی هەم سەلامەتیی دەردان و هەم سەلامەتیی بەرکەوتن. کاتێک لەگەڵ پرۆفایلی بنەڕەتییەکەی بەکاربهێنرێت، جۆرایەتیی چاپی نایاب دەدات و پشتگیریی کارکردنی سەلامەت لە کاتی بەرکەوتندا دەکات. لەبەر ئەوەی بەکارهێنانی ڕاستەقینە بەپێی ژینگە، بارودۆخ و شێوازی کارکردن جیاواز دەبێت، ئەو بەکارهێنانانەی ئاستێکی بەرزتری سەلامەتیی بەرکەوتنیان پێویستە دەبێت ڕێنمایی زیاتر پەیڕەو بکەن."
+ },
+ {
+  "i": 30,
+  "h": "c3a3a7fd886810ee088d2b364ba04dc22cf9b38726de0d35ce3471301d2b0036",
+  "en": "For opened filament, we recommend drying it before use according to the Wiki’s recommended temperature and time settings.",
+  "ar": "بالنسبة للفلامنت المفتوح، نوصي بتجفيفه قبل الاستخدام وفق إعدادات درجة الحرارة والمدة الموصى بها في الويكي.",
+  "ckb": "بۆ فیلامێنتی کراوە، پێشنیار دەکەین پێش بەکارهێنان وشکی بکەیتەوە بەپێی ڕێکخستنەکانی پلەی گەرمی و ماوەی پێشنیارکراو لە ویکی."
+ },
+ {
+  "i": 36,
+  "h": "713e16e692ba1f7f844f32f15bcad285e100ad613c57dcc50f484e976ab67bcc",
+  "en": "Five ingredients, each has passed EU food-contact testing",
+  "ar": "خمسة مكوّنات، اجتاز كلٌّ منها اختبارات الاتحاد الأوروبي لملامسة الطعام",
+  "ckb": "پێنج پێکهاتە، هەریەکەیان تاقیکردنەوەی بەرکەوتنی خۆراکی یەکێتیی ئەوروپای تێپەڕاندووە"
+ },
+ {
+  "i": 42,
+  "h": "704222483c9b265297032c2da89a64224cba3a1dd3e72a1b738cfaab57ad7748",
+  "en": "Bambu PLA Basic, the easiest-to-use filament, delivers smooth and reliable printing right from the start. No complicated setups or calibrations required. Ideal for both hobbyists and professionals seeking dependable, hassle-free results.",
+  "ar": "Bambu PLA Basic، الفلامنت الأسهل استخدامًا، يمنحك طباعة سلسة وموثوقة منذ البداية. لا حاجة إلى إعدادات أو معايرات معقّدة. مثالي للهواة والمحترفين على حدّ سواء ممن يبحثون عن نتائج موثوقة وخالية من المتاعب.",
+  "ckb": "Bambu PLA Basic، ئاسانترین فیلامێنت بۆ بەکارهێنان، هەر لە سەرەتاوە چاپێکی ڕێک و متمانەپێکراو دەدات. پێویستی بە ڕێکخستن یان کالیبرەکردنی ئاڵۆز نییە. گونجاوترینە بۆ هەم خولیاپەرستان و هەم پسپۆڕان کە بەدوای ئەنجامی متمانەپێکراو و بێ گرفتدا دەگەڕێن."
+ },
+ {
+  "i": 48,
+  "h": "42e7e5c45cbac014a52e20d990772226ed5469e84e787dadb9192789a7d2d4eb",
+  "en": "For AMS: Use with Bambu Reusable Spool. Refer to the guide on WIKI",
+  "ar": "لنظام AMS: استخدمه مع Bambu Reusable Spool. راجع الدليل على الويكي",
+  "ckb": "بۆ AMS: لەگەڵ Bambu Reusable Spool بەکاری بهێنە. سەیری ڕێبەرەکە بکە لە ویکی"
+ },
+ {
+  "i": 54,
+  "h": "bd0125f86c3e1573cd38ce1bfec759c9d00e3b25b166909360438c892b143597",
+  "en": "PETG that prints like PLA",
+  "ar": "PETG يُطبع مثل PLA",
+  "ckb": "PETG کە وەک PLA چاپ دەکرێت"
+ },
+ {
+  "i": 60,
+  "h": "0db5c78d513e433e1b5f0efdf8b53afb387612bd1eb7b8a86aee610a0aae8b52",
+  "en": "Tough enough to earn the name",
+  "ar": "متين بما يكفي ليستحق اسمه",
+  "ckb": "ئەوەندە پتەوە کە شایەنی ناوەکەی بێت"
+ },
+ {
+  "i": 66,
+  "h": "692cb28ce697ae9633efcce86ba567a980e0a4bdf0838a247940801fc862feef",
+  "en": "Dry the filament before printing if it has been exposed to humidity above 50% RH for more than 72 hours. For more details, please refer to: Filament drying instructions on WIKI.",
+  "ar": "جفّف الفلامنت قبل الطباعة إذا تعرّض لرطوبة تزيد على 50% RH لأكثر من 72 ساعة. لمزيد من التفاصيل، يرجى الرجوع إلى: تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "ئەگەر فیلامێنتەکە زیاتر لە 72 کاتژمێر بەر شێی سەروو 50% RH کەوتبێت، پێش چاپکردن وشکی بکەرەوە. بۆ وردەکاریی زیاتر، تکایە سەیری ئەمە بکە: ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی."
+ },
+ {
+  "i": 72,
+  "h": "84e1a5851d1a4477fe9ba278289dcb9c2d3ab4a74ab1ea2f12aa3fdb2a42ba57",
+  "en": "Easy Printing with Reduced Stringing",
+  "ar": "طباعة سهلة مع تخييط أقل",
+  "ckb": "چاپی ئاسان لەگەڵ دەزووبەستنی کەمتر"
+ },
+ {
+  "i": 78,
+  "h": "32066a9dcd6db4687ad7a6dbae40ccdd4452a26e187aa53ebbeaddd61c299ad3",
+  "en": "Quantity: 12 pcs",
+  "ar": "الكمية: 12 قطعة",
+  "ckb": "بڕ: 12 دانە"
+ },
+ {
+  "i": 84,
+  "h": "334f1465995e8a7457453e3e6f93d293cd5f4b89fbe3f28e998f44ed3c50aeed",
+  "en": "Made for Pumpkin-Themed Prints: Ideal for creating pumpkin decorations and other Halloween-inspired display pieces.",
+  "ar": "مصمَّم لمطبوعات بطابع اليقطين: مثالي لصنع زينة اليقطين وغيرها من قطع العرض المستوحاة من الهالوين.",
+  "ckb": "بۆ چاپی بە شێوازی کولەکە دروستکراوە: گونجاوترینە بۆ دروستکردنی ڕازاندنەوەی کولەکە و پارچەی نمایشیی تری ئیلهامگرتوو لە هالۆوین."
+ },
+ {
+  "i": 90,
+  "h": "e8d80c67366b1360438dc6c35ab16bae1e382e08207fb33a36fb5834b2955d4c",
+  "en": "Quantity: 1 pcs",
+  "ar": "الكمية: 1 قطعة",
+  "ckb": "بڕ: 1 دانە"
+ },
+ {
+  "i": 96,
+  "h": "5e7555ec3465fa06b4a507a17c793f66b10ced29f0b7bbe69cd406169e23b74c",
+  "en": "Create Atmospheric Scenes: Combine the contrasting Black and White filaments with the MH001 Kit to build a distinctive haunted house display.",
+  "ar": "اصنع مشاهد ذات أجواء مميزة: اجمع بين فلامنت Black وWhite المتباينين وطقم MH001 لبناء مجسّم عرض مميز لبيت مسكون.",
+  "ckb": "دیمەنی پڕ لە کەشوهەوا دروست بکە: فیلامێنتە دژبەیەکەکانی Black و White لەگەڵ کیتی MH001 تێکەڵ بکە بۆ دروستکردنی نمایشێکی جیاوازی خانووی تارماییدار."
+ },
+ {
+  "i": 102,
+  "h": "b5a18877572690e7e7291980e5ebbb0619495a5770ba11364f9ce12e0f440af0",
+  "en": "2. Tested with PLA Basic, 15% infill, 300x300x300mm cube.",
+  "ar": "2. تم الاختبار باستخدام PLA Basic، وحشوة داخلية 15%، ومكعب 300x300x300mm.",
+  "ckb": "2. تاقیکراوەتەوە بە PLA Basic، پڕکەرەوەی ناوەوەی 15%، و کیوبی 300x300x300mm."
+ },
+ {
+  "i": 108,
+  "h": "2a7db3885429be34f9770cbc2285c413903d4096517de99c0d90822530042fa0",
+  "en": "Say goodbye to under-extrusion, rough surfaces, and loss of detail. Unlike standard high-flow hotends, Bambu's high yet consistent extrusion ensures crisp edges, flawless texturing, and ultra-smooth surfaces—every single time.",
+  "ar": "ودّع نقص البثق والأسطح الخشنة وفقدان التفاصيل. على عكس رؤوس الصهر القياسية عالية التدفق، يضمن البثق العالي والثابت في آن واحد من Bambu حوافَّ حادة وملمسًا خاليًا من العيوب وأسطحًا فائقة النعومة، في كل مرة.",
+  "ckb": "ماڵئاوایی لە کەمیی پاڵنان، ڕووکاری زبر و لەدەستدانی وردەکاری بکە. بە پێچەوانەی سەرە ستانداردەکانی تواندنەوەی ڕۆیشتنی بەرز، پاڵنانی بەرز و هاوکات جێگیری Bambu لێواری تیژ، هەستی ڕووکاری بێ کەموکوڕی و ڕووکاری زۆر لووس دەستەبەر دەکات، هەموو جارێک."
+ },
+ {
+  "i": 114,
+  "h": "63de4c6b746281d17b4e6759d92de1907956ac821b70655e900e1ac34a9f2bd2",
+  "en": "High-Speed Precision",
+  "ar": "دقة عالية بسرعة عالية",
+  "ckb": "وردی لە خێرایی بەرزدا"
+ },
+ {
+  "i": 120,
+  "h": "d8da9e4441dce84baf3e3ce1427171977eb3ce55763e6913c3fd3f1af83aac4e",
+  "en": "High-Flow, High-Speed",
+  "ar": "تدفق عالٍ، سرعة عالية",
+  "ckb": "ڕۆیشتنی بەرز، خێرایی بەرز"
+ },
+ {
+  "i": 126,
+  "h": "c839d8a264b62e0ca9618e999db7ac3e08fa29a1be831c7c793e1d24aed9784a",
+  "en": "Official-Tuned Printer Presets",
+  "ar": "إعدادات مسبقة للطابعة مضبوطة رسميًا",
+  "ckb": "ڕێکخستنە ئامادەکراوەکانی چاپکەر کە بە فەرمی ڕێکخراون"
+ },
+ {
+  "i": 132,
+  "h": "e41093ad5200b3646ee93af818d2e097c69d0d2164a0f68d69ee19b437e3fb9c",
+  "en": "The Bambu High Flow Nozzle's optimized melt zone enables significantly increased volumetric speed, achieving up to 62.5%1 higher max volumetric speed and reducing print time by up to 30%2 with ease. The larger your model, the more time you save—especially for prints with extensive infills.",
+  "ar": "تتيح منطقة الصهر المحسّنة في Bambu High Flow Nozzle زيادة كبيرة في السرعة الحجمية، إذ تحقق سرعة حجمية قصوى أعلى بنسبة تصل إلى 62.5%1 وتقلّل وقت الطباعة بنسبة تصل إلى 30%2 بسهولة. كلما كبر نموذجك زاد الوقت الذي توفّره، خاصةً في المطبوعات ذات الحشوة الداخلية الكبيرة.",
+  "ckb": "ناوچەی تواندنەوەی باشترکراوی Bambu High Flow Nozzle خێرایی قەبارەیی بە شێوەیەکی بەرچاو زیاد دەکات، تا 62.5%1 زۆرترین خێرایی قەبارەیی بەرزتر بەدەست دەهێنێت و بە ئاسانی ماوەی چاپ تا 30%2 کەم دەکاتەوە. تا مۆدێلەکەت گەورەتر بێت، کاتی زیاتر پاشەکەوت دەکەیت، بەتایبەتی بۆ چاپی بە پڕکەرەوەی ناوەوەی زۆر."
+ },
+ {
+  "i": 138,
+  "h": "beeb7651377f01a5b5a15defac2e78997a8aaf77c237847bc2259efbca86b5e2",
+  "en": "The special design of hotend heating assembly enables easy separation of the thermal and electronic components of the hotend. Simply unlock the latch for quick and easy hotend removal and installation.",
+  "ar": "يتيح التصميم الخاص لمجموعة تسخين رأس الصهر فصل المكوّنات الحرارية والإلكترونية لرأس الصهر بسهولة. ما عليك سوى فتح المزلاج لإزالة رأس الصهر وتركيبه بسرعة وسهولة.",
+  "ckb": "دیزاینی تایبەتی کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە ڕێگە بە جیاکردنەوەی ئاسانی پێکهاتە گەرمی و ئەلیکترۆنییەکانی سەری تواندنەوە دەدات. تەنها قوفڵەکە بکەرەوە بۆ لابردن و دامەزراندنی خێرا و ئاسانی سەری تواندنەوە."
+ },
+ {
+  "i": 144,
+  "h": "4acaf6c3de57616b0b03abbf9be54626ceac52898113716749e6dada8e8372f1",
+  "en": "High Flow Tungsten Carbide Nozzle Nozzle (0.8mm)",
+  "ar": "High Flow Tungsten Carbide Nozzle Nozzle (0.8mm)",
+  "ckb": "High Flow Tungsten Carbide Nozzle Nozzle (0.8mm)",
+  "keep": true
+ },
+ {
+  "i": 150,
+  "h": "3f1102593bc1f41a460a3a1a2cb3665e74fcca2fac1c539f40ece4faf40ddbbc",
+  "en": "The Vortek System uses up to six interchangeable induction-heated hotends to achieve true multi-material printing with significantly reduced purge waste compared to single-nozzle systems. The hotend swap mechanism eliminates purge flushing during filament changes (H2C under 7 filaments), saving both material and time.",
+  "ar": "يستخدم نظام Vortek ما يصل إلى ستة رؤوس صهر قابلة للتبديل تُسخَّن بالحث لتحقيق طباعة حقيقية متعددة المواد مع هدر طرد أقل بكثير مقارنةً بالأنظمة ذات النوزل الواحد. وتلغي آلية تبديل رأس الصهر الحاجة إلى الطرد عند تبديل الفلامنت (في H2C مع أقل من 7 فلامنتات)، مما يوفّر المادة والوقت معًا.",
+  "ckb": "سیستەمی Vortek تا شەش سەری تواندنەوەی ئاڵوگۆڕکراوی گەرمکراو بە ئیندەکشن بەکاردەهێنێت بۆ بەدەستهێنانی چاپی فرەکەرەستەی ڕاستەقینە لەگەڵ بەفیڕۆچوونی فیلامێنتی دەرکراوی زۆر کەمتر بە بەراورد لەگەڵ سیستەمە تاک-نۆزڵەکان. میکانیزمی گۆڕینی سەری تواندنەوە پێویستی بە دەرکردنی فیلامێنت لە کاتی گۆڕینی فیلامێنتدا نامێڵێت (لە H2C بە کەمتر لە 7 فیلامێنت)، کە هەم کەرەستە و هەم کات پاشەکەوت دەکات."
+ },
+ {
+  "i": 156,
+  "h": "ae32c1238d208cd1f377059b8070f6129b5b8dc259fc48d9f9295a68a3d538b1",
+  "en": "Dual temperature sensors monitor both nozzle and heatsink temperatures in real time. When heatsink temperature exceeds safe limits, the system automatically increases cooling to prevent heat creep and reduce the risk of clogging.",
+  "ar": "يراقب حسّاسا حرارة مزدوجان درجتي حرارة النوزل والمبدّد الحراري في الوقت الفعلي. وعندما تتجاوز حرارة المبدّد الحراري الحدود الآمنة، يزيد النظام التبريد تلقائيًا لمنع زحف الحرارة وتقليل خطر الانسداد.",
+  "ckb": "دوو هەستەوەری پلەی گەرمی لە کاتی ڕاستەقینەدا چاودێریی پلەی گەرمیی نۆزڵ و بڵاوکەرەوەی گەرمی دەکەن. کاتێک پلەی گەرمیی بڵاوکەرەوەی گەرمی لە سنووری سەلامەت تێدەپەڕێت، سیستەمەکە بە شێوەی خۆکار ساردکردنەوە زیاد دەکات بۆ ڕێگریکردن لە خزینی گەرمی و کەمکردنەوەی مەترسیی گیران."
+ },
+ {
+  "i": 162,
+  "h": "a4c0d75dae9f5867bdca3004aba17247fc800886200045664c7f74ca672a0e93",
+  "en": "Induction Hardened Steel Nozzle (0.4mm)",
+  "ar": "Induction Hardened Steel Nozzle (0.4mm)",
+  "ckb": "Induction Hardened Steel Nozzle (0.4mm)",
+  "keep": true
+ },
+ {
+  "i": 168,
+  "h": "c6a58f9cc75e68098e35ca022df61eeb59e17f801beeed005935be50d25f3133",
+  "en": "*Tested with Bambu PLA Basic.",
+  "ar": "*تم الاختبار باستخدام Bambu PLA Basic.",
+  "ckb": "*تاقیکراوەتەوە بە Bambu PLA Basic."
+ },
+ {
+  "i": 174,
+  "h": "fbf21d40323f107278a0cf61a419160e547c12745a0e0d3ccd569578f086a066",
+  "en": "0.2 mm stainless steel nozzle (LHS) ×1 – Perfect for ultra-fine details and high-precision parts",
+  "ar": "نوزل من الفولاذ المقاوم للصدأ 0.2 mm (LHS) ×1 – مثالي للتفاصيل فائقة الدقة والقطع عالية الدقة",
+  "ckb": "نۆزڵی پۆڵای زەنگنەگری 0.2 mm (LHS) ×1 – گونجاوترینە بۆ وردەکاریی زۆر ورد و پارچەی وردیی بەرز"
+ },
+ {
+  "i": 180,
+  "h": "13abd61cc33299d5fb77bf2610601d2e9daebd86476631ceb48ce3210d9b983a",
+  "en": "Assign each of the six induction hotends to specific filament, storing filament info automatically for seamless reloads — perfect for high-value engineering filaments",
+  "ar": "خصّص كل رأس من رؤوس الصهر الحثّية الستة لفلامنت محدد، مع حفظ معلومات الفلامنت تلقائيًا لإعادة التحميل بسلاسة — مثالي للفلامنتات الهندسية عالية القيمة",
+  "ckb": "هەریەک لە شەش سەری تواندنەوەی ئیندەکشنەکە بۆ فیلامێنتێکی دیاریکراو تەرخان بکە، زانیاریی فیلامێنت بە شێوەی خۆکار هەڵدەگیرێت بۆ دووبارە بارکردنەوەی بێ کێشە — گونجاوترینە بۆ فیلامێنتە ئەندازیارییە بەهادارەکان"
+ },
+ {
+  "i": 186,
+  "h": "fb3f67994d8e38d9c6845b8bb64e6c05865e761d93d559e77b38af60067e855e",
+  "en": "Print parameters are precisely fine-tuned for all Bambu TPU filaments when used with the TPU High-Flow Kit. No manual tweaking required—allowing sticky TPU materials to print smoothly right out of the box.",
+  "ar": "تم ضبط إعدادات الطباعة بدقة لجميع فلامنتات Bambu TPU عند استخدامها مع TPU High-Flow Kit. لا حاجة إلى أي تعديل يدوي، مما يتيح طباعة مواد TPU اللزجة بسلاسة فور إخراجها من العلبة.",
+  "ckb": "ڕێکخستنەکانی چاپ بە وردی بۆ هەموو فیلامێنتەکانی Bambu TPU ڕێکخراون کاتێک لەگەڵ TPU High-Flow Kit بەکاردەهێنرێن. پێویستی بە دەستکاریی دەستی نییە — ڕێگە دەدات کەرەستە لینجەکانی TPU هەر لە یەکەم جارەوە بە ڕێکی چاپ بکرێن."
+ },
+ {
+  "i": 192,
+  "h": "26fa71cb865618654e186697aa1c733d066082780faff16c3607d9c47aeffbf4",
+  "en": "Note: Parameter optimization and speed enhancements currently apply only to Bambu TPU 85A, Bambu TPU 90A, and Bambu TPU 95A HF.",
+  "ar": "ملاحظة: يقتصر تحسين الإعدادات وزيادة السرعة حاليًا على Bambu TPU 85A وBambu TPU 90A وBambu TPU 95A HF فقط.",
+  "ckb": "تێبینی: باشترکردنی ڕێکخستنەکان و زیادکردنی خێرایی ئێستا تەنها بۆ Bambu TPU 85A، Bambu TPU 90A و Bambu TPU 95A HF دەگونجێت."
+ },
+ {
+  "i": 198,
+  "h": "0e672bd361a3e75d3f2e336549fb6bce06be393240bd81ef2dfd3a19abcd0772",
+  "en": "All hotends included in the kit are standard flow hotends.",
+  "ar": "جميع رؤوس الصهر المرفقة في الطقم هي رؤوس صهر ذات تدفق قياسي.",
+  "ckb": "هەموو سەرەکانی تواندنەوەی ناو کیتەکە لە جۆری ڕۆیشتنی ستاندارددان."
+ },
+ {
+  "i": 204,
+  "h": "3785e8bb0bde6b59638479b87f6a2de59664fd3ddf5036922c591658d5287eec",
+  "en": "Note: The Smooth PEI Sheet cannot be peeled off from the build plates.",
+  "ar": "ملاحظة: لا يمكن نزع طبقة PEI الملساء عن صفائح الطباعة.",
+  "ckb": "تێبینی: چینی لووسی PEI ناتوانرێت لە پلێتەکانی چاپ دابماڵرێت."
+ },
+ {
+  "i": 210,
+  "h": "14a9aad936335b5f5ecf9bf32c6fff64e990ccb85bf065d62d287ff2acc97a6c",
+  "en": "Two Textures (Textured and Smooth) in One Plate",
+  "ar": "ملمسان (محبّب وأملس) في صفيحة واحدة",
+  "ckb": "دوو ڕووکار (دانەدار و لووس) لە یەک پلێتدا"
+ },
+ {
+  "i": 216,
+  "h": "8e058a5850649a9a8e8ff393fc7b18e1e2552f5fc28fa65b430e9d13b58c82b1",
+  "en": "Carefully sanding the Textured PEI surface with fine-grit (600 was recommended) sandpaper can help restore adhesion.",
+  "ar": "يمكن أن تساعد صنفرة سطح PEI المحبّب بعناية بورق صنفرة ناعم الحبيبات (يُوصى بدرجة 600) في استعادة الالتصاق.",
+  "ckb": "سووانی ڕووکاری دانەداری PEI بە وریاییەوە بە کاغەزی سمباتەی ورد (600 پێشنیار کراوە) دەتوانێت یارمەتی گەڕاندنەوەی لکان بدات."
+ },
+ {
+  "i": 222,
+  "h": "0b6f0bc720d94f23807b091be11beccf6f6b946ae414610237b7ebc93f32890f",
+  "en": "Glue Stick Required for Textured PEI Surface?",
+  "ar": "هل يلزم Glue Stick لسطح PEI المحبّب؟",
+  "ckb": "ئایا Glue Stick بۆ ڕووکاری دانەداری PEI پێویستە؟"
+ },
+ {
+  "i": 228,
+  "h": "298e5ae426d22cfb546bcb0f33f7414886c399dcc5448995ccb116644554fae9",
+  "en": "Starry Surface",
+  "ar": "السطح النجمي",
+  "ckb": "ڕووکاری ئەستێرەیی"
+ },
+ {
+  "i": 234,
+  "h": "a988df0937042c05978e89ddf16bdb17b42ddc04e03fc920b79215bba3d6cbbf",
+  "en": "3. Due to reflections, the LIDAR calibration will not work as expected when using Effect Plates. We recommend skipping the LIDAR calibration sequence, or calibrating with a regular plate.",
+  "ar": "3. بسبب الانعكاسات، لن تعمل معايرة LIDAR كما هو متوقع عند استخدام Effect Plates. نوصي بتخطي تسلسل معايرة LIDAR، أو إجراء المعايرة باستخدام صفيحة عادية.",
+  "ckb": "3. بەهۆی ڕەنگدانەوەکان، کالیبرەکردنی LIDAR وەک چاوەڕوانکراو کار ناکات کاتێک Effect Plates بەکاردەهێنرێن. پێشنیار دەکەین زنجیرەی کالیبرەکردنی LIDAR بپەڕێنیت، یان بە پلێتێکی ئاسایی کالیبرە بکەیت."
+ }
+]

@@ -1,0 +1,537 @@
+{
+ "sourceProductId": "657367793901867008",
+ "handle": "bambu-engineering-plate",
+ "canonicalUrl": "https://us.store.bambulab.com/products/bambu-engineering-plate",
+ "title": "Bambu Engineering Plate",
+ "seoMetaDescription": "",
+ "route": "552709757765505024>552709757794865152",
+ "isFilament": false,
+ "groups": [
+  {
+   "propertyKeyId": "657367793914449920",
+   "propertyKey": "Printer Model",
+   "type": 1,
+   "title": "",
+   "position": 1,
+   "values": [
+    {
+     "id": "737888343593549825",
+     "value": "A2L",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "720442376270401537",
+     "value": "X2D",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "657367793914449921",
+     "value": "P2S",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "667303749711458305",
+     "value": "H2C",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "657379511494086657",
+     "value": "H2S",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "657379511494086658",
+     "value": "H2D",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "657433329381773314",
+     "value": "A1",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "657433329381773313",
+     "value": "P1 Series",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "657433329381773315",
+     "value": "X1C",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "762106616546942977",
+   "propertyKey": "Option",
+   "type": 1,
+   "title": "",
+   "position": 2,
+   "values": [
+    {
+     "id": "762106616546942978",
+     "value": "Engineering Plate",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "762106616546942979",
+     "value": "Engineering Plate + Glues",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  }
+ ],
+ "skus": [
+  {
+   "id": "657379511494086659",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "P2S"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762106927177019392",
+    "url": "https://store.bblcdn.com/s7/default/77179a9fe0db486fa1b08ef92d4c612e/FAP042.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "657379511494086663",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "H2S"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "666922657164611584",
+    "url": "https://store.bblcdn.com/s7/default/9b12b5a83bb4441681f66e146798cfdc/FAC166.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "657379511494086667",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "H2D"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "666922657164611584",
+    "url": "https://store.bblcdn.com/s7/default/9b12b5a83bb4441681f66e146798cfdc/FAC166.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "657433241362993156",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "A1"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762106927177019392",
+    "url": "https://store.bblcdn.com/s7/default/77179a9fe0db486fa1b08ef92d4c612e/FAP042.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "657433241362993160",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "X1C"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762106927177019392",
+    "url": "https://store.bblcdn.com/s7/default/77179a9fe0db486fa1b08ef92d4c612e/FAP042.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "657433241362993164",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "P1 Series"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762106927177019392",
+    "url": "https://store.bblcdn.com/s7/default/77179a9fe0db486fa1b08ef92d4c612e/FAP042.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "720442376270401538",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "X2D"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762106927177019392",
+    "url": "https://store.bblcdn.com/s7/default/77179a9fe0db486fa1b08ef92d4c612e/FAP042.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "737888343593549826",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "H2C"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "672576540268650496",
+    "url": "https://store.bblcdn.com/s7/default/bce7ccbe642547bd903c9f9d0ada3840/FAP039.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "737888343593549830",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "A2L"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "672576540268650496",
+    "url": "https://store.bblcdn.com/s7/default/bce7ccbe642547bd903c9f9d0ada3840/FAP039.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "762106616546942981",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "A2L"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate + Glues"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762104055521615872",
+    "url": "https://store.bblcdn.com/s7/default/a6a5fd15a5fe4e518dbe19847fac880c/FAP039_LGL001_SGL001.jpg"
+   },
+   "description": "<p>Includes Glue Stick (1 pc) and Liquid Glue (1 pc)</p>",
+   "soldOut": false
+  },
+  {
+   "id": "762106616546942987",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "X2D"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate + Glues"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762104054401740800",
+    "url": "https://store.bblcdn.com/s7/default/25bed76e1396498b9c2c9b094ce5fbf9/FAP042_LGL001_SGL001.jpg"
+   },
+   "description": "<p>Includes Glue Stick (1 pc) and Liquid Glue (1 pc)</p>",
+   "soldOut": false
+  },
+  {
+   "id": "762106616546942993",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "P2S"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate + Glues"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762104054401740800",
+    "url": "https://store.bblcdn.com/s7/default/25bed76e1396498b9c2c9b094ce5fbf9/FAP042_LGL001_SGL001.jpg"
+   },
+   "description": "<p>Includes Glue Stick (1 pc) and Liquid Glue (1 pc)</p>",
+   "soldOut": false
+  },
+  {
+   "id": "762106616546942999",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "H2C"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate + Glues"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762104055521615872",
+    "url": "https://store.bblcdn.com/s7/default/a6a5fd15a5fe4e518dbe19847fac880c/FAP039_LGL001_SGL001.jpg"
+   },
+   "description": "<p>Includes Glue Stick (1 pc) and Liquid Glue (1 pc)</p>",
+   "soldOut": false
+  },
+  {
+   "id": "762106616546943005",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "H2S"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate + Glues"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762104056599552000",
+    "url": "https://store.bblcdn.com/s7/default/afb7d99b75d94347ab028e52608982a3/FAP038_LGL001_SGL001.jpg"
+   },
+   "description": "<p>Includes Glue Stick (1 pc) and Liquid Glue (1 pc)</p>",
+   "soldOut": false
+  },
+  {
+   "id": "762106616546943011",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "H2D"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate + Glues"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762104056599552000",
+    "url": "https://store.bblcdn.com/s7/default/afb7d99b75d94347ab028e52608982a3/FAP038_LGL001_SGL001.jpg"
+   },
+   "description": "<p>Includes Glue Stick (1 pc) and Liquid Glue (1 pc)</p>",
+   "soldOut": false
+  },
+  {
+   "id": "762106616546943017",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "A1"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate + Glues"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762104054401740800",
+    "url": "https://store.bblcdn.com/s7/default/25bed76e1396498b9c2c9b094ce5fbf9/FAP042_LGL001_SGL001.jpg"
+   },
+   "description": "<p>Includes Glue Stick (1 pc) and Liquid Glue (1 pc)</p>",
+   "soldOut": false
+  },
+  {
+   "id": "762106616546943023",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "P1 Series"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate + Glues"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762104054401740800",
+    "url": "https://store.bblcdn.com/s7/default/25bed76e1396498b9c2c9b094ce5fbf9/FAP042_LGL001_SGL001.jpg"
+   },
+   "description": "<p>Includes Glue Stick (1 pc) and Liquid Glue (1 pc)</p>",
+   "soldOut": false
+  },
+  {
+   "id": "762106616546943029",
+   "props": [
+    {
+     "propertyKeyId": "657367793914449920",
+     "propertyKey": "Printer Model",
+     "value": "X1C"
+    },
+    {
+     "propertyKeyId": "762106616546942977",
+     "propertyKey": "Option",
+     "value": "Engineering Plate + Glues"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "762104054401740800",
+    "url": "https://store.bblcdn.com/s7/default/25bed76e1396498b9c2c9b094ce5fbf9/FAP042_LGL001_SGL001.jpg"
+   },
+   "description": "<p>Includes Glue Stick (1 pc) and Liquid Glue (1 pc)</p>",
+   "soldOut": false
+  }
+ ],
+ "gallery": [
+  {
+   "resourceFileId": "762106927177019392",
+   "url": "https://store.bblcdn.com/s7/default/77179a9fe0db486fa1b08ef92d4c612e/FAP042.jpg"
+  },
+  {
+   "resourceFileId": "666922657164611584",
+   "url": "https://store.bblcdn.com/s7/default/9b12b5a83bb4441681f66e146798cfdc/FAC166.jpg"
+  },
+  {
+   "resourceFileId": "672576540268650496",
+   "url": "https://store.bblcdn.com/s7/default/bce7ccbe642547bd903c9f9d0ada3840/FAP039.jpg"
+  },
+  {
+   "resourceFileId": "762104054401740800",
+   "url": "https://store.bblcdn.com/s7/default/25bed76e1396498b9c2c9b094ce5fbf9/FAP042_LGL001_SGL001.jpg"
+  },
+  {
+   "resourceFileId": "762104056599552000",
+   "url": "https://store.bblcdn.com/s7/default/afb7d99b75d94347ab028e52608982a3/FAP038_LGL001_SGL001.jpg"
+  },
+  {
+   "resourceFileId": "762104055521615872",
+   "url": "https://store.bblcdn.com/s7/default/a6a5fd15a5fe4e518dbe19847fac880c/FAP039_LGL001_SGL001.jpg"
+  }
+ ],
+ "featuresTitle": "Product Features",
+ "features": [
+  {
+   "title": "Product Features",
+   "html": "<ul>\n<li>Optimized for high-temperature filaments</li>\n<li>Compatible with all filament types</li>\n<li>Built for long-lasting performance</li>\n</ul>\n<p>&nbsp;</p>\n<p><strong>Important</strong></p>\n<p><span style=\"color: #e03e2d;\"><strong>Glue must be applied before printing any material on the Engineering Plate.</strong></span></p>"
+  }
+ ],
+ "videos": [],
+ "description": {
+  "kind": "legacy_html",
+  "html": "<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s1/default/b59279e93e954edfa72f5cadb12aa802/Engineering_Plate__phone.png\" alt=\"vision encoder\" /> <!-- PC端图片 -->2.1.<img class=\"pct_i\" src=\"https://store.bblcdn.com/s1/default/3950d456da684647ae0da920b475f743/Engineering_Plate_PC.png\" alt=\"vision encoder\" /></div>\n</div>\n<br /><br />\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpcic\"><!-- 第一条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\" style=\"text-align: left;\">One Build Plate for All Filaments</h3>\n<p class=\"pct_p\" style=\"text-align: left;\">With a simple layer of glue, the Engineering Plate is compatible with our entire filament lineup, it's the perfect go-to solution when you're not sure which plate to use.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s1/default/5185b93f1b1f495990047c93ca22a1e3/1.jpg\" alt=\"smoke Purifier\" /><img class=\"pct_i\" src=\"https://store.bblcdn.com/s1/default/f701dd0e69594e6bb8e4cf8283345ca0/PC1.png\" alt=\"smoke Purifier\" />&nbsp;</div>\n</div>\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\" style=\"text-align: left;\">Durable Smooth Surface Coating</h3>\n<p class=\"pct_p\" style=\"text-align: left;\">The refreshed coating significantly improves the plate's temperature, scratch, and corrosion resistance. Built to withstand prolonged high-temperature printing and hundreds of washes and peels, its smooth, dependable surface guarantees stable adhesion every single time.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s1/default/1fb047d852164bd3b4b32d59891e546b/Engineering_Plate__2_phone.png\" alt=\"smoke Purifier\" /><img class=\"pct_i\" src=\"https://store.bblcdn.com/s1/default/66ffde9cfda3411988b5b7902b6a5fbb/Engineering_Plate_3.png\" /></div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpcic\"><!-- 第一条 -->\n<div class=\"pct_stpc-ic\"><!-- 左侧文案部分 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\" style=\"text-align: left;\">Smooth &amp; Natural Surface Finish</h3>\n<p class=\"pct_p\" style=\"text-align: left;\">The smooth base coating can impart a smooth &amp; flat texture to the bottom surface of the printed object, better blend in with other surfaces.</p>\n</div>\n<!-- 右侧图片部分 -->\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s1/default/b097b2c237ac44bab8b4484b6af5eee7/MO2.jpg\" alt=\"smoke Purifier\" /><img class=\"pct_i\" src=\"https://store.bblcdn.com/s1/default/c6c8193480524a8c85c91aa30f4066da/PC2.jpg\" alt=\"smoke Purifier\" />&nbsp;</div>\n</div>\n<p></p>\n<!-- 文案布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-stpc\"><!-- 第一条 -->\n<div class=\"pct_st-p\"></div>\n</div>\n</div>\n<h3 class=\"pct_t\" style=\"text-align: center;\"><strong><span style=\"font-size: 34px;\">Considerations</span></strong></h3>\n<p></p>\n<ol>\n<li>1. Before printing with any filament, it is recommended to apply glue on the <strong>Engineering Plate</strong>. Applying <strong>solid glue</strong> can make part removal easier, but since solid glue has a certain thickness and is difficult to apply evenly, the <strong>printing stability and first-layer quality</strong> are usually not as good as when using <strong>liquid glue</strong>. On the other hand, <strong>liquid glue</strong> may make part removal more difficult. You should choose the appropriate glue type based on the <strong>filament</strong>, <strong>printing environment</strong>, and other practical conditions. For more details, please refer to the official wiki: <a href=\"https://wiki.bambulab.com/en/general/how-to-use-bbl-liquid-glue\" target=\"_blank\" rel=\"noopener\">Bambu Lab Wiki</a>.</li>\n<li>2. When using a scraper to remove prints, make sure to use the correct technique. If the model adheres too tightly to the build plate, apply alcohol to the interface between the model and the plate to reduce adhesion and make removal easier. This helps prevent damage to the model, the build plate, or potential injury to the user caused by excessive force.</li>\n<li>3. Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve the most suitable level of adhesion.</li>\n<li>4. For X1 series, P1 series, and A1 printers, before auto-leveling, it is necessary to repeatedly rub the nozzle in the wiping area of the build plate to thoroughly remove any residual material at the tip of the nozzle. The coating in the wiping area will gradually wear over time, which is normal and does not affect print quality or nozzle lifespan, so there is no need to worry about quality issues.</li>\n<li>5. Dust and grease deposits on the build plate can reduce adhesion. It is recommended to regularly clean the build plate with warm water and dish soap to maintain optimal adhesion. Do not use other unapproved cleaning agents.</li>\n<li>6. Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and cannot be held responsible for any damage caused to plates as a result of using third-party glue on build plates. Do not clean the Engineering Plate with Acetone, as it will damage the Engineering Plate surface.</li>\n<li>7. Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and ensures a long lifetime of the product.</li>\n<li>8. The latest firmware brings significant improvements to the Bambu Engineering Plate calibration using the Micro Lidar, and it is now fully compatible with the automatic calibration process.</li>\n<li>9. The Engineering Plate plate is considered a consumable part, which will degrade over time. The warranty will only cover manufacturing defects, not cosmetic damage like scratches, dents, or cracks. Defective sheets upon arrival are the only ones covered by the warranty.</li>\n</ol>\n<p></p>\n<p></p>\n<!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_t\"></h3>\n<h3 class=\"pct_t\">Recommended Settings</h3>\n<p class=\"pct_p\">Please note that&nbsp;other slicer settings might need to be adjusted based on the printed model and the filament requirements</p>\n</div>\n</div>\n</div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\"><!-- 表头 -->\n<thead class=\"pct_th\">\n<tr>\n<td class=\"pct_td\"><strong>Materials</strong></td>\n<td class=\"pct_td\"><strong>Heatbed Temperature</strong></td>\n<td class=\"pct_td\"><strong>Glue Stick Required?</strong></td>\n</tr>\n</thead>\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PLA/PLA-CF/PLA-GF</strong></td>\n<td class=\"pct_td\">45~60℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PETG/PETG-CF</strong></td>\n<td class=\"pct_td\">60~80℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第三行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>ABS (not for A1 mini)</strong></td>\n<td class=\"pct_td\">90~100℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第四行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>ASA (not for A1 mini)</strong></td>\n<td class=\"pct_td\">90~100℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第5行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>TPU</strong></td>\n<td class=\"pct_td\">35~45℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第6行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PVA</strong></td>\n<td class=\"pct_td\">45~60℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第7行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PC/PC-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\">90~110℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第8行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PA/PA-CF/PAHT-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\">90~110℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n<!-- 第9行 -->\n<tr class=\"pct_tr\">\n<td class=\"pct_td\"><strong>PET-CF (not for A1 mini)</strong></td>\n<td class=\"pct_td\">80~100℃</td>\n<td class=\"pct_td\">Glue Stick/Liquid Glue</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n</div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tbc\">\n<h3 class=\"pct_t\" style=\"text-align: center;\"></h3>\n<h3 class=\"pct_t\" style=\"text-align: center;\"></h3>\n<h3 class=\"pct_t\" style=\"text-align: center;\">Product Specifications</h3>\n<p></p>\n<div class=\"pct_tbc\">\n<table class=\"pct_tb\" style=\"height: 254px;\"><!-- 表头 -->\n<tbody><!-- 第一行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 533.652px;\"><strong>Material</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 582.598px;\">Polyester powder + manganese steel</td>\n</tr>\n<!-- 第二行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 533.652px;\"><strong>Surface Temperature Resistance</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 582.598px;\"><span>Up to 120℃</span></td>\n</tr>\n<!-- 第三行 -->\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 533.652px;\"><strong>Thickness</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 582.598px;\"><span>0.5mm</span></td>\n</tr>\n<tr class=\"pct_tr\" style=\"height: 77px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 77px; width: 533.652px;\"><strong>Usable Print Size</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 77px; width: 582.598px;\">\n<p><span style=\"font-size: 15px;\"><span>X1C/P1P/P1S/A1/P2S/X2D - 256*256mm<br />H2D/H2S - 350*320mm <br />H2C/A2L - 330*320mm</span> </span></p>\n</td>\n</tr>\n<tr class=\"pct_tr\" style=\"height: 25px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 533.652px;\"><strong>Packaging Size</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 25px; width: 582.598px;\">\n<p><span style=\"font-size: 15px;\"><span>X1C/P1P/P1S/A1/P2S/X2D - 315*295*15mm</span> </span></p>\n<p><span style=\"font-size: 15px;\"><span>H2D/H2S - </span> 393mm*380mm*15mm</span></p>\n<p><span style=\"font-size: 15px;\"><span>H2C/A2L - </span> 393mm*380mm*15mm</span></p>\n</td>\n</tr>\n<tr class=\"pct_tr\" style=\"height: 77px;\">\n<td class=\"pct_td\" style=\"text-align: center; height: 77px; width: 533.652px;\"><strong>Packaging Weight</strong></td>\n<td class=\"pct_td\" style=\"text-align: center; height: 77px; width: 582.598px;\">\n<p><span style=\"font-size: 15px;\"><span>X1C/P1P/P1S/A1/P2S/X2D - </span> 0.50kg</span></p>\n<p><span style=\"font-size: 15px;\"><span>H2D/H2S - </span> 0.78kg<br /><span>H2C/A2L - </span> 0.78kg</span></p>\n</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>"
+ },
+ "jsonld": {
+  "productGroupId": "657367793901867008",
+  "variantSkus": [
+   "657379511494086659",
+   "657379511494086663",
+   "657379511494086667",
+   "657433241362993156",
+   "657433241362993160",
+   "657433241362993164",
+   "720442376270401538",
+   "737888343593549826",
+   "737888343593549830",
+   "762106616546942981",
+   "762106616546942987",
+   "762106616546942993",
+   "762106616546942999",
+   "762106616546943005",
+   "762106616546943011",
+   "762106616546943017",
+   "762106616546943023",
+   "762106616546943029"
+  ],
+  "brand": "Bambu Lab"
+ }
+}

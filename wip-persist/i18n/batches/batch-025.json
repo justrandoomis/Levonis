@@ -1,0 +1,3292 @@
+{
+ "batch": 25,
+ "surface": "api",
+ "handles": [
+  "vortek-upgrade-kit",
+  "4-piece-needle-file-set",
+  "maker-s-supply-hand-drill-kit",
+  "auto-fire-extinguishing-system",
+  "maker-s-supply-flush-cutter",
+  "maker-s-supply-professional-trimming-tool-kit",
+  "maker-s-supply-precision-cutter",
+  "maker-s-supply-esd-stainless-steel-tweezers-set",
+  "air-filter-for-external-exhaust-fan-kit",
+  "external-exhaust-fan-kit-p2s",
+  "laser-module",
+  "mag-alloy-scraper",
+  "floating-damper-feet",
+  "rotary-attachment",
+  "accessory-box-for-h2d",
+  "mini-heat-press",
+  "tpu-feed-assist-module",
+  "filament-track-switch",
+  "maker-s-supply-long-nose-pliers",
+  "accessory-box-a2l",
+  "print-finishing-kit",
+  "printer-maintenance-kit",
+  "external-exhaust-fan-bundle-x2d",
+  "focusing-lens-medium-long-focal",
+  "installation-bracket-for-rotary-attachment",
+  "guide-rail-extension",
+  "vision-encoder-r1",
+  "riser-base",
+  "automatic-conveyor-feeder",
+  "front-housing-assembly-x1-series",
+  "high-resolution-screen"
+ ],
+ "strings": [
+  {
+   "h": "1bf5fb67a78feb7830203cb6f4b63efa5d9ba736aba128a1c7e92a934c6dc3ba",
+   "en": "Our industry-leading induction heating technology brings the nozzle to temperature in 8 seconds, significantly reducing the preheating time for each material swap compared to traditional methods.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-upgrade-kit",
+    "title": "Vortek Upgrade Kit",
+    "field": "blocks[5].line[1]",
+    "near": "8-Second Induction Heating"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b5a996ff2c3b0634b4a267c6f4c82b2e0f1b7584ad81950b1cec701ef545dd4",
+   "en": "2. Before purchasing, you must read the official installation guide for the Vortek Upgrade Kit available on the Bambu Lab Wiki to fully understand the installation process: H2D to H2C Upgrade Guide/H2S to H2C Upgrade Guide",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-upgrade-kit",
+    "title": "Vortek Upgrade Kit",
+    "field": "blocks[9].line[6]",
+    "near": "• Important Notice Before Purchase"
+   },
+   "dict": null
+  },
+  {
+   "h": "a7f493bc2bb083e7dd35ab8388f5dbebbf92b840d7916a02952926bd6f4a57bb",
+   "en": "4. Laser version H2S is not recommended to be upgraded to H2C.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-upgrade-kit",
+    "title": "Vortek Upgrade Kit",
+    "field": "blocks[9].line[7]",
+    "near": "• 2. Before purchasing, you must read the official installation guide for the Vortek Upgrade Kit available on the Bambu Lab Wiki to fully understand the install"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b259a1fc8598756b3082799b7bc7d0368145994c6123b7039c87082cb140520",
+   "en": "Refine Printed Surfaces with Precision",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[0].line[0]",
+    "near": "After supports are removed, small marks, sharp edges, or layer artifacts may remain on printed parts. Needle files allow controlled material removal to smooth e"
+   },
+   "dict": null
+  },
+  {
+   "h": "1ca83daacc3fcf478000223afb8d56eee5b03281211b7132b0a7b16409f868be",
+   "en": "After supports are removed, small marks, sharp edges, or layer artifacts may remain on printed parts. Needle files allow controlled material removal to smooth edges, refine surfaces, and improve the final finish.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[0].line[1]",
+    "near": "Refine Printed Surfaces with Precision"
+   },
+   "dict": null
+  },
+  {
+   "h": "98ccee4e67781dae97c1eefb091d17836cfec658dc77cfed8a1864a3a4542095",
+   "en": "Reach Areas Sandpaper Can't",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[1].line[0]",
+    "near": "Narrow slots, internal corners, and small holes are often difficult to finish with sandpaper. The slim file profile makes it easier to reach tight spaces and re"
+   },
+   "dict": null
+  },
+  {
+   "h": "81b935495bbd7ad4aba3433aa1be713e0f34a2e3eb8aa86b0c3e023652fa84df",
+   "en": "Narrow slots, internal corners, and small holes are often difficult to finish with sandpaper. The slim file profile makes it easier to reach tight spaces and refine intricate features with precision.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[1].line[1]",
+    "near": "Reach Areas Sandpaper Can't"
+   },
+   "dict": null
+  },
+  {
+   "h": "64193079b05306e8fbec5ea26ded96f28d74af5ca82f5f0a5f1e6bc967181064",
+   "en": "Four File Shapes for Different Features",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[2].line[0]",
+    "near": "The set includes flat, round, half-round, and triangular files for working on flat surfaces, curved areas, narrow grooves, and internal corners. This makes it e"
+   },
+   "dict": null
+  },
+  {
+   "h": "c2d67b9b207b1b6ac90e2496cd4b5dfdf187c49753b5f63cd5aea7bf1922fc93",
+   "en": "The set includes flat, round, half-round, and triangular files for working on flat surfaces, curved areas, narrow grooves, and internal corners. This makes it easier to handle different printed geometries with the right tool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[2].line[1]",
+    "near": "Four File Shapes for Different Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "6090a338f53f79e3855170f06ee16706d3fc92c8f5eacb345362831fd37f329a",
+   "en": "Fine Teeth for Controlled Material Removal",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[3].line[0]",
+    "near": "Made from durable T12A steel, the fine-tooth pattern supports gradual, controlled material removal. It is well suited for refining PLA, PETG, ABS, and other com"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3ba735200c88b77c6dc2aec042b719041273744a6bb9546b9b82fd86b82ae9b",
+   "en": "Made from durable T12A steel, the fine-tooth pattern supports gradual, controlled material removal. It is well suited for refining PLA, PETG, ABS, and other common 3D printing materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[3].line[1]",
+    "near": "Fine Teeth for Controlled Material Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "5c0bf408a781632e965fc87343ba0c8581325c4a7255123df6c282b47d4bea88",
+   "en": "Consideration",
+   "kind": "block_title",
+   "freq": 32,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[4].line[0]",
+    "near": "• Material Limitations: Not suitable for hard alloys or fiberglass."
+   },
+   "dict": null
+  },
+  {
+   "h": "958534c70018fcd5977f1c5d9151638361a86eb48da26be8500fa7bd27a3f67f",
+   "en": "Material Limitations: Not suitable for hard alloys or fiberglass.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[4].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "3164952d3d5070de78f8789cc7becf3fbc5ab6f4f4c1ee2863695a95690f746b",
+   "en": "Safety: Wear goggles when working on harder materials to avoid injury from chipped teeth.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[4].line[2]",
+    "near": "• Material Limitations: Not suitable for hard alloys or fiberglass."
+   },
+   "dict": null
+  },
+  {
+   "h": "7d8775ef780c0d4a0889ba4879d4d6a50240d175314fee8e5819e0e50df5c5ba",
+   "en": "Fine-tooth precision for small holes, narrow parts, and detailed surfaces",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b0858e6089e846a53139a03b69b56559affbd8367e0ca60e5ee37908a78a13c",
+   "en": "4 versatile file shapes for common model-finishing tasks",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[6].line[2]",
+    "near": "• Fine-tooth precision for small holes, narrow parts, and detailed surfaces"
+   },
+   "dict": null
+  },
+  {
+   "h": "c47d5f6a51164971d8da1e80912c8716250419ec15fb7b91a30b03ce4a505f6e",
+   "en": "Durable T12A steel teeth stay sharp on plastic, resin, and soft metals",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[6].line[3]",
+    "near": "• 4 versatile file shapes for common model-finishing tasks"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b28b78055fe5595d23dd26dc320cf06cedb550ffb385a2873c6b30730425f37",
+   "en": "Non-slip PVC handle for a comfortable, controlled grip",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4-piece-needle-file-set",
+    "title": "Maker's Supply Needle File Set",
+    "field": "blocks[6].line[4]",
+    "near": "• Durable T12A steel teeth stay sharp on plastic, resin, and soft metals"
+   },
+   "dict": null
+  },
+  {
+   "h": "995de7a3a3689f9a3bd0317fd3e910fc2ef54538cd346a5ff18f88aaa0a7adb6",
+   "en": "Fine‑Tune Print Tolerances with Precision",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[0].line[0]",
+    "near": "Even with well‑calibrated printers, hole dimensions in FDM prints can vary slightly depending on material shrinkage, cooling, and layer orientation. This manual"
+   },
+   "dict": null
+  },
+  {
+   "h": "1fa93689c181fabac4b53ae0e4da4a00e810ce6e9645ed1c076dffd63e5376b5",
+   "en": "Even with well‑calibrated printers, hole dimensions in FDM prints can vary slightly depending on material shrinkage, cooling, and layer orientation. This manual precision drill helps you carefully enlarge holes and refine tolerances without damaging delicate structures.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Fine‑Tune Print Tolerances with Precision"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4720fd81109242f06199b40575efdd78ad8bb25c7f7ab195b6ffd4db9421df0",
+   "en": "Manual Drilling for Better Control on Printed Parts",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[1].line[0]",
+    "near": "Small printed features or thin walls can crack easily when using powered drills. The manual drilling design provides direct tactile feedback, allowing you to gr"
+   },
+   "dict": null
+  },
+  {
+   "h": "bd08f395d5c68168ac5d25aead7e04ad69301c64835a39cba2208e17fc436970",
+   "en": "Small printed features or thin walls can crack easily when using powered drills. The manual drilling design provides direct tactile feedback, allowing you to gradually remove material and maintain precise control.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Manual Drilling for Better Control on Printed Parts"
+   },
+   "dict": null
+  },
+  {
+   "h": "4b5263b839aa64daf1cf61fa34da8bc7e4be89ae8c07becb0f7f0bf1e0123a31",
+   "en": "Smooth Rotation with Stable Force Control",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[2].line[0]",
+    "near": "The anodized aluminum handle features a comfortable weighted grip, while the rear cap integrates a precision bearing. This allows the drill to rotate smoothly a"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ebc7e13da246b5d1cb5be75ff4f5786e5df4e090ea53194b66dd22f1fa01581",
+   "en": "The anodized aluminum handle features a comfortable weighted grip, while the rear cap integrates a precision bearing. This allows the drill to rotate smoothly against your palm, improving stability and alignment when working with tiny holes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Smooth Rotation with Stable Force Control"
+   },
+   "dict": null
+  },
+  {
+   "h": "06bb62708281bd2cb240fdf49ab095670704c84873de77b08cb22a4c630bc8f3",
+   "en": "Tungsten Steel Bits with Quick Identification",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[3].line[0]",
+    "near": "Made from high‑hardness tungsten steel, the bits maintain sharp edges for clean cuts in PLA, PETG, and ABS. Intuitive color‑coded rings and laser‑engraved marki"
+   },
+   "dict": null
+  },
+  {
+   "h": "9b577b6e03a6babbe272cd9c5fe375209121797202feb72d22faa9f10d8646ba",
+   "en": "Made from high‑hardness tungsten steel, the bits maintain sharp edges for clean cuts in PLA, PETG, and ABS. Intuitive color‑coded rings and laser‑engraved markings make it easy to quickly find the exact size you need.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Tungsten Steel Bits with Quick Identification"
+   },
+   "dict": null
+  },
+  {
+   "h": "d5dde1c4c1f1ab467009740242674c97311d39e46fc8eeaaeb3452d2545faee4",
+   "en": "Optimized Size Range for 3D Printing Tasks",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[4].line[0]",
+    "near": "The hand drill handle is compatible with bits from 0.3 to 3.2 mm, and the included drill bit set covers commonly used sizes for 3D printing post-processing. It "
+   },
+   "dict": null
+  },
+  {
+   "h": "b1f7ca65b056e44132d987382a7f113122ef6a55ca2711626c6326d1eb82ec34",
+   "en": "The hand drill handle is compatible with bits from 0.3 to 3.2 mm, and the included drill bit set covers commonly used sizes for 3D printing post-processing. It is ideal for clearing partially closed pilot holes, refining screw fits, and handling other precise manual drilling tasks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-hand-drill-kit",
+    "title": "Maker's Supply Hand Drill Kit",
+    "field": "blocks[4].line[1]",
+    "near": "Optimized Size Range for 3D Printing Tasks"
+   },
+   "dict": null
+  },
+  {
+   "h": "170c9c3f04ca758abcf9563f0f2286e8c95a20c60ddc171a98be47ee2d812201",
+   "en": "Fully Automated Fire Extinguishing",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[0].line[0]",
+    "near": "The Auto Fire Extinguishing System is seamlessly integrated into the R1 and H2 series' comprehensive safety behavior logic. It leverages the AI camera and flame"
+   },
+   "dict": null
+  },
+  {
+   "h": "ed8a7453ad513e4d198e1b9265b277c3bb6913416a8f8d837fe88128f551b8b9",
+   "en": "The Auto Fire Extinguishing System is seamlessly integrated into the R1 and H2 series' comprehensive safety behavior logic. It leverages the AI camera and flame sensors embedded in the R1 and H2 series machine to detect fire incidents and quickly react by injecting CO2 gas into the chamber, ensuring fully automatic fire suppression.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[0].line[1]",
+    "near": "Fully Automated Fire Extinguishing"
+   },
+   "dict": null
+  },
+  {
+   "h": "759c15c802023dd697d15f906582f36d2492f10126d5aabb9e0896eda51349f5",
+   "en": "Your Backup in a Power Loss",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[1].line[0]",
+    "near": "A dedicated manual safety mechanism provides a critical backup. In the event of a power loss, an emergency manual trigger is available to activate the extinguis"
+   },
+   "dict": null
+  },
+  {
+   "h": "6ddb810bafbd1560361f126ce6d892981770eb397b8dfa277312b75f43d09504",
+   "en": "A dedicated manual safety mechanism provides a critical backup. In the event of a power loss, an emergency manual trigger is available to activate the extinguisher, even when there's no electricity to the system.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[1].line[1]",
+    "near": "Your Backup in a Power Loss"
+   },
+   "dict": null
+  },
+  {
+   "h": "93a37000271df2dcd9dee054f90ec2a8ea2ea1f1fb34cd8f5163509ce9d197eb",
+   "en": "Fire Safety for Laser Operations",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e27b4efae72bf2ab7ef5b6a687d00fece00507c607cd9830d7eb03a3997ea3b",
+   "en": "Emergency Manual Trigger for Power Loss",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[2].line[2]",
+    "near": "• Fire Safety for Laser Operations"
+   },
+   "dict": null
+  },
+  {
+   "h": "489eedcb1b689660aa0869f6c32ada7d91ee4437a3e4b4812c1b5002640016a6",
+   "en": "Adaptive Extinguishing Minimizes Gas Waste",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[2].line[3]",
+    "near": "• Emergency Manual Trigger for Power Loss"
+   },
+   "dict": null
+  },
+  {
+   "h": "d6f24b8555ff82eed5be2b1c600c1d48a8fdcfc2b0cdbc76966e0462d0c17589",
+   "en": "1. For your safety, it is essential to follow all safety protocols and never leave the printer during a laser job. Please note that the extinguisher does not guarantee 100% success.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[2].line[5]",
+    "near": "• Important Notice Before Purchase"
+   },
+   "dict": null
+  },
+  {
+   "h": "1221ea3940c737dbaa5e93d2628f1271baa866ce84effa35d603a3055433959c",
+   "en": "- H2D: O1.02.00.00 or later.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[2].line[6]",
+    "near": "• 1. For your safety, it is essential to follow all safety protocols and never leave the printer during a laser job. Please note that the extinguisher does not "
+   },
+   "dict": null
+  },
+  {
+   "h": "e7ba012c0638eada8c557ec04e99e116fb807e6c153804820c4d677ad58774aa",
+   "en": "- H2D Pro: U1 01.01.00.00 or later.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[2].line[7]",
+    "near": "• - H2D: O1.02.00.00 or later."
+   },
+   "dict": null
+  },
+  {
+   "h": "35e814a6fcb5805a9067336c0996c02eb8a34ea00eb9b8a84ce138a96a95207f",
+   "en": "- H2S: 01.01.00.00 or later.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[2].line[8]",
+    "near": "• - H2D Pro: U1 01.01.00.00 or later."
+   },
+   "dict": null
+  },
+  {
+   "h": "728da2ccca05e54628c1619de7bbe7b9e02b31520425fae8ada43fe7ccefe879",
+   "en": "- H2C: U1 01.01.00.00 or later.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[2].line[9]",
+    "near": "• - H2S: 01.01.00.00 or later."
+   },
+   "dict": null
+  },
+  {
+   "h": "0bda1ad5a28e5f32694f20331bb08cc85ba638f72659c629da9130d3422b3fa5",
+   "en": "- Bambu Suite: 01.01.01.50 or later.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auto-fire-extinguishing-system",
+    "title": "Auto Fire Extinguishing System",
+    "field": "blocks[2].line[10]",
+    "near": "• - H2C: U1 01.01.00.00 or later."
+   },
+   "dict": null
+  },
+  {
+   "h": "8215188d71a8361e02a78e188ed9f3df87144430d65a5eae2f64a72202f1dae8",
+   "en": "Clean Cuts for 3D Print Post‑Processing",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[0].line[0]",
+    "near": "Standard diagonal cutters often leave raised marks or stress the surrounding plastic, which may require additional sanding. The flush‑cut blade design cuts clos"
+   },
+   "dict": null
+  },
+  {
+   "h": "24228b8a9d5fc04d8fb9fd88a8e7d7467ec98b33f20eabdfaa72a7efe01d5962",
+   "en": "Standard diagonal cutters often leave raised marks or stress the surrounding plastic, which may require additional sanding. The flush‑cut blade design cuts closer to the surface, leaving smaller marks and cleaner edges to reduce post‑processing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[0].line[1]",
+    "near": "Clean Cuts for 3D Print Post‑Processing"
+   },
+   "dict": null
+  },
+  {
+   "h": "60bcdc225a2da0001542602e7e4fc121bb1c001bea3530163c2bb97b0ac1a2a7",
+   "en": "Smart Lever System & Durable Construction",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[1].line[0]",
+    "near": "An integrated stop lever prevents excessive compression, while the return spring provides smoother, more comfortable operation. Made from durable chrome‑vanadiu"
+   },
+   "dict": null
+  },
+  {
+   "h": "8fd727eebcb592382d3c0be6a6134aded76de868b3db4b224395f30949320823",
+   "en": "An integrated stop lever prevents excessive compression, while the return spring provides smoother, more comfortable operation. Made from durable chrome‑vanadium steel, the cutter includes a protective guard to keep the blade safe and sharp.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[1].line[1]",
+    "near": "Smart Lever System & Durable Construction"
+   },
+   "dict": null
+  },
+  {
+   "h": "f8b71c8430b56038145e7d6744bf2ff78e7af6d53183ba64337fca0eb645155f",
+   "en": "For use only on plastic model kits, resin parts, and soft metals (e.g., aluminum). Do not cut hard metals (copper, steel, etc.) or electronic wires.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[2].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "a3b17700ac2a1f008a426dfd340504f01f0765c821637ccb21690f52124b2297",
+   "en": "Do not twist, pry, or apply lateral force, as this may chip or misalign the blades.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[2].line[2]",
+    "near": "• For use only on plastic model kits, resin parts, and soft metals (e.g., aluminum). Do not cut hard metals (copper, steel, etc.) or electronic wires."
+   },
+   "dict": null
+  },
+  {
+   "h": "7fccc2892e742c741bbc91b7c47c2b77783f40b6ef9136e85f89782d3c856e61",
+   "en": "It is recommended to wear protective gloves during use, and keep the product away from children and pets.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[2].line[3]",
+    "near": "• Do not twist, pry, or apply lateral force, as this may chip or misalign the blades."
+   },
+   "dict": null
+  },
+  {
+   "h": "f404dec5b240ffbf556e05551bf730d978ece56d5daffd4c02976e65dcba0979",
+   "en": "After use, clean residue from the blade and store with the blade guard in a dry place to prevent damage or rust.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[2].line[4]",
+    "near": "• It is recommended to wear protective gloves during use, and keep the product away from children and pets."
+   },
+   "dict": null
+  },
+  {
+   "h": "6e5dc99b5bf260e8f2d50d965d7787bcddc3d8a7ed9b908b354f2a705dbf8ec9",
+   "en": "For long-term storage, it is recommended to apply a thin layer of anti-rust oil and store in a dry place to extend service life.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[2].line[5]",
+    "near": "• After use, clean residue from the blade and store with the blade guard in a dry place to prevent damage or rust."
+   },
+   "dict": null
+  },
+  {
+   "h": "3826721fe4a7063928012e4f2d95c7c6c6d0a11d3eac0fbb3c19b9e751a953f5",
+   "en": "Precision-cut blades for cleaner cuts and less post-processing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8b701c0d0b4b844b5a6fbb731aa500ea3d67a38d876df6402c2065b2fa1afad",
+   "en": "Smart lever system helps reduce effort and over-compression",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[4].line[2]",
+    "near": "• Precision-cut blades for cleaner cuts and less post-processing"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8e60db883975e8f7417833ef99dd3a4aba8b90a4d03fd4d43072d06a3cde9ea",
+   "en": "Zero-gap jaws for precise cutting with fewer burrs or deformation",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[4].line[3]",
+    "near": "• Smart lever system helps reduce effort and over-compression"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ec0847b08e2ac71c2449192b3f2c94ac6340fb5bfb42d4713d1a6c8c6bdc06a",
+   "en": "Protective blade guard for safer storage and longer blade life",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-flush-cutter",
+    "title": "Maker's Supply Flush Cutter",
+    "field": "blocks[4].line[4]",
+    "near": "• Zero-gap jaws for precise cutting with fewer burrs or deformation"
+   },
+   "dict": null
+  },
+  {
+   "h": "7379430cdb1a2c87b41771e30885c3fff6323f3950d63ecc83021d46d180dda4",
+   "en": "Clean Edges After Printing",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[0].line[0]",
+    "near": "After supports are removed, printed parts may still have small burrs, seam lines, or rough edges along layer transitions. Unlike files or cutters that remove ma"
+   },
+   "dict": null
+  },
+  {
+   "h": "5119f0c1eb69aa3b2f0d8563d6775cdd44ce1da4aa2dd20998ba44a861af0b6d",
+   "en": "After supports are removed, printed parts may still have small burrs, seam lines, or rough edges along layer transitions. Unlike files or cutters that remove material across surfaces, a deburring tool follows edges and holes more smoothly, making it ideal for cleaning print seams, trimming borders, and smoothing the rims of printed holes for a more refined finish.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Clean Edges After Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "7339592d653083d1c5eb2cde054d7a5d815c6cae29d173f140c72983ac14e592",
+   "en": "Four Blade Types for Different Trimming Tasks",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[1].line[0]",
+    "near": "The kit includes four interchangeable blade types (BK1010 / BK3010 / BS2010 / BS1010). Each geometry is optimized for different scenarios, including straight ed"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f5ca2837f89c110b8a8f75811d1597e84026f1e881b2edaf7129058f57a0c2a",
+   "en": "The kit includes four interchangeable blade types (BK1010 / BK3010 / BS2010 / BS1010). Each geometry is optimized for different scenarios, including straight edges, curved surfaces, and internal holes, handling a wide range of post‑processing tasks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Four Blade Types for Different Trimming Tasks"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ef661db8bcb0925b9903bcac4514d0aeed36c9641f32350721b1c765f7f4cf8",
+   "en": "Blade Model",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[2].line[0].cell[0]",
+    "near": "BK1010 | 9 × 43 × 3.2 mm | For fine edge trimming on most materials (e.g., Plastics, Wood, etc.) | 3 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "18d56be9e09bfaccf6c851d33cda63331a69991d3d8e83068b1e8f09df4c33a0",
+   "en": "Dimensions (W × L × T)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[2].line[0].cell[1]",
+    "near": "BK1010 | 9 × 43 × 3.2 mm | For fine edge trimming on most materials (e.g., Plastics, Wood, etc.) | 3 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "822bab8d41bca8d7976cd69963d93a335ee21fa46160c4b866e0df7ea4b33196",
+   "en": "Quantity",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[2].line[0].cell[3]",
+    "near": "BK1010 | 9 × 43 × 3.2 mm | For fine edge trimming on most materials (e.g., Plastics, Wood, etc.) | 3 pcs"
+   },
+   "dict": {
+    "ar": "الكمية",
+    "ckb": "بڕ"
+   }
+  },
+  {
+   "h": "c8532cbf78573de607e6df2c1cb997231737fb29b0ee41edc52f092eb1a6e712",
+   "en": "For fine edge trimming on most materials (e.g., Plastics, Wood, etc.)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[2].line[1].cell[2]",
+    "near": "Blade Model | Dimensions (W × L × T) | Recommended Use | Quantity"
+   },
+   "dict": null
+  },
+  {
+   "h": "c43eb52e02464bcedea63efa70177655f36e9ac1f49445d0d9c8592a4aef50c8",
+   "en": "For deburring small holes (e.g., 1.5 mm diameter) and tight internal edges",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[2].line[2].cell[2]",
+    "near": "BK1010 | 9 × 43 × 3.2 mm | For fine edge trimming on most materials (e.g., Plastics, Wood, etc.) | 3 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "73134257f9ddf6bdbb28c66c4c67740c5c81b41975431a206c8fd15ca6249e55",
+   "en": "For trimming copper, iron, and aluminum (reversible for double-sided use)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[2].line[3].cell[2]",
+    "near": "BK3010 | 9 × 42.5 × 3.2 mm | For deburring small holes (e.g., 1.5 mm diameter) and tight internal edges | 2 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "9cbea4898fe21b6df469487b3a23be755991b98e9547e84761b8fe7a1645d7a9",
+   "en": "For light-duty trimming of plastic, aluminum, copper, and mild steel",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[2].line[4].cell[2]",
+    "near": "BS2010 | 11 × 47 × 3.2 mm | For trimming copper, iron, and aluminum (reversible for double-sided use) | 3 pcs"
+   },
+   "dict": null
+  },
+  {
+   "h": "a703bc7adb29b88a5ee5be03b6b4fe8ae80c0f413acc00659cdb6249b8e89100",
+   "en": "Lightweight Aluminum Handle with Quick Change",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[3].line[0]",
+    "near": "The anodized aluminum handle provides a lightweight yet durable grip for precise control. A tool-free quick‑change mechanism allows blades to be swapped instant"
+   },
+   "dict": null
+  },
+  {
+   "h": "c810580b22c6763639b422de512639de5a15b13c4e1b3a3ec379cf65eaefe2ee",
+   "en": "The anodized aluminum handle provides a lightweight yet durable grip for precise control. A tool-free quick‑change mechanism allows blades to be swapped instantly, helping you switch between trimming tasks effortlessly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Lightweight Aluminum Handle with Quick Change"
+   },
+   "dict": null
+  },
+  {
+   "h": "9dc75f6b50aaf372fe03c2e5ea1cf745c68fdeed254944e9295695f780fbe645",
+   "en": "Anodized Aluminum Handle: Lightweight, strong, and non-slip for secure grip.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "d1011010b137422e1890094804e1df6b65b052e45839c24961807d485e8308a1",
+   "en": "Task-Specific Blades: Four blades optimized for different trimming tasks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[5].line[2]",
+    "near": "• Anodized Aluminum Handle: Lightweight, strong, and non-slip for secure grip."
+   },
+   "dict": null
+  },
+  {
+   "h": "0a6417715f9c8b4b4b34e91830f208db4e5e9dfe55ab4af9211b8b2eb41b6766",
+   "en": "Tool-Free Quick Change: Swap blades instantly, No tools needed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[5].line[3]",
+    "near": "• Task-Specific Blades: Four blades optimized for different trimming tasks."
+   },
+   "dict": null
+  },
+  {
+   "h": "8f6aa680355a358ce86203408cd2c576dd925f48ddfc6f3e0db8d8071e09a301",
+   "en": "Blades Storage Case Included: Keeps blades organized, protected, and portable.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-professional-trimming-tool-kit",
+    "title": "Maker's Supply Professional Trimming Tool Kit",
+    "field": "blocks[5].line[4]",
+    "near": "• Tool-Free Quick Change: Swap blades instantly, No tools needed."
+   },
+   "dict": null
+  },
+  {
+   "h": "5298a6a484ae9a2535c54fecec6fab9144f63441b39a71550d8f902cb95b764b",
+   "en": "Controlled Cutting for Everyday Maker Tasks",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[0].line[0]",
+    "near": "After printing, small cutting tasks still remain—trimming printed edges, cleaning up thin material, or preparing tape and other bench-side materials for assembl"
+   },
+   "dict": null
+  },
+  {
+   "h": "345ac69e8ef9e46a8d9a540bea7ff48c11d3fe4e6c78ee97c40b9f608b819cd1",
+   "en": "After printing, small cutting tasks still remain—trimming printed edges, cleaning up thin material, or preparing tape and other bench-side materials for assembly and finishing. The Precision Cutter delivers clean, controlled cuts for these everyday maker tasks, helping you work more accurately throughout your workflow.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[0].line[1]",
+    "near": "Controlled Cutting for Everyday Maker Tasks"
+   },
+   "dict": null
+  },
+  {
+   "h": "596effbee143b61c20754d7f625caca3e1f003caec726c623f939c1f72011d2b",
+   "en": "Stable Blade Lock for Precise Cuts",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[1].line[0]",
+    "near": "A dual-locking structure combines an axial lock with an anti-shake clip to keep the blade firmly in place during use. This stable construction reduces blade wob"
+   },
+   "dict": null
+  },
+  {
+   "h": "5adf7a3199d6a2e6fd7be4c0413fc4e8ca8e0fd93fb209b22aef24c976438372",
+   "en": "A dual-locking structure combines an axial lock with an anti-shake clip to keep the blade firmly in place during use. This stable construction reduces blade wobble during detailed cutting, giving you better control when trimming small parts, thin materials, or model details.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[1].line[1]",
+    "near": "Stable Blade Lock for Precise Cuts"
+   },
+   "dict": null
+  },
+  {
+   "h": "65a6051e5770688ad0af188d970d9955c28c7e989afe16b0bdbbade7011c2548",
+   "en": "Sharp 30° Blade for Fine Work",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[2].line[0]",
+    "near": "The slim 30° high-carbon steel blade is designed for detailed cutting and precise trimming. Its fine tip makes it easier to work on narrow areas, clean edges, a"
+   },
+   "dict": null
+  },
+  {
+   "h": "f50d37f6df1a5a9045ca82427bbd40060939290cf542b2c90086f086cf69164c",
+   "en": "The slim 30° high-carbon steel blade is designed for detailed cutting and precise trimming. Its fine tip makes it easier to work on narrow areas, clean edges, and other tasks that require more precision than standard utility knives can provide.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[2].line[1]",
+    "near": "Sharp 30° Blade for Fine Work"
+   },
+   "dict": null
+  },
+  {
+   "h": "c9490bc6790673795b761b940cf0b746c8cbbb4601da169b602a3a6c11ee3589",
+   "en": "Two Kits for Different Workbench Needs",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[3].line[0]",
+    "near": "The Maker's Supply Precision Cutter Line is designed for superior control and durability, featuring ergonomic handles and ultra-sharp, replaceable 30° blades. W"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a9edd04e552d65b4dce2c33fcc2fe1bef906e571e8c0f8603b1e507873632b2",
+   "en": "The Maker's Supply Precision Cutter Line is designed for superior control and durability, featuring ergonomic handles and ultra-sharp, replaceable 30° blades. Whether you're a hobbyist or a professional, our range provides the right tool for clean, precise cutting in your projects. The Precision Cutter is available in two configurations to match different maker workflows.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[3].line[1]",
+    "near": "Two Kits for Different Workbench Needs"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8f9feca65fdaaaf613a269f8634b41283dacddbfb871ab3ba042d9b710c037c",
+   "en": "Precision Cutter Starter Kit includes a plastic cutter and 10 PCS/Set blades: Lightweight and practical, it is a great choice for everyday cutting tasks and first-time workspace setup.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[3].line[2]",
+    "near": "The Maker's Supply Precision Cutter Line is designed for superior control and durability, featuring ergonomic handles and ultra-sharp, replaceable 30° blades. W"
+   },
+   "dict": null
+  },
+  {
+   "h": "7250b1210e1178fd54de3aba8c128fcbfd105c8bfb4dc5d6aa8e29711318a287",
+   "en": "Professional Metallic Cutter Set includes a metallic cutter and 10 PCS/Set blades: The metal body provides a more solid in-hand feel and improved stability, making it better suited for frequent use and more demanding precision work.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[3].line[3]",
+    "near": "• Precision Cutter Starter Kit includes a plastic cutter and 10 PCS/Set blades: Lightweight and practical, it is a great choice for everyday cutting tasks and f"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ba852d0c98ef982cec2a10241c8265e3fc6c34e8de5bee417cddc8a5d2adc14",
+   "en": "Each cutter includes 1 pre-installed blade.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-precision-cutter",
+    "title": "Maker's Supply Precision Cutter",
+    "field": "blocks[3].line[4]",
+    "near": "• Professional Metallic Cutter Set includes a metallic cutter and 10 PCS/Set blades: The metal body provides a more solid in-hand feel and improved stability, m"
+   },
+   "dict": null
+  },
+  {
+   "h": "183b3ead46939ab01821c8d8aec5fd5d9006ace438a4f09c8e83780502025f2a",
+   "en": "Precision Handling for 3D Printing Details",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[0].line[0]",
+    "near": "Removing fine supports, clearing filament strings, or positioning tiny printed parts often requires more control than fingers can provide. This precision stainl"
+   },
+   "dict": null
+  },
+  {
+   "h": "f9d3b95fb973bc302c64dddef619f8d1b413fc520c829187a6ed13ed9dba87ce",
+   "en": "Removing fine supports, clearing filament strings, or positioning tiny printed parts often requires more control than fingers can provide. This precision stainless steel tweezer set helps you handle delicate post‑processing tasks with accuracy.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[0].line[1]",
+    "near": "Precision Handling for 3D Printing Details"
+   },
+   "dict": null
+  },
+  {
+   "h": "410ab4ba4320d1acedb1a0514f27670246d49ce002e2f00145e77d4d260736fe",
+   "en": "Multiple Tip Styles for Different Print Tasks",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[1].line[0]",
+    "near": "Different tip geometries are designed to handle specific situations in 3D printing. Fine straight tips allow precise gripping of small supports and filament str"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbb2067a97fb4e721578acec2545bd04e5b73ec2d4432cf0fc91abdd3e8dd23d",
+   "en": "Different tip geometries are designed to handle specific situations in 3D printing. Fine straight tips allow precise gripping of small supports and filament strands, while angled tips make it easier to reach tight corners and recessed areas inside complex prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[1].line[1]",
+    "near": "Multiple Tip Styles for Different Print Tasks"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b28c846004d7dfb4a1be06912f315e366d83b3f69a29a219a5cc2e923e28a90",
+   "en": "Safe Handling Around Hotends & Small Parts",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[2].line[0]",
+    "near": "The slim stainless steel tips allow careful manipulation around tight spaces such as nozzles, cooling ducts, or small assemblies. Whether removing stray filamen"
+   },
+   "dict": null
+  },
+  {
+   "h": "ba491b3e3b5ae6fd8ecd2798aa45e3971973bc916555a532daf3bed413feb6d2",
+   "en": "The slim stainless steel tips allow careful manipulation around tight spaces such as nozzles, cooling ducts, or small assemblies. Whether removing stray filament from a heated nozzle or positioning tiny printed components, the tweezers provide the precision needed to work safely.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[2].line[1]",
+    "near": "Safe Handling Around Hotends & Small Parts"
+   },
+   "dict": null
+  },
+  {
+   "h": "e6903c4bcad34ab4311a497b55c6cd2c5c9ecdeaefdc69b5e60e32a526f2b78b",
+   "en": "Avoid using hard alloys or fiberglass to prevent tip damage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[3].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd0405b97d595eab0ad0c0e0606a6ac8b7400ea34605defc8942d7a2dc2a77c4",
+   "en": "Suitable for plastics, resins, and soft metals (hardness ≤150 HV).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[3].line[2]",
+    "near": "• Avoid using hard alloys or fiberglass to prevent tip damage."
+   },
+   "dict": null
+  },
+  {
+   "h": "fa365de96daf0db3347a8274a81046eadc80e0bc9b121ed1a3ee04731cf05319",
+   "en": "Always replace protective caps after use to maintain tip precision and safety.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[3].line[3]",
+    "near": "• Suitable for plastics, resins, and soft metals (hardness ≤150 HV)."
+   },
+   "dict": null
+  },
+  {
+   "h": "157c43c8ba3953a9b1eb3c3cc4d615617346bb49b08c837b91b4f7b3f81a3c10",
+   "en": "ESD Safe: ESD coating protects sensitive components from static damage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "dcce41ce969965cb5624c9dc748b4c671a66cb16090a5d786fcbac938f28e4e1",
+   "en": "High-Strength Stainless Steel: Corrosion-resistant material suitable for various environments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[5].line[2]",
+    "near": "• ESD Safe: ESD coating protects sensitive components from static damage."
+   },
+   "dict": null
+  },
+  {
+   "h": "73f1546f3c5ccc02dce2664135d4fa8ef27b15828102b1218a273daa6546ff2d",
+   "en": "3 Versatile Tips: Straight, curved, and flat configurations for different precision tasks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[5].line[3]",
+    "near": "• High-Strength Stainless Steel: Corrosion-resistant material suitable for various environments."
+   },
+   "dict": null
+  },
+  {
+   "h": "25f4e44ec5f14570131919f3feb1b7602a3308778a0a24b21e6549001aaa0ee6",
+   "en": "Safe & Portable: Individual protective caps and storage bags for easy carrying and protection.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-esd-stainless-steel-tweezers-set",
+    "title": "Maker's Supply ESD Stainless Steel Tweezers Set",
+    "field": "blocks[5].line[4]",
+    "near": "• 3 Versatile Tips: Straight, curved, and flat configurations for different precision tasks."
+   },
+   "dict": null
+  },
+  {
+   "h": "4c0d5a8624884c05563ed7ef7bf4e6020f7d208140793e462b72fc9630264fae",
+   "en": "The Air Filter is built with a black mesh layer, PVC honeycomb frame, activated carbon pellets, and a HEPA filter for layered filtration and lasting performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "air-filter-for-external-exhaust-fan-kit",
+    "title": "External Exhaust Air Filter",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "80d28e4e6d8bfcd5eaa25945dc35d86fee9af49fb03aa6c68e80da57f34e5525",
+   "en": "The black mesh provides first-stage filtration for larger filament debris, hair, and other foreign particles. The PVC honeycomb frame reinforces the filter structure for extended service life. High-efficiency cylindrical activated carbon pellets deliver a fill rate of ≥65%, while the 7–8 mm F5 pleated HEPA filter features a 2.5 mm pleat spacing for reliable filtration performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "air-filter-for-external-exhaust-fan-kit",
+    "title": "External Exhaust Air Filter",
+    "field": "blocks[0].line[2]",
+    "near": "The Air Filter is built with a black mesh layer, PVC honeycomb frame, activated carbon pellets, and a HEPA filter for layered filtration and lasting performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "a0638cba1ab19e9f71872eb3c4d1b099015dd78c786c35424ab5a89cdcf49ffc",
+   "en": "1. The P2S Printer comes with a built-in recirculating air filtration system as standard, which relies on an internal activated carbon filter to purify the air inside the printing chamber. Designed specifically for users with strict exhaust requirements, the External Exhaust Fan Kit adds an active external exhaust function to the P2S after installation, delivering more efficient directional air extraction performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e111fcb0c8e411b26cee79b5929d2fc814c239ec255443c3ab5a30656c4fc25c",
+   "en": "2. This kit achieves seamless integration with the printer. Once installed, the printer can automatically switch its operating mode based on the type of filament being used. Meanwhile, users can also manually adjust the operating mode via the printer’s touchscreen, Bambu Studio software, or Bambu Handy mobile app.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[0].line[2]",
+    "near": "1. The P2S Printer comes with a built-in recirculating air filtration system as standard, which relies on an internal activated carbon filter to purify the air "
+   },
+   "dict": null
+  },
+  {
+   "h": "e47a8b71eae10415614c3df5dc249a5b6fc06775910d42cfdb6037219d57eb15",
+   "en": "3. With the kit installed, the P2S gains an automatic post-print air purification feature. For engineering-grade filaments that require enclosed printing (such as ABS, PA, etc.), simply enable the \"Purify Air After Printing\" option in the printer’s settings menu. The P2S will then automatically activate the external exhaust mode upon print completion, thoroughly expelling any residual fumes from the chamber.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[0].line[3]",
+    "near": "2. This kit achieves seamless integration with the printer. Once installed, the printer can automatically switch its operating mode based on the type of filamen"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f7d59f427f399813f90cd4d32dcd0aa8e9640987a08595ac7e035dd89315bf7",
+   "en": "4. The External Exhaust Fan Kit supports expandable air filter cartridges, which are available for optional purchase according to users' needs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[1].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "583cfb03c6972147a5174901baf5177e49b3676cd116e774f05ea90c96a18344",
+   "en": "Recommended: Add the Updated Rear Panel with External Exhaust Fan Kit for optimized exhaust efficiency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "8fad7571776e853a47bae330705b9d5dd4ecbdaba6a49e60244dde8d46782aa6",
+   "en": "Standard: The External Exhaust Fan Kit can also be installed directly onto your original rear panel if standard performance meets your needs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[2].line[2]",
+    "near": "• Recommended: Add the Updated Rear Panel with External Exhaust Fan Kit for optimized exhaust efficiency."
+   },
+   "dict": null
+  },
+  {
+   "h": "4eb0e1a46b6910a2289870d35cb26c91d663861dd18be9043ec242b05bb21b29",
+   "en": "Optimizing Your P2S Experience",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[2].line[3]",
+    "near": "• Standard: The External Exhaust Fan Kit can also be installed directly onto your original rear panel if standard performance meets your needs."
+   },
+   "dict": null
+  },
+  {
+   "h": "414f98a5de7e143099b6d128ab3cdac159870f6f772594d9bc1fcb1ab0935679",
+   "en": "How to Choose: Please identify your panel version via the [Bambu Lab Wiki] before ordering:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[2].line[4]",
+    "near": "• Optimizing Your P2S Experience"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b0e0351a48ba10f2005b67c7b6730b6b3ade1091d213307c64aeec109f699b4",
+   "en": "1. If you have the Updated Rear Panel: You only need the External Exhaust Fan Kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[2].line[5]",
+    "near": "• How to Choose: Please identify your panel version via the [Bambu Lab Wiki] before ordering:"
+   },
+   "dict": null
+  },
+  {
+   "h": "fbd714b6587f044efe9429ae3e3bfabe54930fc628011be5e940f5e414f062cd",
+   "en": "2. If you have the Original Rear Panel:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[2].line[6]",
+    "near": "• 1. If you have the Updated Rear Panel: You only need the External Exhaust Fan Kit."
+   },
+   "dict": null
+  },
+  {
+   "h": "431030e0b5389e3007b3770b63d5f31d3cbbee84cabb0804c1c7eb939a1702b0",
+   "en": "3. If you own the P2S Printer without AMS, you will need to purchase an additional buffer accessory to use this exhaust fan kit",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-kit-p2s",
+    "title": "External Exhaust Fan Kit - P2S",
+    "field": "blocks[2].line[7]",
+    "near": "• 2. If you have the Original Rear Panel:"
+   },
+   "dict": null
+  },
+  {
+   "h": "a1d55a1ef82d1aea8b9bfeb6a83e8ad8499d2d9f3adf3a109d3d6537b76dc2fd",
+   "en": "A Hard Core Laser Machine",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "laser-module",
+    "title": "Laser Module",
+    "field": "blocks[0].line[0]",
+    "near": "• High-Power 455nm Laser"
+   },
+   "dict": null
+  },
+  {
+   "h": "6915fef92a77696aa165bb773465310c8609058068a782fc18438fcdd07ab928",
+   "en": "High-Power 455nm Laser",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-module",
+    "title": "Laser Module",
+    "field": "blocks[0].line[1]",
+    "near": "A Hard Core Laser Machine"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2b535234389e59c781af7a192c12d9e329ad51cd915bcbdec34ce24758f0ed3",
+   "en": "High Positioning Accuracy",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-module",
+    "title": "Laser Module",
+    "field": "blocks[0].line[2]",
+    "near": "• High-Power 455nm Laser"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd745c5f17b73bedba4fd9e398e87de92708cdf52f4fd712c430a8635fffe9d7",
+   "en": "Built-In Flame Sensors",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-module",
+    "title": "Laser Module",
+    "field": "blocks[0].line[3]",
+    "near": "• High Positioning Accuracy"
+   },
+   "dict": null
+  },
+  {
+   "h": "82359ed62e9c668a0af34d82bd2cc1a4777594beb1a7e39898c417f8a500fe1d",
+   "en": "Air Assist Technology",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-module",
+    "title": "Laser Module",
+    "field": "blocks[0].line[4]",
+    "near": "• Built-In Flame Sensors"
+   },
+   "dict": null
+  },
+  {
+   "h": "64640b3a3d6e73668fb302676d39b71f37909ece76ba762b1cb202bbad3108d0",
+   "en": "Effortless Print Removal",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[0].line[0]",
+    "near": "The carefully optimized handle angle allows the blade to slide into the narrow gap under stubborn prints with minimal effort, making it easier to lift and remov"
+   },
+   "dict": null
+  },
+  {
+   "h": "38640b0cb92eb6798c982cdd60f428a1060038ca4a373ee63ec207aabe32aba9",
+   "en": "The carefully optimized handle angle allows the blade to slide into the narrow gap under stubborn prints with minimal effort, making it easier to lift and remove prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[0].line[1]",
+    "near": "Effortless Print Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b2d029051a167b71a2594b2a8e77e2f2336545d33bfcc62a0b307b4a9ee9d9e",
+   "en": "Safe, Controlled Handling",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[1].line[0]",
+    "near": "The ergonomically designed handle provides stable force support and effective leverage. Its specially engineered structure sits flush against the build plate, r"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7f27b8c9c82c6a758b0b7f1f0bfbd3c0e14fc907eb5d821d1641cd851dd3b76",
+   "en": "The ergonomically designed handle provides stable force support and effective leverage. Its specially engineered structure sits flush against the build plate, reducing the risk of scratches or damage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[1].line[1]",
+    "near": "Safe, Controlled Handling"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c2e3199be23cbe07a1da53b162137553c8b4e7d1281eb9bc692e4b84d953680",
+   "en": "Premium Design & Comfortable Grip",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[2].line[0]",
+    "near": "Machined from a single piece of aluminum alloy for long-term durability, the finely finished surface provides a secure, comfortable grip that works equally well"
+   },
+   "dict": null
+  },
+  {
+   "h": "df50a92e2e3a66ce6c1cb2b6bc1d57b446555f09348bbedd2d7e9b3634de1a53",
+   "en": "Machined from a single piece of aluminum alloy for long-term durability, the finely finished surface provides a secure, comfortable grip that works equally well for both left- and right-handed use, making print removal easier and giving you more control.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[2].line[1]",
+    "near": "Premium Design & Comfortable Grip"
+   },
+   "dict": null
+  },
+  {
+   "h": "33fd846c0188f5e75a058c5db8b507dd5b1bd54d6b8a11995ca52a4c59e55c4a",
+   "en": "Easy Storage On Metal Surfaces",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[3].line[0]",
+    "near": "Integrated magnets provide secure storage and quick access on metal surfaces. Their orientation is carefully engineered to avoid magnetic interference with the "
+   },
+   "dict": null
+  },
+  {
+   "h": "0bfcfc06e87c47f5e1cba64e61920cac061c7fc8dce9e2a7840f9e1a91b3cb65",
+   "en": "Integrated magnets provide secure storage and quick access on metal surfaces. Their orientation is carefully engineered to avoid magnetic interference with the build plate while ensuring force is directed to keep the magnets firmly seated, reducing the risk of detachment. A silicone sleeve covers the blade after use to prevent accidental cuts and keep you safe.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[3].line[1]",
+    "near": "Easy Storage On Metal Surfaces"
+   },
+   "dict": null
+  },
+  {
+   "h": "b608f9970543765d8c03155d2c095af9687031274b382a13903b9cf119ca1a4e",
+   "en": "Direct Magnetic Mounting on Metal Panel",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[3].line[2]",
+    "near": "Integrated magnets provide secure storage and quick access on metal surfaces. Their orientation is carefully engineered to avoid magnetic interference with the "
+   },
+   "dict": null
+  },
+  {
+   "h": "898362042014a74eaf887eb5514684a20864ceca497196136860ce4ef1a2e2f2",
+   "en": "Magnetic Mounting Using Steel Plate (Plastic Panels)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[3].line[3]",
+    "near": "Direct Magnetic Mounting on Metal Panel"
+   },
+   "dict": null
+  },
+  {
+   "h": "b0a41c75a4c42c672b2d8605437daa7352a10dd673ce05f0497046c6a0c9a026",
+   "en": "DIY Handle Customization",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[4].line[0]",
+    "near": "The handle is compatible with 3D printed decorative components, allowing users to customize the scraper without affecting functionality or structural integrity."
+   },
+   "dict": null
+  },
+  {
+   "h": "3244f690364323bee3f39c65b47089a1a37681994d3055c04ffc8134670ce13a",
+   "en": "The handle is compatible with 3D printed decorative components, allowing users to customize the scraper without affecting functionality or structural integrity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[4].line[1]",
+    "near": "DIY Handle Customization"
+   },
+   "dict": null
+  },
+  {
+   "h": "c04f8392c0f3bb65fba014653c69ad9afb5cd67f69980b3d4dc73d7256c0adc0",
+   "en": "The model is available on MakerWorld with downloadable files and detailed information.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[5].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d39f98fc9e12833121a2bebee250e5d9639a95e8cbe7ba56781bbba526c602ff",
+   "en": "Premium Aluminum Build",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[7].line[3]",
+    "near": "• Safe, Controlled Handling"
+   },
+   "dict": null
+  },
+  {
+   "h": "035d071f1cd96a9f5617ac13286eeeaf2d7a1f84d2059f3fa098828616544578",
+   "en": "Magnetic Storage with Blade Cover",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mag-alloy-scraper",
+    "title": "Mag-Alloy Scraper",
+    "field": "blocks[7].line[4]",
+    "near": "• Premium Aluminum Build"
+   },
+   "dict": null
+  },
+  {
+   "h": "26b071c2b2f8587769431fb172d6730cfbad969df2498492b7f0affd47b50977",
+   "en": "Isolate Unwanted Vibration for Better Print Quality",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[0].line[0]",
+    "near": "The floating damper feet are tuned with precise resonance frequency to effectively decouple the machine from desktop vibrations. This vibration isolation system"
+   },
+   "dict": null
+  },
+  {
+   "h": "7c79c452fe2225d47d8efa1335c01be36f03a3ffaaad68e7c77940c9087cb3fa",
+   "en": "The floating damper feet are tuned with precise resonance frequency to effectively decouple the machine from desktop vibrations. This vibration isolation system ensures consistent print quality even in the presence of external vibration sources.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[0].line[1]",
+    "near": "Isolate Unwanted Vibration for Better Print Quality"
+   },
+   "dict": null
+  },
+  {
+   "h": "2378c0839c48675c50d88fb2605a7deb83791656000f3da76444dc4a4417c917",
+   "en": "*Two machines share a desk, both printing square pillar outer walls at 20,000mm/s² acceleration.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[1].line[0]",
+    "near": "The floating damper feet have been tested and optimized. Results clearly show that the specially tuned floating damper feet deliver superior vibration isolation"
+   },
+   "dict": null
+  },
+  {
+   "h": "de84d17b3875950598db320b2afa7180cdc6757ddf07c20200fcbb13d5a0502e",
+   "en": "The floating damper feet have been tested and optimized. Results clearly show that the specially tuned floating damper feet deliver superior vibration isolation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[1].line[1]",
+    "near": "*Two machines share a desk, both printing square pillar outer walls at 20,000mm/s² acceleration."
+   },
+   "dict": null
+  },
+  {
+   "h": "cc6fa2c56bc5da28473f2f55561edcfafe929e8f8493f8aad62a9f347abfdc50",
+   "en": "The vibration sensor is mounted on the heatbed of Printer A to measure vibrations transmitted through the table from Printer B, whose simulated printing activity represents vibrations across the full frequency range.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[2].line[0]",
+    "near": "*The vertical axis represents vibration acceleration: the larger the value, the stronger the machine heatbed receives vibration from the printer on the same tab"
+   },
+   "dict": null
+  },
+  {
+   "h": "c75b54f7263f76445b86792b86d7c7365cddbd72615900505c77efc051dc91dc",
+   "en": "*The vertical axis represents vibration acceleration: the larger the value, the stronger the machine heatbed receives vibration from the printer on the same table, which is more detrimental to printing stability.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[2].line[1]",
+    "near": "The vibration sensor is mounted on the heatbed of Printer A to measure vibrations transmitted through the table from Printer B, whose simulated printing activit"
+   },
+   "dict": null
+  },
+  {
+   "h": "fbc7897d0ae54131172dea73796bd90697608dff9df8c9e4edc44466d0a03df9",
+   "en": "*The horizontal axis represents time: showing how vibration changes over the course of the printing process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[2].line[2]",
+    "near": "*The vertical axis represents vibration acceleration: the larger the value, the stronger the machine heatbed receives vibration from the printer on the same tab"
+   },
+   "dict": null
+  },
+  {
+   "h": "8345374e2cdd5165d2efda2d3e877684c2b7648b07f12c492e7cc2a6ace0ca0b",
+   "en": "Tool-Free, Non-Invasive Upgrade",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[3].line[0]",
+    "near": "Installation requires no tools or structural modifications. Simply place the Floating Damper Feet beneath the printer for immediate stability improvements. This"
+   },
+   "dict": null
+  },
+  {
+   "h": "70ec21ad5f0e7521ab795c9235708174eccd07f88460aec181c9c8238974694f",
+   "en": "Installation requires no tools or structural modifications. Simply place the Floating Damper Feet beneath the printer for immediate stability improvements. This non-invasive upgrade preserves the printer's original configuration and can be reversed at any time. Please learn about the installation on Bambu Lab Wiki.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[3].line[1]",
+    "near": "Tool-Free, Non-Invasive Upgrade"
+   },
+   "dict": null
+  },
+  {
+   "h": "359d5d894e0c735dabbfd5d9ce4e9339b7f7945389520e86c53029fb284fba51",
+   "en": "The product name \"Floating Damper Feet\" is also listed as \"Anti-vibration Feet\" on some of the product packaging.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "floating-damper-feet",
+    "title": "Floating Damper Feet",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "e0b26e73024bae54e8022d2982426248531865e9ee112bc99d8f4cb823b2618f",
+   "en": "Measure, align, and preview — all with a few touches",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "blocks[1].line[0]",
+    "near": "The Bambu Lab Laser Module uses lidar to automatically map your object, while the camera displays it in Bambu Suite for intuitive graphic placement. No manual a"
+   },
+   "dict": null
+  },
+  {
+   "h": "4f0ad12f3bb79714b689faaef28198342ecba99e59152814585c577e590ad979",
+   "en": "The Bambu Lab Laser Module uses lidar to automatically map your object, while the camera displays it in Bambu Suite for intuitive graphic placement. No manual adjustments needed—everything is handled in software.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "blocks[1].line[1]",
+    "near": "Measure, align, and preview — all with a few touches"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e41b5e2006d1c81fb6af93745e987e5d2729317826d4115d8b18dd4873fc7cf",
+   "en": "Spot-on alignment with true what-you-see-is-what-you-get results",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "blocks[2].line[0]",
+    "near": "Want spot-on laser placement without manually pinpointing the position? Live Spatial Alignment, powered by the BirdsEye camera, makes it easy. Preview your desi"
+   },
+   "dict": null
+  },
+  {
+   "h": "e313e180a1beb800e3be3d5ed81e5ef6fbafdbe166e0b288b355cbb50b228fa7",
+   "en": "Want spot-on laser placement without manually pinpointing the position? Live Spatial Alignment, powered by the BirdsEye camera, makes it easy. Preview your design in Bambu Studio, and the final result will match exactly what you see on the screen.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "blocks[2].line[1]",
+    "near": "Spot-on alignment with true what-you-see-is-what-you-get results"
+   },
+   "dict": null
+  },
+  {
+   "h": "28128b29a919581c0e1b3fb4f9a9bc862aee56221c70836171c192b596d6c539",
+   "en": "Built-in angle tilting for optimal focus on every object",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "blocks[3].line[0]",
+    "near": "With so many different sloped cylinders and curved objects you might engrave, the angle adjuster helps you easily level them for optimal focus."
+   },
+   "dict": null
+  },
+  {
+   "h": "2facc3a1d671fcd6de57b5b12cffe2837669efc2f209d2fdb0f06c95defaff58",
+   "en": "With so many different sloped cylinders and curved objects you might engrave, the angle adjuster helps you easily level them for optimal focus.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "blocks[3].line[1]",
+    "near": "Built-in angle tilting for optimal focus on every object"
+   },
+   "dict": null
+  },
+  {
+   "h": "65f408468b3143cb43db18d7504028a014d67b6f19244f2ecac00b832f96dff5",
+   "en": "Clamp large objects securely",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "blocks[4].line[0]",
+    "near": "The chuck easily switches between two size ranges with a simple clip mechanism, allowing you to clamp objects of various sizes—from small to large—with ease."
+   },
+   "dict": null
+  },
+  {
+   "h": "9a723df2b382cf4e8a9ae447de5da1c0ebde8cf694117e4cc56bb5bcb14e5072",
+   "en": "The chuck easily switches between two size ranges with a simple clip mechanism, allowing you to clamp objects of various sizes—from small to large—with ease.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "blocks[4].line[1]",
+    "near": "Clamp large objects securely"
+   },
+   "dict": null
+  },
+  {
+   "h": "85768a4b238b5621fb67f6ffba0211040360265abf318dece1fa86d988d4f962",
+   "en": "Engrave on a wide range of curved surfaces",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rotary-attachment",
+    "title": "Bambu Lab Rotary Attachment",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4deb2db5016b91cee121e3d228b05183a017e4bcf29b4ba4922a9193dc01112",
+   "en": "The H2D Accessory Box includes essential tools and spare components to support the assembly, maintenance, and daily operation of your H2D printer, helping keep your printer running smoothly and ensuring consistent printing performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-for-h2d",
+    "title": "Accessory Box for H2D",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d418248968ee3f0326ac03659c26a5f20a56de145cce7c152f4e5dbb8b1d606",
+   "en": "Elevate your DIY projects with this mobile-sized Mini Heat Press, specifically engineered for unusually small or unique heat transfer projects like caps, shoes, and intricate garments. It features an intuitive single-button control and a real-time LED display, offering three precision heat levels with a rapid 3-minute warm-up. Built for both efficiency and safety, this versatile press includes a 15-minute auto-shutoff and an insulated base, delivering professional, personalized results on everything from T-shirts to masks with total peace of mind. It also works perfectly with our Heat Transfer Vinyl.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[0].line[1]",
+    "near": "Mini Heat Press"
+   },
+   "dict": null
+  },
+  {
+   "h": "79b92f3fc7605f2a1019250ee64b15a07c74f745e81580507b6298f94f1c0439",
+   "en": "3 Heat Levels for Every Need",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[1].line[0]",
+    "near": "Unlock endless DIY possibilities with three precision heat levels, tailored for unusually small or unique projects. From delicate fabrics to sturdy ceramics, th"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5d388ddb18c61e163be8327f824779db68138ea4d4ba1523e7303b9a36e5647",
+   "en": "Unlock endless DIY possibilities with three precision heat levels, tailored for unusually small or unique projects. From delicate fabrics to sturdy ceramics, the real-time LED display ensures the perfect temperature for professional results every time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[1].line[1]",
+    "near": "3 Heat Levels for Every Need"
+   },
+   "dict": null
+  },
+  {
+   "h": "09ee9977ac5c0770a0d17348edd6017d8bd37e7fb05392de2f1b62eb46e6a4aa",
+   "en": "Fast Heating & 15-Min Auto-Off",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[2].line[0]",
+    "near": "Experience professional efficiency with our rapid heating technology: reach 284°F (140°C) in just 3 minutes, and seamlessly transition to higher levels in as li"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b86b162abeb741b093a3586527abff1532bb8481edd5d722ddbefa5ca180284",
+   "en": "Experience professional efficiency with our rapid heating technology: reach 284°F (140°C) in just 3 minutes, and seamlessly transition to higher levels in as little as 40–50 seconds. For ultimate peace of mind, the machine includes an auto-shutoff feature that powers down after 15 minutes of inactivity, ensuring a safe and worry-free creative environment.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[2].line[1]",
+    "near": "Fast Heating & 15-Min Auto-Off"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e7c984c648f4e2133b06a480bdb4c1eb23e9c7bff165c3f82762e465f28ded4",
+   "en": "Safety Protection & Insulated Base",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[3].line[0]",
+    "near": "To ensure a safe experience across different regions, our product features dedicated 110V and 220V circuitry tailored to local safety standards for related prod"
+   },
+   "dict": null
+  },
+  {
+   "h": "547ec313537464d8bde422b9b23420ceca1dd6fb2c6d3e7749d7f17ba64de97d",
+   "en": "To ensure a safe experience across different regions, our product features dedicated 110V and 220V circuitry tailored to local safety standards for related products. The built-in fuse automatically cuts power if temperatures exceed 216°C or if electrical input spikes above 275V/8A. Paired with a heat-resistant insulated base, this dual-layer protection prevents both electrical hazards and accidental burns.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[3].line[1]",
+    "near": "Safety Protection & Insulated Base"
+   },
+   "dict": null
+  },
+  {
+   "h": "d766f1e52b6279748099a2ea6d2e8079eaf8178d8c6b4627af50c39e51370b92",
+   "en": "Operating Your Heat Press",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[4].line[0]",
+    "near": "Follow our quick guide to master the 3 heat levels and safety features in minutes."
+   },
+   "dict": null
+  },
+  {
+   "h": "29aa792a270d284260141b30da631980be2090dc9c5981f10b11a0f1d9313749",
+   "en": "Follow our quick guide to master the 3 heat levels and safety features in minutes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[4].line[1]",
+    "near": "Operating Your Heat Press"
+   },
+   "dict": null
+  },
+  {
+   "h": "651f70f5713f883275e5ae81644901392a20a4bd01d443deebe1f189e25745f0",
+   "en": "Mini & Portable",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-heat-press",
+    "title": "Mini Heat Press",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "feb6bdbc32e62ea57570f797c5488e1a73d57d99f716a87c078b8939e2d01f99",
+   "en": "TPU Printing, Not A Hassle Anymore",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "tpu-feed-assist-module",
+    "title": "TPU Feed Assist Module",
+    "field": "blocks[0].line[0]",
+    "near": "Printing TPU has traditionally been a challenge due to the filament's inherent elasticity and high friction. To ensure a smooth extrusion, the feed path must be"
+   },
+   "dict": null
+  },
+  {
+   "h": "c90a2e1dc613d20542bfda61ee218e111fdb3e8609696a56163c11de303858b5",
+   "en": "Printing TPU has traditionally been a challenge due to the filament's inherent elasticity and high friction. To ensure a smooth extrusion, the feed path must be as short and direct as possible. The TPU Feed Assist Module eliminates the struggle by providing an active, consistent push to the filament. By stabilizing the feed and reducing drag, it delivers the reliability and precision required for professional-grade TPU results.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-feed-assist-module",
+    "title": "TPU Feed Assist Module",
+    "field": "blocks[0].line[1]",
+    "near": "TPU Printing, Not A Hassle Anymore"
+   },
+   "dict": null
+  },
+  {
+   "h": "38b1c8f96d178c38087572a79fb1cc01fbd35f01507188c6e022cc2e8fa8dc42",
+   "en": "Simplify Your TPU Feeding Path",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "tpu-feed-assist-module",
+    "title": "TPU Feed Assist Module",
+    "field": "blocks[1].line[0]",
+    "near": "Forget the constraints of top-mounted spools or perfectly aligning your filament rack. The TPU Feed Assist Module gives you back your workspace. Now, you can ke"
+   },
+   "dict": null
+  },
+  {
+   "h": "316293a10dc3b04514d2ae83825cab5aa11d0e4a24e35bbc674d54f68ba9dc7b",
+   "en": "Forget the constraints of top-mounted spools or perfectly aligning your filament rack. The TPU Feed Assist Module gives you back your workspace. Now, you can keep your TPU in a side-mounted dry box or any convenient location without worrying about feed path friction. True freedom of placement, zero compromise on convenience.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-feed-assist-module",
+    "title": "TPU Feed Assist Module",
+    "field": "blocks[1].line[1]",
+    "near": "Simplify Your TPU Feeding Path"
+   },
+   "dict": null
+  },
+  {
+   "h": "e3e6c86958c57be776b69d0ceb5a0e2ce74332f5d85c176ea73fc2c87c56146c",
+   "en": "Installed on the right hotend: the left hotend can still be used normally, for example to print PLA supports for TPU.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-feed-assist-module",
+    "title": "TPU Feed Assist Module",
+    "field": "blocks[2].line[3]",
+    "near": "• Simplify Your TPU Feeding Path"
+   },
+   "dict": null
+  },
+  {
+   "h": "33e6bf852b2693814166e8c1001902960ed96d19a531f14ee3a475fbdc80eb08",
+   "en": "Installed on the left hotend: dual-hotend printing is not supported, as the left hotend's vertical movement may cause unstable TPU feeding and increase the risk of clogging.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-feed-assist-module",
+    "title": "TPU Feed Assist Module",
+    "field": "blocks[2].line[4]",
+    "near": "• Installed on the right hotend: the left hotend can still be used normally, for example to print PLA supports for TPU."
+   },
+   "dict": null
+  },
+  {
+   "h": "8ee7f21d93fac5f4b72c98601d0bc19f960d17bbcc2e9ba9fe300f20b6b3abe5",
+   "en": "1. This product provides core extruder components, main control board and various connectors, which need to be assembled by printing the TPU Feed Assist Module Housing and Frame by yourself.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-feed-assist-module",
+    "title": "TPU Feed Assist Module",
+    "field": "blocks[2].line[6]",
+    "near": "• Important Notice Before Purchase"
+   },
+   "dict": null
+  },
+  {
+   "h": "f477e37ed3ea34822503b517d78052bf0f807598b7542acf55b567f1a303ef65",
+   "en": "2. The TPU Feed Assist Module can be installed on either the left or right hotend:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-feed-assist-module",
+    "title": "TPU Feed Assist Module",
+    "field": "blocks[2].line[7]",
+    "near": "• 1. This product provides core extruder components, main control board and various connectors, which need to be assembled by printing the TPU Feed Assist Modul"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c5955236bca587f5e55c7d25e0d645d754a33396153a0bb918256c4aef7c546",
+   "en": "Eliminate Manual Filament Re-grouping",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "blocks[0].line[0]",
+    "near": "Dual-extrusion 3D printers significantly accelerate multi-color printing by reducing the flushing time required by single-extrusion machines. Traditionally, ens"
+   },
+   "dict": null
+  },
+  {
+   "h": "c65557f969083cc0ad0d8ddf88080151c34b41fa3e496b1fafaea6f458b34663",
+   "en": "Dual-extrusion 3D printers significantly accelerate multi-color printing by reducing the flushing time required by single-extrusion machines. Traditionally, ensuring filaments reached the correct nozzle required manually swapping spools between AMS units. With the Filament Track Switch, those days are over. It intelligently routes any filament from your AMS units to whichever nozzle the slicer assigns, giving you total hardware flexibility and faster prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "blocks[0].line[1]",
+    "near": "Eliminate Manual Filament Re-grouping"
+   },
+   "dict": null
+  },
+  {
+   "h": "138ffbcfce8199dd77632760c0ccb3bbcbc2c2ed362e4bfd96d3e8a658acfe5c",
+   "en": "Without Filament Track Switch",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "blocks[0].line[2]",
+    "near": "Dual-extrusion 3D printers significantly accelerate multi-color printing by reducing the flushing time required by single-extrusion machines. Traditionally, ens"
+   },
+   "dict": null
+  },
+  {
+   "h": "f53d5ef440be57434ce990652e88506ea888c352d3fcd17e2368dcfc40db1ff8",
+   "en": "Dynamic Mapping for Peak Efficiency",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "blocks[1].line[0]",
+    "near": "The filament track switch unbinds the AMS from specific nozzles, allowing any filament to feed into any nozzle regardless of configuration. This enables dynamic"
+   },
+   "dict": null
+  },
+  {
+   "h": "d444615224190cd3145809b57c6c53e536ee1da650e96181cd39d726d2ed52fc",
+   "en": "The filament track switch unbinds the AMS from specific nozzles, allowing any filament to feed into any nozzle regardless of configuration. This enables dynamic filament mapping, permitting mid-print color reassignments that significantly boost multi-color efficiency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "blocks[1].line[1]",
+    "near": "Dynamic Mapping for Peak Efficiency"
+   },
+   "dict": null
+  },
+  {
+   "h": "14266eba699606efe5bbcf379ce2b661016cf7d2349d603a97da516a8c007028",
+   "en": "1. After installing the Filament Track Switch, the number of AMS units that can be connected depends on the printer's supported AMS expansion limit. Please refer to the official specifications of the corresponding printer model for details.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "blocks[3].line[4]",
+    "near": "• Important Notice Before Purchase"
+   },
+   "dict": null
+  },
+  {
+   "h": "f7fbd829e52d389e5e177399e43b27c071d44fa0f148d83eee619f276a6ab81e",
+   "en": "2. For dual-nozzle printers (such as the X2D), a single AMS can still support dual-nozzle printing and enable filament switching between the left and right hotends when used with the Filament Track Switch. However, when only one AMS is connected, the left and right hotends support alternate feeding only, not simultaneous feeding. During switching, the AMS must first unload the filament and then reload it.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-track-switch",
+    "title": "Filament Track Switch",
+    "field": "blocks[3].line[5]",
+    "near": "• 1. After installing the Filament Track Switch, the number of AMS units that can be connected depends on the printer's supported AMS expansion limit. Please re"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b1cc379a293ec45b040acb3fa913f520c9c25a4cfdea937f46b64adf73db157",
+   "en": "Precise Grip for Small Parts and Fine Adjustments",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "blocks[0].line[0]",
+    "near": "Small printed components, hardware, and wires can be difficult to hold securely with fingers alone. The long nose pliers provide controlled grip for positioning"
+   },
+   "dict": null
+  },
+  {
+   "h": "6b318a70f97cf7a019c46368b5beb0732b54a5a67b08f11b247a8f1a548f5775",
+   "en": "Small printed components, hardware, and wires can be difficult to hold securely with fingers alone. The long nose pliers provide controlled grip for positioning, adjusting, and handling small parts during assembly, wiring, and other detailed maker tasks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "blocks[0].line[1]",
+    "near": "Precise Grip for Small Parts and Fine Adjustments"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1150ae1d1127181da77ef918d0654c54f4b5ef3f991243478cca94e31f56d7f",
+   "en": "Slim Jaws for Better Access and Visibility",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "blocks[1].line[0]",
+    "near": "The slim jaw profile makes it easier to reach into narrow spaces while maintaining visibility around the part. This is especially useful when working on compact"
+   },
+   "dict": null
+  },
+  {
+   "h": "46ab5181d97f61df21268d87ffa6d20e511a93506b481737f785c128a713a2db",
+   "en": "The slim jaw profile makes it easier to reach into narrow spaces while maintaining visibility around the part. This is especially useful when working on compact assemblies, internal structures, or other detailed bench-side tasks that require both access and control.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "blocks[1].line[1]",
+    "near": "Slim Jaws for Better Access and Visibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "b684a39f78332d5af6b2f5dbf4de2f216b3cca1e07a976dfd0c56f87f7feb8af",
+   "en": "Comfortable Control for Repeated Use",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "blocks[2].line[0]",
+    "near": "The compact form factor and spring-assisted opening make the pliers easy to handle during repeated bench-side work. This helps reduce effort while maintaining s"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3cda853a6b187e32cd39dd3e8aab2a6d7f751283ffd4a50de4a6da5b186a299",
+   "en": "The compact form factor and spring-assisted opening make the pliers easy to handle during repeated bench-side work. This helps reduce effort while maintaining stable control over small parts and fine adjustments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-long-nose-pliers",
+    "title": "Maker's Supply Long Nose Pliers",
+    "field": "blocks[2].line[1]",
+    "near": "Comfortable Control for Repeated Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "6c93d7f38693b83709cf52975a3704ceff060a513edd53931beccf3ffee39989",
+   "en": "A handy set of commonly used accessories and spare parts for your printer. This box contains the same items as the accessory box included with the printer, making it ideal as a replacement, backup, or extra set for everyday maintenance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-a2l",
+    "title": "Accessory Box - A2L",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "edf6049f825d9038bf1790ef03d3b65f042ed62066ac3fdf8a4cec42b09fcd8a",
+   "en": "One Kit = One Complete Workflow",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "blocks[0].line[0]",
+    "near": "You spent 8 hours printing — don't ruin it in the final 8 minutes."
+   },
+   "dict": null
+  },
+  {
+   "h": "9ba4a1b99c66e2d867f410da0c53e02c8fa4666134279caf379de3b7448f8274",
+   "en": "You spent 8 hours printing — don't ruin it in the final 8 minutes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "blocks[0].line[1]",
+    "near": "One Kit = One Complete Workflow"
+   },
+   "dict": null
+  },
+  {
+   "h": "40f04c7d81474d8830cfb5b12e75f7f1f34bbdfacab77560595d0ae2c86f95b5",
+   "en": "From Printer to Finish",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "48243d31dcbb0779eab7abf1d95842c8e93ee8f4a9b13b4945e13961fbddc41b",
+   "en": "4 essential tools, perfectly matched",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• From Printer to Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "556f41e5932f5854e9ae6c50ffdaadc4a51dc4378b2a9cadce1db7cd94af3e53",
+   "en": "Beginner-friendly, ready to use",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "print-finishing-kit",
+    "title": "Print Finishing Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• 4 essential tools, perfectly matched"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a2e0d91b4c74f2b5c2a42ecdc244afbae82704b73a1713177a814dafe8276e6",
+   "en": "What's in the kit?",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[1].cell[0]",
+    "near": "For A2L"
+   },
+   "dict": null
+  },
+  {
+   "h": "df543bb8e82d3b9e2ea95f419a1e0add01ab3e36d4b5facf645cc7b3a8de8515",
+   "en": "What is it and when to replace?",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[1].cell[1]",
+    "near": "For A2L"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d3880c19184ee946fd5bfff4caef22baebf1f16547c708a811169b33c121d51",
+   "en": "How to replace?",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[1].cell[2]",
+    "near": "For A2L"
+   },
+   "dict": null
+  },
+  {
+   "h": "bfe7c7b8432b20378c5e107aa22e4a8e03e2bf8c26b084e62d976f90575a6cc6",
+   "en": "Silicone Sock for Hotend - 3 pcs",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[2].cell[0]",
+    "near": "What's in the kit? | What is it and when to replace? | How to replace?"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa008b06ced8c19f4258dc0604515cb83ece55bbbfb5016737b6866ca0a7d569",
+   "en": "The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating impurities, preventing the filament from soiling the nozzle and affecting print quality. You should replace the silicone hotend cover if any of the following signs occur: 1. Cracks or Damage 2. Looseness or Detachment: 3. Deformation Due to Prolonged High Temperatures: 4. Frequent Filament Build-up on the Heating Block 5. Discoloration or Brittleness 6. Friction With Moving Parts (e.g, Nozzle Wiper)",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[2].cell[1]",
+    "near": "What's in the kit? | What is it and when to replace? | How to replace?"
+   },
+   "dict": null
+  },
+  {
+   "h": "648d368fdaf8bee099e19da3e3d55e960b882cf9b0b553235b72c21aff2f3557",
+   "en": "Heatbed Nozzle Wiper - 3 pcs",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[3].cell[0]",
+    "near": "Silicone Sock for Hotend - 3 pcs | The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating"
+   },
+   "dict": null
+  },
+  {
+   "h": "14384b3b8339367f81173951e3c4b7742bbc57acc15b4ded7b996252ce45f138",
+   "en": "Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that may indicate the need for replacement: 1. Inadequate cleaning of the nozzle during the pre-print preparation step. 2. Filament adhering to the nozzle tip during bed leveling, resulting in an inconsistent first layer. 3. Visible damage or wear on the nozzle wiper.",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[3].cell[1]",
+    "near": "Silicone Sock for Hotend - 3 pcs | The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating"
+   },
+   "dict": null
+  },
+  {
+   "h": "04a0ee4277eff3836e84e5d6513f8161b70b9f95b60788d84afa69fb7bcb78be",
+   "en": "Replacement Filament Cutter - 3 pcs",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[4].cell[0]",
+    "near": "Heatbed Nozzle Wiper - 3 pcs | Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that"
+   },
+   "dict": null
+  },
+  {
+   "h": "e5a36fd5464c3fd79be73fbc8024d2478f570add4a310cc462873e1a56b86432",
+   "en": "The Filament Cutter is a blade that is used to cut the filament during a filament change. The sharpness of the blade can become worse over time. We recommend replacing the filament cutter every 10-15 spools of filament used (or quicker) to ensure the cutting performance is unaffected.",
+   "kind": "block_cell",
+   "freq": 10,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[4].cell[1]",
+    "near": "Heatbed Nozzle Wiper - 3 pcs | Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that"
+   },
+   "dict": null
+  },
+  {
+   "h": "17731b3b673c5e52cb13b09d15a3049d1582137d5424eaddc5e0f75347275a41",
+   "en": "PTFE Tube (4000mm) - 1 pc",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[5].cell[0]",
+    "near": "Replacement Filament Cutter - 3 pcs | The Filament Cutter is a blade that is used to cut the filament during a filament change. The sharpness of the blade can b"
+   },
+   "dict": null
+  },
+  {
+   "h": "d161683bf5049ad67e1423bb1afe1034cec4ac25b62c35d545c6a715056587bb",
+   "en": "The function of PTFE Tube is to reduce resistance and guide filament. If the tubes are worn and not replaced in time, this may lead to feeding failures, filament accumulation inside the AMS, etc. We recommend that you check the PTFE tubes for wear during your maintenance of the machine.",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[5].cell[1]",
+    "near": "Replacement Filament Cutter - 3 pcs | The Filament Cutter is a blade that is used to cut the filament during a filament change. The sharpness of the blade can b"
+   },
+   "dict": null
+  },
+  {
+   "h": "6362de01e9c1feef397441dc8d2a7d960121b8e192c004432a2bbbe3820b433d",
+   "en": "Lubricant Grease is used to lubricate lead screws, or to eliminate noise issues between belts and idle pulleys. Inspect and reapply lubricant to lead screws and guide rails approximately every 3 months.",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[6].cell[1]",
+    "near": "PTFE Tube (4000mm) - 1 pc | The function of PTFE Tube is to reduce resistance and guide filament. If the tubes are worn and not replaced in time, this may lead "
+   },
+   "dict": null
+  },
+  {
+   "h": "a7b63c0cbe4004a1fc99a57d2ae7c8b2d12be3a807077517669d6d34e0d16aca",
+   "en": "Lubricant Oil (3g) - 6 pcs",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[7].cell[0]",
+    "near": "Lubricant Grease - 6g | Lubricant Grease is used to lubricate lead screws, or to eliminate noise issues between belts and idle pulleys. Inspect and reapply lubr"
+   },
+   "dict": null
+  },
+  {
+   "h": "d163d1f1ad3cf782162118b8b67dc79489f46cc84a0d0e1a88b5e4a1456d121b",
+   "en": "Nozzle Cleaning Sponge - 3 pcs",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[8].cell[0]",
+    "near": "Lubricant Oil (3g) - 6 pcs | Lubricant Oil is typically used for the lubrication of linear guides, slide rails, and steel shafts. Inspect and reapply lubricant "
+   },
+   "dict": null
+  },
+  {
+   "h": "2b159879505de30277413bd6b6d403d84e4395ed08f77ce8a9f5ca00014bdc4a",
+   "en": "During daily printing, nozzles easily accumulate filament residue. Over time, this residue can carbonize and turn black, affecting print accuracy. This cleaning sponge is made of high-temperature resistant material and is specially designed to clean stubborn dirt from the hot-end nozzles of printers. It effectively removes carbonized residue, ensuring optimal print quality. It is compatible with nozzles on all printer models.",
+   "kind": "block_cell",
+   "freq": 10,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[0].line[8].cell[1]",
+    "near": "Lubricant Oil (3g) - 6 pcs | Lubricant Oil is typically used for the lubrication of linear guides, slide rails, and steel shafts. Inspect and reapply lubricant "
+   },
+   "dict": null
+  },
+  {
+   "h": "be198c2f96f865ce9efd9cce36926a28184b75556e145bfea532dc7bce805e9e",
+   "en": "Nozzle Wiping Pad - 3 pcs",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[1].line[3].cell[0]",
+    "near": "Silicone Sock for Hotend - 3 pcs | The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating"
+   },
+   "dict": null
+  },
+  {
+   "h": "69c1b904a2f0a5a3cd5610ae8724a3d29d4af4bac0a6e776abb0ed4ca11068a0",
+   "en": "The Nozzle Wiping Pad is installed on the nozzle wiper part of the purge wiper and is used to remove residual waste on the nozzle. It is made of soft silicone material to ensure good contact with the hotend during wiping. Replace the nozzle wiping pad if it is damaged or detached.",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[1].line[3].cell[1]",
+    "near": "Silicone Sock for Hotend - 3 pcs | The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa07d83ca093aa81a7cbb3e873d3f8d1e7c0546dc21edba1383e00c3f67e2f8a",
+   "en": "Air Filter - 1 pc",
+   "kind": "block_cell",
+   "freq": 5,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[1].line[4].cell[0]",
+    "near": "Nozzle Wiping Pad - 3 pcs | The Nozzle Wiping Pad is installed on the nozzle wiper part of the purge wiper and is used to remove residual waste on the nozzle. I"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd76ad5bce84d23e6550dba595b4108dace933d8002ff37c505444070b35c099",
+   "en": "The Air Filter is installed on the inner side of the right inner liner of the printer (closer to the printer chamber) and is used to filter the air inside the chamber, effectively removing VOCs. It is advisable to replace the air filter after a total printing time of 1440 hours (or 60 days).",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "Nozzle Wiping Pad - 3 pcs | The Nozzle Wiping Pad is installed on the nozzle wiper part of the purge wiper and is used to remove residual waste on the nozzle. I"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7b8665ae0b2665bc609a637c289d09b8c7a9c77ca6aa4573603abd96c5825ce",
+   "en": "Replacement Filament Cutter (Left) - 3 pcs Replacement Filament Cutter (Right) - 3 pcs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[1].line[5].cell[0]",
+    "near": "Air Filter - 1 pc | The Air Filter is installed on the inner side of the right inner liner of the printer (closer to the printer chamber) and is used to filter "
+   },
+   "dict": null
+  },
+  {
+   "h": "8d45d067304410d2424c4b9b6c418e0fc0bced43436d882bc4709b1ae63e13b5",
+   "en": "Molecular Sieve Desiccant - 6 pcs",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[1].line[10].cell[0]",
+    "near": "Nozzle Cleaning Sponge - 3 pcs | During daily printing, nozzles easily accumulate filament residue. Over time, this residue can carbonize and turn black, affect"
+   },
+   "dict": null
+  },
+  {
+   "h": "4c552668e919f08ccadc7efdf59b3e685085ce72259bcdd3f437f16a49ba7add",
+   "en": "The molecular sieve desiccant absorbs moisture and keeps the air inside the AMS unit dry, working perfectly alongside the active heater. After the desiccant absorbs sufficient moisture, the indicating particles inside will turn from yellow to purple. When the color changes fully, it needs to be replaced with a new desiccant.",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[1].line[10].cell[1]",
+    "near": "Nozzle Cleaning Sponge - 3 pcs | During daily printing, nozzles easily accumulate filament residue. Over time, this residue can carbonize and turn black, affect"
+   },
+   "dict": null
+  },
+  {
+   "h": "b30fbc48c70c071f6eaa64bcebf791f6a0aca4ddaae72cabb665142c27ce275a",
+   "en": "Silicone Desiccant - 6 pcs",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[1].line[11].cell[0]",
+    "near": "Molecular Sieve Desiccant - 6 pcs | The molecular sieve desiccant absorbs moisture and keeps the air inside the AMS unit dry, working perfectly alongside the ac"
+   },
+   "dict": null
+  },
+  {
+   "h": "180e8927ecf93e79e7d3e2219fed60a4f969c65419df651f19b220aa85dd3fb6",
+   "en": "The color-changing silicone desiccant absorbs moisture and keeps the air inside AMS unit dry. After the desiccant absorbs sufficient moisture, the yellow particles inside will turn purple. When the desiccant turns purple, it needs to be replaced with a new desiccant.",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[1].line[11].cell[1]",
+    "near": "Molecular Sieve Desiccant - 6 pcs | The molecular sieve desiccant absorbs moisture and keeps the air inside the AMS unit dry, working perfectly alongside the ac"
+   },
+   "dict": null
+  },
+  {
+   "h": "2434ec7e0bf517460a3197b6a706cd9ebcb8d3a5528aab66015a87f2dd49fe4d",
+   "en": "Nozzle Wiping Pad - 5 pcs",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[3].line[3].cell[0]",
+    "near": "Silicone Sock for Hotend - 3 pcs | The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d6d3b5d07cbe26ce90872cd73ac0d47f1232a7955634f5334d5de527cec4f1b",
+   "en": "The Nozzle Wiping Pad is used to clean the nozzle before initiating a print job. Upon each print start, the cleaning process will automatically execute without manual intervention. Replacing the silicone wiping component is part of routine maintenance. If the pad shows signs of aging, cracking, or damage, it should be replaced immediately to ensure optimal performance.",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[3].line[3].cell[1]",
+    "near": "Silicone Sock for Hotend - 3 pcs | The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating"
+   },
+   "dict": null
+  },
+  {
+   "h": "56a862b33533f942b501c0c7c5d2ccbb73a00b5c8a43197bef0e40b2844c7344",
+   "en": "Silicone Sleeve for Hotend - 3 pcs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[4].line[2].cell[0]",
+    "near": "What's in the kit? | What is it and when to replace? | How to replace?"
+   },
+   "dict": null
+  },
+  {
+   "h": "9889864ea8fba2c69c8708f0549f5eb8e2bb2a65e0c93cccbd6ad78ef3d92ea4",
+   "en": "Filament Cleaning Pad of 4-in-1 PTFE Adapter II - 10 pcs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[4].line[6].cell[0]",
+    "near": "Replacement Filament Cutter - 3 pcs | The Filament Cutter is a blade that is used to cut the filament during a filament change. The sharpness of the blade can b"
+   },
+   "dict": null
+  },
+  {
+   "h": "1359cdc39240d3ffe5d62628bf85a9a8eeda4a15a85811ce5501ee5e17d7d924",
+   "en": "Purge Wiper - 1 pc",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[6].line[4].cell[0]",
+    "near": "Heatbed Nozzle Wiper - 3 pcs | Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that"
+   },
+   "dict": null
+  },
+  {
+   "h": "5631ad4ce46fe6ef4b54e733e5f3100b2242985a40f3cac3d6d50e9293af4682",
+   "en": "Over time, the purge wiper can become damaged, and the metallic flap of the wiper may wear out or become bent. Common issues that may indicate the need for replacement: 1. Inadequate cleaning of the nozzle during the pre-print preparation step. 2. Filament adhering to the purge wiper flap. 3. Visible damage or wear on the purge wiper.",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[6].line[4].cell[1]",
+    "near": "Heatbed Nozzle Wiper - 3 pcs | Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that"
+   },
+   "dict": null
+  },
+  {
+   "h": "9146f89e3d9605d53b8b09abd7124a372a8cafa86dd25c9a65f54ad54e44f5a1",
+   "en": "Nozzle Wiper - 3 pcs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[8].line[3].cell[0]",
+    "near": "Silicone Sock for Hotend - 3 pcs | The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating"
+   },
+   "dict": null
+  },
+  {
+   "h": "bde106c40437587268ab4ca2b6322b68dc18316d5403b4284fa9a4331394d667",
+   "en": "The Nozzle Wiper is a flexible tool mounted on the edge of the waste chute to clean the nozzles before printing. Replace the Nozzle Wiper when it is deformed or cracked.",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[8].line[3].cell[1]",
+    "near": "Silicone Sock for Hotend - 3 pcs | The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e17a35e80e01843e2e9ca3158270f7bdac4723876e8a6873ecfd36047118732",
+   "en": "Activated Carbon Air Filter - 1 pc",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[8].line[4].cell[0]",
+    "near": "Nozzle Wiper - 3 pcs | The Nozzle Wiper is a flexible tool mounted on the edge of the waste chute to clean the nozzles before printing. Replace the Nozzle Wiper"
+   },
+   "dict": null
+  },
+  {
+   "h": "3198ad78d3fdf328181589747d0a1f8239d71ff593696251876db7937d8890cd",
+   "en": "The Activated Carbon Air Filter is used for filtering the air from the enclosure before it is expelled outside. Each one's working life is about 1440 hours (60 days) cumulative printing time.",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[8].line[4].cell[1]",
+    "near": "Nozzle Wiper - 3 pcs | The Nozzle Wiper is a flexible tool mounted on the edge of the waste chute to clean the nozzles before printing. Replace the Nozzle Wiper"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2bf6ef87b7b5b84754bf53a6647d5b69027257fcfe30d39272f17fdb688884a",
+   "en": "PTFE Tube Connector - 3 pcs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[8].line[5].cell[0]",
+    "near": "Activated Carbon Air Filter - 1 pc | The Activated Carbon Air Filter is used for filtering the air from the enclosure before it is expelled outside. Each one's "
+   },
+   "dict": null
+  },
+  {
+   "h": "7f80eadb9a1bbfec4ac50ec82c2bbbdf5da69bc4c101a1c59d93a4117c2c5884",
+   "en": "The PTFE Tube Connector is mounted on the back of the printer and used to connect the PTFE tube between the buffer and the toolhead. You may need to replace it when you encounter the following situations: 1. The PTFE tube can not be secured. 2. The filament cannot pass through the connector.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "printer-maintenance-kit",
+    "title": "Printer Maintenance Kit",
+    "field": "blocks[8].line[5].cell[1]",
+    "near": "Activated Carbon Air Filter - 1 pc | The Activated Carbon Air Filter is used for filtering the air from the enclosure before it is expelled outside. Each one's "
+   },
+   "dict": null
+  },
+  {
+   "h": "e90baa0f46029d9b8ba0e5aa499679b82e2ba2571a64a63e318d60638e6230a7",
+   "en": "After Installing the external exhaust fan kit, when printing engineering materials that require sealed printing such as ABS and PA, you can enable \"Purify Air at Print End\" - \"Exhaust\" in the Settings on the printer's Screen. After the print is completed, the X2D will automatically start the external exhaust mode to completely exhaust the waste gas inside the chamber. When the fan is not Installed, only the \"Internal Circulation\" mode is used.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "external-exhaust-fan-bundle-x2d",
+    "title": "External Exhaust Fan Bundle - X2D",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "34d999616c748c4718d0821df04ea39608ff3aea807ee94f393f3f06256dbf7b",
+   "en": "The Focusing Lens concentrates the laser beam into a fine spot to achieve the high energy density needed for engraving and cutting.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "focusing-lens-medium-long-focal",
+    "title": "Focusing Lens - Medium & Long Focal",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "672f5d065d571b635808444616bea11d0b420657663441db5914eff35909a1e0",
+   "en": "The Medium Focal version offers a balance of precision, speed, and cutting ability, making it well suited for most everyday applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "focusing-lens-medium-long-focal",
+    "title": "Focusing Lens - Medium & Long Focal",
+    "field": "blocks[0].line[2]",
+    "near": "The Focusing Lens concentrates the laser beam into a fine spot to achieve the high energy density needed for engraving and cutting."
+   },
+   "dict": null
+  },
+  {
+   "h": "2db23d45cb1821217924247e3f7e38c10294e2c44a98f274e3bbf4b4a25865e8",
+   "en": "The Long Focal version has a longer focal depth and stronger cutting ability, making it well suited for cutting thicker materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "focusing-lens-medium-long-focal",
+    "title": "Focusing Lens - Medium & Long Focal",
+    "field": "blocks[0].line[3]",
+    "near": "The Medium Focal version offers a balance of precision, speed, and cutting ability, making it well suited for most everyday applications."
+   },
+   "dict": null
+  },
+  {
+   "h": "2139e0b2b2269497c2ff5010af1407a28fc7d65253987fb2a45e91b4e10ed6c3",
+   "en": "The Installation Bracket for Rotary Attachment secures the rotary attachment in place on the machine.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "installation-bracket-for-rotary-attachment",
+    "title": "Installation Bracket for Rotary Attachment",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e55b05a8748ba374fbb4489179d1f191882fb61322c351dea7dd653c0a4e097",
+   "en": "The Guide Rail Extension extends the feeding rail to support longer materials during roller feeding, enabling the machine to process long boards that exceed the standard working length.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "guide-rail-extension",
+    "title": "Guide Rail Extension",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1aef08966b4fa5a4d8af454418802a681f6a77abe2e2f21cd78b16eb8e9bfc89",
+   "en": "Corrects motion drift",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "blocks[0].line[0]",
+    "near": "Mechanical accuracy can drift with use. The Vision Encoder corrects for it, keeping absolute motion accuracy within 0.1 mm across the full work area. Draw 300 m"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a8155f09f7079d545c6b14e6da088fa9073b5b2f49ba1f3722b2483c931101c",
+   "en": "Mechanical accuracy can drift with use. The Vision Encoder corrects for it, keeping absolute motion accuracy within 0.1 mm across the full work area. Draw 300 mm. Cut 300 mm.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "blocks[0].line[1]",
+    "near": "Corrects motion drift"
+   },
+   "dict": null
+  },
+  {
+   "h": "da216cfba5c65f9f6768b2048275ef8d5a2da22c377f4f127b9cdcd040e6e635",
+   "en": "5-minute calibration for weeks-long accuracy",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "blocks[1].line[0]",
+    "near": "Place, calibrate, and go. A quick 5-minute calibration helps maintain high motion accuracy for weeks, compensating for changes caused by wear and long-term use."
+   },
+   "dict": null
+  },
+  {
+   "h": "d42ce58805ac29f571f2931c69c1fd065c79c852b637d98ac92475455e7b6ed5",
+   "en": "Place, calibrate, and go. A quick 5-minute calibration helps maintain high motion accuracy for weeks, compensating for changes caused by wear and long-term use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "blocks[1].line[1]",
+    "near": "5-minute calibration for weeks-long accuracy"
+   },
+   "dict": null
+  },
+  {
+   "h": "0eb7dbb1b50e2b1837c9ec932bc3b561eca712dcb13331ad2daf04242e3971cc",
+   "en": "Absolute Motion Accuracy Within 0.1 mm Across the Full Work Area",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "faa18bae7a29464ed9bc4981f1d0dcb5def263c2ed8733503825225da934af34",
+   "en": "Compensates for Mechanical Drift Over Time",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder-r1",
+    "title": "Vision Encoder - R1",
+    "field": "blocks[2].line[2]",
+    "near": "• Absolute Motion Accuracy Within 0.1 mm Across the Full Work Area"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d90ea8910110af6c0c372dabe47e427f314e9473f348ba733e7928500b4d38e",
+   "en": "Make room for long materials",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "blocks[0].line[0]",
+    "near": "Raise R1 to create the pass-through space required for the Conveyor, enabling Auto-Passthrough Processing for long materials."
+   },
+   "dict": null
+  },
+  {
+   "h": "8df3b7da67dcccae5976a9ed48937060a002ac727a7be46db9d94340c16afc8b",
+   "en": "Raise R1 to create the pass-through space required for the Conveyor, enabling Auto-Passthrough Processing for long materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "blocks[0].line[1]",
+    "near": "Make room for long materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "17cc9bbe7289839042afba6c3012f17cf703b44370a078233586b99996aabc5c",
+   "en": "Ready for rotary projects",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "blocks[1].line[0]",
+    "near": "The added clearance makes room for the Rotary Attachment, so you can engrave cylindrical and round objects such as bowls, tumblers and bottles."
+   },
+   "dict": null
+  },
+  {
+   "h": "b157c8f7858fd85bf70b0f0dbafaeb7ca540457c51263a7b19aac0ea2e8a4d49",
+   "en": "The added clearance makes room for the Rotary Attachment, so you can engrave cylindrical and round objects such as bowls, tumblers and bottles.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "blocks[1].line[1]",
+    "near": "Ready for rotary projects"
+   },
+   "dict": null
+  },
+  {
+   "h": "7440e667c6089254ac424f036b88fc3e3119dc0140d27d8910cd4850435f1b1b",
+   "en": "More room for thicker objects",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "blocks[2].line[0]",
+    "near": "Raise the working space to engrave thicker objects — from wooden boxes to other bulky projects that wouldn't normally fit inside R1."
+   },
+   "dict": null
+  },
+  {
+   "h": "5c43f7b5eee636d4dae04c44b055721c6cb028cba9625bad59ff5c5754697c80",
+   "en": "Raise the working space to engrave thicker objects — from wooden boxes to other bulky projects that wouldn't normally fit inside R1.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "blocks[2].line[1]",
+    "near": "More room for thicker objects"
+   },
+   "dict": null
+  },
+  {
+   "h": "87f59ac5c0d9627133ea48e95e2b74536db21cf4afddc132eebbaccf65cd894a",
+   "en": "Enables Auto-Passthrough Processing for long materials",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c2b5eda97e32eabd9bb180bc87618302bcaac9e3be211dbe796141bb128dea3",
+   "en": "Enables Rotary Processing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "blocks[3].line[2]",
+    "near": "• Enables Auto-Passthrough Processing for long materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "e02c1665d410a5492a84efbc2de8be58c8806814d302b8a5cbbfc74e5089cedb",
+   "en": "Creates Extra Clearance for Thicker Objects",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "riser-base",
+    "title": "Riser Base",
+    "field": "blocks[3].line[3]",
+    "near": "• Enables Rotary Processing"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7c1b457a791ac13e4c568497b797df60ac25ddc6406318215c4f3ccb8ea64d9",
+   "en": "Go up to 3 meters long",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "blocks[0].line[0]",
+    "near": "The Conveyor automatically feeds long materials through R1 during processing, extending the processing length up to 3,000 mm for signs, panels, furniture parts,"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7193a232ff751244a1470c987763c4c386a5364a51cb5ec4bffe753e2d3ed2e",
+   "en": "The Conveyor automatically feeds long materials through R1 during processing, extending the processing length up to 3,000 mm for signs, panels, furniture parts, and other large-format projects..",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "blocks[0].line[1]",
+    "near": "Go up to 3 meters long"
+   },
+   "dict": null
+  },
+  {
+   "h": "8099790f11df3dea888d333fa3fa08e06890a68a95a135e252ad592be463216a",
+   "en": "Easy to install and remove",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "blocks[1].line[0]",
+    "near": "The Conveyor is quick to install and easy to remove, making it simple to switch between long-material and regular-size projects* Requires the Riser for installa"
+   },
+   "dict": null
+  },
+  {
+   "h": "0597b3a4c9b66f0dfe515488fadaf7e245b3dab73600e5447a8eb2e894fb71a2",
+   "en": "The Conveyor is quick to install and easy to remove, making it simple to switch between long-material and regular-size projects* Requires the Riser for installation and use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "blocks[1].line[1]",
+    "near": "Easy to install and remove"
+   },
+   "dict": null
+  },
+  {
+   "h": "2cafa049e2effd5c9f09d2b779bfe7bd21f173e33ccb89051770229c9876d9b0",
+   "en": "Extends processing length up to 3,000 mm",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c36700ea72d629cfa5394de52dede7d52450d69113bff9a76f7cd5ae4b91f12",
+   "en": "Easy installation and removal",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-conveyor-feeder",
+    "title": "Automatic Conveyor Feeder",
+    "field": "blocks[2].line[2]",
+    "near": "• Extends processing length up to 3,000 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "4340b8fdd146a1efefe6ca622f2ac2d8f140404c64908cb2dcca02a16fd32692",
+   "en": "The Front Housing Assembly is mainly used to cool the printed part so that the printed part can be shaped.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "front-housing-assembly-x1-series",
+    "title": "Front Housing Assembly - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a9402383ca1d19c6300b0e78998a2f4bdc1551448695a1c3598a0dda3589b244",
+   "en": "The high-resolution screen is a 5-inch 1280*720 touch screen, that you can use to control the printer. It is only suitable for Bambu Lab X1 series. We hope you enjoy the clear visuals on our screen",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "high-resolution-screen",
+    "title": "High Resolution Screen - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  }
+ ]
+}

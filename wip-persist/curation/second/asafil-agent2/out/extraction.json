@@ -1,0 +1,896 @@
+{
+ "sourceProductId": "7463000342664",
+ "handle": "asa-filament",
+ "canonicalUrl": "https://us.store.bambulab.com/products/asa-filament",
+ "title": "ASA",
+ "seoMetaDescription": "Bambu ASA is a highly durable material that offers exceptional UV, weather, mechanical, and thermal resistance. Its unique combination of properties makes it an ideal material for printing outdoor models (plant signs, mailboxes, wind vanes, etc.) and structural parts that require long-term exposure to challenging outdoor conditions.",
+ "route": "552709755819347968>552709756700151808>552709756742094848",
+ "isFilament": true,
+ "groups": [
+  {
+   "propertyKeyId": "9742077755528",
+   "propertyKey": "Color",
+   "type": 1,
+   "title": "",
+   "position": 1,
+   "values": [
+    {
+     "id": "564681853373280263",
+     "value": "White (45100)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/50d1a72331c740578d4893eb212d3107/12007d17a7d9416abc87a01a8a299869.media"
+    },
+    {
+     "id": "564681853373280264",
+     "value": "Green (45500)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/bf68172ec3754e9f8da0e48fa105fcc4/cb784d59ca1d48cea42f9c2e545854b7.media"
+    },
+    {
+     "id": "564681853373280265",
+     "value": "Black (45101)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/97b5ec1c47b044c4a29b43f7a787441c/11d6469b590e4b8080ca5bd3f2385e22.media"
+    },
+    {
+     "id": "564681853373280266",
+     "value": "Gray (45102)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/6165d25792ba48ab97860e4cb515a734/7e5829465d8a48b39c5ad1d103db0b5e.media"
+    },
+    {
+     "id": "564681853373280267",
+     "value": "Red (45200)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/05a63b0cfeaf42cc9bdd7d4a2ddda66f/1e6d5f24fcc14949a25332fbbd52f7f2.media"
+    },
+    {
+     "id": "564681853373280268",
+     "value": "Blue (45600)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/e9e66e4dbbc146daaa67f573c7e23dd0/08592504ef0c4ed4a3054fac903bf20f.media"
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "9742077689992",
+   "propertyKey": "Type",
+   "type": 1,
+   "title": "",
+   "position": 2,
+   "values": [
+    {
+     "id": "564681853373280269",
+     "value": "Filament with spool",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "9742077722760",
+   "propertyKey": "Size",
+   "type": 1,
+   "title": "",
+   "position": 3,
+   "values": [
+    {
+     "id": "564681853373280270",
+     "value": "1kg",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  }
+ ],
+ "skus": [
+  {
+   "id": "41227780718728",
+   "props": [
+    {
+     "propertyKeyId": "9742077755528",
+     "propertyKey": "Color",
+     "value": "Red (45200)"
+    },
+    {
+     "propertyKeyId": "9742077689992",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9742077722760",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "32591766454408",
+    "url": "https://store.bblcdn.com/s7/default/cd9e457c7fb14dd7be4443336a1542eb/RED.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "41227780751496",
+   "props": [
+    {
+     "propertyKeyId": "9742077755528",
+     "propertyKey": "Color",
+     "value": "Green (45500)"
+    },
+    {
+     "propertyKeyId": "9742077689992",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9742077722760",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "32591766487176",
+    "url": "https://store.bblcdn.com/s7/default/b354737985754345846640b7fe49668a/ab6743fac3b96abc3a53833a12993981.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "41227780784264",
+   "props": [
+    {
+     "propertyKeyId": "9742077755528",
+     "propertyKey": "Color",
+     "value": "Blue (45600)"
+    },
+    {
+     "propertyKeyId": "9742077689992",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9742077722760",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "32591766421640",
+    "url": "https://store.bblcdn.com/s7/default/5bd780d0213340049ba2a737bfe13c5e/ASABlue.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "41227780817032",
+   "props": [
+    {
+     "propertyKeyId": "9742077755528",
+     "propertyKey": "Color",
+     "value": "Black (45101)"
+    },
+    {
+     "propertyKeyId": "9742077689992",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9742077722760",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "32591766552712",
+    "url": "https://store.bblcdn.com/s7/default/596088848a2b4665853f66fdaec41da1/black.png"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "41227780849800",
+   "props": [
+    {
+     "propertyKeyId": "9742077755528",
+     "propertyKey": "Color",
+     "value": "White (45100)"
+    },
+    {
+     "propertyKeyId": "9742077689992",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9742077722760",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "761009341582024704",
+    "url": "https://store.bblcdn.com/s7/default/064eb368ba6e494f97c74b73e3f6c6ca/ASA_White.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "41227780882568",
+   "props": [
+    {
+     "propertyKeyId": "9742077755528",
+     "propertyKey": "Color",
+     "value": "Gray (45102)"
+    },
+    {
+     "propertyKeyId": "9742077689992",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9742077722760",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "32591766519944",
+    "url": "https://store.bblcdn.com/s7/default/969e2bd5b33c47fd9aeba00f7d81fd32/gray.png"
+   },
+   "description": "",
+   "soldOut": false
+  }
+ ],
+ "gallery": [
+  {
+   "resourceFileId": "761009341582024704",
+   "url": "https://store.bblcdn.com/s7/default/064eb368ba6e494f97c74b73e3f6c6ca/ASA_White.jpg"
+  },
+  {
+   "resourceFileId": "32596672413832",
+   "url": "https://store.bblcdn.com/s7/default/7fda50731fb64a90b802d818292b17ec/ASAModel_1.png"
+  },
+  {
+   "resourceFileId": "32591766487176",
+   "url": "https://store.bblcdn.com/s7/default/b354737985754345846640b7fe49668a/ab6743fac3b96abc3a53833a12993981.png"
+  },
+  {
+   "resourceFileId": "32591766552712",
+   "url": "https://store.bblcdn.com/s7/default/596088848a2b4665853f66fdaec41da1/black.png"
+  },
+  {
+   "resourceFileId": "32591766519944",
+   "url": "https://store.bblcdn.com/s7/default/969e2bd5b33c47fd9aeba00f7d81fd32/gray.png"
+  },
+  {
+   "resourceFileId": "32591766454408",
+   "url": "https://store.bblcdn.com/s7/default/cd9e457c7fb14dd7be4443336a1542eb/RED.png"
+  },
+  {
+   "resourceFileId": "32591766421640",
+   "url": "https://store.bblcdn.com/s7/default/5bd780d0213340049ba2a737bfe13c5e/ASABlue.jpg"
+  }
+ ],
+ "featuresTitle": "Product Features",
+ "features": [
+  {
+   "title": "Product Features",
+   "html": "<div style=\"text-align: left; box-sizing: border-box;\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul style=\"margin: 0px; padding: 0px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">Extraordinary UV Resistance</li>\n<li style=\"box-sizing: border-box;\">Exceptional Temperature Resistance</li>\n<li style=\"box-sizing: border-box;\">High Impact Strength and Durability</li>\n<li style=\"box-sizing: border-box;\">Outdoor Use for Long-Term Purpose</li>\n<li style=\"box-sizing: border-box;\">Comes with High Temperature Reusable Spool</li>\n<li style=\"box-sizing: border-box;\">Diameter: 1.75mm +/- 0.03mm</li>\n</ul>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<div class=\"bbl-title-4 text-bbl-grey-13 font-bold\">Cautions for Use</div>\n<ul style=\"margin: 0px; padding: 0px; margin-top: 8px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">AMS 2 Pro, AMS HT &amp; AMS Compatible</li>\n<li style=\"box-sizing: border-box;\">AMS lite <strong>NOT </strong>Compatible</li>\n<li style=\"box-sizing: border-box;\">Enclosure Printers Required</li>\n</ul>"
+  }
+ ],
+ "videos": [],
+ "description": {
+  "kind": "page_builder",
+  "config": {
+   "schemaVersion": "1.0",
+   "templateId": "tpl-1779356545518",
+   "components": [
+    {
+     "id": "banner_1776859885795_imdr8wmzy",
+     "type": "banner",
+     "variant": "banner_1",
+     "name": "Banner",
+     "anchor": {
+      "enabled": true,
+      "name": "Overview",
+      "id": "banner_1776859885795_imdr8wmzy"
+     },
+     "modules": {
+      "media": {
+       "pc": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/ce89de992d834b4e8c7b35c653c2c6a2/Banner_Media-1-tuya.jpg",
+        "naturalWidth": 5120,
+        "naturalHeight": 1280
+       },
+       "mo": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/f43bf5f22ae74d66b37e8eb141565001/BannerChapter_Media_Assets_x_14.jpg",
+        "naturalWidth": 2048,
+        "naturalHeight": 960
+       }
+      },
+      "typeStyles": {
+       "content": {
+        "title": "ASA",
+        "description": "· Extraordinary UV Resistance\n· Exceptional Temperature Resistance\n· High Impact Strength and Durability"
+       }
+      }
+     }
+    },
+    {
+     "id": "chapter_1776860120943_tabnn7pvy",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "卖点",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-9",
+      "id": "chapter_1776860120943_tabnn7pvy"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "",
+        "description": ""
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1776860161046_c2ynsoh65",
+       "type": "content_block",
+       "variant": "content-block-6",
+       "name": "卖点 1",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1776860161046_c2ynsoh65"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Extraordinary Weather & UV Resistance",
+          "description": "Bambu ASA offers extraordinary UV, oxidation, and aging resistance, providing effective protection against breakage and color degradation when used outdoors for long-term purposes."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/20b6474610614dd3868006cb80517899/Frame_1123864901-tuya.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/43e72280270848b9803904d80f7e196e/Frame_1123864805-2-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040700953_4qpb8nn0q"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/7496653a970149ba90ffec6c29a4b49a/Frame_1123864805-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/52c061bc2cc6492487da107233944135/Frame_1123864908-1-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040700953_bhj85vs7g"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/4d2f4300b9d443f38b16245fc2b5d392/Frame_1123864806-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/72ff73a75a794034b808ab7946d01364/Frame_1123864907-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040700953_s4s8w8eti"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860162526_2x88208di",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 2",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1776860162526_2x88208di"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Tough and Durable",
+          "description": "Suitable for outdoor applications and regular structural requirements due to its toughness and high impact strength."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/db764cbe59cb4784a59467a731b789e6/Frame_1123864805-1-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/6d921c0a9c234c5db7ab6908e13a10dd/Frame_1123864805-1.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040700953_0noec5gh1"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/2c889e49dd214c94b2963fe9667906ee/Frame_1123864806-1-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/3703a50b497447b4b9200c0a1c1bb2e8/Frame_1123864908-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040700953_szf1yejbf"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860163846_rda8jgx7m",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 3",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-3",
+        "id": "content_block_1776860163846_rda8jgx7m"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Better Temperature Resistance",
+          "description": "Compared to normal PETG or ABS, Bambu ASA can remain in shape even at a temperature of 100°C."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/e6ed44f3ef1449ecb5eadc34e4b81153/Frame_1123864805-2-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/ae159c5ab2b945cfa642ac64e9c2df0c/Frame_1123864805-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040700953_f0aph1lm7"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/b23dcb3f16594f038a31b3ab10fe7c20/Frame_1123864807-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/27bc7d27578d49beb3eb36520ce15551/Frame_1123864909-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040700953_ubzl8zztj"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1779446371770_r3q66an79",
+       "type": "content_block",
+       "variant": "content-block-18",
+       "name": "参数对比",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-4",
+        "id": "content_block_1779446371770_r3q66an79"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Parameters Comparison"
+         }
+        },
+        "featureConfig": {
+         "description": ""
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "content_block_1776744592796_vv35dwp6b",
+     "type": "content_block",
+     "variant": "content-block-1",
+     "name": "RFID",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-6",
+      "id": "content_block_1776744592796_vv35dwp6b"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "RFID for Intelligent Printing",
+        "description": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+       }
+      },
+      "featureConfig": {
+       "tabs": [
+        {
+         "name": "Tab 1",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7582b13ce2604750968dafbc244de91a/RFID_for_Intelligent_Printing-compressed.jpg",
+           "naturalWidth": 2400,
+           "naturalHeight": 918
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/06c6251453c340aeab1c0117f97fec75/RFID_for_Intelligent_PrintingMO-compressed.jpg",
+           "naturalWidth": 1344,
+           "naturalHeight": 840
+          }
+         },
+         "id": "comp_1790040700953_wbj3dmd28"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744650085_nu31krt23",
+     "type": "content_block",
+     "variant": "content-block-17",
+     "name": "Download",
+     "anchor": {
+      "enabled": true,
+      "name": "Download",
+      "id": "content_block_1776744650085_nu31krt23"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Download"
+       }
+      },
+      "featureConfig": {
+       "items": [
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/44b88c2274b2430397da892f1de79f70/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament TDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a2896066b2f4308b780cb9d101040a9/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7abf592a7bc44468bb2d86e22fde3d24/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+         "id": "comp_1790040700953_biyue2bon"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/5575e961df094c9591a7faa849ca9b77/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament MSDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/531bad4351164f0a9c0391e0a33f2190/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/9b45266304a64648b14fcbecc220d043/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/10a896db93e04636a9f70b841867e7e6/SDS20251127B01_Bambu_ASA.pdf",
+         "id": "comp_1790040700953_4gmtpulip"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/bf5dbaee598d46e9bd8170e43facfa96/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament RoHS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a31a894dab64da9bf1df9f1f2b620db/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/f1d23869da8f41bab3454ccb28728347/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/94d2da6ca64b4d0e9c1e48faca32c89e.pdf",
+         "id": "comp_1790040700953_xpvysrpin"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/fdec58d7e8cd4820bb93af5ef7582247/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Hex Code",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/ce375e36d3db48b19db9ff0603549fc9/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/d8e728852e1d44b58088c7892cc9be49/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+         "id": "comp_1790040700953_uu3m4aeib"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1779357257213_cgkidxjv5",
+     "type": "content_block",
+     "variant": "content-block-21-pro",
+     "name": "FAQ",
+     "anchor": {
+      "enabled": true,
+      "name": "FAQ",
+      "id": "content_block_1779357257213_cgkidxjv5"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "FAQ"
+       }
+      },
+      "featureConfig": {
+       "faqs": [
+        {
+         "question": "1.What's the difference between ABS and ASA?",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<ul>\n<li>ABS is composed of acrylonitrile, butadiene, and styrene, while ASA is composed of acrylonitrile, styrene, and acrylate.</li>\n<li>ASA is a modified version of ABS that contains an additional acrylate component, which improves its weather adaptability and UV resistance.</li>\n<li>ASA retains the impact resistance and processability of ABS while providing better resistance to fading, yellowing, and degradation from sunlight exposure. Both of them may release pungent and unpleasant odors during printing, <strong>but the pungent odor of ASA is notably lighter than ABS</strong>.</li>\n</ul>",
+           "id": "comp_1790040700953_w2ot8oa9j"
+          }
+         ],
+         "id": "comp_1790040700953_jqyzd7sie"
+        },
+        {
+         "question": "2.What are the different applications of ABS and ASA?",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>ASA is ideal for outdoor applications, such as automotive exterior parts, signage, and outdoor equipment, thanks to its enhanced weather resistance and color stability. ABS is a versatile material with excellent mechanical properties that is commonly used for indoor applications.</div>",
+           "id": "comp_1790040700953_sgwaa57g6"
+          }
+         ],
+         "id": "comp_1790040700953_okbthf83c"
+        },
+        {
+         "question": "3.What are the similarities between ABS and ASA?",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>In terms of physical and mechanical properties, both exhibit good impact resistance and high tensile strength, with almost the same levels of strength, toughness, and stiffness. Both ABS and ASA may release pungent and unpleasant odors during printing and the same warping tendency and enclosed printer requirement when printing large-size and/or high infill density models.</div>",
+           "id": "comp_1790040700953_boblrerj4"
+          }
+         ],
+         "id": "comp_1790040700953_f8e164nc8"
+        },
+        {
+         "question": "4.Safety Tips",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<ul>\n<li>Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.</li>\n<li>Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.</li>\n<li>For opened filament, we recommend drying before use according to the wiki&rsquo;s recommended temperature and time settings.</li>\n<li>Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.</li>\n<li>As this filament is not food-grade, please avoid using finished prints for food storage or contact.&nbsp;</li>\n<li>We recommend using an enclosed printer. At printing temperatures, this filament may release harmful gases, including styrene, which can cause dizziness or nausea. For extended operation, please wear a protective mask with a vapor filter (such as an activated carbon mask). If individuals with asthma or respiratory conditions, pregnant women, or children are present, please increase ventilation or pause printing with this material.</li>\n</ul>",
+           "id": "comp_1790040700953_a4ybdtdxj"
+          }
+         ],
+         "id": "comp_1790040700953_rogr6nutz"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744740718_dwoqb1p7t",
+     "type": "content_block",
+     "variant": "content-block-21-pro",
+     "name": "FAQ",
+     "anchor": {
+      "enabled": true,
+      "name": "Printing Tips",
+      "id": "content_block_1776744740718_dwoqb1p7t"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Printing Tips"
+       }
+      },
+      "featureConfig": {
+       "faqs": [
+        {
+         "question": "1.Accessory Compatibility",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Not compatible with <strong>Cool Plate SuperTack</strong>.</div>",
+           "id": "comp_1790040700953_ywg02t0b1"
+          }
+         ],
+         "id": "comp_1790040700953_n9zag0t6u"
+        },
+        {
+         "question": "2.Drying Recommendations",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: <a href=\"https://wiki.bambulab.com/en/filament-acc/filament/dry-filament\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">Filament drying instructions</span></span></a> on WIKI.</div>",
+           "id": "comp_1790040700953_msf2dvnhw"
+          }
+         ],
+         "id": "comp_1790040700953_3i618urgs"
+        },
+        {
+         "question": "3.Ventilation & Odor Notice",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Pungent and unpleasant odors may be released during printing. Make sure your printer is placed in a well-ventilated area.</div>",
+           "id": "comp_1790040700953_svonmi4h1"
+          }
+         ],
+         "id": "comp_1790040700953_niqhq4aas"
+        },
+        {
+         "question": "4.Warping Prevention Tips",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>ASA is prone to warping when printing large size and/or high infill density model. To avoid warping: 1) Not recommended to print too large size and/or high infill density models. 2) Use enclosure printers and ensure the build plate is properly glued before printing. 3) Set lower printing speed and higher heatbed temperature. For more details, please refer to: <a href=\"https://wiki.bambulab.com/en/knowledge-sharing/common-print-quality-problem\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline; color: #00ae42;\">Common print quality problems and solutions</span></a> on WIKI.</div>",
+           "id": "comp_1790040700953_0o485i3ny"
+          }
+         ],
+         "id": "comp_1790040700953_93ze0sn1w"
+        }
+       ]
+      }
+     }
+    }
+   ]
+  }
+ },
+ "jsonld": {
+  "productGroupId": "7463000342664",
+  "variantSkus": [
+   "41227780718728",
+   "41227780751496",
+   "41227780784264",
+   "41227780817032",
+   "41227780849800",
+   "41227780882568"
+  ],
+  "brand": "Bambu Lab"
+ }
+}

@@ -1,0 +1,889 @@
+{
+  "handle": "pa6-gf",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T13:00:15Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer, page by page): Basic Info, Specifications and Recommended Printing Settings (p.1), Physical and Mechanical Properties (p.2), Other Physical and Chemical Properties and Specimen Test (p.3), test charts (p.4, images), Disclaimer (p.5). No filament length, hardness or diameter tolerance is given. Rows with no registry key: Spool Material \"PC + ABS (Temperature resistance 90 °C)\", Spool Size \"Diameter: 200 mm; Height: 67 mm\", Printing and Storage Humidity \"< 20% RH (Sealed with desiccant)\", Chamber Temperature 45 - 60 °C, Retraction Length 0.8 - 1.4 mm, Retraction Speed 20 - 40 mm/s, Max Overhang Angle ~ 70°, Max Bridging Length ~ 40 mm, Melt Index, Crystallization Temperature, Saturated Water Absorption Rate 2.56%, Young's Modulus, the chemical-resistance rows, and the annealing advice (80 to 130 °C, 6 to 12 hours)."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/6e5c31b749084a07b1045dc2e74225ca/SDS20260701N08_Bambu_PA6-GF.pdf",
+      "title": "Bambu PA6-GF Safety Data Sheet SDS20260701N08",
+      "retrieved_at": "2026-10-16T08:24:28Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 19 pages read. Section 2 (p.3): not classified under (EC) No 1272/2008. Section 3 (p.4): Nylon 6 80-90 % by wt, glass fibre 10-20 % by wt. Section 8 (pp.8-9): fibre-debris handling warning, gloves advised. Section 9 (pp.9-10): \"No data available\" for melting point, density and every other physical datum. Section 14 (pp.13-14): not hazardous goods (IMDG, DOT, ADR/RID, ICAO/IATA). Section 15 (p.16): SVHC not listed. No certification is named."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/59bf6c3e0af14df380b9c69c40b02772/PA6-GF_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PA6-GF",
+      "retrieved_at": "2026-10-16T08:24:30Z",
+      "keys": [],
+      "note": "One page, 8 colours in a 2-column grid: read for the published hex codes (the \"hex\" list), not for spec keys. The table names colours without colour codes, so each is matched to the store value of the same colour name. Brown #5B492F, Yellow #FFCE00 and Lime #C5ED48 have no store value (the store page says \"PA6-GF Yellow, Lime and Brown have been discontinued.\")."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, glue, build-plate and storage tables; rows \"PA-CF/GF PA6-CF/GF PAHT-CF/GF\" name this material as a class; the glue-table row and the storage row (\"PA / PA-CF/GF / PAHT-CF/GF\", \"PA-CF/GF PAHT-CF/GF\") do not name PA6-GF. Star ratings are not numbers. Used as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "compat.*"
+      ],
+      "note": "Filament Overview comparison table (column \"PA6-GF\"), Hardware Compatibility table (row \"PA6-GF\"), Filament Drying table (row \"PA6-GF\"), Device Preparation (glue stick), Advanced Adjustments 1 (speed and volumetric-flow table, row \"PA6-GF\")."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PA6-CF/GF, PAHT-CF/GF, etc.\"; Appendix II note (2) on PA-based filaments and storage humidity."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pa6-gf",
+      "title": "Bambu Lab US store product page: PA6-GF",
+      "retrieved_at": "2026-10-16T07:02:05Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections, FAQ (1-5), documents. The FAQ's annealing advice (\"80 to 130 degrees Celsius for 5 to 12 hours\") differs from the TDS (6 to 12 hours); neither has a registry key."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Nylon 6, glass fiber",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Nylon 6, glass fiber",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The SDS (p.4, section 3) gives \"Nylon 6\" 80-90 % by wt (CAS 25038-54-4) and \"Glass fibre\" 10-20 % by wt. The TDS Basic Info (p.1) and the store page call it \"Nylon 6 with Glass Fiber\"."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "Agrees with the store page (Product Features › bullet 6: \"Diameter: 1.75mm +/- 0.03mm\"). The tolerance stays the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681874097336339",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "Scoped to the store page's only Net weight value \"1 kg\"; agrees with the store page row (option Net weight › 1 kg, 1000 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.14,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.14 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The SDS (p.9, section 9) says \"Density : No data available.\"; the TDS value is kept. The store page states no density (its row is not_found)."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 219,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 219 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The SDS (p.9, section 9) says \"Melting Point : No data available.\"; the TDS value is kept. The same table gives a Crystallization Temperature of 183 °C (DSC, 10 °C/min), which has no registry key."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 67,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 67 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 210,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Physical Properties › Vicat Softening Temperature",
+      "quote": "Vicat Softening Temperature ISO 306, GB/T 1633 210 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (TDS \"Physical Properties\"; the specimen form is not stated for this row)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 158,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row, ISO 75 1.8 MPa)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 158 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value (TDS \"Physical Properties\"; the specimen form is not stated for this row). The next row gives 182 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The glass-fibre wiki (Filament Overview, comparison table, column \"PA6-GF\") gives \"Heat Resistance（HDT，0.45 MPaLoad）\" 182 ℃, which agrees with the TDS 0.45 MPa row. The registry has one HDT key per scope; the 1.8 MPa row is stored, as for every other curated filament."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 75,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 75 ± 6 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 265 °C, bed 100 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The Z row gives 27 ± 5 MPa. Young's Modulus (X-Y) 2850 ± 260 MPa and (Z) 1950 ± 210 MPa (ISO 527, GB/T 1040) have no registry key."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 3.9,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 3.9 ± 0.8 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 265 °C, bed 100 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The Z row gives 2.3 ± 0.7 %."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 3670,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 3670 ± 140 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 265 °C, bed 100 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The Z row gives 2300 ± 120 MPa."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 120,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 120 ± 6 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 265 °C, bed 100 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The Z row gives 51 ± 5 MPa. The glass-fibre wiki agrees: 120 Mpa (\"Strength （Flexural Strength - XY）\", column \"PA6-GF\")."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 27.2,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 27.2 ± 2.2 kJ/m²; 7.2 ± 2.3 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 265 °C, bed 100 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing). First value of the cell; the same cell gives 7.2 ± 2.3 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The Z row gives 4.1 ± 0.7 kJ/m². The glass-fibre wiki agrees: 27.2 KJ/m² (\"Toughness（Impact Strength - XY）\") and 4.1 KJ/m² (\"Interlayer Adhesion（Impact Strength - Z）\"), column \"PA6-GF\"."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 260,
+        "max": 290
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 260 - 290 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The material-table wiki (2. Nozzle, row \"PA-CF/GF PA6-CF/GF PAHT-CF/GF\") gives 260 - 300 (nozzle temperature, ±10 °C) for the class; the product TDS value is kept. The store page states no nozzle temperature (its row is not_found)."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 80,
+        "max": 100
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 100 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate type Engineering Plate, High Temperature Plate or Textured PEI Plate; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The material-table wiki gives 100 - 120 ℃ for \"PA-CF/GF, PA6-CF/GF PAHT-CF/GF\" on the Engineering, Smooth PEI / High-Temperature and Textured PEI plates, and 90 - 110 °C with the glue stick for the \"PA / PA-CF/GF / PAHT-CF/GF\" class; the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 130 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 130 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented. The glass-fibre wiki (Advanced Adjustments 1, speed table) agrees: \"PA6-GF | ＜130 mm/s | 10.5 mm³/s\" (its suggested maximum volumetric flow has no filament key); the same section also says, for surface quality, \"The recommended printing speed should not exceed 100 mm/s.\""
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0 - 60%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 60%",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "The glass-fibre wiki (Hardware Compatibility, row \"PA6-GF\") adds \"It is recommended to use the Smooth PEI Plate with glue applied for printing.\" and \"Not compatible with the Cool Plate SuperTack.\"; the material-table wiki gives \"Not recommended\" for PA6-CF/GF on the Bambu Cool Plate / PLA Plate."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8-12 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8-12 h. The same row gives X1 Series printer heatbed: 90 - 100 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "Agreed by the glass-fibre wiki (Filament Drying table, row \"PA6-GF\": convection oven \"80 °C, 8 - 12h\", heated bed \"90 - 100 °C, 12h\", AMS HT \"85°C, 12h\"). The drying wiki (Appendix I, row \"PA6-CF/GF, PAHT-CF/GF, etc.\") gives a forced-air oven range of 75-85 °C, 8-12 h, which contains 80 °C, and AMS 2 Pro \"Not compatible\"."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 8,
+        "max": 12
+      },
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8-12 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 80 °C. The same row gives 12 h on an X1 Series printer heatbed at 90 - 100 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "note": "A range of hours (the TDS gives \"8-12 h\"); no single number is picked. Agreed by the glass-fibre wiki (convection oven \"80 °C, 8 - 12h\") and the drying wiki (forced-air oven 8-12 h)."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "White (72102)",
+      "source_value_id": "564681874097336335",
+      "hex": "#EAEAE4",
+      "source_url": "https://store.bblcdn.com/s7/default/59bf6c3e0af14df380b9c69c40b02772/PA6-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PA6-GF",
+      "locator": "p.1, row 1, column 1",
+      "quote": "White Hex:#EAEAE4",
+      "retrieved_at": "2026-10-16T08:24:30Z"
+    },
+    {
+      "value_text": "Blue (72600)",
+      "source_value_id": "564681874097336330",
+      "hex": "#75AED8",
+      "source_url": "https://store.bblcdn.com/s7/default/59bf6c3e0af14df380b9c69c40b02772/PA6-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PA6-GF",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Blue Hex:#75AED8",
+      "retrieved_at": "2026-10-16T08:24:30Z"
+    },
+    {
+      "value_text": "Orange (72200)",
+      "source_value_id": "564681874097336331",
+      "hex": "#FF4800",
+      "source_url": "https://store.bblcdn.com/s7/default/59bf6c3e0af14df380b9c69c40b02772/PA6-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PA6-GF",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Orange Hex:#FF4800",
+      "retrieved_at": "2026-10-16T08:24:30Z"
+    },
+    {
+      "value_text": "Gray (72103)",
+      "source_value_id": "564681874097336336",
+      "hex": "#353533",
+      "source_url": "https://store.bblcdn.com/s7/default/59bf6c3e0af14df380b9c69c40b02772/PA6-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PA6-GF",
+      "locator": "p.1, row 4, column 1",
+      "quote": "Gray Hex:#353533",
+      "retrieved_at": "2026-10-16T08:24:30Z"
+    },
+    {
+      "value_text": "Black (72104)",
+      "source_value_id": "564681874097336337",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s7/default/59bf6c3e0af14df380b9c69c40b02772/PA6-GF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PA6-GF",
+      "locator": "p.1, row 4, column 2",
+      "quote": "Black Hex:#000000",
+      "retrieved_at": "2026-10-16T08:24:30Z"
+    }
+  ],
+  "relations": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pa6-gf",
+      "source_title": "Bambu Lab US store product page: PA6-GF",
+      "retrieved_at": "2026-10-16T07:02:05Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "Feeding compatibility. Drying inside the AMS 2 Pro is a different matter: the drying wiki (Appendix I, row \"PA6-CF/GF, PAHT-CF/GF, etc.\") gives AMS 2 Pro \"Not compatible\", and the material-table wiki gives \"Not recommended\" for AMS 2 Pro drying of \"PA-CF/GF PAHT-CF/GF\". The material-table AMS row (\"PA-CF/GF PA6-CF/GF PAHT-CF/GF\") names only \"Bambu PA-CF, PAHT-CF Compatible\"; the glass-fibre wiki names only the AMS lite as not compatible."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pa6-gf",
+      "source_title": "Bambu Lab US store product page: PA6-GF",
+      "retrieved_at": "2026-10-16T07:02:05Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "AMS HT drying of PA6-GF: 85 °C, 12 h (glass-fibre wiki, Filament Drying table; drying wiki, Appendix I)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pa6-gf",
+      "source_title": "Bambu Lab US store product page: PA6-GF",
+      "retrieved_at": "2026-10-16T07:02:05Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "The page's own \"RFID for Intelligent Printing\" section: parameters \"can be read through our AMS (Automatic Material System)\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pa6-gf",
+      "source_title": "Bambu Lab US store product page: PA6-GF",
+      "retrieved_at": "2026-10-16T07:02:05Z",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "AMS lite NOT Compatible",
+      "note": "Agreed by the glass-fibre wiki (Hardware Compatibility, row \"PA6-GF\", Accessory Compatibility: \"not compatible with AMS lite\") and the store FAQ (1.Accessory Compatibility)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pa6-gf",
+      "source_title": "Bambu Lab US store product page: PA6-GF",
+      "retrieved_at": "2026-10-16T07:02:05Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "0.2 mm Nozzle NOT Compatible",
+      "note": "Agreed by the store FAQ (\"Hotend with Stainless Steel Nozzle 0.2 mm\"), the glass-fibre wiki (\"Not compatible with 0.2 mm nozzle\") and the material-table wiki (0.2 mm \"Not Compatible\"; \"Do not use a 0.2 mm nozzle. The clogging risk is extremely high.\"). compat-targets.json lists \"0.2 mm Nozzle\" as reviewed-unresolvable (component concept), so no target handle is named."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "Hardened Steel or Tungsten Carbide nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "source_title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "locator": "Hardware Compatibility › table › row \"PA6-GF\" › Nozzle Compatibility",
+      "quote": "Hardened Steel and Tungsten Carbide nozzles; recommended 0.6 mm",
+      "note": "The material-table wiki agrees (2. Nozzle, row \"PA-CF/GF PA6-CF/GF PAHT-CF/GF\", \"Is it necessary to use hardened steel nozzles?\": \"Required\"; \"Do not use a stainless steel or brass nozzle\"). The store page is weaker: \"Stainless Steel Nozzle NOT Recommended\" (Cautions for Use › bullet 4). No single store product is \"a hardened steel nozzle\", so no target handle is named."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "0.4, 0.6 (recommended), 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6( recommended ), 0.8 mm",
+      "note": "The nozzle must be hardened steel or tungsten carbide (see the requires relation). The glass-fibre wiki adds \"0.4 mm high-flow nozzle not recommended\"; the material-table wiki gives 0.6 mm \"Recommended\", 0.4 and 0.8 mm \"Compatible\", 0.4 mm high flow \"Not Recommended\", 0.6 and 0.8 mm high flow \"Compatible\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pa6-gf",
+      "source_title": "Bambu Lab US store product page: PA6-GF",
+      "retrieved_at": "2026-10-16T07:02:05Z",
+      "locator": "FAQ › \"1.Accessory Compatibility\"",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, Liquid Glue, and AMS lite.",
+      "note": "Agreed by the glass-fibre wiki (Hardware Compatibility, row \"PA6-GF\": \"Not compatible with the Cool Plate SuperTack.\"); the material-table wiki gives \"Not recommended\" for PA6-CF/GF on the \"Bambu Cool Plate / PLA Plate\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Liquid Glue",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pa6-gf",
+      "source_title": "Bambu Lab US store product page: PA6-GF",
+      "retrieved_at": "2026-10-16T07:02:05Z",
+      "locator": "FAQ › \"1.Accessory Compatibility\"",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, Liquid Glue, and AMS lite.",
+      "note": "The material-table wiki glue table gives \"PA / PA-CF/GF / PAHT-CF/GF | 90 - 110 °C | Not Recommended\" (glue stick | liquid glue); the glass-fibre wiki says \"PA6-GF: Use Bambu Lab glue stick.\" and keeps liquid glue for ABS-GF."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "Glue Stick",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "source_title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "locator": "Hardware Compatibility › table › row \"PA6-GF\" › Build Plate Compatibility",
+      "quote": "Requires applying glue stick for printing;",
+      "note": "Agreed by the TDS (p.1, \"Bed Surface Preparation Glue\"), the glass-fibre wiki (Device Preparation: \"PA6-GF: Use Bambu Lab glue stick.\") and the material-table wiki (\"Use Bambu Lab Glue Stick for ASA-CF, PA6-GF/CF, PPA-CF, PPS-CF, PET-CF, and PAHT-CF printing.\")."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki gives PA6-CF/GF on the Bambu Engineering Plate at 100 - 120 ℃."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (PA6-CF/GF 100 - 120 ℃); the glass-fibre wiki: \"It is recommended to use the Smooth PEI Plate with glue applied for printing.\""
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki gives PA6-CF/GF on the \"Bambu Textured PEI Plate\" at 100 - 120 ℃."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "requires",
+      "target_kind": "family",
+      "target_label": "Enclosed printer",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "source_title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "locator": "Hardware Compatibility › table › row \"PA6-GF\" › Printer Compatibility",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 models",
+      "note": "The material-table wiki (1. Printer) recommends an \"Enclosed printer (Bambu H2 Series, X2D, P2S, X1, X1C, P1S, etc.)\" for PA6-CF/GF; the store FAQ (3.Warping Prevention Tips) says \"Use enclosed printers\". No reviewed compat target exists for \"enclosed printers\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "family",
+      "target_label": "A1 models",
+      "target_source_handle": "",
+      "target_family": "a1_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "source_title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "locator": "Hardware Compatibility › table › row \"PA6-GF\" › Printer Compatibility",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 models",
+      "note": "The material-table wiki rates PA6-CF/GF \"Not Recommended\" on open-frame printers (A Series, P1P, etc.). Whether \"A1 models\" includes the A1 mini follows the a1_series family rule (owner question P0-1)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "printer",
+      "target_label": "P1P",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "source_title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "locator": "Hardware Compatibility › table › row \"PA6-GF\" › Printer Compatibility",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 models",
+      "note": "P1P is not sold on the store; compat-targets.json resolves \"P1P\" to the existing Levonis model."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "support-for-pa-pet",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "locator": "p.1, Recommended Printing Settings › Support",
+      "quote": "Support Support for PA/PET",
+      "note": "The TDS recommended support material."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s5/default/f0317db8b3f44d0486553c1e214cff9d.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PA6-GF",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "sha256": "0e7397acf2007ff23291004bc1d38f1809dd51a512602b2b6205c23cbe14ea26"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/6e5c31b749084a07b1045dc2e74225ca/SDS20260701N08_Bambu_PA6-GF.pdf",
+      "title": "Bambu PA6-GF Safety Data Sheet SDS20260701N08",
+      "retrieved_at": "2026-10-16T08:24:28Z",
+      "sha256": "a44c805caac45400ebdd1d0b6dd705ee2037f64f8a253cc8e404b617e944eafb"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/59bf6c3e0af14df380b9c69c40b02772/PA6-GF_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PA6-GF",
+      "retrieved_at": "2026-10-16T08:24:30Z",
+      "sha256": "f6ca2fe301aec222f03612bbf8346ada80b34eb7d9054cd628c6dfe82830dff6"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/absgf_pa6gf",
+      "title": "ABS GF / PA6 GF Glass Fiber Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:21Z",
+      "sha256": "1373cd2a23bb42fb3573d4d9015cfbba76fe59345de76a288ed56f908eb6164b"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ]
+}

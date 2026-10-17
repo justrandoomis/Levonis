@@ -1,0 +1,43 @@
+{
+ "productType": "plate",
+ "format": "legacy_html",
+ "counts": {
+  "groups": 2,
+  "values": 11,
+  "variants": 18,
+  "images": 29,
+  "distinct_images": 6,
+  "swatches": 0,
+  "content_blocks": 15,
+  "content_images": 8,
+  "content_images_omitted": 0,
+  "box_items": 0,
+  "box_images": 0,
+  "specs": 18,
+  "documents": 1,
+  "relations": 13,
+  "external_ids": 19,
+  "notes": 5
+ },
+ "specsByStatus": {
+  "verified": 3,
+  "unverified": 15
+ },
+ "specsByRegion": {},
+ "relationsByState": {
+  "pending": 13
+ },
+ "sentenceCounts": {
+  "money": 0,
+  "promotion": 0,
+  "shipping_policy": 0,
+  "warranty": 2,
+  "region": 0
+ },
+ "errors": [],
+ "hold": "",
+ "unknownLabels": [
+  "Surface Temperature Resistance"
+ ],
+ "soldOutCount": 0
+}

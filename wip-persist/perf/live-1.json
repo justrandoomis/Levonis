@@ -1,0 +1,6761 @@
+{
+ "base": "https://levonis-iq.com",
+ "at": "2026-10-16T06:56:22.260Z",
+ "results": [
+  {
+   "path": "/",
+   "profile": "phone",
+   "runs": [
+    {
+     "path": "/",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 229.29999999701977,
+     "fcp": 2476,
+     "lcp": 2476,
+     "lcpEl": "h1 \"الطباعة ثلاثية الأبعاد من أولها إلى آخرها\"",
+     "cls": 0.004292968750000001,
+     "longTasks": "4/729ms",
+     "loadMs": 2144,
+     "reqLoad": 41,
+     "bytesLoad": 616558,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4092
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43299
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67696
+      },
+      "js": {
+       "n": 23,
+       "bytes": 299258
+      },
+      "api": {
+       "n": 5,
+       "bytes": 20694
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2223
+      },
+      "img": {
+       "n": 6,
+       "bytes": 179296
+      }
+     },
+     "beforeLcp": {
+      "n": 15,
+      "bytes": 352228
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 5,
+     "productLinksAfterScroll": 5,
+     "imgCount": 8,
+     "imgFirstScreen": 2,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79182,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1645
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66715,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1581
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=1080",
+       "kind": "img",
+       "bytes": 52977,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 461
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=800",
+       "kind": "img",
+       "bytes": 43791,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 1987
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43299,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 674
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35618,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1501
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35308,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 585
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32388,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1099
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=640",
+       "kind": "img",
+       "bytes": 26331,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 2070
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=480",
+       "kind": "img",
+       "bytes": 19897,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 714
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=480",
+       "kind": "img",
+       "bytes": 19341,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 637
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18825,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 588
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/home",
+       "status": 200,
+       "bytes": 11466,
+       "body": 48565,
+       "items": 14,
+       "ms": 1176.9989999993413,
+       "start": 323.0650000004971,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1443,
+       "body": 28,
+       "items": 0,
+       "ms": 245.2549999979965,
+       "start": 2395.266999999876,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1715,
+       "body": 62,
+       "items": 0,
+       "ms": 761.7040000004636,
+       "start": 2763.9989999988757,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4353,
+       "body": 6479,
+       "items": 14,
+       "ms": 794.3249999989348,
+       "start": 2767.3260000010487,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/home/sections",
+       "status": 200,
+       "bytes": 1717,
+       "body": 82,
+       "items": 0,
+       "ms": 271.32300000084797,
+       "start": 4950.452999997651,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 955.6999999992549,
+     "fcp": 3172,
+     "lcp": 3172,
+     "lcpEl": "h1 \"الطباعة ثلاثية الأبعاد من أولها إلى آخرها\"",
+     "cls": 0.004292968750000001,
+     "longTasks": "6/866ms",
+     "loadMs": 2837,
+     "reqLoad": 41,
+     "bytesLoad": 616854,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4091
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43271
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67700
+      },
+      "js": {
+       "n": 23,
+       "bytes": 299396
+      },
+      "api": {
+       "n": 5,
+       "bytes": 20653
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2223
+      },
+      "img": {
+       "n": 6,
+       "bytes": 179520
+      }
+     },
+     "beforeLcp": {
+      "n": 15,
+      "bytes": 352205
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 5,
+     "productLinksAfterScroll": 5,
+     "imgCount": 8,
+     "imgFirstScreen": 2,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79244,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1652
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66721,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1591
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=1080",
+       "kind": "img",
+       "bytes": 52977,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 566
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=800",
+       "kind": "img",
+       "bytes": 43840,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 892
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43271,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1284
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35562,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1440
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35314,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 485
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32386,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1067
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=640",
+       "kind": "img",
+       "bytes": 26394,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1758
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=480",
+       "kind": "img",
+       "bytes": 19954,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 389
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=480",
+       "kind": "img",
+       "bytes": 19396,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 400
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18842,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 687
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/home",
+       "status": 200,
+       "bytes": 11425,
+       "body": 48565,
+       "items": 14,
+       "ms": 1411.9419999988168,
+       "start": 1011.0879999992903,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1437,
+       "body": 28,
+       "items": 0,
+       "ms": 254.518999998254,
+       "start": 3103.750999998738,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1717,
+       "body": 62,
+       "items": 0,
+       "ms": 709.0449999996054,
+       "start": 3493.822000000364,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4355,
+       "body": 6479,
+       "items": 14,
+       "ms": 564.9039999989327,
+       "start": 3500.4379999991215,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/home/sections",
+       "status": 200,
+       "bytes": 1719,
+       "body": 82,
+       "items": 0,
+       "ms": 259.0589999999793,
+       "start": 5279.875000000175,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/",
+   "profile": "desktop",
+   "runs": [
+    {
+     "path": "/",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 173.19999999925494,
+     "fcp": 892,
+     "lcp": 892,
+     "lcpEl": "h1 \"الطباعة ثلاثية الأبعاد من أولها إلى آخرها\"",
+     "cls": 0.0028450184244530686,
+     "longTasks": "3/254ms",
+     "loadMs": 754,
+     "reqLoad": 41,
+     "bytesLoad": 604321,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4089
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43275
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67692
+      },
+      "js": {
+       "n": 23,
+       "bytes": 299208
+      },
+      "api": {
+       "n": 5,
+       "bytes": 20698
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2213
+      },
+      "img": {
+       "n": 6,
+       "bytes": 167146
+      }
+     },
+     "beforeLcp": {
+      "n": 15,
+      "bytes": 352140
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 5,
+     "productLinksAfterScroll": 5,
+     "imgCount": 8,
+     "imgFirstScreen": 1,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79178,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 274
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66717,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 158
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=1080",
+       "kind": "img",
+       "bytes": 63134,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 184
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=1080",
+       "kind": "img",
+       "bytes": 52983,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 176
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43275,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 188
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35577,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 504
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35306,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 144
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32386,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 191
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18832,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 560
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=480",
+       "kind": "img",
+       "bytes": 16957,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 343
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15661,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 269
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15494,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 169
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/home",
+       "status": 200,
+       "bytes": 11458,
+       "body": 48565,
+       "items": 14,
+       "ms": 536.1659999980475,
+       "start": 193.52300000173273,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1447,
+       "body": 28,
+       "items": 0,
+       "ms": 100.83099999974365,
+       "start": 802.5630000011006,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1717,
+       "body": 62,
+       "items": 0,
+       "ms": 148.47699999882025,
+       "start": 932.5950000020384,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4359,
+       "body": 6479,
+       "items": 14,
+       "ms": 149.99399999942398,
+       "start": 933.2270000013523,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/home/sections",
+       "status": 200,
+       "bytes": 1717,
+       "body": 82,
+       "items": 0,
+       "ms": 489.49700000230223,
+       "start": 1326.1039999997593,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 179.39999999850988,
+     "fcp": 920,
+     "lcp": 920,
+     "lcpEl": "h1 \"الطباعة ثلاثية الأبعاد من أولها إلى آخرها\"",
+     "cls": 0.0028450184244530686,
+     "longTasks": "2/136ms",
+     "loadMs": 764,
+     "reqLoad": 41,
+     "bytesLoad": 604082,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4091
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43271
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67700
+      },
+      "js": {
+       "n": 23,
+       "bytes": 298943
+      },
+      "api": {
+       "n": 5,
+       "bytes": 20690
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2237
+      },
+      "img": {
+       "n": 6,
+       "bytes": 167150
+      }
+     },
+     "beforeLcp": {
+      "n": 17,
+      "bytes": 431989
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 5,
+     "productLinksAfterScroll": 5,
+     "imgCount": 8,
+     "imgFirstScreen": 1,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79176,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 261
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66445,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 217
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=1080",
+       "kind": "img",
+       "bytes": 63130,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 281
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=1080",
+       "kind": "img",
+       "bytes": 52985,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 232
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43271,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 179
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35565,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 506
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35308,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 174
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32392,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 182
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18840,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 678
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=480",
+       "kind": "img",
+       "bytes": 16963,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 239
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15651,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 247
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15494,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 202
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/home",
+       "status": 200,
+       "bytes": 11468,
+       "body": 48565,
+       "items": 14,
+       "ms": 533.6160000006203,
+       "start": 212.56200000061654,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1443,
+       "body": 28,
+       "items": 0,
+       "ms": 191.46100000216393,
+       "start": 811.5079999988666,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1707,
+       "body": 62,
+       "items": 0,
+       "ms": 118.28999999852385,
+       "start": 1014.6420000019134,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4351,
+       "body": 6479,
+       "items": 14,
+       "ms": 111.7259999991802,
+       "start": 1015.5389999999898,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/home/sections",
+       "status": 200,
+       "bytes": 1721,
+       "body": 82,
+       "items": 0,
+       "ms": 531.2660000017786,
+       "start": 1349.9379999993835,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/products",
+   "profile": "phone",
+   "runs": [
+    {
+     "path": "/products",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 224.10000000149012,
+     "fcp": 2320,
+     "lcp": 3304,
+     "lcpEl": "img /files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=480",
+     "cls": 0.0012890625,
+     "longTasks": "6/638ms",
+     "loadMs": 2167,
+     "reqLoad": 45,
+     "bytesLoad": 703579,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4322
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43269
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67694
+      },
+      "js": {
+       "n": 18,
+       "bytes": 268346
+      },
+      "api": {
+       "n": 4,
+       "bytes": 34804
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2223
+      },
+      "img": {
+       "n": 16,
+       "bytes": 282921
+      }
+     },
+     "beforeLcp": {
+      "n": 45,
+      "bytes": 703579
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 26,
+     "productLinksAfterScroll": 26,
+     "imgCount": 26,
+     "imgFirstScreen": 6,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79184,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1680
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66707,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1594
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43269,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1233
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35559,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1517
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35310,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 483
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32384,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1080
+      },
+      {
+       "url": "/api/products?limit=50",
+       "kind": "api",
+       "bytes": 27297,
+       "phase": "load",
+       "cf": "",
+       "variant": "",
+       "ms": 1998
+      },
+      {
+       "url": "/files/products/catalog/gallery/634c457813b160d9812009c63ddec7419201f68a6c22030856a2a88a2940e3c8.webp?w=480",
+       "kind": "img",
+       "bytes": 23191,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 1905
+      },
+      {
+       "url": "/files/products/catalog/gallery/2348427834d8a2043762f41c489d7f61f79de6058edea978abfeb64e3695d480.webp?w=480",
+       "kind": "img",
+       "bytes": 20321,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 559
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=480",
+       "kind": "img",
+       "bytes": 19958,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 504
+      },
+      {
+       "url": "/files/products/catalog/gallery/4fb906f07041c39203ce7c0cf46d3e51de8cb4462bfe1d916bd32a82fc6a4ee6.webp?w=480",
+       "kind": "img",
+       "bytes": 19428,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 1937
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=480",
+       "kind": "img",
+       "bytes": 19394,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 486
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/products?limit=50",
+       "status": 200,
+       "bytes": 27297,
+       "body": 164290,
+       "items": 26,
+       "ms": 1997.9089999978896,
+       "start": 311.1559999997553,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1441,
+       "body": 28,
+       "items": 0,
+       "ms": 427.2000000019034,
+       "start": 2335.492999998678,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1717,
+       "body": 62,
+       "items": 0,
+       "ms": 1110.8450000028824,
+       "start": 3087.6159999970696,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4349,
+       "body": 6479,
+       "items": 14,
+       "ms": 487.86699999982375,
+       "start": 3088.969000000361,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/products",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 232.09999999776483,
+     "fcp": 2324,
+     "lcp": 3352,
+     "lcpEl": "img /files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=480",
+     "cls": 0.004214434678819445,
+     "longTasks": "4/337ms",
+     "loadMs": 2230,
+     "reqLoad": 45,
+     "bytesLoad": 704594,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4325
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43265
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67694
+      },
+      "js": {
+       "n": 18,
+       "bytes": 268623
+      },
+      "api": {
+       "n": 4,
+       "bytes": 34830
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2221
+      },
+      "img": {
+       "n": 16,
+       "bytes": 283636
+      }
+     },
+     "beforeLcp": {
+      "n": 45,
+      "bytes": 704594
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 26,
+     "productLinksAfterScroll": 26,
+     "imgCount": 26,
+     "imgFirstScreen": 6,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79241,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1764
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66709,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1670
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43265,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1216
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35622,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1485
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35310,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 474
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32384,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 994
+      },
+      {
+       "url": "/api/products?limit=50",
+       "kind": "api",
+       "bytes": 27319,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1703
+      },
+      {
+       "url": "/files/products/catalog/gallery/634c457813b160d9812009c63ddec7419201f68a6c22030856a2a88a2940e3c8.webp?w=480",
+       "kind": "img",
+       "bytes": 23252,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1861
+      },
+      {
+       "url": "/files/products/catalog/gallery/2348427834d8a2043762f41c489d7f61f79de6058edea978abfeb64e3695d480.webp?w=480",
+       "kind": "img",
+       "bytes": 20390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1047
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=480",
+       "kind": "img",
+       "bytes": 19958,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 587
+      },
+      {
+       "url": "/files/products/catalog/gallery/4fb906f07041c39203ce7c0cf46d3e51de8cb4462bfe1d916bd32a82fc6a4ee6.webp?w=480",
+       "kind": "img",
+       "bytes": 19475,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1882
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=480",
+       "kind": "img",
+       "bytes": 19396,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 571
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/products?limit=50",
+       "status": 200,
+       "bytes": 27319,
+       "body": 164290,
+       "items": 26,
+       "ms": 1703.151000001526,
+       "start": 293.4349999995902,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1445,
+       "body": 28,
+       "items": 0,
+       "ms": 372.48799999724724,
+       "start": 2319.3190000019968,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1711,
+       "body": 62,
+       "items": 0,
+       "ms": 1650.8450000001176,
+       "start": 2917.5749999994878,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4355,
+       "body": 6479,
+       "items": 14,
+       "ms": 503.43700000303215,
+       "start": 2931.717999999819,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/products",
+   "profile": "desktop",
+   "runs": [
+    {
+     "path": "/products",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 158.40000000223517,
+     "fcp": 704,
+     "lcp": 1836,
+     "lcpEl": "img /files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=320",
+     "cls": 0.00046348560737766593,
+     "longTasks": "2/117ms",
+     "loadMs": 623,
+     "reqLoad": 57,
+     "bytesLoad": 691086,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4330
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43278
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67698
+      },
+      "js": {
+       "n": 20,
+       "bytes": 288929
+      },
+      "api": {
+       "n": 4,
+       "bytes": 34769
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2219
+      },
+      "img": {
+       "n": 26,
+       "bytes": 249863
+      }
+     },
+     "beforeLcp": {
+      "n": 57,
+      "bytes": 691086
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 26,
+     "productLinksAfterScroll": 26,
+     "imgCount": 26,
+     "imgFirstScreen": 15,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79182,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 321
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66715,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 320
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43278,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 135
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35622,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 317
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35310,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 114
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32388,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 143
+      },
+      {
+       "url": "/api/products?limit=50",
+       "kind": "api",
+       "bytes": 27254,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 446
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18836,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 273
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15661,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 728
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15484,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 316
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14340,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 299
+      },
+      {
+       "url": "/files/products/catalog/gallery/2348427834d8a2043762f41c489d7f61f79de6058edea978abfeb64e3695d480.webp?w=320",
+       "kind": "img",
+       "bytes": 13008,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 449
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/products?limit=50",
+       "status": 200,
+       "bytes": 27254,
+       "body": 164290,
+       "items": 26,
+       "ms": 445.64900000113994,
+       "start": 176.05799999728333,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1437,
+       "body": 28,
+       "items": 0,
+       "ms": 435.1040000001376,
+       "start": 658.3649999993213,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1721,
+       "body": 62,
+       "items": 0,
+       "ms": 108.67700000017066,
+       "start": 1101.2209999971674,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4357,
+       "body": 6479,
+       "items": 14,
+       "ms": 610.6309999995574,
+       "start": 1103.465000000142,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/products",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 157.39999999850988,
+     "fcp": 680,
+     "lcp": 1348,
+     "lcpEl": "img /files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=320",
+     "cls": 0.00046348560737766593,
+     "longTasks": "4/233ms",
+     "loadMs": 865,
+     "reqLoad": 55,
+     "bytesLoad": 690876,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4330
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43266
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67698
+      },
+      "js": {
+       "n": 20,
+       "bytes": 288983
+      },
+      "api": {
+       "n": 4,
+       "bytes": 34763
+      },
+      "other": {
+       "n": 1,
+       "bytes": 737
+      },
+      "img": {
+       "n": 26,
+       "bytes": 251099
+      }
+     },
+     "beforeLcp": {
+      "n": 55,
+      "bytes": 690876
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 26,
+     "productLinksAfterScroll": 26,
+     "imgCount": 26,
+     "imgFirstScreen": 15,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79252,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 217
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66768,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 221
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43266,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 188
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35567,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 339
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35312,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 216
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32386,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 224
+      },
+      {
+       "url": "/api/products?limit=50",
+       "kind": "api",
+       "bytes": 27242,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 375
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18836,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 153
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15655,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 696
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15488,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 407
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14340,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 311
+      },
+      {
+       "url": "/files/products/catalog/gallery/2348427834d8a2043762f41c489d7f61f79de6058edea978abfeb64e3695d480.webp?w=320",
+       "kind": "img",
+       "bytes": 13000,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 436
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/products?limit=50",
+       "status": 200,
+       "bytes": 27242,
+       "body": 164290,
+       "items": 26,
+       "ms": 374.8109999978624,
+       "start": 191.10600000203704,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1453,
+       "body": 28,
+       "items": 0,
+       "ms": 345.28299999874434,
+       "start": 644.4660000015574,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1713,
+       "body": 62,
+       "items": 0,
+       "ms": 365.3809999996156,
+       "start": 1176.6520000019227,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4355,
+       "body": 6479,
+       "items": 14,
+       "ms": 364.7579999997106,
+       "start": 1177.9330000026675,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/categories",
+   "profile": "phone",
+   "runs": [
+    {
+     "path": "/categories",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 123.09999999776483,
+     "fcp": 2292,
+     "lcp": 4520,
+     "lcpEl": "img /files/products/catalog/gallery/df443d5dc42543a233f3ab544a998567c27f690568013ec4dbf91e6b45fb11a6.webp?w=800",
+     "cls": 0.0012890625,
+     "longTasks": "6/506ms",
+     "loadMs": 2006,
+     "reqLoad": 36,
+     "bytesLoad": 677374,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3958
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43263
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67708
+      },
+      "js": {
+       "n": 15,
+       "bytes": 278835
+      },
+      "api": {
+       "n": 8,
+       "bytes": 52490
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2229
+      },
+      "img": {
+       "n": 6,
+       "bytes": 228891
+      }
+     },
+     "beforeLcp": {
+      "n": 36,
+      "bytes": 677374
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 6,
+     "imgFirstScreen": 6,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79190,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1599
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66708,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1537
+      },
+      {
+       "url": "/files/products/catalog/gallery/b80e6d001906236f015da135ffe7e8c9ce83a7aba736f43b74f45b5b9bc9e526.webp?w=800",
+       "kind": "img",
+       "bytes": 56122,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 1789
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43263,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1231
+      },
+      {
+       "url": "/files/products/catalog/gallery/9cee3c1040c2534c82c1b19635a5ef7af4e7ec2d9944c19fd2f3c0cd4221313f.webp?w=800",
+       "kind": "img",
+       "bytes": 42391,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 1281
+      },
+      {
+       "url": "/files/products/catalog/gallery/dab9dfb0bf17103cf93c6fbe08b2013d1ee6abd3e691b6a454d6bc4753176f1e.webp?w=800",
+       "kind": "img",
+       "bytes": 36596,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 808
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35562,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1337
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35318,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 430
+      },
+      {
+       "url": "/files/products/catalog/gallery/6eb8667b8f84f440f7b025b30f9c0da89677abf41bbf52ce2f1fb6034cc3a096.webp?w=800",
+       "kind": "img",
+       "bytes": 34135,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 927
+      },
+      {
+       "url": "/files/products/catalog/gallery/71c039e0138eb6d985b71a28fa48158c868110a1003416f5235b42ada8401a10.webp?w=800",
+       "kind": "img",
+       "bytes": 34031,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 710
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1040
+      },
+      {
+       "url": "/api/products?sort=available&limit=50",
+       "kind": "api",
+       "bytes": 27327,
+       "phase": "load",
+       "cf": "",
+       "variant": "",
+       "ms": 820
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1703,
+       "body": 74,
+       "items": 0,
+       "ms": 225.7869999994,
+       "start": 1957.0759999987786,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1441,
+       "body": 28,
+       "items": 0,
+       "ms": 426.7950000030396,
+       "start": 2123.325999997178,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1713,
+       "body": 62,
+       "items": 0,
+       "ms": 416.01900000023306,
+       "start": 2623.5259999994014,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4359,
+       "body": 6479,
+       "items": 14,
+       "ms": 466.40999999726773,
+       "start": 2629.880000000412,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/tree",
+       "status": 200,
+       "bytes": 3131,
+       "body": 8889,
+       "items": 6,
+       "ms": 925.8699999991222,
+       "start": 3078.5350000005565,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=300",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?sort=available&limit=50",
+       "status": 200,
+       "bytes": 27327,
+       "body": 164338,
+       "items": 26,
+       "ms": 819.5569999988948,
+       "start": 3084.739999998419,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/home",
+       "status": 200,
+       "bytes": 11339,
+       "body": 48565,
+       "items": 14,
+       "ms": 835.4919999983395,
+       "start": 3090.2470000000903,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/bundles?limit=4",
+       "status": 200,
+       "bytes": 1477,
+       "body": 49,
+       "items": 0,
+       "ms": 251.6380000015488,
+       "start": 3095.852999998897,
+       "cf": "",
+       "cache": "public, max-age=60",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/categories",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 175.60000000149012,
+     "fcp": 2464,
+     "lcp": 4096,
+     "lcpEl": "img /files/products/catalog/gallery/df443d5dc42543a233f3ab544a998567c27f690568013ec4dbf91e6b45fb11a6.webp?w=800",
+     "cls": 0.0012890625,
+     "longTasks": "6/446ms",
+     "loadMs": 2027,
+     "reqLoad": 34,
+     "bytesLoad": 657260,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3950
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43261
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67698
+      },
+      "js": {
+       "n": 13,
+       "bytes": 258318
+      },
+      "api": {
+       "n": 8,
+       "bytes": 52615
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2225
+      },
+      "img": {
+       "n": 6,
+       "bytes": 229193
+      }
+     },
+     "beforeLcp": {
+      "n": 34,
+      "bytes": 657260
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 6,
+     "imgFirstScreen": 6,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79190,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1577
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66715,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1299
+      },
+      {
+       "url": "/files/products/catalog/gallery/b80e6d001906236f015da135ffe7e8c9ce83a7aba736f43b74f45b5b9bc9e526.webp?w=800",
+       "kind": "img",
+       "bytes": 56166,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1289
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43261,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 997
+      },
+      {
+       "url": "/files/products/catalog/gallery/9cee3c1040c2534c82c1b19635a5ef7af4e7ec2d9944c19fd2f3c0cd4221313f.webp?w=800",
+       "kind": "img",
+       "bytes": 42449,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1189
+      },
+      {
+       "url": "/files/products/catalog/gallery/dab9dfb0bf17103cf93c6fbe08b2013d1ee6abd3e691b6a454d6bc4753176f1e.webp?w=800",
+       "kind": "img",
+       "bytes": 36649,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 983
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35557,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1491
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35308,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 477
+      },
+      {
+       "url": "/files/products/catalog/gallery/6eb8667b8f84f440f7b025b30f9c0da89677abf41bbf52ce2f1fb6034cc3a096.webp?w=800",
+       "kind": "img",
+       "bytes": 34186,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1180
+      },
+      {
+       "url": "/files/products/catalog/gallery/71c039e0138eb6d985b71a28fa48158c868110a1003416f5235b42ada8401a10.webp?w=800",
+       "kind": "img",
+       "bytes": 34076,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 905
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 821
+      },
+      {
+       "url": "/api/products?sort=available&limit=50",
+       "kind": "api",
+       "bytes": 27279,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 393
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1709,
+       "body": 74,
+       "items": 0,
+       "ms": 358.8080000008631,
+       "start": 1988.1610000011278,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1443,
+       "body": 28,
+       "items": 0,
+       "ms": 456.76299999831826,
+       "start": 2151.2820000025386,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1714,
+       "body": 62,
+       "items": 0,
+       "ms": 305.1159999995434,
+       "start": 2649.977000000945,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4354,
+       "body": 6479,
+       "items": 14,
+       "ms": 294.86499999984517,
+       "start": 2653.1600000016624,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/tree",
+       "status": 200,
+       "bytes": 3204,
+       "body": 8889,
+       "items": 6,
+       "ms": 272.7480000030482,
+       "start": 2963.6109999992186,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=300",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?sort=available&limit=50",
+       "status": 200,
+       "bytes": 27279,
+       "body": 164338,
+       "items": 26,
+       "ms": 392.5620000009076,
+       "start": 2968.1479999999283,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/home",
+       "status": 200,
+       "bytes": 11435,
+       "body": 48565,
+       "items": 14,
+       "ms": 634.8849999994854,
+       "start": 2970.37900000214,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/bundles?limit=4",
+       "status": 200,
+       "bytes": 1477,
+       "body": 49,
+       "items": 0,
+       "ms": 256.1730000015814,
+       "start": 2972.458000000188,
+       "cf": "",
+       "cache": "public, max-age=60",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/categories",
+   "profile": "desktop",
+   "runs": [
+    {
+     "path": "/categories",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 136.39999999850988,
+     "fcp": 984,
+     "lcp": 2004,
+     "lcpEl": "img /files/products/catalog/gallery/df443d5dc42543a233f3ab544a998567c27f690568013ec4dbf91e6b45fb11a6.webp?w=640",
+     "cls": 0.00046348560737766593,
+     "longTasks": "0/0ms",
+     "loadMs": 806,
+     "reqLoad": 34,
+     "bytesLoad": 593953,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3958
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43276
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67694
+      },
+      "js": {
+       "n": 13,
+       "bytes": 258290
+      },
+      "api": {
+       "n": 8,
+       "bytes": 52712
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2223
+      },
+      "img": {
+       "n": 6,
+       "bytes": 165800
+      }
+     },
+     "beforeLcp": {
+      "n": 34,
+      "bytes": 593953
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 6,
+     "imgFirstScreen": 5,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79184,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 246
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66441,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 234
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43276,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 225
+      },
+      {
+       "url": "/files/products/catalog/gallery/b80e6d001906236f015da135ffe7e8c9ce83a7aba736f43b74f45b5b9bc9e526.webp?w=640",
+       "kind": "img",
+       "bytes": 42012,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 784
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35560,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 589
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35312,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 144
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32382,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 259
+      },
+      {
+       "url": "/api/products?sort=available&limit=50",
+       "kind": "api",
+       "bytes": 27360,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 170
+      },
+      {
+       "url": "/files/products/catalog/gallery/9cee3c1040c2534c82c1b19635a5ef7af4e7ec2d9944c19fd2f3c0cd4221313f.webp?w=640",
+       "kind": "img",
+       "bytes": 27115,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 455
+      },
+      {
+       "url": "/files/products/catalog/gallery/dab9dfb0bf17103cf93c6fbe08b2013d1ee6abd3e691b6a454d6bc4753176f1e.webp?w=640",
+       "kind": "img",
+       "bytes": 25504,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 349
+      },
+      {
+       "url": "/files/products/catalog/gallery/71c039e0138eb6d985b71a28fa48158c868110a1003416f5235b42ada8401a10.webp?w=640",
+       "kind": "img",
+       "bytes": 25459,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 333
+      },
+      {
+       "url": "/files/products/catalog/gallery/6eb8667b8f84f440f7b025b30f9c0da89677abf41bbf52ce2f1fb6034cc3a096.webp?w=640",
+       "kind": "img",
+       "bytes": 25109,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 827
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1707,
+       "body": 74,
+       "items": 0,
+       "ms": 154.32700000019395,
+       "start": 771.1100000014994,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1441,
+       "body": 28,
+       "items": 0,
+       "ms": 239.00700000012876,
+       "start": 810.8500000016647,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1708,
+       "body": 62,
+       "items": 0,
+       "ms": 183.51699999766424,
+       "start": 1058.5420000024897,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4354,
+       "body": 6479,
+       "items": 14,
+       "ms": 210.1349999975355,
+       "start": 1059.6260000020266,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/tree",
+       "status": 200,
+       "bytes": 3202,
+       "body": 8889,
+       "items": 6,
+       "ms": 148.882000001322,
+       "start": 1361.3770000010845,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=300",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?sort=available&limit=50",
+       "status": 200,
+       "bytes": 27360,
+       "body": 164338,
+       "items": 26,
+       "ms": 170.11300000012852,
+       "start": 1362.3289999995905,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/home",
+       "status": 200,
+       "bytes": 11463,
+       "body": 48565,
+       "items": 14,
+       "ms": 134.0810000001511,
+       "start": 1363.115000000107,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/bundles?limit=4",
+       "status": 200,
+       "bytes": 1477,
+       "body": 49,
+       "items": 0,
+       "ms": 167.34500000166008,
+       "start": 1363.816000000952,
+       "cf": "",
+       "cache": "public, max-age=60",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/categories",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 143.40000000223517,
+     "fcp": 1112,
+     "lcp": 1880,
+     "lcpEl": "img /files/products/catalog/gallery/df443d5dc42543a233f3ab544a998567c27f690568013ec4dbf91e6b45fb11a6.webp?w=640",
+     "cls": 0.00046348560737766593,
+     "longTasks": "0/0ms",
+     "loadMs": 871,
+     "reqLoad": 34,
+     "bytesLoad": 594025,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3956
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43265
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67700
+      },
+      "js": {
+       "n": 13,
+       "bytes": 258186
+      },
+      "api": {
+       "n": 8,
+       "bytes": 52566
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2215
+      },
+      "img": {
+       "n": 6,
+       "bytes": 166137
+      }
+     },
+     "beforeLcp": {
+      "n": 34,
+      "bytes": 594025
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 6,
+     "imgFirstScreen": 5,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79149,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 365
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66712,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 158
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43265,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 210
+      },
+      {
+       "url": "/files/products/catalog/gallery/b80e6d001906236f015da135ffe7e8c9ce83a7aba736f43b74f45b5b9bc9e526.webp?w=640",
+       "kind": "img",
+       "bytes": 42066,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 394
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35566,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 635
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35310,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 155
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 427
+      },
+      {
+       "url": "/api/products?sort=available&limit=50",
+       "kind": "api",
+       "bytes": 27279,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 118
+      },
+      {
+       "url": "/files/products/catalog/gallery/9cee3c1040c2534c82c1b19635a5ef7af4e7ec2d9944c19fd2f3c0cd4221313f.webp?w=640",
+       "kind": "img",
+       "bytes": 27175,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 376
+      },
+      {
+       "url": "/files/products/catalog/gallery/dab9dfb0bf17103cf93c6fbe08b2013d1ee6abd3e691b6a454d6bc4753176f1e.webp?w=640",
+       "kind": "img",
+       "bytes": 25558,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 393
+      },
+      {
+       "url": "/files/products/catalog/gallery/71c039e0138eb6d985b71a28fa48158c868110a1003416f5235b42ada8401a10.webp?w=640",
+       "kind": "img",
+       "bytes": 25522,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 313
+      },
+      {
+       "url": "/files/products/catalog/gallery/6eb8667b8f84f440f7b025b30f9c0da89677abf41bbf52ce2f1fb6034cc3a096.webp?w=640",
+       "kind": "img",
+       "bytes": 25165,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 619
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1709,
+       "body": 74,
+       "items": 0,
+       "ms": 180.03300000054878,
+       "start": 862.1500000008382,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1435,
+       "body": 28,
+       "items": 0,
+       "ms": 352.9159999998228,
+       "start": 909.7010000004957,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1682,
+       "body": 62,
+       "items": 0,
+       "ms": 283.582000000024,
+       "start": 1274.5429999995395,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4324,
+       "body": 6479,
+       "items": 14,
+       "ms": 231.0619999989285,
+       "start": 1275.236000001314,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/tree",
+       "status": 200,
+       "bytes": 3200,
+       "body": 8889,
+       "items": 6,
+       "ms": 120.46200000258978,
+       "start": 1472.6399999999558,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=300",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?sort=available&limit=50",
+       "status": 200,
+       "bytes": 27279,
+       "body": 164338,
+       "items": 26,
+       "ms": 118.47499999930733,
+       "start": 1473.638999999821,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/home",
+       "status": 200,
+       "bytes": 11460,
+       "body": 48565,
+       "items": 14,
+       "ms": 143.85399999810033,
+       "start": 1474.1700000013225,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/bundles?limit=4",
+       "status": 200,
+       "bytes": 1477,
+       "body": 49,
+       "items": 0,
+       "ms": 229.28699999829405,
+       "start": 1474.6130000021367,
+       "cf": "",
+       "cache": "public, max-age=60",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/categories/printer-accessories",
+   "profile": "phone",
+   "runs": [
+    {
+     "path": "/categories/printer-accessories",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 138.30000000074506,
+     "fcp": 2336,
+     "lcp": 5980,
+     "lcpEl": "img /files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=480",
+     "cls": 0.0012890625,
+     "longTasks": "5/571ms",
+     "loadMs": 2008,
+     "reqLoad": 54,
+     "bytesLoad": 582138,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3960
+      },
+      "css": {
+       "n": 2,
+       "bytes": 45469
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67702
+      },
+      "js": {
+       "n": 36,
+       "bytes": 353480
+      },
+      "api": {
+       "n": 6,
+       "bytes": 18264
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2225
+      },
+      "img": {
+       "n": 4,
+       "bytes": 91038
+      }
+     },
+     "beforeLcp": {
+      "n": 54,
+      "bytes": 582138
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 2,
+     "productLinksAfterScroll": 2,
+     "imgCount": 4,
+     "imgFirstScreen": 4,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79194,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1563
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66539,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1499
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43271,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1226
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=800",
+       "kind": "img",
+       "bytes": 36070,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 628
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35634,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1270
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35316,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 444
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32386,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1074
+      },
+      {
+       "url": "/files/products/catalog/gallery/bfdd1ff6fc51edca9fb92d5cd9ca22bcaf480d23d140347a8b2d787298197072.webp?w=800",
+       "kind": "img",
+       "bytes": 25969,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 654
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18840,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1479
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=480",
+       "kind": "img",
+       "bytes": 16958,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 370
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15657,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 539
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15484,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 355
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1711,
+       "body": 74,
+       "items": 0,
+       "ms": 224.71299999961047,
+       "start": 1948.9529999991646,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1443,
+       "body": 28,
+       "items": 0,
+       "ms": 267.97699999951874,
+       "start": 2121.1509999993723,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1713,
+       "body": 62,
+       "items": 0,
+       "ms": 1442.1699999984412,
+       "start": 2428.641999998945,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4355,
+       "body": 6479,
+       "items": 14,
+       "ms": 1521.377000000939,
+       "start": 2439.6019999985583,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/printer-accessories",
+       "status": 200,
+       "bytes": 4860,
+       "body": 16095,
+       "items": 5,
+       "ms": 637.2230000015406,
+       "start": 4055.5159999967145,
+       "cf": "",
+       "cache": "public, max-age=60",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?category=cat_pacc&facets=1&limit=24",
+       "status": 200,
+       "bytes": 4182,
+       "body": 10680,
+       "items": 8,
+       "ms": 560.7569999992847,
+       "start": 4857.653999999457,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/categories/printer-accessories",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 237.5,
+     "fcp": 3420,
+     "lcp": 6020,
+     "lcpEl": "img /files/products/catalog/gallery/5ff5675b1221f0e5adc869f453dd2870869ee048a7639abb2702458ded4debdc.webp?w=480",
+     "cls": 0.0012890625,
+     "longTasks": "5/743ms",
+     "loadMs": 2894,
+     "reqLoad": 54,
+     "bytesLoad": 582322,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3950
+      },
+      "css": {
+       "n": 2,
+       "bytes": 45471
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67704
+      },
+      "js": {
+       "n": 36,
+       "bytes": 353238
+      },
+      "api": {
+       "n": 6,
+       "bytes": 18533
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2209
+      },
+      "img": {
+       "n": 4,
+       "bytes": 91217
+      }
+     },
+     "beforeLcp": {
+      "n": 54,
+      "bytes": 582322
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 2,
+     "productLinksAfterScroll": 2,
+     "imgCount": 4,
+     "imgFirstScreen": 4,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79188,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 2348
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66709,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1369
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43269,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1182
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=800",
+       "kind": "img",
+       "bytes": 36127,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 510
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35562,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 2140
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35310,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 436
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32394,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1072
+      },
+      {
+       "url": "/files/products/catalog/gallery/bfdd1ff6fc51edca9fb92d5cd9ca22bcaf480d23d140347a8b2d787298197072.webp?w=800",
+       "kind": "img",
+       "bytes": 26028,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 793
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18834,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 430
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=480",
+       "kind": "img",
+       "bytes": 16966,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 418
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15661,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 591
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15486,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 397
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1707,
+       "body": 74,
+       "items": 0,
+       "ms": 236.7980000017269,
+       "start": 2851.126999998087,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1435,
+       "body": 28,
+       "items": 0,
+       "ms": 387.2110000011162,
+       "start": 3124.7389999989537,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1711,
+       "body": 62,
+       "items": 0,
+       "ms": 1172.8719999991881,
+       "start": 3595.9029999976337,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4363,
+       "body": 6479,
+       "items": 14,
+       "ms": 1204.475000002276,
+       "start": 3600.0269999967713,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/printer-accessories",
+       "status": 200,
+       "bytes": 5017,
+       "body": 16095,
+       "items": 5,
+       "ms": 257.29800000044634,
+       "start": 4803.576999998768,
+       "cf": "HIT",
+       "cache": "public, max-age=60",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?category=cat_pacc&facets=1&limit=24",
+       "status": 200,
+       "bytes": 4300,
+       "body": 10680,
+       "items": 8,
+       "ms": 285.2500000008149,
+       "start": 5247.297999998409,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/categories/printer-accessories",
+   "profile": "desktop",
+   "runs": [
+    {
+     "path": "/categories/printer-accessories",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 127,
+     "fcp": 1016,
+     "lcp": 2764,
+     "lcpEl": "img /files/products/catalog/gallery/bfdd1ff6fc51edca9fb92d5cd9ca22bcaf480d23d140347a8b2d787298197072.webp?w=640",
+     "cls": 0.00046348560737766593,
+     "longTasks": "1/84ms",
+     "loadMs": 829,
+     "reqLoad": 55,
+     "bytesLoad": 551153,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3956
+      },
+      "css": {
+       "n": 2,
+       "bytes": 45461
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67704
+      },
+      "js": {
+       "n": 38,
+       "bytes": 362240
+      },
+      "api": {
+       "n": 6,
+       "bytes": 18433
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2215
+      },
+      "img": {
+       "n": 3,
+       "bytes": 51144
+      }
+     },
+     "beforeLcp": {
+      "n": 55,
+      "bytes": 551153
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 2,
+     "productLinksAfterScroll": 2,
+     "imgCount": 4,
+     "imgFirstScreen": 4,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79188,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 280
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66703,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 212
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43265,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 254
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35560,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 602
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35314,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 261
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 196
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=640",
+       "kind": "img",
+       "bytes": 26383,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 122
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18836,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 907
+      },
+      {
+       "url": "/files/products/catalog/gallery/bfdd1ff6fc51edca9fb92d5cd9ca22bcaf480d23d140347a8b2d787298197072.webp?w=640",
+       "kind": "img",
+       "bytes": 17271,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 429
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15659,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 540
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15482,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 465
+      },
+      {
+       "url": "/assets/ListingView-ChNMR53a.js",
+       "kind": "js",
+       "bytes": 14900,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 911
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1705,
+       "body": 74,
+       "items": 0,
+       "ms": 189.6100000012666,
+       "start": 772.8360000000976,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1439,
+       "body": 28,
+       "items": 0,
+       "ms": 529.458999997587,
+       "start": 819.6550000029674,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1713,
+       "body": 62,
+       "items": 0,
+       "ms": 761.8990000009944,
+       "start": 1353.29400000046,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4355,
+       "body": 6479,
+       "items": 14,
+       "ms": 1207.8079999992042,
+       "start": 1353.8210000006075,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/printer-accessories",
+       "status": 200,
+       "bytes": 5008,
+       "body": 16095,
+       "items": 5,
+       "ms": 98.01800000059302,
+       "start": 2086.5130000020145,
+       "cf": "HIT",
+       "cache": "public, max-age=60",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?category=cat_pacc&facets=1&limit=24",
+       "status": 200,
+       "bytes": 4213,
+       "body": 10680,
+       "items": 8,
+       "ms": 277.5809999984631,
+       "start": 2271.952000002784,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/categories/printer-accessories",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 133.39999999850988,
+     "fcp": 992,
+     "lcp": 3144,
+     "lcpEl": "img /files/products/catalog/gallery/bfdd1ff6fc51edca9fb92d5cd9ca22bcaf480d23d140347a8b2d787298197072.webp?w=640",
+     "cls": 0.00046348560737766593,
+     "longTasks": "1/82ms",
+     "loadMs": 739,
+     "reqLoad": 56,
+     "bytesLoad": 560494,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3962
+      },
+      "css": {
+       "n": 2,
+       "bytes": 45467
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67704
+      },
+      "js": {
+       "n": 38,
+       "bytes": 362462
+      },
+      "api": {
+       "n": 6,
+       "bytes": 18457
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2217
+      },
+      "img": {
+       "n": 4,
+       "bytes": 60225
+      }
+     },
+     "beforeLcp": {
+      "n": 56,
+      "bytes": 560494
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 2,
+     "productLinksAfterScroll": 2,
+     "imgCount": 4,
+     "imgFirstScreen": 4,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79190,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 460
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66711,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 516
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43269,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 247
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35560,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 513
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35314,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 114
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 266
+      },
+      {
+       "url": "/files/products/catalog/gallery/89a829ff3a544532435bed66b07500165596fe0ba88b647475725b21e8eede55.webp?w=640",
+       "kind": "img",
+       "bytes": 26385,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 811
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18832,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 168
+      },
+      {
+       "url": "/files/products/catalog/gallery/bfdd1ff6fc51edca9fb92d5cd9ca22bcaf480d23d140347a8b2d787298197072.webp?w=640",
+       "kind": "img",
+       "bytes": 17342,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 588
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15757,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 265
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15488,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 143
+      },
+      {
+       "url": "/assets/ListingView-ChNMR53a.js",
+       "kind": "js",
+       "bytes": 14896,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 944
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1705,
+       "body": 74,
+       "items": 0,
+       "ms": 164.12100000161445,
+       "start": 727.9339999986405,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1451,
+       "body": 28,
+       "items": 0,
+       "ms": 290.68199999892386,
+       "start": 769.931999999244,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1713,
+       "body": 62,
+       "items": 0,
+       "ms": 1157.8179999996792,
+       "start": 1075.9519999992335,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4355,
+       "body": 6479,
+       "items": 14,
+       "ms": 1144.5500000008906,
+       "start": 1077.4659999988216,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/printer-accessories",
+       "status": 200,
+       "bytes": 4941,
+       "body": 16095,
+       "items": 5,
+       "ms": 215.84799999982351,
+       "start": 2185.8399999982794,
+       "cf": "HIT",
+       "cache": "public, max-age=60",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?category=cat_pacc&facets=1&limit=24",
+       "status": 200,
+       "bytes": 4292,
+       "body": 10680,
+       "items": 8,
+       "ms": 161.55200000139303,
+       "start": 2481.391999997868,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/categories/printing-materials/fdm-materials",
+   "profile": "phone",
+   "runs": [
+    {
+     "path": "/categories/printing-materials/fdm-materials",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 132.60000000149012,
+     "fcp": 2496,
+     "lcp": 5992,
+     "lcpEl": "img /files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=480",
+     "cls": 0.0012890625,
+     "longTasks": "7/782ms",
+     "loadMs": 2147,
+     "reqLoad": 64,
+     "bytesLoad": 770119,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3954
+      },
+      "css": {
+       "n": 2,
+       "bytes": 45472
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67698
+      },
+      "js": {
+       "n": 34,
+       "bytes": 344438
+      },
+      "api": {
+       "n": 6,
+       "bytes": 32582
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2223
+      },
+      "img": {
+       "n": 16,
+       "bytes": 273752
+      }
+     },
+     "beforeLcp": {
+      "n": 64,
+      "bytes": 770119
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 16,
+     "productLinksAfterScroll": 16,
+     "imgCount": 16,
+     "imgFirstScreen": 6,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79246,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1612
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66728,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1548
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43276,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1234
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35562,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1446
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35310,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 429
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32388,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1058
+      },
+      {
+       "url": "/files/products/catalog/gallery/634c457813b160d9812009c63ddec7419201f68a6c22030856a2a88a2940e3c8.webp?w=480",
+       "kind": "img",
+       "bytes": 23251,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1329
+      },
+      {
+       "url": "/api/products?category=cat_materials_fdm&facets=1&limit=24",
+       "kind": "api",
+       "bytes": 20102,
+       "phase": "load",
+       "cf": "",
+       "variant": "",
+       "ms": 766
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=480",
+       "kind": "img",
+       "bytes": 19959,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 507
+      },
+      {
+       "url": "/files/products/catalog/gallery/4fb906f07041c39203ce7c0cf46d3e51de8cb4462bfe1d916bd32a82fc6a4ee6.webp?w=480",
+       "kind": "img",
+       "bytes": 19480,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1357
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=480",
+       "kind": "img",
+       "bytes": 19395,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 530
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18834,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 317
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1704,
+       "body": 74,
+       "items": 0,
+       "ms": 298.8550000009127,
+       "start": 2066.936999999598,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1437,
+       "body": 28,
+       "items": 0,
+       "ms": 282.51000000091153,
+       "start": 2313.010999998369,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1715,
+       "body": 62,
+       "items": 0,
+       "ms": 1266.143999997439,
+       "start": 2644.357000001037,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4428,
+       "body": 6479,
+       "items": 14,
+       "ms": 1300.0110000029963,
+       "start": 2648.2079999987036,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/tree",
+       "status": 200,
+       "bytes": 3196,
+       "body": 8889,
+       "items": 6,
+       "ms": 242.91200000152458,
+       "start": 4047.430999999051,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=300",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?category=cat_materials_fdm&facets=1&limit=24",
+       "status": 200,
+       "bytes": 20102,
+       "body": 115476,
+       "items": 16,
+       "ms": 766.2679999993998,
+       "start": 4495.246999998926,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/categories/printing-materials/fdm-materials",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 166,
+     "fcp": 2644,
+     "lcp": 6240,
+     "lcpEl": "img /files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=480",
+     "cls": 0.0012890625,
+     "longTasks": "8/897ms",
+     "loadMs": 2230,
+     "reqLoad": 64,
+     "bytesLoad": 770282,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3960
+      },
+      "css": {
+       "n": 2,
+       "bytes": 45472
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67704
+      },
+      "js": {
+       "n": 34,
+       "bytes": 344366
+      },
+      "api": {
+       "n": 6,
+       "bytes": 32613
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2221
+      },
+      "img": {
+       "n": 16,
+       "bytes": 273946
+      }
+     },
+     "beforeLcp": {
+      "n": 64,
+      "bytes": 770282
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 16,
+     "productLinksAfterScroll": 16,
+     "imgCount": 16,
+     "imgFirstScreen": 6,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79184,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1632
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66715,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1578
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43274,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1254
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35624,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1518
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35314,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 441
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1070
+      },
+      {
+       "url": "/files/products/catalog/gallery/634c457813b160d9812009c63ddec7419201f68a6c22030856a2a88a2940e3c8.webp?w=480",
+       "kind": "img",
+       "bytes": 23249,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1330
+      },
+      {
+       "url": "/api/products?category=cat_materials_fdm&facets=1&limit=24",
+       "kind": "api",
+       "bytes": 20159,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 434
+      },
+      {
+       "url": "/files/products/catalog/gallery/4580a3cec056abdad83feaba2f6b137673818b6e66650accdc28436998b5f724.webp?w=480",
+       "kind": "img",
+       "bytes": 19953,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 589
+      },
+      {
+       "url": "/files/products/catalog/gallery/4fb906f07041c39203ce7c0cf46d3e51de8cb4462bfe1d916bd32a82fc6a4ee6.webp?w=480",
+       "kind": "img",
+       "bytes": 19478,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 1532
+      },
+      {
+       "url": "/files/products/catalog/gallery/e1d1cddedd5d9999ec1f703b23422058b5291aa7bb9114bbabe7288c78fe11bf.webp?w=480",
+       "kind": "img",
+       "bytes": 19395,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 573
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18834,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 424
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1706,
+       "body": 74,
+       "items": 0,
+       "ms": 228.3129999996163,
+       "start": 2176.815999999235,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1439,
+       "body": 28,
+       "items": 0,
+       "ms": 354.08300000199233,
+       "start": 2439.1949999990175,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1717,
+       "body": 62,
+       "items": 0,
+       "ms": 1612.1129999992263,
+       "start": 2837.4089999997523,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4357,
+       "body": 6479,
+       "items": 14,
+       "ms": 1769.2189999979746,
+       "start": 2838.1640000006882,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/tree",
+       "status": 200,
+       "bytes": 3235,
+       "body": 8889,
+       "items": 6,
+       "ms": 234.9820000017644,
+       "start": 4535.908999998355,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=300",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?category=cat_materials_fdm&facets=1&limit=24",
+       "status": 200,
+       "bytes": 20159,
+       "body": 115476,
+       "items": 16,
+       "ms": 433.92300000050454,
+       "start": 4964.658000000782,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/categories/printing-materials/fdm-materials",
+   "profile": "desktop",
+   "runs": [
+    {
+     "path": "/categories/printing-materials/fdm-materials",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 121.09999999776483,
+     "fcp": 1016,
+     "lcp": 2980,
+     "lcpEl": "img /files/products/catalog/gallery/fc3645696fc6c3086fa4fd937fb7fc37d28f8f5f5146fc43e783c02c6fa0e005.webp?w=320",
+     "cls": 0.00046348560737766593,
+     "longTasks": "0/0ms",
+     "loadMs": 768,
+     "reqLoad": 66,
+     "bytesLoad": 663063,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3958
+      },
+      "css": {
+       "n": 2,
+       "bytes": 45478
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67698
+      },
+      "js": {
+       "n": 36,
+       "bytes": 353051
+      },
+      "api": {
+       "n": 6,
+       "bytes": 32698
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2225
+      },
+      "img": {
+       "n": 16,
+       "bytes": 157955
+      }
+     },
+     "beforeLcp": {
+      "n": 66,
+      "bytes": 663063
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 16,
+     "productLinksAfterScroll": 16,
+     "imgCount": 16,
+     "imgFirstScreen": 8,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79247,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 250
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66712,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 221
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43276,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 179
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35566,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 575
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35308,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 126
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 201
+      },
+      {
+       "url": "/api/products?category=cat_materials_fdm&facets=1&limit=24",
+       "kind": "api",
+       "bytes": 20202,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 199
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18834,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 199
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15655,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 324
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15484,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 198
+      },
+      {
+       "url": "/assets/ListingView-ChNMR53a.js",
+       "kind": "js",
+       "bytes": 14955,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 188
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14336,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 376
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1684,
+       "body": 74,
+       "items": 0,
+       "ms": 182.49099999957252,
+       "start": 749.1250000020955,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1437,
+       "body": 28,
+       "items": 0,
+       "ms": 299.630999998044,
+       "start": 805.026000001817,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1711,
+       "body": 62,
+       "items": 0,
+       "ms": 1351.2980000014068,
+       "start": 1113.0279999997583,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4424,
+       "body": 6479,
+       "items": 14,
+       "ms": 768.3949999991455,
+       "start": 1114.5830000023125,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/tree",
+       "status": 200,
+       "bytes": 3240,
+       "body": 8889,
+       "items": 6,
+       "ms": 131.34999999965657,
+       "start": 1849.2040000019188,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=300",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?category=cat_materials_fdm&facets=1&limit=24",
+       "status": 200,
+       "bytes": 20202,
+       "body": 115476,
+       "items": 16,
+       "ms": 199.1410000009637,
+       "start": 2024.6420000003127,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/categories/printing-materials/fdm-materials",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 99.10000000149012,
+     "fcp": 968,
+     "lcp": 2760,
+     "lcpEl": "img /files/products/catalog/gallery/0c4d589f8be69cf9abeeecf93996138d21200074cde849a6e61220f9e118e3a6.webp?w=320",
+     "cls": 0.00046348560737766593,
+     "longTasks": "0/0ms",
+     "loadMs": 728,
+     "reqLoad": 66,
+     "bytesLoad": 662690,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3954
+      },
+      "css": {
+       "n": 2,
+       "bytes": 45469
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67710
+      },
+      "js": {
+       "n": 36,
+       "bytes": 352637
+      },
+      "api": {
+       "n": 6,
+       "bytes": 32734
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2231
+      },
+      "img": {
+       "n": 16,
+       "bytes": 157955
+      }
+     },
+     "beforeLcp": {
+      "n": 66,
+      "bytes": 662690
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 16,
+     "productLinksAfterScroll": 16,
+     "imgCount": 16,
+     "imgFirstScreen": 8,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79190,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 317
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66543,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 156
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43269,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 185
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35558,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 570
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35320,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 140
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 132
+      },
+      {
+       "url": "/api/products?category=cat_materials_fdm&facets=1&limit=24",
+       "kind": "api",
+       "bytes": 20325,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 206
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18838,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 213
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15754,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 244
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15486,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 141
+      },
+      {
+       "url": "/assets/ListingView-ChNMR53a.js",
+       "kind": "js",
+       "bytes": 14908,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 159
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14003,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 424
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1703,
+       "body": 74,
+       "items": 0,
+       "ms": 162.5290000010864,
+       "start": 714.1200000005483,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1433,
+       "body": 28,
+       "items": 0,
+       "ms": 238.64699999830918,
+       "start": 758.0200000011246,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1711,
+       "body": 62,
+       "items": 0,
+       "ms": 567.8200000002107,
+       "start": 1007.7469999996538,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4353,
+       "body": 6479,
+       "items": 14,
+       "ms": 587.1470000020054,
+       "start": 1008.8250000007974,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/catalog/tree",
+       "status": 200,
+       "bytes": 3209,
+       "body": 8889,
+       "items": 6,
+       "ms": 178.19999999846914,
+       "start": 1603.5750000010012,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=300",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products?category=cat_materials_fdm&facets=1&limit=24",
+       "status": 200,
+       "bytes": 20325,
+       "body": 115476,
+       "items": 16,
+       "ms": 206.1939999985043,
+       "start": 1827.1230000027572,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/product/esun-pla-plus",
+   "profile": "phone",
+   "runs": [
+    {
+     "path": "/product/esun-pla-plus",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 230.5,
+     "fcp": 3592,
+     "lcp": 4328,
+     "lcpEl": "img /files/products/import/gallery/fa41c4f399ba03b25cc569e3269fcb6190a06212a914e877e152564b1afb6f7d.webp?w=1080",
+     "cls": 0.01650625,
+     "longTasks": "7/867ms",
+     "loadMs": 2669,
+     "reqLoad": 53,
+     "bytesLoad": 567680,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4576
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43280
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67700
+      },
+      "js": {
+       "n": 32,
+       "bytes": 362358
+      },
+      "api": {
+       "n": 4,
+       "bytes": 19482
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2213
+      },
+      "img": {
+       "n": 10,
+       "bytes": 68071
+      }
+     },
+     "beforeLcp": {
+      "n": 53,
+      "bytes": 567680
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 14,
+     "imgFirstScreen": 7,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79269,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 2043
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66716,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1905
+      },
+      {
+       "url": "/assets/Product-DDcst-Cj.js",
+       "kind": "js",
+       "bytes": 43941,
+       "phase": "load",
+       "cf": "MISS",
+       "variant": "",
+       "ms": 2079
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43280,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1312
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35628,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1583
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35314,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 625
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32386,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1110
+      },
+      {
+       "url": "/files/products/import/gallery/fa41c4f399ba03b25cc569e3269fcb6190a06212a914e877e152564b1afb6f7d.webp?w=1080",
+       "kind": "img",
+       "bytes": 19895,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 493
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18831,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 3048
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15655,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 2640
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15531,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 803
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14381,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 948
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/products/esun-pla-plus",
+       "status": 200,
+       "bytes": 11969,
+       "body": 37545,
+       "items": 13,
+       "ms": 1423.1070000023465,
+       "start": 344.19399999751477,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1447,
+       "body": 28,
+       "items": 0,
+       "ms": 902.0349999991595,
+       "start": 2826.543999999558,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1710,
+       "body": 62,
+       "items": 0,
+       "ms": 284.81100000135484,
+       "start": 3972.6129999980913,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4356,
+       "body": 6479,
+       "items": 14,
+       "ms": 310.9709999989718,
+       "start": 3974.7690000003786,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/product/esun-pla-plus",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 315.5,
+     "fcp": 3468,
+     "lcp": 4284,
+     "lcpEl": "img /files/products/import/gallery/fa41c4f399ba03b25cc569e3269fcb6190a06212a914e877e152564b1afb6f7d.webp?w=1080",
+     "cls": 0.01650625,
+     "longTasks": "6/649ms",
+     "loadMs": 2560,
+     "reqLoad": 54,
+     "bytesLoad": 567929,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4566
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43265
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67704
+      },
+      "js": {
+       "n": 32,
+       "bytes": 362121
+      },
+      "api": {
+       "n": 5,
+       "bytes": 19472
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2231
+      },
+      "img": {
+       "n": 10,
+       "bytes": 68570
+      }
+     },
+     "beforeLcp": {
+      "n": 54,
+      "bytes": 567929
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 14,
+     "imgFirstScreen": 7,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79178,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1998
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66709,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1818
+      },
+      {
+       "url": "/assets/Product-DDcst-Cj.js",
+       "kind": "js",
+       "bytes": 43920,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1923
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43265,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1133
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35577,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1440
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35314,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 471
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 916
+      },
+      {
+       "url": "/files/products/import/gallery/fa41c4f399ba03b25cc569e3269fcb6190a06212a914e877e152564b1afb6f7d.webp?w=1080",
+       "kind": "img",
+       "bytes": 19948,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 462
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18840,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 2877
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15657,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 2539
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15494,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 864
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14340,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 930
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/products/esun-pla-plus",
+       "status": 200,
+       "bytes": 11965,
+       "body": 37545,
+       "items": 13,
+       "ms": 1414.3870000007155,
+       "start": 399.8539999993227,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/products/esun-pla-plus",
+       "status": 200,
+       "ms": 5861.42000000109,
+       "start": 2549.3809999970836,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1443,
+       "body": 28,
+       "items": 0,
+       "ms": 769.5589999966614,
+       "start": 2740.7600000005914,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1710,
+       "body": 62,
+       "items": 0,
+       "ms": 415.4530000014347,
+       "start": 3798.1699999982084,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4354,
+       "body": 6479,
+       "items": 14,
+       "ms": 435.5059999979858,
+       "start": 3805.276999999478,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": [
+      "200 /api/products/esun-pla-plus"
+     ]
+    }
+   ]
+  },
+  {
+   "path": "/product/esun-pla-plus",
+   "profile": "desktop",
+   "runs": [
+    {
+     "path": "/product/esun-pla-plus",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 270.0999999977648,
+     "fcp": 1208,
+     "lcp": 2136,
+     "lcpEl": "img /files/products/import/gallery/fa41c4f399ba03b25cc569e3269fcb6190a06212a914e877e152564b1afb6f7d.webp?w=800",
+     "cls": 0.0030713248497017077,
+     "longTasks": "1/141ms",
+     "loadMs": 798,
+     "reqLoad": 47,
+     "bytesLoad": 530781,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4571
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43267
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67706
+      },
+      "js": {
+       "n": 32,
+       "bytes": 362160
+      },
+      "api": {
+       "n": 4,
+       "bytes": 19420
+      },
+      "other": {
+       "n": 1,
+       "bytes": 743
+      },
+      "img": {
+       "n": 6,
+       "bytes": 32914
+      }
+     },
+     "beforeLcp": {
+      "n": 47,
+      "bytes": 530781
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 14,
+     "imgFirstScreen": 10,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79186,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 177
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66709,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 155
+      },
+      {
+       "url": "/assets/Product-DDcst-Cj.js",
+       "kind": "js",
+       "bytes": 43938,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 320
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43267,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 193
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35558,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 303
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35316,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 114
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 182
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18840,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 857
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15655,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 728
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15484,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 517
+      },
+      {
+       "url": "/files/products/import/gallery/fa41c4f399ba03b25cc569e3269fcb6190a06212a914e877e152564b1afb6f7d.webp?w=800",
+       "kind": "img",
+       "bytes": 14631,
+       "phase": "load",
+       "cf": "",
+       "variant": "r2",
+       "ms": 460
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14348,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 257
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/products/esun-pla-plus",
+       "status": 200,
+       "bytes": 11969,
+       "body": 37545,
+       "items": 13,
+       "ms": 331.69400000042515,
+       "start": 295.9409999966738,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1443,
+       "body": 28,
+       "items": 0,
+       "ms": 517.6830000018526,
+       "start": 674.2549999980838,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1684,
+       "body": 62,
+       "items": 0,
+       "ms": 156.03900000132853,
+       "start": 1198.5709999971732,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4324,
+       "body": 6479,
+       "items": 14,
+       "ms": 214.44899999914924,
+       "start": 1199.1689999995288,
+       "cf": "",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/product/esun-pla-plus",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 278.0999999977648,
+     "fcp": 1556,
+     "lcp": 1824,
+     "lcpEl": "img /files/products/import/gallery/fa41c4f399ba03b25cc569e3269fcb6190a06212a914e877e152564b1afb6f7d.webp?w=800",
+     "cls": 0.0030713248497017077,
+     "longTasks": "1/77ms",
+     "loadMs": 872,
+     "reqLoad": 49,
+     "bytesLoad": 532104,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 4576
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43271
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67700
+      },
+      "js": {
+       "n": 32,
+       "bytes": 361806
+      },
+      "api": {
+       "n": 4,
+       "bytes": 19512
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2233
+      },
+      "img": {
+       "n": 6,
+       "bytes": 33006
+      }
+     },
+     "beforeLcp": {
+      "n": 49,
+      "bytes": 532104
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 14,
+     "imgFirstScreen": 10,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79178,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 473
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66434,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 371
+      },
+      {
+       "url": "/assets/Product-DDcst-Cj.js",
+       "kind": "js",
+       "bytes": 43942,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 504
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43271,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 202
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35561,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 512
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35314,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 90
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32386,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 287
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18838,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1152
+      },
+      {
+       "url": "/assets/vendor-icons-D_A5QRDI.js",
+       "kind": "js",
+       "bytes": 15661,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1024
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15490,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 630
+      },
+      {
+       "url": "/files/products/import/gallery/fa41c4f399ba03b25cc569e3269fcb6190a06212a914e877e152564b1afb6f7d.webp?w=800",
+       "kind": "img",
+       "bytes": 14695,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "edge",
+       "ms": 171
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14336,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 430
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/products/esun-pla-plus",
+       "status": 200,
+       "bytes": 12015,
+       "body": 37545,
+       "items": 13,
+       "ms": 533.4559999973862,
+       "start": 291.1039999999048,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1435,
+       "body": 28,
+       "items": 0,
+       "ms": 702.3339999977907,
+       "start": 903.1140000006417,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1707,
+       "body": 62,
+       "items": 0,
+       "ms": 107.09000000133528,
+       "start": 1627.0039999981236,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4355,
+       "body": 6479,
+       "items": 14,
+       "ms": 179.42300000140676,
+       "start": 1628.3559999974386,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "public, max-age=0, s-maxage=60",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/community",
+   "profile": "phone",
+   "runs": [
+    {
+     "path": "/community",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 137.90000000223517,
+     "fcp": 2556,
+     "lcp": 3192,
+     "lcpEl": "h1 \"ليفو كوميونيتي تحت الصيانة\"",
+     "cls": 0.0012890625,
+     "longTasks": "3/278ms",
+     "loadMs": 2272,
+     "reqLoad": 17,
+     "bytesLoad": 348353,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3960
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43273
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67702
+      },
+      "js": {
+       "n": 6,
+       "bytes": 221979
+      },
+      "api": {
+       "n": 4,
+       "bytes": 9210
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2229
+      }
+     },
+     "beforeLcp": {
+      "n": 17,
+      "bytes": 348353
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 0,
+     "imgFirstScreen": 0,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79186,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1404
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66762,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1277
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43273,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1025
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35566,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1847
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35308,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 420
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32394,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 858
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15490,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 290
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14336,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 859
+      },
+      {
+       "url": "static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920",
+       "kind": "js",
+       "bytes": 10639,
+       "phase": "load",
+       "cf": "",
+       "variant": "",
+       "ms": 618
+      },
+      {
+       "url": "/api/settings/public",
+       "kind": "api",
+       "bytes": 4355,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 261
+      },
+      {
+       "url": "/community",
+       "kind": "doc",
+       "bytes": 3960,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 236
+      },
+      {
+       "url": "/api/community/access",
+       "kind": "api",
+       "bytes": 1713,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 231
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1701,
+       "body": 74,
+       "items": 0,
+       "ms": 229.07500000292202,
+       "start": 2239.2589999981283,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1441,
+       "body": 28,
+       "items": 0,
+       "ms": 464.7660000009637,
+       "start": 2397.905999998329,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1713,
+       "body": 62,
+       "items": 0,
+       "ms": 230.94900000069174,
+       "start": 2894.663999999466,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4355,
+       "body": 6479,
+       "items": 14,
+       "ms": 261.0050000002957,
+       "start": 2895.6729999990785,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/community",
+     "profile": "phone",
+     "navError": "",
+     "ttfb": 162.60000000149012,
+     "fcp": 2644,
+     "lcp": 3476,
+     "lcpEl": "h1 \"ليفو كوميونيتي تحت الصيانة\"",
+     "cls": 0.0012890625,
+     "longTasks": "3/349ms",
+     "loadMs": 2060,
+     "reqLoad": 19,
+     "bytesLoad": 368883,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3962
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43263
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67708
+      },
+      "js": {
+       "n": 8,
+       "bytes": 242503
+      },
+      "api": {
+       "n": 4,
+       "bytes": 9228
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2219
+      }
+     },
+     "beforeLcp": {
+      "n": 19,
+      "bytes": 368883
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 0,
+     "imgFirstScreen": 0,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79176,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1555
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66712,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1442
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43263,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 993
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35577,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 1279
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35318,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 439
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32390,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 719
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18837,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 511
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15525,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 442
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14342,
+       "phase": "load",
+       "cf": "MISS",
+       "variant": "",
+       "ms": 1022
+      },
+      {
+       "url": "static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920",
+       "kind": "js",
+       "bytes": 10664,
+       "phase": "load",
+       "cf": "",
+       "variant": "",
+       "ms": 900
+      },
+      {
+       "url": "/api/settings/public",
+       "kind": "api",
+       "bytes": 4367,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 319
+      },
+      {
+       "url": "/community",
+       "kind": "doc",
+       "bytes": 3962,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 265
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1707,
+       "body": 74,
+       "items": 0,
+       "ms": 1054.4370000025083,
+       "start": 1995.865999997477,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1443,
+       "body": 28,
+       "items": 0,
+       "ms": 688.4270000009565,
+       "start": 2206.038999996963,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4367,
+       "body": 6479,
+       "items": 14,
+       "ms": 319.44300000031944,
+       "start": 2913.827999997011,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1711,
+       "body": 62,
+       "items": 0,
+       "ms": 270.5130000031204,
+       "start": 3139.9709999968763,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  },
+  {
+   "path": "/community",
+   "profile": "desktop",
+   "runs": [
+    {
+     "path": "/community",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 109.59999999776483,
+     "fcp": 1216,
+     "lcp": 1500,
+     "lcpEl": "h1 \"ليفو كوميونيتي تحت الصيانة\"",
+     "cls": 0.00046348560737766593,
+     "longTasks": "0/0ms",
+     "loadMs": 802,
+     "reqLoad": 19,
+     "bytesLoad": 368463,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3953
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43271
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67694
+      },
+      "js": {
+       "n": 8,
+       "bytes": 242088
+      },
+      "api": {
+       "n": 4,
+       "bytes": 9226
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2231
+      }
+     },
+     "beforeLcp": {
+      "n": 19,
+      "bytes": 368463
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 0,
+     "imgFirstScreen": 0,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79180,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 388
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66713,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 268
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43271,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 200
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35558,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 574
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35310,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 336
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32384,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 203
+      },
+      {
+       "url": "/assets/vendor-motion-DDNunUBr.js",
+       "kind": "js",
+       "bytes": 18834,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 227
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15486,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 347
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14003,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 533
+      },
+      {
+       "url": "static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920",
+       "kind": "js",
+       "bytes": 10646,
+       "phase": "load",
+       "cf": "",
+       "variant": "",
+       "ms": 363
+      },
+      {
+       "url": "/api/settings/public",
+       "kind": "api",
+       "bytes": 4355,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 166
+      },
+      {
+       "url": "/community",
+       "kind": "doc",
+       "bytes": 3953,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 144
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1711,
+       "body": 74,
+       "items": 0,
+       "ms": 372.33800000103656,
+       "start": 734.746999998606,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1443,
+       "body": 28,
+       "items": 0,
+       "ms": 511.2570000019332,
+       "start": 784.7239999973681,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1717,
+       "body": 62,
+       "items": 0,
+       "ms": 136.69200000003912,
+       "start": 1301.644999999553,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4355,
+       "body": 6479,
+       "items": 14,
+       "ms": 165.8370000004652,
+       "start": 1302.531999997882,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    },
+    {
+     "path": "/community",
+     "profile": "desktop",
+     "navError": "",
+     "ttfb": 136.5,
+     "fcp": 1016,
+     "lcp": 1412,
+     "lcpEl": "h1 \"ليفو كوميونيتي تحت الصيانة\"",
+     "cls": 0.00046348560737766593,
+     "longTasks": "0/0ms",
+     "loadMs": 751,
+     "reqLoad": 17,
+     "bytesLoad": 348353,
+     "byKind": {
+      "doc": {
+       "n": 1,
+       "bytes": 3956
+      },
+      "css": {
+       "n": 1,
+       "bytes": 43259
+      },
+      "font": {
+       "n": 2,
+       "bytes": 67694
+      },
+      "js": {
+       "n": 6,
+       "bytes": 222003
+      },
+      "api": {
+       "n": 4,
+       "bytes": 9214
+      },
+      "other": {
+       "n": 3,
+       "bytes": 2227
+      }
+     },
+     "beforeLcp": {
+      "n": 17,
+      "bytes": 348353
+     },
+     "reqScroll": 0,
+     "bytesScroll": 0,
+     "imgScroll": 0,
+     "productLinks": 0,
+     "productLinksAfterScroll": 0,
+     "imgCount": 0,
+     "imgFirstScreen": 0,
+     "offscreenEager": 0,
+     "overfetched": [],
+     "largest": [
+      {
+       "url": "/assets/vendor-react-BDQZ98fV.js",
+       "kind": "js",
+       "bytes": 79246,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 498
+      },
+      {
+       "url": "/assets/index-B60d525d.js",
+       "kind": "js",
+       "bytes": 66709,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 189
+      },
+      {
+       "url": "/assets/index-qM9eHnkE.css",
+       "kind": "css",
+       "bytes": 43259,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 165
+      },
+      {
+       "url": "/assets/vendor-motion-core-DrluXP5O.js",
+       "kind": "js",
+       "bytes": 35564,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 540
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-latin.woff2",
+       "kind": "font",
+       "bytes": 35306,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 211
+      },
+      {
+       "url": "/fonts/cairo/cairo-v31-arabic.woff2",
+       "kind": "font",
+       "bytes": 32388,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 152
+      },
+      {
+       "url": "/assets/AppIntro-BVH_XnKx.js",
+       "kind": "js",
+       "bytes": 15484,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 295
+      },
+      {
+       "url": "/assets/vendor-i18n-D3w9Xejm.js",
+       "kind": "js",
+       "bytes": 14336,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 470
+      },
+      {
+       "url": "static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920",
+       "kind": "js",
+       "bytes": 10664,
+       "phase": "load",
+       "cf": "",
+       "variant": "",
+       "ms": 419
+      },
+      {
+       "url": "/api/settings/public",
+       "kind": "api",
+       "bytes": 4359,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 144
+      },
+      {
+       "url": "/community",
+       "kind": "doc",
+       "bytes": 3956,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 161
+      },
+      {
+       "url": "/api/community/access",
+       "kind": "api",
+       "bytes": 1711,
+       "phase": "load",
+       "cf": "HIT",
+       "variant": "",
+       "ms": 136
+      }
+     ],
+     "apis": [
+      {
+       "url": "/api/storefront/resolve",
+       "status": 200,
+       "bytes": 1701,
+       "body": 74,
+       "items": 0,
+       "ms": 203.2710000021325,
+       "start": 734.2729999982112,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/auth/me",
+       "status": 200,
+       "bytes": 1443,
+       "body": 28,
+       "items": 0,
+       "ms": 452.49600000170176,
+       "start": 777.7749999986554,
+       "cf": "",
+       "cache": "private, no-store",
+       "phase": "load"
+      },
+      {
+       "url": "/api/community/access",
+       "status": 200,
+       "bytes": 1711,
+       "body": 62,
+       "items": 0,
+       "ms": 136.15799999752198,
+       "start": 1239.3750000010186,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      },
+      {
+       "url": "/api/settings/public",
+       "status": 200,
+       "bytes": 4359,
+       "body": 6479,
+       "items": 14,
+       "ms": 144.35500000035972,
+       "start": 1241.439999997965,
+       "cf": "HIT",
+       "cache": "public, max-age=60, s-maxage=120, stale-while-revalidate=600",
+       "phase": "load"
+      }
+     ],
+     "videos": [],
+     "docCache": {
+      "cache": "no-cache",
+      "cf": "HIT"
+     },
+     "failed": []
+    }
+   ]
+  }
+ ]
+}

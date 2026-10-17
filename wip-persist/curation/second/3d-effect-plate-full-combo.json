@@ -1,0 +1,486 @@
+{
+  "handle": "3d-effect-plate-full-combo",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T18:17:03Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/3d-effect-plate-full-combo",
+      "title": "3D Effect Plate Full Combo (store page)",
+      "retrieved_at": "2026-10-16T07:09:47Z",
+      "keys": [
+        "product.*",
+        "package.*",
+        "physical.*",
+        "part.*",
+        "contents.*",
+        "compat.statement",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "safety.*",
+        "variant.note"
+      ],
+      "note": "Corpus copy parsed with the package (extractPage + buildImportPayload with the P0 manifest row): legacy_html description (overview, four surface sections, Considerations, Recommended Settings with the Filaments | Heatbed Temperature table), option groups Compatibility (X1/P1/A1/X2/P2, A1 mini) and Texture (Carbon Fiber+Diamond+Galaxy+Starry), two variants, one variant description. No specification table, no weight, size, thickness or in-the-box list. The builder resolves the product type to 'accessory' (route has no plates level-2 id)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "keys": [
+        "product.*",
+        "package.*",
+        "physical.*",
+        "part.*",
+        "contents.*",
+        "compat.statement",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "note": "Cached HTML read in full, including the tabbed Build Plate Types panels that the text extract drops: the Build Plate Dimensions table (Dimensions | Compatible Models), the Important Notice on 256x256 plate generations, and the 3D Effect Sheet tab (description, X1 lidar note, Considerations). No weight, thickness, maximum temperature, package or contents figure for the 3D Effect plate or sheet."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/3d-effect-sheets",
+      "title": "How to replace the Bambu 3D Effect Sheets | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:09Z",
+      "keys": [
+        "product.*",
+        "package.*",
+        "physical.*",
+        "part.*",
+        "contents.*",
+        "compat.statement"
+      ],
+      "note": "Cached HTML read in full: video guide (YouTube 7XuxrBK58Nk), the two Fixture tool 3MF downloads (X1 Series/P1 Series/A1; For A1 mini users), Installation steps 1-7. Names the spring steel plate and the adhesive-backed transfer sheet; states no dimension, thickness, weight or count."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "part.max_temperature"
+      ],
+      "note": "Cached copy read in full. It never names the 3D Effect plate or sheet; its build plate tables cover Cool / Engineering / Smooth PEI (High-Temperature) / Textured PEI plates only, so nothing in it is taken for this product."
+    }
+  ],
+  "specs": [
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991104",
+        "id": "ov_e79d0eeae95769ace3467569",
+        "value_text": "X1/P1/A1/X2/P2",
+        "group": "Compatibility"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The wiki's build plate size for exactly the models this option names (X1/P1/A1/X2/P2); the same page lists the 3D Effect Sheet among its build plate types. The store page states no size."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991104",
+        "id": "ov_e79d0eeae95769ace3467569",
+        "value_text": "X1/P1/A1/X2/P2",
+        "group": "Compatibility"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Second figure of the same 256*256 mm cell."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991105",
+        "id": "ov_1bf583c058972b183f60af9a",
+        "value_text": "A1 mini",
+        "group": "Compatibility"
+      },
+      "value": 180,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 4",
+      "quote": "180*180 mm | A1 mini",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The wiki's build plate size for the A1 mini, the model this option names. The store page states no size."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991105",
+        "id": "ov_1bf583c058972b183f60af9a",
+        "value_text": "A1 mini",
+        "group": "Compatibility"
+      },
+      "value": 180,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 4",
+      "quote": "180*180 mm | A1 mini",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Second figure of the same 180*180 mm cell."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991104",
+        "id": "ov_e79d0eeae95769ace3467569",
+        "value_text": "X1/P1/A1/X2/P2",
+        "group": "Compatibility"
+      },
+      "value": "X1/P1/A1/X2/P2",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/3d-effect-plate-full-combo",
+      "source_title": "3D Effect Plate Full Combo (store page)",
+      "locator": "option group Compatibility (749063516270796801) › value 749063516274991104",
+      "quote": "Compatibility: X1/P1/A1/X2/P2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:47Z",
+      "note": "The option value text itself; the wiki's dimensions row names the same models (X2D / P2S / P1 Series / X1 Series / A1)."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991105",
+        "id": "ov_1bf583c058972b183f60af9a",
+        "value_text": "A1 mini",
+        "group": "Compatibility"
+      },
+      "value": "A1 mini",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/3d-effect-plate-full-combo",
+      "source_title": "3D Effect Plate Full Combo (store page)",
+      "locator": "option group Compatibility (749063516270796801) › value 749063516274991105",
+      "quote": "Compatibility: A1 mini",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:47Z",
+      "note": "The option value text itself."
+    },
+    {
+      "key": "part.surface_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Diamond, Starry, Galaxy, Carbon Fiber",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › 3D Effect Sheet tab › paragraph 1",
+      "quote": "Currently, four patterns are available for selection: diamond, starry, galaxy, and carbon fiber.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Agrees with the store page's only Texture value «Carbon Fiber+Diamond+Galaxy+Starry» (all four patterns in this combo) and its overview (\"There are 4 exciting textures\"). The same tab describes the surface as laser-formed optical textures on a transfer film."
+    },
+    {
+      "key": "part.material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Spring steel plate with a 3D effect transfer sheet",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/3d-effect-sheets",
+      "source_title": "How to replace the Bambu 3D Effect Sheets | Bambu Lab Wiki",
+      "locator": "Installation steps › Step2",
+      "quote": "Step2: Place the Sheet and the spring steel plate on the Fixture tool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:27:09Z",
+      "note": "Unverified: the construction is read from the sheet-replacement steps (sheet with an adhesive back on a spring steel plate), not from a specification row; no film or steel grade is published."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "TPU"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/3d-effect-plate-full-combo",
+      "source_title": "3D Effect Plate Full Combo (store page)",
+      "locator": "description › Recommended Settings › paragraph 1",
+      "quote": "We recommend using PLA and TPU filament for printing.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:47Z",
+      "note": "Unverified because the source says recommended, not supported, and the registry has no recommended-filament key. The wiki's 3D Effect Sheet tab says the same (Considerations › bullet 1). The page's heatbed figures (PLA 60~65℃, TPU 35~45℃, plate type Smooth PEI/High Temp Plate) have no plate key in the registry and are not stored as specs."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991104",
+        "id": "ov_e79d0eeae95769ace3467569",
+        "value_text": "X1/P1/A1/X2/P2",
+        "group": "Compatibility"
+      },
+      "target_kind": "family",
+      "target_label": "X1 Series",
+      "target_family": "x1_series",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "condition": "The lidar calibration does not work with the transfer film (skip it or calibrate with a regular plate); disable Build Plate Position Detection when printing with this plate.",
+      "condition_quote": "Note: Due to the reflective effect of the transfer film, the X1 series laser lidar calibration will not function properly when using it.",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Also the option value itself (Compatibility: X1/P1/A1/X2/P2) and the variant note \"For X1/X2/P2 Series users, please disable the Build Plate Position Detection\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991104",
+        "id": "ov_e79d0eeae95769ace3467569",
+        "value_text": "X1/P1/A1/X2/P2",
+        "group": "Compatibility"
+      },
+      "target_kind": "family",
+      "target_label": "P1 Series",
+      "target_family": "p1_series",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "condition": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991104",
+        "id": "ov_e79d0eeae95769ace3467569",
+        "value_text": "X1/P1/A1/X2/P2",
+        "group": "Compatibility"
+      },
+      "target_kind": "printer",
+      "target_label": "A1",
+      "target_family": "model_a1",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "condition": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The A1 (not the A1 mini, which is the other option value)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991104",
+        "id": "ov_e79d0eeae95769ace3467569",
+        "value_text": "X1/P1/A1/X2/P2",
+        "group": "Compatibility"
+      },
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "target_source_handle": "x2d",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "condition": "Disable Build Plate Position Detection when printing with this plate (store variant note for X1/X2/P2 Series users).",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991104",
+        "id": "ov_e79d0eeae95769ace3467569",
+        "value_text": "X1/P1/A1/X2/P2",
+        "group": "Compatibility"
+      },
+      "target_kind": "printer",
+      "target_label": "P2S",
+      "target_family": "model_p2s",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "condition": "Disable Build Plate Position Detection when printing with this plate (store variant note for X1/X2/P2 Series users).",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "749063516274991105",
+        "id": "ov_1bf583c058972b183f60af9a",
+        "value_text": "A1 mini",
+        "group": "Compatibility"
+      },
+      "target_kind": "printer",
+      "target_label": "A1 mini",
+      "target_source_handle": "a1-mini",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table › row 4",
+      "quote": "180*180 mm | A1 mini",
+      "condition": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "Also the option value itself (Compatibility: A1 mini) and the sheet guide's separate Fixture tool \"For A1 mini users\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/3d-effect-plate-full-combo",
+      "source_title": "3D Effect Plate Full Combo (store page)",
+      "locator": "description › Recommended Settings › paragraph 1 and table row PLA",
+      "quote": "We recommend using PLA and TPU filament for printing.",
+      "condition": "Recommended filament; heatbed 60~65℃ with plate type Smooth PEI Plate/High Temp Plate in Bambu Studio.",
+      "retrieved_at": "2026-10-16T07:09:47Z",
+      "note": "Recommended, not an exclusive list. The wiki's 3D Effect Sheet tab says the same."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "TPU",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/3d-effect-plate-full-combo",
+      "source_title": "3D Effect Plate Full Combo (store page)",
+      "locator": "description › Recommended Settings › paragraph 1 and table row TPU",
+      "quote": "We recommend using PLA and TPU filament for printing.",
+      "condition": "Recommended filament; heatbed 35~45℃ with plate type Smooth PEI Plate/High Temp Plate in Bambu Studio.",
+      "retrieved_at": "2026-10-16T07:09:47Z",
+      "note": "Recommended, not an exclusive list. The wiki's 3D Effect Sheet tab says the same."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/3d-effect-sheets",
+      "title": "How to replace the Bambu 3D Effect Sheets",
+      "retrieved_at": "2026-10-16T08:27:09Z"
+    },
+    {
+      "kind": "video",
+      "url": "https://www.youtube.com/watch?v=7XuxrBK58Nk",
+      "title": "Video guide: How to replace the Bambu 3D Effect Sheets",
+      "retrieved_at": "2026-10-16T08:27:09Z",
+      "note": "The video the sheet guide embeds as https://youtu.be/7XuxrBK58Nk, written in the www.youtube.com form because youtu.be is not an allowed document host. Not checked online (offline curation)."
+    }
+  ],
+  "not_published": [
+    "product.net_weight",
+    "physical.thickness",
+    "part.max_temperature",
+    "contents.pieces",
+    "package.contents",
+    "package.weight",
+    "package.length",
+    "package.width",
+    "package.height"
+  ],
+  "notes": [
+    "No specification table on the store page; the payload built from it holds one spec row (variant.note on the X1/P1/A1/X2/P2 variant), which no curated row touches.",
+    "In the box: no official list in any searched source, so none is given (the Texture value implies four patterns, but no piece count is published).",
+    "Not stored: the heatbed recommendations (PLA 60~65℃, TPU 35~45℃) and the Smooth PEI/High Temp plate-type setting have no registry key for a plate.",
+    "Not added as documents: the two Fixture tool 3MF files on the sheet guide (wiki-relative links, unchecked) and the generic filament guide (does not name this product)."
+  ]
+}

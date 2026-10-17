@@ -1,0 +1,821 @@
+{
+  "handle": "pla-silk-upgrade",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T13:48:17Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer, page by page): Basic Info, Specifications, Recommended Printing Settings, Physical, Mechanical and Other Physical and Chemical Properties, Specimen Test, test drawings, Disclaimer. File named \"Bambu_PLA_Silk_\" but headed \"PLA Silk+\". No filament length, hardness or certification row."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/312c9c05c7274ef3bb6f21c949ae4c2b/SDS20250928A06_Bambu_PLA_Silk.pdf",
+      "title": "Bambu PLA Silk+ Safety Data Sheet SDS20250928A06 (prepared by Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:25:08Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read (text layer). The manufacturer's own SDS for \"Bambu PLA Silk+\" (model A06-xx), not a third-party lab report. Section 3: PLA 60-80 % and TPU 20-40 % by wt; section 9 \"No data available\" for every property but physical state \"Thread\"; CLP \"Not classified\"; not hazardous goods for sea, road and air. No spec value is stored from it."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "retrieved_at": "2026-10-16T08:25:11Z",
+      "keys": [],
+      "note": "One page with a text layer: 13 named colour cells with hex codes, cross-checked against the rendered page. Read for published hex codes, not spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Generic \"PLA*\" / \"PLA\" rows (note ② counts PLA Silk as standard PLA): printer, nozzle, AMS, build plate, glue and storage tables; no row names PLA Silk+. Used for corroboration and relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility row \"PLA Silk / Silk+\", drying row \"PLA Silk / Silk+ / Wood / Aero\", 4.3 PLA Silk (impact strength Z 8.5 kJ/m²), 5.1 silk-texture speed advice."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PLA Silk\": bed 65-75 °C 12 h, forced-air oven 55 °C 8 h, AMS 2 Pro 45 °C 12 h, AMS HT 45 °C 12 h. The store page FAQ (2.Drying Recommendations) links this page."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-silk-upgrade",
+      "title": "Bambu Lab US store product page: PLA Silk+",
+      "retrieved_at": "2026-10-16T07:04:06Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections (feature blocks, RFID), Download block, Printing Tips FAQ."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Polylactic acid",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polylactic acid",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "note": "The SDS SDS20250928A06 (\"Bambu PLA Silk+\", model A06-xx), p.4, section 3, gives a mixture: polylactic acid 60-80 % by wt (CAS 26023-30-3) and thermoplastic polyurethane 20-40 % by wt (CAS 9009-54-5). The TDS names polylactic acid only; the TDS words are stored and the SDS composition is left for review. The store page states no material row."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "note": "The store page agrees (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\"); its tolerance row (± 0.03 mm) stays from the page, the TDS gives none."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681970696351773",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "note": "Scoped to the only \"Net weight\" value \"1 kg\" (shared by \"Filament with spool\" and \"Refill\"); the store option value agrees (1 kg = 1000 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.27,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.27 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "note": "The SDS section 9 gives \"No data available\" for density; that does not override the TDS value. The store page states no density."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 158,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 158 °C",
+      "test_method": "DSC",
+      "test_condition": "Heating rate 10 °C/min, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 57,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 57 °C",
+      "test_method": "DSC",
+      "test_condition": "Heating rate 10 °C/min, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 66,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 66 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value; the TDS spells the row \"Vicar Softening Temperature\"",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 56,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (row 1 of 2)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 56 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value. The next row gives 60 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 33,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 33 ± 4 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing); ± 4 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2.8,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 2.8 ± 0.6 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing); ± 0.6 %",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2460,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2460 ± 150 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing); ± 150 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 75,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 75 ± 4 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing); ± 4 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 18.5,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 18.5 ± 1.6 kJ/m²；10.3 ± 0.5 kJ/m² （notched）",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing); ± 1.6 kJ/m². First value of the cell (no notch mark); the same cell gives 10.3 ± 0.5 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "note": "Z: 8.5 ± 1.1 kJ/m² (TDS), not stored. The PLA wiki (4.3 PLA Silk › Filament Properties) gives \"PLA Silk | 8.5kJ/m²\" for Impact Strength (Z), the same figure. The store page's \"superior resistance to bending and impact\" is prose and proves no number."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 210,
+        "max": 240
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 210 - 240 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "note": "The material-table wiki gives \"PLA* … 190 - 240\" (±10 °C) for standard PLA in general (note ② names PLA Silk); the product TDS range is kept. The store page states no nozzle temperature."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (one range for every build plate type the TDS lists)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "note": "The material-table wiki (Build Plate Settings › 3) gives PLA 35 - 45 ℃ on the Cool Plate and 45 - 65 ℃ on the Smooth PEI / High-Temperature and Textured PEI plates; the product TDS range is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 250 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 250 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "note": "Not the outer-wall tip: the store page says \"Lower the outer wall speed to 50 mm/s for the best gloss\" (Cautions for Use › bullet 1) and the PLA wiki 5.1 suggests 40 – 60 mm/s for a silk-like texture; neither is stored."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate SuperTack",
+        "Smooth PEI Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate SuperTack, Smooth PEI Plate, Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "conflict": "Official sources disagree: the TDS V1.0 (Dec 2024) lists Cool Plate SuperTack as a build plate type, while the store page (Printing Tips › 1.Accessory Compatibility) says \"Not compatible with Cool Plate SuperTack\". Kept as the TDS words but unverified until the owner or reviewer adjudicates; no compatible_with relation is written for the SuperTack.",
+      "note": "The PLA wiki row \"PLA Silk / Silk+\" says \"Not recommended to use low-temperature stabilization board\" (not mapped to a product)."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven (forced-air), before printing. The same row gives X1 Series Printer Heatbed: 65 - 75 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "note": "Agrees with the drying wiki (Appendix I, row \"PLA Silk\": forced-air oven 55 ℃, 8 h) and the PLA wiki (2.1, row \"PLA Silk / Silk+ / Wood / Aero\": convection oven 55℃，8 h). The store page says \"Dry Out Before Use\" without numbers."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven (forced-air) at 55 °C, before printing. The same row gives X1 Series Printer Heatbed: 65 - 75 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "White (13110)",
+      "source_value_id": "564681970696351770",
+      "hex": "#FFFFFF",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 1, column 1",
+      "quote": "White Hex:#FFFFFF",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Silver (13109)",
+      "source_value_id": "564681970696351771",
+      "hex": "#C8C8C8",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Silver Hex:#C8C8C8",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Champagne (13404)",
+      "source_value_id": "564681970696351769",
+      "hex": "#F3CFB2",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 1, column 3",
+      "quote": "Champagne Hex:#F3CFB2",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Pink (13207)",
+      "source_value_id": "564681970696351768",
+      "hex": "#F7ADA6",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Pink Hex:#F7ADA6",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Rose Gold (13206)",
+      "source_value_id": "564681970696351765",
+      "hex": "#BA9594",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Rose Gold Hex:#BA9594",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Candy Red (13205)",
+      "source_value_id": "564681970696351763",
+      "hex": "#D02727",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 2, column 3",
+      "quote": "Candy Red Hex:#D02727",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Gold (13405)",
+      "source_value_id": "564681970696351759",
+      "hex": "#F4A925",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Gold Hex:#F4A925",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Mint (13507)",
+      "source_value_id": "564681970696351767",
+      "hex": "#96DCB9",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Mint Hex:#96DCB9",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Candy Green (13506)",
+      "source_value_id": "564681970696351764",
+      "hex": "#018814",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 3, column 3",
+      "quote": "Candy Green Hex:#018814",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Baby Blue (13603)",
+      "source_value_id": "564681970696351766",
+      "hex": "#A8C6EE",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 4, column 1",
+      "quote": "Baby Blue Hex:#A8C6EE",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Blue (13604)",
+      "source_value_id": "564681970696351761",
+      "hex": "#008BDA",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 4, column 2",
+      "quote": "Blue Hex:#008BDA",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Purple (13702)",
+      "source_value_id": "564681970696351762",
+      "hex": "#8671CB",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 4, column 3",
+      "quote": "Purple Hex:#8671CB",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    },
+    {
+      "value_text": "Titan Gray (13108)",
+      "source_value_id": "564681970696351760",
+      "hex": "#5F6367",
+      "source_url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "locator": "p.1, row 5, column 1",
+      "quote": "Titan Gray Hex:#5F6367",
+      "retrieved_at": "2026-10-16T08:25:11Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "AMS series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA Silk / Silk+\" › Component Compatibility",
+      "quote": "PLA Silk / Silk+ | All standard nozzles are acceptable (A 0.4 mm nozzle is recommended) | Not recommended to use low-temperature stabilization board | Fully compatible with the AMS series",
+      "note": "The store page says the same (Product Features › Cautions for Use › bullet 2: \"All AMS Series Compatible\"), which the builder already turns into pending ams_series rows."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "all_bambu_printers",
+      "target_label": "Open-frame or enclosed printer",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › table › row \"PLA, PETG, TPU …\" › Recommended Printer",
+      "quote": "PLA, PETG, TPU, and their CF/GF reinforced materials (e.g., PLA-CF/GF, PETG-CF/GF, etc.) | Not prone to warping; no mandatory temperature requirements | Open-frame or enclosed printer",
+      "note": "A row for PLA in general; note ② of the same page counts PLA Silk as standard PLA."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-silk-upgrade",
+      "source_title": "Bambu Lab US store product page: PLA Silk+",
+      "retrieved_at": "2026-10-16T07:04:06Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack and Hotend with Hardened Steel Nozzle 0.6mm / 0.8 mm .",
+      "note": "Contradicts the TDS Build Plate Type row (see the print_settings.recommended_plate conflict)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Hardened Steel Nozzle 0.6mm / 0.8 mm",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-silk-upgrade",
+      "source_title": "Bambu Lab US store product page: PLA Silk+",
+      "retrieved_at": "2026-10-16T07:04:06Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack and Hotend with Hardened Steel Nozzle 0.6mm / 0.8 mm .",
+      "note": "No single manifest handle: the label names a nozzle material and two sizes offered across the hotend products."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate SuperTack, Smooth PEI Plate, Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate SuperTack, Smooth PEI Plate, Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2, 0.4, 0.6, 0.8 mm nozzles",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "note": "The store page excludes the hardened steel 0.6 / 0.8 mm hotend (relation above); the PLA wiki recommends a 0.4 mm nozzle."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "669699942791499777",
+        "value_text": "Refill"
+      },
+      "target_kind": "spool",
+      "target_label": "spool",
+      "target_source_handle": "bambu-reusable-spool",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-silk-upgrade",
+      "source_title": "Bambu Lab US store product page: PLA Silk+",
+      "retrieved_at": "2026-10-16T07:04:06Z",
+      "locator": "Product Features › \"Note: The refill needs to be used with a spool.\"",
+      "quote": "Note: The refill needs to be used with a spool.",
+      "note": "Scoped to the Spool value \"Refill\". The FAQ (3.Refill Guidelines) repeats it: \"The refill filament needs to be used with a spool.\""
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Silk__Technical_Data_Sheet.pdf",
+      "title": "Bambu PLA Silk+ Technical Data Sheet (Bambu Filament TDS V1.0)",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "sha256": "336eab9b2bd1b8e1768880cc82b44da4ab16f8de4ccc434d9d47b2beebb22ea6"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/312c9c05c7274ef3bb6f21c949ae4c2b/SDS20250928A06_Bambu_PLA_Silk.pdf",
+      "title": "Bambu PLA Silk+ Safety Data Sheet SDS20250928A06 (prepared by Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:25:08Z",
+      "sha256": "7f661765b8eeff0a512951a11ec5953cd7f819c8c8cead335a523b63e12a724b"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/8aaeedf46e504db4afa2fc13cfbfae0a/PLA_Silk_Upgrade_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Silk+",
+      "retrieved_at": "2026-10-16T08:25:11Z",
+      "sha256": "68d5b52f47baef7a8738355efa47b283962aa31fcb46bceabfe518871f21fa0a"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 25 ± 4 MPa, elongation 1.5 ± 0.2 %, bending modulus 2150 ± 160 MPa, bending strength 30 ± 5 MPa, impact 8.5 ± 1.1 kJ/m²) are not stored. Raw-material properties (density, DSC melting and glass transition) sit in material.* / thermal.* keys.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 2130 ± 210 MPa, Z 1850 ± 140 MPa), melt index (14.5 ± 1.2 g/10 min at 210 °C, 2.16 kg), crystallization temperature (\"/\"), saturated water absorption rate (0.40 % at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed, with desiccant), retraction length (0.6 - 1.0 mm) and speed (20 - 40 mm/s), chamber temperature (25 - 45 °C), max overhang angle (55 °), max bridging length (30 mm), support material (Support for PLA), spool material (ABS, temperature resistance 70 °C) and spool size (diameter 200 mm, height 67 mm), suggested annealing (50 to 55 °C, 6 to 12 hours), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows. The nozzle sizes (0.2, 0.4, 0.6, 0.8 mm) are kept as a relation.",
+    "The TDS recommended chamber temperature (25 - 45 °C) is not written to thermal.chamber_temp: that key is a printer capability (number, template field chamber_temp_max), not a filament print setting.",
+    "SDS facts with no registry key are not stored: model \"A06-xx\", composition (PLA 60-80 %, TPU 20-40 % by wt), CLP \"Not classified\", and \"Not hazardous goods\" for sea, road and air transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Source disagreements kept for review: build plate (TDS lists Cool Plate SuperTack; the store FAQ says not compatible: recommended_plate is unverified with a conflict note); nozzle temperature (TDS 210 - 240 °C vs material-table wiki 190 - 240 °C ±10 °C for PLA*); bed temperature on PEI plates (TDS 35 - 45 °C vs material-table wiki 45 - 65 ℃ for PLA); AMS drying (PLA wiki \"AMS HT/AMS 2 pro 55℃，8 h\" vs drying wiki 45 ℃ for 12 h); bed drying (TDS and drying wiki 65 - 75 °C, 12 h vs PLA wiki hot bed 70℃，12 h). The product TDS values are kept; only the oven drying values are stored.",
+    "Marketing prose proves no number: \"enhanced sheen and gloss\", \"enhanced layer adhesion\", \"superior resistance to bending and impact\" (store page) are not stored.",
+    "Hex: the hex table names all 13 store colours exactly once (\"White\" ↔ \"White (13110)\" … \"Titan Gray\" ↔ \"Titan Gray (13108)\"); values read from the text layer and checked against the rendered page.",
+    "material.spool_type is neither stored nor marked not_published: no source names the spool (no \"Comes with … Spool\" bullet; the TDS gives only spool material and size), and the Spool option group (\"Filament with spool\" / \"Refill\") carries the choice.",
+    "The store page links documents that were not cached and not read: Filament RoHS (https://store.bblcdn.com/s4/default/93498d4068154749a8744f9cb662b857/Bambu_PLA_Silk_upgrade_ROHS.pdf) and the wiki guide https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool. safety.certifications is therefore neither stored nor marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament."
+  ]
+}

@@ -1,0 +1,776 @@
+{
+  "handle": "bambu-dual-texture-pei-plate",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T15:50:47Z",
+  "searched": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "keys": [
+        "product.*",
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "package.contents",
+        "compat.statement",
+        "safety.certifications"
+      ],
+      "note": "Cached copy read in full (HTML, including the tabbed \"Build Plate Types\" panels): Build Plate (dimensions table, types list, Important Notice on plate generations), the Dual-Texture PEI Plate tab (one paragraph, no size table), Appendix."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "part.max_temperature",
+        "compat.statement"
+      ],
+      "note": "Cached copy read in full. Its build-plate tables name the Cool Plate, Engineering Plate, Smooth PEI / High-Temperature Plate and Textured PEI Plate, never the Dual-Texture PEI Plate, so no value is taken from it for this product."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "title": "Bambu Dual-Texture PEI Plate (store page)",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "keys": [
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "product.*",
+        "package.*",
+        "compat.statement"
+      ],
+      "note": "Corpus copy parsed with extractPage/buildImportPayload: Product Specifications (6 rows), description incl. Recommended Settings and Considerations, the Printer Model options and their descriptions."
+    }
+  ],
+  "specs": [
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129985",
+        "value_text": "X2D"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The first number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129985",
+        "value_text": "X2D"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The second number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129986",
+        "value_text": "P2S"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The first number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129986",
+        "value_text": "P2S"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The second number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129987",
+        "value_text": "A1"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The first number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129987",
+        "value_text": "A1"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The second number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419905",
+        "value_text": "A1 mini"
+      },
+      "value": 180,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 4",
+      "quote": "180*180 mm | A1 mini",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The first number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419905",
+        "value_text": "A1 mini"
+      },
+      "value": 180,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 4",
+      "quote": "180*180 mm | A1 mini",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The second number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419904",
+        "value_text": "P1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The first number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419904",
+        "value_text": "P1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The second number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129988",
+        "value_text": "X1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The first number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129988",
+        "value_text": "X1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "From the plates wiki's general \"Build Plate Dimensions\" table (\"The build plate dimensions for each model are as follows\"); the Dual-Texture PEI Plate tab gives no size table of its own. The second number of the Dimensions cell (W*D order). The store page's \"Usable Print Size\" row (256*256mm / 180*180mm) agrees."
+    },
+    {
+      "key": "part.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-Texture PEI Plate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Types › list item 3",
+      "quote": "Currently, Bambu Lab build plates mainly include the following types: … Dual-Texture PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "key": "part.surface_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Textured PEI (one side) / Smooth PEI (other side)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Dual-Texture PEI Plate tab › paragraph 1",
+      "quote": "The stainless steel plate is equipped with dual-sided coatings, one side featuring textured PEI and the other side featuring smooth PEI.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page says the same: \"one side is Textured PEI surface and the other side is Smooth PEI surface\". Value worded from the quote."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA/PLA-CF/PLA-GF",
+        "PETG/PETG-CF",
+        "ABS (not for A1 mini)",
+        "ASA (not for A1 mini)",
+        "TPU",
+        "PVA",
+        "PC/PC-CF (not for A1 mini)",
+        "PA/PA-CF/PAHT-CF (not for A1 mini)",
+        "PET-CF (not for A1 mini)"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › Materials column, rows 1–9",
+      "quote": "PLA/PLA-CF/PLA-GF … PETG/PETG-CF … ABS (not for A1 mini) … ASA (not for A1 mini) … TPU … PVA … PC/PC-CF (not for A1 mini) … PA/PA-CF/PAHT-CF (not for A1 mini) … PET-CF (not for A1 mini)",
+      "test_method": "",
+      "test_condition": "Materials listed in the plate's Recommended Settings table, as written",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Each row also gives the heatbed temperature and whether glue is required per surface; those are in the material relations' notes (no plate key exists for them)."
+    },
+    {
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419905",
+        "value_text": "A1 mini"
+      },
+      "value": [
+        "ABS",
+        "ASA",
+        "PC/PC-CF",
+        "PA/PA-CF/PAHT-CF",
+        "PET-CF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › Materials column, rows 3, 4, 7, 8, 9",
+      "quote": "ABS (not for A1 mini) … ASA (not for A1 mini) … PC/PC-CF (not for A1 mini) … PA/PA-CF/PAHT-CF (not for A1 mini) … PET-CF (not for A1 mini)",
+      "test_method": "",
+      "test_condition": "For the A1 mini plate",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:03Z"
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129985",
+        "value_text": "X2D"
+      },
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "target_source_handle": "x2d",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells this plate with the Printer Model option \"X2D\". Store page (this option's description and Considerations): \"For X2D and P2S users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the Dual-Texture PEI Plate to avoid error reports.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129986",
+        "value_text": "P2S"
+      },
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_source_handle": "p2s",
+      "target_family": "model_p2s",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells this plate with the Printer Model option \"P2S\". Store page (this option's description and Considerations): \"For X2D and P2S users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the Dual-Texture PEI Plate to avoid error reports.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129987",
+        "value_text": "A1"
+      },
+      "target_kind": "family",
+      "target_label": "A1",
+      "target_source_handle": "a1",
+      "target_family": "model_a1",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells this plate with the Printer Model option \"A1\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419905",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "printer",
+      "target_label": "A1 mini",
+      "target_source_handle": "a1-mini",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 4",
+      "quote": "180*180 mm | A1 mini",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells this plate with the Printer Model option \"A1 mini\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419904",
+        "value_text": "P1 Series"
+      },
+      "target_kind": "family",
+      "target_label": "P1 Series",
+      "target_source_handle": "p1s",
+      "target_family": "p1_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells this plate with the Printer Model option \"P1 Series\". Store page (this option's description): \"The older 256mm×256mm build plate does not support the build plate type detection feature available on 2nd Gen machines (P2S and future models).\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "763535124041129988",
+        "value_text": "X1 Series"
+      },
+      "target_kind": "family",
+      "target_label": "X1 Series",
+      "target_source_handle": "refurbished-x1c",
+      "target_family": "x1_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells this plate with the Printer Model option \"X1 Series\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA/PLA-CF/PLA-GF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 1",
+      "quote": "PLA/PLA-CF/PLA-GF | 45~65℃ | No | No",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Heatbed temperature on this plate: 45~65℃. Glue stick required for the Smooth PEI surface: No; for the Textured PEI surface: No."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG/PETG-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 2",
+      "quote": "PETG/PETG-CF | 60~80℃ | Glue Stick/Liquid Glue | No",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Heatbed temperature on this plate: 60~80℃. Glue stick required for the Smooth PEI surface: Glue Stick/Liquid Glue; for the Textured PEI surface: No."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 3",
+      "quote": "ABS (not for A1 mini) | 90~100℃ | Glue Stick/Liquid Glue | No",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Heatbed temperature on this plate: 90~100℃. Glue stick required for the Smooth PEI surface: Glue Stick/Liquid Glue; for the Textured PEI surface: No. Not for A1 mini (see the A1 mini not_compatible_with row)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 4",
+      "quote": "ASA (not for A1 mini) | 90~100℃ | Glue Stick/Liquid Glue | No",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Heatbed temperature on this plate: 90~100℃. Glue stick required for the Smooth PEI surface: Glue Stick/Liquid Glue; for the Textured PEI surface: No. Not for A1 mini (see the A1 mini not_compatible_with row)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "TPU",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 5",
+      "quote": "TPU | 35~45℃ | Glue Stick/Liquid Glue | Glue Stick/Liquid Glue",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Heatbed temperature on this plate: 35~45℃. Glue stick required for the Smooth PEI surface: Glue Stick/Liquid Glue; for the Textured PEI surface: Glue Stick/Liquid Glue."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 6",
+      "quote": "PVA | 45~60℃ | Glue Stick/Liquid Glue | No",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Heatbed temperature on this plate: 45~60℃. Glue stick required for the Smooth PEI surface: Glue Stick/Liquid Glue; for the Textured PEI surface: No."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PC/PC-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 7",
+      "quote": "PC/PC-CF (not for A1 mini) | 90~110℃ | Glue Stick | Glue Stick",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Heatbed temperature on this plate: 90~110℃. Glue stick required for the Smooth PEI surface: Glue Stick; for the Textured PEI surface: Glue Stick. Not for A1 mini (see the A1 mini not_compatible_with row)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PA/PA-CF/PAHT-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 8",
+      "quote": "PA/PA-CF/PAHT-CF (not for A1 mini) | 90~110℃ | Glue Stick | Glue Stick",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Heatbed temperature on this plate: 90~110℃. Glue stick required for the Smooth PEI surface: Glue Stick; for the Textured PEI surface: Glue Stick. Not for A1 mini (see the A1 mini not_compatible_with row)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 9",
+      "quote": "PET-CF (not for A1 mini) | 80~100℃ | Glue Stick/Liquid Glue | No",
+      "retrieved_at": "2026-10-16T07:09:03Z",
+      "note": "Heatbed temperature on this plate: 80~100℃. Glue stick required for the Smooth PEI surface: Glue Stick/Liquid Glue; for the Textured PEI surface: No. Not for A1 mini (see the A1 mini not_compatible_with row)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419905",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 3",
+      "quote": "ABS (not for A1 mini) | 90~100℃ | Glue Stick/Liquid Glue | No",
+      "retrieved_at": "2026-10-16T07:09:03Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419905",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 4",
+      "quote": "ASA (not for A1 mini) | 90~100℃ | Glue Stick/Liquid Glue | No",
+      "retrieved_at": "2026-10-16T07:09:03Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419905",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "PC/PC-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 7",
+      "quote": "PC/PC-CF (not for A1 mini) | 90~110℃ | Glue Stick | Glue Stick",
+      "retrieved_at": "2026-10-16T07:09:03Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419905",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "PA/PA-CF/PAHT-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 8",
+      "quote": "PA/PA-CF/PAHT-CF (not for A1 mini) | 90~110℃ | Glue Stick | Glue Stick",
+      "retrieved_at": "2026-10-16T07:09:03Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681809383419905",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "source_title": "Bambu Dual-Texture PEI Plate (store page)",
+      "locator": "Description › Recommended Settings › row 9",
+      "quote": "PET-CF (not for A1 mini) | 80~100℃ | Glue Stick/Liquid Glue | No",
+      "retrieved_at": "2026-10-16T07:09:03Z"
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates",
+      "text": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    }
+  ],
+  "not_published": [
+    "product.net_weight",
+    "part.max_temperature",
+    "package.contents"
+  ],
+  "notes": [
+    "Sizes per printer come from the plates wiki's general \"Build Plate Dimensions\" table (the Dual-Texture tab has none); stored as product.length/product.width per Printer Model option. They agree with the store page's \"Usable Print Size\" (256*256mm / 180*180mm).",
+    "Thickness: the store page row gives three layers (\"Textured PEI - 0.075mm / Smooth PEI - 0.125mm / Stainless Steel Plate - 0.4mm\"), while the description prose says \"a 0.5mm magnetic stainless steel plate\". The table row wins over prose; no curated thickness is written. The deterministic page row physical.thickness carries value_num 0.075 (the Textured PEI layer, the first number), unverified.",
+    "The store page's \"Packaging Size\" (300*270*17mm / 220*190*15mm) and \"Packaging Weight\" (0.45kg / 0.23kg) cells list two values with no option labels; they are not mapped to options (that would rest on row order only). No net weight is published.",
+    "The plates wiki's Important Notice on two 256×256 mm plate generations names the Textured PEI, Smooth PEI and Cool Plate SuperTack plates only, not the Dual-Texture plate; the store page's own option notes (P1 Series: older plate without type detection on 2nd Gen machines; X2D/P2S: disable Build Plate Position Detection) are kept in the printer relations' notes and as the page's variant.note rows.",
+    "Glue: per material and per surface only (store page Recommended Settings); no unconditional requires relation exists, so none is written.",
+    "Bed temperatures per filament on this plate have no registry key for a plate (print_settings.bed_temp applies to filament only); they are kept in the material relations' quotes and notes. The material-table wiki has no Dual-Texture column, so its Smooth/Textured PEI columns are not applied to this plate.",
+    "No in-the-box list: neither the store page nor the wiki gives an official packing list for this plate."
+  ]
+}

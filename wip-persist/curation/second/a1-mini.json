@@ -1,0 +1,1377 @@
+{
+  "handle": "a1-mini",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T19:49:08Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "title": "Bambu Lab A1 mini Technical Specification",
+      "retrieved_at": "2026-10-16T08:21:25Z",
+      "pages": 2,
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "title": "Supplemental Instructions for Packaging List",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "keys": [
+        "package.contents",
+        "printing.included_build_plate",
+        "connectivity.storage"
+      ]
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/a1-mini",
+      "title": "Bambu Lab US store product page",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*",
+        "package.contents"
+      ]
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "180 × 180 × 180 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Body › Build Volume",
+      "quote": "Build Volume: 180*180*180 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Steel + Extruded Aluminum",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Body › Chassis",
+      "quote": "Chassis: Steel + Extruded Aluminum",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "extrusion.hotend",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "All-Metal",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › ToolHead › Hot End",
+      "quote": "Hot End: All-Metal",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "extrusion.extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › ToolHead › Extruder Gears",
+      "quote": "Extruder Gears: Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Stainless Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › ToolHead › Nozzle",
+      "quote": "Nozzle: Stainless Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › ToolHead › Max Hot End Temperature",
+      "quote": "Max Hot End Temperature: 300 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › ToolHead › Nozzle Diameter (Included)",
+      "quote": "Nozzle Diameter (Included): 0.4 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › ToolHead › Nozzle Diameter (Included); Nozzle Diameter (Optional)",
+      "quote": "Nozzle Diameter (Included): 0.4 mm Nozzle Diameter (Optional): 0.2 mm, 0.6 mm, 0.8 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z",
+      "note": "The included 0.4 mm plus the optional 0.2, 0.6 and 0.8 mm the sheet lists; both rows quoted."
+    },
+    {
+      "key": "printing.filament_cutter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Yes",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › ToolHead › Filament Cutter",
+      "quote": "Filament Cutter: Yes",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › ToolHead › Filament Diameter",
+      "quote": "Filament Diameter: 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "printing.build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Bambu Textured PEI Plate",
+        "Bambu Smooth PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Heatbed › Compatible Build Plate",
+      "quote": "Compatible Build Plate: Bambu Textured PEI Plate Bambu Smooth PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z",
+      "conflict_note": "Same two plates as the store page row \"Heatbed › Build Plate\"; the store page also marks the Textured PEI Plate \"(Included)\" (kept as printing.included_build_plate) and joins the items differently, so the merge records a text difference only."
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Heatbed › Max Build Plate Temperature",
+      "quote": "Max Build Plate Temperature: 80 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 500,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Speed › Max Speed of Toolhead",
+      "quote": "Max Speed of Toolhead: 500 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 10000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Speed › Max Acceleration of Toolhead",
+      "quote": "Max Acceleration of Toolhead: 10 m/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z",
+      "note": "10 m/s² written in the registry unit (10000 mm/s²); the store page states 10000 mm/s²."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 28,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Speed › Max Hot End Flow",
+      "quote": "Max Hot End Flow: 28 mm³/s @ABS (Model: 150*150 mm single wall; Material: Bambu ABS; Temperature: 280 ℃)",
+      "test_method": "",
+      "test_condition": "@ABS (Model: 150*150 mm single wall; Material: Bambu ABS; Temperature: 280 ℃)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "thermal.part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Cooling › Part Cooling Fan",
+      "quote": "Part Cooling Fan: Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "thermal.hotend_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Cooling › Hot End Fan",
+      "quote": "Hot End Fan: Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "thermal.control_board_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Cooling › MC Board Cooling Fan",
+      "quote": "MC Board Cooling Fan: Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA, PETG, TPU, PVA — Ideal",
+        "ABS, ASA, PC, PA, PET, Carbon/Glass Fiber Reinforced Polymer — Not Recommended"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.1 › Supported Filament",
+      "quote": "PLA, PETG, TPU, PVA: Ideal ABS, ASA, PC, PA, PET, Carbon/Glass Fiber Reinforced Polymer: Not Recommended",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z",
+      "conflict_note": "Same two items as the store page row; the store page joins them with a line break and the merge joins list items with a comma, so the merge records a text difference only. \"Not Recommended\" is not \"not supported\": printing.unsupported_filament is left unset."
+    },
+    {
+      "key": "printing.camera",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Low Rate Camera (up to 1080P), Timelapse Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Sensors › Monitoring Camera",
+      "quote": "Monitoring Camera: Low Rate Camera (up to1080P) Timelapse Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z",
+      "conflict_note": "The store page row \"Sensors › Monitoring Camera\" (parsed to x.monitoring_camera, an unknown label) reads \"Low Framerate Camera (Up to 1080P) / Timelapse Supported\": same camera and resolution, different wording."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Sensors › Filament Run Out Sensor",
+      "quote": "Filament Run Out Sensor: Yes",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Sensors › Filament Odometry",
+      "quote": "Filament Odometry: Yes",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "printing.power_loss_recovery",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Sensors › Power Loss Recover",
+      "quote": "Power Loss Recover: Yes",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "printing.filament_tangle_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Sensors › Filament Tangle Sensor",
+      "quote": "Filament Tangle Sensor: Yes",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 347,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Physical Dimensions › Dimensions",
+      "quote": "Dimensions: 347*315*365 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 315,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Physical Dimensions › Dimensions",
+      "quote": "Dimensions: 347*315*365 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 365,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Physical Dimensions › Dimensions",
+      "quote": "Dimensions: 347*315*365 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 5500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Physical Dimensions › Net Weight",
+      "quote": "Net Weight : 5.5 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-240 VAC",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Electrical Requirements › Input Voltage",
+      "quote": "Input Voltage: 100-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z",
+      "region_note": "Region-free (\"\"): the sheet states one universal 100-240 VAC input that covers 220 V; it is not a US 100-120 V table and not a 220 V-only message, so neither us_110v nor intl_220v applies."
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Electrical Requirements › Input Voltage",
+      "quote": "Input Voltage: 100-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z",
+      "region_note": "Region-free, as electrical.voltage."
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 150,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Electrical Requirements › Max Power",
+      "quote": "Max Power: 150 W",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z",
+      "region_note": "Region-free: one figure for the universal 100-240 VAC input."
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "2.4 inches 320*240 IPS Touch Screen",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Electronics › Display",
+      "quote": "Display: 2.4 inches 320*240 IPS Touch Screen",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "connectivity.interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Wi-Fi, Bambu-Bus",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Electronics › Connectivity",
+      "quote": "Connectivity: Wi-Fi, Bambu-Bus",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "connectivity.storage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Micro SD Card",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Electronics › Storage",
+      "quote": "Storage: Micro SD Card",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "connectivity.control_interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Touch Screen",
+        "APP",
+        "PC Application"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Electronics › Control Interface",
+      "quote": "Control Interface: Touch Screen, APP, PC Application",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "connectivity.motion_controller",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-Core Cortex M4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Electronics › Motion Controller",
+      "quote": "Motion Controller: Dual-Core Cortex M4",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Studio; supports third-party slicers which export standard G-code, such as SuperSlicer, PrusaSlicer and Cura, but certain advanced features may not be supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Software › Slicer",
+      "quote": "Slicer: Bambu Studio Support third party slicers which export standard Gcode such as Superslicer, Prusaslicer and Cura, but certain advanced features may not be supported.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "MacOS",
+        "Windows"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Software › Slicer Supported OS",
+      "quote": "Slicer Supported OS: MacOS, Windows",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "IEEE 802.11 b/g/n; 2412–2472 MHz (CE), 2412–2462 MHz (FCC), 2400–2483.5 MHz (SRRC); transmitter power (EIRP) ≤ 21.5 dBm (FCC), ≤ 20 dBm (CE/SRRC)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "source_title": "Bambu Lab A1 mini Technical Specification",
+      "locator": "p.2 › Wi-Fi › Frequency Range; Transmitter Power (EIRP); Protocol",
+      "quote": "Frequency Range: 2412 MHz - 2472 MHz (CE) 2412 MHz - 2462 MHz (FCC) 2400 MHz - 2483.5 MHz (SRRC) Transmitter Power (EIRP): ≤ 21.5 dBm (FCC) ≤ 20 dBm (CE/SRRC) Protocol: IEEE 802.11 b/g/n",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:25Z"
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "source_title": "Supplemental Instructions for Packaging List",
+      "locator": "Packing list › table row 8 (both versions)",
+      "quote": "Textured PEI plate | Placed on the heatbed to hold the model; Both sides can be used.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "Both the Combo and the non-combo packing lists name \"Textured PEI plate\"; the store page marks \"Bambu Textured PEI Plate (Included)\": they agree."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "locator": "p.1 › Heatbed › Compatible Build Plate",
+      "quote": "Compatible Build Plate: Bambu Textured PEI Plate Bambu Smooth PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "locator": "p.1 › Heatbed › Compatible Build Plate",
+      "quote": "Compatible Build Plate: Bambu Textured PEI Plate Bambu Smooth PEI Plate"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/a1-mini",
+      "locator": "FAQ › 1 (store page, owner-only provenance)",
+      "quote": "AMS is incompatible with the A1 mini. If you want a multi-color print using A1 mini, you must use the AMS lite."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/a1-mini",
+      "locator": "FAQ › 1 (store page, owner-only provenance)",
+      "quote": "AMS is incompatible with the A1 mini. If you want a multi-color print using A1 mini, you must use the AMS lite.",
+      "also_evidence": {
+        "source_kind": "wiki",
+        "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+        "locator": "Packing list › Combo version",
+        "quote": "AMS lite body (including 4-pin cable), AMS lite stand and installation screws, AMS lite rotary spool holder"
+      }
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "A1 mini printer",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 1",
+      "quote": "Combo version: A1 mini printer"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "32 GB Micro SD card (pre-installed in the printer)",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 2",
+      "quote": "32 GB Micro SD card (pre-installed in the printer)"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "AMS lite body (including 4-pin cable)",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 3",
+      "quote": "AMS lite body (including 4-pin cable)"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "AMS lite stand and installation screws",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 4",
+      "quote": "AMS lite stand and installation screws"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "AMS lite rotary spool holder",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 5",
+      "quote": "AMS lite rotary spool holder",
+      "note": "The wiki gives no count; the store page says \"AMS lite Rotary Spool Holder (x4)\"."
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Purge wiper and its screws",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 6",
+      "quote": "purge wiper, and its screws"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Spool holder with the bracket and its screws",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 7",
+      "quote": "spool holder with the bracket and its screws"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "PTFE tube 580 mm",
+      "qty": 2,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 8",
+      "quote": "PTFE tubes (580 mm *2, 700 mm *2)"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "PTFE tube 700 mm",
+      "qty": 2,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 8",
+      "quote": "PTFE tubes (580 mm *2, 700 mm *2)"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Textured PEI plate",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 9",
+      "quote": "Textured PEI plate"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Sample filament 20g",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 10; table row 9",
+      "quote": "Sample filament 20g"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Unclogging Pin Tool",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 11",
+      "quote": "Unclogging Pin Tool"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Allen keys (H2 and H1.5)",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 12",
+      "quote": "Allen keys (H2 and H1.5)"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Cable Organizer",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 13",
+      "quote": "Cable Organizer"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Bambu Scraper Blade and its screws",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 14",
+      "quote": "Bambu Scraper Blade and it screws"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Lubricant grease",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 15",
+      "quote": "lubricant grease"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Lubricant oil",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 16",
+      "quote": "lubricant oil"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918661",
+        "value_text": "A1 mini Combo"
+      },
+      "text": "Bambu filament swatches",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Combo version › item 17",
+      "quote": "and Bambu filament swatches."
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "A1 mini printer",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 1",
+      "quote": "Non-combo version: A1 mini printer"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "32 GB Micro SD card (pre-installed in the printer)",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 2",
+      "quote": "32 GB Micro SD card (pre-installed in the printer)"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Purge wiper and its screws",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 3",
+      "quote": "purge wiper, and its screws"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Spool holder with the bracket and its screws",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 4",
+      "quote": "spool holder with the bracket and its screws"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "PTFE tube 520 mm",
+      "qty": 1,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 5",
+      "quote": "PTFE tube (520 mm *1)"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Textured PEI plate",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 6",
+      "quote": "Textured PEI plate"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Sample filament 20g",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 7; table row 9",
+      "quote": "Sample filament 20g"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Unclogging Pin Tool",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 8",
+      "quote": "Unclogging Pin Tool"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Allen keys (H2 and H1.5)",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 9",
+      "quote": "Allen keys (H2 and H1.5)"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Cable Organizer",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 10",
+      "quote": "Cable Organizer"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Bambu Scraper Blade and its screws",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 11",
+      "quote": "Bambu Scraper Blade and it screws"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Lubricant grease",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 12",
+      "quote": "lubricant grease"
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681835966918662",
+        "value_text": "A1 mini"
+      },
+      "text": "Lubricant oil",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › Non-combo version › item 13",
+      "quote": "and lubricant oil."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "text": "Quick start guide",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › table row 16",
+      "quote": "Quick start guide"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "text": "Disclaimer and Safety Guidelines",
+      "qty": null,
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "locator": "Packing list › table row 17",
+      "quote": "Disclaimer and Safety Guidelines"
+    }
+  ],
+  "in_the_box_note": "Official wiki packing list (\"The type and quantity of accessories may change from time to time.\"). The store page box list differs in breakdown: it adds \"Stainless Steel Nozzle (Included)\" and \"Accessory Box\", and splits PTFE tubes as 1 base + 3 Combo add-ons (4 in a Combo, as the wiki 2 × 580 mm + 2 × 700 mm).",
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/6cddc28fcb5a4a34975cfc7a23c83491.pdf",
+      "title": "Bambu Lab A1 mini Technical Specification",
+      "source_kind": "store_doc",
+      "pages": 2
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/a1-mini/manual/acc-in-the-box",
+      "title": "Supplemental Instructions for Packaging List",
+      "source_kind": "wiki"
+    }
+  ],
+  "not_published": [
+    "printing.technology",
+    "printing.layer_height",
+    "printing.auto_leveling",
+    "extrusion.extruder_motor",
+    "electrical.rated_power",
+    "electrical.current",
+    "electrical.standby_power",
+    "physical.noise",
+    "physical.operating_temp",
+    "physical.recommended_space",
+    "safety.certifications",
+    "connectivity.application_processor"
+  ],
+  "notes": [
+    "Not listed as not_published because the store page states them (per version): package.length/width/height, shipment.gross_weight, package.contents.",
+    "Left unset (not applicable to this open-frame, single-nozzle printer, which only registry rules may mark): thermal.chamber_temp, thermal.chamber_heating, printing.door_sensor, printing.camera_toolhead/nozzle/birdseye, motion.max_flow_high_flow, extrusion.main_*/aux_*, printing.filament_*_hotend*, thermal.aux_part_cooling_fan, thermal.chamber_*_fan, safety.*filter*/filtration, connectivity.npu/network_kill_switch/removable_network_module/network_access_control, printing.working_area.",
+    "connectivity.bluetooth and connectivity.ethernet are left unset: the sheet's \"Connectivity: Wi-Fi, Bambu-Bus\" row is a closed list."
+  ]
+}

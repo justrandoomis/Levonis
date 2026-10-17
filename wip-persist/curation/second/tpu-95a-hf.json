@@ -1,0 +1,763 @@
+{
+  "handle": "tpu-95a-hf",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T22:19:02Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "pages": "1-5",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "mechanical.*",
+        "print_settings.*",
+        "drying.*",
+        "extrusion.supported_nozzle_diameters",
+        "safety.*"
+      ]
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/74dc918e3eb543238582c8d9084c3ce0/SDS20251127U01_Bambu_TPU_95A_HF.pdf",
+      "title": "Safety Data Sheet SDS20251127U01 — Bambu TPU 95A HF",
+      "retrieved_at": "2026-10-16T08:24:02Z",
+      "pages": "1-18",
+      "keys": [
+        "material.type",
+        "material.density",
+        "thermal.*",
+        "safety.*"
+      ]
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/6ec4738ccb144e8880cfec81a4cb6665/TPU_95A_HF_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table — TPU 95A HF",
+      "retrieved_at": "2026-10-16T08:24:04Z",
+      "pages": "1",
+      "keys": [],
+      "looked_for": [
+        "colour hex per option value"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.nozzle_temp",
+        "print_settings.bed_temp",
+        "print_settings.recommended_plate",
+        "extrusion.supported_nozzle_diameters",
+        "drying.*",
+        "thermal.heat_deflection_temp",
+        "mechanical.tensile_strength",
+        "mechanical.impact_strength"
+      ],
+      "looked_for": [
+        "printer, nozzle, AMS and build-plate compatibility"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ]
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "TPU",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Thermoplastic polyurethane",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "note": "TPU is the abbreviation of the stated composition; the SDS (p.4, section 3) gives Thermoplastic Polyurethane 99-99.9 % by wt, CAS 9009-54-5."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: 1.75 mm)."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681959094906895",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "note": "Scoped to the Size value «1 kg» (the product's only size); agrees with the store page option row (1000 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.22,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.22 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Typical value (Bambu Lab test)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z"
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 183,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 183 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Typical value (Bambu Lab test)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z"
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 27.3,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 27.3 ± 0.8 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimen, X-Y direction (± 0.8 MPa); printed at nozzle 230 °C, bed 35 °C, 140 mm/s, 100% infill; annealed and dried at 70 °C for 12 h before testing. Z direction: 22.3 ± 0.6 MPa (no registry key).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "> 650%",
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 > 650%",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimen, X-Y direction; lower bound as published (> 650%); printed at nozzle 230 °C, bed 35 °C, 140 mm/s, 100% infill; annealed and dried at 70 °C for 12 h before testing. Z direction: > 480% (no registry key).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z"
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 123.2,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 123.2 kJ/m²",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimen, X-Y direction; printed at nozzle 230 °C, bed 35 °C, 140 mm/s, 100% infill; annealed and dried at 70 °C for 12 h before testing. Z direction: 86.3 kJ/m² (no registry key).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z"
+    },
+    {
+      "key": "mechanical.hardness",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "95A",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, title",
+      "quote": "TPU 95A HF",
+      "test_method": "",
+      "test_condition": "Read from the product name (Shore A designation «95A»); the TDS has no hardness row and states no test method.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "note": "Unverified: the name is not a measured spec row. No document states a Shore hardness value."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing settings",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "note": "Wiki material table agrees: 0.2 mm nozzle «Not Recommended», 0.4/0.6/0.8 mm (standard and high flow) «Compatible»."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 220,
+        "max": 240
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 220 - 240 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing settings",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "conflict": "The wiki filament guide material table (TPU 95A HF row) gives 200 - 250 °C (± 10 °C); the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 30,
+        "max": 35
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 30 - 35 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing settings; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "conflict": "The wiki filament guide gives TPU (generic) per plate: Engineering Plate 30 - 35 ℃, Smooth PEI / High-Temperature Plate 35 - 45 ℃, Textured PEI 35 - 45 ℃; with glue 30 - 45 °C. The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 200 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 200 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing settings; upper bound as published",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z"
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing settings",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing settings",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "conflict": "The wiki filament guide build-plate table marks TPU (generic) on «Bambu Cool Plate / PLA Plate» as «Not recommended»; the store page FAQ says not compatible with Cool Plate SuperTack (a different plate). The product TDS list is kept."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 70,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Blast Drying Oven: 70 °C, 8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven (forced-air), before printing. Alternative: X1 Series printer heatbed 80 - 90 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "note": "Wiki drying Appendix I (TPU 95A HF row) agrees: forced-air oven 70 °C, 8 h; heatbed 80-90 °C, 12 h; AMS 2 Pro 65 °C 12 h (may not fully dry TPU); AMS HT 75 °C 18 h."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0 — TPU 95A HF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Blast Drying Oven: 70 °C, 8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven (forced-air) at 70 °C, before printing. Alternative: X1 Series printer heatbed 80 - 90 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:00Z",
+      "note": "Agrees with the wiki drying Appendix I (TPU 95A HF row: forced-air oven 70 °C, 8 h)."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "White (51102)",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681959094906888"
+      },
+      "hex": "#FFFFFF",
+      "source_url": "https://store.bblcdn.com/s7/default/6ec4738ccb144e8880cfec81a4cb6665/TPU_95A_HF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table — TPU 95A HF",
+      "locator": "p.1",
+      "quote": "White Hex:#FFFFFF",
+      "retrieved_at": "2026-10-16T08:24:04Z"
+    },
+    {
+      "value_text": "Gray (51101)",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681959094906889"
+      },
+      "hex": "#898D8D",
+      "source_url": "https://store.bblcdn.com/s7/default/6ec4738ccb144e8880cfec81a4cb6665/TPU_95A_HF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table — TPU 95A HF",
+      "locator": "p.1",
+      "quote": "Gray Hex:#898D8D",
+      "retrieved_at": "2026-10-16T08:24:04Z"
+    },
+    {
+      "value_text": "Yellow (51400)",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681959094906890"
+      },
+      "hex": "#F3E600",
+      "source_url": "https://store.bblcdn.com/s7/default/6ec4738ccb144e8880cfec81a4cb6665/TPU_95A_HF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table — TPU 95A HF",
+      "locator": "p.1",
+      "quote": "Yellow Hex:#F3E600",
+      "retrieved_at": "2026-10-16T08:24:04Z"
+    },
+    {
+      "value_text": "Blue (51600)",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681959094906891"
+      },
+      "hex": "#0072CE",
+      "source_url": "https://store.bblcdn.com/s7/default/6ec4738ccb144e8880cfec81a4cb6665/TPU_95A_HF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table — TPU 95A HF",
+      "locator": "p.1",
+      "quote": "Blue Hex:#0072CE",
+      "retrieved_at": "2026-10-16T08:24:04Z"
+    },
+    {
+      "value_text": "Red (51200)",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681959094906892"
+      },
+      "hex": "#C8102E",
+      "source_url": "https://store.bblcdn.com/s7/default/6ec4738ccb144e8880cfec81a4cb6665/TPU_95A_HF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table — TPU 95A HF",
+      "locator": "p.1",
+      "quote": "Red Hex:#C8102E",
+      "retrieved_at": "2026-10-16T08:24:04Z"
+    },
+    {
+      "value_text": "Black (51100)",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681959094906893"
+      },
+      "hex": "#101820",
+      "source_url": "https://store.bblcdn.com/s7/default/6ec4738ccb144e8880cfec81a4cb6665/TPU_95A_HF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table — TPU 95A HF",
+      "locator": "p.1",
+      "quote": "Black Hex:#101820",
+      "retrieved_at": "2026-10-16T08:24:04Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table row «TPU» (column AMS / AMS lite Compatibility)",
+      "quote": "TPU | Compatible | Compatible | Not Compatible |",
+      "note": "The same section lists TPU 95A as «Too soft» for the AMS / AMS lite channel; the store page says «All AMS Series NOT Compatible»."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table row «TPU» (column AMS / AMS lite Compatibility)",
+      "quote": "TPU | Compatible | Compatible | Not Compatible |"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "Open-frame printer (A Series, P1P, etc.)",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table row «TPU» (column Open-frame printer)",
+      "quote": "TPU | Compatible | Compatible | Not Compatible |"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "Enclosed printer (H2 Series, X2D, P2S, X1 Series, P1S, etc.)",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table row «TPU» (column Enclosed printer)",
+      "quote": "TPU | Compatible | Compatible | Not Compatible |"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4 mm Nozzle",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table row «TPU 95A HF»",
+      "quote": "TPU 95A HF | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 200 - 250 |"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.6 mm Nozzle",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table row «TPU 95A HF»",
+      "quote": "TPU 95A HF | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 200 - 250 |"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.8 mm Nozzle",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table row «TPU 95A HF»",
+      "quote": "TPU 95A HF | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 200 - 250 |"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4 mm High flow nozzle",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table row «TPU 95A HF»",
+      "quote": "TPU 95A HF | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 200 - 250 |"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.6 mm High flow nozzle",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table row «TPU 95A HF»",
+      "quote": "TPU 95A HF | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 200 - 250 |"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.8 mm High flow nozzle",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table row «TPU 95A HF»",
+      "quote": "TPU 95A HF | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 200 - 250 |"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Stainless Steel Nozzle 0.2 mm",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-95a-hf",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "note": "Store page (owner-only provenance). The wiki nozzle table marks the 0.2 mm nozzle «Not Recommended» for TPU 95A HF."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-95a-hf",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "note": "Store page (owner-only provenance)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "locator": "TDS p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "Conflict: the wiki build-plate table marks TPU on «Bambu Cool Plate / PLA Plate» as «Not recommended»."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "locator": "TDS p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, Engineering Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "locator": "TDS p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, Engineering Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "locator": "TDS p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, Engineering Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "recommended_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "Glue",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "locator": "TDS p.1, Recommended Printing Settings › Bed Surface Preparation",
+      "quote": "Bed Surface Preparation Glue",
+      "note": "The wiki filament guide gives TPU with glue stick or liquid glue at 30 - 45 °C."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/58df32731eab4c90a7dac9b12e13ba88.pdf",
+      "title": "Filament TDS"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/74dc918e3eb543238582c8d9084c3ce0/SDS20251127U01_Bambu_TPU_95A_HF.pdf",
+      "title": "Filament MSDS"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/6ec4738ccb144e8880cfec81a4cb6665/TPU_95A_HF_Hex_Code_Table.pdf",
+      "title": "Hex Code"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament drying instructions"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "thermal.glass_transition",
+    "thermal.vicat_softening",
+    "thermal.heat_deflection_temp",
+    "mechanical.flexural_strength",
+    "mechanical.flexural_modulus"
+  ],
+  "not_published_evidence": {
+    "material.length": "TDS p.1 Specifications lists Diameter, Net Filament Weight, Spool Material, Spool Size only; no filament length in any searched document.",
+    "thermal.glass_transition": "TDS p.2: «Glass Transition Temperature DSC, 10 °C/min N/A».",
+    "thermal.vicat_softening": "TDS p.2: «Vicar Softening Temperature ISO 306, GB/T 1633 N/A».",
+    "thermal.heat_deflection_temp": "TDS p.2: «Heat Deflection Temperature ISO 75 1.8 MPa N/A» and «ISO 75 0.45 MPa N/A».",
+    "mechanical.flexural_strength": "TDS p.2: «Bending Strength (X-Y) ISO 178, GB/T 9341 N/A» (Z: N/A).",
+    "mechanical.flexural_modulus": "TDS p.2: «Bending Modulus (X-Y) ISO 178, GB/T 9341 N/A» (Z: N/A)."
+  }
+}

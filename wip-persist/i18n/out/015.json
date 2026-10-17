@@ -1,0 +1,1673 @@
+[
+ {
+  "h": "d4b1ea5708dd532930a85188b45aff6f0a3ed458500c7577e0127a538eb0d100",
+  "en": "Overview",
+  "ar": "نظرة عامة",
+  "ckb": "تێڕوانینی گشتی",
+  "kind": "block_title"
+ },
+ {
+  "h": "26b9d142e1df2166945c9f4bf457e94a41dfb2cedd908479407f1a43c9750001",
+  "en": "The Filament buffer is an accessory that is required in conjunction with a single AMS unit. Its function is to provide a buffering effect for the filament. The interface is 4-Pin cable with 3mm pitch with snap terminal input, 6-Pin cable with 3mm pitch open snap terminal output.",
+  "ar": "موازن الفلامنت ملحق يلزم استخدامه مع وحدة AMS واحدة، ووظيفته توفير تأثير موازنة للفلامنت. المنافذ: دخل بكابل 4-Pin بمسافة 3mm بين الأطراف مع طرف توصيل كبّاس، وخرج بكابل 6-Pin بمسافة 3mm بين الأطراف مع طرف توصيل كبّاس مفتوح.",
+  "ckb": "هاوسەنگکەری فیلامێنت پێداویستییەکە کە لەگەڵ یەک یەکەی AMS پێویستە، و ئەرکەکەی دابینکردنی کاریگەریی هاوسەنگکردنە بۆ فیلامێنتەکە. دەرچەکان: چوونەژوورەوە بە کێبڵی 4-Pin بە دووریی 3mm لە نێوان پینەکاندا لەگەڵ سەرەی پەیوەستکردنی کلیکی، و دەرچوون بە کێبڵی 6-Pin بە دووریی 3mm لە نێوان پینەکاندا لەگەڵ سەرەی پەیوەستکردنی کلیکیی کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d8da2c49df39d91df7ecd199b92da7bf264f026242ccc69b08daeadfe587c45b",
+  "en": "Note",
+  "ar": "ملاحظة",
+  "ckb": "تێبینی",
+  "kind": "block_title"
+ },
+ {
+  "h": "c06e7789b9c11a1fe571a021018d2df5e7e3c1b7dd30357e6cdf0b36f57c9a63",
+  "en": "For multiple AMS units, the AMS Hub is required instead of the Filament buffer.",
+  "ar": "عند استخدام عدة وحدات AMS، يلزم استخدام AMS Hub بدلًا من موازن الفلامنت.",
+  "ckb": "بۆ چەند یەکەیەکی AMS، لە جیاتی هاوسەنگکەری فیلامێنت، AMS Hub پێویستە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a488dd27cc1534c31394ed7339b4fbcf30d75dc2004ea29dc209034458acf906",
+  "en": "Rethink Personal Manufacturing",
+  "ar": "أعِد التفكير في التصنيع الشخصي",
+  "ckb": "بە شێوەیەکی نوێ بیر لە بەرهەمهێنانی کەسی بکەرەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "b788c732e391a5b7ff4e53e038a78a3e6641abf69e06cad3dcc89ae2a1e7228c",
+  "en": "Flexible and rigid, low cost and exotic materials in one print",
+  "ar": "مواد مرنة وصلبة، ومواد منخفضة التكلفة وأخرى غير مألوفة، في طبعة واحدة",
+  "ckb": "کەرەستەی نەرمونیان و ڕەق، کەرەستەی تێچوو کەم و دەگمەن، لە یەک چاپدا",
+  "kind": "block_title"
+ },
+ {
+  "h": "1455148fedfd9e07f62564f0741bb52a026352bb3e522bcd56f06fcb76698249",
+  "en": "Multi-material Printing",
+  "ar": "الطباعة متعددة المواد",
+  "ckb": "چاپی فرەکەرەستە",
+  "kind": "block_line"
+ },
+ {
+  "h": "a167e203add23994eb9288822d43210dbc627ab056bf84e7a440604869fc5845",
+  "en": "Perfect supports with minimal waste, purging and reloading",
+  "ar": "دعامات مثالية بأقل قدر من الهدر وطرد الفلامنت وإعادة التحميل",
+  "ckb": "پاڵپشتی تەواو بە کەمترین بەفیڕۆچوون و دەرکردنی فیلامێنت و بارکردنەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "fb07d9074c03a431dd039d5d5904608020b6b3574bca861c762afa2401948757",
+  "en": "Dedicated Support Material",
+  "ar": "مادة دعامات مخصّصة",
+  "ckb": "کەرەستەی پاڵپشتی تایبەت",
+  "kind": "block_line"
+ },
+ {
+  "h": "e331e08c4aed281015be504b81729b3e5248fb205b260113829a7bc55e866f9f",
+  "en": "Fast and efficient multi-color printing",
+  "ar": "طباعة متعددة الألوان سريعة وفعّالة",
+  "ckb": "چاپی فرەڕەنگی خێرا و کارا",
+  "kind": "block_title"
+ },
+ {
+  "h": "cc816bdec98a69d12c9eeec519cfc98e7ba8d9e934d55982e4dad0a00f963701",
+  "en": "Efficient Multi-color Printing",
+  "ar": "طباعة فعّالة متعددة الألوان",
+  "ckb": "چاپی فرەڕەنگی کارا",
+  "kind": "block_line"
+ },
+ {
+  "h": "73dea27adf03c0466ce8414e1529ae353560c9ae6d67751e6ad325acf2d6cf0f",
+  "en": "Combine flexible and rigid materials in a single print to create impressive interlocking structures and innovative designs beyond traditional manufacturing. Pairing high-performance materials with standard ones further reduces costs and boosts material efficiency by using premium materials only where necessary.",
+  "ar": "اجمع بين المواد المرنة والصلبة في طبعة واحدة لصنع هياكل متشابكة مذهلة وتصاميم مبتكرة تتجاوز حدود التصنيع التقليدي. كما أن الجمع بين المواد عالية الأداء والمواد القياسية يخفّض التكاليف أكثر ويرفع كفاءة استخدام المواد، إذ لا تُستخدم المواد الممتازة إلا حيث تلزم.",
+  "ckb": "کەرەستەی نەرمونیان و ڕەق لە یەک چاپدا تێکەڵ بکە بۆ دروستکردنی پێکهاتەی بەیەکداچووی سەرنجڕاکێش و دیزاینی داهێنەرانە کە لە سنووری بەرهەمهێنانی نەریتی تێدەپەڕن. هەروەها جووتکردنی کەرەستەی کارایی بەرز لەگەڵ کەرەستەی ستاندارد تێچوون زیاتر کەم دەکاتەوە و کارایی بەکارهێنانی کەرەستە بەرز دەکاتەوە، چونکە کەرەستە نایابەکان تەنها لەو شوێنانەدا بەکاردێن کە پێویستن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "baeba562f528a571d0dfe52a78d198683a6f95198710a0a33143e53f0beafc80",
+  "en": "Print with support is no longer a headache. With H2D’s dual-nozzle setup, one nozzle can be reserved for dedicated support material, allowing secured print and perfect support interface.",
+  "ar": "لم تعد الطباعة بالدعامات مصدر إزعاج. بفضل نظام النوزل المزدوج في H2D، يمكن تخصيص نوزل واحد لمادة الدعامات، ما يتيح طباعة مضمونة وسطح تلامس مثاليًا بين الدعامات والقطعة.",
+  "ckb": "چاپکردن بە پاڵپشتەوە ئیتر سەرئێشە نییە. بە ڕێکخستنی دوو نۆزڵی چاپکەری H2D، دەکرێت یەک نۆزڵ بۆ کەرەستەی پاڵپشتی تایبەت تەرخان بکرێت، کە چاپێکی پارێزراو و ڕووی بەریەککەوتنی پاڵپشتی تەواو دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f6cde85c57c7e77e2fe774719245781d994089b4b2588e813ab1f80621975847",
+  "en": "Dual-nozzle printing reduces purge cycles in multi-color prints. H2D's smart algorithms optimize filament use, maximizing dual-nozzle efficiency to save time and materials.",
+  "ar": "تقلّل الطباعة بنوزلين دورات طرد الفلامنت في الطبعات متعددة الألوان. وتعمل الخوارزميات الذكية في H2D على تحسين استخدام الفلامنت، لتحقيق أقصى كفاءة من النوزلين وتوفير الوقت والمواد.",
+  "ckb": "چاپکردن بە دوو نۆزڵ خولەکانی دەرکردنی فیلامێنت لە چاپە فرەڕەنگەکاندا کەم دەکاتەوە. ئەلگۆریتمە زیرەکەکانی H2D بەکارهێنانی فیلامێنت باشتر دەکەن و کارایی دوو نۆزڵەکە دەگەیەننە بەرزترین ئاست بۆ پاشەکەوتکردنی کات و کەرەستە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "38df4d6991b6894c33fd964ae943c6d8a134eb83f513efce41c8b36a9cfcd533",
+  "en": "Laser",
+  "ar": "ليزر",
+  "ckb": "لەیزەر",
+  "kind": "block_title"
+ },
+ {
+  "h": "3acc90d890eac3382eb4ac14dd0fef26168f12c0c29f909c3262af8454436ca3",
+  "en": "10W and 40W 455nm Laser for engraving & cutting",
+  "ar": "ليزر 10W و40W بطول موجي 455nm للحفر والقص",
+  "ckb": "لەیزەری 10W و 40W بە درێژی شەپۆلی 455nm بۆ هەڵکۆڵین و بڕین",
+  "kind": "block_line"
+ },
+ {
+  "h": "3208539cf989cf7e8407f524dbe9b77bdd5ee50f486c048dee1a2e024a7aceff",
+  "en": "Digital Cutting",
+  "ar": "القص الرقمي",
+  "ckb": "بڕینی دیجیتاڵ",
+  "kind": "block_title"
+ },
+ {
+  "h": "2c1e425134b6a87e1bc6291d994521ffd408dd79c0d5dc1a83aeeb108e735c31",
+  "en": "Precise cutting on variety of materials",
+  "ar": "قص دقيق على مجموعة متنوعة من المواد",
+  "ckb": "بڕینی ورد لەسەر جۆرەها کەرەستە",
+  "kind": "block_line"
+ },
+ {
+  "h": "64793b0186688a0d405a4d96bed5d08fb92f43f65f3875cd4b222596e809d38a",
+  "en": "Pen Drawing",
+  "ar": "الرسم بالقلم",
+  "ckb": "وێنەکێشان بە پێنووس",
+  "kind": "block_title"
+ },
+ {
+  "h": "5fd3269a29e28ee6583175e478fcb9ec966e56644ce419db55f934810b7a90a3",
+  "en": "Drawing and writing",
+  "ar": "الرسم والكتابة",
+  "ckb": "وێنەکێشان و نووسین",
+  "kind": "block_line"
+ },
+ {
+  "h": "416cbf08af0862572e8fe2d95fcc7ee84f04e4c8bb27aeebf2a074fb6700a70c",
+  "en": "Live Spatial Alignment",
+  "ar": "المحاذاة المكانية المباشرة",
+  "ckb": "ڕێکخستنی شوێنیی ڕاستەوخۆ",
+  "kind": "block_line"
+ },
+ {
+  "h": "9745129bac715c704d60c725b796ced65c0b6c35dd850a7865dcd8d39acf778b",
+  "en": "What-You-See-Is-What-You-Get",
+  "ar": "ما تراه هو ما تحصل عليه",
+  "ckb": "ئەوەی دەیبینیت ئەوەیە کە وەریدەگریت",
+  "kind": "block_line"
+ },
+ {
+  "h": "a41cb12072e9a7939d242a800e89a1639037f0ab7a529663f9334c8e9cd61130",
+  "en": "The H2D’s BirdsEye camera, combined with computer vision algorithms, delivers top-view alignment accuracy up to 0.3mm. This advanced spatial alignment allows users to place the tool path at the right position on the material – truly \"what-you-see-is-what-you-get.\"*",
+  "ar": "تحقّق كاميرا BirdsEye في H2D، بالاقتران مع خوارزميات الرؤية الحاسوبية، دقة محاذاة من المنظر العلوي تصل إلى 0.3mm. وتتيح هذه المحاذاة المكانية المتقدمة للمستخدمين وضع مسار الأداة في الموضع الصحيح على المادة، فما تراه هو ما تحصل عليه فعلًا.*",
+  "ckb": "کامێرای BirdsEye لە چاپکەری H2D، لەگەڵ ئەلگۆریتمەکانی بینینی کۆمپیوتەری، وردیی ڕێکخستن لە دیمەنی سەرەوە تا 0.3mm دابین دەکات. ئەم ڕێکخستنە شوێنییە پێشکەوتووە ڕێگە بە بەکارهێنەران دەدات ڕێڕەوی ئامرازەکە لە شوێنی دروستی خۆی لەسەر کەرەستەکە دابنێن، بە ڕاستی «ئەوەی دەیبینیت ئەوەیە کە وەریدەگریت».*",
+  "kind": "block_line"
+ },
+ {
+  "h": "996674552a8a50f6f704ba1c25212591ff9b3a5cabe8b100e8943abec17b3294",
+  "en": "Auto Arrangement",
+  "ar": "الترتيب التلقائي",
+  "ckb": "ڕیزکردنی خۆکار",
+  "kind": "block_line"
+ },
+ {
+  "h": "39605033c1a4180e42c5ff1129cda471a59ed9a9d13620256dbb5d37639d475a",
+  "en": "Maximize material efficiency, minimize waste",
+  "ar": "أقصى كفاءة للمواد وأقل هدر",
+  "ckb": "زۆرترین کارایی کەرەستە، کەمترین بەفیڕۆچوون",
+  "kind": "block_title"
+ },
+ {
+  "h": "2d6919e9656df5a8e0ba31f87e9d1938793eeaa43b4eb50c8009e192d713bb60",
+  "en": "Leveraging real-time images from the BirdsEye camera, Bambu Suite can automatically arrange your project according to the shape of your material, i.e left over plywood from the previous project. This feature helps you to get the most out of every material.",
+  "ar": "بالاستفادة من الصور الملتقطة في الوقت الفعلي بكاميرا BirdsEye، يستطيع برنامج Bambu Suite ترتيب مشروعك تلقائيًا وفق شكل المادة لديك، مثل بقايا خشب الأبلكاش من المشروع السابق. وتساعدك هذه الميزة على الاستفادة القصوى من كل مادة.",
+  "ckb": "بە سوودوەرگرتن لە وێنەکانی کاتی ڕاستەقینەی کامێرای BirdsEye، بەرنامەی Bambu Suite دەتوانێت بە شێوەی خۆکار پڕۆژەکەت بەپێی شێوەی کەرەستەکەت ڕیز بکات، بۆ نموونە پاشماوەی ئەبلەکاش لە پڕۆژەی پێشوو. ئەم تایبەتمەندییە یارمەتیت دەدات زۆرترین سوود لە هەموو کەرەستەیەک وەربگریت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a22891c49c9c4905ca7602a618f4a5e7acb68ea6ace4a7fe00fddb011b97a64b",
+  "en": "Don’t Worry About Safety – We’ve Got You Covered",
+  "ar": "لا تقلق بشأن السلامة، فنحن نتكفّل بذلك",
+  "ckb": "خەمی سەلامەتیت نەبێت، ئێمە ئاگامان لێیە",
+  "kind": "block_title"
+ },
+ {
+  "h": "ea9aaa466d2c8acff8595afa850fbee0fdb2b858e6f4ce61b16d1cc192cef3e2",
+  "en": "Laser Safety Windows",
+  "ar": "نوافذ أمان الليزر",
+  "ckb": "پەنجەرەکانی سەلامەتیی لەیزەر",
+  "kind": "block_line"
+ },
+ {
+  "h": "12bf4feee5d30b95316fd3ba78ee103df9bdf891738a98d6277e312fb846a47e",
+  "en": "Operate and monitor laser projects safely without the need for goggles, thanks to our safety windows.",
+  "ar": "شغّل مشاريع الليزر وراقبها بأمان دون الحاجة إلى نظارات واقية، بفضل نوافذ الأمان.",
+  "ckb": "بە سوپاسی پەنجەرەکانی سەلامەتیمان، پڕۆژەکانی لەیزەر بە سەلامەتی کارپێبکە و چاودێرییان بکە بەبێ پێویستی بە چاویلکەی پارێزەر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2b1dcd9191095ed005ec08e7d0c63056eab010a16de52e349d53f57ff1ecdbbe",
+  "en": "Air Purifier",
+  "ar": "منقّي الهواء",
+  "ckb": "پاککەرەوەی هەوا",
+  "kind": "block_line"
+ },
+ {
+  "h": "33f7949e192e3d8fed6f516f9dccf9a833f33ddddd4db1ea24dba64e9abe7a09",
+  "en": "An optional air purifier ensures clean air, even during indoor laser operations.*",
+  "ar": "يضمن منقّي الهواء الاختياري هواءً نظيفًا، حتى أثناء تشغيل الليزر في الأماكن المغلقة.*",
+  "ckb": "پاککەرەوەی هەوای هەڵبژاردەیی هەوای پاک دابین دەکات، تەنانەت لە کاتی کارکردنی لەیزەر لە ناو ژووردا.*",
+  "kind": "block_line"
+ },
+ {
+  "h": "c1d45d9b2ef381d8acdb86ddbee3119ccda2bd9ee66d14719800b92998af12a3",
+  "en": "Don’t Worry About the Settings – We’ve Got It Covered",
+  "ar": "لا تقلق بشأن الإعدادات، فنحن نتكفّل بها",
+  "ckb": "خەمی ڕێکخستنەکانت نەبێت، ئێمە ئاگامان لێیەتی",
+  "kind": "block_title"
+ },
+ {
+  "h": "2bc7ff88aa2dd5333fb4d1ee7d7af76fef23eb9ec26fd7df55021404e011cf10",
+  "en": "Full-auto Calibration",
+  "ar": "معايرة تلقائية بالكامل",
+  "ckb": "کالیبرەکردنی تەواو خۆکار",
+  "kind": "block_line"
+ },
+ {
+  "h": "0cbdd450fc9c584033dda58b8ce751ffb6933fecbadaef0d2e9390b618c43b1a",
+  "en": "A single tap initiates automated laser focus verification and material measurement, eliminating manual adjustments.",
+  "ar": "بلمسة واحدة يبدأ التحقق التلقائي من تركيز الليزر وقياس المادة، دون الحاجة إلى ضبط يدوي.",
+  "ckb": "بە یەک دەستلێدان پشکنینی خۆکاری فۆکەسی لەیزەر و پێوانی کەرەستەکە دەست پێدەکات، بەبێ پێویستی بە ڕێکخستنی دەستی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6c9f7e4bfa936a844c3499feb178a26771ff4add678e44ce7c1d3480c5e1b35d",
+  "en": "Material CodeSync",
+  "ar": "ميزة CodeSync للمواد",
+  "ckb": "تایبەتمەندیی CodeSync بۆ کەرەستە",
+  "kind": "block_line"
+ },
+ {
+  "h": "22d5a04ee029a6a14998da531aef5fa85c3a50426dbfb6de2160f22c3e8f1e91",
+  "en": "The H2D automatically scans the QR code on your material to load the perfect preset.*",
+  "ar": "تمسح طابعة H2D تلقائيًا رمز QR الموجود على المادة لتحميل الإعداد المسبق المثالي.*",
+  "ckb": "چاپکەری H2D بە شێوەی خۆکار کۆدی QR لەسەر کەرەستەکەت دەپشکنێت بۆ ئەوەی گونجاوترین ڕێکخستنی ئامادەکراو باربکات.*",
+  "kind": "block_line"
+ },
+ {
+  "h": "f6ead18a5263adbfaa6274c17014bcb71eaa48331d2149e9a76202420605ba64",
+  "en": "A Serious Laser Machine",
+  "ar": "جهاز ليزر احترافي بحق",
+  "ckb": "ئامێرێکی لەیزەریی بە ڕاستی پیشەگەرانە",
+  "kind": "block_title"
+ },
+ {
+  "h": "7a26ffcc09511c0f2d582762920f16b35a93caf63e43c96c7c66690b55085872",
+  "en": "Air Assist",
+  "ar": "نفخ الهواء المساعد",
+  "ckb": "هەوای یاریدەدەر",
+  "kind": "block_line"
+ },
+ {
+  "h": "a1c636fc85814ac80b6e9537e65c058e66cbc17078b4feba4a1be2179b7138ee",
+  "en": "Improve surface quality by directing high-speed air to cool the laser path, ensuring cleaner and more precise results.",
+  "ar": "حسّن جودة السطح بتوجيه هواء عالي السرعة لتبريد مسار الليزر، ما يضمن نتائج أنظف وأكثر دقة.",
+  "ckb": "جۆرایەتیی ڕووکار باشتر بکە بە ئاراستەکردنی هەوای خێرا بۆ ساردکردنەوەی ڕێڕەوی لەیزەر، کە ئەنجامی پاکتر و وردتر دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e6432ea92fff04f6af1d568e31bfdde29369b15bbf1f39f95f54618992d889b9",
+  "en": "Contact-less 3D Mesh*",
+  "ar": "شبكة 3D بلا تلامس*",
+  "ckb": "تۆڕی 3D بێ بەرکەوتن*",
+  "kind": "block_line"
+ },
+ {
+  "h": "51cd57bac5d848730b43565ded6f650c6c2ddb2a854d59478f4cbf455b5c3be6",
+  "en": "Advanced optical height measurement creates a detailed 3D mesh without physical contact, enabling precise laser work on curved surfaces.",
+  "ar": "يُنشئ القياس البصري المتقدم للارتفاع شبكة 3D مفصّلة دون أي تلامس مادي، ما يتيح عملًا دقيقًا بالليزر على الأسطح المنحنية.",
+  "ckb": "پێوانی بەرزیی ئۆپتیکیی پێشکەوتوو تۆڕێکی وردەکاریی 3D دروست دەکات بەبێ بەرکەوتنی فیزیکی، کە ڕێگە بە کاری وردی لەیزەر لەسەر ڕووکارە چەماوەکان دەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a44cb12c6ba63680d820b555660fdb51b36671057380e5c5d6daa95cc38de49b",
+  "en": "Go Big, Go Fast, Go Precise",
+  "ar": "أكبر، أسرع، أدق",
+  "ckb": "گەورەتر، خێراتر، وردتر",
+  "kind": "block_title"
+ },
+ {
+  "h": "0a7b83cc98b5d148bca04458a3c44612d21177d8ab820bd88c1aa09292a7290e",
+  "en": "Our Secret Weapon:Vision Encoder",
+  "ar": "سلاحنا السري: Vision Encoder",
+  "ckb": "چەکە نهێنییەکەمان: Vision Encoder",
+  "kind": "block_line"
+ },
+ {
+  "h": "f5c35895304e27e04007bb3f9e2ec32c1ed91c4d8615d97cbfa5a35ad5a40848",
+  "en": "50µm ultra-fine motion accuracy*",
+  "ar": "دقة حركة فائقة تبلغ 50µm*",
+  "ckb": "وردیی جووڵەی زۆر ورد بە 50µm*",
+  "kind": "block_line"
+ },
+ {
+  "h": "668af35a7c30b18c11cf111a010a3af82803997df655c7fa3f8f550eec993731",
+  "en": "An ultra-accurate vision encoder plate, combined with 5µm resolution optical measurements to track and correct toolhead motion, enables the H2D to achieve consistent and reliable distance-independent 50μm motion accuracy across the entire workspace, one order of magnitude better than its predecessor. (*Vision Encoder sold separately)",
+  "ar": "تتيح لوحة مشفّر الرؤية فائقة الدقة، مع قياسات بصرية بدقة 5µm لتتبّع حركة رأس الطباعة وتصحيحها، أن تحقق H2D دقة حركة ثابتة وموثوقة تبلغ 50μm بصرف النظر عن المسافة وعلى كامل مساحة العمل، أي أفضل بعشرة أضعاف من سابقتها. (*يُباع Vision Encoder بشكل منفصل)",
+  "ckb": "پلێتی ئینکۆدەری بینینی زۆر ورد، لەگەڵ پێوانە ئۆپتیکییەکان بە وردیی 5µm بۆ بەدواداچوون و ڕاستکردنەوەی جووڵەی سەری چاپ، ڕێگە بە H2D دەدات بگاتە وردیی جووڵەی 50μm کە جێگیر و متمانەپێکراوە و پەیوەست نییە بە دوورییەوە لە سەرانسەری ڕووبەری کاردا، کە دە هێندە باشترە لە مۆدێلی پێشوو. (*Vision Encoder بە جیا دەفرۆشرێت)",
+  "kind": "block_line"
+ },
+ {
+  "h": "894878f20b7ddb599d36e68a074acf1d0077e61ac1589c765d56b61c12847944",
+  "en": "King-size Work Zone",
+  "ar": "منطقة عمل بحجم كبير جدًا",
+  "ckb": "ناوچەی کاری زۆر گەورە",
+  "kind": "block_line"
+ },
+ {
+  "h": "b4d3fcb9486ba358392d5dd32c7b56643e7bee75669b8b54404bd1532b7beede",
+  "en": "Break free from size constraints",
+  "ar": "تحرّر من قيود الحجم",
+  "ckb": "لە سنووری قەبارە ڕزگارت بێت",
+  "kind": "block_title"
+ },
+ {
+  "h": "1b6403cec28b4b84bdf4dd3536cba3047717d8db4e4f864274292fe348d4620b",
+  "en": "With a print volume up to 350mm×320mm×325mm*, creating large-scale projects has never been easier! From laser engraving on sizable objects to printing oversized models, the expanded capacity empowers you to bring even your most ambitious ideas to life.",
+  "ar": "مع حجم طباعة يصل إلى 350mm×320mm×325mm*، لم يكن إنشاء المشاريع الكبيرة أسهل من قبل! من الحفر بالليزر على الأجسام الكبيرة إلى طباعة النماذج الضخمة، تمنحك السعة الموسّعة القدرة على تحويل أكثر أفكارك طموحًا إلى واقع.",
+  "ckb": "بە قەبارەی چاپ تا 350mm×320mm×325mm*، دروستکردنی پڕۆژەی گەورە هەرگیز ئەوەندە ئاسان نەبووە! لە هەڵکۆڵینی لەیزەری لەسەر تەنە گەورەکانەوە تا چاپکردنی مۆدێلی زۆر گەورە، توانای فراوانکراو هێزت پێدەبەخشێت تا تەنانەت بلندپەروازانەترین بیرۆکەکانیشت بکەیتە ڕاستی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "467cbf60e9b16995e6af94378204d741552af02ffb116f81146ea66157ad2955",
+  "en": "350°C Hotend & 65°C Chamber Heating",
+  "ar": "رأس صهر 350°C وتسخين حجرة الطباعة 65°C",
+  "ckb": "سەری تواندنەوەی 350°C و گەرمکردنی ژووری چاپ بە 65°C",
+  "kind": "block_line"
+ },
+ {
+  "h": "8fc534f0804b496805971208d942876a6f7128184928a8ba3042359643846c3e",
+  "en": "Unleash the full potential of high-performance materials",
+  "ar": "أطلق العنان للإمكانات الكاملة للمواد عالية الأداء",
+  "ckb": "هەموو توانای کەرەستە کارایی بەرزەکان ئازاد بکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "e886cdbb739c58c9f35ab206f0bfa5d5e771ca22138bd82d693d00d70828fe40",
+  "en": "Equipped with 65°C active chamber heating and a high-temperature hotend reaching up to 350°C, the H2D delivers precise closed-loop temperature control. This advanced system effectively eliminates warping and deformation in high-performance materials, ensuring superior layer bonding and maximizing their full potential.",
+  "ar": "بتسخين نشط لحجرة الطباعة بدرجة 65°C ورأس صهر عالي الحرارة يصل إلى 350°C، توفّر H2D تحكمًا دقيقًا بالحرارة بالحلقة المغلقة. ويقضي هذا النظام المتقدم فعليًا على التقوّس والتشوّه في المواد عالية الأداء، ما يضمن التصاقًا ممتازًا بين الطبقات ويستخرج كامل إمكاناتها.",
+  "ckb": "بە گەرمکردنی چالاکی ژووری چاپ بە 65°C و سەری تواندنەوەی پلەی گەرمیی بەرز کە دەگاتە 350°C، چاپکەری H2D کۆنترۆڵی وردی پلەی گەرمی بە بازنەی داخراو دابین دەکات. ئەم سیستەمە پێشکەوتووە بە کاریگەری چەمانەوەی لێوار و شێوەگۆڕان لە کەرەستە کارایی بەرزەکاندا نەدەهێڵێت، کە لکانی نایابی چینەکان مسۆگەر دەکات و هەموو توانایان دەردەخات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fb92c643bbc7941c731e3f16c438f9239c9d197cea92ba8956e12426f7cfc06b",
+  "en": "REAL High-Flow Hotend*",
+  "ar": "رأس صهر بتدفق عالٍ حقيقي*",
+  "ckb": "سەری تواندنەوە بە ڕۆیشتنی بەرزی ڕاستەقینە*",
+  "kind": "block_line"
+ },
+ {
+  "h": "6bb78b862ffe629875f3bc7752c5fca954c14fb45b2a4e64afdc0995d451f593",
+  "en": "Consistently print at 600mm/s with ease",
+  "ar": "اطبع بسرعة 600mm/s بثبات وسهولة",
+  "ckb": "بە بەردەوامی و بە ئاسانی بە خێرایی 600mm/s چاپ بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "3fa19e8204c036a3689d623ed8f90680e8977f0fcae9d827c18d926bb56cd129",
+  "en": "The H2D’s purpose-built high-flow hotend ensures reliable, high-speed printing at 600mm/s. Designed for consistent performance, it eliminates mid-print flow rate restrictions, enabling uninterrupted high-speed printing regardless of the print size or complexity.*",
+  "ar": "يضمن رأس الصهر عالي التدفق المصمَّم خصيصًا لطابعة H2D طباعة موثوقة عالية السرعة بمعدل 600mm/s. وقد صُمّم لأداء ثابت، فهو يزيل قيود معدل التدفق أثناء الطباعة، ما يتيح طباعة عالية السرعة دون انقطاع بغض النظر عن حجم الطبعة أو مدى تعقيدها.*",
+  "ckb": "سەری تواندنەوەی ڕۆیشتنی بەرز کە بە تایبەتی بۆ چاپکەری H2D دروستکراوە، چاپی خێرا و متمانەپێکراو بە 600mm/s مسۆگەر دەکات. بۆ کارکردنی جێگیر دیزاین کراوە، و سنووردارکردنی ڕێژەی ڕۆیشتن لە ناوەڕاستی چاپدا لادەبات، و ڕێگە بە چاپی خێرای بێ پچڕان دەدات بەبێ گوێدانە قەبارە یان ئاڵۆزیی چاپەکە.*",
+  "kind": "block_line"
+ },
+ {
+  "h": "a68d42d763a4bbec7ca78d9d96402378b3880e076282cd73099d950b1f31812a",
+  "en": "DynaSense Extruder",
+  "ar": "دافع DynaSense",
+  "ckb": "پاڵنەری DynaSense",
+  "kind": "block_line"
+ },
+ {
+  "h": "df7f82273447e5e64d00a7c8959daa2a1c69c3be4c7b8382ec4acd5f59b91a93",
+  "en": "Intelligent sensing for precise extrusion control",
+  "ar": "استشعار ذكي لتحكم دقيق في البثق",
+  "ckb": "هەستپێکردنی زیرەک بۆ کۆنترۆڵی وردی پاڵنان",
+  "kind": "block_line"
+ },
+ {
+  "h": "1d88b3fb957ae2b11f309f3e02bf56e11c2e0a38722c8eafef60c9ab6678f299",
+  "en": "Bambu Lab's proprietary PMSM servo architecture establishes an intelligent extrusion governance system. It executes 20kHz Torque/Resistance and position sampling to dynamically modulate electromagnetic torque vectors. Stabilizing extrusion and detecting filament grinding and clogging.",
+  "ar": "تُنشئ بنية سيرفو PMSM الحصرية من Bambu Lab نظامًا ذكيًا لإدارة البثق. فهي تأخذ عينات من عزم الدوران/المقاومة والموضع بتردد 20kHz لضبط متجهات العزم الكهرومغناطيسي ديناميكيًا، ما يحقق ثبات البثق ويكشف طحن الفلامنت وانسداده.",
+  "ckb": "ئەندازەسازیی تایبەتی Bambu Lab بۆ سێرڤۆی PMSM سیستەمێکی زیرەک بۆ بەڕێوەبردنی پاڵنان دادەمەزرێنێت. نموونەوەرگرتنی تۆرک/بەرگری و شوێن بە 20kHz ئەنجام دەدات بۆ ڕێکخستنی داینامیکیی ڤێکتەرەکانی تۆرکی ئەلیکترۆموگناتیسی. بەمەش پاڵنان جێگیر دەکات و هاڕینی فیلامێنت و گیرانی دەدۆزێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3a36e26e2fdaabf706e2d24ec0ac74f323a53e6120b162ce7dc13d92c0476a75",
+  "en": "A Smarter, Safer Experience",
+  "ar": "تجربة أذكى وأكثر أمانًا",
+  "ckb": "ئەزموونێکی زیرەکتر و سەلامەتتر",
+  "kind": "block_title"
+ },
+ {
+  "h": "00873758bc151220e327d08c5e0aedc62c711e055462db34938f6ec57cb79b66",
+  "en": "Monitor extrusion at the nozzle tip",
+  "ar": "راقب البثق عند طرف النوزل",
+  "ckb": "چاودێریی پاڵنان لە سەری نۆزڵەکە بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "1c6ca7112225f37051eeca6b7d00af482297a018d9690a227a157ead2612a332",
+  "en": "The H2D features an AI-backed nozzle camera with macro lens. This intelligent monitoring system continuously tracks extrusion patterns, immediately detecting material accumulation, filament deviations, and extrusion failures.",
+  "ar": "تتميّز H2D بكاميرا نوزل مدعومة بالذكاء الاصطناعي (AI) ومزوّدة بعدسة ماكرو. ويتتبّع نظام المراقبة الذكي هذا أنماط البثق باستمرار، فيكشف فورًا تراكم المادة وانحرافات الفلامنت وأعطال البثق.",
+  "ckb": "چاپکەری H2D کامێرایەکی نۆزڵی هەیە کە پشت بە AI دەبەستێت و هاوێنەی ماکرۆی هەیە. ئەم سیستەمە زیرەکەی چاودێری بە بەردەوامی بەدوای شێوازەکانی پاڵناندا دەچێت، و دەستبەجێ کەڵەکەبوونی کەرەستە، لادانی فیلامێنت و شکستی پاڵنان دەدۆزێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "528fd347a9d6cf750ec673cc7b6a4151577fed9dcbd4d602cbd5b8a8e8a2081d",
+  "en": "Pre-Flight Checklist by AI",
+  "ar": "قائمة فحص ما قبل التشغيل بالذكاء الاصطناعي (AI)",
+  "ckb": "لیستی پشکنینی پێش دەستپێکردن بە AI",
+  "kind": "block_line"
+ },
+ {
+  "h": "e4ab9d1b611eda29357230d1d894c662e0e1f86caf87f4dcee98d6d928e7895c",
+  "en": "Peace of mind, every time you print",
+  "ar": "راحة بال في كل مرة تطبع فيها",
+  "ckb": "ئاسوودەیی دەروون لە هەموو جارێکدا کە چاپ دەکەیت",
+  "kind": "block_line"
+ },
+ {
+  "h": "76ab30444a322e4366d278472b0733336405d6b48abce80cd02f7240483a32b0",
+  "en": "Prior to each operational cycle, H2D's vision system initiates a comprehensive pre-flight checklist: Chamber Integrity Scan – Detects debris across the entire print surface. Hardware Configuration Audit – Instantly identifies nozzle dimensions and build plate properties. Digital-Physical Alignment – Automatically verifies consistency between detected hardware specifications and active slicer parameters.",
+  "ar": "قبل كل دورة تشغيل، يبدأ نظام الرؤية في H2D قائمة فحص شاملة لما قبل التشغيل: فحص سلامة حجرة الطباعة – يكشف الشوائب على سطح الطباعة بالكامل. تدقيق إعدادات العتاد – يحدّد فورًا مقاسات النوزل وخصائص صفيحة الطباعة. المطابقة الرقمية-الفعلية – يتحقق تلقائيًا من تطابق مواصفات العتاد المكتشفة مع إعدادات برنامج التقطيع النشطة.",
+  "ckb": "پێش هەر خولێکی کارکردن، سیستەمی بینینی H2D لیستێکی پشکنینی گشتگیری پێش دەستپێکردن دەست پێدەکات: پشکنینی تەندروستیی ژووری چاپ – پاشماوە لە سەرانسەری ڕووی چاپدا دەدۆزێتەوە. وردبینیی ڕێکخستنی ڕەقەکاڵا – دەستبەجێ قەبارەکانی نۆزڵ و تایبەتمەندییەکانی پلێتی چاپ دەناسێتەوە. ڕێکخستنی دیجیتاڵی-فیزیکی – بە شێوەی خۆکار دڵنیا دەبێتەوە لە یەکگرتنی تایبەتمەندییە دۆزراوەکانی ڕەقەکاڵا لەگەڵ ڕێکخستنە چالاکەکانی سلایسەر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a03cea1ad3c24e77b24b1624df42d5d9c4793b09008142074148daf403f0eb46",
+  "en": "SOTA Filament Monitoring",
+  "ar": "مراقبة الفلامنت بأحدث التقنيات (SOTA)",
+  "ckb": "چاودێریی فیلامێنت بە نوێترین تەکنەلۆژیا (SOTA)",
+  "kind": "block_line"
+ },
+ {
+  "h": "86651d3a36ad9f28f3296c00f72e55b5c5157d105763169c7a98bf0487e0a89e",
+  "en": "15 sensors on one filament path",
+  "ar": "15 حساسًا على مسار فلامنت واحد",
+  "ckb": "15 هەستەوەر لەسەر یەک ڕێڕەوی فیلامێنت",
+  "kind": "block_title"
+ },
+ {
+  "h": "9618b10aa0160df1d2d366fb8d0ddad7797a6d8e1c803e8f5e39d39a4127621d",
+  "en": "Unlike legacy systems with single filament run-out detectors, the H2D features comprehensive material flow monitoring. Throughout the AMS-to-nozzle path, 15 strategic sensors form an intelligent network, continuously tracking five key parameters: feeding velocity, tension, filament tip location, extruder thermal environment, and dynamic extrusion pressure. This establishes an industry-leading filament behavior control system.",
+  "ar": "على عكس الأنظمة القديمة التي تعتمد على حساس واحد لنفاد الفلامنت، تتميّز H2D بمراقبة شاملة لتدفق المادة. فعلى طول المسار من وحدة AMS إلى النوزل، يشكّل 15 حساسًا موزّعة بعناية شبكة ذكية تتابع باستمرار خمسة معايير أساسية: سرعة التغذية، والشدّ، وموضع طرف الفلامنت، والبيئة الحرارية للدافع، وضغط البثق الديناميكي. وبذلك يتكوّن نظام رائد في الصناعة للتحكم في سلوك الفلامنت.",
+  "ckb": "بە پێچەوانەی سیستەمە کۆنەکان کە تەنها یەک هەستەوەری تەواوبوونی فیلامێنتیان هەیە، چاپکەری H2D چاودێرییەکی گشتگیری ڕۆیشتنی کەرەستەی هەیە. بە درێژایی ڕێڕەوی نێوان یەکەی AMS و نۆزڵ، 15 هەستەوەری ستراتیژی تۆڕێکی زیرەک پێکدەهێنن کە بە بەردەوامی پێنج پارامەتەری سەرەکی دەپشکنن: خێرایی پێدان، ڕاکێشان، شوێنی سەری فیلامێنت، ژینگەی گەرمیی پاڵنەر، و پەستانی داینامیکیی پاڵنان. بەمەش سیستەمێکی پێشەنگ لە پیشەسازیدا بۆ کۆنترۆڵکردنی ڕەفتاری فیلامێنت دادەمەزرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8d8cd546b58d91c300d3149ef40b8d98d3061dc38f15ea937d2ed785a3f25771",
+  "en": "Learn More",
+  "ar": "اعرف المزيد",
+  "ckb": "زیاتر بزانە",
+  "kind": "block_line"
+ },
+ {
+  "h": "043d7f664efde4b373ce7f0766b21fb04e4b0b5a41b79b80393f107931eca7ad",
+  "en": "1.Can H2D be upgraded to H2D Laser Edition?",
+  "ar": "1. هل يمكن ترقية H2D إلى H2D Laser Edition؟",
+  "ckb": "1. دەکرێت H2D بۆ H2D Laser Edition نوێ بکرێتەوە؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "f5d39a95c862dd141da435630d9c0125eeea4f33c35e69b986aebea6dcec857c",
+  "en": "The H2D laser full combo has a built-in air pump and air pipe on the back of the printer, and is pre-installed with a BirdsEye camera. The front door, left and right side Laser Protective Windows, and top cover are all designed with laser protection. The packaging list includes a laser module, a cutting module, a smoke exhaust pipe and its adapter, as well as an emergency stop button.",
+  "ar": "تأتي باقة H2D الكاملة مع الليزر مزوّدة بمضخة هواء وأنبوب هواء مدمجين في الجهة الخلفية للطابعة، ومعها كاميرا BirdsEye مركّبة مسبقًا. كما أن الباب الأمامي ونوافذ الحماية من الليزر في الجانبين الأيسر والأيمن والغطاء العلوي مصمّمة جميعها للحماية من الليزر. وتتضمن قائمة محتويات العلبة وحدة ليزر ووحدة قص وأنبوب شفط الدخان مع محوّله، إضافة إلى زر الإيقاف الطارئ.",
+  "ckb": "کۆمبۆی تەواوی H2D لەگەڵ لەیزەر پەمپێکی هەوا و بۆرییەکی هەوای ناوخۆیی لە پشتەوەی چاپکەرەکەدا هەیە، و کامێرای BirdsEye پێشوەختە تێیدا دامەزرێنراوە. دەرگای پێشەوە، پەنجەرەکانی پاراستن لە لەیزەر لە لای چەپ و ڕاست، و قەپاغی سەرەوە هەموویان بۆ پاراستن لە لەیزەر دیزاین کراون. لیستی ناوەڕۆکی پاکەتەکە مۆدیولی لەیزەر، مۆدیولی بڕین، بۆریی دەرکردنی دووکەڵ و ئەداپتەرەکەی، و هەروەها دوگمەی وەستانی خێرا لەخۆدەگرێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "eee7ac62d5f4dcaa644b1af84c2d8b7320e4d6aba5132512641dc59eeedd5293",
+  "en": "We plan to launch a laser upgrade kit for the non-laser version of H2D.",
+  "ar": "نخطط لطرح طقم ترقية بالليزر للنسخة غير المزوّدة بالليزر من H2D.",
+  "ckb": "پلانمان هەیە کیتێکی نوێکردنەوەی لەیزەر بۆ وەشانی بێ لەیزەری H2D بخەینە بازاڕ.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "be6f62a01afa0ff942bf5437f6c928bb177b7ae4e2ee04dab4fcc2a98afd20ed",
+  "en": "It is important to note that the air pump in the upgrade kit is an external air pump, which has a different installation structure from the built-in air pump in the full set. When using it, it can only be installed externally and connected to the machine through an air tube.",
+  "ar": "من المهم ملاحظة أن مضخة الهواء في طقم الترقية مضخة خارجية، ولها بنية تركيب مختلفة عن مضخة الهواء المدمجة في الطقم الكامل. وعند استخدامها لا يمكن تركيبها إلا من الخارج وتوصيلها بالجهاز عبر أنبوب هواء.",
+  "ckb": "گرنگە ئاگاداربیت کە پەمپی هەوای ناو کیتی نوێکردنەوەکە پەمپێکی دەرەکییە، و پێکهاتەی دامەزراندنی جیاوازە لە پەمپی هەوای ناوخۆیی لە کۆمەڵە تەواوەکەدا. لە کاتی بەکارهێناندا، تەنها دەکرێت لە دەرەوە دابمەزرێنرێت و لە ڕێگەی بۆرییەکی هەواوە بە ئامێرەکەوە ببەسترێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "0db795b46b6df8f064ed12c49bb3621260ebf6f1a237e2f22a3eee692d2ebc53",
+  "en": "Upgrading the non-laser H2D to H2D Laser Edition through the laser upgrade kit retains identical product functions and performances as the H2D Laser Edition.",
+  "ar": "عند ترقية طابعة H2D غير المزوّدة بالليزر إلى H2D Laser Edition باستخدام طقم ترقية الليزر، تحصل على وظائف وأداء مطابقة تمامًا لنسخة H2D Laser Edition.",
+  "ckb": "نوێکردنەوەی چاپکەری بێ لەیزەری H2D بۆ H2D Laser Edition لە ڕێگەی کیتی نوێکردنەوەی لەیزەرەوە، هەمان ئەرک و کارایی تەواو وەک H2D Laser Edition دەدات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "18e0a728f40fae722eb16c2d3297433a90af7db9a6cd910b4a0a27e2ed84544b",
+  "en": "2.Are the left and right hotends exactly the same?",
+  "ar": "2. هل رأسا الصهر الأيسر والأيمن متطابقان تمامًا؟",
+  "ckb": "2. ئایا سەری تواندنەوەی چەپ و ڕاست تەواو وەک یەکن؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "35dc92848961f0c4505a79ba96e41c2747377940e8291a48d06c923f59a35c88",
+  "en": "Yes, the left and right hotends have identical structures and materials, and can be used interchangeably.",
+  "ar": "نعم، رأسا الصهر الأيسر والأيمن متطابقان في البنية والمواد، ويمكن تبديل أحدهما بالآخر.",
+  "ckb": "بەڵێ، سەری تواندنەوەی چەپ و ڕاست هەمان پێکهاتە و کەرەستەیان هەیە، و دەکرێت لە جیاتی یەکتر بەکاربهێنرێن.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3b7482a656c35f49e23ca8afa7015dad342977683ce0bab35cb4e3e29ec5515a",
+  "en": "3.What is the maximum number of AMS 2 Pro and AMS HT units that the H2D supports? How many colors can it print at most?",
+  "ar": "3. ما الحد الأقصى لعدد وحدات AMS 2 Pro وAMS HT التي تدعمها H2D؟ وما أقصى عدد من الألوان يمكنها طباعته؟",
+  "ckb": "3. زۆرترین ژمارەی یەکەکانی AMS 2 Pro و AMS HT کە H2D پشتگیرییان دەکات چەندە؟ زۆرترین ژمارەی ڕەنگ کە دەتوانێت چاپی بکات چەندە؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "11b5b8a312411a4c05f632969eac6a0b8fea5f32f561a948eda77f864ab1fb2d",
+  "en": "The H2D supports a maximum of 4 AMS 2 Pro and 8 AMS HT connected simultaneously, a total of 12 units with 24 slots.",
+  "ar": "تدعم H2D توصيل 4 وحدات AMS 2 Pro و8 وحدات AMS HT كحد أقصى في وقت واحد، أي 12 وحدة إجمالًا بـ 24 فتحة.",
+  "ckb": "چاپکەری H2D پشتگیریی پەیوەستکردنی زۆرترین 4 یەکەی AMS 2 Pro و 8 یەکەی AMS HT دەکات لە یەک کاتدا، کۆی گشتی 12 یەکە بە 24 شوێنی فیلامێنت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "093710a3c10cf4d23337eee51b5d4d26cc662e1f13bfa9089d45cb20432d8f64",
+  "en": "Because H2D is a dual-hotend printer, and in the most extreme scenario, all AMS can be connected to one hotend while the other hotend uses an external spool holder, it can support up to 25 colors.",
+  "ar": "لأن H2D طابعة برأسي صهر، وفي الحالة القصوى يمكن توصيل جميع وحدات AMS برأس صهر واحد بينما يستخدم رأس الصهر الآخر حامل بكرة (spool) خارجيًا، فإنها تستطيع دعم ما يصل إلى 25 لونًا.",
+  "ckb": "لەبەر ئەوەی H2D چاپکەرێکی دوو سەری تواندنەوەیە، و لە توندترین حاڵەتدا هەموو یەکەکانی AMS دەکرێت بە یەک سەری تواندنەوەوە ببەسترێن لە کاتێکدا سەری تواندنەوەکەی تر هەڵگرێکی دەرەکیی ماسوورە (spool) بەکاردەهێنێت، دەتوانێت پشتگیریی تا 25 ڕەنگ بکات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "14112e7c896d05621dbd8a26e93ba89fac1b01c80fdbb6cce006426c716c655b",
+  "en": "4.Is H2D compatible with first generation AMS?",
+  "ar": "4. هل H2D متوافقة مع الجيل الأول من AMS؟",
+  "ckb": "4. ئایا H2D لەگەڵ نەوەی یەکەمی AMS گونجاوە؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "fce7a36ce9c83feb1e48755175766deedd2a7d210a971a675bf50396d42d7cef",
+  "en": "The first-generation AMS has been confirmed to have full plug-and-play compatibility and can be used with the H2D for multi-color printing, but it does not support the AMS drying function.",
+  "ar": "ثبت أن الجيل الأول من AMS متوافق تمامًا بنظام التوصيل والتشغيل المباشر (plug-and-play)، ويمكن استخدامه مع H2D للطباعة متعددة الألوان، لكنه لا يدعم وظيفة التجفيف في AMS.",
+  "ckb": "پشتڕاستکراوەتەوە کە نەوەی یەکەمی AMS بە تەواوی گونجاوە بە شێوەی بەستن و دەستبەجێ کارکردن (plug-and-play)، و دەکرێت لەگەڵ H2D بۆ چاپی فرەڕەنگ بەکاربهێنرێت، بەڵام پشتگیریی ئەرکی وشککردنەوەی AMS ناکات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "6802edc79e9ae7ff8461f73f958537e8764ee0fd33117c1954d4e32117ff3b10",
+  "en": "Due to the fundamental differences in the feeding mechanism and buffering structure, the H2D does not support the AMS lite.",
+  "ar": "بسبب الاختلافات الجوهرية في آلية التغذية وبنية الموازنة، لا تدعم H2D وحدة AMS lite.",
+  "ckb": "بەهۆی جیاوازییە بنەڕەتییەکان لە میکانیزمی پێدان و پێکهاتەی هاوسەنگکردندا، H2D پشتگیریی AMS lite ناکات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "9283bf45f1a2b3e9989397fbfd0e17f54ffb52691b9357120ab887d3a30767a5",
+  "en": "5.AMS 2 Pro is directly connected to the printer through the 6-pin ports, so what are the two 4-pin ports on the back of the printer used for?",
+  "ar": "5. تتصل وحدة AMS 2 Pro مباشرةً بالطابعة عبر منافذ 6-pin، إذن ما وظيفة منفذَي 4-pin في الجهة الخلفية للطابعة؟",
+  "ckb": "5. یەکەی AMS 2 Pro ڕاستەوخۆ لە ڕێگەی دەرچەکانی 6-pin بە چاپکەرەکەوە دەبەسترێت، کەواتە دوو دەرچەکەی 4-pin لە پشتەوەی چاپکەرەکە بۆ چی بەکاردێن؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "dd1304ad8d96215367f413f915fd4721661880033b9e38621917d13e31f70f81",
+  "en": "The two 4-pin ports on the back are reserved for future expansion accessories. For example, to upgrade a non-laser version of the printer to a laser version, one of these ports can be used to connect an external air pump.",
+  "ar": "منفذا 4-pin في الخلف مخصّصان لملحقات التوسعة المستقبلية. فعلى سبيل المثال، لترقية نسخة الطابعة غير المزوّدة بالليزر إلى نسخة الليزر، يمكن استخدام أحد هذين المنفذين لتوصيل مضخة هواء خارجية.",
+  "ckb": "دوو دەرچەکەی 4-pin لە پشتەوە بۆ پێداویستییەکانی فراوانکردنی داهاتوو تەرخان کراون. بۆ نموونە، بۆ نوێکردنەوەی وەشانی بێ لەیزەری چاپکەرەکە بۆ وەشانی لەیزەر، دەکرێت یەکێک لەم دەرچانە بۆ بەستنی پەمپێکی هەوای دەرەکی بەکاربهێنرێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "2fc3d8b2bbb9b79f9eaa526c4efb460ed87a89370b6ded7ece2c46311a8e3971",
+  "en": "6.Can I use the A1 series Hotend on the H2D? Conversely, can H2D hotends be used on A1 series printers?",
+  "ar": "6. هل يمكنني استخدام رأس صهر طابعات A1 Series على H2D؟ وبالعكس، هل يمكن استخدام رؤوس صهر H2D على طابعات A1 Series؟",
+  "ckb": "6. دەتوانم سەری تواندنەوەی چاپکەرەکانی A1 Series لەسەر H2D بەکاربهێنم؟ بە پێچەوانەشەوە، دەکرێت سەری تواندنەوەکانی H2D لەسەر چاپکەرەکانی A1 Series بەکاربهێنرێن؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "16c19c35acdb5e4624d2b4078ea4b8a083057de64c659e6cb09978b1aa72d912",
+  "en": "Although the hotend of the H2D series is similar to the A1 hotend in structure , it is not exactly the same.",
+  "ar": "على الرغم من أن رأس صهر H2D يشبه رأس صهر A1 في بنيته، فإنه ليس مطابقًا له تمامًا.",
+  "ckb": "هەرچەندە سەری تواندنەوەی H2D لە پێکهاتەدا لە سەری تواندنەوەی A1 دەچێت، بەڵام تەواو وەک یەک نین.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "9a372b456dfa851212c2f3c1752ad0d6263da6be8e062f3340821d2fe5ef8f42",
+  "en": "The H2D hotends are specifically designed for the H2D printer, offering optimized compatibility. For example, they support a larger maximum volumetric flow rate, lower clogging risk, more precise nozzle offset calibration between the left and right hotends, and automatic hotend type recognition via the live camera.",
+  "ar": "صُمّمت رؤوس صهر H2D خصيصًا لطابعة H2D، وتوفر توافقًا محسّنًا. فعلى سبيل المثال، تدعم معدل تدفق حجمي أقصى أكبر، وخطر انسداد أقل، ومعايرة أدق لإزاحة النوزل بين رأسي الصهر الأيسر والأيمن، والتعرّف التلقائي على نوع رأس الصهر عبر الكاميرا المباشرة.",
+  "ckb": "سەری تواندنەوەکانی H2D بە تایبەتی بۆ چاپکەری H2D دیزاین کراون، و گونجاوییەکی باشترکراو پێشکەش دەکەن. بۆ نموونە، پشتگیریی زۆرترین ڕێژەی ڕۆیشتنی قەبارەیی گەورەتر دەکەن، مەترسیی گیرانیان کەمترە، کالیبرەکردنی وردتری لادانی نۆزڵ لە نێوان سەری تواندنەوەی چەپ و ڕاستدا هەیە، و جۆری سەری تواندنەوە بە شێوەی خۆکار لە ڕێگەی کامێرای ڕاستەوخۆوە دەناسرێتەوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3f4919be631b71bbb2b1e43888a3361c60a3e00539b6f0cd1181f648de3560d4",
+  "en": "Therefore , to ensure you get the best print quality, we strongly recommend that you do not use the A1 hotend for H2D printers.",
+  "ar": "لذلك، ولضمان حصولك على أفضل جودة طباعة، نوصي بشدة بعدم استخدام رأس صهر A1 في طابعات H2D.",
+  "ckb": "بۆیە، بۆ دڵنیابوون لەوەی باشترین جۆرایەتیی چاپ بەدەست دەهێنیت، بە توندی پێشنیار دەکەین سەری تواندنەوەی A1 بۆ چاپکەرەکانی H2D بەکارنەهێنیت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "37db10eb758e41159e5c1dd921fe323baf5be6f275f10272bea23e1132748952",
+  "en": "Purchasing additional H2D hotends for use on A1 printers is feasible. However, you will also need to use the H2D hotend silicone sock.",
+  "ar": "يمكن شراء رؤوس صهر H2D إضافية لاستخدامها على طابعات A1، لكن ستحتاج أيضًا إلى استخدام غطاء السيليكون الخاص برأس صهر H2D.",
+  "ckb": "کڕینی سەری تواندنەوەی زیادەی H2D بۆ بەکارهێنان لەسەر چاپکەرەکانی A1 دەکرێت. بەڵام هەروەها پێویستە بەرگی سیلیکۆنی تایبەت بە سەری تواندنەوەی H2D بەکاربهێنیت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "ee7443e7ad6b55702f5a0c85253e12fef0c7e63b1ac3ea5d8aa992f86e9a4d00",
+  "en": "7.What are the differences between the 10W and 40W laser modules? How should I choose?",
+  "ar": "7. ما الفروق بين وحدتي الليزر 10W و40W؟ وكيف أختار بينهما؟",
+  "ckb": "7. جیاوازییەکانی نێوان مۆدیولەکانی لەیزەری 10W و 40W چین؟ چۆن هەڵیبژێرم؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "9428a105994d7be236f235c37ec1398844e9b3e8674c1addef6fc0c88a911185",
+  "en": "Both the 10W and 40W laser modules are blue light lasers that support processing a variety of materials, including wood, rubber, metal sheets, leather, dark acrylic, and stone. However, due to differences in power and size, there are the following distinctions:",
+  "ar": "وحدتا الليزر 10W و40W كلتاهما ليزر بالضوء الأزرق تدعمان معالجة مجموعة متنوعة من المواد، منها الخشب والمطاط والصفائح المعدنية والجلد والأكريليك الداكن والحجر. لكن بسبب اختلاف القدرة والحجم، توجد الفروق التالية:",
+  "ckb": "هەردوو مۆدیولی لەیزەری 10W و 40W لەیزەری ڕووناکیی شینن کە پشتگیریی کارکردن لەسەر جۆرەها کەرەستە دەکەن، لەوانە دار، لاستیک، پەڕەی کانزا، چەرم، ئاکریلیکی تاریک و بەرد. بەڵام بەهۆی جیاوازیی وزە و قەبارەوە، ئەم جیاوازییانەی خوارەوە هەن:",
+  "kind": "faq_a"
+ },
+ {
+  "h": "857b8bd1d0970a3e53babaf67a400d877a8df5449e2f6d2e1224aa017d62eeb3",
+  "en": "1.Maximum cutting thickness(For Basswood Plywood):",
+  "ar": "1. أقصى سماكة للقص (لخشب أبلكاش الزيزفون):",
+  "ckb": "1. زۆرترین ئەستووریی بڕین (بۆ ئەبلەکاشی داری زێزەفوون):",
+  "kind": "faq_a"
+ },
+ {
+  "h": "10e1d1720a4b322a077ccf25bee6459b0f9357031dbf8fe7e6459d5fb1a6a8aa",
+  "en": "2.Maximum engraving speed(For Basswood Plywood):",
+  "ar": "2. أقصى سرعة للحفر (لخشب أبلكاش الزيزفون):",
+  "ckb": "2. زۆرترین خێرایی هەڵکۆڵین (بۆ ئەبلەکاشی داری زێزەفوون):",
+  "kind": "faq_a"
+ },
+ {
+  "h": "93056791733f1109196890ec75b7d1fc88f3b9ca1332ebeaa15eab3989015d20",
+  "en": "3.Processable Area:",
+  "ar": "3. المساحة القابلة للمعالجة:",
+  "ckb": "3. ڕووبەری کارپێکردن:",
+  "kind": "faq_a"
+ },
+ {
+  "h": "e91906ca514a46aae332fa258e78f54ad6769dcc2b93f31ed6754019feaa8548",
+  "en": "10W laser module: Maximum processing area X310mm * Y270mm, maximum processing height 280mm；",
+  "ar": "وحدة الليزر 10W: أقصى مساحة معالجة X310mm * Y270mm، وأقصى ارتفاع معالجة 280mm؛",
+  "ckb": "مۆدیولی لەیزەری 10W: زۆرترین ڕووبەری کارپێکردن X310mm * Y270mm، زۆرترین بەرزیی کارپێکردن 280mm؛",
+  "kind": "faq_a"
+ },
+ {
+  "h": "03d42fa43c0b5ea766046981eb997ae4fc0d1cf7444a741cceba2ce9f842d77f",
+  "en": "40W laser module: Maximum processing area X310mm * Y250mm, maximum processing height 265mm；",
+  "ar": "وحدة الليزر 40W: أقصى مساحة معالجة X310mm * Y250mm، وأقصى ارتفاع معالجة 265mm؛",
+  "ckb": "مۆدیولی لەیزەری 40W: زۆرترین ڕووبەری کارپێکردن X310mm * Y250mm، زۆرترین بەرزیی کارپێکردن 265mm؛",
+  "kind": "faq_a"
+ },
+ {
+  "h": "866b94d5f68d24944f9f4660eb046f34d3e5b54becd0256c002f1a66120bfbb9",
+  "en": "8.Is a USB included as standard? What functions are affected without a USB?",
+  "ar": "8. هل ذاكرة USB مرفقة بشكل قياسي؟ وما الوظائف التي تتأثر بعدم وجود USB؟",
+  "ckb": "8. ئایا فلاشی USB وەک ستاندارد لەگەڵدایە؟ بەبێ USB کام ئەرکەکان کاریگەرییان لەسەر دەبێت؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "fed2fb4830f7432461f8db10098f0ac6e830a762e7cd29f6b6ab478f33d71577",
+  "en": "The package does not include a standard USB flash drive. You can still initiate printing normally without a USB, as the printer has built-in storage space to run print files.",
+  "ar": "لا تتضمن العبوة ذاكرة فلاش USB قياسية. ومع ذلك يمكنك بدء الطباعة بشكل طبيعي دون USB، لأن الطابعة تحتوي على مساحة تخزين مدمجة لتشغيل ملفات الطباعة.",
+  "ckb": "پاکەتەکە فلاشی ستانداردی USB لەخۆ ناگرێت. لەگەڵ ئەوەشدا دەتوانیت بەبێ USB بە ئاسایی دەست بە چاپکردن بکەیت، چونکە چاپکەرەکە بیرگەیەکی ناوخۆیی هەیە بۆ کارپێکردنی فایلەکانی چاپ.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "201a048f91afcd5dd667168024de982d0b6c1c26e920e4f95381caf4c39c3bf1",
+  "en": "However, without a USB inserted, the following functions will be affected:",
+  "ar": "لكن عند عدم إدخال USB، ستتأثر الوظائف التالية:",
+  "ckb": "بەڵام بەبێ دانانی USB، ئەم ئەرکانەی خوارەوە کاریگەرییان لەسەر دەبێت:",
+  "kind": "faq_a"
+ },
+ {
+  "h": "ea750d4d93b1f8e9a5ab68cfff3b8aca6d95abcc6db817eec4e8558531ae2ad8",
+  "en": "1. The recording and time-lapse photography functions can't be turned on;",
+  "ar": "1. لا يمكن تشغيل وظيفتي التسجيل والتصوير بفاصل زمني؛",
+  "ckb": "1. ئەرکەکانی تۆمارکردن و وێنەگرتنی کاتی خێراکراو ناتوانرێت هەڵبکرێن؛",
+  "kind": "faq_a"
+ },
+ {
+  "h": "07ced1cadff1773b56c9c949d81489ccddb226eca5674653fdbbf5f43dc4a037",
+  "en": "2. Printing cannot be initiated through the LAN;",
+  "ar": "2. لا يمكن بدء الطباعة عبر الشبكة المحلية (LAN)؛",
+  "ckb": "2. ناتوانرێت لە ڕێگەی تۆڕی ناوخۆیی (LAN) دەست بە چاپکردن بکرێت؛",
+  "kind": "faq_a"
+ },
+ {
+  "h": "bf4fafcb1ef5eec89a5c160715e6207ffa6f67c8b537500d0de2d370abd05bf0",
+  "en": "3. Print files cannot be sent to the machine for storage through the studio;",
+  "ar": "3. لا يمكن إرسال ملفات الطباعة إلى الجهاز لتخزينها عبر برنامج Studio؛",
+  "ckb": "3. فایلەکانی چاپ ناتوانرێت بە بەرنامەی Studio بنێردرێنە ئامێرەکە بۆ هەڵگرتن؛",
+  "kind": "faq_a"
+ },
+ {
+  "h": "9c6bafee7372626425c638056b0ae9d2200a04184383941335832c7ebb68810f",
+  "en": "4. Log files cannot be exported;",
+  "ar": "4. لا يمكن تصدير ملفات السجل؛",
+  "ckb": "4. ناتوانرێت فایلەکانی تۆمار هەناردە بکرێن؛",
+  "kind": "faq_a"
+ },
+ {
+  "h": "1ca02080a2fe4d98ce3f9b1fe0c8575fe93bb8237d87731e8c2a30f1308f64c7",
+  "en": "USB requirements: USB2.0 protocol or above (actual minimum write speed needs to be greater than 10M/s), supported file formats are FAT32 and exFAT. And the printer only supports mounting one USB, and cannot connect multiple USB via a USB hub.",
+  "ar": "متطلبات USB: بروتوكول USB2.0 أو أعلى (يجب أن تتجاوز سرعة الكتابة الفعلية الدنيا 10M/s)، وصيغ التهيئة المدعومة هي FAT32 وexFAT. كما أن الطابعة لا تدعم إلا تركيب ذاكرة USB واحدة، ولا يمكن توصيل عدة ذاكرات USB عبر موزّع USB.",
+  "ckb": "پێداویستییەکانی USB: پڕۆتۆکۆڵی USB2.0 یان بەرزتر (پێویستە کەمترین خێرایی نووسینی ڕاستەقینە لە 10M/s زیاتر بێت)، فۆرماتە پشتگیریکراوەکان بریتین لە FAT32 و exFAT. هەروەها چاپکەرەکە تەنها پشتگیریی بەستنی یەک فلاشی USB دەکات، و ناتوانرێت چەند فلاشێکی USB بە دابەشکەری USB پێکەوە ببەسترێن.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "cca6f9d909ab2dc5e00ebacc310a05e3a79613fbe2981c681e8096e630167ea4",
+  "en": "9.Why can’t I freely select hotend for printing with the printer’s built-in files?",
+  "ar": "9. لماذا لا يمكنني اختيار رأس الصهر بحرية عند الطباعة من الملفات المدمجة في الطابعة؟",
+  "ckb": "9. بۆچی ناتوانم بە ئازادی سەری تواندنەوە هەڵبژێرم کاتێک بە فایلە ناوخۆییەکانی چاپکەرەکە چاپ دەکەم؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "22624d853f8fb77906229256d7b111eaddc6844e893114bfe44a34989b626611",
+  "en": "The hotend to be used for printing has already been determined when the model file is sliced. As for the built-in models, the right hotend has been selected during the slicing process, so it is impossible to change the hotend used for printing on the printer screen.",
+  "ar": "يُحدَّد رأس الصهر المستخدم في الطباعة مسبقًا عند تقطيع ملف النموذج. أما النماذج المدمجة، فقد اختير لها رأس الصهر المناسب أثناء عملية التقطيع، لذا لا يمكن تغيير رأس الصهر المستخدم في الطباعة من شاشة الطابعة.",
+  "ckb": "سەری تواندنەوەی بەکارهاتوو بۆ چاپ لە کاتی سلایسکردنی فایلی مۆدێلەکەدا دیاری کراوە. سەبارەت بە مۆدێلە ناوخۆییەکان، سەری تواندنەوەی گونجاو لە کاتی پرۆسەی سلایسکردندا هەڵبژێردراوە، بۆیە ناتوانرێت سەری تواندنەوەی چاپ لە شاشەی چاپکەرەکەوە بگۆڕدرێت.",
+  "kind": "faq_a",
+  "needs_review": true
+ },
+ {
+  "h": "ecd865f174681118246d16751416ac5c3a48ad775e9a130940eb96354c3690d7",
+  "en": "When you slice the file in Bambu Studio and send the print task , you can freely choose to use the left hotend or the right hotend. For some filaments, such as TPU and PPS/PPA-CF, it is recommended to use specific hotends for printing.",
+  "ar": "عند تقطيع الملف في Bambu Studio وإرسال مهمة الطباعة، يمكنك اختيار استخدام رأس الصهر الأيسر أو الأيمن بحرية. ولبعض أنواع الفلامنت، مثل TPU وPPS/PPA-CF، يُوصى باستخدام رؤوس صهر محددة للطباعة.",
+  "ckb": "کاتێک فایلەکە لە Bambu Studio سلایس دەکەیت و ئەرکی چاپەکە دەنێریت، دەتوانیت بە ئازادی سەری تواندنەوەی چەپ یان ڕاست هەڵبژێریت. بۆ هەندێک فیلامێنت، وەک TPU و PPS/PPA-CF، پێشنیار دەکرێت سەری تواندنەوەی دیاریکراو بۆ چاپکردن بەکاربهێنرێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "09b0098e0fb4d0310e391bb82abadd4c7a9103163725e2d5e988157e18521040",
+  "en": "For more details on H2D filament printing, please check the wiki.",
+  "ar": "لمزيد من التفاصيل حول طباعة الفلامنت على H2D، يرجى مراجعة الويكي.",
+  "ckb": "بۆ وردەکاریی زیاتر دەربارەی چاپکردنی فیلامێنت لەسەر H2D، تکایە سەیری ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "d664aef1bc436ea0914824ac795ccea21f2338804902f516a845cfbd13a16e3a",
+  "en": "10. Will the smoke and dust generated by laser operations affect my printer's precision and lifespan?",
+  "ar": "10. هل يؤثر الدخان والغبار الناتجان عن عمليات الليزر في دقة طابعتي وعمرها الافتراضي؟",
+  "ckb": "10. ئایا ئەو دووکەڵ و تۆزەی لە کارکردنی لەیزەرەوە دروست دەبێت کاریگەری لەسەر وردی و تەمەنی بەکارهێنانی چاپکەرەکەم دەبێت؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "72ade62c07e6ca3f1ae38e32ca658173f9371b26012ea071b0904d49d175720e",
+  "en": "H2D is equipped with an efficient exhaust system that effectively removes smoke and dust generated by laser operations, significantly reducing contamination. During R&D, we conducted rigorous testing to ensure that with regular machine cleaning, the impact of smoke and dust on performance and precision is negligible. For detailed cleaning instructions, please refer to: wiki",
+  "ar": "زُوّدت H2D بنظام شفط فعّال يزيل بكفاءة الدخان والغبار الناتجين عن عمليات الليزر، ما يقلّل التلوث بشكل كبير. وخلال مرحلة البحث والتطوير، أجرينا اختبارات صارمة للتأكد من أن تأثير الدخان والغبار في الأداء والدقة يكون ضئيلًا جدًا مع التنظيف المنتظم للجهاز. للاطلاع على تعليمات التنظيف المفصّلة، يرجى الرجوع إلى: الويكي",
+  "ckb": "چاپکەری H2D سیستەمێکی کارای دەرکردنی هەوای هەیە کە بە باشی ئەو دووکەڵ و تۆزە لادەبات کە لە کارکردنی لەیزەرەوە دروست دەبێت، و پیسبوون بە شێوەیەکی بەرچاو کەم دەکاتەوە. لە قۆناغی توێژینەوە و پەرەپێداندا، تاقیکردنەوەی توندمان ئەنجامدا بۆ دڵنیابوون لەوەی کە بە پاککردنەوەی بەردەوامی ئامێرەکە، کاریگەریی دووکەڵ و تۆز لەسەر کارایی و وردی ئەوەندە کەمە کە شایانی باس نییە. بۆ ڕێنماییە وردەکانی پاککردنەوە، تکایە سەیری ئەمە بکە: ویکی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "943cbaac55588045aa548c1521605991f0daa5fbd9e5b667c4dbb8aafe949cf4",
+  "en": "11. How can I improve the success rate and quality of TPU printing?",
+  "ar": "11. كيف يمكنني تحسين نسبة نجاح طباعة TPU وجودتها؟",
+  "ckb": "11. چۆن دەتوانم ڕێژەی سەرکەوتن و جۆرایەتیی چاپکردنی TPU باشتر بکەم؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "e1185987eccc8a350462637b20c6660eacf6f589aeef1c53c540562d2fa336b1",
+  "en": "Due to the flexible nature of TPU filaments, there are some operational issues that can arise during feeding and printing. To facilitate TPU printing, we have created a dedicated Wiki guide. Simply follow the instructions in the Wiki to successfully print with TPU filaments: wiki",
+  "ar": "بسبب الطبيعة المرنة لفلامنت TPU، قد تظهر بعض المشكلات التشغيلية أثناء التغذية والطباعة. ولتسهيل طباعة TPU، أعددنا دليلًا مخصّصًا على الويكي. ما عليك سوى اتباع التعليمات في الويكي لتطبع بفلامنت TPU بنجاح: الويكي",
+  "ckb": "بەهۆی سروشتی نەرمونیانی فیلامێنتی TPU، هەندێک کێشەی کارپێکردن لەوانەیە لە کاتی پێدان و چاپکردندا دروست ببن. بۆ ئاسانکردنی چاپکردنی TPU، ڕێبەرێکی تایبەتمان لە ویکی ئامادە کردووە. تەنها ڕێنماییەکانی ناو ویکی پەیڕەو بکە بۆ ئەوەی بە سەرکەوتوویی بە فیلامێنتی TPU چاپ بکەیت: ویکی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "ef02791b07db8583d080896085f2de172ed0659c5a9fa3b7de91b0df23df9271",
+  "en": "12. Are there any special safety precautions I need to take when using the laser function?",
+  "ar": "12. هل هناك احتياطات سلامة خاصة يجب أن أتخذها عند استخدام وظيفة الليزر؟",
+  "ckb": "12. ئایا هیچ ڕێنماییەکی سەلامەتیی تایبەت هەیە کە پێویست بێت لە کاتی بەکارهێنانی ئەرکی لەیزەردا ڕەچاوی بکەم؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "252314ba92535a139f4b0e9f08b59580f6414b65f6a8ade195ef9b86544ac90a",
+  "en": "Because laser processing involves using high-energy lasers on potentially flammable materials, we strongly advise users not to leave the machine unattended during laser operations. Please maintain constant vigilance over the machine's operational status and ensure that there are no flammable or explosive materials in the machine's surroundings. For more information please refer to: wiki",
+  "ar": "لأن المعالجة بالليزر تتضمن استخدام ليزر عالي الطاقة على مواد قد تكون قابلة للاشتعال، ننصح المستخدمين بشدة بعدم ترك الجهاز دون مراقبة أثناء عمليات الليزر. يرجى مراقبة حالة تشغيل الجهاز باستمرار والتأكد من عدم وجود أي مواد قابلة للاشتعال أو الانفجار في محيطه. لمزيد من المعلومات يرجى الرجوع إلى: الويكي",
+  "ckb": "لەبەر ئەوەی کارکردن بە لەیزەر بریتییە لە بەکارهێنانی لەیزەری وزە بەرز لەسەر کەرەستەی ڕەنگە گڕگر، بە توندی ئامۆژگاریی بەکارهێنەران دەکەین کە لە کاتی کارکردنی لەیزەردا ئامێرەکە بەبێ چاودێری جێنەهێڵن. تکایە بە بەردەوامی ئاگاداری دۆخی کارکردنی ئامێرەکە بە و دڵنیابە کە هیچ کەرەستەیەکی گڕگر یان تەقەمەنی لە دەوروبەری ئامێرەکەدا نییە. بۆ زانیاریی زیاتر تکایە سەیری ئەمە بکە: ویکی",
+  "kind": "faq_a"
+ },
+ {
+  "h": "9c98ecd480f22d8529b3b414f162ed6071156daee4e751d1208460d0bf714133",
+  "en": "For more information about H2D, refer to the official wiki.",
+  "ar": "لمزيد من المعلومات حول H2D، راجع الويكي الرسمي.",
+  "ckb": "بۆ زانیاریی زیاتر دەربارەی H2D، سەیری ویکیی فەرمی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "8e956fc8300f96f1a06d2c6576500494461c75978455912c3c2f279ac93ab7ff",
+  "en": "Dual-nozzle Multi-material 3D Printing",
+  "ar": "طباعة 3D متعددة المواد بنوزلين",
+  "ckb": "چاپی فرەکەرەستەی 3D بە دوو نۆزڵ",
+  "kind": "block_line"
+ },
+ {
+  "h": "e75db7bd636e0b3aa403f598394b58a13ae39458204b82dcc83947b0dc91edc0",
+  "en": "350*320*325 mm³ Print Volume",
+  "ar": "حجم طباعة 350*320*325 mm³",
+  "ckb": "قەبارەی چاپی 350*320*325 mm³",
+  "kind": "block_line"
+ },
+ {
+  "h": "af9d5246d3010a3538b7ca3847ea1a9f78bd4ee56f315c6c49b46a96c1a0bb7f",
+  "en": "5μm Resolution Optical Motion Calibration",
+  "ar": "معايرة بصرية للحركة بدقة 5μm",
+  "ckb": "کالیبرەکردنی ئۆپتیکیی جووڵە بە وردیی 5μm",
+  "kind": "block_line"
+ },
+ {
+  "h": "098567633cffdc4354bb8b4823ca5c82bac5b7675719a58ffb57e1a6f2b5979b",
+  "en": "Closed-loop Servo Extruder",
+  "ar": "دافع سيرفو بالحلقة المغلقة",
+  "ckb": "پاڵنەری سێرڤۆی بازنەی داخراو",
+  "kind": "block_line"
+ },
+ {
+  "h": "ac4d87edf35b7c7d1bbaf14f1bfc87d41472544dc50fec097c208723693a2e95",
+  "en": "350°C Nozzle & 65°C Active Chamber Heating",
+  "ar": "نوزل 350°C وتسخين نشط لحجرة الطباعة 65°C",
+  "ckb": "نۆزڵی 350°C و گەرمکردنی چالاکی ژووری چاپ بە 65°C",
+  "kind": "block_line"
+ },
+ {
+  "h": "8df30d558e41ce4c6036bffd34c0fdce16f1641786ad3378aa078ff751e7eef6",
+  "en": "* To connect more than 2 AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+  "ar": "* لتوصيل أكثر من 2 من وحدات AMS (بما فيها AMS 2 Pro, AMS HT)، يلزم 4-in-1 PTFE Adapter (FAZ013-N).",
+  "ckb": "* بۆ بەستنی زیاتر لە 2 یەکەی AMS (لەوانە AMS 2 Pro, AMS HT)، پێویستە 4-in-1 PTFE Adapter (FAZ013-N) بەکاربهێنرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f339ca996a30fd0b8a2103b7345f945010668420dbb9348e267317338f63578d",
+  "en": "* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020. Learn more.",
+  "ar": "* الأمن السيبراني متوافق مع EU RED المادة 3.3(d)(e) ومع ETSI EN 303 645 V2.1.1:2020. اعرف المزيد.",
+  "ckb": "* ئاسایشی سایبەری گونجاوە لەگەڵ EU RED ماددەی 3.3(d)(e) و ETSI EN 303 645 V2.1.1:2020. زیاتر بزانە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e7cca57f216ee7d35ced57076975442d4f0f32f89e245edfaf10a28d8a7fb6f",
+  "en": "Professionally function-tested, with defective components replaced as needed.",
+  "ar": "خضع لاختبار وظيفي احترافي، مع استبدال المكونات المعيبة عند الحاجة.",
+  "ckb": "بە شێوەیەکی پیشەگەرانە ئەرکەکانی تاقیکراونەتەوە، و پێکهاتە تێکچووەکان بەپێی پێویست گۆڕدراون.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1b6e88364ec66744db4dd66467fd648bc0b15e13129f5be142fec160c0c79114",
+  "en": "Thoroughly cleaned and inspected (Cosmetic imperfections may remain and do not affect functionality).",
+  "ar": "نُظّف وفُحص بدقة (قد تبقى عيوب شكلية لا تؤثر في الأداء الوظيفي).",
+  "ckb": "بە وردی پاککراوەتەوە و پشکنراوە (لەوانەیە کەموکوڕیی ڕووکەشی بمێنێت کە کاریگەری لەسەر کارکردن نییە).",
+  "kind": "block_line"
+ },
+ {
+  "h": "1331cac82515f4faaca68d6240422ae99b4ef3fbc2f3e82bc04004440d446766",
+  "en": "Repackaged with all the original accessories — manual, cables, and box.",
+  "ar": "أُعيد تغليفه مع جميع الملحقات الأصلية — دليل الاستخدام والكابلات والعلبة.",
+  "ckb": "دووبارە پاکەت کراوەتەوە لەگەڵ هەموو پێداویستییە ئەسڵییەکان — ڕێبەری بەکارهێنان، کێبڵەکان و سندوقەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4cc6cfc24febbd666cae36a29792bdf70301765287031a9b0d910077531dce78",
+  "en": "Released for sale only after a final quality inspection. Click here for details.",
+  "ar": "لا يُطرح للبيع إلا بعد فحص نهائي للجودة. انقر هنا للتفاصيل.",
+  "ckb": "تەنها دوای پشکنینی کۆتایی جۆرایەتی بۆ فرۆشتن دەخرێتە ڕوو. بۆ وردەکاری لێرە کرتە بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5fcee675171bf56eae668332a21140bc6075cfd1401b8e9d74b9b6e1120d0321",
+  "en": "Every Bambu Lab Official Refurbished Product:",
+  "ar": "كل منتج مجدّد رسمي من Bambu Lab:",
+  "ckb": "هەموو بەرهەمێکی نۆژەنکراوەی فەرمیی Bambu Lab:",
+  "kind": "block_line"
+ },
+ {
+  "h": "0bba300219e4f9007c6836d9f32cb4373dd1485ebe5558af950f87332914699c",
+  "en": "24-Colors/Multi-material24-ColorsMulti-material",
+  "ar": "24 لونًا/متعدد المواد",
+  "ckb": "24 ڕەنگ/فرەکەرەستە",
+  "kind": "block_title",
+  "needs_review": true
+ },
+ {
+  "h": "31341a0d52f52bfca734976e4a44bea2c871cd483e4d292ba11fccf089313d75",
+  "en": "Serially connect up to 4 AMS 2 Pro & 8 AMS HT units, total of 24 filaments",
+  "ar": "صِل على التوالي حتى 4 وحدات AMS 2 Pro و8 وحدات AMS HT، بإجمالي 24 فلامنت",
+  "ckb": "بە زنجیرە تا 4 یەکەی AMS 2 Pro و 8 یەکەی AMS HT پێکەوە ببەستە، کۆی گشتی 24 فیلامێنت",
+  "kind": "block_line"
+ },
+ {
+  "h": "3f2575bbba651124b616a8ba47a8afcd1e825da796ece4d8d41e5cb89b8600cc",
+  "en": "Electro-Magnetic Air Vent",
+  "ar": "فتحة تهوية كهرومغناطيسية",
+  "ckb": "کونی هەواگۆڕکێی ئەلیکترۆموگناتیسی",
+  "kind": "block_title"
+ },
+ {
+  "h": "7058ad78901de742e88ac1c4f609b274918ff3ace0f828cc13b76c5f977260d6",
+  "en": "Fast filament drying & air-tight filament storage",
+  "ar": "تجفيف سريع للفلامنت وتخزين محكم الإغلاق للفلامنت",
+  "ckb": "وشککردنەوەی خێرای فیلامێنت و هەڵگرتنی فیلامێنت بە شێوەی هەوابەند",
+  "kind": "block_line"
+ },
+ {
+  "h": "c6b5036f27d2e56fc219668729f2936f0c47fe999626cfc54e91ea21e4217328",
+  "en": "65°C Drying",
+  "ar": "تجفيف بحرارة 65°C",
+  "ckb": "وشککردنەوە بە 65°C",
+  "kind": "block_title"
+ },
+ {
+  "h": "d6d0dea56960bf2fbc0ba0265fbc87bd5f05fd07b727d0ccc4ecd4572816ce34",
+  "en": "Up to 65°C drying temperature",
+  "ar": "حرارة تجفيف تصل إلى 65°C",
+  "ckb": "پلەی گەرمیی وشککردنەوە تا 65°C",
+  "kind": "block_line"
+ },
+ {
+  "h": "c891f7b14851deb7d020504679156f9eeeb854de3b57a565a1f4174415062668",
+  "en": "Brushless Motor",
+  "ar": "محرك بدون فرش",
+  "ckb": "بزوێنەری بێ فڵچە",
+  "kind": "block_title"
+ },
+ {
+  "h": "345066469c36c1a1360085c48acc11a1f8216eae9410d328d503e028d90feb4a",
+  "en": "60% faster feeding speed",
+  "ar": "سرعة تغذية أعلى بنسبة 60%",
+  "ckb": "پێدان بە 60% خێراتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "59cef9b0163aadf2de0950ce76c806045b538017544ff79e5c4e770e3c9b2c2c",
+  "en": "Dry Filament Quickly and Intelligently",
+  "ar": "جفّف الفلامنت بسرعة وذكاء",
+  "ckb": "فیلامێنت بە خێرایی و زیرەکی وشک بکەرەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "147e5636e646d3d32d2609305e2f3e541814f9d785032de1b2c2f67ef581091e",
+  "en": "Automated venting facilitates dehumidification during drying and ensures airtight sealing for weeks of high-quality printing.",
+  "ar": "تسهّل التهوية التلقائية إزالة الرطوبة أثناء التجفيف، وتضمن إغلاقًا محكمًا يحافظ على جودة طباعة عالية لأسابيع.",
+  "ckb": "هەواگۆڕکێی خۆکار لابردنی شێ لە کاتی وشککردنەوەدا ئاسان دەکات و داخستنێکی هەوابەند مسۆگەر دەکات بۆ چەند هەفتەیەک چاپی جۆرایەتی بەرز.",
+  "kind": "block_title"
+ },
+ {
+  "h": "3c942ce49d0c612583d782b41dfc748c51914cf0c3f43e5a3338278b029d5d55",
+  "en": "Auto-rotate Drying",
+  "ar": "تجفيف مع تدوير تلقائي",
+  "ckb": "وشککردنەوە بە سووڕانی خۆکار",
+  "kind": "block_line"
+ },
+ {
+  "h": "25f5fd87af9a4fb42bac5ce9f1a6decf052cd79e737c3aa41dbe709c39211ec2",
+  "en": "During the drying process, the filament spools rotate automatically to ensure more even drying.",
+  "ar": "أثناء عملية التجفيف، تدور بكرات الفلامنت تلقائيًا لضمان تجفيف أكثر تجانسًا.",
+  "ckb": "لە کاتی پرۆسەی وشککردنەوەدا، ماسوورەکانی فیلامێنت بە شێوەی خۆکار دەسووڕێن بۆ دڵنیابوون لە وشکبوونەوەیەکی یەکسانتر.",
+  "kind": "block_title"
+ },
+ {
+  "h": "028bbec6f80ee6ac4be49cafca9b1dbaff1ff0d2ab86bd4cc76ed98974ef9b68",
+  "en": "RFID Sync",
+  "ar": "مزامنة RFID",
+  "ckb": "هاوکاتکردنی RFID",
+  "kind": "block_line"
+ },
+ {
+  "h": "ba459f0b2fb0970e44f5b005d67286c015625a1174c626cffa494907fb94aad6",
+  "en": "AMS 2 Pro uses RFID to auto-match drying settings for Bambu official filaments, no manual input needed.",
+  "ar": "تستخدم وحدة AMS 2 Pro تقنية RFID لمطابقة إعدادات التجفيف تلقائيًا مع فلامنتات Bambu الرسمية، دون الحاجة إلى إدخال يدوي.",
+  "ckb": "یەکەی AMS 2 Pro تەکنەلۆژیای RFID بەکاردەهێنێت بۆ گونجاندنی خۆکاری ڕێکخستنەکانی وشککردنەوە بۆ فیلامێنتە فەرمییەکانی Bambu، بەبێ پێویستی بە داخڵکردنی دەستی.",
+  "kind": "block_title"
+ },
+ {
+  "h": "702ec3f256e47f56915eb1b7124bf51fef15846f57f0683144168467d9e76523",
+  "en": "Dry",
+  "ar": "جاف",
+  "ckb": "وشک",
+  "kind": "block_line"
+ },
+ {
+  "h": "04624e44577eb80b8029250561386f7d99b5b089a70572ef4228695ea524de8f",
+  "en": "Moist",
+  "ar": "رطب",
+  "ckb": "شێدار",
+  "kind": "block_line"
+ },
+ {
+  "h": "f7e2c291c8a36e1dcbdadb3597532e3fd39814a4b02d77f6cf13cd665184cb47",
+  "en": "Bambu PETG Basic",
+  "ar": "Bambu PETG Basic",
+  "ckb": "Bambu PETG Basic",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "f0b57425c8054cccce19e9fe79d6ce5e60e1d8f0f428b384a1e5aafc4febfe01",
+  "en": "Speed Up! Faster Multi-material Printing!",
+  "ar": "سرعة أكبر! طباعة متعددة المواد أسرع!",
+  "ckb": "خێراتر! چاپی فرەکەرەستەی خێراتر!",
+  "kind": "block_title"
+ },
+ {
+  "h": "e8364427e7f5452ddd712a71d33d0f3391e0d293b7554b6f744edcf0c9f2d712",
+  "en": "The powerful Bambu permanent magnet synchronous servo motor accelerates filament feeding by 60% for enhanced efficiency.",
+  "ar": "يُسرّع محرك السيرفو المتزامن ذو المغناطيس الدائم القوي من Bambu تغذية الفلامنت بنسبة 60% لرفع الكفاءة.",
+  "ckb": "بزوێنەری سێرڤۆی هاوکاتی موگناتیسی هەمیشەیی بەهێزی Bambu پێدانی فیلامێنت بە ڕێژەی 60% خێراتر دەکات بۆ کارایی باشتر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b70c76f225270a2a3721b7c6d8042866612e3dfd78bbbd7d69fd4d9685e23f72",
+  "en": "Saves an average of 10 minutes per 100 filament changes.",
+  "ar": "يوفّر في المتوسط 10 دقائق لكل 100 عملية تبديل للفلامنت.",
+  "ckb": "بە تێکڕایی 10 خولەک بۆ هەر 100 جار گۆڕینی فیلامێنت پاشەکەوت دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "57df96f3a8d0009ff42d80cd670b1f2eb7c222ba3fc865ff439e27983663d31b",
+  "en": "Faster multi-color printing",
+  "ar": "طباعة أسرع متعددة الألوان",
+  "ckb": "چاپی فرەڕەنگی خێراتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "e493138648401c5fe4da8e2318d1710a00ad562beac6da72f23336a8d16f7ccf",
+  "en": "Xiaomi Su7 Ultra Prototype by @大匠",
+  "ar": "نموذج أولي لـ Xiaomi Su7 Ultra من إعداد @大匠",
+  "ckb": "نموونەی سەرەتایی Xiaomi Su7 Ultra لەلایەن @大匠",
+  "kind": "block_line"
+ },
+ {
+  "h": "70b800bcf8f1b417168bf9b0e32cbd4cdf9e9c2f7319661c2d728f68fe005b5e",
+  "en": "Evolved, Polished Design Details",
+  "ar": "تفاصيل تصميم متطوّرة ومصقولة",
+  "ckb": "وردەکارییەکانی دیزاینی پێشکەوتوو و ڕێکوپێک",
+  "kind": "block_title"
+ },
+ {
+  "h": "d530a0ef5e94a88a640f5367ed2637caded8a400bbe4ca72a7f171a5e8a6dede",
+  "en": "Tool-Free Filament Tubes Access",
+  "ar": "الوصول إلى أنابيب الفلامنت دون أدوات",
+  "ckb": "دەستگەیشتن بە بۆرییەکانی فیلامێنت بەبێ ئامراز",
+  "kind": "block_line"
+ },
+ {
+  "h": "0309afb51f67c39518bddcf2a84064ceca14db32abdd27e8f5eb89ccfa2135d4",
+  "en": "Removing snapped filament from the first-gen AMS requires extracting all spools and disassembling the shell with two screws, taking 3-5 minutes. In contrast, the AMS 2 Pro offers direct, tool-free access to filament tubes from the top.",
+  "ar": "تتطلب إزالة الفلامنت المكسور من الجيل الأول من AMS إخراج جميع البكرات وفك الغلاف المثبّت ببرغيين، ما يستغرق 3-5 دقائق. أما AMS 2 Pro فتتيح الوصول المباشر إلى أنابيب الفلامنت من الأعلى دون أدوات.",
+  "ckb": "لابردنی فیلامێنتی پچڕاو لە نەوەی یەکەمی AMS پێویستی بە دەرهێنانی هەموو ماسوورەکان و کردنەوەی ڕووپۆشەکە بە کردنەوەی دوو بورغی هەیە، کە 3-5 خولەک دەخایەنێت. بە پێچەوانەوە، AMS 2 Pro دەستگەیشتنی ڕاستەوخۆ و بێ ئامراز بە بۆرییەکانی فیلامێنت لە سەرەوە دابین دەکات.",
+  "kind": "block_title"
+ },
+ {
+  "h": "1fefb530e09e55fb3e578e40e964f6852381ac7b95a0675565da894c4fed3438",
+  "en": "Ceramic Inlet",
+  "ar": "مدخل سيراميكي",
+  "ckb": "دەروازەی سیرامیکی",
+  "kind": "block_line"
+ },
+ {
+  "h": "7afc45a13ae082304559d24ce68c8a0273031481a5f629e5e29f5f148de245bc",
+  "en": "Active Air Vent 65°C Filament Drying",
+  "ar": "تجفيف الفلامنت بحرارة 65°C مع فتحة تهوية نشطة",
+  "ckb": "وشککردنەوەی فیلامێنت بە 65°C لەگەڵ کونی هەواگۆڕکێی چالاک",
+  "kind": "block_line"
+ },
+ {
+  "h": "f409a973f484334ce0c2db0df1a58d4fd05c7648b13144d6c85dd526eae517ab",
+  "en": "Air-tight Filament Storage",
+  "ar": "تخزين محكم الإغلاق للفلامنت",
+  "ckb": "هەڵگرتنی هەوابەندی فیلامێنت",
+  "kind": "block_line"
+ },
+ {
+  "h": "665e93bdfe55e6de7fcfb29d5f56df856978f107a708845349f63a5fc1a7b88e",
+  "en": "Up to 24-color/Multi-material Printing",
+  "ar": "طباعة حتى 24 لونًا/متعددة المواد",
+  "ckb": "چاپی تا 24 ڕەنگ/فرەکەرەستە",
+  "kind": "block_line"
+ },
+ {
+  "h": "88b5dbd0bcadca7157e83485717f1393771871678cd2ba5ee8f0bd102ef73b90",
+  "en": "Brushless Servo Feeding Motor",
+  "ar": "محرك تغذية سيرفو بدون فرش",
+  "ckb": "بزوێنەری پێدانی سێرڤۆی بێ فڵچە",
+  "kind": "block_line"
+ },
+ {
+  "h": "df60d34c6829ca09bf84726d1c8337da9c17f9dd26464fc80aeddffd7d5b5c0c",
+  "en": "RFID filament sync",
+  "ar": "مزامنة الفلامنت عبر RFID",
+  "ckb": "هاوکاتکردنی فیلامێنت بە RFID",
+  "kind": "block_line"
+ },
+ {
+  "h": "0252579287b44383ba79a2e11d2253e0cbefc33527d86d6396c217ee0212f8b0",
+  "en": "Important notice",
+  "ar": "تنبيه مهم",
+  "ckb": "ئاگادارییەکی گرنگ",
+  "kind": "block_line"
+ },
+ {
+  "h": "778e9142846e46f2fcf23030c821b74b9f8bd49f942c4cf5f925e0fd250c9309",
+  "en": "See the Multiple AMS Units Connection Guide for detailed setup instructions.",
+  "ar": "راجع دليل توصيل عدة وحدات AMS (Multiple AMS Units Connection Guide) للاطلاع على تعليمات الإعداد المفصّلة.",
+  "ckb": "بۆ ڕێنماییە وردەکانی ڕێکخستن، سەیری ڕێبەری بەستنی چەند یەکەیەکی AMS (Multiple AMS Units Connection Guide) بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "256e7236152d064a4a836ca76b7550ce58251831cf5acf9002d83577e3b77ac4",
+  "en": "Please note the product is the same among all variants, and the only difference is recommended accessories.",
+  "ar": "يرجى ملاحظة أن المنتج نفسه في جميع الخيارات، والفرق الوحيد هو الملحقات الموصى بها.",
+  "ckb": "تکایە ئاگاداربە کە بەرهەمەکە لە هەموو جۆرەکاندا هەمان شتە، و تاکە جیاوازی پێداویستییە پێشنیارکراوەکانە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "11fb4ed5b8a3e09ab1028356bdd6e23e22699d6580f618076a8cf614d0bba269",
+  "en": "Stand Out, Never Dull",
+  "ar": "كن مميزًا، ولا تكن باهتًا أبدًا",
+  "ckb": "جیاواز بە، هەرگیز کاڵ مەبە",
+  "kind": "block_line"
+ },
+ {
+  "h": "45240a5be05866c74ec8f1d01b7a0d8c8451d4e421c0624247770a326b432402",
+  "en": "Find the Perfect Color",
+  "ar": "اعثر على اللون المثالي",
+  "ckb": "ڕەنگی تەواو گونجاو بدۆزەرەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "0d8576cc25c056a800e4a8e3851c78059137db416bce57b01868c888eaf0c9fc",
+  "en": "With a palette of up to 30 colors, Bambu PLA Basic lets you find the perfect shade to bring flair to your projects. The colors remain consistent across prints, ensuring a stunning and uniform finish every time.",
+  "ar": "مع لوحة ألوان تضم ما يصل إلى 30 لونًا، يتيح لك Bambu PLA Basic العثور على الدرجة المثالية لإضفاء لمسة مميزة على مشاريعك. وتبقى الألوان ثابتة من طبعة إلى أخرى، ما يضمن تشطيبًا مذهلًا ومتجانسًا في كل مرة.",
+  "ckb": "بە پالێتێکی تا 30 ڕەنگ، Bambu PLA Basic یارمەتیت دەدات ڕەنگی تەواو گونجاو بدۆزیتەوە بۆ ئەوەی جوانییەکی تایبەت بە پڕۆژەکانت ببەخشیت. ڕەنگەکان لە هەموو چاپەکاندا جێگیر دەمێننەوە، کە هەموو جارێک ڕووکارێکی سەرسوڕهێنەر و یەکدەست مسۆگەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8c307bc74682c494b7be71fe14a13d16a34b378ccd8da9500962e1259a904220",
+  "en": "Your Worry-Free Start",
+  "ar": "بداية خالية من القلق",
+  "ckb": "دەستپێکێکی بێ خەم",
+  "kind": "block_title"
+ },
+ {
+  "h": "cf0967dc03673060b3dabbf32cf51f00324184119f7bfcadfc071eba97da2b46",
+  "en": "Bambu PLA Basic, the easiest-to-use filament, delivers smooth printing right from the start. No complicated setups or calibrations needed. Ideal for both hobbyists and professionals seeking reliable, hassle-free results.",
+  "ar": "يوفّر Bambu PLA Basic، الفلامنت الأسهل استخدامًا، طباعة سلسة منذ البداية. لا حاجة إلى إعدادات أو معايرات معقدة. وهو مثالي للهواة والمحترفين على حد سواء ممن يبحثون عن نتائج موثوقة وخالية من المتاعب.",
+  "ckb": "فیلامێنتی Bambu PLA Basic، ئاسانترین فیلامێنت بۆ بەکارهێنان، هەر لە سەرەتاوە چاپێکی نەرم و بێ کێشە دابین دەکات. هیچ ڕێکخستن یان کالیبرەکردنێکی ئاڵۆز پێویست نییە. گونجاوە بۆ هەردوو حەزلێکەران و پیشەگەران کە بەدوای ئەنجامی متمانەپێکراو و بێ گرفتدا دەگەڕێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1d38c4f152dcf1ad3e763b3874b77be5d7c19b872fa177ac7bed1d58ea31c030",
+  "en": "Built Stronger, Faster and to Last Longer",
+  "ar": "مصنوع ليكون أقوى وأسرع ويدوم أطول",
+  "ckb": "بەهێزتر، خێراتر و تەمەن درێژتر دروستکراوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "5af87831098d0e85aa7ce569656d406682a6652fe7ad92b5c5a3cfc1872cc8f0",
+  "en": "With Bambu's exclusive fine-turned formulation based on 3D printing expertise and fine-turned settings, Bambu PLA Basic delivers stronger layer adhesion, enhanced impact resistance, and long-lasting durability compared to other standard PLA filaments on the market. Additionally, it reaches a print speed up to 258mm/s*, cutting your printing time without compromising quality.",
+  "ar": "بفضل تركيبة Bambu الحصرية المضبوطة بدقة والمستندة إلى خبرتها في الطباعة 3D، وإعداداتها المضبوطة بعناية، يوفّر Bambu PLA Basic التصاقًا أقوى بين الطبقات ومقاومة صدمات محسّنة ومتانة تدوم طويلًا مقارنة بفلامنتات PLA القياسية الأخرى في السوق. كما تصل سرعة الطباعة به إلى 258mm/s*، ما يختصر وقت الطباعة دون التأثير في الجودة.",
+  "ckb": "بە فۆرمولەی تایبەتی Bambu کە بە وردی ڕێکخراوە و لەسەر شارەزایی لە چاپی 3D بنیات نراوە، و ڕێکخستنە وردەکانی، Bambu PLA Basic لکانی بەهێزتری چینەکان، بەرگەی لێدانی باشتر و بەرگەگریی درێژخایەن پێشکەش دەکات بە بەراورد لەگەڵ فیلامێنتە ستانداردەکانی تری PLA لە بازاڕدا. هەروەها خێرایی چاپی دەگاتە 258mm/s*، کە کاتی چاپکردنت کەم دەکاتەوە بەبێ ئەوەی کاریگەری لەسەر جۆرایەتی هەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "dd1af647993e9f7cc0ba13e3899d22fb9da747b1da57130d1aec8972951c8e53",
+  "en": "0.4mm nozzle, 0.4mm line width, 0.2mm layer height",
+  "ar": "نوزل 0.4mm، عرض خط 0.4mm، ارتفاع طبقة 0.2mm",
+  "ckb": "نۆزڵی 0.4mm، پانیی هێڵ 0.4mm، بەرزیی چین 0.2mm",
+  "kind": "block_line"
+ },
+ {
+  "h": "140fc854cb1f68bf87837128f1e283b0743dad73031b330df6da1d22d58e9d79",
+  "en": "RFID for Intelligent Printing",
+  "ar": "تقنية RFID لطباعة ذكية",
+  "ckb": "تەکنەلۆژیای RFID بۆ چاپی زیرەک",
+  "kind": "block_title"
+ },
+ {
+  "h": "1d6d9107aeaf79b3ff1575454eb02135b7d79953324dc0db42455c45051d40ee",
+  "en": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System).",
+  "ar": "جميع إعدادات الطباعة مضمّنة في شريحة RFID، ويمكن قراءتها عبر نظام AMS (نظام المواد التلقائي) الخاص بنا.",
+  "ckb": "هەموو ڕێکخستنەکانی چاپ لە ناو چیپی RFID هەڵگیراون، کە سیستەمەکەمان، AMS (سیستەمی خۆکاری کەرەستە)، دەتوانێت بیانخوێنێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "413575b5c09c55f69e7f4a1c63473f2718bbc69c60eef6def5dc3e48bbf97572",
+  "en": "UL GREENGUARD certified. Cleaner air for indoor printing.",
+  "ar": "حاصل على شهادة UL GREENGUARD. هواء أنظف للطباعة في الأماكن المغلقة.",
+  "ckb": "خاوەنی بڕوانامەی UL GREENGUARD. هەوای پاکتر بۆ چاپکردن لە ناو ژووردا.",
+  "kind": "block_title"
+ },
+ {
+  "h": "28535eaa9f52d1881902829272c397f4e40c3ebe6a324bb289da438e0d19c5e9",
+  "en": "PLA Basic is certified to UL GREENGUARD (UL 2904), the recognized standard for 3D printer emissions. The particles and VOCs released measure below the levels of an average kitchen, living room, or office—cleaner than the air you're already breathing.",
+  "ar": "حصل PLA Basic على شهادة UL GREENGUARD (UL 2904)، وهو المعيار المعتمد لانبعاثات الطابعات 3D. إذ تقلّ الجسيمات والمركبات العضوية المتطايرة (VOC) المنبعثة عن مستوياتها في المطبخ أو غرفة المعيشة أو المكتب العادي، أي أنها أنظف من الهواء الذي تتنفسه أصلًا.",
+  "ckb": "فیلامێنتی PLA Basic بەپێی UL GREENGUARD (UL 2904) بڕوانامەی پێدراوە، کە ستانداردی ناسراوە بۆ دەردانەکانی چاپکەری 3D. ئەو گەردیلە و پێکهاتە ئۆرگانییە بەهەڵمبووانەی (VOC) کە دەردەدرێن لە ئاستی چێشتخانە، ژووری دانیشتن یان ئۆفیسێکی ئاسایی کەمترن — پاکترن لەو هەوایەی کە ئێستا هەناسەی پێدەدەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c32133d5b677ef86bb246bd42184039405d0f4ccf4a18c5935bac08cff9e7dd9",
+  "en": "1.Accessory Compatibility",
+  "ar": "1. توافق الملحقات",
+  "ckb": "1. گونجاویی پێداویستییەکان",
+  "kind": "faq_q"
+ },
+ {
+  "h": "53d74b79c8d05e6f0f78046ab979eb2737312b0bb7b0138b080c6340af90fd8d",
+  "en": "Compatible with all printers, AMS, build plate, and nozzles.",
+  "ar": "متوافق مع جميع الطابعات ووحدات AMS وصفائح الطباعة والنوزلات.",
+  "ckb": "گونجاوە لەگەڵ هەموو چاپکەرەکان، یەکەکانی AMS، پلێتەکانی چاپ و نۆزڵەکان.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "b77d5c0add4d541f245a5b7914c2db2215a58e8ad051c6a00f15d21c2439f362",
+  "en": "2.Drying Recommendations",
+  "ar": "2. توصيات التجفيف",
+  "ckb": "2. پێشنیارەکانی وشککردنەوە",
+  "kind": "faq_q"
+ },
+ {
+  "h": "9a10acae666926dac6dd66527edc2c676f9c985eaa5d87dae120fd6996a85581",
+  "en": "Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: Filament drying instructions on WIKI.",
+  "ar": "جفّفه قبل الاستخدام لضمان أفضل جودة طباعة وتشطيب متجانس. احفظه في مكان جاف بعد الاستخدام. لمزيد من التفاصيل، يرجى الرجوع إلى: تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "پێش بەکارهێنان وشکی بکەرەوە بۆ دڵنیابوون لە باشترین جۆرایەتیی چاپ و ڕووکارێکی یەکدەست. دوای بەکارهێنان لە شوێنێکی وشکدا هەڵیبگرە. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a42fcd94e849bbe11cdc5855b4757c2177e57b0ad59a1996ea3dc453a3e836ee",
+  "en": "3.Refill Guidelines",
+  "ar": "3. إرشادات عبوة التعبئة بدون بكرة",
+  "ckb": "3. ڕێنماییەکانی پڕکەرەوەی بێ ماسوورە",
+  "kind": "faq_q"
+ },
+ {
+  "h": "83e3d891e377f9e7326ea7c90e114e4a96f1213a4ea44f74619940b77fae8cb1",
+  "en": "The refill filament needs to be used with a spool. For detailed instructions on how to swap in the new filament using the Bambu Reusable Spool, please refer to the guide on WIKI.",
+  "ar": "يجب استخدام فلامنت التعبئة (refill) مع بكرة (spool). للاطلاع على تعليمات مفصّلة حول كيفية تركيب الفلامنت الجديد باستخدام Bambu Reusable Spool، يرجى الرجوع إلى الدليل على الويكي.",
+  "ckb": "فیلامێنتی پڕکەرەوە (refill) پێویستە لەگەڵ ماسوورە (spool) بەکاربهێنرێت. بۆ ڕێنماییی ورد دەربارەی چۆنیەتی دانانی فیلامێنتە نوێیەکە بە بەکارهێنانی Bambu Reusable Spool، تکایە سەیری ڕێبەرەکە لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "31bd3331527a270e705d46c1cc01c2046b45ddbe78a0767143997c3b9fa00801",
+  "en": "4.Safety Tips",
+  "ar": "4. نصائح السلامة",
+  "ckb": "4. ئامۆژگارییەکانی سەلامەتی",
+  "kind": "faq_q"
+ },
+ {
+  "h": "6827e3327a051f32a5a00e338214c07cec7534fde970a2db693bf7b844522eec",
+  "en": "Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.",
+  "ar": "يرجى حفظ الفلامنت في مكان بارد ومظلم وجاف بعيدًا عن أشعة الشمس المباشرة ودرجات الحرارة العالية.",
+  "ckb": "تکایە فیلامێنتەکە لە شوێنێکی فێنک و تاریک و وشکدا هەڵبگرە، دوور لە تیشکی ڕاستەوخۆی خۆر و پلەی گەرمیی بەرز.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3f8ff368cc4469c19f760b98c12c350fd32c3de3ce32042dd79dbcec59b16018",
+  "en": "Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.",
+  "ar": "يرجى حفظ الفلامنت وأي قطع مكسورة منه بعيدًا عن متناول الرضّع والأطفال والحيوانات الأليفة لمنع البلع أو الاختناق.",
+  "ckb": "تکایە فیلامێنت و هەر پارچەیەکی شکاوی لە دەستڕەسی ساوایان و منداڵان و ئاژەڵە ماڵییەکان دوور بخەرەوە بۆ ڕێگریکردن لە قووتدان یان خنکان.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "d538631d4081e48335ed4e5ce7596dd6b64532a43a1ffb67dcbea1ae4fcbc828",
+  "en": "For opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings.",
+  "ar": "للفلامنت المفتوح، نوصي بتجفيفه قبل الاستخدام وفق إعدادات الحرارة والمدة الموصى بها في الويكي.",
+  "ckb": "بۆ فیلامێنتی کراوە، پێشنیار دەکەین پێش بەکارهێنان وشک بکرێتەوە بەپێی ڕێکخستنەکانی پلەی گەرمی و کاتی پێشنیارکراو لە ویکی.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "35f0bda8ab235cab023bdb28eb05af88dec40fa1c6004ba0cdd3645067d42c96",
+  "en": "Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.",
+  "ar": "يرجى طباعة هذا الفلامنت في مكان جيد التهوية، أو تركيب نظام فعّال لتنقية الهواء أو الشفط.",
+  "ckb": "تکایە ئەم فیلامێنتە لە شوێنێکی هەواگۆڕکێی باشدا چاپ بکە، یان سیستەمێکی کارای پاڵاوتنی هەوا یان دەرکردنی هەوا دابمەزرێنە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "672dda8fe579f695f7a7a355c47472e6f48c27b65674a5b230eee26bfff4abdd",
+  "en": "As this filament is not food-grade, please avoid using finished prints for food storage or contact.",
+  "ar": "لأن هذا الفلامنت غير آمن للاستخدام الغذائي، يرجى تجنّب استخدام المطبوعات لتخزين الطعام أو ملامسته.",
+  "ckb": "لەبەر ئەوەی ئەم فیلامێنتە گونجاو نییە بۆ خۆراک، تکایە چاپکراوەکان بۆ هەڵگرتنی خۆراک یان بەرکەوتن لەگەڵی بەکارمەهێنە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "bbcf2f70d97f5d3e8b336ed1ff96e7012f278571c21ff02942f07d3681bb55a1",
+  "en": "Easy to Print & Beginner Friendly",
+  "ar": "سهل الطباعة ومناسب للمبتدئين",
+  "ckb": "چاپکردنی ئاسان و گونجاو بۆ سەرەتاییەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "3f102a4030b734202dc158b1119b0c68e3bf9020c137b765620b49f5f6218588",
+  "en": "Smooth Surface Finish",
+  "ar": "تشطيب سطح أملس",
+  "ckb": "ڕووکاری لووس",
+  "kind": "block_line"
+ },
+ {
+  "h": "c59dbc2861acac4617922d03fd0ec01df940d323d29d4006f7ceb28d211232d8",
+  "en": "Biodegradable",
+  "ar": "قابل للتحلل الحيوي",
+  "ckb": "شیاوی شیبوونەوەی زیندەیی",
+  "kind": "block_line"
+ },
+ {
+  "h": "342545351da31fc329def3931f4b247e4f2f774342eed1d94987dbd55ce4c0aa",
+  "en": "Low indoor printing emissions, certified to UL GREENGUARD 2904",
+  "ar": "انبعاثات منخفضة عند الطباعة في الأماكن المغلقة، وحاصل على شهادة UL GREENGUARD 2904",
+  "ckb": "دەردانی کەم لە کاتی چاپکردن لە ناو ژووردا، خاوەنی بڕوانامەی UL GREENGUARD 2904",
+  "kind": "block_line"
+ },
+ {
+  "h": "3601d8f1ac9a2085338ef28f17fc533ef19be41b9b2e232f8c89420b8c7fb5e2",
+  "en": "Cautions for Use",
+  "ar": "تنبيهات الاستخدام",
+  "ckb": "وریاییەکانی بەکارهێنان",
+  "kind": "block_line"
+ },
+ {
+  "h": "262c758b5482781b1530065a5b3020f318ebdf2a5b5cd380b7564efe7d857060",
+  "en": "0.2mm Nozzle - Optimal Print Fineness",
+  "ar": "نوزل 0.2mm - أفضل دقة في تفاصيل الطباعة",
+  "ckb": "نۆزڵی 0.2mm - باشترین وردیی چاپ",
+  "kind": "block_title"
+ },
+ {
+  "h": "7f7383ba29f5e4b48b4832657ea498cc6b0165842bc19d107c1754ac4d7f218b",
+  "en": "Smaller diameter extrudes thin filaments",
+  "ar": "القطر الأصغر يبثق خيوطًا رفيعة",
+  "ckb": "تیرەی بچووکتر هێڵی باریک پاڵ دەنێتە دەرەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "28289b4bcc56b00cd14a6f7437bc15ca9ad41565b00e4f4614f91d5a980b5a69",
+  "en": "High resolution on the horizontal print surface",
+  "ar": "دقة عالية على سطح الطباعة الأفقي",
+  "ckb": "وردیی بەرز لەسەر ڕووی ئاسۆیی چاپ",
+  "kind": "block_line"
+ },
+ {
+  "h": "2b3c9e96fff6022a7379873040e36fb025d433ec95c6fb0e088a8d517f7236b4",
+  "en": "0.6mm and 0.8mm Nozzle - Faster Print Speed",
+  "ar": "نوزل 0.6mm و0.8mm - سرعة طباعة أعلى",
+  "ckb": "نۆزڵی 0.6mm و 0.8mm - خێرایی چاپی زیاتر",
+  "kind": "block_title"
+ },
+ {
+  "h": "4bdf427a4bdf4ba8a0ad10d978a5c4dca1a62cc0f02e206a4195376c8fd8cf3f",
+  "en": "Larger diameter extrudes more filaments per second, resulting in faster print speed",
+  "ar": "القطر الأكبر يبثق كمية أكبر من الفلامنت في الثانية، ما ينتج سرعة طباعة أعلى",
+  "ckb": "تیرەی گەورەتر لە هەر چرکەیەکدا فیلامێنتی زیاتر پاڵ دەنێتە دەرەوە، کە دەبێتە هۆی خێرایی چاپی زیاتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "46e9290d9fb3805f44704fac12a815e0dcb975ffab2aa03bf9dc7fbe2c9ba46b",
+  "en": "Comparison of Different Nozzle Sizes",
+  "ar": "مقارنة بين مقاسات النوزل المختلفة",
+  "ckb": "بەراوردکردنی قەبارە جیاوازەکانی نۆزڵ",
+  "kind": "block_title"
+ },
+ {
+  "h": "4743b4e4994dcc7ba4fc59d061805793c57117d5504d3d0cac5dc509693fa759",
+  "en": "0.4 mm Nozzle",
+  "ar": "نوزل 0.4 mm",
+  "ckb": "نۆزڵی 0.4 mm",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0897c2bdbee019033e7ba06bffc67c27291af457667a7ed3b0651479a1a8087a",
+  "en": "0.6 mm Nozzle",
+  "ar": "نوزل 0.6 mm",
+  "ckb": "نۆزڵی 0.6 mm",
+  "kind": "block_cell"
+ },
+ {
+  "h": "6a183c8ca7185a492beef72f4d385a4ec7c6085d0e71339a87e3e580e9e33c4f",
+  "en": "0.8 mm Nozzle",
+  "ar": "نوزل 0.8 mm",
+  "ckb": "نۆزڵی 0.8 mm",
+  "kind": "block_cell"
+ },
+ {
+  "h": "961f24a07aeed416afb6e37336615d3867016e5ad55134d4861fb24f04b7411d",
+  "en": "Usage scenario",
+  "ar": "مجال الاستخدام",
+  "ckb": "بواری بەکارهێنان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "785045dbad8282734264c06db35c3050671da41fbb3bf559329e73c2c9699149",
+  "en": "Perfect for small and intricate models, with precision that's worth the wait",
+  "ar": "مثالي للنماذج الصغيرة والمعقدة، بدقة تستحق الانتظار",
+  "ckb": "گونجاوترین بۆ مۆدێلی بچووک و ئاڵۆز، بە وردییەک کە شایەنی چاوەڕوانییە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e130eb669d6dff75626d1244c3047393b705ada5209674cadcbb9002f077d151",
+  "en": "Ideal for everyday use with the perfect balance of speed and quality",
+  "ar": "مثالي للاستخدام اليومي مع توازن مثالي بين السرعة والجودة",
+  "ckb": "گونجاوترین بۆ بەکارهێنانی ڕۆژانە بە هاوسەنگییەکی تەواو لە نێوان خێرایی و جۆرایەتیدا",
+  "kind": "block_cell"
+ },
+ {
+  "h": "7c23c221241ff6ae5e4dd8b18f436cb5a92c254be92bc32ff83fcd3fc2a9d3d6",
+  "en": "Faster speeds and capable of printing high-performance filaments, with some decrease in resolution",
+  "ar": "سرعات أعلى وقدرة على طباعة الفلامنتات عالية الأداء، مع بعض الانخفاض في الدقة",
+  "ckb": "خێرایی زیاتر و توانای چاپکردنی فیلامێنتی کارایی بەرز، لەگەڵ کەمێک دابەزین لە وردیدا",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f2ccec0126fbcc42e84f009a447145fe30110305fb19ad1568f3ce6a7f56a41d",
+  "en": "Commonly used for",
+  "ar": "الاستخدامات الشائعة",
+  "ckb": "بەکارهێنانە باوەکان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "39568c1e90cc872c8d8a123b3ed7803b603ac642b97be7ffb5555778402909a9",
+  "en": "Miniature models Intricate logos Text Molds",
+  "ar": "نماذج مصغّرة، شعارات معقدة، نصوص، قوالب",
+  "ckb": "مۆدێلی بچووککراوە، لۆگۆی ئاڵۆز، دەق، قاڵب",
+  "kind": "block_cell"
+ },
+ {
+  "h": "97ffef888a92cd998a710c779c3dc76a859266e21a963126e5538fb8b3d3f9b4",
+  "en": "Toys Mechanical parts Decorative objects",
+  "ar": "ألعاب، قطع ميكانيكية، أغراض زينة",
+  "ckb": "یاری، پارچەی میکانیکی، شتی ڕازاندنەوە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "33cbb30352a083c09154a4e7a857b09c049f30b74152c52b52a2e476f942c872",
+  "en": "Large structural parts Functional parts for household Industrial or engineering parts High-strength models",
+  "ar": "قطع إنشائية كبيرة، قطع وظيفية للاستخدام المنزلي، قطع صناعية أو هندسية، نماذج عالية المتانة",
+  "ckb": "پارچەی پێکهاتەیی گەورە، پارچەی بەکارهێنانی ماڵەوە، پارچەی پیشەسازی یان ئەندازیاری، مۆدێلی بەهێزیی بەرز",
+  "kind": "block_cell"
+ },
+ {
+  "h": "b6cf8691eafb745a4396d32cbfe6e4eaa47352ab452a24f56bd5c57aae514829",
+  "en": "*The final display of 'Model Strength' & 'Model Fineness' depends on the results of the material testing.",
+  "ar": "*يعتمد العرض النهائي لـ«متانة النموذج» و«دقة تفاصيل النموذج» على نتائج اختبار المادة.",
+  "ckb": "*پیشاندانی کۆتایی «بەهێزیی مۆدێل» و «وردیی مۆدێل» پشت بە ئەنجامەکانی تاقیکردنەوەی کەرەستە دەبەستێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8ce6704fba8a33db068df84478d9b3d1af568294b164ebe04fa213f0a5df0f77",
+  "en": "Excellent First-layer Adhesion and Improved Durability",
+  "ar": "التصاق ممتاز للطبقة الأولى ومتانة محسّنة",
+  "ckb": "لکانی نایابی چینی یەکەم و بەرگەگریی باشترکراو",
+  "kind": "block_title"
+ },
+ {
+  "h": "e61068df72578c047aeaeb56136424917f64f1b54d17cb5d7e7c1a95206117a9",
+  "en": "After optimizing the manufacturing process of the Bambu Texture PEI Plate, the durability of the plate is enhanced. Additionally, the adhesion between the prints and the plate is significantly improved, eliminating the need for adhesives.",
+  "ar": "بعد تحسين عملية تصنيع Bambu Texture PEI Plate، أصبحت الصفيحة أكثر متانة. كما تحسّن الالتصاق بين المطبوعات والصفيحة بشكل كبير، ما يلغي الحاجة إلى المواد اللاصقة.",
+  "ckb": "دوای باشترکردنی پرۆسەی دروستکردنی Bambu Texture PEI Plate، بەرگەگریی پلێتەکە زیادی کردووە. هەروەها لکانی نێوان چاپکراوەکان و پلێتەکە بە شێوەیەکی بەرچاو باشتر بووە، و پێویستی بە ماددەی لکێنەر نەماوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "13ab3fece37c0cbfa94117579f5ab9ffa183485f347353a35b6eb832b37b6c51",
+  "en": "*In some situations, glue is required for very specific filaments",
+  "ar": "*في بعض الحالات، يلزم استخدام الغراء مع أنواع فلامنت محددة جدًا",
+  "ckb": "*لە هەندێک حاڵەتدا، بۆ هەندێک فیلامێنتی زۆر تایبەت چەسپ پێویستە",
+  "kind": "block_line"
+ },
+ {
+  "h": "55d5a70742d1587674eb469f591a663b837f0ebfd34b7d6b76dfb53812a5d470",
+  "en": "Self-release when Cooled Down",
+  "ar": "انفصال ذاتي عند التبريد",
+  "ckb": "خۆجیابوونەوە دوای سارد بوونەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "e5cc8c9bb05e50d31419ab6b1ca63ba2c9ddf79d9ece6e1f703576fd9b6f72a9",
+  "en": "PEI is an excellent material for 3D printing applications due to its ability to withstand the repeated heating and cooling cycles of a printer heatbed. Prints come off easily when the temperature of the heatbed reaches room temperature, and we always recommend waiting until it reaches 35℃ or lower. If the print still adheres to the plate, simply bend the steel plate and the model will fall right into your hands.",
+  "ar": "تُعد مادة PEI ممتازة لتطبيقات الطباعة 3D لقدرتها على تحمّل دورات التسخين والتبريد المتكررة للسرير الساخن في الطابعة. وتنفصل المطبوعات بسهولة عندما تصل حرارة السرير الساخن إلى درجة حرارة الغرفة، ونوصي دائمًا بالانتظار حتى تصل إلى 35℃ أو أقل. وإذا بقيت القطعة المطبوعة ملتصقة بالصفيحة، فما عليك سوى ثني الصفيحة الفولاذية لتسقط القطعة في يديك مباشرة.",
+  "ckb": "ماددەی PEI کەرەستەیەکی نایابە بۆ بەکارهێنانەکانی چاپی 3D بەهۆی توانای بەرگەگرتنی خولە دووبارەکانی گەرمکردن و ساردکردنەوەی بێدی گەرمی چاپکەر. چاپکراوەکان بە ئاسانی جیا دەبنەوە کاتێک پلەی گەرمیی بێدی گەرم دەگاتە پلەی گەرمیی ژوور، و هەمیشە پێشنیار دەکەین چاوەڕێ بکەیت تا دەگاتە 35℃ یان کەمتر. ئەگەر چاپکراوەکە هێشتا بە پلێتەکەوە لکابوو، تەنها پلێتە پۆڵاکە بچەمێنەوە و مۆدێلەکە ڕاستەوخۆ دەکەوێتە ناو دەستتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "aae6fbb2dce50fd32f176e5fc1a1a8260a2fbd5a1cb8aaf409ca9f5e744dc814",
+  "en": "Reliable Magnetic Adhesion to Prevent Warping",
+  "ar": "التصاق مغناطيسي موثوق لمنع التقوّس",
+  "ckb": "لکانی موگناتیسیی متمانەپێکراو بۆ ڕێگریکردن لە چەمانەوەی لێوار",
+  "kind": "block_title"
+ },
+ {
+  "h": "774684d1949404d51b37bb12cab849a29bf095fd98a7d5fd8a1b0851af570ac5",
+  "en": "The Bambu Texture PEI Plate features a 0.5mm-thick stainless steel plate that enhances magnetic adhesion. This helps to prevent warping and ensure optimal print quality during 3D printing, reducing the likelihood of the first layer detaching due to deformation. It also helps when printing larger models with materials that are prone to warping like ABS, PC and Nylon.",
+  "ar": "تتميّز Bambu Texture PEI Plate بصفيحة من الفولاذ المقاوم للصدأ بسماكة 0.5mm تعزّز الالتصاق المغناطيسي. ويساعد ذلك على منع التقوّس وضمان أفضل جودة طباعة أثناء الطباعة 3D، ويقلّل احتمال انفصال الطبقة الأولى بسبب التشوّه. كما يفيد عند طباعة نماذج أكبر بمواد معرّضة للتقوّس مثل ABS وPC والنايلون.",
+  "ckb": "پلێتی Bambu Texture PEI Plate پلێتێکی پۆڵای زەنگنەگری تێدایە بە ئەستووریی 0.5mm کە لکانی موگناتیسی بەهێزتر دەکات. ئەمە یارمەتی ڕێگریکردن لە چەمانەوەی لێوار دەدات و باشترین جۆرایەتیی چاپ لە کاتی چاپکردنی 3D مسۆگەر دەکات، و ئەگەری جیابوونەوەی چینی یەکەم بەهۆی شێوەگۆڕانەوە کەم دەکاتەوە. هەروەها لە کاتی چاپکردنی مۆدێلی گەورەتر بە کەرەستەی وەک ABS، PC و نایلۆن کە مەیلی چەمانەوەیان هەیە یارمەتیدەرە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e76f5d60989c6b647026884a12167cdde307bbb87752e3401703b0caf7357508",
+  "en": "Textured Surface Finish",
+  "ar": "تشطيب سطح محبّب",
+  "ckb": "ڕووکاری دانەدار",
+  "kind": "block_title"
+ },
+ {
+  "h": "37611d80cca4658a50234946800ae3920640210d122c03f655f27b5209513233",
+  "en": "Bambu Texture PEI Plate offers a one-of-a-kind first-layer surface. Through the application of a powder-coating process, this PEI Build Plate creates a rugged texture that adds a texture to your prints.",
+  "ar": "توفّر Bambu Texture PEI Plate سطحًا فريدًا للطبقة الأولى. فمن خلال عملية طلاء بالبودرة، تُنشئ صفيحة الطباعة PEI هذه ملمسًا خشنًا يضيف ملمسًا مميزًا إلى مطبوعاتك.",
+  "ckb": "پلێتی Bambu Texture PEI Plate ڕووکارێکی بێوێنە بۆ چینی یەکەم پێشکەش دەکات. لە ڕێگەی پرۆسەی ڕووپۆشکردن بە پاودەر، پلێتی چاپی PEI بەم شێوەیە هەستێکی زبر دروست دەکات کە هەستی ڕووکارێکی تایبەت دەبەخشێتە چاپکراوەکانت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3a2e5f1acd69815bf0d741b83f789a7b612234d790e2d0532ea025143ae1a648",
+  "en": "Considerations",
+  "ar": "أمور يجب مراعاتها",
+  "ckb": "خاڵەکانی ڕەچاوکردن",
+  "kind": "block_title"
+ },
+ {
+  "h": "0fcd0b2cfa6bab6850e3f24cf7df371924d0ccd362652fc78c8c586bb99d2976",
+  "en": "Increasing heatbed temperature enhances adhesion. Users need to adjust the temperature of the heatbed based on their specific requirements in order to achieve the most suitable level of adhesion.",
+  "ar": "رفع حرارة السرير الساخن يعزّز الالتصاق. وعلى المستخدمين ضبط حرارة السرير الساخن وفق متطلباتهم الخاصة للوصول إلى مستوى الالتصاق الأنسب.",
+  "ckb": "بەرزکردنەوەی پلەی گەرمیی بێدی گەرم لکان بەهێزتر دەکات. بەکارهێنەران پێویستە پلەی گەرمیی بێدی گەرم بەپێی پێداویستییە تایبەتەکانیان ڕێکبخەن بۆ گەیشتن بە گونجاوترین ئاستی لکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "62ba68b0a3b576097810863a93181f184d2526e70cf48870360dea442fc5a5b9",
+  "en": "Before auto-leveling, it is necessary to repeatedly rub the nozzle in the special wiping area of the build plate to completely remove any residual material at the tip of the nozzle. The coating in the special-designed wiping area will gradually become worn over time. This is normal and does not affect print quality or nozzle lifetime, so there is no need to worry about any quality issues.",
+  "ar": "قبل التسوية التلقائية، يلزم فرك النوزل مرارًا في منطقة المسح المخصّصة على صفيحة الطباعة لإزالة أي بقايا مادة عن طرف النوزل تمامًا. وسيتآكل الطلاء في منطقة المسح المصمّمة خصيصًا تدريجيًا مع مرور الوقت. وهذا أمر طبيعي لا يؤثر في جودة الطباعة أو عمر النوزل، فلا داعي للقلق بشأن أي مشكلات في الجودة.",
+  "ckb": "پێش ڕێکخستنی خۆکاری پلێت، پێویستە نۆزڵەکە چەند جارێک لە ناوچەی تایبەتی سڕینەوەی پلێتی چاپدا بخشێنرێت بۆ لابردنی تەواوی هەر پاشماوەیەکی کەرەستە لە سەری نۆزڵەکە. ڕووپۆشی ناوچەی سڕینەوەی تایبەت دیزاینکراو بەرەبەرە بە تێپەڕبوونی کات دەسووێت. ئەمە ئاساییە و کاریگەری لەسەر جۆرایەتیی چاپ یان تەمەنی نۆزڵ نییە، بۆیە پێویست ناکات خەمی هیچ کێشەیەکی جۆرایەتیت هەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "60269244912add5e29724585480cb3b4ff04091b99a35b4b3d13a22e768c5918",
+  "en": "Deposition of dust and grease on the build plate decrease adhesion. It is recommended to regularly clean the surface with detergent and water to maintain best adhesion.",
+  "ar": "تراكم الغبار والدهون على صفيحة الطباعة يقلّل الالتصاق. يُنصح بتنظيف السطح بانتظام بالمنظّف والماء للحفاظ على أفضل التصاق.",
+  "ckb": "نیشتنی تۆز و چەوری لەسەر پلێتی چاپ لکان کەم دەکاتەوە. پێشنیار دەکرێت ڕووەکە بە بەردەوامی بە ماددەی پاککەرەوە و ئاو پاک بکرێتەوە بۆ پاراستنی باشترین لکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8394a47dffec87c2e2a30baa1bd0338aff9112d05fd4d1660d1aee03c86d02c9",
+  "en": "Bambu Lab recommends only using Bambu Lab official glue on the Bambu Lab build plates, and can not be held responsible for any damage caused to plates as a result of using third-party glue on build plates. Do not clean the Textured PEI with Acetone, as it will damage the PEI surface.",
+  "ar": "توصي Bambu Lab باستخدام غراء Bambu Lab الرسمي فقط على صفائح الطباعة من Bambu Lab، ولا تتحمّل أي مسؤولية عن أي ضرر يلحق بالصفائح نتيجة استخدام غراء من جهات خارجية عليها. لا تنظّف صفيحة Textured PEI بالأسيتون، لأنه سيتلف سطح PEI.",
+  "ckb": "کۆمپانیای Bambu Lab پێشنیار دەکات تەنها چەسپی فەرمیی Bambu Lab لەسەر پلێتەکانی چاپی Bambu Lab بەکاربهێنرێت، و هیچ بەرپرسیارێتییەک ناگرێتە ئەستۆ بۆ هەر زیانێک کە بەهۆی بەکارهێنانی چەسپی لایەنی سێیەم لەسەر پلێتەکان بەر پلێتەکان دەکەوێت. پلێتی Textured PEI بە ئەسیتۆن پاک مەکەرەوە، چونکە ڕووی PEI تێکدەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e827ab797e0c5d844ce47ebab002bad2fa7ee3f9bb09f2d625e5fa0aa387f552",
+  "en": "Always wait for a few minutes before removing printed models to allow the plate to cool down for easy print removal. This prevents damage to the plate and ensures a long lifetime of the product.",
+  "ar": "انتظر دائمًا بضع دقائق قبل إزالة النماذج المطبوعة حتى تبرد الصفيحة وتسهل إزالة المطبوعات. فهذا يمنع تلف الصفيحة ويضمن عمرًا طويلًا للمنتج.",
+  "ckb": "هەمیشە چەند خولەکێک چاوەڕێ بکە پێش لابردنی مۆدێلە چاپکراوەکان بۆ ئەوەی پلێتەکە سارد ببێتەوە و چاپکراوەکان بە ئاسانی لاببرێن. ئەمە ڕێگری لە زیانگەیاندن بە پلێتەکە دەکات و تەمەنێکی درێژ بۆ بەرهەمەکە مسۆگەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ab8a13a81d587a4ba18fa0ed4d50707ccec854f97b28cea98b8ded9596050d03",
+  "en": "Carefully sanding the surface with fine-grit (600 was recommended) sandpaper can help restore adhesion.",
+  "ar": "يمكن أن تساعد صنفرة السطح بعناية بورق صنفرة ناعم الحبيبات (يُوصى بدرجة 600) في استعادة الالتصاق.",
+  "ckb": "سووانی ڕووەکە بە وریاییەوە بە کاغەزی سمباتەی ورد (600 پێشنیار کراوە) دەتوانێت یارمەتی گەڕاندنەوەی لکان بدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3090bc20161f9dd9e4fcd33202023d788cffd66e76f56bc11ee1d58706add4bd",
+  "en": "The latest firmware brings significant improvements to the Bambu Textured PEI Plate calibration using the Micro Lidar, and it is now fully compatible with the automatic calibration process.",
+  "ar": "يقدّم أحدث برنامج ثابت تحسينات كبيرة على معايرة Bambu Textured PEI Plate باستخدام مستشعر Micro Lidar، وأصبحت الآن متوافقة تمامًا مع عملية المعايرة التلقائية.",
+  "ckb": "نوێترین فێرموێر باشترکردنی بەرچاو بۆ کالیبرەکردنی Bambu Textured PEI Plate بە هەستەوەری Micro Lidar دەهێنێت، و ئێستا بە تەواوی لەگەڵ پرۆسەی کالیبرەکردنی خۆکار گونجاوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6d5bacb798e02d2ece7f8e31cf6cf36e5dbec5a75909e877156409ce0f4f98a1",
+  "en": "The Textured PEI plate is considered a consumable part, which will degrade over time.",
+  "ar": "تُعد صفيحة Textured PEI قطعة استهلاكية، وستتدهور حالتها مع مرور الوقت.",
+  "ckb": "پلێتی Textured PEI بە پارچەیەکی بەکاربەر دادەنرێت، کە بە تێپەڕبوونی کات جۆرایەتییەکەی دادەبەزێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5ae7d773595c7e7bcc12aeb225e892d472d7632e310ab1b36324cef0f8f36ca0",
+  "en": "Recommended Settings",
+  "ar": "الإعدادات الموصى بها",
+  "ckb": "ڕێکخستنە پێشنیارکراوەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "f71de42e1ebe6be7890f0b567af67a89b091f62261433b8d167f90efbb50a89f",
+  "en": "Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements",
+  "ar": "يرجى ملاحظة أن إعدادات برنامج التقطيع الأخرى قد تحتاج إلى تعديل بحسب النموذج المطبوع ومتطلبات الفلامنت",
+  "ckb": "تکایە ئاگاداربە کە لەوانەیە ڕێکخستنەکانی تری سلایسەر پێویستیان بە گۆڕین بێت بەپێی مۆدێلی چاپکراو و پێداویستییەکانی فیلامێنتەکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "425f7317196531fb22086ad90abc8e752f3eee64b966ec3c10a285a95b163537",
+  "en": "Heatbed Temperature",
+  "ar": "حرارة السرير الساخن",
+  "ckb": "پلەی گەرمیی بێدی گەرم",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2acf84bcf9bc57e9ab0eba31412de88f80607b0be2cb44af8f2ad30ab1ac4267",
+  "en": "Glue Stick Required?",
+  "ar": "هل يلزم Glue Stick؟",
+  "ckb": "پێویستی بە Glue Stick هەیە؟",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f91cfe156767dbca75f217d10c0fbbb651b3b44927c4672b8585e170f3318a81",
+  "en": "Upper Glass Cover Plate Removed?",
+  "ar": "هل تُزال صفيحة Glass Cover Plate العلوية؟",
+  "ckb": "ئایا Glass Cover Plate لە سەرەوە لادەبرێت؟",
+  "kind": "block_cell"
+ },
+ {
+  "h": "baceb4afbf5d05f06f6b98d641b0da022a930714056e9d6657c59449c4097640",
+  "en": "PLA/PLA-CF/PLA-GF",
+  "ar": "PLA/PLA-CF/PLA-GF",
+  "ckb": "PLA/PLA-CF/PLA-GF",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "cd2beac0246720c17ace9bfed1fd90838dd6eb1a29a01c8b345da82f89f7f114",
+  "en": "ABS (not for A1 mini)",
+  "ar": "مادة ABS (غير مناسبة لطابعة A1 mini)",
+  "ckb": "کەرەستەی ABS (بۆ A1 mini گونجاو نییە)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "d84db05c06ae82b2d9a705f667fa83a5fb7f2b51a27d65bf46668d0db63366d6",
+  "en": "PETG/PETG-CF",
+  "ar": "PETG/PETG-CF",
+  "ckb": "PETG/PETG-CF",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "822d3270e5a40dc1b226f6bd4273d5c711ffbdbc35c495b05635f5637116e4f2",
+  "en": "PET-CF (not for A1 mini)",
+  "ar": "مادة PET-CF (غير مناسبة لطابعة A1 mini)",
+  "ckb": "کەرەستەی PET-CF (بۆ A1 mini گونجاو نییە)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "facbf0063a288e908673463e9143f395e8372e0374c1d2201a0e90310274e550",
+  "en": "TPU 95A for AMS",
+  "ar": "مادة TPU 95A المخصّصة لوحدة AMS",
+  "ckb": "کەرەستەی TPU 95A تایبەت بە یەکەی AMS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e9d83d31565e406766a7d5461965b2782b18a3057bcff636d969f14be40a12f0",
+  "en": "ASA (not for A1 mini)",
+  "ar": "مادة ASA (غير مناسبة لطابعة A1 mini)",
+  "ckb": "کەرەستەی ASA (بۆ A1 mini گونجاو نییە)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "1599ba449457cb8c6699a84a2a3820e1b28f40b5e09d581f3994f74f73a743c0",
+  "en": "PC/PC-CF (not for A1 mini)",
+  "ar": "مادة PC/PC-CF (غير مناسبة لطابعة A1 mini)",
+  "ckb": "کەرەستەی PC/PC-CF (بۆ A1 mini گونجاو نییە)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0279f757acd5d6d7ef5792ca7a15b8dc8e06959cc48c0292066cfe8a6c37901e",
+  "en": "PA/PA-CF/PAHT-CF (not for A1 mini)",
+  "ar": "مادة PA/PA-CF/PAHT-CF (غير مناسبة لطابعة A1 mini)",
+  "ckb": "کەرەستەی PA/PA-CF/PAHT-CF (بۆ A1 mini گونجاو نییە)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "8ee5ed7c62951f2212eeeb8e99c68479b11fac03d8fa00c164ceb5225adb5852",
+  "en": "The AMS 2 Pro Feeder Unit is specially designed to support the AMS 2 Pro for printing multiple colors and materials. Ceramic-reinforced antiwear bushings are embedded in each feeder inlet to better protect the inlet from being worn by the filament after prolonged use. Each AMS 2 Pro has 4 feeder units, and each feeder unit has its own motor and gears to actively push the filament forward or wind it back to the spool.The AMS 2 Pro Feeder Unit has a sensor to detect filament. When a filament is inserted, the feeder unit will feed the filament automatically. When a filament needs to be wound back, the feeder unit will drive the AMS 2 Pro active support shaft to rotate the spool for filament winding.",
+  "ar": "صُمّمت AMS 2 Pro Feeder Unit خصيصًا لدعم AMS 2 Pro في الطباعة بعدة ألوان ومواد. وفي كل مدخل تغذية جُلَب مقاومة للتآكل مقوّاة بالسيراميك لحماية المدخل بشكل أفضل من تآكله بفعل الفلامنت بعد الاستخدام الطويل. تحتوي كل وحدة AMS 2 Pro على 4 وحدات تغذية، ولكل وحدة تغذية محركها وتروسها الخاصة لدفع الفلامنت بشكل نشط إلى الأمام أو لفّه عائدًا إلى البكرة (spool). وتحتوي AMS 2 Pro Feeder Unit على حساس لكشف الفلامنت. فعند إدخال الفلامنت، تغذّيه وحدة التغذية تلقائيًا. وعندما يلزم لفّ الفلامنت للخلف، تُدير وحدة التغذية عمود الدعم النشط في AMS 2 Pro لتدوير البكرة ولفّ الفلامنت.",
+  "ckb": "یەکەی AMS 2 Pro Feeder Unit بە تایبەتی دیزاین کراوە بۆ پشتگیریکردنی AMS 2 Pro لە چاپکردن بە چەند ڕەنگ و کەرەستەیەک. لە هەر دەروازەیەکی پێدانەکەدا بوشی دژە سووانی بەهێزکراو بە سیرامیک چەسپێنراوە بۆ پاراستنی باشتری دەروازەکە لە سووان بەهۆی فیلامێنتەوە دوای بەکارهێنانی درێژخایەن. هەر یەکەیەکی AMS 2 Pro خاوەنی 4 یەکەی پێدانە، و هەر یەکەیەکی پێدان بزوێنەر و چەرخی ددانەداری تایبەتی خۆی هەیە بۆ پاڵنانی چالاکانەی فیلامێنت بەرەو پێشەوە یان پێچانەوەی بۆ سەر ماسوورەکە (spool). یەکەی AMS 2 Pro Feeder Unit هەستەوەرێکی هەیە بۆ دۆزینەوەی فیلامێنت. کاتێک فیلامێنتێک دەخرێتە ناوەوە، یەکەی پێدانەکە بە شێوەی خۆکار فیلامێنتەکە پێش دەخات. کاتێک پێویست بە پێچانەوەی فیلامێنت بێت، یەکەی پێدانەکە میلی پاڵپشتی چالاکی AMS 2 Pro دەجووڵێنێت بۆ سووڕاندنی ماسوورەکە و پێچانەوەی فیلامێنتەکە.",
+  "kind": "block_line"
+ }
+]

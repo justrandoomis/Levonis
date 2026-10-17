@@ -1,0 +1,3306 @@
+{
+  "handle": "h2c-induction-hotend-right",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T15:26:58Z",
+  "searched": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "printing.layer_height",
+        "product.*",
+        "package.*",
+        "part.*",
+        "motion.max_flow",
+        "extrusion.*",
+        "electrical.*",
+        "compat.statement",
+        "variant.note",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "Read in full from the cached HTML (the cached .txt omits the tab panels). The \"Vortek Induction Nozzle\" panel (purchase link \"H2C Induction Hotend - Standard & High Flow\") and the Nozzle-Printer Compatibility row \"H2C Induction Hotend | H2C\" are this product. It agrees with the store page on the sizes (\"Size: 0.2mm/ 0.4mm/ 0.6mm/ 0.8mm\"), the materials (\"Materials: Hardened steel / Stainless steel\") and the max temperature (350 ℃); the per-option diameter and material stay with the page's Size values (official_variant). It states no dimensions, weight, filament diameter, in-the-box list, flow rate or electrical value for this product. Its heating sentence (\"Only about 8 seconds to reach printing temperature (e.g., 220°C) from room temperature\") is an advantage claim with no registry key; not stored. \"6 right hotends to be installed for alternating use\" is printer capacity, not a spec of this product; not stored."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "compat.statement",
+        "printing.layer_height",
+        "motion.max_flow",
+        "extrusion.filament_diameter"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "Linked from the store page (\"Learn more about filament compatibility on Bambu Lab Wiki\"). A general guide for every Bambu nozzle that does not name the H2C or the induction hotend, so none of its rows is stored as a spec of this product; it is used only to flag disagreements with this page's own Filament Compatibility table (the relations' conflict notes: PC and the TPUs at 0.2 mm, TPU 85A at 0.4 mm, PLA Aero at 0.2 mm). Where this page says \"Not recommended\" and the wiki \"Not Compatible\" (PETG Translucent at 0.2 mm), or this page is stricter than the wiki's \"PLA*\" row (PLA Silk family, PLA Galaxy, PLA Translucent, PLA Aero), no relation is recorded. Its nozzle temperature column is per filament, not a hotend limit."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2c/manual/induction-hotend-system-workflow",
+      "title": "Introduction to the Workflow of the Vortek Induction Hotend | Bambu Lab Wiki",
+      "keys": [
+        "thermal.*",
+        "electrical.*",
+        "part.*",
+        "product.*",
+        "package.*",
+        "nozzle.*",
+        "extrusion.*",
+        "motion.max_flow",
+        "compat.statement"
+      ],
+      "retrieved_at": "2026-10-16T08:26:57Z",
+      "note": "Linked from the nozzles page panel for this product. It describes how the system works (induction heating assembly on the toolhead; on the hotend a U-shaped steel sleeve, an induction communication board, a hotend temperature NTC and an in-position detection magnet) and repeats the heating claim (\"Only about 8 seconds to reach printing temperature (e.g., 220°C)\"). It has no table and states no temperature limit, power, voltage, dimension or weight; nothing is stored from it."
+    }
+  ],
+  "specs": [
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Vortek Induction Nozzle › Max. Printing Temp",
+      "quote": "Purchase link: H2C Induction Hotend - Standard & High Flow | Compatibility: H2C (right hotend) | Max. Printing Temp: 350 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The Vortek Induction Nozzle panel is this product: its purchase link is \"H2C Induction Hotend - Standard & High Flow\" (asia store handle h2c-induction-hotend-standard-high-flow; the US title is \"H2C Induction Hotend (Right)\"), and it gives the same sizes and materials as this page's Size values (\"Size: 0.2mm/ 0.4mm/ 0.6mm/ 0.8mm\", \"Materials: Hardened steel / Stainless steel\"). Agrees with the store page's Product Specifications (\"Max. Printing Temp. | 350 ℃\"), which the deterministic parse stores verified at product scope."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H2C (right hotend)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Vortek Induction Nozzle › Compatibility",
+      "quote": "Compatibility: H2C (right hotend)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "conflict": "Replaces the store page's compatibility text (deterministic compat.statement, unverified), which runs the link sentence \"Learn more about filament compatibility on Bambu Lab Wiki.\", the six numbered usage notes and the Compatibility line \"H2C and H2C Laser\" together. The printers agree (H2C Laser is the H2C's laser edition; compat-targets.json \"H2C Laser\" resolves to h2c); the notes are kept as relations in this file (AMS, TPU 85A, PET-CF / PPA-CF / PPS-CF, CF/GF on the 0.2 mm stainless steel nozzle).",
+      "note": "The wiki adds which side: \"The Vortek Induction Hotend is designed for the right hotend of H2C printer\". Its Nozzle-Printer Compatibility table row reads \"H2C Induction Hotend | H2C\"."
+    },
+    {
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "value": {
+        "min": 0.05,
+        "max": 0.12
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.2 mm\" › Layer heights",
+      "quote": "Typically 0.05 mm to 0.12 mm (25-60% of nozzle diameter for optimal results).",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter, not a specification published for this product; kept unverified. Scoped to this page's Size value by its diameter (both versions that carry the size)."
+    },
+    {
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "value": {
+        "min": 0.1,
+        "max": 0.3
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.4 mm\" › Layer heights",
+      "quote": "0.1 mm to 0.3 mm (25-75% of nozzle diameter), with 0.2 mm being standard.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter, not a specification published for this product; kept unverified. Scoped to this page's Size value by its diameter (both versions that carry the size)."
+    },
+    {
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "value": {
+        "min": 0.15,
+        "max": 0.45
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.6 mm\" › Layer heights",
+      "quote": "0.15 mm to 0.45 mm (25-75% of nozzle diameter), with 0.3-0.4 mm being common.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter, not a specification published for this product; kept unverified. Scoped to this page's Size value by its diameter (both versions that carry the size)."
+    },
+    {
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "value": {
+        "min": 0.2,
+        "max": 0.6
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.8 mm\" › Layer heights",
+      "quote": "0.2 mm to 0.6 mm (25-75% of nozzle diameter), with 0.4-0.5 mm being typical.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter, not a specification published for this product; kept unverified. Scoped to this page's Size value by its diameter (both versions that carry the size)."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901960",
+        "value_text": "Standard Flow / 0.2mm Stainless Steel"
+      },
+      "value": 2,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "locator": "Description › \"Real High-Flow, Real Time Saved\" › table \"H2C Max Volumetric Speed\" › row \"Induction Stainless Steel Nozzle (0.2mm)\"",
+      "quote": "H2C Max Volumetric Speed | Induction Stainless Steel Nozzle (0.2mm) | 2 mm³/s … *Tested with Bambu PLA Basic.",
+      "test_method": "",
+      "test_condition": "On the H2C; filament: Bambu PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "note": "A table in the page's description (not its Product Specifications table), one value per nozzle; kept unverified like every description-table flow value in the class. The row name maps to one variant (Type and Size). The deterministic parse keeps this table only as content text, so it stores no flow row."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901965",
+        "value_text": "Standard Flow / 0.4mm Hardened Steel"
+      },
+      "value": 25,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "locator": "Description › \"Real High-Flow, Real Time Saved\" › table \"H2C Max Volumetric Speed\" › row \"Induction Hardened Steel Nozzle (0.4mm)\"",
+      "quote": "H2C Max Volumetric Speed | Induction Hardened Steel Nozzle (0.4mm) | 25 mm³/s … *Tested with Bambu PLA Basic.",
+      "test_method": "",
+      "test_condition": "On the H2C; filament: Bambu PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "note": "A table in the page's description (not its Product Specifications table), one value per nozzle; kept unverified like every description-table flow value in the class. The row name maps to one variant (Type and Size). The deterministic parse keeps this table only as content text, so it stores no flow row."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901970",
+        "value_text": "Standard Flow / 0.6mm Hardened Steel"
+      },
+      "value": 30,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "locator": "Description › \"Real High-Flow, Real Time Saved\" › table \"H2C Max Volumetric Speed\" › row \"Induction Hardened Steel Nozzle (0.6mm)\"",
+      "quote": "H2C Max Volumetric Speed | Induction Hardened Steel Nozzle (0.6mm) | 30 mm³/s … *Tested with Bambu PLA Basic.",
+      "test_method": "",
+      "test_condition": "On the H2C; filament: Bambu PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "note": "A table in the page's description (not its Product Specifications table), one value per nozzle; kept unverified like every description-table flow value in the class. The row name maps to one variant (Type and Size). The deterministic parse keeps this table only as content text, so it stores no flow row."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901975",
+        "value_text": "Standard Flow / 0.8mm Hardened Steel"
+      },
+      "value": 30,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "locator": "Description › \"Real High-Flow, Real Time Saved\" › table \"H2C Max Volumetric Speed\" › row \"Induction Hardened Steel Nozzle (0.8mm)\"",
+      "quote": "H2C Max Volumetric Speed | Induction Hardened Steel Nozzle (0.8mm) | 30 mm³/s … *Tested with Bambu PLA Basic.",
+      "test_method": "",
+      "test_condition": "On the H2C; filament: Bambu PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "note": "A table in the page's description (not its Product Specifications table), one value per nozzle; kept unverified like every description-table flow value in the class. The row name maps to one variant (Type and Size). The deterministic parse keeps this table only as content text, so it stores no flow row."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901980",
+        "value_text": "High Flow / 0.4mm Hardened Steel"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "locator": "Description › \"Real High-Flow, Real Time Saved\" › table \"H2C Max Volumetric Speed\" › row \"High Flow Induction Hardened Steel Nozzle (0.4mm)\"",
+      "quote": "H2C Max Volumetric Speed | High Flow Induction Hardened Steel Nozzle (0.4mm) | 40 mm³/s … *Tested with Bambu PLA Basic.",
+      "test_method": "",
+      "test_condition": "On the H2C; filament: Bambu PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "note": "A table in the page's description (not its Product Specifications table), one value per nozzle; kept unverified like every description-table flow value in the class. The row name maps to one variant (Type and Size). The deterministic parse keeps this table only as content text, so it stores no flow row."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901985",
+        "value_text": "High Flow / 0.6mm Hardened Steel"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "locator": "Description › \"Real High-Flow, Real Time Saved\" › table \"H2C Max Volumetric Speed\" › row \"High Flow Induction Hardened Steel Nozzle (0.6mm)\"",
+      "quote": "H2C Max Volumetric Speed | High Flow Induction Hardened Steel Nozzle (0.6mm) | 40 mm³/s … *Tested with Bambu PLA Basic.",
+      "test_method": "",
+      "test_condition": "On the H2C; filament: Bambu PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "note": "A table in the page's description (not its Product Specifications table), one value per nozzle; kept unverified like every description-table flow value in the class. The row name maps to one variant (Type and Size). The deterministic parse keeps this table only as content text, so it stores no flow row."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901990",
+        "value_text": "High Flow / 0.8mm Hardened Steel"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "locator": "Description › \"Real High-Flow, Real Time Saved\" › table \"H2C Max Volumetric Speed\" › row \"High Flow Induction Hardened Steel Nozzle (0.8mm)\"",
+      "quote": "H2C Max Volumetric Speed | High Flow Induction Hardened Steel Nozzle (0.8mm) | 40 mm³/s … *Tested with Bambu PLA Basic.",
+      "test_method": "",
+      "test_condition": "On the H2C; filament: Bambu PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "note": "A table in the page's description (not its Product Specifications table), one value per nozzle; kept unverified like every description-table flow value in the class. The row name maps to one variant (Type and Size). The deterministic parse keeps this table only as content text, so it stores no flow row."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C (Right Hotend)",
+      "target_source_handle": "h2c",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Types › Vortek Induction Nozzle › Compatibility; Nozzle-Printer Compatibility › row \"H2C Induction Hotend\"",
+      "quote": "Compatibility: H2C (right hotend) … H2C Induction Hotend | H2C",
+      "note": "compat-targets.json label \"H2C (Right Hotend)\" (printer h2c, qualifier \"Right Hotend\"). Agrees with the store page's \"Compatibility H2C and H2C Laser\" and its notes (\"connect the AMS to the right-side Fixed Hotend\"). The wiki: \"the right nozzle of the H2C is an induction nozzle, while the left one is a standard H2 Series nozzle.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C Laser",
+      "target_source_handle": "h2c",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Compatibility",
+      "quote": "Compatibility H2C and H2C Laser",
+      "note": "compat-targets.json label \"H2C Laser\" (printer h2c, qualifier \"Laser\"). The deterministic parse records the same relation (and \"H2C\"). The wiki names only \"H2C (right hotend)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › note 2",
+      "quote": "2. If you need multi-color printing with the AMS, connect the AMS to the right-side Fixed Hotend.",
+      "note": "This product is the right-side Fixed Hotend (note 1: \"the Fixed Hotend (Induction Hotend)\"; wiki: \"designed for the right hotend of H2C printer\"). compat-targets.json label \"AMS\" (ams-multicolor-printing); the deterministic parse records the same relation. The note says \"the AMS\" without naming a model."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 1 (PLA Basic) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Basic | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 1 (PLA Basic) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Basic | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 1 (PLA Basic) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Basic | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 1 (PLA Basic) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Basic | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 2 (PLA Matte) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Matte | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 2 (PLA Matte) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Matte | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 2 (PLA Matte) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Matte | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 2 (PLA Matte) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Matte | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Lite",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 3 (PLA Lite) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Lite | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Lite",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 3 (PLA Lite) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Lite | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Lite",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 3 (PLA Lite) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Lite | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Lite",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 3 (PLA Lite) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Lite | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 4 (PLA Basic Gradient) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Basic Gradient | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 4 (PLA Basic Gradient) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Basic Gradient | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 4 (PLA Basic Gradient) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Basic Gradient | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 4 (PLA Basic Gradient) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Basic Gradient | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 5 (PLA Silk+) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Silk+ | √ | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 5 (PLA Silk+) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Silk+ | √ | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 6 (PLA Silk Dual Color) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Silk Dual Color | √ | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 6 (PLA Silk Dual Color) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Silk Dual Color | √ | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 7 (PLA Silk) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Silk | √ | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 7 (PLA Silk) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Silk | √ | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 8 (PLA Metal) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Metal | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 8 (PLA Metal) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Metal | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 8 (PLA Metal) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Metal | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 8 (PLA Metal) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Metal | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 9 (PLA Marble) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Marble | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 9 (PLA Marble) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Marble | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 9 (PLA Marble) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Marble | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 9 (PLA Marble) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Marble | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 10 (PLA Sparkle) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Sparkle | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 10 (PLA Sparkle) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Sparkle | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 10 (PLA Sparkle) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Sparkle | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 10 (PLA Sparkle) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Sparkle | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 11 (PLA Wood) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Wood | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 11 (PLA Wood) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Wood | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 11 (PLA Wood) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Wood | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 11 (PLA Wood) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Wood | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 12 (PLA Galaxy) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Galaxy | Not recommended | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 12 (PLA Galaxy) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Galaxy | Not recommended | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 12 (PLA Galaxy) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Galaxy | Not recommended | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 13 (PLA Glow) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Glow | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 13 (PLA Glow) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Glow | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 13 (PLA Glow) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Glow | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 13 (PLA Glow) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Glow | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 14 (PLA Translucent) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Translucent | Not recommended | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 14 (PLA Translucent) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA Translucent | Not recommended | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 14 (PLA Translucent) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA Translucent | Not recommended | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA tough+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 15 (PLA tough+) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA tough+ | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA tough+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 15 (PLA tough+) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA tough+ | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA tough+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 15 (PLA tough+) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA tough+ | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA tough+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 15 (PLA tough+) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA tough+ | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 16 (PLA-CF) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 6: \"CF/GF-reinforced filaments are not compatible with stainless steel nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901965",
+        "value_text": "Standard Flow / 0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 16 (PLA-CF) › column \"Induction 0.4 mm Hardened Steel\"",
+      "quote": "PLA-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 16 (PLA-CF) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PLA-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 16 (PLA-CF) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PLA-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 17 (PLA Aero) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PLA Aero | X | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version.",
+      "conflict": "The general wiki Filament guide (2. Nozzle) has no PLA Aero row; its \"PLA*\" row says \"Compatible\" for the 0.2 mm nozzle. This product's own table says X; the product table is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 17 (PLA Aero) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PLA Aero | X | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 18 (PETG HF) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PETG HF | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 18 (PETG HF) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PETG HF | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 18 (PETG HF) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PETG HF | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 18 (PETG HF) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PETG HF | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 19 (PETG Basic) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PETG Basic | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 19 (PETG Basic) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PETG Basic | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 19 (PETG Basic) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PETG Basic | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 19 (PETG Basic) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PETG Basic | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 20 (PETG Translucent) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PETG Translucent | Not recommended | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 20 (PETG Translucent) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PETG Translucent | Not recommended | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 20 (PETG Translucent) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PETG Translucent | Not recommended | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 21 (PETG-CF) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PETG-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 6: \"CF/GF-reinforced filaments are not compatible with stainless steel nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901965",
+        "value_text": "Standard Flow / 0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 21 (PETG-CF) › column \"Induction 0.4 mm Hardened Steel\"",
+      "quote": "PETG-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 21 (PETG-CF) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PETG-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 21 (PETG-CF) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PETG-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 22 (ABS) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "ABS | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 22 (ABS) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "ABS | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 22 (ABS) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "ABS | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 22 (ABS) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "ABS | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 23 (ABS-GF) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "ABS-GF | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 6: \"CF/GF-reinforced filaments are not compatible with stainless steel nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 23 (ABS-GF) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "ABS-GF | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 23 (ABS-GF) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "ABS-GF | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 23 (ABS-GF) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "ABS-GF | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 24 (ASA) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "ASA | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 24 (ASA) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "ASA | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 24 (ASA) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "ASA | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 24 (ASA) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "ASA | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 25 (ASA Aero) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "ASA Aero | X | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 25 (ASA Aero) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "ASA Aero | X | √ | Not recommended | Not recommended | √ | Not recommended | Not recommended",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 26 (ASA-CF) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "ASA-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 6: \"CF/GF-reinforced filaments are not compatible with stainless steel nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901965",
+        "value_text": "Standard Flow / 0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 26 (ASA-CF) › column \"Induction 0.4 mm Hardened Steel\"",
+      "quote": "ASA-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 26 (ASA-CF) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "ASA-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 26 (ASA-CF) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "ASA-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 27 (PC) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PC | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version.",
+      "conflict": "The general wiki Filament guide (2. Nozzle) says \"Not Recommended\" for the 0.2 mm nozzle: \"PC | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible\". This product's own table says √; the product table is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 27 (PC) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PC | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 27 (PC) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PC | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 27 (PC) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PC | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 28 (PC FR) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PC FR | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 28 (PC FR) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PC FR | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 28 (PC FR) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PC FR | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 28 (PC FR) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PC FR | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 29 (TPU for AMS) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "TPU for AMS | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version.",
+      "conflict": "The general wiki Filament guide (2. Nozzle) says \"Not Recommended\" (not \"X\") for the 0.2 mm nozzle: \"TPU for AMS | Not Recommended | Compatible …\". This product's own table says X; the product table is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 29 (TPU for AMS) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "TPU for AMS | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 29 (TPU for AMS) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "TPU for AMS | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 29 (TPU for AMS) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "TPU for AMS | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 30 (TPU 95A HF) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "TPU 95A HF | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 4: \"TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2.\" (the other hotend; this product's own table gives its support).",
+      "conflict": "The general wiki Filament guide (2. Nozzle) says \"Not Recommended\" (not \"X\") for the 0.2 mm nozzle: \"TPU 95A HF | Not Recommended | Compatible …\". This product's own table says X; the product table is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 30 (TPU 95A HF) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "TPU 95A HF | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value. Note 4: \"TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2.\" (the other hotend; this product's own table gives its support)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 30 (TPU 95A HF) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "TPU 95A HF | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value. Note 4: \"TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2.\" (the other hotend; this product's own table gives its support)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 30 (TPU 95A HF) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "TPU 95A HF | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value. Note 4: \"TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2.\" (the other hotend; this product's own table gives its support)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 31 (TPU 85A) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "TPU 85A | X | X | √ | √ | X | Not recommended | Not recommended",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 4: \"TPU85A is only supported on the right-side Fixed Hotend.\" (this product).",
+      "conflict": "The general wiki Filament guide (2. Nozzle) says \"Not Recommended\" (not \"X\") for the 0.2 mm nozzle: \"TPU 85A | Not Recommended | Compatible | Compatible | Compatible | Not Compatible | Not Recommended | Not Recommended\". This product's own table says X; the product table is kept."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 31 (TPU 85A) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "TPU 85A | X | X | √ | √ | X | Not recommended | Not recommended",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value. Note 4: \"TPU85A is only supported on the right-side Fixed Hotend.\" (this product).",
+      "conflict": "The general wiki Filament guide (2. Nozzle) says \"Compatible\" for the 0.4 mm (standard) nozzle and \"Not Compatible\" for the 0.4 mm high flow nozzle: \"TPU 85A | Not Recommended | Compatible | Compatible | Compatible | Not Compatible | …\". This product's own table says X for both 0.4 mm columns; the product table is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901970",
+        "value_text": "Standard Flow / 0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 31 (TPU 85A) › column \"Induction 0.6 mm Hardened Steel\"",
+      "quote": "TPU 85A | X | X | √ | √ | X | Not recommended | Not recommended",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant. Note 4: \"TPU85A is only supported on the right-side Fixed Hotend.\" (this product)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901975",
+        "value_text": "Standard Flow / 0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 31 (TPU 85A) › column \"Induction 0.8 mm Hardened Steel\"",
+      "quote": "TPU 85A | X | X | √ | √ | X | Not recommended | Not recommended",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant. Note 4: \"TPU85A is only supported on the right-side Fixed Hotend.\" (this product)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 90A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 32 (TPU 90A) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "TPU 90A | X | √ | √ | √ | Not recommended | Not recommended | Not recommended",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 4: \"TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2.\" (the other hotend; this product's own table gives its support).",
+      "conflict": "The general wiki Filament guide (2. Nozzle) says \"Not Recommended\" (not \"X\") for the 0.2 mm nozzle: \"TPU 90A | Not Recommended | Compatible …\". This product's own table says X; the product table is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901965",
+        "value_text": "Standard Flow / 0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 90A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 32 (TPU 90A) › column \"Induction 0.4 mm Hardened Steel\"",
+      "quote": "TPU 90A | X | √ | √ | √ | Not recommended | Not recommended | Not recommended",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant. Note 4: \"TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2.\" (the other hotend; this product's own table gives its support)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901970",
+        "value_text": "Standard Flow / 0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 90A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 32 (TPU 90A) › column \"Induction 0.6 mm Hardened Steel\"",
+      "quote": "TPU 90A | X | √ | √ | √ | Not recommended | Not recommended | Not recommended",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant. Note 4: \"TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2.\" (the other hotend; this product's own table gives its support)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901975",
+        "value_text": "Standard Flow / 0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 90A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 32 (TPU 90A) › column \"Induction 0.8 mm Hardened Steel\"",
+      "quote": "TPU 90A | X | √ | √ | √ | Not recommended | Not recommended | Not recommended",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant. Note 4: \"TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2.\" (the other hotend; this product's own table gives its support)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 33 (PAHT-CF) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PAHT-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 6: \"CF/GF-reinforced filaments are not compatible with stainless steel nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901965",
+        "value_text": "Standard Flow / 0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 33 (PAHT-CF) › column \"Induction 0.4 mm Hardened Steel\"",
+      "quote": "PAHT-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 33 (PAHT-CF) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PAHT-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 33 (PAHT-CF) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PAHT-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › note 5",
+      "quote": "5. PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend.",
+      "conflict": "The same page's Filament Compatibility table marks this filament √ for this product: \"PET-CF | X | √ | √ | √ | Not recommended | √ | √\" (row 34). Note 5 limits it to the left-side Liftable Hotend, and this product is the right-side Fixed Hotend (note 1; wiki \"designed for the right hotend of H2C printer\"), so the table's √ cells are not recorded. To be confirmed by the reviewer.",
+      "note": "The table's X in the 0.2 mm Stainless Steel column agrees with note 5. The wiki nozzles page states no filament limit for this hotend."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 35 (PA6-CF) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PA6-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 6: \"CF/GF-reinforced filaments are not compatible with stainless steel nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901965",
+        "value_text": "Standard Flow / 0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 35 (PA6-CF) › column \"Induction 0.4 mm Hardened Steel\"",
+      "quote": "PA6-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 35 (PA6-CF) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PA6-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 35 (PA6-CF) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PA6-CF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 36 (PA6-GF) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PA6-GF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version. Note 6: \"CF/GF-reinforced filaments are not compatible with stainless steel nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "667200883931901965",
+        "value_text": "Standard Flow / 0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 36 (PA6-GF) › column \"Induction 0.4 mm Hardened Steel\"",
+      "quote": "PA6-GF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "The other version's column says \"Not recommended\" for this size, so the relation is scoped to the Standard Flow variant."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 36 (PA6-GF) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PA6-GF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 36 (PA6-GF) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PA6-GF | X | √ | √ | √ | Not recommended | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › note 5",
+      "quote": "5. PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend.",
+      "conflict": "The same page's Filament Compatibility table marks this filament √ for this product: \"PPA-CF | X | √ | √ | √ | Not recommended | √ | √\" (row 37). Note 5 limits it to the left-side Liftable Hotend, and this product is the right-side Fixed Hotend (note 1; wiki \"designed for the right hotend of H2C printer\"), so the table's √ cells are not recorded. To be confirmed by the reviewer.",
+      "note": "The table's X in the 0.2 mm Stainless Steel column agrees with note 5. The wiki nozzles page states no filament limit for this hotend."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › note 5",
+      "quote": "5. PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend.",
+      "conflict": "The same page's Filament Compatibility table marks this filament √ for this product: \"PPS-CF | X | √ | √ | √ | Not recommended | √ | √\" (row 38). Note 5 limits it to the left-side Liftable Hotend, and this product is the right-side Fixed Hotend (note 1; wiki \"designed for the right hotend of H2C printer\"), so the table's √ cells are not recorded. To be confirmed by the reviewer.",
+      "note": "The table's X in the 0.2 mm Stainless Steel column agrees with note 5. The wiki nozzles page states no filament limit for this hotend."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 39 (Support for ABS) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "Support for ABS | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 39 (Support for ABS) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "Support for ABS | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 39 (Support for ABS) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "Support for ABS | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 39 (Support for ABS) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "Support for ABS | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 40 (Support for PLA/PETG) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "Support for PLA/PETG | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 40 (Support for PLA/PETG) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "Support for PLA/PETG | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 40 (Support for PLA/PETG) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "Support for PLA/PETG | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 40 (Support for PLA/PETG) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "Support for PLA/PETG | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 41 (Support for PA/PET) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "Support for PA/PET | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 41 (Support for PA/PET) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "Support for PA/PET | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 41 (Support for PA/PET) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "Support for PA/PET | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 41 (Support for PA/PET) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "Support for PA/PET | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 42 (Support for PLA (New Version)) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "Support for PLA (New Version) | √ | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 42 (Support for PLA (New Version)) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "Support for PLA (New Version) | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 42 (Support for PLA (New Version)) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "Support for PLA (New Version) | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 42 (Support for PLA (New Version)) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "Support for PLA (New Version) | √ | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901956",
+        "value_text": "0.2mm Stainless Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 43 (PVA) › column \"Induction 0.2 mm Stainless Steel\"",
+      "quote": "PVA | X | √ | √ | √ | √ | √ | √",
+      "note": "The 0.2mm Stainless Steel value exists only in the Standard Flow version."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901957",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 43 (PVA) › column \"Induction 0.4 mm Hardened Steel\" / column \"Induction 0.4 mm High Flow Hardened Steel\"",
+      "quote": "PVA | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901958",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 43 (PVA) › column \"Induction 0.6 mm Hardened Steel\" / column \"Induction 0.6 mm High Flow Hardened Steel\"",
+      "quote": "PVA | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667200883931901959",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c-induction-hotend-right",
+      "source_title": "H2C Induction Hotend (Right) (store page)",
+      "retrieved_at": "2026-10-16T07:07:57Z",
+      "locator": "Description › Filament Compatibility › table › row 43 (PVA) › column \"Induction 0.8 mm Hardened Steel\" / column \"Induction 0.8 mm High Flow Hardened Steel\"",
+      "quote": "PVA | X | √ | √ | √ | √ | √ | √",
+      "note": "Both versions agree for this size, so the relation is scoped to the Size value."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles",
+      "text": "Introduction to Bambu Nozzles",
+      "note": "Not linked from the store page; the §F nozzles page. Its Vortek Induction Nozzle panel and its Nozzle-Printer Compatibility table name this product."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2c/manual/induction-hotend-system-workflow",
+      "title": "Introduction to the Workflow of the Vortek Induction Hotend",
+      "text": "Introduction to the Workflow of the Vortek Induction Hotend",
+      "note": "Not linked from the store page; linked from the nozzles page panel for this product."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "note": "Linked from the store page; the builder already records it (same id, so the merge does not add it twice)."
+    }
+  ],
+  "not_published": [
+    "product.width",
+    "product.height",
+    "product.net_weight",
+    "package.contents",
+    "extrusion.filament_diameter"
+  ],
+  "notes": [
+    "The store page has no In the Box list and no official document gives one, so in_the_box is empty and package.contents is not_published.",
+    "Product Specifications on the page (Max. Printing Temp. 350 ℃, Length 56.2 mm, Packaging Weight 0.015 kg, Packaging Size 60*60*30 mm) are parsed deterministically and are not repeated here, except the max temperature, which the wiki states for this product.",
+    "Contradiction on the store page: the Filament Compatibility table marks PET-CF, PPA-CF and PPS-CF √ for this hotend, while note 5 says they are supported only on the left-side Liftable Hotend (this product is the right-side Fixed Hotend). Recorded as not_compatible_with with a conflict note; to be confirmed by the reviewer."
+  ]
+}

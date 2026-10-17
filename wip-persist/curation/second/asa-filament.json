@@ -1,0 +1,888 @@
+{
+  "handle": "asa-filament",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T22:09:30Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "extrusion.supported_nozzle_diameters",
+        "safety.certifications",
+        "identity.model"
+      ]
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/10a896db93e04636a9f70b841867e7e6/SDS20251127B01_Bambu_ASA.pdf",
+      "title": "Safety Data Sheet SDS20251127B01 - Bambu ASA",
+      "retrieved_at": "2026-10-16T08:23:48Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*",
+        "identity.model"
+      ]
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table - ASA",
+      "retrieved_at": "2026-10-16T08:23:51Z",
+      "keys": [],
+      "looked_for": [
+        "published hex per colour value"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "looked_for": [
+        "printer / nozzle / AMS / build plate / glue compatibility"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "title": "ABS / ASA / PC Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*"
+      ],
+      "looked_for": [
+        "hardware compatibility (printer, nozzle, build plate, accessory)"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ]
+    }
+  ],
+  "specs": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "material identity",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "material.type",
+      "value": "ASA",
+      "unit": "",
+      "locator": "p.1 › title",
+      "quote": "Bambu Filament Technical Data Sheet V3.0 ASA",
+      "note": "TDS p.3 Composition: «acrylonitrile - styrene - acrylate»; the SDS (p.4, section 3) agrees: «Acrylonitrile-styrene-acrylate (ASA) 95-99» % by weight."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "specification (nominal)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "material.diameter",
+      "value": 1.75,
+      "unit": "mm",
+      "locator": "p.1 › Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "note": "Agrees with the store page (Product Features bullet «Diameter: 1.75mm +/- 0.03mm»). The TDS states no tolerance; the ± 0.03 mm tolerance is the store page's own row."
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681853373280270",
+        "value_text": "1kg"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "specification (nominal)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "material.net_weight",
+      "value": 1000,
+      "unit": "g",
+      "locator": "p.1 › Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "note": "Scoped to the store page's only Net weight value «1kg», which states the same 1 kg (1000 g)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "ISO 1183",
+      "test_condition": "material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "material.density",
+      "value": 1.05,
+      "unit": "g/cm³",
+      "locator": "p.2 › Physical Properties › Density",
+      "quote": "Density ISO 1183 1.05 g/cm³",
+      "note": "The SDS (p.9, section 9) gives «Density: No data available»; the TDS value is the manufacturer's published figure."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "thermal.melting_temp",
+      "value": 210,
+      "unit": "°C",
+      "locator": "p.2 › Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 210 °C",
+      "note": "The SDS (p.9, section 9) gives «Melting Point: No data available»."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "thermal.vicat_softening",
+      "value": 106,
+      "unit": "°C",
+      "locator": "p.2 › Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 106 °C",
+      "note": "The TDS row label is spelled «Vicar»; it is the Vicat softening temperature (ISO 306)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "ISO 75",
+      "test_condition": "0.45 MPa load, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "thermal.heat_deflection_temp",
+      "value": 100,
+      "unit": "°C",
+      "locator": "p.2 › Physical Properties › Heat Deflection Temperature (ISO 75 0.45 MPa row)",
+      "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 100 °C",
+      "note": "The TDS also gives 92 °C at 1.8 MPa (ISO 75), not stored: one row per key. The wiki ABS/ASA/PC guide agrees: «Heat Resistance（HDT，0.45 MPaLoad）… ASA 100 ℃»."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "printed specimen, X-Y direction; specimens printed at nozzle 260 °C, bed 80 °C, 200 mm/s, 100% infill, annealed and dried at 80 °C for 12 h (p.3 Specimen Test)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "mechanical.tensile_strength",
+      "value": 37,
+      "unit": "MPa",
+      "locator": "p.2 › Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 37 ± 3 MPa",
+      "note": "Z direction: 31 ± 4 MPa (not stored: one row per key). Young's modulus 2450 ± 270 MPa (X-Y) / 2120 ± 260 MPa (Z) has no registry key."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "printed specimen, X-Y direction; specimens printed at nozzle 260 °C, bed 80 °C, 200 mm/s, 100% infill, annealed and dried at 80 °C for 12 h (p.3 Specimen Test)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "mechanical.elongation_at_break",
+      "value": 9.2,
+      "unit": "%",
+      "locator": "p.2 › Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 9.2 ± 1.4 %",
+      "note": "Z direction: 4.6 ± 0.8 % (not stored: one row per key)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "printed specimen, X-Y direction; specimens printed at nozzle 260 °C, bed 80 °C, 200 mm/s, 100% infill, annealed and dried at 80 °C for 12 h (p.3 Specimen Test)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "mechanical.flexural_strength",
+      "value": 65,
+      "unit": "MPa",
+      "locator": "p.2 › Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 65 ± 5 MPa",
+      "note": "Z direction: 40 ± 3 MPa (not stored). The wiki ABS/ASA/PC guide agrees: «Flexural Strength - XY … ASA 65 Mpa»."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "printed specimen, X-Y direction; specimens printed at nozzle 260 °C, bed 80 °C, 200 mm/s, 100% infill, annealed and dried at 80 °C for 12 h (p.3 Specimen Test)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "mechanical.flexural_modulus",
+      "value": 1920,
+      "unit": "MPa",
+      "locator": "p.2 › Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 1920 ± 130 MPa",
+      "note": "Z direction: 1650 ± 120 MPa (not stored)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "printed specimen, X-Y direction; specimens printed at nozzle 260 °C, bed 80 °C, 200 mm/s, 100% infill, annealed and dried at 80 °C for 12 h (p.3 Specimen Test); the first listed value (the second, 19.6 ± 1.8 kJ/m², is marked notched)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "mechanical.impact_strength",
+      "value": 41,
+      "unit": "kJ/m²",
+      "locator": "p.2 › Mechanical Properties › Impact Strength (X-Y), first value",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 41.0 ± 2.3 kJ/m²；19.6 ± 1.8 kJ/m² (notched)",
+      "note": "Z direction: 4.9 ± 0.6 kJ/m² (not stored). The wiki ABS/ASA/PC guide agrees: «Impact Strength - XY … ASA 41 KJ/m²» and «Impact Strength - Z … 4.9 KJ/m²»."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "print_settings.nozzle_temp",
+      "value": {
+        "min": 240,
+        "max": 270
+      },
+      "unit": "°C",
+      "locator": "p.1 › Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 240 - 270 °C",
+      "conflict_note": "The wiki material table (generic «ASA» row, all brands) gives 240 - 280 °C (± 10 °C); the product TDS value is kept."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "recommended printing setting (bed surface preparation: glue)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "print_settings.bed_temp",
+      "value": {
+        "min": 80,
+        "max": 100
+      },
+      "unit": "°C",
+      "locator": "p.1 › Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 100 °C",
+      "conflict_note": "The wiki material table gives 90 - 100 °C for ASA (with glue stick or liquid glue; Engineering, Smooth PEI / High-Temperature and Textured PEI plates); the product TDS value is kept."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "recommended printing setting (an upper bound; no lower bound is published)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "print_settings.print_speed",
+      "value": "< 250 mm/s",
+      "unit": "mm/s",
+      "locator": "p.1 › Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 250 mm/s"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "print_settings.fan_speed",
+      "value": "0–80%",
+      "unit": "",
+      "locator": "p.1 › Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 80%"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "print_settings.recommended_plate",
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "locator": "p.1 › Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The wiki plate table agrees (90 - 100 ℃ on the Engineering, Smooth PEI / High-Temperature and Textured PEI plates; Cool Plate / PLA Plate «Not recommended»)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "recommended printing setting (printer chamber while printing this filament)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "thermal.chamber_temp",
+      "value": {
+        "min": 45,
+        "max": 60
+      },
+      "unit": "°C",
+      "locator": "p.1 › Recommended Printing Settings › Chamber Temperature",
+      "quote": "Chamber Temperature 45 - 60 °C"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "extrusion.supported_nozzle_diameters",
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "locator": "p.1 › Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "note": "The wiki material table agrees (ASA compatible with 0.2 / 0.4 / 0.6 / 0.8 mm and 0.4 / 0.6 / 0.8 mm high-flow nozzles; hardened steel «Not Required»); the wiki ABS/ASA/PC guide: «Compatible with all nozzle sizes»."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "blast drying oven, before printing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "drying.temperature",
+      "value": 80,
+      "unit": "°C",
+      "locator": "p.1 › Recommended Printing Settings › Drying Settings before Printing (Blast Drying Oven)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 h",
+      "note": "The TDS also gives «X1 Series Printer Heatbed: 90 - 100 °C, 12 h» (not stored: one row per key). The wiki drying guide (forced-air oven 75-85 ℃, 8 h; AMS HT 80 ℃, 8 h) and the wiki material table (80 ℃ for 8 h) agree."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "test_method": "",
+      "test_condition": "blast drying oven at 80 °C, before printing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "key": "drying.time",
+      "value": 8,
+      "unit": "h",
+      "locator": "p.1 › Recommended Printing Settings › Drying Settings before Printing (Blast Drying Oven)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 h",
+      "note": "Heatbed drying (X1 Series): 12 h at 90 - 100 °C (not stored). The wiki drying guide agrees (forced-air oven 8 h)."
+    },
+    {
+      "key": "identity.model",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "B01-xx",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "sds",
+      "source_url": "https://store.bblcdn.com/s7/default/10a896db93e04636a9f70b841867e7e6/SDS20251127B01_Bambu_ASA.pdf",
+      "source_title": "Safety Data Sheet SDS20251127B01 - Bambu ASA",
+      "locator": "p.2 › 1 - Identification › Product identifier › Model",
+      "quote": "Model : B01-xx(xx stands for any suffix)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:48Z",
+      "note": "The SDS model code of the product line; «xx» stands for any suffix."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "White (45100)",
+      "source_value_id": "564681853373280263",
+      "hex": "#FFFAF2",
+      "source_url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table - ASA",
+      "locator": "p.1 › row 1, left (White)",
+      "quote": "Hex:#FFFAF2",
+      "retrieved_at": "2026-10-16T08:23:51Z"
+    },
+    {
+      "value_text": "Green (45500)",
+      "source_value_id": "564681853373280264",
+      "hex": "#00A6A0",
+      "source_url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table - ASA",
+      "locator": "p.1 › row 2, right (Green)",
+      "quote": "Hex:#00A6A0",
+      "retrieved_at": "2026-10-16T08:23:51Z"
+    },
+    {
+      "value_text": "Black (45101)",
+      "source_value_id": "564681853373280265",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table - ASA",
+      "locator": "p.1 › row 3, right (Black)",
+      "quote": "Hex:#000000",
+      "retrieved_at": "2026-10-16T08:23:51Z"
+    },
+    {
+      "value_text": "Gray (45102)",
+      "source_value_id": "564681853373280266",
+      "hex": "#8A949E",
+      "source_url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table - ASA",
+      "locator": "p.1 › row 1, right (Gray)",
+      "quote": "Hex:#8A949E",
+      "retrieved_at": "2026-10-16T08:23:51Z"
+    },
+    {
+      "value_text": "Red (45200)",
+      "source_value_id": "564681853373280267",
+      "hex": "#E02928",
+      "source_url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table - ASA",
+      "locator": "p.1 › row 2, left (Red)",
+      "quote": "Hex:#E02928",
+      "retrieved_at": "2026-10-16T08:23:51Z"
+    },
+    {
+      "value_text": "Blue (45600)",
+      "source_value_id": "564681853373280268",
+      "hex": "#2140B4",
+      "source_url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table - ASA",
+      "locator": "p.1 › row 3, left (Blue)",
+      "quote": "Hex:#2140B4",
+      "retrieved_at": "2026-10-16T08:23:51Z"
+    }
+  ],
+  "relations": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "",
+      "source_title": "Bambu Lab US store product page (owner-only provenance)",
+      "retrieved_at": "2026-10-16T07:00:26Z",
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "Feeding compatibility. Drying ASA in the AMS 2 Pro is not supported: the wiki drying guide lists «ABS, ASA … AMS 2 Pro Temp: Not compatible» (the AMS 2 Pro dries at no more than 65 °C)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "",
+      "source_title": "Bambu Lab US store product page (owner-only provenance)",
+      "retrieved_at": "2026-10-16T07:00:26Z",
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "The wiki drying guide also gives AMS HT drying for ABS, ASA: 80 ℃ for 8 h."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "",
+      "source_title": "Bambu Lab US store product page (owner-only provenance)",
+      "retrieved_at": "2026-10-16T07:00:26Z",
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "",
+      "source_title": "Bambu Lab US store product page (owner-only provenance)",
+      "retrieved_at": "2026-10-16T07:00:26Z",
+      "relation": "not_compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "AMS lite NOT Compatible",
+      "corroborated_by": {
+        "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+        "locator": "Hardware Compatibility › Accessory Compatibility",
+        "quote": "Not compatible with AMS lite"
+      },
+      "conflict_note": "The wiki material table's combined «AMS / AMS lite Compatibility» column reads «Compatible» for the generic ASA row; the product page and the ABS/ASA/PC guide both say AMS lite is not compatible, which is kept."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "",
+      "source_title": "Bambu Lab US store product page (owner-only provenance)",
+      "retrieved_at": "2026-10-16T07:00:26Z",
+      "relation": "requires",
+      "target_kind": "printer",
+      "target_label": "Enclosure Printers",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "Enclosure Printers Required",
+      "corroborated_by": {
+        "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+        "locator": "Hardware Compatibility › Printer Compatibility",
+        "quote": "Requires an enclosed printer; not compatible with P1P or A models"
+      }
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "source_title": "ABS / ASA / PC Usage Guide",
+      "locator": "Basic Filament Information › Hardware Compatibility › row «ABS / ASA / PC / PC FR»",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "relation": "not_compatible_with",
+      "target_kind": "printer",
+      "target_label": "P1P",
+      "quote": "Requires an enclosed printer; not compatible with P1P or A models",
+      "note": "The wiki material table rates open-frame printers (A Series, P1P) «Not Recommended» for ASA."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "source_title": "ABS / ASA / PC Usage Guide",
+      "locator": "Basic Filament Information › Hardware Compatibility › row «ABS / ASA / PC / PC FR»",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "relation": "not_compatible_with",
+      "target_kind": "printer",
+      "target_label": "A models",
+      "quote": "Requires an enclosed printer; not compatible with P1P or A models",
+      "note": "The source's own words; the wiki material table names the open-frame printers «A Series, P1P»."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "source_title": "ABS / ASA / PC Usage Guide",
+      "locator": "Basic Filament Information › Hardware Compatibility › row «ABS / ASA / PC / PC FR»",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "relation": "requires",
+      "target_kind": "other",
+      "target_label": "Glue",
+      "quote": "Glue application required; not compatible with Low-Temp Engineering Plate",
+      "corroborated_by": {
+        "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+        "locator": "p.1 › Recommended Printing Settings › Bed Surface Preparation",
+        "quote": "Bed Surface Preparation Glue"
+      }
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "source_title": "ABS / ASA / PC Usage Guide",
+      "locator": "Basic Filament Information › Hardware Compatibility › row «ABS / ASA / PC / PC FR»",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Low-Temp Engineering Plate",
+      "quote": "Glue application required; not compatible with Low-Temp Engineering Plate"
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "",
+      "source_title": "Bambu Lab US store product page (owner-only provenance)",
+      "retrieved_at": "2026-10-16T07:00:26Z",
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "locator": "p.1 › Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "note": "The wiki plate table agrees: «Bambu Engineering Plate … ASA … 90 - 100 ℃»."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "locator": "p.1 › Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "note": "The wiki plate table groups it as «Bambu Smooth PEI / High-Temperature Plate … ASA … 90 - 100 ℃»."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0 - ASA",
+      "locator": "p.1 › Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "retrieved_at": "2026-10-16T08:23:46Z",
+      "note": "The wiki plate table agrees: «Bambu Textured PEI Plate … ASA … 90 - 100 ℃»."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 3 › plate table › row ASA, column «Bambu Smooth PEI / High-Temperature Plate»",
+      "quote": "ASA | Not recommended | 90 - 100 ℃ | 90 - 100 ℃ | 90 - 100 ℃ | NO |",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "Columns: Cool Plate / PLA Plate | Engineering Plate | Smooth PEI / High-Temperature Plate | Textured PEI Plate | Upper Glass Cover Plate Removal. Cool Plate / PLA Plate is «Not recommended» (not a not_compatible_with fact)."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+      "title": "Filament TDS"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/10a896db93e04636a9f70b841867e7e6/SDS20251127B01_Bambu_ASA.pdf",
+      "title": "Filament MSDS"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/8b59c35ced5c4b848affd97e0664e12c/ASA_Hex_Code_Table.pdf",
+      "title": "Hex Code"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/abs_asa_pc",
+      "title": "ABS / ASA / PC Usage Guide"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament drying instructions"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness",
+    "thermal.glass_transition"
+  ],
+  "notes": [
+    "thermal.glass_transition: the TDS (p.2, Physical Properties) states «Glass Transition Temperature DSC, 10 °C/min N/A»; no number is published.",
+    "TDS values with no registry key (not stored): Young's modulus X-Y 2450 ± 270 MPa / Z 2120 ± 260 MPa; melt index 7.0 ± 0.8 g/10 min (260 °C, 2.16 kg); saturated water absorption 0.45% (25 °C, 55% RH); crystallization temperature N/A; printing and storage humidity < 20% RH (sealed, with desiccant); retraction length 0.8 - 1.4 mm; retraction speed 20 - 40 mm/s; max overhang angle ~ 70°; max bridging length ~ 40 mm; spool material PC + ABS (temperature resistance 90 °C); spool size diameter 200 mm, height 67 mm; annealing 80 to 90 °C for 6 to 12 h.",
+    "Z-direction mechanical values are not stored (one row per key, scope and region): tensile 31 ± 4 MPa, elongation 4.6 ± 0.8 %, bending modulus 1650 ± 120 MPa, bending strength 40 ± 3 MPa, impact 4.9 ± 0.6 kJ/m².",
+    "Every mechanical.* value is a printed-specimen result (TDS Specimen Test); the TDS publishes no raw-material mechanical values, so none are mixed. material.density, thermal.melting_temp, thermal.vicat_softening and thermal.heat_deflection_temp come from the TDS Physical Properties table.",
+    "In the box: no official in-the-box list exists for this product (the store page has none; the TDS has none).",
+    "material.diameter_tolerance (± 0.03 mm) and the spool type («Filament with spool») are published on the store page and kept from the deterministic layer; they are not listed as not_published."
+  ]
+}

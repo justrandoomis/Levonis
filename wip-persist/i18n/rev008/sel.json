@@ -1,0 +1,522 @@
+[
+ {
+  "i": 0,
+  "h": "823ad262d7fdbdb4a10cc2e4aa092b53710ee05d119a60bb95e3a75572fdc608",
+  "en": "Learn more about the AMS 2 Pro Power Board on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "ams-2-pro-power-board",
+   "title": "AMS 2 Pro Power Board",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  },
+  "dict": null
+ },
+ {
+  "i": 6,
+  "h": "6a327e86786e83b9cfe437a5f1ff1d25d044fc8ab2942fb6890a99ec87aca0bc",
+  "en": "Shock-Absorbing Extrusion Silicone",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "ams-2-pro-internal-hub-unit",
+   "title": "AMS 2 Pro Internal Hub Unit",
+   "field": "box[5]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 12,
+  "h": "63cdf337ce2387e5807fda37d6103743cb0a258491f64c5ecd64ee4527ff04e0",
+  "en": "Learn more about the AMS HT Bottom Cover Unit on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "ams-ht-bottom-cover-unit",
+   "title": "AMS HT Bottom Cover Unit",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  },
+  "dict": null
+ },
+ {
+  "i": 18,
+  "h": "358930f744253a143c7916afff464dd62a336ae52265412ee23071a49061d6f0",
+  "en": "Learn more about the AMS HT AC Power Cord on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "ams-ht-ac-power-cord",
+   "title": "AMS HT AC Power Cord",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  },
+  "dict": null
+ },
+ {
+  "i": 24,
+  "h": "315e149064f576b1f6cbd5717806cb331bdacf34b6fda9f6378696b53a50ac1b",
+  "en": "AMS HT Filament Retraction Motor",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "ams-ht-filament-retraction-assembly",
+   "title": "AMS HT Filament Retraction Assembly",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 31,
+  "h": "907b219341278f1d713bb0dc768920597dfd69c40dd4db2752acf19bdfba7721",
+  "en": "Learn more about the AMS HT Power Board on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "ams-ht-power-board",
+   "title": "AMS HT Power Board",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  },
+  "dict": null
+ },
+ {
+  "i": 37,
+  "h": "b493f9fed259bded5e835b26ff9a34cb3115af38cad5ec7a1e1f334bdc2d617f",
+  "en": "Learn more about the AMS HT Active Support Shaft Assembly on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "ams-ht-active-support-shaft-assembly",
+   "title": "AMS HT Active Support Shaft Assembly",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  },
+  "dict": null
+ },
+ {
+  "i": 43,
+  "h": "b143f4e3eeca095115cb1dabeb8280753720a054fc3a401bdf62e6039d3f3168",
+  "en": "BT2.6 Screw",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "filament-cutter-lever-h2s",
+   "title": "Filament Cutter Lever - H2S",
+   "field": "box[2]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 49,
+  "h": "242d17fbec779f31847159a6969f92e7c3534068ee44dffdf1e359733f79db13",
+  "en": "Extruder Drive Gear",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "extruder-gear-assembly-h2s",
+   "title": "Extruder Gear Assembly - H2S",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 55,
+  "h": "1a0c3abf7b371770bcce24ab17cc5657b410276998dad373c05faf103a8dc313",
+  "en": "Thermal Insulation Foam",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "hotend-heating-assembly-h2s",
+   "title": "Hotend Heating Assembly - H2S",
+   "field": "box[2]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 62,
+  "h": "526a15e660c6e75744db5964c3c672b94f974aef490785cb64ea80fc27cb87c3",
+  "en": "Nozzle Wiping Silicone Block",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "nozzle-wiping-pad-h2-series",
+   "title": "Nozzle Wiping Pad - H2 Series",
+   "field": "box[2]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 68,
+  "h": "d350aa657d8c1ab391e4a027641b3d37f517491191ab7420e699f373145bc059",
+  "en": "Carbon steel, Silicone",
+  "kind": "spec_value_text",
+  "ctx": {
+   "handle": "xy-belt-tensioner-p2s",
+   "title": "XY Belt Tensioner - P2S",
+   "field": "specs[part.material]",
+   "near": "Materials"
+  },
+  "dict": null
+ },
+ {
+  "i": 74,
+  "h": "74d474742f30054b6d79df4fd41fe903a7f3c1d36918ee229dc64bf6d6893d94",
+  "en": "Spacer",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "filament-cutter-lever-p2s",
+   "title": "Filament Cutter Lever - P2S",
+   "field": "box[1]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 80,
+  "h": "2f7e199b52ff4c3122467a8fe2251d57ed1cce312a0cb69a8f147c174a0a34ac",
+  "en": "Right side panel",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "right-side-panel-p2s",
+   "title": "Right Side Panel -P2S",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 86,
+  "h": "83d33c86988c7d0ba8a60209cd9dd8d372dd0536c1294b3b4edf4e27a73a5b71",
+  "en": "Cavity temperature sensor",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "chamber-temperature-sensor-p2s",
+   "title": "Chamber Temperature Sensor - P2S",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 93,
+  "h": "9211e5204f6be9bfa0ba13d7b5d228ac4df6c3c80417989e7b53c75359f58d40",
+  "en": "BT2x8 Screws",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "ap-board-cover-p2s",
+   "title": "AP Board Cover - P2S",
+   "field": "box[1]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 99,
+  "h": "c09de849df4509890387a6175e3e662613a96357473fd7e4f0950bf45290b506",
+  "en": "Springs",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "toolhead-carriage-p2s",
+   "title": "Toolhead Carriage - P2S",
+   "field": "box[3]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 105,
+  "h": "1b0e873d3e485293def3ced703ae3b6aea51635b1a92eb8e00e0d8ae93f40e7f",
+  "en": "Learn more about the replacement of the Heatbed for P2 Series on Bambu Lab Wiki .",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "heatbed-lv-p2s",
+   "title": "Heatbed - LV - P2S",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  },
+  "dict": null
+ },
+ {
+  "i": 111,
+  "h": "0c854a707371d7bc1f763a8f7cced0d3e0fe86a6677fed11d7ab12ea5b1fe19f",
+  "en": "LED Fill Light - Left",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "led-light-p2s",
+   "title": "LED Light - P2S",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 117,
+  "h": "3a93beaa114045dbb25493b29b046952cde76a40ac700ff7aef6cc70621479bf",
+  "en": "ST2x3.5 Screw",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "door-sensor-p2s",
+   "title": "Door Sensor - P2S",
+   "field": "box[1]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 124,
+  "h": "8af85857f161ef3c323ef41dd10355accd78b6653dc75f21420cda4cc26ccfbe",
+  "en": "PTFE Tube Bracket",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "ptfe-tube-bracket-p2s",
+   "title": "PTFE Tube Bracket - P2S",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 130,
+  "h": "f0c7d993933c1b6cabe9462bf15ffe8e4b7f7095c5a510fb396bfb5886498e3b",
+  "en": "Spool Holder base",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "spool-holder-p2s-x2d",
+   "title": "Spool Holder - P2S/X2D",
+   "field": "box[1]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 136,
+  "h": "eee5961f7f1c848db95bb8247196a7c976a0167a3757769e170f9d3c9aade19f",
+  "en": "BT3x10 Screw",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "front-door-mounting-kit-p2s",
+   "title": "Front Door Mounting Kit - P2S",
+   "field": "box[2]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 142,
+  "h": "599559cf22d5ae432851b584492f870c772af18a631875744cabe676ce9bf6e1",
+  "en": "Wiping Pad",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "nozzle-wiping-pad-p2s-x2d",
+   "title": "Nozzle Wiping Pad - P2S/X2D",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 148,
+  "h": "1256251b8d7a8148135fc920904a0cb0176a08231e422af84bfb4f3c7a2f5a26",
+  "en": "PW2.2x4.8x0.3 Washers",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "mc-board-p2s",
+   "title": "MC Board - P2S",
+   "field": "box[3]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 155,
+  "h": "0cd0b3686fc9e938925c892ba8bf62ed9c0347ccea4869929d8099a3d5d28abc",
+  "en": "ST3x24x7 screw",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "filament-buffer-p2s",
+   "title": "Filament Buffer - P2S",
+   "field": "box[1]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 161,
+  "h": "5b074bb6aef7aee6041c2e5470501c35b229ed644fb27bfb3636e212649c7274",
+  "en": "MC-AP Cable (Communication)",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "mc-ap-cable-pack-2-in-1-p2s",
+   "title": "MC AP Cable Pack (2-in-1) - P2S",
+   "field": "box[1]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 167,
+  "h": "17d81e8d1d85660441f5f44c5ca55e92468eb55dee9ca71e47b59a4739500948",
+  "en": "BT2x5 screw",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "th-board-p2s",
+   "title": "TH Board - P2S",
+   "field": "box[1]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 173,
+  "h": "8c9fed9f8f61c8e5f2b1974a17a0a08fb3b36de11122682aa693d4705bdb1a23",
+  "en": "Belt Tensioner Bracket",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "belt-tensioner-bracket-p2s",
+   "title": "Belt Tensioner Bracket - P2S",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 179,
+  "h": "c950782e00285885c2ba2015d96914f9cbec4d4dc706cba5a99015ed204c6944",
+  "en": "Induction Hotend Rack Control Board – MC Board Cable",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "induction-hotend-rack-cables-pack",
+   "title": "Induction Hotend Rack Cables Pack",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 186,
+  "h": "c4800f4bdcd4615650118d258d00f76f414dffd00a202f390449d58dcdffde59",
+  "en": "Learn more about the replacement of 3513 Induction Hotend Rack Motor on Bambu Lab Wiki.",
+  "kind": "usage_body",
+  "ctx": {
+   "handle": "3513-induction-hotend-rack-motor",
+   "title": "3513 Induction Hotend Rack Motor",
+   "field": "usage[0].body.line[0]",
+   "near": ""
+  },
+  "dict": null
+ },
+ {
+  "i": 192,
+  "h": "23ac7d2be063e4cf444f3e3688fd941d25c2e4dbb45d996958573f5efb0160e6",
+  "en": "M3x4.5 screws",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "rear-panel-p2s",
+   "title": "Rear Panel - P2S",
+   "field": "box[3]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 198,
+  "h": "4d6f9657776115c5a2b648960daa268c223425e986dc162d1f68925711a2b483",
+  "en": "Tape Measure * 1 pc",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "rotary-attachment-accessory-kit",
+   "title": "Rotary Attachment Accessory Kit",
+   "field": "box[1]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 204,
+  "h": "50e23a30d862dd9471acc04f79ec42c8c48d144c0803302e8fa2c9588d856a2a",
+  "en": "Auxiliary Extruder Assembly",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "auxiliary-extruder-x2d",
+   "title": "Auxiliary Extruder - X2D",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 210,
+  "h": "eaf028a379e2b4d95d1053a14645e889aa36990b0aab8fbe48fcbade2e7d9fa8",
+  "en": "M3x8 Screw *1;",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "auxiliary-extruder-gear-assembly-x2d",
+   "title": "Auxiliary Extruder Gear Assembly - X2D",
+   "field": "box[5]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 217,
+  "h": "5e7c811e60334bbcb7fba3dba81cfc9d1d3c44f98f4c4591cd5df227a774875a",
+  "en": "Right Air Duct",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "cooling-fan-for-hotend-x2d",
+   "title": "Cooling Fan for Hotend - X2D",
+   "field": "box[2]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 223,
+  "h": "5dc807cb5c0734df2d8b6daa92405188de53e8a28639dd90fb3c0a8ab66f7230",
+  "en": "Toolhead Interface Board",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "extruder-connection-board-x2d",
+   "title": "Extruder Connection Board - X2D",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 229,
+  "h": "7b36257f8784bbcd368d1515980fc67af5d88350a1e11fd69cedc9b360375f42",
+  "en": "Left Hotend Heating Assembly",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "hotend-heating-assembly-left-x2d",
+   "title": "Hotend Heating Assembly - Left - X2D",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 235,
+  "h": "07b0f0f184ca9b18fc2798bcdc14fbcdd4969b29f3fdd4dbae0a62b28d355cdb",
+  "en": "Extruder Front Cover *1;",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "extruder-unit-front-cover-assembly-x2d",
+   "title": "Extruder Unit Front Cover Assembly - X2D",
+   "field": "box[0]",
+   "near": "In the box"
+  },
+  "dict": null
+ },
+ {
+  "i": 241,
+  "h": "eda2553acb929f74ec3ad72e42645ca5f5a70e9b2b3b9b70104be8562e35728b",
+  "en": "Rear Cover",
+  "kind": "box_item",
+  "ctx": {
+   "handle": "toolhead-carriage-x2d",
+   "title": "Toolhead Carriage - X2D",
+   "field": "box[1]",
+   "near": "In the box"
+  },
+  "dict": null
+ }
+]

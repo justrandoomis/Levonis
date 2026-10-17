@@ -1,0 +1,2966 @@
+{
+ "batch": 33,
+ "surface": "api",
+ "handles": [
+  "lithophane-led-backlight-board-kit",
+  "tec-9-disc-shooter",
+  "breezebuddy",
+  "adhesive-foam-sponge-strip-roll",
+  "piano-music-box-winding-kit",
+  "water-bladder",
+  "smooth-ball-spring-plunger",
+  "electric-push-rod",
+  "gt2-timing-belt",
+  "nfc-tag-with-adhesive",
+  "nfc-tag-sticker",
+  "single-axis-plastic-reduction-gear-kit",
+  "dual-axis-plastic-reduction-gear-kit",
+  "030-micro-dc-motor-with-sh1-0",
+  "apex-legends-wingman-with-reload-mechanics",
+  "cute-flame-devil-lights",
+  "monster-tree-light",
+  "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+  "halloween-classic-carved-pumpkin-lantern",
+  "halloween-skull-tear-pumpkin-lantern",
+  "halloween-ghost-night-light",
+  "pocket-rubber-band-racer",
+  "watch-stand-for-apple-samsung-galaxy",
+  "endless-loop-express-kit-016",
+  "halloween-cute-creepy-candle-holder",
+  "halloween-ghost",
+  "halloween-ghost-light",
+  "cauldron-light",
+  "halloween-pumpkin-light",
+  "electric-water-spray-kit-02",
+  "rechargeable-power-kit",
+  "electric-water-spray-kit-01",
+  "electric-bubble-maker-kit-01",
+  "cute-witchs-cauldron-tea-light",
+  "jack-skellington-oogie-boogie-pumpkin-theelight",
+  "reading-ghost-halloween-tea-light-decor",
+  "flexi-pets-keychain-magnet-collections",
+  "6500k-white-led-light-strip-combo-kit",
+  "standby-mode-dock-for-iphone",
+  "ws2812b-rgb-led-strip-light-bundle",
+  "makers-supply-electronics-bundle",
+  "cipher-helmet-lock-kit",
+  "rectangular-transparent-double-sided-adhesive"
+ ],
+ "strings": [
+  {
+   "h": "c94332ef268ff9f7f9f7fa3b01bdaabe1c66838a8bc9d11a66705df9080f8ad6",
+   "en": "Note: The latest version and portable photo frames are now available on MakerWorld. For more details, click here.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[0].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fc2d9bec29c375581fe99badfa93545014a70f589e0bd9320291bdbb5c3f9228",
+   "en": "Bring your images to life! By combining 3D printing technology with the PLA CMYK Lithophane Bundle, you can effortlessly design and create stunning Lithophane artworks at home. Simply use the Lithophane LED Backlight Board Kit to illuminate your creations and make them truly shine.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "7670860767ace1ed03bf4fd983ecba66af83d598dff45397471b62a0dba7f70f",
+   "en": "Start creating your lithophane with Make My Lithophane today! Make My Lithophane is also available in Bambu Handy now.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[1].line[2]",
+    "near": "Bring your images to life! By combining 3D printing technology with the PLA CMYK Lithophane Bundle, you can effortlessly design and create stunning Lithophane a"
+   },
+   "dict": null
+  },
+  {
+   "h": "e14967c87693dc8546a7f0950aa1dee374a1be2aec4a1707e35a17530ea9b827",
+   "en": "6 Lithophane Styles to Choose From",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[2].line[0]",
+    "near": "There are six types of Lithophane available on the Make My Lithophane page. Among them, Mono Lithophane with Frame and Colorful Lithophane are compatible with t"
+   },
+   "dict": null
+  },
+  {
+   "h": "008fe1f285b01e4fd176c487a578a88004f2c693dd1af1cf469c6ebea84d53b3",
+   "en": "There are six types of Lithophane available on the Make My Lithophane page. Among them, Mono Lithophane with Frame and Colorful Lithophane are compatible with the Lithophane LED Backlight Board Kit. If you want to bring color to your Lithophane, please choose the Colorful Lithophane with Frame option.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[2].line[1]",
+    "near": "6 Lithophane Styles to Choose From"
+   },
+   "dict": null
+  },
+  {
+   "h": "e6a24228f0ddc4c7ef9da68af4a5fffc4382f545bf384f2e47effdb009cab2bb",
+   "en": "Note: The latest version and portable photo frames are now available on MakerWorld, with updated supporting documents are provided below for downloading.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[3].line[0]",
+    "near": "For more details, click here. We welcome everyone's feedback about the model to further improve it."
+   },
+   "dict": null
+  },
+  {
+   "h": "65bf189a2466dacec52b18f83c4f234e20345f7bdaa3970fcf6966f739fd0fe0",
+   "en": "For more details, click here. We welcome everyone's feedback about the model to further improve it.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Note: The latest version and portable photo frames are now available on MakerWorld, with updated supporting documents are provided below for downloading."
+   },
+   "dict": null
+  },
+  {
+   "h": "a44de33e446e42aa3c7f40d3db81abf33a8bfff88a157183c983f1451c0d8405",
+   "en": "Difference between CMYK Backlight Board And This Kit",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[0]",
+    "near": "Product | CMYK Backlight Board | Lithophane LED Backlight Board （2PCS） | Lithophane LED Backlight Board （4PCS）"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb9ef894175c327470f768d95ca7bee65e19853a0eaace3805f8a7b8a12270da",
+   "en": "Product",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[1].cell[0]",
+    "near": "Difference between CMYK Backlight Board And This Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ecc08b23ca7e5be598ff4cecc2dc24525a1c7d23fc9f531de0df86d466a8c8c",
+   "en": "CMYK Backlight Board",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[1].cell[1]",
+    "near": "Difference between CMYK Backlight Board And This Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "31c1edd94cf448c8da7db12eef8717a4f197246cfadeb9199349fc95ddefc3d8",
+   "en": "Lithophane LED Backlight Board （2PCS）",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[1].cell[2]",
+    "near": "Difference between CMYK Backlight Board And This Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "f901f1093ea1b99dafe18d639dd6b3dca8158e80555388b9341649889ba31956",
+   "en": "Lithophane LED Backlight Board （4PCS）",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[1].cell[3]",
+    "near": "Difference between CMYK Backlight Board And This Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "f1a19b5769b9233ab279cd9711ae89f06dc94e5ead39f7cde21e4ff22e10a9da",
+   "en": "Size support",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[2].cell[0]",
+    "near": "Product | CMYK Backlight Board | Lithophane LED Backlight Board （2PCS） | Lithophane LED Backlight Board （4PCS）"
+   },
+   "dict": null
+  },
+  {
+   "h": "b51fbff7ef3484ca39f5c1f2e26d0d866657dcf45626dcbe349aa9b669a551f2",
+   "en": "Single size",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[2].cell[1]",
+    "near": "Product | CMYK Backlight Board | Lithophane LED Backlight Board （2PCS） | Lithophane LED Backlight Board （4PCS）"
+   },
+   "dict": null
+  },
+  {
+   "h": "f7901d5de76bec4217fde054652bb1613a4f75546446de8f72b184f70ad9b930",
+   "en": "Multiple sizes supported",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[2].cell[3]",
+    "near": "Product | CMYK Backlight Board | Lithophane LED Backlight Board （2PCS） | Lithophane LED Backlight Board （4PCS）"
+   },
+   "dict": null
+  },
+  {
+   "h": "177689083b77982f06739691e4dc823ed3dbe6c9a024e6792b1643850db05058",
+   "en": "Lithophane Size(including margin)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[3].cell[0]",
+    "near": "Size support | Single size | Single size | Multiple sizes supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ddf86edacddcefa282fe7e5f12586aac415ed8950725c43c706c1eace5d9e1b",
+   "en": "2PCS：106 x 156 x （2.5-3.2）mm",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[3].cell[2]",
+    "near": "Size support | Single size | Single size | Multiple sizes supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "d06cab960c9219f3f4a8b4d991431b307b24770ae348362aafb7ebbe3439f198",
+   "en": "2PCS：106 x 156 x （2.5-3.2）mm OR 3PCS：156 x 156 x （2.5-3.2）mm OR 4PCS：156 x 207 x（2.5-3.2）mm",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[3].cell[3]",
+    "near": "Size support | Single size | Single size | Multiple sizes supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "5eaa70151d13588490040d8db1447a4eb30db6b6dbff1b3820e33874c7b05911",
+   "en": "Assemble Methods",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[4].cell[0]",
+    "near": "Lithophane Size(including margin) | 144 x 108 x 2.7 mm | 2PCS：106 x 156 x （2.5-3.2）mm | 2PCS：106 x 156 x （2.5-3.2）mm OR 3PCS：156 x 156 x （2.5-3.2）mm OR 4PCS：156"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b12507783d5becacbf2ebe5b01a60024d8728a8f86dcc818bce699e8b3320bc",
+   "en": "One",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[4].cell[1]",
+    "near": "Lithophane Size(including margin) | 144 x 108 x 2.7 mm | 2PCS：106 x 156 x （2.5-3.2）mm | 2PCS：106 x 156 x （2.5-3.2）mm OR 3PCS：156 x 156 x （2.5-3.2）mm OR 4PCS：156"
+   },
+   "dict": null
+  },
+  {
+   "h": "94a72c074cfe574742c9e99e863322f73feff82981d065ff65a0308f44f19f62",
+   "en": "Two",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[4].cell[2]",
+    "near": "Lithophane Size(including margin) | 144 x 108 x 2.7 mm | 2PCS：106 x 156 x （2.5-3.2）mm | 2PCS：106 x 156 x （2.5-3.2）mm OR 3PCS：156 x 156 x （2.5-3.2）mm OR 4PCS：156"
+   },
+   "dict": null
+  },
+  {
+   "h": "6ab523c52d1407cc4de015423091d1a76995f01d32d6c4b36616df23da744a0e",
+   "en": "Five",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[4].cell[3]",
+    "near": "Lithophane Size(including margin) | 144 x 108 x 2.7 mm | 2PCS：106 x 156 x （2.5-3.2）mm | 2PCS：106 x 156 x （2.5-3.2）mm OR 3PCS：156 x 156 x （2.5-3.2）mm OR 4PCS：156"
+   },
+   "dict": null
+  },
+  {
+   "h": "0072e6b934945d5ba08f9729e00847391922f2f6026a435e704634fb93bf4502",
+   "en": "Design",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[5].cell[0]",
+    "near": "Assemble Methods | One | Two | Five"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a1f61aec86e8dd3bbb8d61a9ddc93b56f79d875f2f16db753a6f312ed59fd4d",
+   "en": "Fixed size",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[5].cell[1]",
+    "near": "Assemble Methods | One | Two | Five"
+   },
+   "dict": null
+  },
+  {
+   "h": "3352c1dffdb439133b304e276cceff10c3178bfa5bedf22c8aa1c8c3bdf8502d",
+   "en": "Modular design",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[5].cell[2]",
+    "near": "Assemble Methods | One | Two | Five"
+   },
+   "dict": null
+  },
+  {
+   "h": "c869f99efa11a911698519ef3227cf5c236c2cab16ba8314bc2f29c15ad85a62",
+   "en": "Dimming function",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[6].cell[0]",
+    "near": "Design | Fixed size | Modular design | Modular design"
+   },
+   "dict": null
+  },
+  {
+   "h": "1246fc93bca00b90d0fcaf2f7b7b41546f08817ce552c25eabc7dca19181c65a",
+   "en": "Fixed",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[6].cell[1]",
+    "near": "Design | Fixed size | Modular design | Modular design"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3530e19b18ffc72087f058e8a1862ec03152c6db0988d5dbee89abbccb57c65",
+   "en": "Adjustable (long-press dimming)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[6].cell[2]",
+    "near": "Design | Fixed size | Modular design | Modular design"
+   },
+   "dict": null
+  },
+  {
+   "h": "b665bfc292d96e31d6fbb0b28ee03bd36c8266b1e7d0d61f999a874ac093d4d0",
+   "en": "Not included",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[7].cell[1]",
+    "near": "Dimming function | Fixed | Adjustable (long-press dimming) | Adjustable (long-press dimming)"
+   },
+   "dict": {
+    "ar": "غير مشمول",
+    "ckb": "لەخۆناگرێت"
+   }
+  },
+  {
+   "h": "f7cb5647f0c57e30b0b1c8af05238ef2a2d3ed82520be09476026160f85e463f",
+   "en": "Ideal for",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[8].cell[0]",
+    "near": "Power cable | Not included | Included | Included"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6fa936821d993cf07230f80fc81485bb0e5def84506a02a954b3216731d4ac2",
+   "en": "Users seeking a straightforward solution",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[8].cell[1]",
+    "near": "Power cable | Not included | Included | Included"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e566bd8b4222a1a5b1142030a7b0d2eb73a7b604632ab40e0da9c512cc0db16",
+   "en": "Users who require flexibility and customization",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[8].cell[2]",
+    "near": "Power cable | Not included | Included | Included"
+   },
+   "dict": null
+  },
+  {
+   "h": "cdd5ae5154a29611db80408d9a7f80f2b3a57bba4118267074ede8af64e18a70",
+   "en": "xxxxDiablo Cathedral - Detailed Light-Up Miniature",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[10].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "0a8e6229a09add54a9866bd6df2c7d1c7d535976c63946b41208061e9ad49272",
+   "en": "MaKim",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[10].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "a807d11a08677944a12ad22d194e7dcaae167f6ff0e98bff3cda1230f1c5001c",
+   "en": "Ozark Mountain Sunset Book Nook",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[6].line[11].cell[0]",
+    "near": "xxxxDiablo Cathedral - Detailed Light-Up Miniature | MaKim | xxxxDiablo Cathedral - Detailed Light-Up Miniature"
+   },
+   "dict": null
+  },
+  {
+   "h": "0198a83cad308b406fe032123de38268b2c902c4d93e5866f703cb5db9615340",
+   "en": "Smaller nozzle sizes and lower layer heights are essential to achieve better printing results. We suggest using 0.2mm or 0.4mm nozzle sizes and layer heights between 0.08mm and 0.12mm. If you use other tools to generate the lithophane model, you may need to configure the print profile to optimize the result. Please check CMYK Lithophane Printing Guide on Wiki.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "blocks[7].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "10d81c8ce01665e25939038d10fb1878c29f7a04bc8b486311300975997f8b35",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional T-15/ TEC-9 Disc Shooter . To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tec-9-disc-shooter",
+    "title": "T-15/TEC-9 Disc Shooter",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a399a525787d4dbfcb613c7d568b9db02e00749cdecb301be2fd06b09ee4c69",
+   "en": "To download the model files of the T-15/ TEC-9 Disc Shooter and obtain detailed information, please visit the T-15/ TEC-9 Disc Shooter on MakerWorld. The creator@QYM3D has released v2.0 and a mini version of the TEC-9 Disc Shooter, which fixes multiple issues with v1.0 and enhances the user experience.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tec-9-disc-shooter",
+    "title": "T-15/TEC-9 Disc Shooter",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "4f6d864c00198e03cc375153930a676a582d91714b7733f582e40b048cba8e4c",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional BreezeBuddy. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "breezebuddy",
+    "title": "BreezeBuddy",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "09020f584f720adb64f48fa18bf4f6ce11c613b1ec56f7371ad4c2f1b3e39865",
+   "en": "To download the model files of the BreezeBuddy and obtain detailed information, please visit the BreezeBuddy on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "breezebuddy",
+    "title": "BreezeBuddy",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "75d07a7d25cf1ceacae49fd2ce206dfb4bf5ac18e54645a7df96788bd5d54e4c",
+   "en": "W (mm) Thickness",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "blocks[0].line[2].cell[2]",
+    "near": "Specification"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6860733ad71c9b548ed206a7d8eac3a0bf1290cfc86ba6621b7bc769c11c9aa",
+   "en": "L (m) Length",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "blocks[0].line[2].cell[3]",
+    "near": "Specification"
+   },
+   "dict": null
+  },
+  {
+   "h": "89a3bed3345c7fadd6fbe58748d0152dec4683ada7386eb10c4fab10f855fe7c",
+   "en": "The Adhesive Foam Sponge Strip Roll is highly versatile due to its excellent sealing, shock absorption, and adhesive properties. It can be applied to the bottom of models to prevent sliding on smooth surfaces, ensuring stability for display models or items that need secure placement. Additionally, the sealing capabilities of adhesive foam can be useful in multiple applications such as filament dry boxes, etc. to extend the shelf life of water-absorbing materials in humid environments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "a8b9a2c224c84c553661108177650f3c6c1a2a8246e6c12613cf19aca9cb42b1",
+   "en": "Leaves no residue or contamination on equipment and is non-corrosive to metals",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "blocks[2].line[1].cell[0]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "b739d539cf08f2c7671a72f96e18c481df8cd87d560674dc4f425d80b41374eb",
+   "en": "Suitable for temperature ranges from -40℃ to 90℃",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "74d3410583ebec9413f20f6150eca2ba31c2566f2fc8eae6c7a6a542b2f27cb9",
+   "en": "Easy to adhere, fabricate, and cut",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "blocks[2].line[1].cell[2]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f2b549743c4ac9204cc287c29a16164c28030780b05a031f26e6496db571ed9",
+   "en": "Noise reduction, gap filling, sealing, dustproofing, shock absorption, and light blocking",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "blocks[2].line[2].cell[0]",
+    "near": "Leaves no residue or contamination on equipment and is non-corrosive to metals | Suitable for temperature ranges from -40℃ to 90℃ | Easy to adhere, fabricate, a"
+   },
+   "dict": null
+  },
+  {
+   "h": "8264c8530e6b437d3dfe71604057d492164edc7948fb517862b257d80e8a12cf",
+   "en": "Safe and eco-friendly with high flame resistance",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "blocks[2].line[2].cell[1]",
+    "near": "Leaves no residue or contamination on equipment and is non-corrosive to metals | Suitable for temperature ranges from -40℃ to 90℃ | Easy to adhere, fabricate, a"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9dfdd5fc9ade1bd923b7dc3b7ae97bc9f7993bc9151ce832bf72e3b3152b4bb",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Piano Music Box Bottom Winding Kit and Piano Music Box Hand Winding Kit. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "piano-music-box-winding-kit",
+    "title": "Piano Music Box Winding Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad0f43ba30312809914575c64958f945d8883e5bbf03c2dafb0cf009138e5f85",
+   "en": "Assembly Instructions",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "piano-music-box-winding-kit",
+    "title": "Piano Music Box Winding Kit",
+    "field": "blocks[2].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2ba86ab44b82fc7d7a19b2ee0d279238d89d95177a58283657a3b97c3931f213",
+   "en": "Musical Tunes List",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "piano-music-box-winding-kit",
+    "title": "Piano Music Box Winding Kit",
+    "field": "blocks[3].line[0]",
+    "near": "*Note: The melody can be confirmed by checking the stamped serial number on the movement and consulting the Musical Tunes List provided in the appendix."
+   },
+   "dict": null
+  },
+  {
+   "h": "d57b7c3586b59e4426d2b759c68378f7832f9ab76a45dba28bf573448fb9aa45",
+   "en": "*Note: The melody can be confirmed by checking the stamped serial number on the movement and consulting the Musical Tunes List provided in the appendix.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "piano-music-box-winding-kit",
+    "title": "Piano Music Box Winding Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Musical Tunes List"
+   },
+   "dict": null
+  },
+  {
+   "h": "42dca5c5848699d40da8ccfd131c37939668f61b373ec5c2313e845e7b0d20d2",
+   "en": "This eco-friendly water bladder is designed to be lightweight and foldable, saving space and making it ideal for outdoor activities or everyday use. Made from TPU, the material boasts excellent wear resistance, durability in low temperatures, and superior flexibility. It is also safe and free from harmful substances, offering a reliable and healthy choice for hydration.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "a49a1b9e5f13183692317874d67ee86a2f85cf19390f79ef8f6b7e861420c18e",
+   "en": "Lightweight, Foldable, and Space-Saving: Compact and lightweight design that folds for easy storage, saving space—perfect for outdoor adventures, hiking, and daily use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "1160d904ed40a4d0d7a8dc99fe200ad95d01a524dd376fbcd09f6d6297fc35b8",
+   "en": "Durable, Leak-Proof, and Secure Threaded Design: Made with high-strength TPU material and a threaded interface for a leak-proof and durable design, ensuring a worry-free experience.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[2].line[2]",
+    "near": "• Lightweight, Foldable, and Space-Saving: Compact and lightweight design that folds for easy storage, saving space—perfect for outdoor adventures, hiking, and "
+   },
+   "dict": null
+  },
+  {
+   "h": "bd06405f253f2166be30a35e87effba04734ad34193a00ec265f3acc98789218",
+   "en": "Eco-Friendly, Safe, and Comfortable to Handle: Made from eco-friendly TPU and silicone materials, it is soft, flexible, and comfortable to use, making it suitable for various environments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[2].line[3]",
+    "near": "• Durable, Leak-Proof, and Secure Threaded Design: Made with high-strength TPU material and a threaded interface for a leak-proof and durable design, ensuring a"
+   },
+   "dict": null
+  },
+  {
+   "h": "1897351e6a9c74492c162d25e55ef8ea6fc158a7a37360cd13f1ae8cb05f55b9",
+   "en": "Mushroom Bottle",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[2].line[5].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "930ff231ddca70f760516a87acefb9c616dd46adf1b03e90fc719b2f87123482",
+   "en": "Trailblazer's Scarlet Gourd",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[2].line[6].cell[0]",
+    "near": "Mushroom Bottle | wuguigui | Mushroom Bottle"
+   },
+   "dict": null
+  },
+  {
+   "h": "2426eafcd78bbfef02e734d84668885d00ceff6807001d15c7aa5d65f6bf0378",
+   "en": "DaDaLand",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[2].line[6].cell[1]",
+    "near": "Mushroom Bottle | wuguigui | Mushroom Bottle"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b08a55edb460a25c85d7032d39334aceadb346d0087520b99c56672f04209c9",
+   "en": "Avoid Long-Term Liquid Storage. Long-term liquid storage may lead to bacterial growth. Clean and air-dry the bladder after each use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[3].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "eab7a7e97b8c4ac3402e3f2a162381d6b8f539546c4e2bf0b5716f53538dc1f0",
+   "en": "The water bladder is not suitable for sugary drinks, as they can promote bacterial growth, mold, and odors, nor is it recommended for alcoholic beverages, which may affect the seal.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[3].line[2]",
+    "near": "• Avoid Long-Term Liquid Storage. Long-term liquid storage may lead to bacterial growth. Clean and air-dry the bladder after each use."
+   },
+   "dict": null
+  },
+  {
+   "h": "c34aab80414d16cef2dd9363daaa79d2ac0f533576a386b76df433d1932206f7",
+   "en": "Additionally, avoid using hot liquids, as they can damage the water bladder, reduce its lifespan, or cause burns.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "blocks[3].line[3]",
+    "near": "• The water bladder is not suitable for sugary drinks, as they can promote bacterial growth, mold, and odors, nor is it recommended for alcoholic beverages, whi"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9959a097d42ce26b963bcd7a965589a285a5546766a58fe102c16ff998ed659",
+   "en": "D (mm) Out Diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "blocks[1].line[0].cell[2]",
+    "near": "FB001 | 3 | 2 | 0.5 | 5"
+   },
+   "dict": null
+  },
+  {
+   "h": "dbb8c8d079ed738dc0ff769c9641efd1a43d3bcb93b463e76468d17ae070f6ea",
+   "en": "C (mm) Length",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "blocks[1].line[0].cell[3]",
+    "near": "FB001 | 3 | 2 | 0.5 | 5"
+   },
+   "dict": null
+  },
+  {
+   "h": "f44cede8a9541d32cff79125703b4267c4a1d7720e4cc1461a7d46863dbdb016",
+   "en": "B (N) Pressure",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "blocks[1].line[0].cell[4]",
+    "near": "FB001 | 3 | 2 | 0.5 | 5"
+   },
+   "dict": null
+  },
+  {
+   "h": "2a418da0a65e4208f1522b52b83223d80b3a00db8e524c6263f1bd68023b5d6f",
+   "en": "High Quality: Made from durable stainless steel, providing exceptional strength and reliable resistance in various environments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "7bfa780fd02ed40101dc715d4b885cb2903b8d0bb2124083e8a2bf3503070503",
+   "en": "Excellent Functionality: Ideal for delivering consistent pressure and ensuring precise positioning.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "blocks[2].line[2]",
+    "near": "• High Quality: Made from durable stainless steel, providing exceptional strength and reliable resistance in various environments."
+   },
+   "dict": null
+  },
+  {
+   "h": "0423205a43ebf86c6bfa505660f45ac100ebc9a61f5e86ff2a24702583f7eb0d",
+   "en": "Easy to Use: Easy to install and convenient to use—simply press it in for secure fastening.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "blocks[2].line[3]",
+    "near": "• Excellent Functionality: Ideal for delivering consistent pressure and ensuring precise positioning."
+   },
+   "dict": null
+  },
+  {
+   "h": "699534173b3f1a45e8f85e53c98bd01c3924228bfac36bec2f1f7c10b192a0df",
+   "en": "Wide Application: Versatile for use in mechanical devices, clamps, automatic machines, and more.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "blocks[2].line[4]",
+    "near": "• Easy to Use: Easy to install and convenient to use—simply press it in for secure fastening."
+   },
+   "dict": null
+  },
+  {
+   "h": "376aaf28f599151f7e6e476a09f9af1f357804a166c0c5421ed778c4baeaad44",
+   "en": "Ensure the 3D printed parts have holes matching the size of the plain ball plunger screw.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "blocks[3].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "cafd9b2305552b92f4b5cab064f0d4c50d78795d46f9e00466e8c0fe1dc2412c",
+   "en": "Maintain precise tolerances for a proper fit and smooth operation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "blocks[3].line[2]",
+    "near": "• Ensure the 3D printed parts have holes matching the size of the plain ball plunger screw."
+   },
+   "dict": null
+  },
+  {
+   "h": "79da5170af29ac8d1b6b0bd6fd335a3a0e5b409f04cb58b7137fc3186ab106a9",
+   "en": "The Electric Push Rod includes an electric linear actuator and a control cable. Connect the actuator to the Remote Control Receiver Shield's servo interface using the included cable to control its extension and retraction. With its ultra-compact size and sleek silver-white design, it's perfect for CyberBrick miniature engineering models, serving as a realistic substitute for hydraulic cylinders and similar components. Ideal for any application requiring stable, precise linear motion.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-push-rod",
+    "title": "Electric Push Rod",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "b55584b035159a9171c4965932c0fa76cbb6ce9a8a2feef3caa95f9012cc24fc",
+   "en": "Essential Electrical and Physical Parameters.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-push-rod",
+    "title": "Electric Push Rod",
+    "field": "blocks[2].line[2]",
+    "near": "Specification"
+   },
+   "dict": null
+  },
+  {
+   "h": "8aed0d25f69af3223facf1158515e26ecaac04e7ac91af43dd563416a3a6cded",
+   "en": "Side-insert hidden component design",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-push-rod",
+    "title": "Electric Push Rod",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "e19e872c6da25f87d958f001d010d27ea71cdf0bf62c3a77447a81541331871a",
+   "en": "Protective structure against motor wire breakage",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-push-rod",
+    "title": "Electric Push Rod",
+    "field": "blocks[4].line[2]",
+    "near": "• Side-insert hidden component design"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb827f24d7b88619d06ed313f4676d58241d247935438d33ddf5738f59194423",
+   "en": "ROHS2.0 compliant, ensuring safety & environmental friendliness",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-push-rod",
+    "title": "Electric Push Rod",
+    "field": "blocks[4].line[3]",
+    "near": "• Protective structure against motor wire breakage"
+   },
+   "dict": null
+  },
+  {
+   "h": "76ca71e5792bbb9ddda206d23f3d4047fbee850217cc85712f93db71996a522d",
+   "en": "Rotatable telescopic rod for versatile applications and flexible operation",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-push-rod",
+    "title": "Electric Push Rod",
+    "field": "blocks[4].line[4]",
+    "near": "• ROHS2.0 compliant, ensuring safety & environmental friendliness"
+   },
+   "dict": null
+  },
+  {
+   "h": "a012a2cfb5fa42e00cb2da27c74928acb908a5f2daf19e342be8c414c370b74f",
+   "en": "Ensure accurate rotation alignment for motors and components, enhance system stability",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "gt2-timing-belt",
+    "title": "GT2 Timing Belt",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "8bf6298ae04eb614ea10774294e07237f687f0b25bc9833be5e5ee51caa299cd",
+   "en": "Improve torque transmission and meshing, reducing tooth slippage",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "gt2-timing-belt",
+    "title": "GT2 Timing Belt",
+    "field": "blocks[2].line[2]",
+    "near": "• Ensure accurate rotation alignment for motors and components, enhance system stability"
+   },
+   "dict": null
+  },
+  {
+   "h": "b14d4d25612ce8dff40fc92fcbae49f82ab637fe8892f6a9d7783611409d0434",
+   "en": "Ideal for demanding high-load and high-torque drive system",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "gt2-timing-belt",
+    "title": "GT2 Timing Belt",
+    "field": "blocks[2].line[3]",
+    "near": "• Improve torque transmission and meshing, reducing tooth slippage"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe69a385ab9ca7953d3aa2a7abb7edcdbd90748bd256e5938fb6573a03e706bd",
+   "en": "High efficiency, smooth, quiet and durable",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "gt2-timing-belt",
+    "title": "GT2 Timing Belt",
+    "field": "blocks[2].line[4]",
+    "near": "• Ideal for demanding high-load and high-torque drive system"
+   },
+   "dict": null
+  },
+  {
+   "h": "a61dbfe73969fb51d17cad3f62cc5ba2ead9259063b4ab5454ccec62a88c5c83",
+   "en": "The NFC Tag with Adhesive is a durable and versatile solution for integrating NFC functionality into a wide range of projects. Featuring a robust plastic or composite material, this tag is designed to withstand various environmental conditions while offering the convenience of an adhesive backing for easy attachment. Its sturdy construction makes it ideal for applications requiring long-term durability, such as embedding in industrial equipment, smart signage, or 3D-printed objects. With its ability to store and transfer data securely, the NFC Tag with Adhesive is a reliable choice for enhancing interactivity and functionality in your designs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "a1872f3b4c78828783aa8b8ea7a9195d97d7a663d7da6bbc2a35739e309b7976",
+   "en": "Valentine's Day Heart Box",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "blocks[0].line[3].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "ddbcef3bc819f8145a7a4b39066e46e42bb83594b785cf4be01fcc424d031b34",
+   "en": "@SouthLab",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "blocks[0].line[3].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "850645639b9c137dc73dc382e80465907aff3859a78e17945ce26081bbbf6a5d",
+   "en": "Wide Compatibility: Fully compatible with most NFC-enabled devices, including smartphones, tablets, and NFC readers.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "10b7880da3c555047e04d19844e59872b3316b73c3b66450a42910d27eb569c5",
+   "en": "Easy to Use: Durable adhesive backing ensures strong and secure attachment to various surfaces, including 3D-printed objects, metal, plastic, or wood.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "blocks[1].line[2]",
+    "near": "• Wide Compatibility: Fully compatible with most NFC-enabled devices, including smartphones, tablets, and NFC readers."
+   },
+   "dict": null
+  },
+  {
+   "h": "a0b224f22ac8e9385561a3268b25a19219c9e6f74bfc3a699b1ed6b3b4997234",
+   "en": "Durable and Reliable: Built with robust PVC material, designed for long-term use, supporting up to 100,000 read/write cycles and 10 years of data retention.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "blocks[1].line[3]",
+    "near": "• Easy to Use: Durable adhesive backing ensures strong and secure attachment to various surfaces, including 3D-printed objects, metal, plastic, or wood."
+   },
+   "dict": null
+  },
+  {
+   "h": "658476ec5d2c54c883e4be81ab0c15520b86e852795e25526ff6573ae8c7dbea",
+   "en": "Advanced Security: Features anti-collision technology and unique serial numbers for stable and secure data transmission, ideal for sensitive or critical applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "blocks[1].line[4]",
+    "near": "• Durable and Reliable: Built with robust PVC material, designed for long-term use, supporting up to 100,000 read/write cycles and 10 years of data retention."
+   },
+   "dict": null
+  },
+  {
+   "h": "4bace90a4ea2a913802af4da137493dbebc9958802ecd68968dc4d374a1ab390",
+   "en": "Versatile Applications: Excellent for embedding in 3D-printed objects, industrial equipment, smart home automation, access control systems, and more.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "blocks[1].line[5]",
+    "near": "• Advanced Security: Features anti-collision technology and unique serial numbers for stable and secure data transmission, ideal for sensitive or critical appli"
+   },
+   "dict": null
+  },
+  {
+   "h": "8244896ebe6d28d9a5591754b8e8258c72f1f37f4ace2d7b22e471e12b16990a",
+   "en": "NFC (Near Field Communication) tag stickers combine the functionality of NFC tags with a lightweight, adhesive-backed design, making them ideal for quick and versatile applications. Commonly used for contactless payments, access control, and product tracking, NFC tag stickers are particularly well-suited for embedding in 3D printing projects. They can store data such as model settings or usage instructions and can be easily affixed to 3D-printed objects. This makes them a practical and efficient choice for enhancing the interactivity and functionality of your designs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nfc-tag-sticker",
+    "title": "NFC Tag Sticker (20pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "e58860397e886d0c44f964189878d1c5d35e790a6ea7c1e11fdffc82b0a2f1da",
+   "en": "Lightweight and Compact: Ultra-thin and lightweight design, ideal for temporary or low-impact applications, with up to 100,000 read/write cycles and 10 years of data retention.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nfc-tag-sticker",
+    "title": "NFC Tag Sticker (20pcs)",
+    "field": "blocks[1].line[3]",
+    "near": "• Easy to Use: Durable adhesive backing ensures strong and secure attachment to various surfaces, including 3D-printed objects, metal, plastic, or wood."
+   },
+   "dict": null
+  },
+  {
+   "h": "1231e7cee7d53d5247136062c64a300fbdeb6110935191fd6e508f9b37d995b3",
+   "en": "Versatile Applications: Perfect for product labeling, ticketing, promotional campaigns, or interactive marketing materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nfc-tag-sticker",
+    "title": "NFC Tag Sticker (20pcs)",
+    "field": "blocks[1].line[4]",
+    "near": "• Lightweight and Compact: Ultra-thin and lightweight design, ideal for temporary or low-impact applications, with up to 100,000 read/write cycles and 10 years "
+   },
+   "dict": null
+  },
+  {
+   "h": "342e8979f868a409128f6f0dc769cf5dc38d1f8298ccedad9e5c5f40c5780f7c",
+   "en": "Single-Axis Precision: Specifically designed for single-axis applications, ensuring smooth and accurate mechanical movements in toys, robots, and small engines.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "single-axis-plastic-reduction-gear-kit",
+    "title": "Single-axis Plastic Reduction Gear Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "99061493c09f637033c0c7717a4b054ff6ad2519e2c424213a24b500e1df7c38",
+   "en": "Durable Construction: High-strength plastic gears combined with robust metal shafts and screws provide long-lasting performance and reliability.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "single-axis-plastic-reduction-gear-kit",
+    "title": "Single-axis Plastic Reduction Gear Kit",
+    "field": "blocks[1].line[2]",
+    "near": "• Single-Axis Precision: Specifically designed for single-axis applications, ensuring smooth and accurate mechanical movements in toys, robots, and small engine"
+   },
+   "dict": null
+  },
+  {
+   "h": "e800fc7dd5231bbbad36cf8afa336278c1dae8748c0b9ac9ac43e7b3cad04d4d",
+   "en": "Versatile Gear Sizes: Includes a range of gear sizes and tooth counts, allowing for flexible gear ratio configurations to suit various mechanical needs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "single-axis-plastic-reduction-gear-kit",
+    "title": "Single-axis Plastic Reduction Gear Kit",
+    "field": "blocks[1].line[3]",
+    "near": "• Durable Construction: High-strength plastic gears combined with robust metal shafts and screws provide long-lasting performance and reliability."
+   },
+   "dict": null
+  },
+  {
+   "h": "4fb7273b8b444f6cd231678223bf4adb1f0d9058bc5706c7f1bcd8d1416f42d2",
+   "en": "Lightweight and Compact: Designed for easy integration into compact spaces, without adding unnecessary weight to your projects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "single-axis-plastic-reduction-gear-kit",
+    "title": "Single-axis Plastic Reduction Gear Kit",
+    "field": "blocks[1].line[4]",
+    "near": "• Versatile Gear Sizes: Includes a range of gear sizes and tooth counts, allowing for flexible gear ratio configurations to suit various mechanical needs."
+   },
+   "dict": null
+  },
+  {
+   "h": "c16f8033b504765da55c8d6ca8efce6529ffbe0ca63dd20918ccff32da831691",
+   "en": "Ensure the gear sizes and shaft lengths are compatible with your specific project requirements before purchase.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "single-axis-plastic-reduction-gear-kit",
+    "title": "Single-axis Plastic Reduction Gear Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "86e09a857d77ba9db902a66fc8e381c2ff6a91d1c2a915ed0b6ac5fdc25d79d0",
+   "en": "Designed for single-axis systems only; may not be suitable for multi-axis applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "single-axis-plastic-reduction-gear-kit",
+    "title": "Single-axis Plastic Reduction Gear Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• Ensure the gear sizes and shaft lengths are compatible with your specific project requirements before purchase."
+   },
+   "dict": null
+  },
+  {
+   "h": "408d7a7f2b5e97005dcf8ec71db584786aef29ac25951921effc8dee22d20682",
+   "en": "Assembly Guide",
+   "kind": "block_line",
+   "freq": 24,
+   "context": {
+    "handle": "single-axis-plastic-reduction-gear-kit",
+    "title": "Single-axis Plastic Reduction Gear Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Documentation"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d24f8c1a4813ebbde8c6b10fb79ac10897a0f7251ba433081736b4d1cc7659d",
+   "en": "Dual-Axis Precision: Specifically designed for dual-axis applications, enabling complex and accurate mechanical movements in various projects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-axis-plastic-reduction-gear-kit",
+    "title": "Dual-axis Plastic Reduction Gear Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "76b8a86840d00d10c9e72822c26d79eccbd6b34a0eed2c48ee9a916d2d93e09c",
+   "en": "Robust Construction: Features high-quality plastic gears and durable metal dowerl pin, ensuring long-lasting reliability and performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-axis-plastic-reduction-gear-kit",
+    "title": "Dual-axis Plastic Reduction Gear Kit",
+    "field": "blocks[1].line[2]",
+    "near": "• Dual-Axis Precision: Specifically designed for dual-axis applications, enabling complex and accurate mechanical movements in various projects."
+   },
+   "dict": null
+  },
+  {
+   "h": "67176c6926e80b131436f10f94b7d6ef759d100f3b5d51a279ba458d28e602c4",
+   "en": "Flexible Gear Sizes: Includes a range of gear sizes and tooth counts for versatile gear ratio options, accommodating different mechanical needs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-axis-plastic-reduction-gear-kit",
+    "title": "Dual-axis Plastic Reduction Gear Kit",
+    "field": "blocks[1].line[3]",
+    "near": "• Robust Construction: Features high-quality plastic gears and durable metal dowerl pin, ensuring long-lasting reliability and performance."
+   },
+   "dict": null
+  },
+  {
+   "h": "9220e8b0631c354e46451d2ce03a6ba6aef5b620f212e0fa55defffe43ffbdcc",
+   "en": "Compact and Lightweight: Optimized for easy integration into compact spaces without adding significant weight.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-axis-plastic-reduction-gear-kit",
+    "title": "Dual-axis Plastic Reduction Gear Kit",
+    "field": "blocks[1].line[4]",
+    "near": "• Flexible Gear Sizes: Includes a range of gear sizes and tooth counts for versatile gear ratio options, accommodating different mechanical needs."
+   },
+   "dict": null
+  },
+  {
+   "h": "f4b401c4c9d0277a55dc2333a2d983a5f58c11a1068465bc711968414ed0984b",
+   "en": "Ensure the gear sizes and shaft lengths align with your project requirements before purchase.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-axis-plastic-reduction-gear-kit",
+    "title": "Dual-axis Plastic Reduction Gear Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "7bff455d1622b60cb5ee4dc09b37cb815fb2bda5503bd42685edfdd9362aa12f",
+   "en": "Designed for dual-axis systems; may not be compatible with single-axis applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-axis-plastic-reduction-gear-kit",
+    "title": "Dual-axis Plastic Reduction Gear Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• Ensure the gear sizes and shaft lengths align with your project requirements before purchase."
+   },
+   "dict": null
+  },
+  {
+   "h": "55164906322e738ac1be79839d16a0f2dc2058760fca4c77fa958df771a9414b",
+   "en": "The 030 Micro DC Motor with SH1.0 connector is a compact and efficient motor, perfect for space-constrained projects. Its 1.5mm output shaft and SH1.0 connector ensure easy and reliable connections, making it ideal for robotics, small appliances, and various electronic applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "030-micro-dc-motor-with-sh1-0",
+    "title": "030 Micro DC Motor with SH1.0 (2pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "561d0d749905d5a3de1333bfb9f28b761d03762297b9b2ba4e9604ade51dccf8",
+   "en": "The product contains all the non-3D printed parts for assembling various functional Apex Legends Wingman with Reload Mechanics. To complete the work, you also need to download the Apex Legends Wingman with Reload Mechanics and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "apex-legends-wingman-with-reload-mechanics",
+    "title": "Apex Legends Wingman with Reload Mechanics",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "911094ea7dc94956823cf4f097c197a9d7371512cb91f64b58ac3970f2f348bc",
+   "en": "G-Man Projects",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "apex-legends-wingman-with-reload-mechanics",
+    "title": "Apex Legends Wingman with Reload Mechanics",
+    "field": "blocks[0].line[4].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7533b76b238bc6a6076ef1995dca69438189fc5cd8d9542353eeada1d91eec4",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Cute Flame Devil Lights. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cute-flame-devil-lights",
+    "title": "Cute Flame Devil Lights",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2423573c343209028e4675102b76b78ceb5961332ff4d60d1b171103bcbab47c",
+   "en": "To download the model files of the Cute Flame Devil Lights and obtain detailed information, please visit the Cute Flame Devil Lights on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cute-flame-devil-lights",
+    "title": "Cute Flame Devil Lights",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "426d1b9e869fb3002a19442ca057ee16f1bddc4b9298a952237f4e174e5584f0",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Monster Tree Light. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "monster-tree-light",
+    "title": "Monster Tree Light",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "072b05370d18541c606c6d1b550fadb7daef1ea02185926e84493888a3b1ea13",
+   "en": "To download the model files of the Monster Tree Light and obtain detailed information, please visit the Monster Tree Light on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "monster-tree-light",
+    "title": "Monster Tree Light",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "31bfabd1f9f5afe130655cf17066996f491ce16e2eaa4025efff788612fef279",
+   "en": "These models offer both storage and organization for desiccant packs, and are equipped with circular hygrometers for precise monitoring of environmental temperature and humidity. By maintaining optimal environmental conditions, these models effectively protect moisture-sensitive components and materials, ensuring their performance and longevity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ffff8f2f8339d0456ae629bfc5de4de3e1d8b397f24466a5dfd5e660292b8ee",
+   "en": "Dry Pod Storage with Funnel for AMS",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[1].line[0]",
+    "near": "This model is an upgraded version of the AMS desiccant storage solution that allows the use of loose (silica gel) desiccant. It also includes an extra drying ch"
+   },
+   "dict": null
+  },
+  {
+   "h": "d68ddd0b2b8a344498505876d3612a602bb63b95d83ddc41463aa276213b1944",
+   "en": "This model is an upgraded version of the AMS desiccant storage solution that allows the use of loose (silica gel) desiccant. It also includes an extra drying chamber that allows the AMS to store more desiccant, meaning longer refresh intervals. It's also got a funnel to help load the silica gel and minimize spillage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[1].line[1]",
+    "near": "Dry Pod Storage with Funnel for AMS"
+   },
+   "dict": null
+  },
+  {
+   "h": "828bba5299f6c79387d7af346bc64a6f1db09e51fa3648f1441a9b51fe5ebaf0",
+   "en": "The model is compatible with both rectangular thermohygrometers and circular thermohygrometers, so you can choose to print parts based on the shape of your thermohygrometer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[1].line[2]",
+    "near": "This model is an upgraded version of the AMS desiccant storage solution that allows the use of loose (silica gel) desiccant. It also includes an extra drying ch"
+   },
+   "dict": null
+  },
+  {
+   "h": "bfb4e726bc2dc7057498b7742739c87da10c090a527750d81d25d463aac17a5b",
+   "en": "Ultimate Filament Spool Enclosure for AMS Lite",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[2].line[0]",
+    "near": "This model offers both storage and organization for desiccant packs, and is equipped with circular hygrometers for precise monitoring of environmental temperatu"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d8277e825ba3e7a034b01547f216e154de5c22c528980560c58787872d9673b",
+   "en": "This model offers both storage and organization for desiccant packs, and is equipped with circular hygrometers for precise monitoring of environmental temperature and humidity. By maintaining optimal environmental conditions, this model effectively protect moisture-sensitive components and materials, ensuring their performance and longevity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[2].line[1]",
+    "near": "Ultimate Filament Spool Enclosure for AMS Lite"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d17cc979b4060fb907056bb4774ba560f45aac60975aaccdf4d546eaba193f3",
+   "en": "SPILLPROOF AMS Desiccant Box",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[3].line[0]",
+    "near": "This round hygrometer, when combined with a 3D-printed desiccant box, efficiently monitors the storage environment of your 3D printing materials."
+   },
+   "dict": null
+  },
+  {
+   "h": "0a550d509dcf0a82a1e2eb0729e62a9da802703e6c050719eca2d7afc8a41ad9",
+   "en": "SPILLPROOF AMS Desiccant Box - ROUND Hygrometer",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[4].line[1].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "997ea025531a064b26af4bf1314563613606daea6c3ff873de0cbdc5ca6d77af",
+   "en": "AeonJoey",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[4].line[1].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "505c1355a7c44f1a081dcd7df8ff83e863069fdfa12afdebbaf2a1dd42498de2",
+   "en": "Supergrapher",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[4].line[2].cell[1]",
+    "near": "SPILLPROOF AMS Desiccant Box - ROUND Hygrometer | AeonJoey | SPILLPROOF AMS Desiccant Box - ROUND Hygrometer"
+   },
+   "dict": null
+  },
+  {
+   "h": "b764ab56d2a5a8a5b218cdee2e1a1e4d4828504bb75c5def05445b5145fb5687",
+   "en": "AMS Dry Pods Lrg, Sml, Hygro, Trays, & Funnel V7",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "blocks[4].line[3].cell[0]",
+    "near": "Ultimate Filament Spool Enclosure for AMS Lite | Supergrapher | Ultimate Filament Spool Enclosure for AMS Lite"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d67458f2b780fcf13d761c5ffc527a6fddeb1ed02a87a4856016223a25215a4",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Halloween Classic Carved Pumpkin Lantern. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-classic-carved-pumpkin-lantern",
+    "title": "Halloween Classic Carved Pumpkin Lantern",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "518638d1fc9665a4552030413a1447fe9172f84a2d55b0695151c10bc822b1ac",
+   "en": "To download the model files of the Halloween Classic Carved Pumpkin Lantern and obtain detailed information, please visit the Halloween Classic Carved Pumpkin Lantern on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-classic-carved-pumpkin-lantern",
+    "title": "Halloween Classic Carved Pumpkin Lantern",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "36a1378ea5d0c721927075af1f8f8317d9d27c780d37c7c0b94a6f018f2cbf41",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Halloween Skull Tear Pumpkin Lantern. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-skull-tear-pumpkin-lantern",
+    "title": "Halloween Skull Tear Pumpkin Lantern",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "44f58c5826e4e5aa2a44b986e44efbafad1225aba12b82111d936e5f3be39e39",
+   "en": "To download the model files of the Halloween Skull Tear Pumpkin Lantern and obtain detailed information, please visit the Halloween Skull Tear Pumpkin Lantern on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-skull-tear-pumpkin-lantern",
+    "title": "Halloween Skull Tear Pumpkin Lantern",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "4727c3d7e12c1b6031496db3d5a3b25826d85d2a7382b5a85cc0deb4ec20e136",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Halloween Ghost Night Light. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-ghost-night-light",
+    "title": "Halloween Ghost Night Light",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "21ad09a87abc0b6438019f14edc9961c2222fcd2a2dcd97dbe16991c267aba18",
+   "en": "To download the model files of the Halloween Ghost Night Light and obtain detailed information, please visit the Halloween Ghost Night Light on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-ghost-night-light",
+    "title": "Halloween Ghost Night Light",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "af1d6f01110097be48dde3b57ecd54d461e4c2faded2343f735024eb4032f53d",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Pocket Rubber Band Racer. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pocket-rubber-band-racer",
+    "title": "Pocket Rubber Band Racer",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "070039a11e2c5eaa888a2150a726b4be7d051cdf754233ed0102d1bc25e34a06",
+   "en": "To download the model files of the Pocket Rubber Band Racer and obtain detailed information, please visit the Pocket Rubber Band Racer on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pocket-rubber-band-racer",
+    "title": "Pocket Rubber Band Racer",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "7df57c0e993c46aba9e971a62637bb96931c11a0201be37960a1187a031f5429",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Watch Stand For Apple/Samsung Galaxy. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "watch-stand-for-apple-samsung-galaxy",
+    "title": "Watch Stand For Apple/Samsung Galaxy",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "899fe7abbd6dfbcb8f75f07c02b9847a27b2507d4e94f5e8d4fb5bbbe50e6c4d",
+   "en": "To download the model files of the Watch Stand For Apple/Samsung Galaxy and obtain detailed information, please visit the Watch Stand For Apple/Samsung Galaxy on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "watch-stand-for-apple-samsung-galaxy",
+    "title": "Watch Stand For Apple/Samsung Galaxy",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "64ff415162bb101c939863d17c02180d8de73315ad12b1d77a53094baf882d9c",
+   "en": "The Endless Loop Express Model Components Kit contains all the necessary hardware components for assembling a desktop train model. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "endless-loop-express-kit-016",
+    "title": "Endless Loop Express Kit 016",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "cfbf7b28632a8924513ba599a050e067f797f622a7e445e2b30c415ba797ad1e",
+   "en": "To download the model files of Endless Loop Express and obtain detailed information, please visit the Endless Loop Express on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "endless-loop-express-kit-016",
+    "title": "Endless Loop Express Kit 016",
+    "field": "blocks[0].line[5]",
+    "near": "Endless Loop Express | IMD_Q. | Endless Loop Express"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c9b92d25c81883ee08e0c6c1cd40f4ab257335a4821af6d043bf39e16b23c94",
+   "en": "1. Please note that the Endless Loop Express does not come with batteries. Please bring your own AAA battery to power the Endless Loop Express.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "endless-loop-express-kit-016",
+    "title": "Endless Loop Express Kit 016",
+    "field": "blocks[1].line[1]",
+    "near": "Notes"
+   },
+   "dict": null
+  },
+  {
+   "h": "b7d1cdfd579c9f71c5de17a7c6271de268e0756e8dcdf3bed70f15011bc787ff",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Halloween Cute Creepy Candle Holder. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-cute-creepy-candle-holder",
+    "title": "Halloween Cute Creepy Candle Holder",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e60cacea22bc0eaa49c53cb2d12fafa2c43a9f8dca81b79a3ebb0e472fe724f3",
+   "en": "To download the model files of the Halloween Cute Creepy Candle Holder and obtain detailed information, please visit the Halloween Cute Creepy Candle Holder on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-cute-creepy-candle-holder",
+    "title": "Halloween Cute Creepy Candle Holder",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "1ae25e7ce30109cd02c7fa81ffee471c5c88603dbd14ae409acce3afc08eb62e",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Halloween Ghost. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-ghost",
+    "title": "Halloween Ghost",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "35742df0f7c937358357dcf05c1f302173ec27f9e297ac0c27a4e16fc8bac753",
+   "en": "To download the model files of the Halloween Ghost and obtain detailed information, please visit the Halloween Ghost on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-ghost",
+    "title": "Halloween Ghost",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "4d5ac85511aa62b94636b3b7bb662ddd792d9c4497773cf38d39f03f030ba05e",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Halloween Ghost Light. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-ghost-light",
+    "title": "Halloween Ghost Light",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "65847ce128b6026f1e404764bf0004080b37462d8efae4bf4da8ae33a1fc6a4f",
+   "en": "To download the model files of the Halloween Ghost Light and obtain detailed information, please visit the Halloween Ghost Light on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-ghost-light",
+    "title": "Halloween Ghost Light",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "9a14c08927269d97f4b85348b7f5169fdaa3adf68ba90ccda0d1c45b9f9ef466",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Cauldron Light. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cauldron-light",
+    "title": "Cauldron Light",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6fc11a5861c1516d54b0d687152d014b1bbae3146d0395885d4e2036782aa16",
+   "en": "To download the model files of the Cauldron Light and obtain detailed information, please visit the Cauldron Light on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cauldron-light",
+    "title": "Cauldron Light",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "3bb32df9a52fb5bc51c2bf36a0b398ebdd14c3502ae13488fb309d125d287953",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Halloween Pumpkin Light. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-pumpkin-light",
+    "title": "Halloween Pumpkin Light",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "49f1bb9e9f8b3f5cbb7d3265aa9cbe0f90ca4ca281e0b8991b3c145c31e5edc4",
+   "en": "To download the model files of the Halloween Pumpkin Light and obtain detailed information, please visit the Halloween Pumpkin Light on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-pumpkin-light",
+    "title": "Halloween Pumpkin Light",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "af76c0effc1baa8f4be385b3dd23bb19a338a5ab66af68a3963fd94f35fbfe46",
+   "en": "The Electric Water Spray Kit 02 contains all the non-3D printed hardware components necessary to assemble the TEC-9 / T-15 Electric Water Toy Gun . The electric water gun mechanism allows for continuous shooting, with a pulsing water flow activated by pulling the trigger. The mechanism features a simulated recoil function for added fun. To complete the work, you need to download the model files and 3D print the parts. To complete the project, you need to download the model files for TEC-9 / T-15 Electric Water Toy Gun on MakerWorld and 3D print the parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "867b90e118ddbb89e369d11fdcf8715ae0f5b8cc1f213b914d97b43e20084eae",
+   "en": "Difference between Electric Water Spray Kit 01 And This Kit",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[2].line[0]",
+    "near": "Product | Electric Water Spray Kit 01 | Electric Water Spray Kit 02"
+   },
+   "dict": null
+  },
+  {
+   "h": "33840c914613effc858c18c9783655ce795ccc668587a9bc98d5647b6002b45a",
+   "en": "Auto-fill",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[2].line[3].cell[0]",
+    "near": "Size | 5.3 x 2.95 x 20.5 CM | 3.27 x 2.49 x 15.7 CM"
+   },
+   "dict": null
+  },
+  {
+   "h": "b85769f4acbe9b5a67b254cd613fdce64015e1b0562af342aa825d543420113d",
+   "en": "Rate of Fire",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[2].line[6].cell[0]",
+    "near": "Range | 10 M | 7-8 M | 7-8 M"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd4ec216df5dba55fb44affb513ab70abbc2a799ad86d37ae729bd39459a436f",
+   "en": "Silicone tube & screw",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[2].line[7].cell[0]",
+    "near": "Rate of Fire | 2 round/s | 8 round/s | 8 round/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "5df31414844fe9263ef1b67245d0e8333b5171f443763ccb8a20a7682d8dc478",
+   "en": "Purchased separately 3x5mm Transparent 2m (1PCS)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[2].line[7].cell[1]",
+    "near": "Rate of Fire | 2 round/s | 8 round/s | 8 round/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "73440f1a1b948a0f2c0d82b6c8614754609660af517674f2c5861026f7d19c3e",
+   "en": "Considerations of The Kit",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[3].line[0]",
+    "near": "• Do not operate the Water Toy Gun without water, it may damage the internal components and render it non-functional."
+   },
+   "dict": null
+  },
+  {
+   "h": "b17031f30bda19a1d21deaf74e4840e9a8752c46e0f6b97d599df3667914586e",
+   "en": "Do not operate the Water Toy Gun without water, it may damage the internal components and render it non-functional.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[3].line[1]",
+    "near": "Considerations of The Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "0a18b794a1e72d0e8170491566b1206674d00645552b737da544215aa4a2a5a8",
+   "en": "The switch and battery are not waterproof, do not submerge the kit directly in water.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[3].line[2]",
+    "near": "• Do not operate the Water Toy Gun without water, it may damage the internal components and render it non-functional."
+   },
+   "dict": null
+  },
+  {
+   "h": "81490c82a2251af71474156793863e5271204b98a71564d858a12131ed82774d",
+   "en": "The required silicone tube is not included, you can purchase and cut the silicone tube as you need.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[3].line[3]",
+    "near": "• The switch and battery are not waterproof, do not submerge the kit directly in water."
+   },
+   "dict": null
+  },
+  {
+   "h": "d7335c3e0b71c19e9801fd59bfb7d60b95589debc0c8fca032a7abff823ee78e",
+   "en": "The mechanism includes a simulated recoil feature. Please be cautious of the interference between the housing and the recoil slider.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[3].line[4]",
+    "near": "• The required silicone tube is not included, you can purchase and cut the silicone tube as you need."
+   },
+   "dict": null
+  },
+  {
+   "h": "e0a7faef24cfa2535977415806ebe78e84ace236dd35acd5365915e6fe70885c",
+   "en": "You need a H1.5 hex screwdriver to install the bolt handle.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[3].line[5]",
+    "near": "• The mechanism includes a simulated recoil feature. Please be cautious of the interference between the housing and the recoil slider."
+   },
+   "dict": null
+  },
+  {
+   "h": "9216b84bb1b297e0b65115b0dad85800b562d06941f2174c76715cc104f9c057",
+   "en": "Warning of Lithium Battery",
+   "kind": "block_title",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[4].line[0]",
+    "near": "• This product utilizes a replaceable rechargeable lithium battery."
+   },
+   "dict": null
+  },
+  {
+   "h": "11a22cd5af4d1971a38c4aa57e197bd1340864e845dd80d992579d571134821a",
+   "en": "This product utilizes a replaceable rechargeable lithium battery.",
+   "kind": "block_line",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[4].line[1]",
+    "near": "Warning of Lithium Battery"
+   },
+   "dict": null
+  },
+  {
+   "h": "71780c2e438aae77ecabf209fc0e936dd16540e8c63816231d41a24fc45a418c",
+   "en": "Adult supervision is required when children are handling batteries or the charger. Do not operate the product while it is charging.",
+   "kind": "block_line",
+   "freq": 23,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[4].line[2]",
+    "near": "• This product utilizes a replaceable rechargeable lithium battery."
+   },
+   "dict": null
+  },
+  {
+   "h": "40a68530cccdf060fc5240361096335ee2bafc26437d5f5853a606e5c70ace2f",
+   "en": "Ensure the battery is installed correctly. Improper installation may result in short circuits, overheating, or potential explosion.",
+   "kind": "block_line",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[4].line[3]",
+    "near": "• Adult supervision is required when children are handling batteries or the charger. Do not operate the product while it is charging."
+   },
+   "dict": null
+  },
+  {
+   "h": "5e7da653b45ec3fe05d17873c6dcaf44d515248999ffe5bf4c65c79526905976",
+   "en": "Regularly inspect the charger’s cord, plug, housing, and other components for damage. If any damage is found, discontinue use immediately until the device is fully repaired.",
+   "kind": "block_line",
+   "freq": 23,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[4].line[4]",
+    "near": "• Ensure the battery is installed correctly. Improper installation may result in short circuits, overheating, or potential explosion."
+   },
+   "dict": null
+  },
+  {
+   "h": "617bb09925b496604d66b4b900ac1f5accadb3daf9a15198ed1068829039ff8f",
+   "en": "Choking Hazard: Contains small parts; not suitable for children under 3 years of age.",
+   "kind": "block_line",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[4].line[5]",
+    "near": "• Regularly inspect the charger’s cord, plug, housing, and other components for damage. If any damage is found, discontinue use immediately until the device is "
+   },
+   "dict": null
+  },
+  {
+   "h": "9717594f025c0f7fe8ce8a61649c2b5c51cddde25ba646930c80b853294fe2d3",
+   "en": "Improper disposal of this product may harm the environment - please recycle responsibly.",
+   "kind": "block_line",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[4].line[6]",
+    "near": "• Choking Hazard: Contains small parts; not suitable for children under 3 years of age."
+   },
+   "dict": null
+  },
+  {
+   "h": "e2326919da8b2addb0ce2c134adf172d8f1a2c20b71c08ccc9e456201db97193",
+   "en": "Charging Precautions",
+   "kind": "block_title",
+   "freq": 23,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[5].line[0]",
+    "near": "• Use only the officially supplied charger. The charger is not a toy."
+   },
+   "dict": null
+  },
+  {
+   "h": "6243084411115ed2c979ac2397d695590325e2eafc18665cbe34009ad1a212f6",
+   "en": "The USB charger for this product only supports standard 5V 1-2A input. Please always use the original charger that meets the voltage/current requirements, or charge directly via a computer USB port. DO NOT use chargers with output higher than 5V or 2A (such as mobile fast chargers, 9V/12V adapters, etc.), as this may cause device damage, overheating, or even serious fire hazards.",
+   "kind": "block_line",
+   "freq": 22,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[5].line[2]",
+    "near": "• Use only the officially supplied charger. The charger is not a toy."
+   },
+   "dict": null
+  },
+  {
+   "h": "8b1fa11fc01b8eaef7f4ee773b5696c211c7bb77adbac2d5e442ccd1611ab856",
+   "en": "Lithium Battery Safety Precautions",
+   "kind": "block_title",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[6].line[0]",
+    "near": "• DO NOT attempt to use or charge the battery pack if it shows any signs of leakage or corrosion."
+   },
+   "dict": null
+  },
+  {
+   "h": "0f1441d040126b9ce00afba2b506315741df9fe1dae4a2c2d63985fef736e04f",
+   "en": "DO NOT attempt to use or charge the battery pack if it shows any signs of leakage or corrosion.",
+   "kind": "block_line",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[6].line[1]",
+    "near": "Lithium Battery Safety Precautions"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3eca1f14869daa67033f44fa999f54689f6b2d5bba035ee629a98b294780929",
+   "en": "DO NOT disassemble, crush, or mechanically abuse the battery pack.",
+   "kind": "block_line",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[6].line[2]",
+    "near": "• DO NOT attempt to use or charge the battery pack if it shows any signs of leakage or corrosion."
+   },
+   "dict": null
+  },
+  {
+   "h": "d51d0feef62c91244f7dc7c4857fda128f71405b29acae1e31d8e30ec76df570",
+   "en": "DO NOT dispose of the battery pack in fire.",
+   "kind": "block_line",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[6].line[3]",
+    "near": "• DO NOT disassemble, crush, or mechanically abuse the battery pack."
+   },
+   "dict": null
+  },
+  {
+   "h": "a5ae3045e4b50d240c583d0246316a89b9eed1d2077b122edb7b33ee28b79155",
+   "en": "Exercise extreme caution when handling an overheated battery pack.",
+   "kind": "block_line",
+   "freq": 24,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[6].line[4]",
+    "near": "• DO NOT dispose of the battery pack in fire."
+   },
+   "dict": null
+  },
+  {
+   "h": "7bd6435a7a06a40bc533c41906130a3ca5e5ba00b1b400fef06ba80da473e24f",
+   "en": "This Rechargeable Power Kit features a compact PCB design with a Type-C charging port, a switch, and two ZH1.5 connectors, along with a charging indicator and protection function. Equipped with a 500RPM N20 motor, compact in size and offering high torque, it is suitable for various small products. Users can easily connect the battery and appliances (such as motors and LEDs) without soldering, making it perfect for creating mini handheld devices like fans and flashlights.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ab678146a555d334c7fe939839e69698d2399a201d79b619d3aa5f3eca9f320f",
+   "en": "Example of a model using this kit (includes other Maker's Supply parts)",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "blocks[1].line[2]",
+    "near": "This Rechargeable Power Kit features a compact PCB design with a Type-C charging port, a switch, and two ZH1.5 connectors, along with a charging indicator and p"
+   },
+   "dict": null
+  },
+  {
+   "h": "18be8e1510bc81088f70fc57a42538f32fd5a86c12b25c23eb590dbfccfe2bff",
+   "en": "Motor Box for Mini Train Dioramas",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "blocks[1].line[4].cell[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "9fffef6ae95acbf59d8572337e528d17fa939428f7fba37c64f145a3209970a4",
+   "en": "@BamBamDesign",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "0fffc2a555bf37b1ab65b65d34d7265142166ebd815da2b8ff563a57b4fc921b",
+   "en": "*Note: This model requires additional Maker's Supply parts for full assembly. Please check the model link for the complete BOM list.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "blocks[1].line[5]",
+    "near": "Motor Box for Mini Train Dioramas | @BamBamDesign | Motor Box for Mini Train Dioramas | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "d5c33ecc8f257d332fe9cb38a3e4b7cb0f135a312b8652b76374e30ca214b27a",
+   "en": "Please ensure that the motherboard battery and output interface are connected correctly according to the markings. Incorrect connections may affect device usage and charging.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "9bbcb8ed6568ea386fa8496eed93a2c8bb3ee2c31d964d1ecb91843e9ec0b1c9",
+   "en": "Please use within the rated power.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• Please ensure that the motherboard battery and output interface are connected correctly according to the markings. Incorrect connections may affect device usa"
+   },
+   "dict": null
+  },
+  {
+   "h": "4c9c4539f23d2901470bbc6126d6a64970ed4dac5e74b94d57fd78290e47d3b6",
+   "en": "The Electric Water Spray Kit 01 contains all the non-3D printed hardware components necessary to assemble the Electric Water Toy Gun. The electric water gun mechanism allows for continuous shooting, with a pulsing water flow activated by pulling the trigger. The mechanism features a simulated recoil function for added fun. The kit also includes a water pump that automatically draws water from open sources into the tank, reducing the need for users to detach it for refills.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-01",
+    "title": "Electric Water Spray Kit 01",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d77e5f48b7b2d1707ef3df40a1cd70f8f43e1d28c840ed1f831b187efd4dab3b",
+   "en": "The kit does not include the required silicone tubes; you can purchase the appropriate length based on your specific needs (3x5mm Transparent 2m (1PCS) - RC021). To complete the design, you need to download the model files and 3D print the parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-01",
+    "title": "Electric Water Spray Kit 01",
+    "field": "blocks[2].line[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "2218699febc7d6aded37658750c466a6c74da524bf650ee3156c4b3d310d8907",
+   "en": "T-10 Water Toy Gun",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-01",
+    "title": "Electric Water Spray Kit 01",
+    "field": "blocks[2].line[2].cell[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "e834856f681488edbc030e302b65ab4f4442db998e0cdf5be01280c7f3b60767",
+   "en": "Difference between Electric Water Spray Kit 02 And This Kit",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-01",
+    "title": "Electric Water Spray Kit 01",
+    "field": "blocks[3].line[0]",
+    "near": "Product | Electric Water Spray Kit 01 | Electric Water Spray Kit 02"
+   },
+   "dict": null
+  },
+  {
+   "h": "07d07767c84699e0294dd8f2c886c746bf325cbb2c1c972d52fcc629b7e86530",
+   "en": "Considerations for The Kit",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-01",
+    "title": "Electric Water Spray Kit 01",
+    "field": "blocks[4].line[0]",
+    "near": "• Do not operate the Water Toy Gun without water, it may damage the internal components and render it non-functional."
+   },
+   "dict": null
+  },
+  {
+   "h": "8b82b4362f19250160ecad3476fbca6f3586e56001bfb557ef4a6827606583b3",
+   "en": "Please note that there may be small oil stains on the gearbox surface. These stains are mainly from the residual lubricants used to protect the internal gears during manufacturing. These stains do not affect the product's sealing performance or normal use, and are not a fault or quality issue.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-01",
+    "title": "Electric Water Spray Kit 01",
+    "field": "blocks[4].line[5]",
+    "near": "• The mechanism includes a simulated recoil feature. Please be cautious of the interference between the housing and the recoil slider."
+   },
+   "dict": null
+  },
+  {
+   "h": "38b7314cf08167f99816403716702099458012a2f2c6950f9249cca9c4274fb2",
+   "en": "Bubble Blaster",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "blocks[2].line[1].cell[0]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "894bebe4631021f1f0c528c94ee71b86e7049e46d6bef3181690be4f27debd5e",
+   "en": "@wuboo",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Models | Creators | Model Links | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "d30f867b3ecb8d49d4c49cc78f44f5966f0e4c22f384fb3bf09adcce0363c386",
+   "en": "Bubble Gun Toy",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "blocks[2].line[2].cell[0]",
+    "near": "Bubble Blaster | @wuboo | Bubble Blaster | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e2591d145bae92c4a85e9cad2600a8671e9afd98f6a10e81de7f8a4a6b8ff39",
+   "en": "@MatthewGhost",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "blocks[2].line[2].cell[1]",
+    "near": "Bubble Blaster | @wuboo | Bubble Blaster | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "669c3a7676e34fd2215c0186222430d191fd00bc72d32e5bee93eae4739eb592",
+   "en": "Dreamy Flight Bubble Gun",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "blocks[2].line[3].cell[0]",
+    "near": "Bubble Gun Toy | @MatthewGhost | Bubble Gun Toy | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d2b302ea0f128c9da2d43b20588e2aa412d20d4b1e72faad2ea160ad05bb04e",
+   "en": "@flowercat",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "blocks[2].line[3].cell[1]",
+    "near": "Bubble Gun Toy | @MatthewGhost | Bubble Gun Toy | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b96686f64aff3ee2ddd92a4cb50ef87855f7be145967212aa2d37cc824e9af2",
+   "en": "To use the bubble bottle, attach the included 24T/30T bottle cap. Avoid using beverage bottles.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "blocks[3].line[1]",
+    "near": "Considerations of The Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "c48f435885825e3af85ff096b0a35fcff5e7c2d7164c3d3262463b6bd4dc9bdc",
+   "en": "If the silicone tube floats, simply attach the blue gravity ball for better performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "blocks[3].line[2]",
+    "near": "• To use the bubble bottle, attach the included 24T/30T bottle cap. Avoid using beverage bottles."
+   },
+   "dict": null
+  },
+  {
+   "h": "b15ea305aa4f0a57da6efd1e5d30ff92802237810695752f4c47eff528c4a3c8",
+   "en": "A one-way valve can be formed by fitting a silicone sleeve onto the bottle cap's protrusion, preventing bubble solution leakage during storage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "blocks[3].line[3]",
+    "near": "• If the silicone tube floats, simply attach the blue gravity ball for better performance."
+   },
+   "dict": null
+  },
+  {
+   "h": "6ed1b8c86d97705c41573f96ed7244786b2c3a063dc219dd80df9d623ce3fa3b",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Cute Witch's Cauldron Tea Light. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cute-witchs-cauldron-tea-light",
+    "title": "Cute Witch's Cauldron Tea Light",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "79e09760af0ef590e7567da7920523cc45b8c0fa3cd1b7035dde357ce7a087cd",
+   "en": "To download the model files of the Cute Witch's Cauldron Tea Light and obtain detailed information, please visit the Cute Witch's Cauldron Tea Light on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cute-witchs-cauldron-tea-light",
+    "title": "Cute Witch's Cauldron Tea Light",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "1288a73646006a60c4ce7219a741a5c31e12c002838170bc6ef187876d5c4037",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Jack Skellington & Oogie Boogie Pumpkin TheeLight. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "jack-skellington-oogie-boogie-pumpkin-theelight",
+    "title": "Jack Skellington & Oogie Boogie Pumpkin TheeLight",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "442926d3cba1ea7d3d0702253b491deecc7b859399486b70379754ab49619bee",
+   "en": "To download the model files of the Jack Skellington & Oogie Boogie Pumpkin TheeLight and obtain detailed information, please visit the Jack Skellington & Oogie Boogie Pumpkin TheeLight on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "jack-skellington-oogie-boogie-pumpkin-theelight",
+    "title": "Jack Skellington & Oogie Boogie Pumpkin TheeLight",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "9d700f530b243980268f614257bf5ddd62b8c5cf401a54494a6db8fa378d1ebe",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Reading Ghost Halloween Tea Light Decor. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "reading-ghost-halloween-tea-light-decor",
+    "title": "Reading Ghost Halloween Tea Light Decor",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fdb0b35a189055b62e2153476ff7a14eec00cac4bff20985f58f910decd3d7dc",
+   "en": "To download the model files of the Reading Ghost Halloween Tea Light Decor and obtain detailed information, please visit the Reading Ghost Halloween Tea Light Decor on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "reading-ghost-halloween-tea-light-decor",
+    "title": "Reading Ghost Halloween Tea Light Decor",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "2939d4de9dd038d7b72d853880f53c32997e4727a0a6735335d6f71d3c4f8d22",
+   "en": "The product contains all the non-3D printed parts for assembling various functional Flexi Pets Keychain & Magnet Collections. To complete the work, you also need to download the Compatible model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d248c53ad9a802b2b312f95a6a5503430f67072892174381595c426d013e64d9",
+   "en": "Cute Flexi Pets Pig (Keychain & Magnet)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "blocks[0].line[4].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e107f2d5863d7e38573bfa55776db14e96b8750886d42b2bb551424bfdb10f6",
+   "en": "Cute Flexi Pets Hippo (Keychain & Magnet)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "blocks[0].line[5].cell[0]",
+    "near": "Cute Flexi Pets Pig (Keychain & Magnet) | Valeria Momo & Mattia | Cute Flexi Pets Pig (Keychain & Magnet)"
+   },
+   "dict": null
+  },
+  {
+   "h": "a7d3454c321a6893df059acd874ffe73d625148554f4ef8533012032fce48a5d",
+   "en": "Cute Flexi Pets Fox (Keychain & Magnet)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "blocks[0].line[6].cell[0]",
+    "near": "Cute Flexi Pets Hippo (Keychain & Magnet) | Valeria Momo & Mattia | Cute Flexi Pets Hippo (Keychain & Magnet)"
+   },
+   "dict": null
+  },
+  {
+   "h": "d73fca27c06e2666176acc274d1936427632f71be7005d15375abbf1736fbc90",
+   "en": "Cute Flexi Goldfish (Toy, Keychain & Magnet)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "blocks[0].line[7].cell[0]",
+    "near": "Cute Flexi Pets Fox (Keychain & Magnet) | Valeria Momo & Mattia | Cute Flexi Pets Fox (Keychain & Magnet)"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec3f39ca76a5959a6c84bfb632eecb014a0bb4440ab73daf089ec1591af344d7",
+   "en": "Cute Flexi Pets Chameleon (Keychain & Magnet)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "blocks[0].line[8].cell[0]",
+    "near": "Cute Flexi Goldfish (Toy, Keychain & Magnet) | Valeria Momo & Mattia | Cute Flexi Goldfish (Toy, Keychain & Magnet)"
+   },
+   "dict": null
+  },
+  {
+   "h": "3fe419bdb7ff0ad86882136dd47a188891c16b7a8c4cb4462572ee1983876826",
+   "en": "Cute Flexi Pets Triceratops (Keychain & Magnet)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "blocks[0].line[9].cell[0]",
+    "near": "Cute Flexi Pets Chameleon (Keychain & Magnet) | Valeria Momo & Mattia | Cute Flexi Pets Chameleon (Keychain & Magnet)"
+   },
+   "dict": null
+  },
+  {
+   "h": "487b2963d42a33d8b556c55d51798670165b90cefc9529bba59ca4c1cdbe0e96",
+   "en": "Cute Flexi Pets Raccoon ( + Keychain Version)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "blocks[0].line[10].cell[0]",
+    "near": "Cute Flexi Pets Triceratops (Keychain & Magnet) | Valeria Momo & Mattia | Cute Flexi Pets Triceratops (Keychain & Magnet)"
+   },
+   "dict": null
+  },
+  {
+   "h": "a207af96b1522e9c34a63a10e792ed318152c26b43dc9cab5aa8f3d1678e56dd",
+   "en": "The 6500K White LED Light Strip Combo Kit contains 6500K White LED Light Strip (1pcs), contains USB-A to 2 Pin 8mm Solderless Quick Connectors (2pcs), and 2-pin 8mm L-shaped LED Strip Connectors (10pcs）. The 2-pin 8mm L-shaped LED Strip Connectors and the USB-A to 2 Pin 8mm Solderless Quick Connectors fit the 6500K White LED Light Strip, making it the perfect DIY LED light accessory kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip-combo-kit",
+    "title": "6500K White LED Light Strip Bundle",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "89852e10c26077266a917877908956f5837d6cf6c3ac1e61a82b0b466e11df43",
+   "en": "The product contains all the non-3D printed parts for assembling a functional Standby Mode Dock for iPhone . To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "standby-mode-dock-for-iphone",
+    "title": "Standby Mode Dock for iPhone",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa98e988811ff71f65089958e5d9096344163911cf0224b321a4d7b280f82ece",
+   "en": "To download the model files of the Standby Mode Dock for iPhone and obtain detailed information, please visit the Standby Mode Dock for iPhone on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "standby-mode-dock-for-iphone",
+    "title": "Standby Mode Dock for iPhone",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "3e767409ffd691f07ddcfac749d0b407432a713c78e2125656cf41e1d74f10e4",
+   "en": "The WS2812B RGB LED Strip Light Combo Kit contains WS2812B RGB LED Strip Light (1pcs) , contains 3 Pin 10mm Cable (2pcs), and 3-pin 10mm L-shaped LED Strip Connectors (10pcs). The 3-pin 10mm L-shaped LED Strip Connectors and the 3 Pin 10mm Cable fit the WS2812B RGB LED Strip Light, making it the perfect DIY LED light accessory kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light-bundle",
+    "title": "WS2812B RGB LED Strip Light Bundle",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb9bca994e112b7a50e1c67af43a1dbfdb23e7de4b557570ea2df706b6bff6ab",
+   "en": "3D Model Application instructions",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-supply-electronics-bundle",
+    "title": "Maker's Supply Electronics Bundle",
+    "field": "blocks[0].line[1]",
+    "near": "Documentation"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b7cfbefb9f3c06d57a7e8f2c4ec3883cc52ae4cbef5803c3546a851dde7b26f",
+   "en": "The Maker's Supply Electronics Bundle consists of a Power Distribution Board - 4 Channels (1PCS), Self-Locking Button Switch (2PCS), Potentiometer Board with SH1.0 Connector (2PCS), and includes USB-A Power Cable with complete wiring accessories (Jumper Cable). Featuring standard SH1.0/PH2.0 connectors between modules, it supports various applications such as LED dimming, motor speed control, and voltage regulation, offering simple operation and easy connectivity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-supply-electronics-bundle",
+    "title": "Maker's Supply Electronics Bundle",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "35b51f8767bb52c03e09a542150b130fc728c99fde711d1f45118069f2886935",
+   "en": "LED Dimming Controller: A dual-channel LED strip control system with independent switching and brightness adjustment, suitable for various lighting scenarios",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-supply-electronics-bundle",
+    "title": "Maker's Supply Electronics Bundle",
+    "field": "blocks[2].line[1]",
+    "near": "Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ab643b78d7121918d52e11414b586b7c41352a651c21977028af79e13fae580",
+   "en": "DC Motor Speed Controller: Dual-channel stepless speed control system with precise start/stop and speed regulation for two motors, ideal for mechanical power applications",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-supply-electronics-bundle",
+    "title": "Maker's Supply Electronics Bundle",
+    "field": "blocks[2].line[2]",
+    "near": "• LED Dimming Controller: A dual-channel LED strip control system with independent switching and brightness adjustment, suitable for various lighting scenarios"
+   },
+   "dict": null
+  },
+  {
+   "h": "1297c23a40471bc707341ef53f6e25d8f275dba49912fb489341ef17024dff85",
+   "en": "Adjustable Power Supply: Protected dual-channel adjustable power solution with variable voltage output, perfect for electronic experiments and testing scenarios",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-supply-electronics-bundle",
+    "title": "Maker's Supply Electronics Bundle",
+    "field": "blocks[2].line[3]",
+    "near": "• DC Motor Speed Controller: Dual-channel stepless speed control system with precise start/stop and speed regulation for two motors, ideal for mechanical power "
+   },
+   "dict": null
+  },
+  {
+   "h": "0c7cba74a84bf76373bd7da7795b0fec9acce5eeddc444c97c52e03df6f8d8ac",
+   "en": "Example of a module using this kit (includes other Maker's Supply parts)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-supply-electronics-bundle",
+    "title": "Maker's Supply Electronics Bundle",
+    "field": "blocks[2].line[4]",
+    "near": "• Adjustable Power Supply: Protected dual-channel adjustable power solution with variable voltage output, perfect for electronic experiments and testing scenari"
+   },
+   "dict": null
+  },
+  {
+   "h": "99ebaf5521e5117c4168498d311eeff2d91713daf712885acb7ebc09c74ec008",
+   "en": "The Cipher Helmet Lock is a remarkable product designed to provide a convenient and secure solution for helmet storage. This kit contains all the non-3D printed hardware components necessary to assemble a Cipher Helmet Lock. It can be fixed onto a bicycle handle and used to lock a helmet by setting a password and inserting the helmet strap. To complete the project, you need to download the model files on MakerWorld and 3D print the parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cipher-helmet-lock-kit",
+    "title": "Cipher Helmet Lock Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "dc577d8aaa2c1cbe2359bf4657fdfdafe7852fe4d7f6df02102b195794a1ce0a",
+   "en": "Password-Protected:",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cipher-helmet-lock-kit",
+    "title": "Cipher Helmet Lock Kit",
+    "field": "blocks[1].line[0]",
+    "near": "The lock features a password-based locking system. You can choose your desired numbers as ciphers and set them in the P6 and P7 parts. The operation of setting "
+   },
+   "dict": null
+  },
+  {
+   "h": "25732ac6be2dc96717c0c56ea5c9570a74d6758220556c33c4d5f59261e7c5ec",
+   "en": "The lock features a password-based locking system. You can choose your desired numbers as ciphers and set them in the P6 and P7 parts. The operation of setting and using the password is intuitive.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cipher-helmet-lock-kit",
+    "title": "Cipher Helmet Lock Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Password-Protected:"
+   },
+   "dict": null
+  },
+  {
+   "h": "593840aea594c0c7704218c592d76d2b22df9f184e57c8fe1b8b83bf2a237a42",
+   "en": "Anti-Cracking Features:",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "cipher-helmet-lock-kit",
+    "title": "Cipher Helmet Lock Kit",
+    "field": "blocks[2].line[0]",
+    "near": "The lock has an anti-cracking mode that adds an extra layer of security. When the wrong combination is entered and the lock release button P11 is pushed, the P3"
+   },
+   "dict": null
+  },
+  {
+   "h": "87733eb98fcdca05261187033f19606dd6ff936fc0b78fa8c17d871cf2c024e5",
+   "en": "The lock has an anti-cracking mode that adds an extra layer of security. When the wrong combination is entered and the lock release button P11 is pushed, the P3 part will move, preventing unauthorized access. Even if the correct numbers are turned on the cipher gears (P6 and P7), the lock will not open until the anti-cracking mode is deactivated.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cipher-helmet-lock-kit",
+    "title": "Cipher Helmet Lock Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Anti-Cracking Features:"
+   },
+   "dict": null
+  },
+  {
+   "h": "d80242613628bb5cc7709b003d97e11a34686b9f4cb8b4be4035cc721ec69930",
+   "en": "Suitable for fitting right-angled edges without leaving any gaps",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-transparent-double-sided-adhesive",
+    "title": "Rectangular Transparent Double-Sided Adhesive",
+    "field": "blocks[1].line[4]",
+    "near": "• Easy to bend and adjust shape"
+   },
+   "dict": null
+  }
+ ]
+}

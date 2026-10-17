@@ -1,0 +1,601 @@
+600
+{"en": "filament", "ar": "فلامنت", "ckb": "فیلامێنت", "keep_latin": false, "note": "The shop word, used in the import's section names. Registry spec labels say «الخيط/الخيوط»; in sentences write «فلامنت»."}
+{"en": "3D", "ar": "3D", "ckb": "3D", "keep_latin": true, "note": "\"3D\" is a protected code token: it must appear verbatim in both translations («طابعة 3D», «چاپکەری 3D»). Same for 2D, 4WD."}
+{"en": "printing", "ar": "الطباعة", "ckb": "چاپکردن", "keep_latin": false, "note": "As a section/label: «الطباعة» / «چاپکردن»; in compounds Sorani uses «چاپ» («خێرایی چاپ»)."}
+{"en": "Bambu Lab", "ar": "Bambu Lab", "ckb": "Bambu Lab", "keep_latin": true, "note": "The brand; a protected name: copy verbatim in every sentence. Never «بامبو لاب». No Arabic article or Sorani suffix glued to it."}
+{"en": "AMS", "ar": "AMS", "ckb": "AMS", "keep_latin": true, "note": "Automatic Material System. Add a head noun instead of an article or suffix: «وحدة AMS» / «یەکەی AMS», «نظام AMS» / «سیستەمی AMS». Never «الـAMS» or «AMSەکە»."}
+{"en": "model", "ar": "نموذج", "ckb": "مۆدێل", "keep_latin": false, "note": "A 3D model. A printer model (the registry \"Model\" label) → «الطراز» / «مۆدێل»."}
+{"en": "Installation", "ar": "التركيب", "ckb": "دامەزراندن", "keep_latin": false, "note": "Usage title (589×). App dictionary."}
+{"en": "wiki", "ar": "ويكي", "ckb": "ویکی", "keep_latin": false, "note": "\"Bambu Lab Wiki\" → «ويكي Bambu Lab» / «ویکی Bambu Lab» (registry document title). \"refer to the Bambu Lab Wiki\" → «راجع ويكي Bambu Lab» / «سەیری ویکی Bambu Lab بکە»."}
+{"en": "Overview", "ar": "نظرة عامة", "ckb": "تێڕوانینی گشتی", "keep_latin": false, "note": "The most frequent block title."}
+{"en": "parts", "ar": "القطع", "ckb": "پارچەکان", "keep_latin": false, "note": ""}
+{"en": "print", "ar": "طبعة", "ckb": "چاپ", "keep_latin": false, "note": "Verb: «اطبع» / «چاپ بکە»; a finished object: «القطعة المطبوعة» / «چاپکراو»."}
+{"en": "screw", "ar": "برغي", "ckb": "بورغی", "keep_latin": false, "note": "Registry «نوع البرغي» / «جۆری بورغی». Search alias «براغي»."}
+{"en": "board", "ar": "لوحة", "ckb": "بۆرد", "keep_latin": false, "note": "An electronic board."}
+{"en": "laser", "ar": "ليزر", "ckb": "لەیزەر", "keep_latin": false, "note": "App dictionary and search alias."}
+{"en": "printer", "ar": "طابعة", "ckb": "چاپکەر", "keep_latin": false, "note": "Sorani: «چاپکەر» (the import's section names), not «پرینتەر»."}
+{"en": "plastic", "ar": "بلاستيك", "ckb": "پلاستیک", "keep_latin": false, "note": ""}
+{"en": "nozzle", "ar": "نوزل", "ckb": "نۆزڵ", "keep_latin": false, "note": "Registry and app: «النوزل» / «نۆزڵ». Never «الفوهة» in this import. Sizes stay \"0.4 mm\"."}
+{"en": "power", "ar": "الطاقة", "ckb": "وزە", "keep_latin": false, "note": "App dictionary. Registry spec labels \"Max power\" / \"Rated power\" read «أقصى قدرة» / «زۆرترین توانا» and «القدرة المقدّرة» / «توانای دیاریکراو»."}
+{"en": "metal", "ar": "معدن", "ckb": "کانزا", "keep_latin": false, "note": "App dictionary."}
+{"en": "plate", "ar": "صفيحة", "ckb": "پلێت", "keep_latin": false, "note": "A print plate."}
+{"en": "learn more", "ar": "اعرف المزيد", "ckb": "زیاتر بزانە", "keep_latin": false, "note": "\"please learn about the installation on Bambu Lab Wiki\" → «تعرّف على طريقة التركيب في ويكي Bambu Lab» / «زانیاری دەربارەی دامەزراندن لە ویکی Bambu Lab ببینە»."}
+{"en": "steel", "ar": "فولاذ", "ckb": "پۆڵا", "keep_latin": false, "note": ""}
+{"en": "temperature", "ar": "درجة الحرارة", "ckb": "پلەی گەرمی", "keep_latin": false, "note": ""}
+{"en": "hotend", "ar": "رأس الصهر", "ckb": "سەری تواندنەوە", "keep_latin": false, "note": "Registry label «رأس الصهر (Hotend)» / «سەری تواندنەوە (Hotend)». Never «الرأس الساخن». \"Bambu Hotend - X1C\" etc. are product names: copy verbatim."}
+{"en": "kit", "ar": "طقم", "ckb": "کیت", "keep_latin": false, "note": "App dictionary."}
+{"en": "material", "ar": "المادة", "ckb": "کەرەستە", "keep_latin": false, "note": "Registry label."}
+{"en": "PLA", "ar": "PLA", "ckb": "PLA", "keep_latin": true, "note": "Material code. All material codes stay Latin: PLA, PETG, ABS, ASA, TPU, PC, PA, PET, PVA, BVOH, HIPS, PPA, PPS, TPE, PP, PU, CF, GF. Names like \"PLA Basic\", \"PETG HF\", \"PLA Silk+\" are product names: copy verbatim."}
+{"en": "MakerWorld", "ar": "MakerWorld", "ckb": "MakerWorld", "keep_latin": true, "note": "The model-sharing site: «منصة MakerWorld» / «پلاتفۆرمی MakerWorld». \"on MakerWorld\" → «على MakerWorld» / «لە MakerWorld»."}
+{"en": "series", "ar": "سلسلة", "ckb": "زنجیرە", "keep_latin": false, "note": "Bare lower-case word only; \"X1 Series\" etc. are protected names (see X1 Series)."}
+{"en": "assembly", "ar": "التجميع", "ckb": "پێکەوەنان", "keep_latin": false, "note": "The act of assembling (app dictionary). A sub-assembly part (\"X-axis assembly\") → «مجموعة محور X» / «کۆمەڵەی تەوەری X»."}
+{"en": "battery", "ar": "بطارية", "ckb": "باتری", "keep_latin": false, "note": "Registry label."}
+{"en": "cable", "ar": "كابل", "ckb": "کێبڵ", "keep_latin": false, "note": ""}
+{"en": "CyberBrick", "ar": "CyberBrick", "ckb": "CyberBrick", "keep_latin": true, "note": "Product line (toy/robot kits); never transliterated in text (the search alias «سايبر بريك» is for search only)."}
+{"en": "motor", "ar": "محرك", "ckb": "بزوێنەر", "keep_latin": false, "note": "Registry and search alias. \"XY Motor\", \"Z Motor\" capitalised are part names."}
+{"en": "cutting", "ar": "القص", "ckb": "بڕین", "keep_latin": false, "note": "App dictionary (\"cutting speed\" → «سرعة القص» / «خێرایی بڕین»)."}
+{"en": "color", "ar": "لون", "ckb": "ڕەنگ", "keep_latin": false, "note": "Colour NAMES of an option (Jade White, Bambu Green …) stay English."}
+{"en": "drying", "ar": "التجفيف", "ckb": "وشککردنەوە", "keep_latin": false, "note": "Registry group label."}
+{"en": "surface", "ar": "السطح", "ckb": "ڕووکار", "keep_latin": false, "note": ""}
+{"en": "guide", "ar": "دليل", "ckb": "ڕێبەر", "keep_latin": false, "note": "Registry document title."}
+{"en": "quality", "ar": "الجودة", "ckb": "جۆرایەتی", "keep_latin": false, "note": ""}
+{"en": "download", "ar": "تنزيل", "ckb": "داگرتن", "keep_latin": false, "note": "\"download the model files\" → «نزّل ملفات النموذج» / «فایلەکانی مۆدێل دابگرە»."}
+{"en": "compatible", "ar": "متوافق", "ckb": "گونجاو", "keep_latin": false, "note": ""}
+{"en": "LED", "ar": "LED", "ckb": "LED", "keep_latin": true, "note": "«إضاءة LED» / «ڕووناکیی LED»; «شريط LED» / «شریتی LED»."}
+{"en": "3D model", "ar": "نموذج 3D", "ckb": "مۆدێلی 3D", "keep_latin": false, "note": "\"3D\" must survive verbatim."}
+{"en": "3D printed parts", "ar": "القطع المطبوعة بطابعة 3D", "ckb": "پارچەی چاپکراوی 3D", "keep_latin": false, "note": "Also \"3D-printed parts\". \"non-3D printed parts\" → «القطع غير المطبوعة بطابعة 3D» / «ئەو پارچانەی بە 3D چاپ ناکرێن»."}
+{"en": "safety", "ar": "السلامة", "ckb": "سەلامەتی", "keep_latin": false, "note": "Registry group «السلامة والشهادات» / «سەلامەتی و بڕوانامەکان»."}
+{"en": "3D printing", "ar": "الطباعة 3D", "ckb": "چاپی 3D", "keep_latin": false, "note": "\"3D\" must survive verbatim; «الطباعة ثلاثية الأبعاد» alone would be refused."}
+{"en": "cover", "ar": "غطاء", "ckb": "قەپاغ", "keep_latin": false, "note": ""}
+{"en": "size", "ar": "المقاس", "ckb": "قەبارە", "keep_latin": false, "note": "App dictionary."}
+{"en": "speed", "ar": "السرعة", "ckb": "خێرایی", "keep_latin": false, "note": ""}
+{"en": "unit", "ar": "وحدة", "ckb": "یەکە", "keep_latin": false, "note": ""}
+{"en": "AMS 2 Pro", "ar": "AMS 2 Pro", "ckb": "AMS 2 Pro", "keep_latin": true, "note": "Protected product name; copy verbatim."}
+{"en": "axis", "ar": "المحور", "ckb": "تەوەر", "keep_latin": false, "note": ""}
+{"en": "ideal", "ar": "مثالي", "ckb": "گونجاوترین", "keep_latin": false, "note": "\"Ideal: PLA, PETG\" → «مثالي: PLA وPETG» / «گونجاوترین: PLA و PETG». \"ideal for\" → «مثالي لـ» / «گونجاوە بۆ»."}
+{"en": "note", "ar": "ملاحظة", "ckb": "تێبینی", "keep_latin": false, "note": "\"Please note that …\" → «يرجى ملاحظة أن …» / «تکایە ئاگاداربە کە …»."}
+{"en": "extruder", "ar": "الدافع", "ckb": "پاڵنەر", "keep_latin": false, "note": "Registry labels use «الدافع» / «پاڵنەر» («ترس الدافع», «محرك الدافع»). Not «الباثق»."}
+{"en": "materials", "ar": "المواد", "ckb": "کەرەستەکان", "keep_latin": false, "note": "Registry label."}
+{"en": "module", "ar": "وحدة", "ckb": "مۆدیول", "keep_latin": false, "note": ""}
+{"en": "recommended", "ar": "موصى به", "ckb": "پێشنیارکراو", "keep_latin": false, "note": "App dictionary Arabic; registry Sorani."}
+{"en": "remote", "ar": "جهاز التحكم", "ckb": "ڕیمۆت", "keep_latin": false, "note": "\"CyberBrick Official Standard Remote\" is a product name."}
+{"en": "thread", "ar": "سنّ اللولب", "ckb": "پێچ", "keep_latin": false, "note": "Registry \"Thread type\" → «نوع السنّ» / «جۆری پێچ»."}
+{"en": "Specification", "ar": "المواصفات", "ckb": "تایبەتمەندییەکان", "keep_latin": false, "note": "Also \"Specifications\", \"technical specifications\" → «المواصفات الفنية» / «تایبەتمەندییە تەکنیکییەکان»."}
+{"en": "standard", "ar": "معيار", "ckb": "ستاندارد", "keep_latin": false, "note": "A norm (ISO, EN …). As a value \"standard\" (regular) → «قياسي» / «ستاندارد»."}
+{"en": "creator", "ar": "المصمّم", "ckb": "دروستکەر", "keep_latin": false, "note": "MakerWorld creators/designers."}
+{"en": "CF", "ar": "CF", "ckb": "CF", "keep_latin": true, "note": "Carbon-fibre suffix in codes (PLA-CF, PAHT-CF); spelled out in prose as «ألياف الكربون» / «ڕیشاڵی کاربۆن»."}
+{"en": "charger", "ar": "شاحن", "ckb": "بارگاویکەر", "keep_latin": false, "note": ""}
+{"en": "Documentation", "ar": "الوثائق", "ckb": "بەڵگەنامەکان", "keep_latin": false, "note": ""}
+{"en": "spool", "ar": "بكرة", "ckb": "ماسوورە", "keep_latin": false, "note": "VALIDATOR: the lower-case word \"spool\" is a protected name (a requirement target): a sentence whose English contains the bare word \"spool\" must also carry \"spool\" in Latin, e.g. «بكرة (spool)» / «ماسوورە (spool)». \"spools\", \"Spool\" are not affected."}
+{"en": "PETG", "ar": "PETG", "ckb": "PETG", "keep_latin": true, "note": "Material code."}
+{"en": "prints", "ar": "المطبوعات", "ckb": "چاپکراوەکان", "keep_latin": false, "note": "The finished printed objects."}
+{"en": "please refer to", "ar": "يرجى الرجوع إلى", "ckb": "تکایە سەیری … بکە", "keep_latin": false, "note": "Sorani wraps the object: «تکایە سەیری ویکی Bambu Lab بکە»."}
+{"en": "children", "ar": "الأطفال", "ckb": "منداڵان", "keep_latin": false, "note": "\"not suitable for children under 3 years\" → «غير مناسب للأطفال دون 3 سنوات» / «گونجاو نییە بۆ منداڵانی خوار 3 ساڵ»."}
+{"en": "TPU", "ar": "TPU", "ckb": "TPU", "keep_latin": true, "note": "Material code. Shore grades stay: «TPU 95A», «TPU 85A»."}
+{"en": "instructions", "ar": "التعليمات", "ckb": "ڕێنماییەکان", "keep_latin": false, "note": "Also \"Instruction\", \"Usage Instructions\", \"Instructions for use\" → «تعليمات الاستخدام» / «ڕێنماییەکانی بەکارهێنان»."}
+{"en": "USB", "ar": "USB", "ckb": "USB", "keep_latin": true, "note": "«منفذ USB» / «دەرچەی USB»."}
+{"en": "pack", "ar": "عبوة", "ckb": "پاکەت", "keep_latin": false, "note": "\"pack of 2\" → «عبوة من 2» / «پاکەتی 2 دانە»."}
+{"en": "required", "ar": "مطلوب", "ckb": "پێویست", "keep_latin": false, "note": "\"an extra accessory is required\" → «يلزم ملحق إضافي» / «پێداویستییەکی زیادە پێویستە»."}
+{"en": "toolhead", "ar": "رأس الطباعة", "ckb": "سەری چاپ", "keep_latin": false, "note": "Registry: «كاميرا رأس الطباعة» / «کامێرای سەری چاپ». Also \"tool head\"."}
+{"en": "included", "ar": "مرفق", "ckb": "لەگەڵدایە", "keep_latin": false, "note": "Registry: «قطر النوزل المرفق» / «تیرەی نۆزڵی لەگەڵدا»."}
+{"en": "supported", "ar": "مدعوم", "ckb": "پشتگیریکراو", "keep_latin": false, "note": "App dictionary. \"Supported Filament\" registry → «الخيوط المدعومة» / «فیلامێنتە پشتگیریکراوەکان»."}
+{"en": "hardware", "ar": "العتاد", "ckb": "ڕەقەکاڵا", "keep_latin": false, "note": "\"hardware kit\" → «طقم عتاد» / «کیتی ڕەقەکاڵا»."}
+{"en": "diameter", "ar": "القطر", "ckb": "تیرە", "keep_latin": false, "note": "Registry label."}
+{"en": "stainless steel", "ar": "فولاذ مقاوم للصدأ", "ckb": "پۆڵای زەنگنەگر", "keep_latin": false, "note": "App dictionary."}
+{"en": "features", "ar": "المزايا", "ckb": "تایبەتمەندییەکان", "keep_latin": false, "note": "\"key features\" → «أبرز المزايا» / «تایبەتمەندییە سەرەکییەکان»."}
+{"en": "type", "ar": "النوع", "ckb": "جۆر", "keep_latin": false, "note": "Registry label."}
+{"en": "chamber", "ar": "حجرة الطباعة", "ckb": "ژووری چاپ", "keep_latin": false, "note": "Registry: «حرارة حجرة الطباعة» / «پلەی گەرمیی ژووری چاپ». Standing alone as a whole Sorani row, write «ژووری چاپەکە» (a two-word Sorani row needs one of ە ێ ۆ ڵ ڕ to pass the validator)."}
+{"en": "PTFE", "ar": "PTFE", "ckb": "PTFE", "keep_latin": true, "note": "Teflon; «أنبوب PTFE» / «بۆریی PTFE»."}
+{"en": "box", "ar": "علبة", "ckb": "سندوق", "keep_latin": false, "note": ""}
+{"en": "fan", "ar": "مروحة", "ckb": "پانکە", "keep_latin": false, "note": "Search alias."}
+{"en": "tube", "ar": "أنبوب", "ckb": "بۆری", "keep_latin": false, "note": ""}
+{"en": "connector", "ar": "موصل", "ckb": "گەیەنەر", "keep_latin": false, "note": "Registry label."}
+{"en": "heatbed", "ar": "السرير الساخن", "ckb": "بێدی گەرم", "keep_latin": false, "note": "Also \"heated bed\", \"heat bed\". Its temperature label in the registry: «حرارة صفيحة الطباعة»."}
+{"en": "strength", "ar": "المتانة", "ckb": "بەهێزی", "keep_latin": false, "note": ""}
+{"en": "glue", "ar": "غراء", "ckb": "چەسپ", "keep_latin": false, "note": ""}
+{"en": "sensor", "ar": "حساس", "ckb": "هەستەوەر", "keep_latin": false, "note": ""}
+{"en": "glass", "ar": "زجاج", "ckb": "شووشە", "keep_latin": false, "note": ""}
+{"en": "build plate", "ar": "صفيحة الطباعة", "ckb": "پلێتی چاپ", "keep_latin": false, "note": "Registry label and search alias. Not «منصة الطباعة»."}
+{"en": "PEI", "ar": "PEI", "ckb": "PEI", "keep_latin": true, "note": "Plate coating. «صفيحة PEI» / «پلێتی PEI»; never transliterated."}
+{"en": "precision", "ar": "الدقة", "ckb": "وردی", "keep_latin": false, "note": "\"high precision\" → «دقة عالية» / «وردیی بەرز»."}
+{"en": "suitable for", "ar": "مناسب لـ", "ckb": "گونجاوە بۆ", "keep_latin": false, "note": "App dictionary Arabic."}
+{"en": "range", "ar": "النطاق", "ckb": "مەودا", "keep_latin": false, "note": ""}
+{"en": "moisture", "ar": "الرطوبة", "ckb": "شێ", "keep_latin": false, "note": ""}
+{"en": "battery pack", "ar": "حزمة البطارية", "ckb": "کۆمەڵە باتری", "keep_latin": false, "note": ""}
+{"en": "compatible with", "ar": "متوافق مع", "ckb": "گونجاوە لەگەڵ", "keep_latin": false, "note": "App dictionary. Say compatibility ONCE per sentence; model names after it stay Latin and verbatim: «متوافق مع X1 Series وP1S» / «گونجاوە لەگەڵ X1 Series و P1S»."}
+{"en": "length", "ar": "الطول", "ckb": "درێژی", "keep_latin": false, "note": ""}
+{"en": "adapter", "ar": "محوّل", "ckb": "ئەداپتەر", "keep_latin": false, "note": ""}
+{"en": "blade", "ar": "شفرة", "ckb": "تیغ", "keep_latin": false, "note": "App dictionary."}
+{"en": "finish", "ar": "التشطيب", "ckb": "ڕووکار", "keep_latin": false, "note": "The surface look."}
+{"en": "main image", "ar": "الصورة الرئيسية", "ckb": "وێنەی سەرەکی", "keep_latin": false, "note": "\"as shown in the main image\" → «كما هو موضّح في الصورة الرئيسية» / «وەک لە وێنە سەرەکییەکەدا دیارە»."}
+{"en": "AMS HT", "ar": "AMS HT", "ckb": "AMS HT", "keep_latin": true, "note": "Protected product name; copy verbatim."}
+{"en": "supports", "ar": "الدعامات", "ckb": "پاڵپشتەکان", "keep_latin": false, "note": "Print supports (search alias «دعامات»). The verb \"supports\" → «يدعم» / «پشتگیری دەکات»."}
+{"en": "storage", "ar": "التخزين", "ckb": "هەڵگرتن", "keep_latin": false, "note": "Keeping things (filament). Data storage in the registry: «وسائط التخزين» / «بیرگە»."}
+{"en": "connection", "ar": "الاتصال", "ckb": "پەیوەندی", "keep_latin": false, "note": "Registry \"Connection\" → «طريقة الاتصال» / «شێوازی پەیوەندی»."}
+{"en": "pin", "ar": "دبوس", "ckb": "پین", "keep_latin": false, "note": "Pin counts like \"4-Pin\", \"6-pin\" stay Latin. A metal dowel \"pin\" → «مسمار توجيه» / «بزمار»."}
+{"en": "charging", "ar": "الشحن", "ckb": "بارگاویکردن", "keep_latin": false, "note": "Battery charging. VALIDATOR: never write «الشحن خلال» (it reads as a shipping time); prefer «شحن البطارية»."}
+{"en": "silicone", "ar": "سيليكون", "ckb": "سیلیکۆن", "keep_latin": false, "note": ""}
+{"en": "durable", "ar": "متين", "ckb": "بەرگەگر", "keep_latin": false, "note": ""}
+{"en": "switch", "ar": "مفتاح", "ckb": "کلیل", "keep_latin": false, "note": "An electrical switch; registry \"Network kill switch\" → «مفتاح فصل الشبكة» / «کلیلی پچڕاندنی تۆڕ»."}
+{"en": "accessory", "ar": "ملحق", "ckb": "پێداویستی", "keep_latin": false, "note": "Registry sections use «ملحقات» / «پێداویستی»."}
+{"en": "desiccant", "ar": "مادة مجففة", "ckb": "ماددەی وشککەرەوە", "keep_latin": false, "note": "Silica-gel packs."}
+{"en": "hex", "ar": "سداسي", "ckb": "شەشپاڵوو", "keep_latin": false, "note": ""}
+{"en": "part", "ar": "قطعة", "ckb": "پارچە", "keep_latin": false, "note": "Registry label \"Part\"."}
+{"en": "camera", "ar": "كاميرا", "ckb": "کامێرا", "keep_latin": false, "note": ""}
+{"en": "PC", "ar": "PC", "ckb": "PC", "keep_latin": true, "note": "Polycarbonate; material code (never «حاسوب» here)."}
+{"en": "layer", "ar": "طبقة", "ckb": "چین", "keep_latin": false, "note": ""}
+{"en": "ABS", "ar": "ABS", "ckb": "ABS", "keep_latin": true, "note": "Material code."}
+{"en": "engraving", "ar": "الحفر", "ckb": "هەڵکۆڵین", "keep_latin": false, "note": "App dictionary (\"engraving speed\" → «سرعة الحفر» / «خێرایی هەڵکۆڵین»)."}
+{"en": "recommend", "ar": "نوصي", "ckb": "پێشنیار دەکەین", "keep_latin": false, "note": "\"we recommend drying\" → «نوصي بالتجفيف» / «پێشنیاری وشککردنەوە دەکەین»."}
+{"en": "filter", "ar": "فلتر", "ckb": "فلتەر", "keep_latin": false, "note": ""}
+{"en": "charge", "ar": "شحن", "ckb": "بارگاویکردن", "keep_latin": false, "note": "\"charge the battery\" → «اشحن البطارية» / «باترییەکە بارگاوی بکە»."}
+{"en": "adhesion", "ar": "الالتصاق", "ckb": "لکان", "keep_latin": false, "note": "\"bed adhesion\" → «الالتصاق بالصفيحة» / «لکان بە پلێتەوە»."}
+{"en": "DIY", "ar": "DIY", "ckb": "DIY", "keep_latin": true, "note": "«مشاريع DIY» / «پڕۆژەی DIY»."}
+{"en": "belt", "ar": "سير", "ckb": "قایش", "keep_latin": false, "note": ""}
+{"en": "detection", "ar": "الكشف", "ckb": "دۆزینەوە", "keep_latin": false, "note": ""}
+{"en": "plywood", "ar": "خشب أبلكاش", "ckb": "ئەبلەکاش", "keep_latin": false, "note": "App dictionary."}
+{"en": "AMS lite", "ar": "AMS lite", "ckb": "AMS lite", "keep_latin": true, "note": "Protected product name; copy verbatim (lower-case \"lite\")."}
+{"en": "app", "ar": "تطبيق", "ckb": "ئەپ", "keep_latin": false, "note": ""}
+{"en": "A1 mini", "ar": "A1 mini", "ckb": "A1 mini", "keep_latin": true, "note": "Printer model; copy verbatim (lower-case \"mini\"). Same for X1C, X1E, P1P, P1S, P2S, X2D, A1, A2L, H2D, H2S, H2C, H2D Pro, R1."}
+{"en": "cutter", "ar": "قاطع", "ckb": "بڕەر", "keep_latin": false, "note": ""}
+{"en": "tool", "ar": "أداة", "ckb": "ئامراز", "keep_latin": false, "note": ""}
+{"en": "cooling", "ar": "التبريد", "ckb": "ساردکردنەوە", "keep_latin": false, "note": ""}
+{"en": "interface", "ar": "الواجهة", "ckb": "ڕووکار", "keep_latin": false, "note": "App dictionary; a hardware connector interface (\"4-Pin interface\") → «منفذ 4-Pin» / «دەرچەی 4-Pin»."}
+{"en": "pcs", "ar": "قطعة", "ckb": "دانە", "keep_latin": false, "note": "\"12pcs\" → «12 قطعة» / «12 دانە»; inside names \"(10PCS)\" stays."}
+{"en": "gear", "ar": "ترس", "ckb": "چەرخی ددانەدار", "keep_latin": false, "note": "In registry compounds the Sorani is short: «چەرخی پاڵنەر»."}
+{"en": "heating", "ar": "التسخين", "ckb": "گەرمکردن", "keep_latin": false, "note": ""}
+{"en": "accuracy", "ar": "الدقة", "ckb": "وردی", "keep_latin": false, "note": ""}
+{"en": "extrusion", "ar": "البثق", "ckb": "پاڵنان", "keep_latin": false, "note": ""}
+{"en": "panel", "ar": "لوح", "ckb": "پانێڵ", "keep_latin": false, "note": ""}
+{"en": "RFID", "ar": "RFID", "ckb": "RFID", "keep_latin": true, "note": "«شريحة RFID» / «چیپی RFID»."}
+{"en": "voltage", "ar": "الجهد الكهربائي", "ckb": "ڤۆڵتیە", "keep_latin": false, "note": "Registry label."}
+{"en": "print quality", "ar": "جودة الطباعة", "ckb": "جۆرایەتیی چاپ", "keep_latin": false, "note": "Sorani «جۆرایەتی» for quality throughout (the colloquial «کوالیتی» also appears in the app)."}
+{"en": "PTFE tube", "ar": "أنبوب PTFE", "ckb": "بۆریی PTFE", "keep_latin": false, "note": ""}
+{"en": "compatibility", "ar": "التوافق", "ckb": "گونجاوی", "keep_latin": false, "note": "Registry label «التوافق» / «گونجاوی»."}
+{"en": "base", "ar": "قاعدة", "ckb": "بنکە", "keep_latin": false, "note": ""}
+{"en": "wood", "ar": "خشب", "ckb": "دار", "keep_latin": false, "note": "App dictionary."}
+{"en": "PET", "ar": "PET", "ckb": "PET", "keep_latin": true, "note": "Material code."}
+{"en": "socket", "ar": "مقبس", "ckb": "پریز", "keep_latin": false, "note": "A power socket. A screw's \"hex socket\" is different (see hex socket)."}
+{"en": "thickness", "ar": "السماكة", "ckb": "ئەستووری", "keep_latin": false, "note": "Registry label."}
+{"en": "lighting", "ar": "الإضاءة", "ckb": "ڕووناکی", "keep_latin": false, "note": ""}
+{"en": "Product Feature", "ar": "مزايا المنتج", "ckb": "تایبەتمەندییەکانی بەرهەم", "keep_latin": false, "note": "Also \"Product Features\"."}
+{"en": "requirements", "ar": "المتطلبات", "ckb": "پێداویستییەکان", "keep_latin": false, "note": "Registry \"Electrical requirements\" → «المتطلبات الكهربائية» / «پێداویستییە کارەباییەکان»."}
+{"en": "hardened steel", "ar": "فولاذ مقسّى", "ckb": "پۆڵای ڕەقکراو", "keep_latin": false, "note": "App dictionary."}
+{"en": "output", "ar": "الخرج", "ckb": "دەرچوون", "keep_latin": false, "note": "\"output power\" → «قدرة الخرج» / «وزەی دەرچوون»."}
+{"en": "calibration", "ar": "المعايرة", "ckb": "کالیبرەکردن", "keep_latin": false, "note": ""}
+{"en": "remote control", "ar": "جهاز التحكم عن بُعد", "ckb": "کۆنترۆڵی لە دوورەوە", "keep_latin": false, "note": ""}
+{"en": "application", "ar": "الاستخدام", "ckb": "بەکارهێنان", "keep_latin": false, "note": "Spec label \"Application\" (what it is used for). \"Application Scenarios\" → «مجالات الاستخدام» / «بوارەکانی بەکارهێنان»."}
+{"en": "filament drying", "ar": "تجفيف الفلامنت", "ckb": "وشککردنەوەی فیلامێنت", "keep_latin": false, "note": ""}
+{"en": "holder", "ar": "حامل", "ckb": "هەڵگر", "keep_latin": false, "note": ""}
+{"en": "durability", "ar": "المتانة", "ckb": "بەرگەگری", "keep_latin": false, "note": ""}
+{"en": "installation guide", "ar": "دليل التركيب", "ckb": "ڕێبەری دامەزراندن", "keep_latin": false, "note": "Registry document title."}
+{"en": "multi-color", "ar": "متعدد الألوان", "ckb": "فرەڕەنگ", "keep_latin": false, "note": "Also \"multicolor\", \"multi-colour\"."}
+{"en": "laser module", "ar": "وحدة الليزر", "ckb": "مۆدیولی لەیزەر", "keep_latin": false, "note": "Capitalised \"Laser Module\" and \"10W laser modules\" are protected names: copy verbatim."}
+{"en": "magnetic", "ar": "مغناطيسي", "ckb": "موگناتیسی", "keep_latin": false, "note": ""}
+{"en": "ASA", "ar": "ASA", "ckb": "ASA", "keep_latin": true, "note": "Material code."}
+{"en": "button", "ar": "زر", "ckb": "دوگمە", "keep_latin": false, "note": ""}
+{"en": "warping", "ar": "التقوّس", "ckb": "چەمانەوەی لێوار", "keep_latin": false, "note": "Corners lifting/curling during printing."}
+{"en": "automatic", "ar": "تلقائي", "ckb": "خۆکار", "keep_latin": false, "note": "App dictionary."}
+{"en": "door", "ar": "الباب", "ckb": "دەرگا", "keep_latin": false, "note": ""}
+{"en": "buffer", "ar": "موازن", "ckb": "هاوسەنگکەر", "keep_latin": false, "note": ""}
+{"en": "display", "ar": "الشاشة", "ckb": "شاشە", "keep_latin": false, "note": ""}
+{"en": "carbon steel", "ar": "فولاذ كربوني", "ckb": "پۆڵای کاربۆنی", "keep_latin": false, "note": ""}
+{"en": "high temperature", "ar": "درجة حرارة عالية", "ckb": "پلەی گەرمیی بەرز", "keep_latin": false, "note": ""}
+{"en": "power supply", "ar": "مزوّد الطاقة", "ckb": "دابینکەری وزە", "keep_latin": false, "note": "App dictionary. \"Power Supply - P2S\" is a part name."}
+{"en": "input", "ar": "الدخل", "ckb": "چوونەژوورەوە", "keep_latin": false, "note": "\"input voltage\" → «جهد الدخل» / «ڤۆڵتیەی چوونەژوورەوە»."}
+{"en": "feeding", "ar": "التغذية", "ckb": "پێدان", "keep_latin": false, "note": "Registry section: «أنظمة تغذية المواد (AMS)» / «سیستەمەکانی پێدانی کەرەستە (AMS)»."}
+{"en": "manual", "ar": "يدوي", "ckb": "دەستی", "keep_latin": false, "note": "App dictionary (the adjective). A user manual → «دليل الاستخدام» / «ڕێبەری بەکارهێنان»."}
+{"en": "wire", "ar": "سلك", "ckb": "وایەر", "keep_latin": false, "note": ""}
+{"en": "exhaust", "ar": "الشفط", "ckb": "دەرکردنی هەوا", "keep_latin": false, "note": "\"exhaust system\" → «نظام الشفط» / «سیستەمی دەرکردنی هەوا»."}
+{"en": "housing", "ar": "الغلاف", "ckb": "بەرگ", "keep_latin": false, "note": ""}
+{"en": "matte", "ar": "مطفي", "ckb": "مات", "keep_latin": false, "note": "A finish. \"PLA Matte\", \"PETG Matte\" are product names. \"matte finish\" → «تشطيب مطفي» / «ڕووکاری مات»."}
+{"en": "overheating", "ar": "ارتفاع الحرارة المفرط", "ckb": "گەرمبوونی زیادە", "keep_latin": false, "note": ""}
+{"en": "lithium battery", "ar": "بطارية ليثيوم", "ckb": "باتریی لیتیۆم", "keep_latin": false, "note": ""}
+{"en": "filament cutter", "ar": "قاطع الفلامنت", "ckb": "بڕەری فیلامێنت", "keep_latin": false, "note": "Registry label uses «قاطع الخيط»; in prose use «الفلامنت»."}
+{"en": "shaft", "ar": "عمود", "ckb": "میل", "keep_latin": false, "note": ""}
+{"en": "humidity", "ar": "الرطوبة", "ckb": "شێ", "keep_latin": false, "note": "Registry label."}
+{"en": "PA", "ar": "PA", "ckb": "PA", "keep_latin": true, "note": "Nylon/polyamide material code. Plain \"nylon\" → «نايلون» / «نایلۆن»."}
+{"en": "small parts", "ar": "قطع صغيرة", "ckb": "پارچەی بچووک", "keep_latin": false, "note": ""}
+{"en": "frame", "ar": "الإطار", "ckb": "چوارچێوە", "keep_latin": false, "note": ""}
+{"en": "magnet", "ar": "مغناطيس", "ckb": "موگناتیس", "keep_latin": false, "note": "Registry and search alias."}
+{"en": "port", "ar": "منفذ", "ckb": "دەرچە", "keep_latin": false, "note": "Registry \"Interfaces\" → «المنافذ» / «دەرچەکان»."}
+{"en": "cooling fan", "ar": "مروحة التبريد", "ckb": "پانکەی ساردکەرەوە", "keep_latin": false, "note": ""}
+{"en": "weight", "ar": "الوزن", "ckb": "کێش", "keep_latin": false, "note": ""}
+{"en": "drying instructions", "ar": "تعليمات التجفيف", "ckb": "ڕێنماییەکانی وشککردنەوە", "keep_latin": false, "note": "\"Filament drying instructions\" is a document title."}
+{"en": "handle", "ar": "مقبض", "ckb": "دەسک", "keep_latin": false, "note": "Registry \"Handle material\" → «مادة المقبض» / «کەرەستەی دەسک»."}
+{"en": "Introduction", "ar": "مقدمة", "ckb": "پێشەکی", "keep_latin": false, "note": ""}
+{"en": "rubber", "ar": "مطاط", "ckb": "لاستیک", "keep_latin": false, "note": ""}
+{"en": "screen", "ar": "الشاشة", "ckb": "شاشە", "keep_latin": false, "note": ""}
+{"en": "X-axis", "ar": "محور X", "ckb": "تەوەری X", "keep_latin": false, "note": "Same for Y-axis, Z-axis: the letter stays Latin."}
+{"en": "current", "ar": "التيار", "ckb": "تەزوو", "keep_latin": false, "note": "Registry label. Not the adjective \"current\" (الحالي / ئێستا)."}
+{"en": "flexible", "ar": "مرن", "ckb": "نەرمونیان", "keep_latin": false, "note": ""}
+{"en": "lubricant", "ar": "مادة تشحيم", "ckb": "ماددەی چەورکردن", "keep_latin": false, "note": "|"}
+{"en": "servo", "ar": "سيرفو", "ckb": "سێرڤۆ", "keep_latin": false, "note": "\"PMSM servo\" → «سيرفو PMSM» / «سێرڤۆی PMSM»."}
+{"en": "spring", "ar": "نابض", "ckb": "فەنەر", "keep_latin": false, "note": ""}
+{"en": "texture", "ar": "الملمس", "ckb": "هەستی ڕووکار", "keep_latin": false, "note": ""}
+{"en": "X1 Series", "ar": "X1 Series", "ckb": "X1 Series", "keep_latin": true, "note": "«X1 Series», «P1 Series», «A1 Series», «H2 Series», «P2 Series», «X2 Series», «A2 Series» are PROTECTED NAMES: copy the whole two words verbatim inside the sentence (the validator refuses «سلسلة X1»). Only a bare lower-case \"series\" in prose is translated."}
+{"en": "hub", "ar": "موزّع", "ckb": "دابەشکەر", "keep_latin": false, "note": "Capitalised \"AMS Hub\" is a protected name."}
+{"en": "acrylic", "ar": "أكريليك", "ckb": "ئاکریلیک", "keep_latin": false, "note": "App dictionary and search alias."}
+{"en": "component", "ar": "مكوّن", "ckb": "پێکهاتە", "keep_latin": false, "note": ""}
+{"en": "bearing", "ar": "محمل", "ckb": "بێرینگ", "keep_latin": false, "note": "Registry: «المحمل» / «بێرینگ». Iraqi shops also say «رولمان»."}
+{"en": "firmware", "ar": "البرنامج الثابت", "ckb": "فێرموێر", "keep_latin": false, "note": "App dictionary."}
+{"en": "aluminum", "ar": "ألمنيوم", "ckb": "ئەلەمنیۆم", "keep_latin": false, "note": "Also \"aluminium\"."}
+{"en": "bed", "ar": "السرير", "ckb": "بێد", "keep_latin": false, "note": ""}
+{"en": "dry environment", "ar": "مكان جاف", "ckb": "شوێنی وشک", "keep_latin": false, "note": "\"cool, dark and dry environment\" → «مكان بارد ومظلم وجاف» / «شوێنێکی فێنک و تاریک و وشک»."}
+{"en": "purge", "ar": "طرد الفلامنت", "ckb": "دەرکردنی فیلامێنت", "keep_latin": false, "note": "Filament pushed out at a colour change. \"purging\" the same."}
+{"en": "torque", "ar": "عزم الدوران", "ckb": "تۆرک", "keep_latin": false, "note": "\"stall torque\" → «عزم التوقف» / «تۆرکی وەستان»; \"rated torque\" → «العزم المقدّر» / «تۆرکی دیاریکراو»."}
+{"en": "hex socket", "ar": "تجويف سداسي", "ckb": "کونی شەشپاڵوو", "keep_latin": false, "note": "The screw-head recess."}
+{"en": "LED strip", "ar": "شريط LED", "ckb": "شریتی LED", "keep_latin": false, "note": ""}
+{"en": "carbon fiber", "ar": "ألياف الكربون", "ckb": "ڕیشاڵی کاربۆن", "keep_latin": false, "note": "Search alias \"cf\". Also \"carbon fibre\"."}
+{"en": "depth", "ar": "العمق", "ckb": "قووڵایی", "keep_latin": false, "note": ""}
+{"en": "SuperTack", "ar": "SuperTack", "ckb": "SuperTack", "keep_latin": true, "note": "Plate name (Cool Plate SuperTack); copy verbatim."}
+{"en": "feeder", "ar": "وحدة التغذية", "ckb": "پێدەر", "keep_latin": false, "note": ""}
+{"en": "laser engraving", "ar": "الحفر بالليزر", "ckb": "هەڵکۆڵینی لەیزەری", "keep_latin": false, "note": ""}
+{"en": "RC", "ar": "RC", "ckb": "RC", "keep_latin": true, "note": "Radio-controlled; also written R/C. «سيارة RC» / «ئۆتۆمبێلی RC»."}
+{"en": "TDS", "ar": "TDS", "ckb": "TDS", "keep_latin": true, "note": "Registry: «ورقة البيانات الفنية (TDS)» / «پەڕەی زانیاری تەکنیکی (TDS)»."}
+{"en": "circuit board", "ar": "لوحة إلكترونية", "ckb": "بۆردی ئەلیکترۆنی", "keep_latin": false, "note": "\"MC Board\", \"TH Board\", \"AP Board\", \"AC Board\" are part names: copy verbatim."}
+{"en": "transparent", "ar": "شفاف", "ckb": "ڕوون", "keep_latin": false, "note": "Registry colour label."}
+{"en": "adult supervision", "ar": "إشراف شخص بالغ", "ckb": "چاودێریی کەسێکی گەورە", "keep_latin": false, "note": ""}
+{"en": "precautions", "ar": "الاحتياطات", "ckb": "وریاییەکان", "keep_latin": false, "note": ""}
+{"en": "adhesive", "ar": "مادة لاصقة", "ckb": "چەسپ", "keep_latin": false, "note": "\"adhesive backing\" → «ظهر لاصق» / «پشتی چەسپاو» (app dictionary)."}
+{"en": "Combo", "ar": "Combo", "ckb": "Combo", "keep_latin": true, "note": "Inside product/option names (\"A1 Combo\", \"Hotend Combo\") it stays. A lower-case generic \"combo\" → «باقة» / «کۆمبۆ»."}
+{"en": "noise", "ar": "الضجيج", "ckb": "دەنگەدەنگ", "keep_latin": false, "note": ""}
+{"en": "self-tapping screws", "ar": "براغٍ ذاتية اللولبة", "ckb": "بورغیی خۆپێچەکان", "keep_latin": false, "note": ""}
+{"en": "coating", "ar": "طلاء", "ckb": "ڕووپۆش", "keep_latin": false, "note": "App dictionary."}
+{"en": "cutting module", "ar": "وحدة القص", "ckb": "مۆدیولی بڕین", "keep_latin": false, "note": ""}
+{"en": "LED light", "ar": "ضوء LED", "ckb": "گڵۆپی LED", "keep_latin": false, "note": ""}
+{"en": "screw gauge", "ar": "مقياس البراغي", "ckb": "پێوەری بورغی", "keep_latin": false, "note": "\"Screw Gauge\" (document title) is a model name."}
+{"en": "wireless", "ar": "لاسلكي", "ckb": "بێتەل", "keep_latin": false, "note": ""}
+{"en": "controller", "ar": "وحدة التحكم", "ckb": "کۆنترۆڵەر", "keep_latin": false, "note": ""}
+{"en": "high flow", "ar": "تدفق عالٍ", "ckb": "ڕۆیشتنی بەرز", "keep_latin": false, "note": "\"High Flow\" capitalised as an option name stays English."}
+{"en": "high-performance", "ar": "عالي الأداء", "ckb": "کارایی بەرز", "keep_latin": false, "note": "\"high-performance filaments\" → «فلامنتات عالية الأداء» / «فیلامێنتی کارایی بەرز»."}
+{"en": "plug", "ar": "قابس", "ckb": "فیش", "keep_latin": false, "note": ""}
+{"en": "power distribution board", "ar": "لوحة توزيع الطاقة", "ckb": "بۆردی دابەشکردنی وزە", "keep_latin": false, "note": "\"PDB\" stays Latin."}
+{"en": "shape", "ar": "الشكل", "ckb": "شێوە", "keep_latin": false, "note": "Registry label."}
+{"en": "vinyl", "ar": "فينيل", "ckb": "ڤاینل", "keep_latin": false, "note": "App dictionary and search alias."}
+{"en": "front cover", "ar": "الغطاء الأمامي", "ckb": "قەپاغی پێشەوە", "keep_latin": false, "note": "\"Front Cover - X1C\" is a part name."}
+{"en": "lamp", "ar": "مصباح", "ckb": "چرا", "keep_latin": false, "note": ""}
+{"en": "smoke", "ar": "دخان", "ckb": "دووکەڵ", "keep_latin": false, "note": ""}
+{"en": "spool holder", "ar": "حامل البكرة", "ckb": "هەڵگری ماسوورە", "keep_latin": false, "note": "Capitalised \"Spool Holder - A1\" is a part name."}
+{"en": "alloy", "ar": "سبيكة", "ckb": "ئاوێتە", "keep_latin": false, "note": ""}
+{"en": "Considerations", "ar": "أمور يجب مراعاتها", "ckb": "خاڵەکانی ڕەچاوکردن", "keep_latin": false, "note": "Also \"Consideration\"."}
+{"en": "cool plate", "ar": "صفيحة باردة", "ckb": "پلێتی سارد", "keep_latin": false, "note": "\"Bambu Cool Plate\" / \"Cool Plate SuperTack\" as names stay English."}
+{"en": "maintenance", "ar": "الصيانة", "ckb": "چاککردنەوە", "keep_latin": false, "note": "Registry section \"Parts for all series\" → «قطع صيانة لكل السلاسل» / «پارچەی چاککردنەوە بۆ هەموو زنجیرەکان»."}
+{"en": "vibration", "ar": "الاهتزاز", "ckb": "لەرینەوە", "keep_latin": false, "note": ""}
+{"en": "filtration", "ar": "الترشيح", "ckb": "پاڵاوتن", "keep_latin": false, "note": ""}
+{"en": "MSDS", "ar": "MSDS", "ckb": "MSDS", "keep_latin": true, "note": "Material safety data sheet; registry document title for SDS: «ورقة بيانات السلامة (SDS)» / «پەڕەی زانیاری سەلامەتی (SDS)»."}
+{"en": "PVA", "ar": "PVA", "ckb": "PVA", "keep_latin": true, "note": "Water-soluble support material code."}
+{"en": "requires", "ar": "يتطلب", "ckb": "پێویستی بە … هەیە", "keep_latin": false, "note": "Keep it plain «يتطلب X» / «پێویستی بە X هەیە» (DECISIONS: «يتطلب» stays plain until it links). X, a product name, stays verbatim."}
+{"en": "corrosion", "ar": "تآكل", "ckb": "داخوران", "keep_latin": false, "note": ""}
+{"en": "resolution", "ar": "الدقة", "ckb": "ڕوونی", "keep_latin": false, "note": "Registry label (screen/camera resolution)."}
+{"en": "multi-color printing", "ar": "الطباعة متعددة الألوان", "ckb": "چاپی فرەڕەنگ", "keep_latin": false, "note": "Registry: \"Multi-colour printing\". \"multi-color\" alone → «متعدد الألوان» / «فرەڕەنگ»."}
+{"en": "XY", "ar": "XY", "ckb": "XY", "keep_latin": true, "note": "Axis pair; «حركة XY» / «جووڵەی XY»."}
+{"en": "style", "ar": "الطراز", "ckb": "شێواز", "keep_latin": false, "note": "Registry label."}
+{"en": "ventilation", "ar": "التهوية", "ckb": "هەواگۆڕکێ", "keep_latin": false, "note": ""}
+{"en": "density", "ar": "الكثافة", "ckb": "چڕی", "keep_latin": false, "note": "Registry label."}
+{"en": "in the box", "ar": "محتويات العلبة", "ckb": "ناوەڕۆکی سندوق", "keep_latin": false, "note": "Registry label; also \"What's in the box\"."}
+{"en": "max", "ar": "أقصى", "ckb": "زۆرترین", "keep_latin": false, "note": "Registry Sorani uses «زۆرترین»."}
+{"en": "nominal", "ar": "اسمي", "ckb": "ناوزەد", "keep_latin": false, "note": ""}
+{"en": "RoHS", "ar": "RoHS", "ckb": "RoHS", "keep_latin": true, "note": "Standard name; stays Latin. So do CE, FCC, UL, ISO, EN, DIN, GB/T, ETSI."}
+{"en": "screwdriver", "ar": "مفكّ براغي", "ckb": "دەرنەفیس", "keep_latin": false, "note": ""}
+{"en": "choking hazard", "ar": "خطر الاختناق", "ckb": "مەترسیی خنکان", "keep_latin": false, "note": ""}
+{"en": "compliant", "ar": "متوافق مع المعايير", "ckb": "گونجاو لەگەڵ ستانداردەکان", "keep_latin": false, "note": "\"compliant with EU RED\" → «متوافق مع EU RED» / «گونجاوە لەگەڵ EU RED»."}
+{"en": "extruder unit", "ar": "وحدة الدافع", "ckb": "یەکەی پاڵنەر", "keep_latin": false, "note": ""}
+{"en": "hazard", "ar": "خطر", "ckb": "مەترسی", "keep_latin": false, "note": ""}
+{"en": "tape", "ar": "شريط لاصق", "ckb": "شریتی چەسپدار", "keep_latin": false, "note": "\"masking tape\" → «شريط تغطية» / «شریتی داپۆشین»."}
+{"en": "food-grade", "ar": "آمن للاستخدام الغذائي", "ckb": "گونجاو بۆ خۆراک", "keep_latin": false, "note": ""}
+{"en": "leather", "ar": "جلد", "ckb": "چەرم", "keep_latin": false, "note": "App dictionary. \"PU leather\" → «جلد PU» / «چەرمی PU»."}
+{"en": "lifespan", "ar": "العمر الافتراضي", "ckb": "تەمەنی بەکارهێنان", "keep_latin": false, "note": "Registry \"Life cycle\"."}
+{"en": "packaging", "ar": "التغليف", "ckb": "پاکەت", "keep_latin": false, "note": ""}
+{"en": "printing parameters", "ar": "إعدادات الطباعة", "ckb": "ڕێکخستنەکانی چاپ", "keep_latin": false, "note": "Registry group \"Print settings\" uses the same words."}
+{"en": "silk", "ar": "حريري", "ckb": "ئاوریشمی", "keep_latin": false, "note": "\"PLA Silk+\" is a product name. \"silk finish\" → «لمعة حريرية» / «بریسکەی ئاوریشمی»."}
+{"en": "Wi-Fi", "ar": "Wi-Fi", "ckb": "Wi-Fi", "keep_latin": true, "note": "Stays Latin in sentences (the registry label alone reads «الواي فاي» / «وایفای»)."}
+{"en": "automatic material system", "ar": "نظام المواد التلقائي", "ckb": "سیستەمی خۆکاری کەرەستە", "keep_latin": false, "note": "What AMS stands for."}
+{"en": "glass fiber", "ar": "ألياف الزجاج", "ckb": "ڕیشاڵی شووشە", "keep_latin": false, "note": "Search alias \"gf\"."}
+{"en": "induction hotend", "ar": "رأس صهر بالتسخين الحثّي", "ckb": "سەری تواندنەوەی ئیندەکشن", "keep_latin": false, "note": "H2C induction heating."}
+{"en": "PU", "ar": "PU", "ckb": "PU", "keep_latin": true, "note": "Polyurethane code (e.g. «جلد PU» / «چەرمی PU»)."}
+{"en": "real time", "ar": "الوقت الفعلي", "ckb": "کاتی ڕاستەقینە", "keep_latin": false, "note": "\"in real time\" → «في الوقت الفعلي» / «لە کاتی ڕاستەقینەدا»."}
+{"en": "smooth surface", "ar": "سطح أملس", "ckb": "ڕووی لووس", "keep_latin": false, "note": ""}
+{"en": "wheel", "ar": "عجلة", "ckb": "تایە", "keep_latin": false, "note": ""}
+{"en": "accessory compatibility", "ar": "توافق الملحقات", "ckb": "گونجاویی پێداویستییەکان", "keep_latin": false, "note": ""}
+{"en": "dimensions", "ar": "الأبعاد", "ckb": "ڕەهەندەکان", "keep_latin": false, "note": "App dictionary."}
+{"en": "lever", "ar": "ذراع", "ckb": "لیڤەر", "keep_latin": false, "note": "|"}
+{"en": "reusable spool", "ar": "بكرة قابلة لإعادة الاستخدام", "ckb": "ماسوورەی دووبارە بەکارهێنراو", "keep_latin": false, "note": "Capitalised \"Reusable Spool\" / \"Bambu Reusable Spool\" is a product name: copy verbatim."}
+{"en": "safety tips", "ar": "نصائح السلامة", "ckb": "ئامۆژگارییەکانی سەلامەتی", "keep_latin": false, "note": ""}
+{"en": "time-lapse", "ar": "تصوير بفاصل زمني", "ckb": "وێنەگرتنی کاتی خێراکراو", "keep_latin": false, "note": "\"time-lapse photography\" the same."}
+{"en": "bolt", "ar": "مسمار ملولب", "ckb": "بۆڵت", "keep_latin": false, "note": ""}
+{"en": "grease", "ar": "شحم", "ckb": "گریس", "keep_latin": false, "note": "\"Lubricant Grease\" capitalised is a product name."}
+{"en": "nylon", "ar": "نايلون", "ckb": "نایلۆن", "keep_latin": false, "note": ""}
+{"en": "package", "ar": "العبوة", "ckb": "پاکەت", "keep_latin": false, "note": "Registry «العبوة» / «پاکەت»."}
+{"en": "textured PEI plate", "ar": "صفيحة PEI محبّبة", "ckb": "پلێتی دانەداری PEI", "keep_latin": false, "note": "Capitalised \"Textured PEI Plate\" / \"Bambu Textured PEI Plate\" as an option or product name stays English. Never glue a Sorani suffix to PEI: «پلێتی دانەداری PEI», not «پلێتی PEIی دانەدار»."}
+{"en": "well-ventilated area", "ar": "مكان جيد التهوية", "ckb": "شوێنێکی هەواگۆڕکێی باش", "keep_latin": false, "note": ""}
+{"en": "air filter", "ar": "فلتر الهواء", "ckb": "فلتەری هەوا", "keep_latin": false, "note": ""}
+{"en": "Cool Plate SuperTack", "ar": "Cool Plate SuperTack", "ckb": "Cool Plate SuperTack", "keep_latin": true, "note": "Plate/option name; copy verbatim. Describe it if needed as «صفيحة باردة عالية الالتصاق» / «پلێتی سارد بە لکانی بەهێز»."}
+{"en": "direct sunlight", "ar": "أشعة الشمس المباشرة", "ckb": "تیشکی ڕاستەوخۆی خۆر", "keep_latin": false, "note": ""}
+{"en": "front door", "ar": "الباب الأمامي", "ckb": "دەرگای پێشەوە", "keep_latin": false, "note": ""}
+{"en": "air filtration", "ar": "تنقية الهواء", "ckb": "پاڵاوتنی هەوا", "keep_latin": false, "note": "App dictionary."}
+{"en": "bracket", "ar": "دعامة تثبيت", "ckb": "پایەی جێگیرکردن", "keep_latin": false, "note": ""}
+{"en": "nozzle wiper", "ar": "ماسحة النوزل", "ckb": "سڕەری نۆزڵ", "keep_latin": false, "note": "Capitalised \"Nozzle Wiper - A2L\" is a part name."}
+{"en": "Bambu Studio", "ar": "Bambu Studio", "ckb": "Bambu Studio", "keep_latin": true, "note": "The slicer software. When a head noun helps: «برنامج Bambu Studio» / «بەرنامەی Bambu Studio»."}
+{"en": "closed-loop control", "ar": "التحكم بالحلقة المغلقة", "ckb": "کۆنترۆڵی بازنەی داخراو", "keep_latin": false, "note": "Also \"closed loop control\"."}
+{"en": "printing process", "ar": "عملية الطباعة", "ckb": "پرۆسەی چاپ", "keep_latin": false, "note": "\"during printing\" → «أثناء الطباعة» / «لە کاتی چاپدا»."}
+{"en": "touchscreen", "ar": "شاشة لمس", "ckb": "شاشەی دەستلێدان", "keep_latin": false, "note": "App dictionary."}
+{"en": "3D printer", "ar": "طابعة 3D", "ckb": "چاپکەری 3D", "keep_latin": false, "note": "\"3D\" must survive verbatim."}
+{"en": "bamboo", "ar": "خيزران", "ckb": "بامبوو", "keep_latin": false, "note": ""}
+{"en": "lock", "ar": "قفل", "ckb": "قفڵ", "keep_latin": false, "note": ""}
+{"en": "warning", "ar": "تحذير", "ckb": "ئاگاداری", "keep_latin": false, "note": ""}
+{"en": "filament buffer", "ar": "موازن الفلامنت", "ckb": "هاوسەنگکەری فیلامێنت", "keep_latin": false, "note": "Capitalised \"Filament Buffer\" is a protected product name: copy verbatim."}
+{"en": "pulley", "ar": "بكرة السير", "ckb": "چەرخی قایش", "keep_latin": false, "note": "Not «بكرة» alone (that is a filament spool)."}
+{"en": "self-tapping screw", "ar": "برغي ذاتي اللولبة", "ckb": "بورغیی خۆپێچ", "keep_latin": false, "note": "Also \"self tapping screw\"."}
+{"en": "side panel", "ar": "اللوح الجانبي", "ckb": "پانێڵی لاتەنیشت", "keep_latin": false, "note": "\"left/right side panel\" → «اللوح الجانبي الأيسر/الأيمن» / «پانێڵی لای چەپ/ڕاست»."}
+{"en": "USB port", "ar": "منفذ USB", "ckb": "دەرچەی USB", "keep_latin": false, "note": ""}
+{"en": "width", "ar": "العرض", "ckb": "پانی", "keep_latin": false, "note": ""}
+{"en": "fiber reinforced", "ar": "مقوّى بالألياف", "ckb": "بەهێزکراو بە ڕیشاڵ", "keep_latin": false, "note": "Registry section \"Fibre-reinforced\" → «مواد مقوّاة بالألياف»."}
+{"en": "height", "ar": "الارتفاع", "ckb": "بەرزی", "keep_latin": false, "note": ""}
+{"en": "laser cutting", "ar": "القص بالليزر", "ckb": "بڕینی لەیزەری", "keep_latin": false, "note": ""}
+{"en": "lithophane", "ar": "ليثوفان", "ckb": "لیتۆفەین", "keep_latin": false, "note": "A backlit relief print. \"CMYK Lithophane\" keeps CMYK."}
+{"en": "paper", "ar": "ورق", "ckb": "کاغەز", "keep_latin": false, "note": "App dictionary."}
+{"en": "stainless steel nozzle", "ar": "نوزل من الفولاذ المقاوم للصدأ", "ckb": "نۆزڵی پۆڵای زەنگنەگر", "keep_latin": false, "note": ""}
+{"en": "AI", "ar": "AI", "ckb": "AI", "keep_latin": true, "note": "«كاميرا AI» / «کامێرای AI»; «كشف الأخطاء بالذكاء الاصطناعي (AI)» / «دۆزینەوەی هەڵە بە AI»."}
+{"en": "assembly guide", "ar": "دليل التجميع", "ckb": "ڕێبەری پێکەوەنان", "keep_latin": false, "note": ""}
+{"en": "coding", "ar": "البرمجة", "ckb": "کۆدنووسین", "keep_latin": false, "note": ""}
+{"en": "full thread", "ar": "سنّ كامل", "ckb": "پێچی تەواو", "keep_latin": false, "note": ""}
+{"en": "purge wiper", "ar": "ماسحة الطرد", "ckb": "سڕەری فیلامێنتی دەرکراو", "keep_latin": false, "note": "Capitalised \"Purge Wiper - …\" is a part name."}
+{"en": "capable", "ar": "ممكن", "ckb": "دەتوانرێت", "keep_latin": false, "note": "In the \"Ideal / Capable\" filament lists: «ممكن: PA وPC» / «دەتوانرێت: PA و PC»."}
+{"en": "feeder unit", "ar": "وحدة التغذية", "ckb": "یەکەی پێدان", "keep_latin": false, "note": "\"AMS Feeder Unit\" capitalised is a part name."}
+{"en": "keep out of reach of children", "ar": "يُحفظ بعيدًا عن متناول الأطفال", "ckb": "لە دەستڕەسی منداڵان دووری بخەرەوە", "keep_latin": false, "note": "Also \"keep away from infants, children and pets\" → «يُحفظ بعيدًا عن الرضّع والأطفال والحيوانات الأليفة» / «لە ساوایان و منداڵان و ئاژەڵە ماڵییەکان دووری بخەرەوە»."}
+{"en": "outer diameter", "ar": "القطر الخارجي", "ckb": "تیرەی دەرەوە", "keep_latin": false, "note": ""}
+{"en": "rechargeable", "ar": "قابل لإعادة الشحن", "ckb": "دووبارە بارگاوی دەکرێتەوە", "keep_latin": false, "note": ""}
+{"en": "recommended temperature", "ar": "الحرارة الموصى بها", "ckb": "پلەی گەرمیی پێشنیارکراو", "keep_latin": false, "note": ""}
+{"en": "translucent", "ar": "شبه شفاف", "ckb": "نیمچە ڕوون", "keep_latin": false, "note": "\"PLA Translucent\" is a product name."}
+{"en": "brass", "ar": "نحاس أصفر", "ckb": "برنج", "keep_latin": false, "note": "App dictionary."}
+{"en": "enclosed", "ar": "مغلق", "ckb": "داخراو", "keep_latin": false, "note": ""}
+{"en": "encoder", "ar": "مشفّر الحركة", "ckb": "ئینکۆدەر", "keep_latin": false, "note": "\"Vision Encoder\" capitalised is a part name."}
+{"en": "heater", "ar": "سخّان", "ckb": "گەرمکەرەوە", "keep_latin": false, "note": ""}
+{"en": "monitoring", "ar": "المراقبة", "ckb": "چاودێری", "keep_latin": false, "note": ""}
+{"en": "stiffness", "ar": "الصلابة", "ckb": "سەختی", "keep_latin": false, "note": "Also \"rigidity\"; \"rigid\" → «صلب» / «ڕەق»."}
+{"en": "upgrade kit", "ar": "طقم ترقية", "ckb": "کیتی نوێکردنەوە", "keep_latin": false, "note": "Capitalised \"Laser Upgrade Kit\", \"Vortek Upgrade Kit\" are product names."}
+{"en": "Using Tips", "ar": "نصائح الاستخدام", "ckb": "ئامۆژگارییەکانی بەکارهێنان", "keep_latin": false, "note": "Also \"Usage tips\"."}
+{"en": "AMS Hub", "ar": "AMS Hub", "ckb": "AMS Hub", "keep_latin": true, "note": "Protected name (a requirement target); copy verbatim. A generic lower-case \"hub\" → «موزّع» / «دابەشکەر»."}
+{"en": "enclosure", "ar": "هيكل مغلق", "ckb": "ژووری داخراو", "keep_latin": false, "note": "App dictionary. Standing alone as a whole Sorani row: «ژووری داخراوی چاپکەرەکە» (passes the Sorani-letter check)."}
+{"en": "flow rate", "ar": "معدل التدفق", "ckb": "ڕێژەی ڕۆیشتن", "keep_latin": false, "note": "Registry wording."}
+{"en": "moving parts", "ar": "الأجزاء المتحركة", "ckb": "پارچە جووڵاوەکان", "keep_latin": false, "note": ""}
+{"en": "not recommended", "ar": "غير موصى به", "ckb": "پێشنیار ناکرێت", "keep_latin": false, "note": ""}
+{"en": "metric coarse thread", "ar": "سنّ متري خشن", "ckb": "پێچی مەتری زبر", "keep_latin": false, "note": ""}
+{"en": "basswood plywood", "ar": "أبلكاش خشب الزيزفون", "ckb": "ئەبلەکاشی داری زێزەفوون", "keep_latin": false, "note": ""}
+{"en": "caution", "ar": "تنبيه", "ckb": "وریایی", "keep_latin": false, "note": ""}
+{"en": "connectivity", "ar": "الاتصال", "ckb": "پەیوەندیکردن", "keep_latin": false, "note": "Registry group: «الاتصال والتخزين» / «پەیوەندیکردن و بیرگە»."}
+{"en": "engineering plate", "ar": "صفيحة هندسية", "ckb": "پلێتی ئەندازیاری", "keep_latin": false, "note": "\"Engineering Plate\" as an option name stays English."}
+{"en": "first layer", "ar": "الطبقة الأولى", "ckb": "چینی یەکەم", "keep_latin": false, "note": ""}
+{"en": "flammable", "ar": "قابل للاشتعال", "ckb": "گڕگر", "keep_latin": false, "note": ""}
+{"en": "head diameter", "ar": "قطر الرأس", "ckb": "تیرەی سەر", "keep_latin": false, "note": ""}
+{"en": "head thickness", "ar": "سماكة الرأس", "ckb": "ئەستووریی سەر", "keep_latin": false, "note": ""}
+{"en": "hex code", "ar": "رمز اللون HEX", "ckb": "کۆدی ڕەنگی HEX", "keep_latin": false, "note": "Document title \"Hex Code\"; registry \"Colour codes\" → «رموز الألوان» / «کۆدەکانی ڕەنگ»."}
+{"en": "interface board", "ar": "لوحة الواجهة", "ckb": "بۆردی ڕووکار", "keep_latin": false, "note": ""}
+{"en": "laser safety", "ar": "سلامة الليزر", "ckb": "سەلامەتیی لەیزەر", "keep_latin": false, "note": ""}
+{"en": "light strip", "ar": "شريط إضاءة", "ckb": "شریتی ڕووناکی", "keep_latin": false, "note": "\"LED strip light\" → «شريط إضاءة LED» / «شریتی ڕووناکیی LED»."}
+{"en": "mainboard", "ar": "اللوحة الأم", "ckb": "بۆردی سەرەکی", "keep_latin": false, "note": ""}
+{"en": "sharp edges", "ar": "حواف حادة", "ckb": "لێواری تیژ", "keep_latin": false, "note": ""}
+{"en": "across flats", "ar": "المسافة بين الوجهين المتقابلين", "ckb": "پانیی نێوان دوو ڕووی تەخت", "keep_latin": false, "note": "Hex size measured across flats."}
+{"en": "activated carbon", "ar": "كربون منشّط", "ckb": "کاربۆنی چالاککراو", "keep_latin": false, "note": "App dictionary."}
+{"en": "bolt length", "ar": "طول البرغي", "ckb": "درێژیی بۆڵت", "keep_latin": false, "note": ""}
+{"en": "extruder gear", "ar": "ترس الدافع", "ckb": "چەرخی پاڵنەر", "keep_latin": false, "note": "Registry label."}
+{"en": "heating assembly", "ar": "مجموعة التسخين", "ckb": "کۆمەڵەی گەرمکەرەوە", "keep_latin": false, "note": ""}
+{"en": "impact resistance", "ar": "مقاومة الصدمات", "ckb": "بەرگەی لێدان", "keep_latin": false, "note": ""}
+{"en": "link", "ar": "رابط", "ckb": "بەستەر", "keep_latin": false, "note": "Registry document title \"Link\"."}
+{"en": "live view", "ar": "المشاهدة المباشرة", "ckb": "بینینی ڕاستەوخۆ", "keep_latin": false, "note": "\"Live View Camera\" (capitalised part name) stays English."}
+{"en": "multi-material printing", "ar": "الطباعة متعددة المواد", "ckb": "چاپی فرەکەرەستە", "keep_latin": false, "note": ""}
+{"en": "not included", "ar": "غير مرفق", "ckb": "لەگەڵدا نییە", "keep_latin": false, "note": "\"the product does not include the 3D printed parts\" → «لا يتضمن المنتج القطع المطبوعة بطابعة 3D» / «بەرهەمەکە پارچە چاپکراوەکانی 3D لەخۆ ناگرێت»."}
+{"en": "PPS", "ar": "PPS", "ckb": "PPS", "keep_latin": true, "note": "Material code."}
+{"en": "refill", "ar": "عبوة تعبئة بدون بكرة", "ckb": "پڕکەرەوەی بێ ماسوورە", "keep_latin": false, "note": "Filament sold without a spool. As an option name (\"Refill\", \"Filament with spool\") it stays English."}
+{"en": "strength grade", "ar": "درجة المتانة", "ckb": "پلەی بەهێزی", "keep_latin": false, "note": "Bolt grades like \"8.8\", \"12.9\" stay as written."}
+{"en": "top cover", "ar": "الغطاء العلوي", "ckb": "قەپاغی سەرەوە", "keep_latin": false, "note": "Also \"top lid\"."}
+{"en": "brightness", "ar": "السطوع", "ckb": "ڕووناکی", "keep_latin": false, "note": ""}
+{"en": "cutter lever", "ar": "ذراع القاطع", "ckb": "لیڤەری بڕەر", "keep_latin": false, "note": "\"Filament Cutter Lever\" capitalised is a part name."}
+{"en": "groove depth", "ar": "عمق المجرى", "ckb": "قووڵایی شیار", "keep_latin": false, "note": ""}
+{"en": "screwdriver bit", "ar": "رأس مفكّ", "ckb": "سەری دەرنەفیس", "keep_latin": false, "note": "\"bit size\" → «مقاس الرأس» / «قەبارەی سەر»."}
+{"en": "sealed container", "ar": "وعاء محكم الإغلاق", "ckb": "دەفری داخراو", "keep_latin": false, "note": "\"sealed container with desiccant\" → «وعاء محكم مع مادة مجففة» / «دەفری داخراو لەگەڵ ماددەی وشککەرەوە»."}
+{"en": "silicone sock", "ar": "غطاء سيليكون للنوزل", "ckb": "بەرگی سیلیکۆنی نۆزڵ", "keep_latin": false, "note": ""}
+{"en": "AMS unit", "ar": "وحدة AMS", "ckb": "یەکەی AMS", "keep_latin": false, "note": "Plural \"AMS units\" → «وحدات AMS» / «یەکەکانی AMS»."}
+{"en": "liquid glue", "ar": "غراء سائل", "ckb": "چەسپی شل", "keep_latin": false, "note": "Capitalised \"Liquid Glue\" is a product name."}
+{"en": "metallic", "ar": "معدني اللمعان", "ckb": "بریسکەی کانزایی", "keep_latin": false, "note": ""}
+{"en": "NFC", "ar": "NFC", "ckb": "NFC", "keep_latin": true, "note": "Stays Latin."}
+{"en": "programmable", "ar": "قابل للبرمجة", "ckb": "پرۆگرامپێکراو", "keep_latin": false, "note": "\"programmable hardware\" → «عتاد قابل للبرمجة» / «ڕەقەکاڵای پرۆگرامپێکراو»."}
+{"en": "rated", "ar": "مقدّر", "ckb": "دیاریکراو", "keep_latin": false, "note": "Registry: «القدرة المقدّرة» / «توانای دیاریکراو»."}
+{"en": "troubleshooting", "ar": "استكشاف الأخطاء وإصلاحها", "ckb": "چارەسەرکردنی کێشەکان", "keep_latin": false, "note": ""}
+{"en": "Vortek", "ar": "Vortek", "ckb": "Vortek", "keep_latin": true, "note": "Hotend-change system name (H2C); copy verbatim: «نظام Vortek» / «سیستەمی Vortek»."}
+{"en": "capacity", "ar": "السعة", "ckb": "توانا", "keep_latin": false, "note": "The registry label reads «توانای گرتن». Battery capacity → «سعة البطارية» / «توانای باتری»."}
+{"en": "core board", "ar": "لوحة النواة", "ckb": "بۆردی ناوک", "keep_latin": false, "note": "\"multi-function core board\" → «لوحة النواة متعددة الوظائف» / «بۆردی ناوکی فرەئەرک»."}
+{"en": "glossy", "ar": "لامع", "ckb": "بریسکەدار", "keep_latin": false, "note": ""}
+{"en": "heatbed temperature", "ar": "حرارة السرير الساخن", "ckb": "پلەی گەرمیی بێدی گەرم", "keep_latin": false, "note": ""}
+{"en": "hotend heating assembly", "ar": "مجموعة تسخين رأس الصهر", "ckb": "کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە", "keep_latin": false, "note": ""}
+{"en": "infill", "ar": "الحشوة الداخلية", "ckb": "پڕکەرەوەی ناوەوە", "keep_latin": false, "note": ""}
+{"en": "part cooling fan", "ar": "مروحة تبريد القطعة المطبوعة", "ckb": "پانکەی ساردکردنەوەی پارچەی چاپکراو", "keep_latin": false, "note": "Registry label."}
+{"en": "PPA", "ar": "PPA", "ckb": "PPA", "keep_latin": true, "note": "Material code."}
+{"en": "Comparison", "ar": "مقارنة", "ckb": "بەراوردکردن", "keep_latin": false, "note": "Registry block title."}
+{"en": "gradient", "ar": "متدرّج الألوان", "ckb": "ڕەنگی پلەپلە", "keep_latin": false, "note": "\"PLA Basic Gradient\" is a product name."}
+{"en": "hardened steel nozzle", "ar": "نوزل من الفولاذ المقسّى", "ckb": "نۆزڵی پۆڵای ڕەقکراو", "keep_latin": false, "note": ""}
+{"en": "mechanical properties", "ar": "الخصائص الميكانيكية", "ckb": "تایبەتمەندییە میکانیکییەکان", "keep_latin": false, "note": "Registry group label."}
+{"en": "motion accuracy", "ar": "دقة الحركة", "ckb": "وردیی جووڵە", "keep_latin": false, "note": ""}
+{"en": "receiver", "ar": "مستقبِل", "ckb": "وەرگر", "keep_latin": false, "note": ""}
+{"en": "RGB", "ar": "RGB", "ckb": "RGB", "keep_latin": true, "note": "Stays Latin («إضاءة RGB» / «ڕووناکیی RGB»)."}
+{"en": "safety precautions", "ar": "احتياطات السلامة", "ckb": "ڕێنماییەکانی سەلامەتی", "keep_latin": false, "note": ""}
+{"en": "scraper", "ar": "مكشطة", "ckb": "تاشەر", "keep_latin": false, "note": "\"Bambu Scraper\", \"Mag-Alloy Scraper\" are product names."}
+{"en": "steel plate", "ar": "صفيحة فولاذية", "ckb": "پلێتی پۆڵا", "keep_latin": false, "note": "Spring-steel sheet."}
+{"en": "video", "ar": "فيديو", "ckb": "ڤیدیۆ", "keep_latin": false, "note": "Registry document title."}
+{"en": "wood grain", "ar": "عروق الخشب", "ckb": "ڕیشاڵی دار", "keep_latin": false, "note": "\"natural wood grain\" → «عروق خشب طبيعية» / «ڕیشاڵی سروشتیی دار»."}
+{"en": "cable chain", "ar": "سلسلة الكابلات", "ckb": "زنجیری کێبڵ", "keep_latin": false, "note": ""}
+{"en": "coupler", "ar": "وصلة", "ckb": "گەیەنەر", "keep_latin": false, "note": ""}
+{"en": "filament sensor", "ar": "حساس الفلامنت", "ckb": "هەستەوەری فیلامێنت", "keep_latin": false, "note": ""}
+{"en": "Hall sensor", "ar": "حساس Hall", "ckb": "هەستەوەری Hall", "keep_latin": false, "note": "Also \"Hall effect sensor\"; \"Hall\" stays Latin."}
+{"en": "plating", "ar": "طلاء معدني", "ckb": "ڕووپۆشی کانزایی", "keep_latin": false, "note": ""}
+{"en": "post-processing", "ar": "المعالجة اللاحقة", "ckb": "چارەسەرکردنی دوای چاپ", "keep_latin": false, "note": ""}
+{"en": "power adapter", "ar": "محوّل الطاقة", "ckb": "ئەداپتەری وزە", "keep_latin": false, "note": "\"AC to DC Power Adapter\" is a product name."}
+{"en": "shell", "ar": "الغلاف", "ckb": "ڕووپۆش", "keep_latin": false, "note": ""}
+{"en": "smooth PEI plate", "ar": "صفيحة PEI ملساء", "ckb": "پلێتی لووسی PEI", "keep_latin": false, "note": "Capitalised \"Smooth PEI Plate\" as a name stays English."}
+{"en": "2D drawing", "ar": "رسم 2D", "ckb": "نەخشەی 2D", "keep_latin": false, "note": "\"2D\" must survive verbatim."}
+{"en": "control board", "ar": "لوحة التحكم", "ckb": "بۆردی کۆنترۆڵ", "keep_latin": false, "note": "Registry: \"Main control board fan\" → «مروحة لوحة التحكم الرئيسية» / «پانکەی تەختەی کۆنترۆڵی سەرەکی»."}
+{"en": "filament spool", "ar": "بكرة الفلامنت", "ckb": "ماسوورەی فیلامێنت", "keep_latin": false, "note": ""}
+{"en": "slicer", "ar": "برنامج التقطيع", "ckb": "نەرمەکاڵای سلایسەر", "keep_latin": false, "note": "App dictionary term."}
+{"en": "USB-C", "ar": "USB-C", "ckb": "USB-C", "keep_latin": true, "note": "«كابل USB-C» / «کێبڵی USB-C». Type-C also stays Latin."}
+{"en": "aluminum alloy", "ar": "سبيكة ألمنيوم", "ckb": "ئاوێتەی ئەلەمنیۆم", "keep_latin": false, "note": ""}
+{"en": "glue stick", "ar": "غراء أصبعي", "ckb": "چەسپی قەڵەمی", "keep_latin": false, "note": "Capitalised \"Glue Stick\" is a product name."}
+{"en": "rear panel", "ar": "اللوح الخلفي", "ckb": "پانێڵی پشتەوە", "keep_latin": false, "note": ""}
+{"en": "Bambu Handy", "ar": "Bambu Handy", "ckb": "Bambu Handy", "keep_latin": true, "note": "The phone app: «تطبيق Bambu Handy» / «ئەپی Bambu Handy»."}
+{"en": "BVOH", "ar": "BVOH", "ckb": "BVOH", "keep_latin": true, "note": "Water-soluble support material code."}
+{"en": "cutting mat", "ar": "حصيرة القص", "ckb": "ڕایەخی بڕین", "keep_latin": false, "note": "\"LightGrip/StrongGrip Cutting Mat\" are product names."}
+{"en": "exhaust fan", "ar": "مروحة الشفط", "ckb": "پانکەی دەرکردنی هەوا", "keep_latin": false, "note": "Registry: \"Chamber exhaust fan\" → «مروحة شفط هواء الحجرة»."}
+{"en": "Important Notices", "ar": "تنبيهات مهمة", "ckb": "ئاگادارییە گرنگەکان", "keep_latin": false, "note": "Also \"Important notice\"."}
+{"en": "layer adhesion", "ar": "التصاق الطبقات", "ckb": "لکانی چینەکان", "keep_latin": false, "note": "Also \"layer bonding\"."}
+{"en": "live view camera", "ar": "كاميرا المشاهدة المباشرة", "ckb": "کامێرای بینینی ڕاستەوخۆ", "keep_latin": false, "note": "Capitalised \"Live View Camera - A1\" is a part name."}
+{"en": "lubricant oil", "ar": "زيت تشحيم", "ckb": "ڕۆنی چەورکردن", "keep_latin": false, "note": "\"Lubricant Oil\" capitalised is a product name."}
+{"en": "power cable", "ar": "كابل الطاقة", "ckb": "کێبڵی کارەبا", "keep_latin": false, "note": ""}
+{"en": "print speed", "ar": "سرعة الطباعة", "ckb": "خێرایی چاپ", "keep_latin": false, "note": "Registry label."}
+{"en": "support interface", "ar": "سطح تلامس الدعامات", "ckb": "ڕووی بەریەککەوتنی پاڵپشت", "keep_latin": false, "note": ""}
+{"en": "toolhead board", "ar": "لوحة رأس الطباعة", "ckb": "بۆردی سەری چاپ", "keep_latin": false, "note": "\"TH Board - …\" is a part name."}
+{"en": "chamber temperature", "ar": "حرارة حجرة الطباعة", "ckb": "پلەی گەرمیی ژووری چاپ", "keep_latin": false, "note": "Registry label."}
+{"en": "engineering filaments", "ar": "الفلامنتات الهندسية", "ckb": "فیلامێنتە ئەندازیارییەکان", "keep_latin": false, "note": ""}
+{"en": "machine screw", "ar": "برغي ميكانيكي", "ckb": "بورغیی ئامێر", "keep_latin": false, "note": ""}
+{"en": "support material", "ar": "مادة الدعامات", "ckb": "کەرەستەی پاڵپشت", "keep_latin": false, "note": "Registry section \"Support materials\" → «مواد الدعم» / «کەرەستەی پاڵپشت». \"Support for PLA\" is a product name: copy verbatim."}
+{"en": "UV", "ar": "UV", "ckb": "UV", "keep_latin": true, "note": "The token UV must survive: «مقاومة الأشعة UV» / «بەرگەی تیشکی UV»."}
+{"en": "air flow", "ar": "تدفق الهواء", "ckb": "ڕۆیشتنی هەوا", "keep_latin": false, "note": "Registry \"Max air flow\" → «أقصى تدفق للهواء»."}
+{"en": "nozzle temperature", "ar": "حرارة النوزل", "ckb": "پلەی گەرمیی نۆزڵ", "keep_latin": false, "note": "Registry label."}
+{"en": "print time", "ar": "وقت الطباعة", "ckb": "ماوەی چاپ", "keep_latin": false, "note": "Also \"printing time\"."}
+{"en": "printing temperature", "ar": "حرارة الطباعة", "ckb": "پلەی گەرمیی چاپ", "keep_latin": false, "note": "App dictionary."}
+{"en": "safety key", "ar": "مفتاح الأمان", "ckb": "کلیلی سەلامەتی", "keep_latin": false, "note": ""}
+{"en": "slot", "ar": "فتحة", "ckb": "شوێن", "keep_latin": false, "note": "An AMS slot."}
+{"en": "air assist", "ar": "نفخ الهواء المساعد", "ckb": "هەوای یاریدەدەر", "keep_latin": false, "note": ""}
+{"en": "COB LED", "ar": "COB LED", "ckb": "COB LED", "keep_latin": true, "note": "LED-strip type; stays Latin."}
+{"en": "extruder motor", "ar": "محرك الدافع", "ckb": "بزوێنەری پاڵنەر", "keep_latin": false, "note": "Registry label; capitalised \"Extruder Motor - H2S\" is a part name."}
+{"en": "infill density", "ar": "كثافة الحشوة الداخلية", "ckb": "چڕیی پڕکەرەوەی ناوەوە", "keep_latin": false, "note": ""}
+{"en": "nominal diameter", "ar": "القطر الاسمي", "ckb": "تیرەی ناوزەد", "keep_latin": false, "note": ""}
+{"en": "Notes", "ar": "ملاحظات", "ckb": "تێبینییەکان", "keep_latin": false, "note": ""}
+{"en": "packaging size", "ar": "أبعاد التغليف", "ckb": "قەبارەی پاکەت", "keep_latin": false, "note": "Registry Sorani for package is «پاکەت»."}
+{"en": "tolerance", "ar": "التفاوت", "ckb": "تۆڵێرانس", "keep_latin": false, "note": "App dictionary."}
+{"en": "build volume", "ar": "حجم الطباعة", "ckb": "قەبارەی چاپ", "keep_latin": false, "note": "Registry label."}
+{"en": "heat transfer vinyl", "ar": "فينيل النقل الحراري", "ckb": "ڤاینلی گواستنەوەی گەرمی", "keep_latin": false, "note": "\"HTV\" stays Latin."}
+{"en": "outer wall", "ar": "الجدار الخارجي", "ckb": "دیواری دەرەوە", "keep_latin": false, "note": ""}
+{"en": "smoke purifier", "ar": "منقّي الدخان", "ckb": "پاککەرەوەی دووکەڵ", "keep_latin": false, "note": "Capitalised \"Smoke Purifier\" is a protected product name."}
+{"en": "tube coupler", "ar": "وصلة الأنبوب", "ckb": "گەیەنەری بۆری", "keep_latin": false, "note": "Capitalised \"PTFE Tube Coupler\" is a protected name: copy verbatim."}
+{"en": "Downloads", "ar": "التنزيلات", "ckb": "داگرتنەکان", "keep_latin": false, "note": ""}
+{"en": "Micro Lidar", "ar": "Micro Lidar", "ckb": "Micro Lidar", "keep_latin": true, "note": "Bambu sensor name: «مستشعر Micro Lidar» / «هەستەوەری Micro Lidar»."}
+{"en": "power source", "ar": "مصدر الطاقة", "ckb": "سەرچاوەی وزە", "keep_latin": false, "note": "Registry label."}
+{"en": "stringing", "ar": "التخييط", "ckb": "دەزووبەستن", "keep_latin": false, "note": "Thin strings between parts."}
+{"en": "carbon filter", "ar": "فلتر كربوني", "ckb": "فلتەری کاربۆنی", "keep_latin": false, "note": ""}
+{"en": "carbon/glass fiber reinforced", "ar": "مقوّى بألياف الكربون أو الزجاج", "ckb": "بەهێزکراو بە ڕیشاڵی کاربۆن یان شووشە", "keep_latin": false, "note": ""}
+{"en": "filament change", "ar": "تبديل الفلامنت", "ckb": "گۆڕینی فیلامێنت", "keep_latin": false, "note": "Also \"filament switching\"."}
+{"en": "nut", "ar": "صامولة", "ckb": "سامۆڵە", "keep_latin": false, "note": ""}
+{"en": "surface finish", "ar": "تشطيب السطح", "ckb": "جۆرایەتیی ڕووکار", "keep_latin": false, "note": ""}
+{"en": "toughness", "ar": "المتانة ضد الكسر", "ckb": "پتەوی", "keep_latin": false, "note": "\"tough\" → «متين» / «پتەو»."}
+{"en": "servo motor", "ar": "محرك سيرفو", "ckb": "بزوێنەری سێرڤۆ", "keep_latin": false, "note": ""}
+{"en": "standard flow", "ar": "تدفق قياسي", "ckb": "ڕۆیشتنی ستاندارد", "keep_latin": false, "note": "\"Standard Flow\" as an option name stays English."}
+{"en": "support removal", "ar": "إزالة الدعامات", "ckb": "لابردنی پاڵپشت", "keep_latin": false, "note": ""}
+{"en": "toolhead camera", "ar": "كاميرا رأس الطباعة", "ckb": "کامێرای سەری چاپ", "keep_latin": false, "note": "Registry label."}
+{"en": "wear resistance", "ar": "مقاومة التآكل بالاحتكاك", "ckb": "بەرگەی سووان", "keep_latin": false, "note": "|"}
+{"en": "auto calibration", "ar": "المعايرة التلقائية", "ckb": "کالیبرەکردنی خۆکار", "keep_latin": false, "note": ""}
+{"en": "Bambu Suite", "ar": "Bambu Suite", "ckb": "Bambu Suite", "keep_latin": true, "note": "The laser/cutting software: «برنامج Bambu Suite» / «بەرنامەی Bambu Suite»."}
+{"en": "bed temperature", "ar": "حرارة السرير", "ckb": "پلەی گەرمیی بێد", "keep_latin": false, "note": "Registry: \"Build plate temperature\" → «حرارة صفيحة الطباعة» / «پلەی گەرمیی پلێتی چاپ»."}
+{"en": "heatsink", "ar": "مبدّد حراري", "ckb": "بڵاوکەرەوەی گەرمی", "keep_latin": false, "note": "Also \"heat sink\", \"radiator\"."}
+{"en": "PC app", "ar": "برنامج الحاسوب (PC)", "ckb": "بەرنامەی کۆمپیوتەر (PC)", "keep_latin": false, "note": "\"PC\" here is a computer, not polycarbonate; the token PC must still survive in both languages."}
+{"en": "room temperature", "ar": "درجة حرارة الغرفة", "ckb": "پلەی گەرمیی ژوور", "keep_latin": false, "note": ""}
+{"en": "UL GREENGUARD", "ar": "UL GREENGUARD", "ckb": "UL GREENGUARD", "keep_latin": true, "note": "Certification name: «شهادة UL GREENGUARD» / «بڕوانامەی UL GREENGUARD»."}
+{"en": "vibration compensation", "ar": "تعويض الاهتزاز", "ckb": "قەرەبووکردنەوەی لەرینەوە", "keep_latin": false, "note": ""}
+{"en": "bed leveling", "ar": "تسوية الصفيحة", "ckb": "ڕێکخستنی پلێت", "keep_latin": false, "note": ""}
+{"en": "food contact", "ar": "ملامسة الطعام", "ckb": "بەرکەوتنی خۆراک", "keep_latin": false, "note": "\"avoid using finished prints for food storage or contact\" → «تجنّب استخدام المطبوعات لتخزين الطعام أو ملامسته» / «چاپکراوەکان بۆ هەڵگرتنی خۆراک یان بەرکەوتن لەگەڵی بەکارمەهێنە»."}
+{"en": "heat resistance", "ar": "مقاومة الحرارة", "ckb": "بەرگەی گەرمی", "keep_latin": false, "note": ""}
+{"en": "layer lines", "ar": "خطوط الطبقات", "ckb": "هێڵەکانی چین", "keep_latin": false, "note": ""}
+{"en": "shrinkage", "ar": "الانكماش", "ckb": "کرژبوونەوە", "keep_latin": false, "note": ""}
+{"en": "software", "ar": "البرمجيات", "ckb": "نەرمەکاڵا", "keep_latin": false, "note": "Registry label."}
+{"en": "UV resistance", "ar": "مقاومة الأشعة UV", "ckb": "بەرگەی تیشکی UV", "keep_latin": false, "note": "\"UV\" must survive verbatim."}
+{"en": "BirdsEye camera", "ar": "كاميرا BirdsEye", "ckb": "کامێرای BirdsEye", "keep_latin": false, "note": "Registry label. BirdsEye stays Latin."}
+{"en": "DC motor", "ar": "محرك DC", "ckb": "بزوێنەری DC", "keep_latin": false, "note": ""}
+{"en": "emergency stop", "ar": "زر الإيقاف الطارئ", "ckb": "دوگمەی وەستانی خێرا", "keep_latin": false, "note": "App dictionary."}
+{"en": "idler pulley", "ar": "بكرة الشد", "ckb": "چەرخی ڕاکێشەر", "keep_latin": false, "note": ""}
+{"en": "laser safety window", "ar": "نافذة أمان الليزر", "ckb": "پەنجەرەی سەلامەتیی لەیزەر", "keep_latin": false, "note": ""}
+{"en": "purge waste", "ar": "هدر الطرد", "ckb": "بەفیڕۆچوونی فیلامێنتی دەرکراو", "keep_latin": false, "note": "App dictionary: \"purge waste on colour change\" → «هدر الفلامنت عند تغيير اللون»."}
+{"en": "thermistor", "ar": "ثرمستور", "ckb": "تێرمیستۆر", "keep_latin": false, "note": "Temperature sensor of the hotend/bed."}
+{"en": "timing belt", "ar": "سير مسنّن", "ckb": "قایشی ددانەدار", "keep_latin": false, "note": "\"GT2 Timing Belt\" etc. are part names."}
+{"en": "engineering materials", "ar": "المواد الهندسية", "ckb": "کەرەستە ئەندازیارییەکان", "keep_latin": false, "note": "Registry section."}
+{"en": "high temperature plate", "ar": "صفيحة للحرارة العالية", "ckb": "پلێتی پلەی گەرمیی بەرز", "keep_latin": false, "note": "\"Bambu High Temperature Plate\" as a name stays English."}
+{"en": "operating temperature", "ar": "حرارة التشغيل", "ckb": "پلەی گەرمیی کارکردن", "keep_latin": false, "note": "Registry label; also \"working temperature\"."}
+{"en": "rated voltage", "ar": "الجهد المقدّر", "ckb": "ڤۆڵتیەی دیاریکراو", "keep_latin": false, "note": ""}
+{"en": "tungsten carbide", "ar": "كربيد التنغستن", "ckb": "کاربایدی تەنگستن", "keep_latin": false, "note": "App dictionary."}
+{"en": "active chamber heating", "ar": "تسخين نشط لحجرة الطباعة", "ckb": "گەرمکردنی چالاکی ژووری چاپ", "keep_latin": false, "note": "Registry label."}
+{"en": "laser safety class", "ar": "فئة أمان الليزر", "ckb": "پۆلی سەلامەتیی لەیزەر", "keep_latin": false, "note": "App dictionary. \"Class 1\", \"Class 4\" stay Latin with the digit."}
+{"en": "non-toxic", "ar": "غير سام", "ckb": "بێ ژەهر", "keep_latin": false, "note": ""}
+{"en": "temperature range", "ar": "نطاق درجة الحرارة", "ckb": "مەودای پلەی گەرمی", "keep_latin": false, "note": "Registry label."}
+{"en": "temperature sensor", "ar": "حساس الحرارة", "ckb": "هەستەوەری پلەی گەرمی", "keep_latin": false, "note": ""}
+{"en": "filament path", "ar": "مسار الفلامنت", "ckb": "ڕێڕەوی فیلامێنت", "keep_latin": false, "note": "Also \"feeding path\"."}
+{"en": "hardness", "ar": "الصلادة", "ckb": "ڕەقی", "keep_latin": false, "note": "Registry label."}
+{"en": "quick swap nozzle", "ar": "نوزل سريع التبديل", "ckb": "نۆزڵی گۆڕینی خێرا", "keep_latin": false, "note": "\"Quick Swap\" capitalised as a feature name may stay; the generic phrase is translated."}
+{"en": "rotary attachment", "ar": "ملحق التدوير", "ckb": "پاشکۆی سووڕاوە", "keep_latin": false, "note": "Capitalised \"Rotary Attachment\" is a protected product name."}
+{"en": "acceleration", "ar": "التسارع", "ckb": "خێرابوون", "keep_latin": false, "note": "Registry: «أقصى تسارع لرأس الطباعة» / «زۆرترین خێرابوونی سەری چاپ»."}
+{"en": "ball bearing", "ar": "محمل كروي", "ckb": "بێرینگی تۆپەڵەیی", "keep_latin": false, "note": "Registry wording."}
+{"en": "chemical resistance", "ar": "مقاومة المواد الكيميائية", "ckb": "بەرگەی ماددە کیمیاییەکان", "keep_latin": false, "note": ""}
+{"en": "desiccant box", "ar": "علبة المادة المجففة", "ckb": "قوتووی ماددەی وشککەرەوە", "keep_latin": false, "note": ""}
+{"en": "filament backup", "ar": "الفلامنت الاحتياطي", "ckb": "فیلامێنتی یەدەگ", "keep_latin": false, "note": "When a spool runs out the AMS switches automatically to an identical filament: «التبديل التلقائي إلى الفلامنت الاحتياطي» / «گۆڕینی خۆکار بۆ فیلامێنتی یەدەگ»."}
+{"en": "HEPA", "ar": "HEPA", "ckb": "HEPA", "keep_latin": true, "note": "«فلتر HEPA» / «فلتەری HEPA»."}
+{"en": "impact strength", "ar": "مقاومة الصدمات", "ckb": "بەرگەی لێدان", "keep_latin": false, "note": "Registry label."}
+{"en": "laser power", "ar": "قدرة الليزر", "ckb": "وزەی لەیزەر", "keep_latin": false, "note": "App dictionary."}
+{"en": "linear rail", "ar": "سكة خطية", "ckb": "ڕێڕەوی هێڵی", "keep_latin": false, "note": "App dictionary Sorani."}
+{"en": "max cutting thickness", "ar": "أقصى سماكة للقص", "ckb": "زۆرترین ئەستووریی بڕین", "keep_latin": false, "note": ""}
+{"en": "spaghetti detection", "ar": "كشف التشابك (السباغيتي)", "ckb": "دۆزینەوەی سپاگێتی", "keep_latin": false, "note": "The tangled-failure detection."}
+{"en": "stepper motor", "ar": "محرك خطوي", "ckb": "بزوێنەری هەنگاوی", "keep_latin": false, "note": ""}
+{"en": "STL", "ar": "STL", "ckb": "STL", "keep_latin": true, "note": "File format; stays Latin. So do 3MF, STEP, SVG, DXF, PDF."}
+{"en": "TPE", "ar": "TPE", "ckb": "TPE", "keep_latin": true, "note": "Material code."}
+{"en": "work area", "ar": "مساحة العمل", "ckb": "ڕووبەری کار", "keep_latin": false, "note": "Registry \"Working area\"."}
+{"en": "dual-color", "ar": "ثنائي اللون", "ckb": "دوو ڕەنگ", "keep_latin": false, "note": ""}
+{"en": "flame retardant", "ar": "مقاوم للهب", "ckb": "دژە گڕ", "keep_latin": false, "note": "\"flame retardancy\" → «مقاومة اللهب» / «بەرگەی گڕ». \"PC FR\" is a product name."}
+{"en": "G-code", "ar": "G-code", "ckb": "G-code", "keep_latin": true, "note": "Stays Latin."}
+{"en": "guide rail", "ar": "سكة التوجيه", "ckb": "ڕێڕەوی ڕێنمایی", "keep_latin": false, "note": ""}
+{"en": "layer height", "ar": "ارتفاع الطبقة", "ckb": "بەرزیی چین", "keep_latin": false, "note": "Registry label."}
+{"en": "lead screw", "ar": "العمود الملولب", "ckb": "میلی پێچدار", "keep_latin": false, "note": ""}
+{"en": "NPU", "ar": "NPU", "ckb": "NPU", "keep_latin": true, "note": "Registry: «وحدة المعالجة العصبية (NPU)» / «یەکەی پرۆسێسکردنی دەماری (NPU)»."}
+{"en": "usable print size", "ar": "مساحة الطباعة القابلة للاستخدام", "ckb": "ڕووبەری چاپی بەکارهاتوو", "keep_latin": false, "note": "Registry label."}
+{"en": "weeding", "ar": "إزالة الزوائد", "ckb": "لابردنی زیادەکان", "keep_latin": false, "note": "App dictionary."}
+{"en": "Bluetooth", "ar": "Bluetooth", "ckb": "Bluetooth", "keep_latin": true, "note": "Stays Latin in sentences (registry label alone: «البلوتوث» / «بلووتووس»)."}
+{"en": "eddy current sensor", "ar": "حساس التيار الدوّامي", "ckb": "هەستەوەری جەریانی ئێدی", "keep_latin": false, "note": "App dictionary."}
+{"en": "flame sensor", "ar": "حساس اللهب", "ckb": "هەستەوەری گڕ", "keep_latin": false, "note": ""}
+{"en": "HIPS", "ar": "HIPS", "ckb": "HIPS", "keep_latin": true, "note": "Material code."}
+{"en": "overhang", "ar": "الأجزاء المعلّقة", "ckb": "بەشی هەڵواسراو", "keep_latin": false, "note": ""}
+{"en": "PCB", "ar": "PCB", "ckb": "PCB", "keep_latin": true, "note": "«لوحة PCB» / «بۆردی PCB»; PCBA likewise."}
+{"en": "preset", "ar": "إعداد مسبق", "ckb": "ڕێکخستنی ئامادەکراو", "keep_latin": false, "note": "\"printer presets\" → «إعدادات الطابعة المسبقة» / «ڕێکخستنە ئامادەکراوەکانی چاپکەر»."}
+{"en": "short circuit", "ar": "دائرة قصر", "ckb": "کورتە بازنە", "keep_latin": false, "note": ""}
+{"en": "single color", "ar": "لون واحد", "ckb": "یەک ڕەنگ", "keep_latin": false, "note": ""}
+{"en": "tensile strength", "ar": "مقاومة الشد", "ckb": "بەرگەی ڕاکێشان", "keep_latin": false, "note": "Registry label."}
+{"en": "water resistance", "ar": "مقاومة الماء", "ckb": "بەرگەی ئاو", "keep_latin": false, "note": "\"waterproof\" → «مقاوم للماء» / «دژە ئاو»."}
+{"en": "CoreXY", "ar": "CoreXY", "ckb": "CoreXY", "keep_latin": true, "note": "Motion-system name: «نظام حركة CoreXY» / «سیستەمی جووڵەی CoreXY»."}
+{"en": "door sensor", "ar": "حساس الباب", "ckb": "هەستەوەری دەرگا", "keep_latin": false, "note": "Registry label."}
+{"en": "drying temperature", "ar": "حرارة التجفيف", "ckb": "پلەی گەرمیی وشککردنەوە", "keep_latin": false, "note": "Registry label."}
+{"en": "engraving area", "ar": "مساحة الحفر", "ckb": "ڕووبەری هەڵکۆڵین", "keep_latin": false, "note": ""}
+{"en": "flame detection", "ar": "كشف اللهب", "ckb": "دۆزینەوەی گڕ", "keep_latin": false, "note": "App dictionary."}
+{"en": "heat press", "ar": "مكبس حراري", "ckb": "پرێسی گەرمی", "keep_latin": false, "note": "\"Mini Heat Press\" is a product name."}
+{"en": "laser spot", "ar": "بقعة الليزر", "ckb": "خاڵی لەیزەر", "keep_latin": false, "note": "\"laser spot dimension\" → «أبعاد بقعة الليزر» / «ڕەهەندی خاڵی لەیزەر»."}
+{"en": "laser wavelength", "ar": "الطول الموجي لليزر", "ckb": "درێژی شەپۆلی لەیزەر", "keep_latin": false, "note": "App dictionary."}
+{"en": "run-out", "ar": "نفاد", "ckb": "تەواوبوون", "keep_latin": false, "note": ""}
+{"en": "with spool", "ar": "مع بكرة", "ckb": "لەگەڵ ماسوورە", "keep_latin": false, "note": "| The bare lower-case word \"spool\" is a protected name for the validator (see spool): for the English \"with spool\" write «مع بكرة (spool)» / «لەگەڵ ماسوورە (spool)»."}
+{"en": "heat deflection temperature", "ar": "درجة حرارة الانحراف الحراري", "ckb": "پلەی گەرمیی لاربوونەوە", "keep_latin": false, "note": "Registry label. \"HDT\" stays Latin."}
+{"en": "Highlights", "ar": "أبرز المزايا", "ckb": "تایبەتمەندییە سەرەکییەکان", "keep_latin": false, "note": "Registry block title."}
+{"en": "net weight", "ar": "الوزن الصافي", "ckb": "کێشی پوخت", "keep_latin": false, "note": "Registry label."}
+{"en": "noise level", "ar": "مستوى الضجيج", "ckb": "ئاستی دەنگەدەنگ", "keep_latin": false, "note": "Registry label."}
+{"en": "nozzle camera", "ar": "كاميرا النوزل", "ckb": "کامێرای نۆزڵ", "keep_latin": false, "note": "Registry label."}
+{"en": "power consumption", "ar": "استهلاك الطاقة", "ckb": "خەرجکردنی وزە", "keep_latin": false, "note": "App dictionary."}
+{"en": "quick start guide", "ar": "دليل البدء السريع", "ckb": "ڕێبەری دەستپێکی خێرا", "keep_latin": false, "note": "Registry document title."}
+{"en": "rated current", "ar": "التيار المقدّر", "ckb": "تەزووی دیاریکراو", "keep_latin": false, "note": ""}
+{"en": "slicing", "ar": "التقطيع", "ckb": "سلایسکردن", "keep_latin": false, "note": ""}
+{"en": "tangle", "ar": "تشابك", "ckb": "ئاڵۆزبوون", "keep_latin": false, "note": "\"tangle-free\" → «خالٍ من التشابك» / «بێ ئاڵۆزبوون»."}
+{"en": "filament diameter", "ar": "قطر الفلامنت", "ckb": "تیرەی فیلامێنت", "keep_latin": false, "note": "Registry label uses «قطر الخيط»."}
+{"en": "first-layer adhesion", "ar": "التصاق الطبقة الأولى", "ckb": "لکانی چینی یەکەم", "keep_latin": false, "note": ""}
+{"en": "glow in the dark", "ar": "يتوهّج في الظلام", "ckb": "لە تاریکیدا دەدرەوشێتەوە", "keep_latin": false, "note": ""}
+{"en": "volumetric flow", "ar": "التدفق الحجمي", "ckb": "ڕۆیشتنی قەبارەیی", "keep_latin": false, "note": "\"max volumetric flow\" registry: «أقصى معدل تدفق» / «زۆرترین ڕێژەی ڕۆیشتن»."}
+{"en": "abrasive", "ar": "كاشط", "ckb": "ڕووشێنەر", "keep_latin": false, "note": "\"abrasive filaments\" → «فلامنتات كاشطة» / «فیلامێنتی ڕووشێنەر»."}
+{"en": "FAQ", "ar": "الأسئلة الشائعة", "ckb": "پرسیارە باوەکان", "keep_latin": false, "note": "Registry block title."}
+{"en": "LCD", "ar": "LCD", "ckb": "LCD", "keep_latin": true, "note": "«شاشة LCD» / «شاشەی LCD»."}
+{"en": "nominal capacity", "ar": "السعة الاسمية", "ckb": "توانای ناوزەد", "keep_latin": false, "note": "Battery mAh."}
+{"en": "technical data sheet", "ar": "ورقة البيانات الفنية", "ckb": "پەڕەی زانیاری تەکنیکی", "keep_latin": false, "note": "Registry document title \"(TDS)\"."}
+{"en": "user manual", "ar": "دليل الاستخدام", "ckb": "ڕێبەری بەکارهێنان", "keep_latin": false, "note": "Registry document title; also \"User's Manual\"."}
+{"en": "VOC", "ar": "VOC", "ckb": "VOC", "keep_latin": true, "note": "Registry: «المركبات العضوية المتطايرة (VOC)» / «پێکهاتە ئۆرگانییە بەهەڵمبووەکان (VOC)»."}
+{"en": "drying time", "ar": "مدة التجفيف", "ckb": "ماوەی وشککردنەوە", "keep_latin": false, "note": "Registry label."}
+{"en": "Ethernet", "ar": "Ethernet", "ckb": "Ethernet", "keep_latin": true, "note": "«منفذ Ethernet» / «دەرچەی Ethernet»."}
+{"en": "hotend fan", "ar": "مروحة تبريد رأس الصهر", "ckb": "پانکەی ساردکردنەوەی سەری تواندنەوە", "keep_latin": false, "note": "Registry label."}
+{"en": "humidity sensor", "ar": "حساس الرطوبة", "ckb": "هەستەوەری شێ", "keep_latin": false, "note": ""}

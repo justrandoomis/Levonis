@@ -1,0 +1,601 @@
+600
+filament | فلامنت | فیلامێنت || The shop word, used in the import's section names. Registry spec labels say «الخيط/الخيوط»; in sentences write «فلامنت».
+3D | 3D | 3D | K || "3D" is a protected code token: it must appear verbatim in both translations («طابعة 3D», «چاپکەری 3D»). Same for 2D, 4WD.
+printing | الطباعة | چاپکردن || As a section/label: «الطباعة» / «چاپکردن»; in compounds Sorani uses «چاپ» («خێرایی چاپ»).
+Bambu Lab | Bambu Lab | Bambu Lab | K || The brand; a protected name: copy verbatim in every sentence. Never «بامبو لاب». No Arabic article or Sorani suffix glued to it.
+AMS | AMS | AMS | K || Automatic Material System. Add a head noun instead of an article or suffix: «وحدة AMS» / «یەکەی AMS», «نظام AMS» / «سیستەمی AMS». Never «الـAMS» or «AMSەکە».
+model | نموذج | مۆدێل || A 3D model. A printer model (the registry "Model" label) → «الطراز» / «مۆدێل».
+Installation | التركيب | دامەزراندن || Usage title (589×). App dictionary.
+wiki | ويكي | ویکی || "Bambu Lab Wiki" → «ويكي Bambu Lab» / «ویکی Bambu Lab» (registry document title). "refer to the Bambu Lab Wiki" → «راجع ويكي Bambu Lab» / «سەیری ویکی Bambu Lab بکە».
+Overview | نظرة عامة | تێڕوانینی گشتی || The most frequent block title.
+parts | القطع | پارچەکان
+print | طبعة | چاپ || Verb: «اطبع» / «چاپ بکە»; a finished object: «القطعة المطبوعة» / «چاپکراو».
+screw | برغي | بورغی || Registry «نوع البرغي» / «جۆری بورغی». Search alias «براغي».
+board | لوحة | بۆرد || An electronic board.
+laser | ليزر | لەیزەر || App dictionary and search alias.
+printer | طابعة | چاپکەر || Sorani: «چاپکەر» (the import's section names), not «پرینتەر».
+plastic | بلاستيك | پلاستیک
+nozzle | نوزل | نۆزڵ || Registry and app: «النوزل» / «نۆزڵ». Never «الفوهة» in this import. Sizes stay "0.4 mm".
+power | الطاقة | وزە || App dictionary. Registry spec labels "Max power" / "Rated power" read «أقصى قدرة» / «زۆرترین توانا» and «القدرة المقدّرة» / «توانای دیاریکراو».
+metal | معدن | کانزا || App dictionary.
+plate | صفيحة | پلێت || A print plate.
+learn more | اعرف المزيد | زیاتر بزانە || "please learn about the installation on Bambu Lab Wiki" → «تعرّف على طريقة التركيب في ويكي Bambu Lab» / «زانیاری دەربارەی دامەزراندن لە ویکی Bambu Lab ببینە».
+steel | فولاذ | پۆڵا
+temperature | درجة الحرارة | پلەی گەرمی
+hotend | رأس الصهر | سەری تواندنەوە || Registry label «رأس الصهر (Hotend)» / «سەری تواندنەوە (Hotend)». Never «الرأس الساخن». "Bambu Hotend - X1C" etc. are product names: copy verbatim.
+kit | طقم | کیت || App dictionary.
+material | المادة | کەرەستە || Registry label.
+PLA | PLA | PLA | K || Material code. All material codes stay Latin: PLA, PETG, ABS, ASA, TPU, PC, PA, PET, PVA, BVOH, HIPS, PPA, PPS, TPE, PP, PU, CF, GF. Names like "PLA Basic", "PETG HF", "PLA Silk+" are product names: copy verbatim.
+MakerWorld | MakerWorld | MakerWorld | K || The model-sharing site: «منصة MakerWorld» / «پلاتفۆرمی MakerWorld». "on MakerWorld" → «على MakerWorld» / «لە MakerWorld».
+series | سلسلة | زنجیرە || Bare lower-case word only; "X1 Series" etc. are protected names (see X1 Series).
+assembly | التجميع | پێکەوەنان || The act of assembling (app dictionary). A sub-assembly part ("X-axis assembly") → «مجموعة محور X» / «کۆمەڵەی تەوەری X».
+battery | بطارية | باتری || Registry label.
+cable | كابل | کێبڵ
+CyberBrick | CyberBrick | CyberBrick | K || Product line (toy/robot kits); never transliterated in text (the search alias «سايبر بريك» is for search only).
+motor | محرك | بزوێنەر || Registry and search alias. "XY Motor", "Z Motor" capitalised are part names.
+cutting | القص | بڕین || App dictionary ("cutting speed" → «سرعة القص» / «خێرایی بڕین»).
+color | لون | ڕەنگ || Colour NAMES of an option (Jade White, Bambu Green …) stay English.
+drying | التجفيف | وشککردنەوە || Registry group label.
+surface | السطح | ڕووکار
+guide | دليل | ڕێبەر || Registry document title.
+quality | الجودة | جۆرایەتی
+download | تنزيل | داگرتن || "download the model files" → «نزّل ملفات النموذج» / «فایلەکانی مۆدێل دابگرە».
+compatible | متوافق | گونجاو
+LED | LED | LED | K || «إضاءة LED» / «ڕووناکیی LED»; «شريط LED» / «شریتی LED».
+3D model | نموذج 3D | مۆدێلی 3D || "3D" must survive verbatim.
+3D printed parts | القطع المطبوعة بطابعة 3D | پارچەی چاپکراوی 3D || Also "3D-printed parts". "non-3D printed parts" → «القطع غير المطبوعة بطابعة 3D» / «ئەو پارچانەی بە 3D چاپ ناکرێن».
+safety | السلامة | سەلامەتی || Registry group «السلامة والشهادات» / «سەلامەتی و بڕوانامەکان».
+3D printing | الطباعة 3D | چاپی 3D || "3D" must survive verbatim; «الطباعة ثلاثية الأبعاد» alone would be refused.
+cover | غطاء | قەپاغ
+size | المقاس | قەبارە || App dictionary.
+speed | السرعة | خێرایی
+unit | وحدة | یەکە
+AMS 2 Pro | AMS 2 Pro | AMS 2 Pro | K || Protected product name; copy verbatim.
+axis | المحور | تەوەر
+ideal | مثالي | گونجاوترین || "Ideal: PLA, PETG" → «مثالي: PLA وPETG» / «گونجاوترین: PLA و PETG». "ideal for" → «مثالي لـ» / «گونجاوە بۆ».
+note | ملاحظة | تێبینی || "Please note that …" → «يرجى ملاحظة أن …» / «تکایە ئاگاداربە کە …».
+extruder | الدافع | پاڵنەر || Registry labels use «الدافع» / «پاڵنەر» («ترس الدافع», «محرك الدافع»). Not «الباثق».
+materials | المواد | کەرەستەکان || Registry label.
+module | وحدة | مۆدیول
+recommended | موصى به | پێشنیارکراو || App dictionary Arabic; registry Sorani.
+remote | جهاز التحكم | ڕیمۆت || "CyberBrick Official Standard Remote" is a product name.
+thread | سنّ اللولب | پێچ || Registry "Thread type" → «نوع السنّ» / «جۆری پێچ».
+Specification | المواصفات | تایبەتمەندییەکان || Also "Specifications", "technical specifications" → «المواصفات الفنية» / «تایبەتمەندییە تەکنیکییەکان».
+standard | معيار | ستاندارد || A norm (ISO, EN …). As a value "standard" (regular) → «قياسي» / «ستاندارد».
+creator | المصمّم | دروستکەر || MakerWorld creators/designers.
+CF | CF | CF | K || Carbon-fibre suffix in codes (PLA-CF, PAHT-CF); spelled out in prose as «ألياف الكربون» / «ڕیشاڵی کاربۆن».
+charger | شاحن | بارگاویکەر
+Documentation | الوثائق | بەڵگەنامەکان
+spool | بكرة | ماسوورە || VALIDATOR: the lower-case word "spool" is a protected name (a requirement target): a sentence whose English contains the bare word "spool" must also carry "spool" in Latin, e.g. «بكرة (spool)» / «ماسوورە (spool)». "spools", "Spool" are not affected.
+PETG | PETG | PETG | K || Material code.
+prints | المطبوعات | چاپکراوەکان || The finished printed objects.
+please refer to | يرجى الرجوع إلى | تکایە سەیری … بکە || Sorani wraps the object: «تکایە سەیری ویکی Bambu Lab بکە».
+children | الأطفال | منداڵان || "not suitable for children under 3 years" → «غير مناسب للأطفال دون 3 سنوات» / «گونجاو نییە بۆ منداڵانی خوار 3 ساڵ».
+TPU | TPU | TPU | K || Material code. Shore grades stay: «TPU 95A», «TPU 85A».
+instructions | التعليمات | ڕێنماییەکان || Also "Instruction", "Usage Instructions", "Instructions for use" → «تعليمات الاستخدام» / «ڕێنماییەکانی بەکارهێنان».
+USB | USB | USB | K || «منفذ USB» / «دەرچەی USB».
+pack | عبوة | پاکەت || "pack of 2" → «عبوة من 2» / «پاکەتی 2 دانە».
+required | مطلوب | پێویست || "an extra accessory is required" → «يلزم ملحق إضافي» / «پێداویستییەکی زیادە پێویستە».
+toolhead | رأس الطباعة | سەری چاپ || Registry: «كاميرا رأس الطباعة» / «کامێرای سەری چاپ». Also "tool head".
+included | مرفق | لەگەڵدایە || Registry: «قطر النوزل المرفق» / «تیرەی نۆزڵی لەگەڵدا».
+supported | مدعوم | پشتگیریکراو || App dictionary. "Supported Filament" registry → «الخيوط المدعومة» / «فیلامێنتە پشتگیریکراوەکان».
+hardware | العتاد | ڕەقەکاڵا || "hardware kit" → «طقم عتاد» / «کیتی ڕەقەکاڵا».
+diameter | القطر | تیرە || Registry label.
+stainless steel | فولاذ مقاوم للصدأ | پۆڵای زەنگنەگر || App dictionary.
+features | المزايا | تایبەتمەندییەکان || "key features" → «أبرز المزايا» / «تایبەتمەندییە سەرەکییەکان».
+type | النوع | جۆر || Registry label.
+chamber | حجرة الطباعة | ژووری چاپ || Registry: «حرارة حجرة الطباعة» / «پلەی گەرمیی ژووری چاپ». Standing alone as a whole Sorani row, write «ژووری چاپەکە» (a two-word Sorani row needs one of ە ێ ۆ ڵ ڕ to pass the validator).
+PTFE | PTFE | PTFE | K || Teflon; «أنبوب PTFE» / «بۆریی PTFE».
+box | علبة | سندوق
+fan | مروحة | پانکە || Search alias.
+tube | أنبوب | بۆری
+connector | موصل | گەیەنەر || Registry label.
+heatbed | السرير الساخن | بێدی گەرم || Also "heated bed", "heat bed". Its temperature label in the registry: «حرارة صفيحة الطباعة».
+strength | المتانة | بەهێزی
+glue | غراء | چەسپ
+sensor | حساس | هەستەوەر
+glass | زجاج | شووشە
+build plate | صفيحة الطباعة | پلێتی چاپ || Registry label and search alias. Not «منصة الطباعة».
+PEI | PEI | PEI | K || Plate coating. «صفيحة PEI» / «پلێتی PEI»; never transliterated.
+precision | الدقة | وردی || "high precision" → «دقة عالية» / «وردیی بەرز».
+suitable for | مناسب لـ | گونجاوە بۆ || App dictionary Arabic.
+range | النطاق | مەودا
+moisture | الرطوبة | شێ
+battery pack | حزمة البطارية | کۆمەڵە باتری
+compatible with | متوافق مع | گونجاوە لەگەڵ || App dictionary. Say compatibility ONCE per sentence; model names after it stay Latin and verbatim: «متوافق مع X1 Series وP1S» / «گونجاوە لەگەڵ X1 Series و P1S».
+length | الطول | درێژی
+adapter | محوّل | ئەداپتەر
+blade | شفرة | تیغ || App dictionary.
+finish | التشطيب | ڕووکار || The surface look.
+main image | الصورة الرئيسية | وێنەی سەرەکی || "as shown in the main image" → «كما هو موضّح في الصورة الرئيسية» / «وەک لە وێنە سەرەکییەکەدا دیارە».
+AMS HT | AMS HT | AMS HT | K || Protected product name; copy verbatim.
+supports | الدعامات | پاڵپشتەکان || Print supports (search alias «دعامات»). The verb "supports" → «يدعم» / «پشتگیری دەکات».
+storage | التخزين | هەڵگرتن || Keeping things (filament). Data storage in the registry: «وسائط التخزين» / «بیرگە».
+connection | الاتصال | پەیوەندی || Registry "Connection" → «طريقة الاتصال» / «شێوازی پەیوەندی».
+pin | دبوس | پین || Pin counts like "4-Pin", "6-pin" stay Latin. A metal dowel "pin" → «مسمار توجيه» / «بزمار».
+charging | الشحن | بارگاویکردن || Battery charging. VALIDATOR: never write «الشحن خلال» (it reads as a shipping time); prefer «شحن البطارية».
+silicone | سيليكون | سیلیکۆن
+durable | متين | بەرگەگر
+switch | مفتاح | کلیل || An electrical switch; registry "Network kill switch" → «مفتاح فصل الشبكة» / «کلیلی پچڕاندنی تۆڕ».
+accessory | ملحق | پێداویستی || Registry sections use «ملحقات» / «پێداویستی».
+desiccant | مادة مجففة | ماددەی وشککەرەوە || Silica-gel packs.
+hex | سداسي | شەشپاڵوو
+part | قطعة | پارچە || Registry label "Part".
+camera | كاميرا | کامێرا
+PC | PC | PC | K || Polycarbonate; material code (never «حاسوب» here).
+layer | طبقة | چین
+ABS | ABS | ABS | K || Material code.
+engraving | الحفر | هەڵکۆڵین || App dictionary ("engraving speed" → «سرعة الحفر» / «خێرایی هەڵکۆڵین»).
+recommend | نوصي | پێشنیار دەکەین || "we recommend drying" → «نوصي بالتجفيف» / «پێشنیاری وشککردنەوە دەکەین».
+filter | فلتر | فلتەر
+charge | شحن | بارگاویکردن || "charge the battery" → «اشحن البطارية» / «باترییەکە بارگاوی بکە».
+adhesion | الالتصاق | لکان || "bed adhesion" → «الالتصاق بالصفيحة» / «لکان بە پلێتەوە».
+DIY | DIY | DIY | K || «مشاريع DIY» / «پڕۆژەی DIY».
+belt | سير | قایش
+detection | الكشف | دۆزینەوە
+plywood | خشب أبلكاش | ئەبلەکاش || App dictionary.
+AMS lite | AMS lite | AMS lite | K || Protected product name; copy verbatim (lower-case "lite").
+app | تطبيق | ئەپ
+A1 mini | A1 mini | A1 mini | K || Printer model; copy verbatim (lower-case "mini"). Same for X1C, X1E, P1P, P1S, P2S, X2D, A1, A2L, H2D, H2S, H2C, H2D Pro, R1.
+cutter | قاطع | بڕەر
+tool | أداة | ئامراز
+cooling | التبريد | ساردکردنەوە
+interface | الواجهة | ڕووکار || App dictionary; a hardware connector interface ("4-Pin interface") → «منفذ 4-Pin» / «دەرچەی 4-Pin».
+pcs | قطعة | دانە || "12pcs" → «12 قطعة» / «12 دانە»; inside names "(10PCS)" stays.
+gear | ترس | چەرخی ددانەدار || In registry compounds the Sorani is short: «چەرخی پاڵنەر».
+heating | التسخين | گەرمکردن
+accuracy | الدقة | وردی
+extrusion | البثق | پاڵنان
+panel | لوح | پانێڵ
+RFID | RFID | RFID | K || «شريحة RFID» / «چیپی RFID».
+voltage | الجهد الكهربائي | ڤۆڵتیە || Registry label.
+print quality | جودة الطباعة | جۆرایەتیی چاپ || Sorani «جۆرایەتی» for quality throughout (the colloquial «کوالیتی» also appears in the app).
+PTFE tube | أنبوب PTFE | بۆریی PTFE
+compatibility | التوافق | گونجاوی || Registry label «التوافق» / «گونجاوی».
+base | قاعدة | بنکە
+wood | خشب | دار || App dictionary.
+PET | PET | PET | K || Material code.
+socket | مقبس | پریز || A power socket. A screw's "hex socket" is different (see hex socket).
+thickness | السماكة | ئەستووری || Registry label.
+lighting | الإضاءة | ڕووناکی
+Product Feature | مزايا المنتج | تایبەتمەندییەکانی بەرهەم || Also "Product Features".
+requirements | المتطلبات | پێداویستییەکان || Registry "Electrical requirements" → «المتطلبات الكهربائية» / «پێداویستییە کارەباییەکان».
+hardened steel | فولاذ مقسّى | پۆڵای ڕەقکراو || App dictionary.
+output | الخرج | دەرچوون || "output power" → «قدرة الخرج» / «وزەی دەرچوون».
+calibration | المعايرة | کالیبرەکردن
+remote control | جهاز التحكم عن بُعد | کۆنترۆڵی لە دوورەوە
+application | الاستخدام | بەکارهێنان || Spec label "Application" (what it is used for). "Application Scenarios" → «مجالات الاستخدام» / «بوارەکانی بەکارهێنان».
+filament drying | تجفيف الفلامنت | وشککردنەوەی فیلامێنت
+holder | حامل | هەڵگر
+durability | المتانة | بەرگەگری
+installation guide | دليل التركيب | ڕێبەری دامەزراندن || Registry document title.
+multi-color | متعدد الألوان | فرەڕەنگ || Also "multicolor", "multi-colour".
+laser module | وحدة الليزر | مۆدیولی لەیزەر || Capitalised "Laser Module" and "10W laser modules" are protected names: copy verbatim.
+magnetic | مغناطيسي | موگناتیسی
+ASA | ASA | ASA | K || Material code.
+button | زر | دوگمە
+warping | التقوّس | چەمانەوەی لێوار || Corners lifting/curling during printing.
+automatic | تلقائي | خۆکار || App dictionary.
+door | الباب | دەرگا
+buffer | موازن | هاوسەنگکەر
+display | الشاشة | شاشە
+carbon steel | فولاذ كربوني | پۆڵای کاربۆنی
+high temperature | درجة حرارة عالية | پلەی گەرمیی بەرز
+power supply | مزوّد الطاقة | دابینکەری وزە || App dictionary. "Power Supply - P2S" is a part name.
+input | الدخل | چوونەژوورەوە || "input voltage" → «جهد الدخل» / «ڤۆڵتیەی چوونەژوورەوە».
+feeding | التغذية | پێدان || Registry section: «أنظمة تغذية المواد (AMS)» / «سیستەمەکانی پێدانی کەرەستە (AMS)».
+manual | يدوي | دەستی || App dictionary (the adjective). A user manual → «دليل الاستخدام» / «ڕێبەری بەکارهێنان».
+wire | سلك | وایەر
+exhaust | الشفط | دەرکردنی هەوا || "exhaust system" → «نظام الشفط» / «سیستەمی دەرکردنی هەوا».
+housing | الغلاف | بەرگ
+matte | مطفي | مات || A finish. "PLA Matte", "PETG Matte" are product names. "matte finish" → «تشطيب مطفي» / «ڕووکاری مات».
+overheating | ارتفاع الحرارة المفرط | گەرمبوونی زیادە
+lithium battery | بطارية ليثيوم | باتریی لیتیۆم
+filament cutter | قاطع الفلامنت | بڕەری فیلامێنت || Registry label uses «قاطع الخيط»; in prose use «الفلامنت».
+shaft | عمود | میل
+humidity | الرطوبة | شێ || Registry label.
+PA | PA | PA | K || Nylon/polyamide material code. Plain "nylon" → «نايلون» / «نایلۆن».
+small parts | قطع صغيرة | پارچەی بچووک
+frame | الإطار | چوارچێوە
+magnet | مغناطيس | موگناتیس || Registry and search alias.
+port | منفذ | دەرچە || Registry "Interfaces" → «المنافذ» / «دەرچەکان».
+cooling fan | مروحة التبريد | پانکەی ساردکەرەوە
+weight | الوزن | کێش
+drying instructions | تعليمات التجفيف | ڕێنماییەکانی وشککردنەوە || "Filament drying instructions" is a document title.
+handle | مقبض | دەسک || Registry "Handle material" → «مادة المقبض» / «کەرەستەی دەسک».
+Introduction | مقدمة | پێشەکی
+rubber | مطاط | لاستیک
+screen | الشاشة | شاشە
+X-axis | محور X | تەوەری X || Same for Y-axis, Z-axis: the letter stays Latin.
+current | التيار | تەزوو || Registry label. Not the adjective "current" (الحالي / ئێستا).
+flexible | مرن | نەرمونیان
+lubricant | مادة تشحيم | ماددەی چەورکردن || |
+servo | سيرفو | سێرڤۆ || "PMSM servo" → «سيرفو PMSM» / «سێرڤۆی PMSM».
+spring | نابض | فەنەر
+texture | الملمس | هەستی ڕووکار
+X1 Series | X1 Series | X1 Series | K || «X1 Series», «P1 Series», «A1 Series», «H2 Series», «P2 Series», «X2 Series», «A2 Series» are PROTECTED NAMES: copy the whole two words verbatim inside the sentence (the validator refuses «سلسلة X1»). Only a bare lower-case "series" in prose is translated.
+hub | موزّع | دابەشکەر || Capitalised "AMS Hub" is a protected name.
+acrylic | أكريليك | ئاکریلیک || App dictionary and search alias.
+component | مكوّن | پێکهاتە
+bearing | محمل | بێرینگ || Registry: «المحمل» / «بێرینگ». Iraqi shops also say «رولمان».
+firmware | البرنامج الثابت | فێرموێر || App dictionary.
+aluminum | ألمنيوم | ئەلەمنیۆم || Also "aluminium".
+bed | السرير | بێد
+dry environment | مكان جاف | شوێنی وشک || "cool, dark and dry environment" → «مكان بارد ومظلم وجاف» / «شوێنێکی فێنک و تاریک و وشک».
+purge | طرد الفلامنت | دەرکردنی فیلامێنت || Filament pushed out at a colour change. "purging" the same.
+torque | عزم الدوران | تۆرک || "stall torque" → «عزم التوقف» / «تۆرکی وەستان»; "rated torque" → «العزم المقدّر» / «تۆرکی دیاریکراو».
+hex socket | تجويف سداسي | کونی شەشپاڵوو || The screw-head recess.
+LED strip | شريط LED | شریتی LED
+carbon fiber | ألياف الكربون | ڕیشاڵی کاربۆن || Search alias "cf". Also "carbon fibre".
+depth | العمق | قووڵایی
+SuperTack | SuperTack | SuperTack | K || Plate name (Cool Plate SuperTack); copy verbatim.
+feeder | وحدة التغذية | پێدەر
+laser engraving | الحفر بالليزر | هەڵکۆڵینی لەیزەری
+RC | RC | RC | K || Radio-controlled; also written R/C. «سيارة RC» / «ئۆتۆمبێلی RC».
+TDS | TDS | TDS | K || Registry: «ورقة البيانات الفنية (TDS)» / «پەڕەی زانیاری تەکنیکی (TDS)».
+circuit board | لوحة إلكترونية | بۆردی ئەلیکترۆنی || "MC Board", "TH Board", "AP Board", "AC Board" are part names: copy verbatim.
+transparent | شفاف | ڕوون || Registry colour label.
+adult supervision | إشراف شخص بالغ | چاودێریی کەسێکی گەورە
+precautions | الاحتياطات | وریاییەکان
+adhesive | مادة لاصقة | چەسپ || "adhesive backing" → «ظهر لاصق» / «پشتی چەسپاو» (app dictionary).
+Combo | Combo | Combo | K || Inside product/option names ("A1 Combo", "Hotend Combo") it stays. A lower-case generic "combo" → «باقة» / «کۆمبۆ».
+noise | الضجيج | دەنگەدەنگ
+self-tapping screws | براغٍ ذاتية اللولبة | بورغیی خۆپێچەکان
+coating | طلاء | ڕووپۆش || App dictionary.
+cutting module | وحدة القص | مۆدیولی بڕین
+LED light | ضوء LED | گڵۆپی LED
+screw gauge | مقياس البراغي | پێوەری بورغی || "Screw Gauge" (document title) is a model name.
+wireless | لاسلكي | بێتەل
+controller | وحدة التحكم | کۆنترۆڵەر
+high flow | تدفق عالٍ | ڕۆیشتنی بەرز || "High Flow" capitalised as an option name stays English.
+high-performance | عالي الأداء | کارایی بەرز || "high-performance filaments" → «فلامنتات عالية الأداء» / «فیلامێنتی کارایی بەرز».
+plug | قابس | فیش
+power distribution board | لوحة توزيع الطاقة | بۆردی دابەشکردنی وزە || "PDB" stays Latin.
+shape | الشكل | شێوە || Registry label.
+vinyl | فينيل | ڤاینل || App dictionary and search alias.
+front cover | الغطاء الأمامي | قەپاغی پێشەوە || "Front Cover - X1C" is a part name.
+lamp | مصباح | چرا
+smoke | دخان | دووکەڵ
+spool holder | حامل البكرة | هەڵگری ماسوورە || Capitalised "Spool Holder - A1" is a part name.
+alloy | سبيكة | ئاوێتە
+Considerations | أمور يجب مراعاتها | خاڵەکانی ڕەچاوکردن || Also "Consideration".
+cool plate | صفيحة باردة | پلێتی سارد || "Bambu Cool Plate" / "Cool Plate SuperTack" as names stay English.
+maintenance | الصيانة | چاککردنەوە || Registry section "Parts for all series" → «قطع صيانة لكل السلاسل» / «پارچەی چاککردنەوە بۆ هەموو زنجیرەکان».
+vibration | الاهتزاز | لەرینەوە
+filtration | الترشيح | پاڵاوتن
+MSDS | MSDS | MSDS | K || Material safety data sheet; registry document title for SDS: «ورقة بيانات السلامة (SDS)» / «پەڕەی زانیاری سەلامەتی (SDS)».
+PVA | PVA | PVA | K || Water-soluble support material code.
+requires | يتطلب | پێویستی بە … هەیە || Keep it plain «يتطلب X» / «پێویستی بە X هەیە» (DECISIONS: «يتطلب» stays plain until it links). X, a product name, stays verbatim.
+corrosion | تآكل | داخوران
+resolution | الدقة | ڕوونی || Registry label (screen/camera resolution).
+multi-color printing | الطباعة متعددة الألوان | چاپی فرەڕەنگ || Registry: "Multi-colour printing". "multi-color" alone → «متعدد الألوان» / «فرەڕەنگ».
+XY | XY | XY | K || Axis pair; «حركة XY» / «جووڵەی XY».
+style | الطراز | شێواز || Registry label.
+ventilation | التهوية | هەواگۆڕکێ
+density | الكثافة | چڕی || Registry label.
+in the box | محتويات العلبة | ناوەڕۆکی سندوق || Registry label; also "What's in the box".
+max | أقصى | زۆرترین || Registry Sorani uses «زۆرترین».
+nominal | اسمي | ناوزەد
+RoHS | RoHS | RoHS | K || Standard name; stays Latin. So do CE, FCC, UL, ISO, EN, DIN, GB/T, ETSI.
+screwdriver | مفكّ براغي | دەرنەفیس
+choking hazard | خطر الاختناق | مەترسیی خنکان
+compliant | متوافق مع المعايير | گونجاو لەگەڵ ستانداردەکان || "compliant with EU RED" → «متوافق مع EU RED» / «گونجاوە لەگەڵ EU RED».
+extruder unit | وحدة الدافع | یەکەی پاڵنەر
+hazard | خطر | مەترسی
+tape | شريط لاصق | شریتی چەسپدار || "masking tape" → «شريط تغطية» / «شریتی داپۆشین».
+food-grade | آمن للاستخدام الغذائي | گونجاو بۆ خۆراک
+leather | جلد | چەرم || App dictionary. "PU leather" → «جلد PU» / «چەرمی PU».
+lifespan | العمر الافتراضي | تەمەنی بەکارهێنان || Registry "Life cycle".
+packaging | التغليف | پاکەت
+printing parameters | إعدادات الطباعة | ڕێکخستنەکانی چاپ || Registry group "Print settings" uses the same words.
+silk | حريري | ئاوریشمی || "PLA Silk+" is a product name. "silk finish" → «لمعة حريرية» / «بریسکەی ئاوریشمی».
+Wi-Fi | Wi-Fi | Wi-Fi | K || Stays Latin in sentences (the registry label alone reads «الواي فاي» / «وایفای»).
+automatic material system | نظام المواد التلقائي | سیستەمی خۆکاری کەرەستە || What AMS stands for.
+glass fiber | ألياف الزجاج | ڕیشاڵی شووشە || Search alias "gf".
+induction hotend | رأس صهر بالتسخين الحثّي | سەری تواندنەوەی ئیندەکشن || H2C induction heating.
+PU | PU | PU | K || Polyurethane code (e.g. «جلد PU» / «چەرمی PU»).
+real time | الوقت الفعلي | کاتی ڕاستەقینە || "in real time" → «في الوقت الفعلي» / «لە کاتی ڕاستەقینەدا».
+smooth surface | سطح أملس | ڕووی لووس
+wheel | عجلة | تایە
+accessory compatibility | توافق الملحقات | گونجاویی پێداویستییەکان
+dimensions | الأبعاد | ڕەهەندەکان || App dictionary.
+lever | ذراع | لیڤەر || |
+reusable spool | بكرة قابلة لإعادة الاستخدام | ماسوورەی دووبارە بەکارهێنراو || Capitalised "Reusable Spool" / "Bambu Reusable Spool" is a product name: copy verbatim.
+safety tips | نصائح السلامة | ئامۆژگارییەکانی سەلامەتی
+time-lapse | تصوير بفاصل زمني | وێنەگرتنی کاتی خێراکراو || "time-lapse photography" the same.
+bolt | مسمار ملولب | بۆڵت
+grease | شحم | گریس || "Lubricant Grease" capitalised is a product name.
+nylon | نايلون | نایلۆن
+package | العبوة | پاکەت || Registry «العبوة» / «پاکەت».
+textured PEI plate | صفيحة PEI محبّبة | پلێتی دانەداری PEI || Capitalised "Textured PEI Plate" / "Bambu Textured PEI Plate" as an option or product name stays English. Never glue a Sorani suffix to PEI: «پلێتی دانەداری PEI», not «پلێتی PEIی دانەدار».
+well-ventilated area | مكان جيد التهوية | شوێنێکی هەواگۆڕکێی باش
+air filter | فلتر الهواء | فلتەری هەوا
+Cool Plate SuperTack | Cool Plate SuperTack | Cool Plate SuperTack | K || Plate/option name; copy verbatim. Describe it if needed as «صفيحة باردة عالية الالتصاق» / «پلێتی سارد بە لکانی بەهێز».
+direct sunlight | أشعة الشمس المباشرة | تیشکی ڕاستەوخۆی خۆر
+front door | الباب الأمامي | دەرگای پێشەوە
+air filtration | تنقية الهواء | پاڵاوتنی هەوا || App dictionary.
+bracket | دعامة تثبيت | پایەی جێگیرکردن
+nozzle wiper | ماسحة النوزل | سڕەری نۆزڵ || Capitalised "Nozzle Wiper - A2L" is a part name.
+Bambu Studio | Bambu Studio | Bambu Studio | K || The slicer software. When a head noun helps: «برنامج Bambu Studio» / «بەرنامەی Bambu Studio».
+closed-loop control | التحكم بالحلقة المغلقة | کۆنترۆڵی بازنەی داخراو || Also "closed loop control".
+printing process | عملية الطباعة | پرۆسەی چاپ || "during printing" → «أثناء الطباعة» / «لە کاتی چاپدا».
+touchscreen | شاشة لمس | شاشەی دەستلێدان || App dictionary.
+3D printer | طابعة 3D | چاپکەری 3D || "3D" must survive verbatim.
+bamboo | خيزران | بامبوو
+lock | قفل | قفڵ
+warning | تحذير | ئاگاداری
+filament buffer | موازن الفلامنت | هاوسەنگکەری فیلامێنت || Capitalised "Filament Buffer" is a protected product name: copy verbatim.
+pulley | بكرة السير | چەرخی قایش || Not «بكرة» alone (that is a filament spool).
+self-tapping screw | برغي ذاتي اللولبة | بورغیی خۆپێچ || Also "self tapping screw".
+side panel | اللوح الجانبي | پانێڵی لاتەنیشت || "left/right side panel" → «اللوح الجانبي الأيسر/الأيمن» / «پانێڵی لای چەپ/ڕاست».
+USB port | منفذ USB | دەرچەی USB
+width | العرض | پانی
+fiber reinforced | مقوّى بالألياف | بەهێزکراو بە ڕیشاڵ || Registry section "Fibre-reinforced" → «مواد مقوّاة بالألياف».
+height | الارتفاع | بەرزی
+laser cutting | القص بالليزر | بڕینی لەیزەری
+lithophane | ليثوفان | لیتۆفەین || A backlit relief print. "CMYK Lithophane" keeps CMYK.
+paper | ورق | کاغەز || App dictionary.
+stainless steel nozzle | نوزل من الفولاذ المقاوم للصدأ | نۆزڵی پۆڵای زەنگنەگر
+AI | AI | AI | K || «كاميرا AI» / «کامێرای AI»; «كشف الأخطاء بالذكاء الاصطناعي (AI)» / «دۆزینەوەی هەڵە بە AI».
+assembly guide | دليل التجميع | ڕێبەری پێکەوەنان
+coding | البرمجة | کۆدنووسین
+full thread | سنّ كامل | پێچی تەواو
+purge wiper | ماسحة الطرد | سڕەری فیلامێنتی دەرکراو || Capitalised "Purge Wiper - …" is a part name.
+capable | ممكن | دەتوانرێت || In the "Ideal / Capable" filament lists: «ممكن: PA وPC» / «دەتوانرێت: PA و PC».
+feeder unit | وحدة التغذية | یەکەی پێدان || "AMS Feeder Unit" capitalised is a part name.
+keep out of reach of children | يُحفظ بعيدًا عن متناول الأطفال | لە دەستڕەسی منداڵان دووری بخەرەوە || Also "keep away from infants, children and pets" → «يُحفظ بعيدًا عن الرضّع والأطفال والحيوانات الأليفة» / «لە ساوایان و منداڵان و ئاژەڵە ماڵییەکان دووری بخەرەوە».
+outer diameter | القطر الخارجي | تیرەی دەرەوە
+rechargeable | قابل لإعادة الشحن | دووبارە بارگاوی دەکرێتەوە
+recommended temperature | الحرارة الموصى بها | پلەی گەرمیی پێشنیارکراو
+translucent | شبه شفاف | نیمچە ڕوون || "PLA Translucent" is a product name.
+brass | نحاس أصفر | برنج || App dictionary.
+enclosed | مغلق | داخراو
+encoder | مشفّر الحركة | ئینکۆدەر || "Vision Encoder" capitalised is a part name.
+heater | سخّان | گەرمکەرەوە
+monitoring | المراقبة | چاودێری
+stiffness | الصلابة | سەختی || Also "rigidity"; "rigid" → «صلب» / «ڕەق».
+upgrade kit | طقم ترقية | کیتی نوێکردنەوە || Capitalised "Laser Upgrade Kit", "Vortek Upgrade Kit" are product names.
+Using Tips | نصائح الاستخدام | ئامۆژگارییەکانی بەکارهێنان || Also "Usage tips".
+AMS Hub | AMS Hub | AMS Hub | K || Protected name (a requirement target); copy verbatim. A generic lower-case "hub" → «موزّع» / «دابەشکەر».
+enclosure | هيكل مغلق | ژووری داخراو || App dictionary. Standing alone as a whole Sorani row: «ژووری داخراوی چاپکەرەکە» (passes the Sorani-letter check).
+flow rate | معدل التدفق | ڕێژەی ڕۆیشتن || Registry wording.
+moving parts | الأجزاء المتحركة | پارچە جووڵاوەکان
+not recommended | غير موصى به | پێشنیار ناکرێت
+metric coarse thread | سنّ متري خشن | پێچی مەتری زبر
+basswood plywood | أبلكاش خشب الزيزفون | ئەبلەکاشی داری زێزەفوون
+caution | تنبيه | وریایی
+connectivity | الاتصال | پەیوەندیکردن || Registry group: «الاتصال والتخزين» / «پەیوەندیکردن و بیرگە».
+engineering plate | صفيحة هندسية | پلێتی ئەندازیاری || "Engineering Plate" as an option name stays English.
+first layer | الطبقة الأولى | چینی یەکەم
+flammable | قابل للاشتعال | گڕگر
+head diameter | قطر الرأس | تیرەی سەر
+head thickness | سماكة الرأس | ئەستووریی سەر
+hex code | رمز اللون HEX | کۆدی ڕەنگی HEX || Document title "Hex Code"; registry "Colour codes" → «رموز الألوان» / «کۆدەکانی ڕەنگ».
+interface board | لوحة الواجهة | بۆردی ڕووکار
+laser safety | سلامة الليزر | سەلامەتیی لەیزەر
+light strip | شريط إضاءة | شریتی ڕووناکی || "LED strip light" → «شريط إضاءة LED» / «شریتی ڕووناکیی LED».
+mainboard | اللوحة الأم | بۆردی سەرەکی
+sharp edges | حواف حادة | لێواری تیژ
+across flats | المسافة بين الوجهين المتقابلين | پانیی نێوان دوو ڕووی تەخت || Hex size measured across flats.
+activated carbon | كربون منشّط | کاربۆنی چالاککراو || App dictionary.
+bolt length | طول البرغي | درێژیی بۆڵت
+extruder gear | ترس الدافع | چەرخی پاڵنەر || Registry label.
+heating assembly | مجموعة التسخين | کۆمەڵەی گەرمکەرەوە
+impact resistance | مقاومة الصدمات | بەرگەی لێدان
+link | رابط | بەستەر || Registry document title "Link".
+live view | المشاهدة المباشرة | بینینی ڕاستەوخۆ || "Live View Camera" (capitalised part name) stays English.
+multi-material printing | الطباعة متعددة المواد | چاپی فرەکەرەستە
+not included | غير مرفق | لەگەڵدا نییە || "the product does not include the 3D printed parts" → «لا يتضمن المنتج القطع المطبوعة بطابعة 3D» / «بەرهەمەکە پارچە چاپکراوەکانی 3D لەخۆ ناگرێت».
+PPS | PPS | PPS | K || Material code.
+refill | عبوة تعبئة بدون بكرة | پڕکەرەوەی بێ ماسوورە || Filament sold without a spool. As an option name ("Refill", "Filament with spool") it stays English.
+strength grade | درجة المتانة | پلەی بەهێزی || Bolt grades like "8.8", "12.9" stay as written.
+top cover | الغطاء العلوي | قەپاغی سەرەوە || Also "top lid".
+brightness | السطوع | ڕووناکی
+cutter lever | ذراع القاطع | لیڤەری بڕەر || "Filament Cutter Lever" capitalised is a part name.
+groove depth | عمق المجرى | قووڵایی شیار
+screwdriver bit | رأس مفكّ | سەری دەرنەفیس || "bit size" → «مقاس الرأس» / «قەبارەی سەر».
+sealed container | وعاء محكم الإغلاق | دەفری داخراو || "sealed container with desiccant" → «وعاء محكم مع مادة مجففة» / «دەفری داخراو لەگەڵ ماددەی وشککەرەوە».
+silicone sock | غطاء سيليكون للنوزل | بەرگی سیلیکۆنی نۆزڵ
+AMS unit | وحدة AMS | یەکەی AMS || Plural "AMS units" → «وحدات AMS» / «یەکەکانی AMS».
+liquid glue | غراء سائل | چەسپی شل || Capitalised "Liquid Glue" is a product name.
+metallic | معدني اللمعان | بریسکەی کانزایی
+NFC | NFC | NFC | K || Stays Latin.
+programmable | قابل للبرمجة | پرۆگرامپێکراو || "programmable hardware" → «عتاد قابل للبرمجة» / «ڕەقەکاڵای پرۆگرامپێکراو».
+rated | مقدّر | دیاریکراو || Registry: «القدرة المقدّرة» / «توانای دیاریکراو».
+troubleshooting | استكشاف الأخطاء وإصلاحها | چارەسەرکردنی کێشەکان
+Vortek | Vortek | Vortek | K || Hotend-change system name (H2C); copy verbatim: «نظام Vortek» / «سیستەمی Vortek».
+capacity | السعة | توانا || The registry label reads «توانای گرتن». Battery capacity → «سعة البطارية» / «توانای باتری».
+core board | لوحة النواة | بۆردی ناوک || "multi-function core board" → «لوحة النواة متعددة الوظائف» / «بۆردی ناوکی فرەئەرک».
+glossy | لامع | بریسکەدار
+heatbed temperature | حرارة السرير الساخن | پلەی گەرمیی بێدی گەرم
+hotend heating assembly | مجموعة تسخين رأس الصهر | کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە
+infill | الحشوة الداخلية | پڕکەرەوەی ناوەوە
+part cooling fan | مروحة تبريد القطعة المطبوعة | پانکەی ساردکردنەوەی پارچەی چاپکراو || Registry label.
+PPA | PPA | PPA | K || Material code.
+Comparison | مقارنة | بەراوردکردن || Registry block title.
+gradient | متدرّج الألوان | ڕەنگی پلەپلە || "PLA Basic Gradient" is a product name.
+hardened steel nozzle | نوزل من الفولاذ المقسّى | نۆزڵی پۆڵای ڕەقکراو
+mechanical properties | الخصائص الميكانيكية | تایبەتمەندییە میکانیکییەکان || Registry group label.
+motion accuracy | دقة الحركة | وردیی جووڵە
+receiver | مستقبِل | وەرگر
+RGB | RGB | RGB | K || Stays Latin («إضاءة RGB» / «ڕووناکیی RGB»).
+safety precautions | احتياطات السلامة | ڕێنماییەکانی سەلامەتی
+scraper | مكشطة | تاشەر || "Bambu Scraper", "Mag-Alloy Scraper" are product names.
+steel plate | صفيحة فولاذية | پلێتی پۆڵا || Spring-steel sheet.
+video | فيديو | ڤیدیۆ || Registry document title.
+wood grain | عروق الخشب | ڕیشاڵی دار || "natural wood grain" → «عروق خشب طبيعية» / «ڕیشاڵی سروشتیی دار».
+cable chain | سلسلة الكابلات | زنجیری کێبڵ
+coupler | وصلة | گەیەنەر
+filament sensor | حساس الفلامنت | هەستەوەری فیلامێنت
+Hall sensor | حساس Hall | هەستەوەری Hall || Also "Hall effect sensor"; "Hall" stays Latin.
+plating | طلاء معدني | ڕووپۆشی کانزایی
+post-processing | المعالجة اللاحقة | چارەسەرکردنی دوای چاپ
+power adapter | محوّل الطاقة | ئەداپتەری وزە || "AC to DC Power Adapter" is a product name.
+shell | الغلاف | ڕووپۆش
+smooth PEI plate | صفيحة PEI ملساء | پلێتی لووسی PEI || Capitalised "Smooth PEI Plate" as a name stays English.
+2D drawing | رسم 2D | نەخشەی 2D || "2D" must survive verbatim.
+control board | لوحة التحكم | بۆردی کۆنترۆڵ || Registry: "Main control board fan" → «مروحة لوحة التحكم الرئيسية» / «پانکەی تەختەی کۆنترۆڵی سەرەکی».
+filament spool | بكرة الفلامنت | ماسوورەی فیلامێنت
+slicer | برنامج التقطيع | نەرمەکاڵای سلایسەر || App dictionary term.
+USB-C | USB-C | USB-C | K || «كابل USB-C» / «کێبڵی USB-C». Type-C also stays Latin.
+aluminum alloy | سبيكة ألمنيوم | ئاوێتەی ئەلەمنیۆم
+glue stick | غراء أصبعي | چەسپی قەڵەمی || Capitalised "Glue Stick" is a product name.
+rear panel | اللوح الخلفي | پانێڵی پشتەوە
+Bambu Handy | Bambu Handy | Bambu Handy | K || The phone app: «تطبيق Bambu Handy» / «ئەپی Bambu Handy».
+BVOH | BVOH | BVOH | K || Water-soluble support material code.
+cutting mat | حصيرة القص | ڕایەخی بڕین || "LightGrip/StrongGrip Cutting Mat" are product names.
+exhaust fan | مروحة الشفط | پانکەی دەرکردنی هەوا || Registry: "Chamber exhaust fan" → «مروحة شفط هواء الحجرة».
+Important Notices | تنبيهات مهمة | ئاگادارییە گرنگەکان || Also "Important notice".
+layer adhesion | التصاق الطبقات | لکانی چینەکان || Also "layer bonding".
+live view camera | كاميرا المشاهدة المباشرة | کامێرای بینینی ڕاستەوخۆ || Capitalised "Live View Camera - A1" is a part name.
+lubricant oil | زيت تشحيم | ڕۆنی چەورکردن || "Lubricant Oil" capitalised is a product name.
+power cable | كابل الطاقة | کێبڵی کارەبا
+print speed | سرعة الطباعة | خێرایی چاپ || Registry label.
+support interface | سطح تلامس الدعامات | ڕووی بەریەککەوتنی پاڵپشت
+toolhead board | لوحة رأس الطباعة | بۆردی سەری چاپ || "TH Board - …" is a part name.
+chamber temperature | حرارة حجرة الطباعة | پلەی گەرمیی ژووری چاپ || Registry label.
+engineering filaments | الفلامنتات الهندسية | فیلامێنتە ئەندازیارییەکان
+machine screw | برغي ميكانيكي | بورغیی ئامێر
+support material | مادة الدعامات | کەرەستەی پاڵپشت || Registry section "Support materials" → «مواد الدعم» / «کەرەستەی پاڵپشت». "Support for PLA" is a product name: copy verbatim.
+UV | UV | UV | K || The token UV must survive: «مقاومة الأشعة UV» / «بەرگەی تیشکی UV».
+air flow | تدفق الهواء | ڕۆیشتنی هەوا || Registry "Max air flow" → «أقصى تدفق للهواء».
+nozzle temperature | حرارة النوزل | پلەی گەرمیی نۆزڵ || Registry label.
+print time | وقت الطباعة | ماوەی چاپ || Also "printing time".
+printing temperature | حرارة الطباعة | پلەی گەرمیی چاپ || App dictionary.
+safety key | مفتاح الأمان | کلیلی سەلامەتی
+slot | فتحة | شوێن || An AMS slot.
+air assist | نفخ الهواء المساعد | هەوای یاریدەدەر
+COB LED | COB LED | COB LED | K || LED-strip type; stays Latin.
+extruder motor | محرك الدافع | بزوێنەری پاڵنەر || Registry label; capitalised "Extruder Motor - H2S" is a part name.
+infill density | كثافة الحشوة الداخلية | چڕیی پڕکەرەوەی ناوەوە
+nominal diameter | القطر الاسمي | تیرەی ناوزەد
+Notes | ملاحظات | تێبینییەکان
+packaging size | أبعاد التغليف | قەبارەی پاکەت || Registry Sorani for package is «پاکەت».
+tolerance | التفاوت | تۆڵێرانس || App dictionary.
+build volume | حجم الطباعة | قەبارەی چاپ || Registry label.
+heat transfer vinyl | فينيل النقل الحراري | ڤاینلی گواستنەوەی گەرمی || "HTV" stays Latin.
+outer wall | الجدار الخارجي | دیواری دەرەوە
+smoke purifier | منقّي الدخان | پاککەرەوەی دووکەڵ || Capitalised "Smoke Purifier" is a protected product name.
+tube coupler | وصلة الأنبوب | گەیەنەری بۆری || Capitalised "PTFE Tube Coupler" is a protected name: copy verbatim.
+Downloads | التنزيلات | داگرتنەکان
+Micro Lidar | Micro Lidar | Micro Lidar | K || Bambu sensor name: «مستشعر Micro Lidar» / «هەستەوەری Micro Lidar».
+power source | مصدر الطاقة | سەرچاوەی وزە || Registry label.
+stringing | التخييط | دەزووبەستن || Thin strings between parts.
+carbon filter | فلتر كربوني | فلتەری کاربۆنی
+carbon/glass fiber reinforced | مقوّى بألياف الكربون أو الزجاج | بەهێزکراو بە ڕیشاڵی کاربۆن یان شووشە
+filament change | تبديل الفلامنت | گۆڕینی فیلامێنت || Also "filament switching".
+nut | صامولة | سامۆڵە
+surface finish | تشطيب السطح | جۆرایەتیی ڕووکار
+toughness | المتانة ضد الكسر | پتەوی || "tough" → «متين» / «پتەو».
+servo motor | محرك سيرفو | بزوێنەری سێرڤۆ
+standard flow | تدفق قياسي | ڕۆیشتنی ستاندارد || "Standard Flow" as an option name stays English.
+support removal | إزالة الدعامات | لابردنی پاڵپشت
+toolhead camera | كاميرا رأس الطباعة | کامێرای سەری چاپ || Registry label.
+wear resistance | مقاومة التآكل بالاحتكاك | بەرگەی سووان || |
+auto calibration | المعايرة التلقائية | کالیبرەکردنی خۆکار
+Bambu Suite | Bambu Suite | Bambu Suite | K || The laser/cutting software: «برنامج Bambu Suite» / «بەرنامەی Bambu Suite».
+bed temperature | حرارة السرير | پلەی گەرمیی بێد || Registry: "Build plate temperature" → «حرارة صفيحة الطباعة» / «پلەی گەرمیی پلێتی چاپ».
+heatsink | مبدّد حراري | بڵاوکەرەوەی گەرمی || Also "heat sink", "radiator".
+PC app | برنامج الحاسوب (PC) | بەرنامەی کۆمپیوتەر (PC) || "PC" here is a computer, not polycarbonate; the token PC must still survive in both languages.
+room temperature | درجة حرارة الغرفة | پلەی گەرمیی ژوور
+UL GREENGUARD | UL GREENGUARD | UL GREENGUARD | K || Certification name: «شهادة UL GREENGUARD» / «بڕوانامەی UL GREENGUARD».
+vibration compensation | تعويض الاهتزاز | قەرەبووکردنەوەی لەرینەوە
+bed leveling | تسوية الصفيحة | ڕێکخستنی پلێت
+food contact | ملامسة الطعام | بەرکەوتنی خۆراک || "avoid using finished prints for food storage or contact" → «تجنّب استخدام المطبوعات لتخزين الطعام أو ملامسته» / «چاپکراوەکان بۆ هەڵگرتنی خۆراک یان بەرکەوتن لەگەڵی بەکارمەهێنە».
+heat resistance | مقاومة الحرارة | بەرگەی گەرمی
+layer lines | خطوط الطبقات | هێڵەکانی چین
+shrinkage | الانكماش | کرژبوونەوە
+software | البرمجيات | نەرمەکاڵا || Registry label.
+UV resistance | مقاومة الأشعة UV | بەرگەی تیشکی UV || "UV" must survive verbatim.
+BirdsEye camera | كاميرا BirdsEye | کامێرای BirdsEye || Registry label. BirdsEye stays Latin.
+DC motor | محرك DC | بزوێنەری DC
+emergency stop | زر الإيقاف الطارئ | دوگمەی وەستانی خێرا || App dictionary.
+idler pulley | بكرة الشد | چەرخی ڕاکێشەر
+laser safety window | نافذة أمان الليزر | پەنجەرەی سەلامەتیی لەیزەر
+purge waste | هدر الطرد | بەفیڕۆچوونی فیلامێنتی دەرکراو || App dictionary: "purge waste on colour change" → «هدر الفلامنت عند تغيير اللون».
+thermistor | ثرمستور | تێرمیستۆر || Temperature sensor of the hotend/bed.
+timing belt | سير مسنّن | قایشی ددانەدار || "GT2 Timing Belt" etc. are part names.
+engineering materials | المواد الهندسية | کەرەستە ئەندازیارییەکان || Registry section.
+high temperature plate | صفيحة للحرارة العالية | پلێتی پلەی گەرمیی بەرز || "Bambu High Temperature Plate" as a name stays English.
+operating temperature | حرارة التشغيل | پلەی گەرمیی کارکردن || Registry label; also "working temperature".
+rated voltage | الجهد المقدّر | ڤۆڵتیەی دیاریکراو
+tungsten carbide | كربيد التنغستن | کاربایدی تەنگستن || App dictionary.
+active chamber heating | تسخين نشط لحجرة الطباعة | گەرمکردنی چالاکی ژووری چاپ || Registry label.
+laser safety class | فئة أمان الليزر | پۆلی سەلامەتیی لەیزەر || App dictionary. "Class 1", "Class 4" stay Latin with the digit.
+non-toxic | غير سام | بێ ژەهر
+temperature range | نطاق درجة الحرارة | مەودای پلەی گەرمی || Registry label.
+temperature sensor | حساس الحرارة | هەستەوەری پلەی گەرمی
+filament path | مسار الفلامنت | ڕێڕەوی فیلامێنت || Also "feeding path".
+hardness | الصلادة | ڕەقی || Registry label.
+quick swap nozzle | نوزل سريع التبديل | نۆزڵی گۆڕینی خێرا || "Quick Swap" capitalised as a feature name may stay; the generic phrase is translated.
+rotary attachment | ملحق التدوير | پاشکۆی سووڕاوە || Capitalised "Rotary Attachment" is a protected product name.
+acceleration | التسارع | خێرابوون || Registry: «أقصى تسارع لرأس الطباعة» / «زۆرترین خێرابوونی سەری چاپ».
+ball bearing | محمل كروي | بێرینگی تۆپەڵەیی || Registry wording.
+chemical resistance | مقاومة المواد الكيميائية | بەرگەی ماددە کیمیاییەکان
+desiccant box | علبة المادة المجففة | قوتووی ماددەی وشککەرەوە
+filament backup | الفلامنت الاحتياطي | فیلامێنتی یەدەگ || When a spool runs out the AMS switches automatically to an identical filament: «التبديل التلقائي إلى الفلامنت الاحتياطي» / «گۆڕینی خۆکار بۆ فیلامێنتی یەدەگ».
+HEPA | HEPA | HEPA | K || «فلتر HEPA» / «فلتەری HEPA».
+impact strength | مقاومة الصدمات | بەرگەی لێدان || Registry label.
+laser power | قدرة الليزر | وزەی لەیزەر || App dictionary.
+linear rail | سكة خطية | ڕێڕەوی هێڵی || App dictionary Sorani.
+max cutting thickness | أقصى سماكة للقص | زۆرترین ئەستووریی بڕین
+spaghetti detection | كشف التشابك (السباغيتي) | دۆزینەوەی سپاگێتی || The tangled-failure detection.
+stepper motor | محرك خطوي | بزوێنەری هەنگاوی
+STL | STL | STL | K || File format; stays Latin. So do 3MF, STEP, SVG, DXF, PDF.
+TPE | TPE | TPE | K || Material code.
+work area | مساحة العمل | ڕووبەری کار || Registry "Working area".
+dual-color | ثنائي اللون | دوو ڕەنگ
+flame retardant | مقاوم للهب | دژە گڕ || "flame retardancy" → «مقاومة اللهب» / «بەرگەی گڕ». "PC FR" is a product name.
+G-code | G-code | G-code | K || Stays Latin.
+guide rail | سكة التوجيه | ڕێڕەوی ڕێنمایی
+layer height | ارتفاع الطبقة | بەرزیی چین || Registry label.
+lead screw | العمود الملولب | میلی پێچدار
+NPU | NPU | NPU | K || Registry: «وحدة المعالجة العصبية (NPU)» / «یەکەی پرۆسێسکردنی دەماری (NPU)».
+usable print size | مساحة الطباعة القابلة للاستخدام | ڕووبەری چاپی بەکارهاتوو || Registry label.
+weeding | إزالة الزوائد | لابردنی زیادەکان || App dictionary.
+Bluetooth | Bluetooth | Bluetooth | K || Stays Latin in sentences (registry label alone: «البلوتوث» / «بلووتووس»).
+eddy current sensor | حساس التيار الدوّامي | هەستەوەری جەریانی ئێدی || App dictionary.
+flame sensor | حساس اللهب | هەستەوەری گڕ
+HIPS | HIPS | HIPS | K || Material code.
+overhang | الأجزاء المعلّقة | بەشی هەڵواسراو
+PCB | PCB | PCB | K || «لوحة PCB» / «بۆردی PCB»; PCBA likewise.
+preset | إعداد مسبق | ڕێکخستنی ئامادەکراو || "printer presets" → «إعدادات الطابعة المسبقة» / «ڕێکخستنە ئامادەکراوەکانی چاپکەر».
+short circuit | دائرة قصر | کورتە بازنە
+single color | لون واحد | یەک ڕەنگ
+tensile strength | مقاومة الشد | بەرگەی ڕاکێشان || Registry label.
+water resistance | مقاومة الماء | بەرگەی ئاو || "waterproof" → «مقاوم للماء» / «دژە ئاو».
+CoreXY | CoreXY | CoreXY | K || Motion-system name: «نظام حركة CoreXY» / «سیستەمی جووڵەی CoreXY».
+door sensor | حساس الباب | هەستەوەری دەرگا || Registry label.
+drying temperature | حرارة التجفيف | پلەی گەرمیی وشککردنەوە || Registry label.
+engraving area | مساحة الحفر | ڕووبەری هەڵکۆڵین
+flame detection | كشف اللهب | دۆزینەوەی گڕ || App dictionary.
+heat press | مكبس حراري | پرێسی گەرمی || "Mini Heat Press" is a product name.
+laser spot | بقعة الليزر | خاڵی لەیزەر || "laser spot dimension" → «أبعاد بقعة الليزر» / «ڕەهەندی خاڵی لەیزەر».
+laser wavelength | الطول الموجي لليزر | درێژی شەپۆلی لەیزەر || App dictionary.
+run-out | نفاد | تەواوبوون
+with spool | مع بكرة | لەگەڵ ماسوورە || | The bare lower-case word "spool" is a protected name for the validator (see spool): for the English "with spool" write «مع بكرة (spool)» / «لەگەڵ ماسوورە (spool)».
+heat deflection temperature | درجة حرارة الانحراف الحراري | پلەی گەرمیی لاربوونەوە || Registry label. "HDT" stays Latin.
+Highlights | أبرز المزايا | تایبەتمەندییە سەرەکییەکان || Registry block title.
+net weight | الوزن الصافي | کێشی پوخت || Registry label.
+noise level | مستوى الضجيج | ئاستی دەنگەدەنگ || Registry label.
+nozzle camera | كاميرا النوزل | کامێرای نۆزڵ || Registry label.
+power consumption | استهلاك الطاقة | خەرجکردنی وزە || App dictionary.
+quick start guide | دليل البدء السريع | ڕێبەری دەستپێکی خێرا || Registry document title.
+rated current | التيار المقدّر | تەزووی دیاریکراو
+slicing | التقطيع | سلایسکردن
+tangle | تشابك | ئاڵۆزبوون || "tangle-free" → «خالٍ من التشابك» / «بێ ئاڵۆزبوون».
+filament diameter | قطر الفلامنت | تیرەی فیلامێنت || Registry label uses «قطر الخيط».
+first-layer adhesion | التصاق الطبقة الأولى | لکانی چینی یەکەم
+glow in the dark | يتوهّج في الظلام | لە تاریکیدا دەدرەوشێتەوە
+volumetric flow | التدفق الحجمي | ڕۆیشتنی قەبارەیی || "max volumetric flow" registry: «أقصى معدل تدفق» / «زۆرترین ڕێژەی ڕۆیشتن».
+abrasive | كاشط | ڕووشێنەر || "abrasive filaments" → «فلامنتات كاشطة» / «فیلامێنتی ڕووشێنەر».
+FAQ | الأسئلة الشائعة | پرسیارە باوەکان || Registry block title.
+LCD | LCD | LCD | K || «شاشة LCD» / «شاشەی LCD».
+nominal capacity | السعة الاسمية | توانای ناوزەد || Battery mAh.
+technical data sheet | ورقة البيانات الفنية | پەڕەی زانیاری تەکنیکی || Registry document title "(TDS)".
+user manual | دليل الاستخدام | ڕێبەری بەکارهێنان || Registry document title; also "User's Manual".
+VOC | VOC | VOC | K || Registry: «المركبات العضوية المتطايرة (VOC)» / «پێکهاتە ئۆرگانییە بەهەڵمبووەکان (VOC)».
+drying time | مدة التجفيف | ماوەی وشککردنەوە || Registry label.
+Ethernet | Ethernet | Ethernet | K || «منفذ Ethernet» / «دەرچەی Ethernet».
+hotend fan | مروحة تبريد رأس الصهر | پانکەی ساردکردنەوەی سەری تواندنەوە || Registry label.
+humidity sensor | حساس الرطوبة | هەستەوەری شێ

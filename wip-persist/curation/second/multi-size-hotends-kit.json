@@ -1,0 +1,539 @@
+{
+  "handle": "multi-size-hotends-kit",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T18:14:59Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "keys": [
+        "nozzle.*",
+        "thermal.*",
+        "part.*",
+        "product.*",
+        "package.*",
+        "motion.max_flow",
+        "extrusion.*",
+        "electrical.*",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "compat.statement",
+        "contents.pieces",
+        "safety.certifications",
+        "identity.*"
+      ],
+      "note": "P0 corpus copy parsed with extractPage + buildImportPayload (the runner path, manifest row applied). Format A legacy description: a nozzle comparison table, the Filament Compatibility matrix and a [Note]; one Notice feature; no spec table, no In the box block, no document links other than the wiki filament guide and a video."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "keys": [
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "printing.layer_height",
+        "part.*",
+        "product.*",
+        "package.*",
+        "motion.max_flow",
+        "extrusion.*",
+        "electrical.*",
+        "safety.certifications",
+        "compat.statement"
+      ],
+      "note": "Read from the cached HTML: all ten tables, including the per-type tabs (tables 3–9) that the .txt export omits."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "motion.max_flow",
+        "extrusion.filament_diameter"
+      ],
+      "note": "Read from the cached HTML. Its nozzle table is a per-filament guide for every Bambu nozzle size (standard and high flow); it names no hotend product and gives no hotend rating."
+    }
+  ],
+  "specs": [
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0.2 mm: Stainless Steel; 0.4 mm, 0.6 mm, 0.8 mm: Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "locator": "description › Filament Compatibility › table header row (cells 2–5)",
+      "quote": "0.2 mm Stainless Steel | 0.4 mm Hardened Steel | 0.6 mm Hardened Steel | 0.8 mm Hardened Steel",
+      "store_page_check": "same source as the store page; the deterministic layer writes no nozzle.material row for this page (no Size group), so nothing to disagree with"
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154951",
+        "id": "ov_bb5667c6f0c1c3afa29f33e6",
+        "value_text": "0.2mm + 0.4mm + 0.6mm + 0.8mm"
+      },
+      "value": "0.2 mm: Stainless Steel; 0.4 mm, 0.6 mm, 0.8 mm: Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "locator": "option Combo › 0.2mm + 0.4mm + 0.6mm + 0.8mm + description › Filament Compatibility › table header row",
+      "quote": "Combo: 0.2mm + 0.4mm + 0.6mm + 0.8mm. Table header: 0.2 mm Stainless Steel | 0.4 mm Hardened Steel | 0.6 mm Hardened Steel | 0.8 mm Hardened Steel",
+      "store_page_check": "same source as the store page (the Combo value names the diameters, the table header pairs each diameter with its material); no deterministic row to disagree with"
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154950",
+        "id": "ov_3dc37ae9e10a42846c9efde6",
+        "value_text": "0.2mm + 0.6mm + 0.8mm"
+      },
+      "value": "0.2 mm: Stainless Steel; 0.6 mm, 0.8 mm: Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "locator": "option Combo › 0.2mm + 0.6mm + 0.8mm + description › Filament Compatibility › table header row",
+      "quote": "Combo: 0.2mm + 0.6mm + 0.8mm. Table header: 0.2 mm Stainless Steel | 0.6 mm Hardened Steel | 0.8 mm Hardened Steel",
+      "store_page_check": "same source as the store page (the Combo value names the diameters, the table header pairs each diameter with its material); no deterministic row to disagree with"
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154949",
+        "id": "ov_d7bf6c732dd33bcad3b0a978",
+        "value_text": "0.2mm + 0.6mm"
+      },
+      "value": "0.2 mm: Stainless Steel; 0.6 mm: Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "locator": "option Combo › 0.2mm + 0.6mm + description › Filament Compatibility › table header row",
+      "quote": "Combo: 0.2mm + 0.6mm. Table header: 0.2 mm Stainless Steel | 0.6 mm Hardened Steel",
+      "store_page_check": "same source as the store page (the Combo value names the diameters, the table header pairs each diameter with its material); no deterministic row to disagree with"
+    },
+    {
+      "key": "part.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Standard flow hotend",
+      "unit": "",
+      "status": "unverified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "locator": "features › Notice",
+      "quote": "All hotends included in the kit are standard flow hotends.",
+      "store_page_check": "same source as the store page (feature bullet); unverified because it is a sentence, not a table cell (§C.6)"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "758575094279757825",
+        "id": "ov_acac07bfbb5b4d8c3859eb99",
+        "value_text": "A2L"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "unverified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Types › A Series Nozzle tab (wiki table 8) › Max. Printing Temp",
+      "quote": "Purchase link: A Series Nozzle | Compatibility:A2L/ A1 / A1 mini | Max. Printing Temp: 300 ℃",
+      "note": "Unverified: the wiki states this for the hotend family, not for the kit by name; the family is chosen by this Printer Model value. The A2L slot takes the A Series nozzle (wiki table 8 names A2L).",
+      "store_page_check": "not on the store page (the page states no temperature for this kit)"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154947",
+        "id": "ov_6597e970ede17230a8c863b4",
+        "value_text": "A1 Series"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "unverified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Types › A Series Nozzle tab (wiki table 8) › Max. Printing Temp",
+      "quote": "Purchase link: A Series Nozzle | Compatibility:A2L/ A1 / A1 mini | Max. Printing Temp: 300 ℃",
+      "note": "Unverified: the wiki states this for the hotend family, not for the kit by name; the family is chosen by this Printer Model value. The A1 Series slot takes the A Series nozzle (wiki table 8 names A1 and A1 mini).",
+      "store_page_check": "not on the store page (the page states no temperature for this kit)"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154948",
+        "id": "ov_f5d9a384881eed0fb12e7bb5",
+        "value_text": "X1/P1 Series"
+      },
+      "value": 320,
+      "unit": "°C",
+      "status": "unverified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Types › X1/P1 Series Nozzle tab (wiki table 9) › Max. Printing Temp",
+      "quote": "Purchase link: Bambu Hotend - X1C & Bambu Hotend - P1 Series | Compatibility: X1C, P1P, P1S | Max. Printing Temp: 320 ℃",
+      "note": "Unverified: the wiki states this for the hotend family, not for the kit by name; the family is chosen by this Printer Model value. The X1/P1 standard hotend (wiki table 9). The E3D High Flow ObXidian tab (table 7, 300 ℃) also fits X1C/P1 but is high flow, and the store Notice says every hotend in the kit is standard flow.",
+      "store_page_check": "not on the store page (the page states no temperature for this kit)"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154945",
+        "id": "ov_6a5e0184deab9fc51bcef485",
+        "value_text": "X2D/P2S"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "unverified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle tab (wiki table 6) › Max. Printing Temp",
+      "quote": "Purchase link: Bambu Hotend - H2/P2S Standard & High Flow | Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D | Max. Printing Temp: 350 ℃",
+      "note": "Unverified: the wiki states this for the hotend family, not for the kit by name; the family is chosen by this Printer Model value. The H2/P2S hotend (wiki table 6 names P2S and X2D). The Tungsten Carbide tab (table 4) also gives 350 ℃ for the same printers.",
+      "store_page_check": "not on the store page (the page states no temperature for this kit)"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154946",
+        "id": "ov_ab0913a48e8d223767c04966",
+        "value_text": "H2D/H2S/H2C (Left Hotend)"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "unverified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle tab (wiki table 6) › Max. Printing Temp",
+      "quote": "Purchase link: Bambu Hotend - H2/P2S Standard & High Flow | Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D | Max. Printing Temp: 350 ℃",
+      "note": "Unverified: the wiki states this for the hotend family, not for the kit by name; the family is chosen by this Printer Model value. The H2/P2S hotend (wiki table 6 names H2D, H2S and the H2C left hotend).",
+      "store_page_check": "not on the store page (the page states no temperature for this kit)"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759204332972335105",
+        "id": "ov_33b8897f836603096c8001c9",
+        "value_text": "H2C (Right Hotend)"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "unverified",
+      "region": "",
+      "test_method": "",
+      "test_condition": "",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Types › Vortek Induction Nozzle tab (wiki table 5) › Max. Printing Temp",
+      "quote": "Purchase link: H2C Induction Hotend - Standard & High Flow | Compatibility: H2C (right hotend) | Max. Printing Temp: 350 ℃",
+      "note": "Unverified: the wiki states this for the hotend family, not for the kit by name; the family is chosen by this Printer Model value. The H2C right hotend takes only the Vortek induction hotend (wiki table 5: \"Compatibility: H2C (right hotend)\").",
+      "store_page_check": "not on the store page (the page states no temperature for this kit)"
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "A2L",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "758575094279757825",
+        "id": "ov_acac07bfbb5b4d8c3859eb99",
+        "value_text": "A2L"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › A2L",
+      "quote": "Printer Model: A2L",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "Wiki agrees: \"Introduction to Bambu Nozzles\" table 8 (A Series Nozzle) \"Compatibility:A2L/ A1 / A1 mini\"; table 10 \"A1 Series Hotend | A1 mini, A1, A2L\"."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154945",
+        "id": "ov_6a5e0184deab9fc51bcef485",
+        "value_text": "X2D/P2S"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › X2D/P2S",
+      "quote": "Printer Model: X2D/P2S",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "Wiki agrees: table 6 (H2/P2S hotend) \"Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D\"."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "P2S",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154945",
+        "id": "ov_6a5e0184deab9fc51bcef485",
+        "value_text": "X2D/P2S"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › X2D/P2S",
+      "quote": "Printer Model: X2D/P2S",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "Wiki agrees: table 6 (H2/P2S hotend) names P2S."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "H2C (Right Hotend)",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759204332972335105",
+        "id": "ov_33b8897f836603096c8001c9",
+        "value_text": "H2C (Right Hotend)"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › H2C (Right Hotend)",
+      "quote": "Printer Model: H2C (Right Hotend)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "Right hotend position only. Wiki agrees: table 5 (H2C Induction Hotend) \"Compatibility: H2C (right hotend)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "H2D",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154946",
+        "id": "ov_ab0913a48e8d223767c04966",
+        "value_text": "H2D/H2S/H2C (Left Hotend)"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › H2D/H2S/H2C (Left Hotend)",
+      "quote": "Printer Model: H2D/H2S/H2C (Left Hotend)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "Wiki agrees: table 6 \"H2D (both left and right)\". The store label leaves open whether \"(Left Hotend)\" qualifies H2D too; the wiki says the H2/P2S hotend fits both H2D positions."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "H2S",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154946",
+        "id": "ov_ab0913a48e8d223767c04966",
+        "value_text": "H2D/H2S/H2C (Left Hotend)"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › H2D/H2S/H2C (Left Hotend)",
+      "quote": "Printer Model: H2D/H2S/H2C (Left Hotend)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "Wiki agrees: table 6 names H2S."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "printer",
+      "target_label": "H2C (Left Hotend)",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154946",
+        "id": "ov_ab0913a48e8d223767c04966",
+        "value_text": "H2D/H2S/H2C (Left Hotend)"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › H2D/H2S/H2C (Left Hotend)",
+      "quote": "Printer Model: H2D/H2S/H2C (Left Hotend)",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "Left hotend position only. Wiki agrees: table 6 \"H2C (left hotend)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154947",
+        "id": "ov_6597e970ede17230a8c863b4",
+        "value_text": "A1 Series"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › A1 Series",
+      "quote": "Printer Model: A1 Series",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "The store names the family only. Wiki table 8 (A Series Nozzle) \"Compatibility:A2L/ A1 / A1 mini\" and table 10 \"A1 Series Hotend | A1 mini, A1, A2L\": evidence that the A1 Series hotend fits the A1 mini (owner question P0-1, by subject)."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "X1 Series",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154948",
+        "id": "ov_f5d9a384881eed0fb12e7bb5",
+        "value_text": "X1/P1 Series"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › X1/P1 Series",
+      "quote": "Printer Model: X1/P1 Series",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "Wiki table 9 (X1/P1 Series Nozzle) \"Compatibility: X1C, P1P, P1S\"; table 10 \"X1C Hotend | X1C\". The X1E is not named by either document."
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "P1 Series",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "759185397619154948",
+        "id": "ov_f5d9a384881eed0fb12e7bb5",
+        "value_text": "X1/P1 Series"
+      },
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/multi-size-hotends-kit",
+      "source_title": "Multi-Size Hotends Kit (Bambu Lab US store product page)",
+      "locator": "option Printer Model › X1/P1 Series",
+      "quote": "Printer Model: X1/P1 Series",
+      "retrieved_at": "2026-10-16T07:08:41Z",
+      "note": "Wiki table 9 \"Compatibility: X1C, P1P, P1S\"; table 10 \"P1 Series Hotend | P1P, P1S\"."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters"
+    }
+  ],
+  "review_notes": [
+    "nozzle.diameter is published (each Combo value names its diameters: 0.2 + 0.6, 0.2 + 0.6 + 0.8, 0.2 + 0.4 + 0.6 + 0.8 mm), but the registry key is a single number and a kit holds two to four nozzles, so no nozzle.diameter row is written and it is not listed as not_published. A list-typed key (or per-nozzle rows) would be needed to carry it.",
+    "thermal.max_nozzle_temp rows are unverified on purpose: the wiki states 300/320/350 ℃ per hotend family; the family for each Printer Model value follows from the wiki compatibility rows and the store Notice (all standard flow), but no document names this kit.",
+    "Not stored: the per-nozzle filament matrix on the store page (√ / Not recommended / X per 0.2/0.4/0.6/0.8 mm) and the wiki layer-height guidance per diameter. Both are per nozzle, and no scope of this product is a single nozzle (Combo values hold several), so they stay as description text.",
+    "Not stored: the \"Free Silicone Sock (3 pcs)!\" line in three variant descriptions (a promotion, not an official contents list), so in_the_box stays empty.",
+    "The deterministic compat.statement row for this page is the sentence \"[Note] Learn more about filament compatibility on Bambu Lab Wiki.\" (unverified, store_page). It is a link sentence, not a compatibility statement; this file does not override it (same rank), the relations above carry the printer compatibility.",
+    "Store page vs wiki filament guide on filaments, for the record (not stored): with a 0.2 mm nozzle the store marks PLA Marble, PLA Wood and PETG Translucent \"Not recommended\" where the wiki says \"Not Compatible\", and PC \"√\" where the wiki says \"Not Recommended\"; with a 0.4 mm nozzle the store marks TPU 85A \"X\" where the wiki says \"Compatible\"."
+  ],
+  "not_published": [
+    "product.net_weight",
+    "product.length",
+    "product.width",
+    "product.height",
+    "package.weight",
+    "package.length",
+    "package.width",
+    "package.height",
+    "motion.max_flow",
+    "extrusion.filament_diameter",
+    "safety.certifications"
+  ]
+}

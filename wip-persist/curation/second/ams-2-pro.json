@@ -1,0 +1,1147 @@
+{
+  "handle": "ams-2-pro",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T16:55:31Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "title": "AMS 2 Pro Spec Sheet",
+      "keys": [
+        "product.*",
+        "physical.*",
+        "printing.*",
+        "extrusion.*",
+        "electrical.*",
+        "ams.*",
+        "package.*",
+        "shipment.*",
+        "safety.*"
+      ],
+      "retrieved_at": "2026-10-16T08:21:16Z",
+      "note": "One page. The store page links it as \"Download TDS\"; the PDF titles itself \"AMS 2 Pro Spec Sheet\" and states no test methods, so its values carry source_kind store_doc."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-2-pro/manual/intro-and-connection-guide",
+      "title": "AMS 2 Pro Part Introduction and Connection Guide | Bambu Lab Wiki",
+      "keys": [
+        "ams.*",
+        "printing.*",
+        "electrical.*",
+        "physical.*"
+      ],
+      "retrieved_at": "2026-10-16T08:21:27Z",
+      "also": "relations (Switching Adapter, filament buffer / hub)"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-2-pro/manual/drying-function",
+      "title": "Filament drying guide for AMS 2 Pro and AMS HT | Bambu Lab Wiki",
+      "keys": [
+        "electrical.*",
+        "physical.*"
+      ],
+      "retrieved_at": "2026-10-16T08:21:32Z",
+      "also": "relations (Switching Adapter for drying)"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "keys": [
+        "ams.max_units",
+        "electrical.connector"
+      ],
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "also": "relations (compatible printers, required buffers / hubs / PTFE adapters, not compatible accessories)"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "Its AMS / AMS lite compatibility column agrees with the spec sheet; its per-filament AMS 2 Pro drying conditions are filament facts (drying.* applies to filament only)."
+    }
+  ],
+  "specs": [
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 372,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Body › Dimensions",
+      "quote": "Dimensions 372*280*226 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z"
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 280,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Body › Dimensions",
+      "quote": "Dimensions 372*280*226 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z"
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 226,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Body › Dimensions",
+      "quote": "Dimensions 372*280*226 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z"
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Body › Net Weight",
+      "quote": "Net Weight 2.5 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z"
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "ABS/PC",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Body › Housing Material",
+      "quote": "Housing Material ABS/PC",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z"
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "ABS",
+        "ASA",
+        "PET",
+        "PA",
+        "PC",
+        "PVA (dried)",
+        "BVOH (dried)",
+        "PP",
+        "POM",
+        "HIPS",
+        "Bambu PLA-CF",
+        "Bambu PAHT-CF",
+        "Bambu PETG-CF",
+        "Bambu Support for PLA/PETG",
+        "TPU for AMS"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Printing › Filament Supported",
+      "quote": "Filament Supported PLA, PETG, ABS, ASA, PET, PA, PC, PVA (dried), BVOH (dried), PP, POM, HIPS, Bambu PLA-CF/PAHT-CF/PETG-CF/Support for PLA/PETG, and TPU for AMS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z",
+      "conflict_note": "Same content as the parsed store page row (messages.SpecificationTable); the page row splits the cell on commas only, the curated list names each filament (the \"Bambu\" prefix applies to every slash-separated item)."
+    },
+    {
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "TPE",
+        "generic TPU",
+        "PVA (damp)",
+        "BVOH (damp)",
+        "Bambu PET-CF",
+        "Bambu TPU 95A",
+        "other filament that contains carbon fiber or glass fiber"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Printing › Filament Not Supported",
+      "quote": "Filament Not Supported TPE, generic TPU, PVA (damp), BVOH (damp),Bambu PET-CF/TPU 95A, and other filament that contains carbon fiber or glass fiber",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z",
+      "conflict_note": "Same content as the parsed store page row (messages.SpecificationTable); the page row splits the cell on commas only, the curated list names each filament (the \"Bambu\" prefix applies to every slash-separated item)."
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Printing › Filament Diameter",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z"
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "24 V",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Power › Input",
+      "quote": "Input 24 V 4 A",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z",
+      "note": "The unit input (from the printer over the 6-pin bus or from the AMS 2 Pro Switching Adapter); not a mains value, so it is region-free."
+    },
+    {
+      "key": "electrical.current",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "4 A",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "source_title": "AMS 2 Pro Spec Sheet",
+      "locator": "p.1 › Power › Input",
+      "quote": "Input 24 V 4 A",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:16Z",
+      "note": "The unit input (from the printer over the 6-pin bus or from the AMS 2 Pro Switching Adapter); not a mains value, so it is region-free."
+    },
+    {
+      "key": "ams.slots",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-2-pro/manual/intro-and-connection-guide",
+      "source_title": "AMS 2 Pro Part Introduction and Connection Guide | Bambu Lab Wiki",
+      "locator": "Introduction to each module › Filament slots",
+      "quote": "The AMS 2 Pro has four filament slots, each with one feeder inside.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:27Z"
+    },
+    {
+      "key": "electrical.connector",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Two 6-pin ports on the back",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › Cable Connection",
+      "quote": "Each AMS has two 6-pin ports on the back, allowing you to daisy-chain multiple AMS units.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "note": "The page defines \"AMS\" as the AMS, AMS 2 Pro and AMS HT collectively; the same sentence repeats in the X2D and P2S sections."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "644350794219778050",
+        "id": "ov_a7ff3c43b0002650947ac8bc",
+        "label": "A1 Series"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A1 Series Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS units (AMS, AMS 2 Pro, or AMS HT) connected at the same time.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685249",
+        "id": "ov_86e1129c427b3649035b043b",
+        "label": "X1/P1 Series"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X1/P1 Series Connection Guide › Maximum number of connected AMS units",
+      "quote": "The X1/P1 supports up to 4 AMS 2 Pro or 4 AMS HT units — 4 units in total.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685250",
+        "id": "ov_1150cff145c893df640fb747",
+        "label": "P2S"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "P2S › Maximum number of connected AMS units",
+      "quote": "The P2S supports up to 4 AMS 2 Pro and 4 AMS HT units simultaneously — 8 units in total with 20 slots.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685251",
+        "id": "ov_f264a6eadc13d3537934b54d",
+        "label": "H2S"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS 2 Pro units and 8 AMS HT units connected simultaneously.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692955201173307393",
+        "id": "ov_61c4cb3115ecf5e773104503",
+        "label": "H2D/H2C"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS 2 Pro units and 8 AMS HT units connected simultaneously.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720832839840628737",
+        "id": "ov_635c7019bd48ebb440a0156a",
+        "label": "X2D"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X2D Printer Connection Guide › Maximum Connections",
+      "quote": "Maximum Connections: Supports up to 4 AMS 2 Pro and 8 AMS HT units simultaneously.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "738525024395620353",
+        "id": "ov_6e9c392c85e88f1deb2f1767",
+        "label": "A2 Series"
+      },
+      "value": "4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A2L Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS units and 1 AMS lite simultaneously",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "note": "The store option \"A2 Series\" is the A2L in the wiki; \"AMS units\" there are the AMS, AMS 2 Pro and AMS HT (the store variant note says the same)."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer_family",
+      "target_label": "A1 Series",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A1 Series Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS units (AMS, AMS 2 Pro, or AMS HT) connected at the same time.",
+      "condition": "Through the A1 Series AMS Hub; printer firmware 01.07.00.00 or later",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer_family",
+      "target_label": "X1 Series",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X1/P1 Series Connection Guide › Maximum number of connected AMS units",
+      "quote": "The X1/P1 supports up to 4 AMS 2 Pro or 4 AMS HT units — 4 units in total.",
+      "condition": "Up to 4 AMS 2 Pro",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer_family",
+      "target_label": "P1 Series",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X1/P1 Series Connection Guide › Maximum number of connected AMS units",
+      "quote": "The X1/P1 supports up to 4 AMS 2 Pro or 4 AMS HT units — 4 units in total.",
+      "condition": "Up to 4 AMS 2 Pro",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "P2S",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "P2S › Maximum number of connected AMS units",
+      "quote": "The P2S supports up to 4 AMS 2 Pro and 4 AMS HT units simultaneously — 8 units in total with 20 slots.",
+      "condition": "Up to 4 AMS 2 Pro",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2D",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS 2 Pro units and 8 AMS HT units connected simultaneously.",
+      "condition": "Up to 4 AMS 2 Pro; filament buffer built in",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS 2 Pro units and 8 AMS HT units connected simultaneously.",
+      "condition": "Up to 4 AMS 2 Pro; filament buffer built in",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2S",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS 2 Pro units and 8 AMS HT units connected simultaneously.",
+      "condition": "Up to 4 AMS 2 Pro; filament buffer built in",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X2D Printer Connection Guide › Maximum Connections",
+      "quote": "Maximum Connections: Supports up to 4 AMS 2 Pro and 8 AMS HT units simultaneously.",
+      "condition": "Up to 4 AMS 2 Pro",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "A2L",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A2L Connection Guide › Maximum number of connected AMS units",
+      "quote": "Supports up to 4 AMS units and 1 AMS lite simultaneously",
+      "condition": "Up to 4 AMS units (AMS, AMS 2 Pro, AMS HT) plus 1 AMS lite",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "644350794219778050",
+        "id": "ov_a7ff3c43b0002650947ac8bc",
+        "label": "A1 Series"
+      },
+      "target_kind": "hub",
+      "target_label": "A1 series AMS Hub",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A1 Series Connection Guide › Accessories required",
+      "quote": "To connect AMS, AMS 2 Pro, or AMS HT, an A Series AMS Hub are required, which should be purchased seperately.",
+      "condition": "Any number of AMS 2 Pro units on an A1 series printer",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685249",
+        "id": "ov_86e1129c427b3649035b043b",
+        "label": "X1/P1 Series"
+      },
+      "target_kind": "buffer",
+      "target_label": "Filament Buffer",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 1 AMS to the X1/P1 series printer, you need to purchase a Filament Buffer, a PTFE Tube Coupler, and a 4-pin Cable separately.",
+      "condition": "One AMS 2 Pro unit",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685249",
+        "id": "ov_86e1129c427b3649035b043b",
+        "label": "X1/P1 Series"
+      },
+      "target_kind": "part",
+      "target_label": "PTFE Tube Coupler",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 1 AMS to the X1/P1 series printer, you need to purchase a Filament Buffer, a PTFE Tube Coupler, and a 4-pin Cable separately.",
+      "condition": "One or more AMS 2 Pro units",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685249",
+        "id": "ov_86e1129c427b3649035b043b",
+        "label": "X1/P1 Series"
+      },
+      "target_kind": "part",
+      "target_label": "4-pin Cable",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 1 AMS to the X1/P1 series printer, you need to purchase a Filament Buffer, a PTFE Tube Coupler, and a 4-pin Cable separately.",
+      "condition": "One or more AMS 2 Pro units",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "note": "compat-targets.json lists \"4-pin Cable(CAB002-N)\" as requirement_unresolvable (no crawled product page)."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685249",
+        "id": "ov_86e1129c427b3649035b043b",
+        "label": "X1/P1 Series"
+      },
+      "target_kind": "hub",
+      "target_label": "AMS Hub",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X1/P1 Series Connection Guide › Accessories required",
+      "quote": "When connecting 2 or more AMS units to the X1/P1, you need to purchase a AMS Hub, a PTFE Tube Coupler, and a 4-pin Cable separately.",
+      "condition": "Two or more AMS 2 Pro units",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685250",
+        "id": "ov_1150cff145c893df640fb747",
+        "label": "P2S"
+      },
+      "target_kind": "buffer",
+      "target_label": "P2S Filament Buffer",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "P2S › Accessories required",
+      "quote": "When pairing a standalone P2S with a standalone AMS, you also need to purchase a P2S filament buffer.",
+      "condition": "Standalone P2S (the P2S Combo includes a filament buffer)",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685250",
+        "id": "ov_1150cff145c893df640fb747",
+        "label": "P2S"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "P2S › PTFE Tube Connection",
+      "quote": "When connecting 3 or more AMS units, 4-in-1 PTFE Adapters are required to connect the PTFE tubes.",
+      "condition": "Three or more AMS units",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685251",
+        "id": "ov_f264a6eadc13d3537934b54d",
+        "label": "H2S"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › PTFE Tube Connection",
+      "quote": "When connecting two AMS units to the H2S, a 4-in-1 PTFE Adapter is also required.",
+      "condition": "Two or more AMS units",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692955201173307393",
+        "id": "ov_61c4cb3115ecf5e773104503",
+        "label": "H2D/H2C"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › PTFE Tube Connection",
+      "quote": "If you need to use 2 AMS units plus an external spool, or 3 or more AMS units, you need to use a 4-in-1 PTFE Adapter for expansion.",
+      "condition": "Two AMS units plus an external spool, or three or more AMS units",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "note": "For the H2C the wiki names the H2 series dedicated version (next relation); the store variant note for this option names \"4-in-1 PTFE Adapter II (SA014)\"."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692955201173307393",
+        "id": "ov_61c4cb3115ecf5e773104503",
+        "label": "H2D/H2C"
+      },
+      "target_kind": "part",
+      "target_label": "H2 Series Dedicated 4-in-1 PTFE Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "AMS Connection Components › 4-in-1 PTFE Adapter › Types",
+      "quote": "The H2C printer requires the H2 series dedicated 4-in-1 PTFE Adapter, while the P2S and X2D requires the standard 4-in-1 PTFE Adapter.",
+      "condition": "H2C only, when a 4-in-1 PTFE Adapter is needed",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720832839840628737",
+        "id": "ov_635c7019bd48ebb440a0156a",
+        "label": "X2D"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "X2D Printer Connection Guide › PTFE Tube Connection",
+      "quote": "To use 2 AMS units plus an external spool, or 3 or more AMS units, a 4-in-1 PTFE adapter is required.",
+      "condition": "Two AMS units plus an external spool, or three or more AMS units",
+      "retrieved_at": "2026-10-16T08:21:20Z",
+      "conflict_note": "The same page says \"the P2S and X2D requires the standard 4-in-1 PTFE Adapter\" but its X2D summary says \"Scenarios with more than two AMS units require purchasing the 4-in-1 PTFE adapter II\". The store variant note for X2D names FAZ013-N (the standard adapter)."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "738525024395620353",
+        "id": "ov_6e9c392c85e88f1deb2f1767",
+        "label": "A2 Series"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A2L Connection Guide › Accessories required",
+      "quote": "If you need to connect two or more AMS units, you will need to purchase an additional 4-in-1 PTFE Adapter.",
+      "condition": "Two or more AMS units",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "644350794219778050",
+        "id": "ov_a7ff3c43b0002650947ac8bc",
+        "label": "A1 Series"
+      },
+      "target_kind": "accessory",
+      "target_label": "AMS 2 Pro Switching Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "AMS Drying Function Requirements › AMS 2 Pro Drying Power Requirements",
+      "quote": "When using an AMS 2 Pro with an X1/P1/A1 series printer, each AMS 2 Pro must be powered through a power adapter to use the drying function.",
+      "condition": "Drying function only; one adapter per AMS 2 Pro unit",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685249",
+        "id": "ov_86e1129c427b3649035b043b",
+        "label": "X1/P1 Series"
+      },
+      "target_kind": "accessory",
+      "target_label": "AMS 2 Pro Switching Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-2-pro/manual/intro-and-connection-guide",
+      "source_title": "AMS 2 Pro Part Introduction and Connection Guide | Bambu Lab Wiki",
+      "locator": "Introduction to each module › Switching Adapter",
+      "quote": "If the X1 or P1 series printer is used with the AMS 2 Pro and uses the AMS 2 Pro's drying function, each AMS 2 Pro requires an official Bambu Lab Switching Adapter to power it.",
+      "condition": "Drying function only; one adapter per AMS 2 Pro unit",
+      "retrieved_at": "2026-10-16T08:21:27Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "738525024395620353",
+        "id": "ov_6e9c392c85e88f1deb2f1767",
+        "label": "A2 Series"
+      },
+      "target_kind": "accessory",
+      "target_label": "AMS 2 Pro Switching Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-2-pro/manual/drying-function",
+      "source_title": "Filament drying guide for AMS 2 Pro and AMS HT | Bambu Lab Wiki",
+      "locator": "Hardware Function Introduction › Power Requirements › X1 / P1 /A2L Series printers",
+      "quote": "Every AMS 2 Pro must use its own adapter to enable drying",
+      "condition": "Drying function only; one adapter per AMS 2 Pro unit",
+      "retrieved_at": "2026-10-16T08:21:32Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685250",
+        "id": "ov_1150cff145c893df640fb747",
+        "label": "P2S"
+      },
+      "target_kind": "accessory",
+      "target_label": "AMS 2 Pro Switching Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "AMS Drying Function Requirements › AMS 2 Pro Drying Power Requirements",
+      "quote": "When an H2 series/P2S printer is connected to multiple AMS 2 Pro units, only 1 unit can use the printer's power supply.",
+      "condition": "Drying in more than one AMS 2 Pro at once: one unit draws printer power, each additional unit needs its own adapter",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "665692645061685251",
+        "id": "ov_f264a6eadc13d3537934b54d",
+        "label": "H2S"
+      },
+      "target_kind": "accessory",
+      "target_label": "AMS 2 Pro Switching Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "AMS Drying Function Requirements › AMS 2 Pro Drying Power Requirements",
+      "quote": "When an H2 series/P2S printer is connected to multiple AMS 2 Pro units, only 1 unit can use the printer's power supply.",
+      "condition": "Drying in more than one AMS 2 Pro at once: one unit draws printer power, each additional unit needs its own adapter",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "692955201173307393",
+        "id": "ov_61c4cb3115ecf5e773104503",
+        "label": "H2D/H2C"
+      },
+      "target_kind": "accessory",
+      "target_label": "AMS 2 Pro Switching Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "AMS Drying Function Requirements › AMS 2 Pro Drying Power Requirements",
+      "quote": "When an H2 series/P2S printer is connected to multiple AMS 2 Pro units, only 1 unit can use the printer's power supply.",
+      "condition": "Drying in more than one AMS 2 Pro at once: one unit draws printer power, each additional unit needs its own adapter",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720832839840628737",
+        "id": "ov_635c7019bd48ebb440a0156a",
+        "label": "X2D"
+      },
+      "target_kind": "accessory",
+      "target_label": "AMS 2 Pro Switching Adapter",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-2-pro/manual/drying-function",
+      "source_title": "Filament drying guide for AMS 2 Pro and AMS HT | Bambu Lab Wiki",
+      "locator": "Hardware Function Introduction › Power Requirements › H2 Series / P2S / X2D (multiple AMS 2 Pro drying simultaneously)",
+      "quote": "Additional units require separate adapters (purchase separately)",
+      "condition": "Drying in more than one AMS 2 Pro at once: only 1 unit may be powered via 6-pin",
+      "retrieved_at": "2026-10-16T08:21:32Z",
+      "conflict_note": "The store variant note for \"X2D / Connect 3 or more\" says one Switching Adapter is required for each AMS 2 Pro unit; the wiki and the store note for \"X2D / Connect 1 or 2\" say the X2D powers one unit for drying."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "644350794219778050",
+        "id": "ov_a7ff3c43b0002650947ac8bc",
+        "label": "A1 Series"
+      },
+      "target_kind": "buffer",
+      "target_label": "Filament Buffer",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A1 Series Connection Guide › Note",
+      "quote": "Do not use the filament buffer or AMS Hub included with the AMS to connect an A series printer to the AMS.",
+      "condition": "To connect an A1 series printer (use the A1 Series AMS Hub)",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "644350794219778050",
+        "id": "ov_a7ff3c43b0002650947ac8bc",
+        "label": "A1 Series"
+      },
+      "target_kind": "hub",
+      "target_label": "AMS Hub",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A1 Series Connection Guide › Note",
+      "quote": "Do not use the filament buffer or AMS Hub included with the AMS to connect an A series printer to the AMS.",
+      "condition": "To connect an A1 series printer (use the A1 Series AMS Hub)",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "644350794219778050",
+        "id": "ov_a7ff3c43b0002650947ac8bc",
+        "label": "A1 Series"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "A1 Series Connection Guide › Maximum number of connected AMS units",
+      "quote": "Alternatively, you can connect one AMS lite — but the AMS lite cannot be combined with other AMS models.",
+      "condition": "On the same A1 series printer",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "6-pin cable from the AMS (1st gen)",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "source_title": "Connection Guide for Multiple AMS Units with Different Printer Models | Bambu Lab Wiki",
+      "locator": "H2 Series AMS Connection Guide › Cable Connection",
+      "quote": "Using a 6-pin cable from the AMS (1st gen) may cause unstable communication between AMS and printer.",
+      "condition": "Use the new-version 6-pin cable included with the AMS 2 Pro (2.5 mm step height; the AMS 1st-gen cable is 1.1 mm)",
+      "retrieved_at": "2026-10-16T08:21:20Z"
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "items": [
+        {
+          "text": "Bambu AMS 2 Pro",
+          "qty": null
+        },
+        {
+          "text": "Desiccant",
+          "qty": null
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": 5,
+          "note": "185 mm ×2, 225 mm ×2, 900 mm ×1"
+        },
+        {
+          "text": "Bambu Bus Cable-6Pin",
+          "qty": null
+        }
+      ],
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-2-pro",
+      "source_title": "Bambu Lab AMS 2 Pro store page",
+      "locator": "What’s in the Box (rendered list; messages keys \"Bambu AMS 2 Pro\", \"Desiccant\", \"PTFE Tube\", \"Bambu Bus Cable-6Pin\")",
+      "quote": "Bambu AMS 2 Pro | Desiccant | PTFE Tube (185mm*2+225mm*2+900mm*1) | Bambu Bus Cable-6Pin",
+      "retrieved_at": "2026-10-16T06:53:17Z",
+      "note": "The store page says the product is the same among all variants (only the recommended accessories differ). No acc-in-the-box wiki page for the AMS 2 Pro was cached."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/s3/default/02bc9c24b207476a9608a314b8039509/AMS_2_Pro-EN.pdf",
+      "title": "AMS 2 Pro Spec Sheet"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-2-pro/manual/intro-and-connection-guide",
+      "title": "AMS 2 Pro Part Introduction and Connection Guide"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-2-pro/manual/drying-function",
+      "title": "Filament drying guide for AMS 2 Pro and AMS HT"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams/manual/multi-model-AMS-compatibility-guide",
+      "title": "Connection Guide for Multiple AMS Units with Different Printer Models"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters"
+    }
+  ],
+  "not_published": [
+    "electrical.max_power",
+    "electrical.rated_power",
+    "electrical.standby_power",
+    "physical.noise",
+    "physical.operating_temp",
+    "package.weight",
+    "package.length",
+    "package.width",
+    "package.height",
+    "shipment.gross_weight",
+    "safety.certifications",
+    "printing.filament_odometry"
+  ]
+}

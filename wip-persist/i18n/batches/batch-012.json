@@ -1,0 +1,3115 @@
+{
+ "batch": 12,
+ "surface": "page",
+ "handles": [
+  "silicone-tube",
+  "pu-tubes",
+  "rectangular-magnet",
+  "round-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+  "plastic-button-ornaments-for-shoe-charms",
+  "rectangle-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+  "disc-countersunk-hole-magnet",
+  "suction-caps-with-hole",
+  "suction-caps-with-mushroom-head",
+  "pvc-suction-caps-with-flat-head",
+  "rubber-bands",
+  "ring-magnets",
+  "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+  "2-wires-slip-ring-12-5mm-with-sh1-0-connector",
+  "cob-led-strip-light",
+  "remote-controlled-16-color-rgbw-puck-lights",
+  "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+  "card-shuffler",
+  "compact-multi-use-case-in-two-sizes",
+  "ring-led-magnetic-control-switch-light",
+  "single-led-magnetic-control-switch-light",
+  "push-opener-bottle-opener",
+  "led-flame-tea-light-candle-set-warm-yellow",
+  "split-ring-keychain",
+  "pvc-tubes",
+  "clear-acrylic-rigid-tubes",
+  "plastic-hose-barb-fittings",
+  "endless-loop-express",
+  "mini-motorized-basketball-game",
+  "black-nylon-cord",
+  "extension-springs",
+  "magnets-for-make-my-sign",
+  "running-dinosaur-automaton",
+  "2-pin-8mm-l-shaped-led-strip-connectors",
+  "3-pin-10mm-l-shaped-led-strip-connectors",
+  "stemfie-electronics-components",
+  "pc4-m6-pneumatic-connector-for-ptfe-tube",
+  "lithophane-led-backlight-board-kit",
+  "tec-9-disc-shooter",
+  "breezebuddy",
+  "adhesive-foam-sponge-strip-roll",
+  "piano-music-box-winding-kit",
+  "water-bladder",
+  "smooth-ball-spring-plunger",
+  "electric-push-rod",
+  "gt2-timing-belt",
+  "nfc-tag-with-adhesive",
+  "single-axis-plastic-reduction-gear-kit",
+  "dual-axis-plastic-reduction-gear-kit",
+  "030-micro-dc-motor-with-sh1-0",
+  "apex-legends-wingman-with-reload-mechanics",
+  "cute-flame-devil-lights",
+  "monster-tree-light",
+  "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+  "halloween-classic-carved-pumpkin-lantern",
+  "halloween-skull-tear-pumpkin-lantern",
+  "halloween-ghost-night-light",
+  "pocket-rubber-band-racer",
+  "watch-stand-for-apple-samsung-galaxy",
+  "endless-loop-express-kit-016",
+  "halloween-cute-creepy-candle-holder",
+  "halloween-ghost",
+  "halloween-ghost-light",
+  "cauldron-light",
+  "halloween-pumpkin-light",
+  "electric-water-spray-kit-02",
+  "rechargeable-power-kit",
+  "electric-water-spray-kit-01",
+  "electric-bubble-maker-kit-01",
+  "cute-witchs-cauldron-tea-light",
+  "jack-skellington-oogie-boogie-pumpkin-theelight",
+  "reading-ghost-halloween-tea-light-decor",
+  "flexi-pets-keychain-magnet-collections",
+  "6500k-white-led-light-strip-combo-kit",
+  "standby-mode-dock-for-iphone",
+  "ws2812b-rgb-led-strip-light-bundle",
+  "makers-supply-electronics-bundle",
+  "cipher-helmet-lock-kit",
+  "rectangular-transparent-double-sided-adhesive",
+  "wind-up-walking-mechanisms",
+  "7mm-round-magnetic-connector-with-sh1-0-connector-2pair",
+  "magnetic-levitation-diy-kit",
+  "catmaw-afv-model-car-for-scx10",
+  "motion-activated-sound-and-light-props-kit",
+  "decoration-display-kit",
+  "multi-ratio-motorized-system-kit",
+  "easy-mounting-kit",
+  "dynamic-installation-art-kit",
+  "desktop-ornament-components-kit",
+  "filament-protection-kit",
+  "fastener-kit",
+  "workshop-modification-kit",
+  "eye-bolt-with-self-tapping-thread",
+  "precision-shaft-system-kit",
+  "led-light-strip-remote-controller",
+  "makers-beginner-kit"
+ ],
+ "strings": [
+  {
+   "h": "882e55e2ff6419f5ac08b3518e708da19dd05e04912d7774d595e26afe1d2f58",
+   "en": "1. Made of flexible and durable silicone 2. Easy to install and suitable for transporting liquids and gases in your DIY projects 3. Non-toxic and odourless, environmentally friendly 4. Strong stability, corrosion-resistant high temperature, not easy to aging",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-tube",
+    "title": "Silicone Tubes",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2764c1897dd03ecf46244c2b75af129727a2ce7b08ec85254e1c01f781ecffad",
+   "en": "-40℃ to +200℃",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-tube",
+    "title": "Silicone Tubes",
+    "field": "specs[part.temperature_range]",
+    "near": "Temperature range"
+   },
+   "dict": null
+  },
+  {
+   "h": "291ded9e33c4f44acb313e8cdba880738157e281357f664b7d43a2189f8bc5ba",
+   "en": "Item Length",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "silicone-tube",
+    "title": "Silicone Tubes",
+    "field": "specs[x.item_length].label",
+    "near": "2m"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd0489bc86241d4c2335895c034613d4f364a0f8156e615e2b0ff2b3849d1563",
+   "en": "1. Strong stress tolerance 2. Long service life 3. Various colours available 4. Easy to install and suitable for transporting high pressure gases and liquids in a variety of DIY projects",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pu-tubes",
+    "title": "PU Tubes",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "db27e8b2939a8aba6f5f0b191a40e4f8fe56a77e50bf705480d4f2294ceb2b65",
+   "en": "-10℃ to +80℃",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "pu-tubes",
+    "title": "PU Tubes",
+    "field": "specs[part.temperature_range]",
+    "near": "Temperature range"
+   },
+   "dict": null
+  },
+  {
+   "h": "ef8ccc9af7ca6d680519998fad2406c897607e73e3e20abe4a71ff86b77493d3",
+   "en": "The rectangular magnet is ideal for securing objects to metal surfaces in various industrial and household applications, with high temperature resistance up to 80°C.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-magnet",
+    "title": "Rectangular Magnet",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f7224d9cac16ac726d87390c7b762a76ad808e8be5e834bb8aa92d263bbdc4a4",
+   "en": "The 3M™ Dual Lock Reclosable Fastener simplifies use, offering both durability and convenience. The mushroom-shaped heads allow parts to slide easily into place before securely locking together. Once fastened, the connectors are hidden, leaving a smooth and clean surface.",
+   "kind": "short_description",
+   "freq": 4,
+   "context": {
+    "handle": "round-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Round Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "84961e697f0f4b3ae6760f217d1a20e1da25c9ffcede6a2c0988413dd2cfde77",
+   "en": "Brand Name",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "round-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Round Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "specs[x.brand_name].label",
+    "near": "3M"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a3b3750e3a18dac0910911194b0a99d20695c55dd08f08950d8c4602a763e43",
+   "en": "4 PCS",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "round-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Round Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "specs[contents.pieces]",
+    "near": "Pieces per pack"
+   },
+   "dict": {
+    "ar": "4 قطعة",
+    "ckb": "4 دانە"
+   }
+  },
+  {
+   "h": "2040b5592994c955e6794b90c543291b3d6b3e1e7efe613bd34842054b296629",
+   "en": "12mmx10mmx3.5mm (50pcs) White PVC 1. Lightweight and portable, sturdy and durable, waterproof and not easy to break 2. Bonds to ornament with glue, easy to install in your DIY model",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-button-ornaments-for-shoe-charms",
+    "title": "Plastic Button Ornaments For Shoe Charms",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d55cba896ae5b06215152f13f18b482b738daa73ff832939e1e4052b151bf4cb",
+   "en": "PVC",
+   "kind": "spec_value_text",
+   "freq": 6,
+   "context": {
+    "handle": "plastic-button-ornaments-for-shoe-charms",
+    "title": "Plastic Button Ornaments For Shoe Charms",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "0306996228eb0b748da44b48ce0d392b557fea59fc6eca397caef02aabdbc6ed",
+   "en": "Rectangle",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "rectangle-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Rectangle Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "specs[part.shape]",
+    "near": "Shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "5da4e591214fe5dd55f13731b7b9771df22302a188d561a6cb7b3c2717b5efdd",
+   "en": "Pixel Puzzle Maker",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "rectangle-dual-lock-3m-sj3550-reclosable-fastener-mounting-tape",
+    "title": "Rectangle Dual Lock 3M SJ3550 Reclosable Fastener Mounting Tape",
+    "field": "documents[0]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f7589483d7e9e179ad8bde75aeb4aefd7c34fa74269f5b33803d9c13215e8e4",
+   "en": "12x3x3 mm & 10x4x3 mm Our ring countersunk magnets stand out for their superior quality, strength, and versatility. Whether you're a professional in need of reliable industrial magnets or a DIY enthusiast looking for the perfect magnetic solution, our magnets are designed to meet your needs with excellence and reliability.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "disc-countersunk-hole-magnet",
+    "title": "Disc Countersunk Hole Magnets",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b3f952e8b6787ce08c5b04c6969fa74919a86c47008d9130cce38483541337b1",
+   "en": "Ring",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "disc-countersunk-hole-magnet",
+    "title": "Disc Countersunk Hole Magnets",
+    "field": "specs[part.shape]",
+    "near": "Shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "ce697bb455bc12499e187d791bc4fb31a68e3ec28a948bc11b5533b0d6bda0ec",
+   "en": "The PVC Suction Cap with Hole is designed for easy hanging with a string, without the need for a hook. It is perfect for securing lightweight items on any smooth surface. Its compact size saves space, making it ideal for hanging dolls, crafts, and holiday decorations such as Halloween and Christmas ornaments. Enjoy stronger suction for a stable and reliable hold.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "suction-caps-with-hole",
+    "title": "Suction Caps with Hole",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ce9f228403f00361602e9e8e588127dd573d7080446a54a8b7c16d0a5ffeafa2",
+   "en": "The PVC Suction Cap with Mushroom Head is perfect for various household and kitchen uses, eliminating the need for hooks. Its protruding mushroom head design ensures stronger suction, providing stable and reliable support. The compact, space-saving size makes it ideal for hanging home and holiday decorations, fixing soap dishes, bathroom racks, and sink filters, as well as hanging window signs and small lights during holidays.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "suction-caps-with-mushroom-head",
+    "title": "Suction Caps with Mushroom Head",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "edc8b031caf0f2a170cafbef05f86159dbf3ec0cba641b189c0e2228a33ab0c8",
+   "en": "Featuring a flat head suction design that eliminates the need for hooks, these PVC Suction Caps with Flat Head offer strong suction power, ensuring stable and reliable use. Their compact, space-saving size makes them perfect for hanging various household and kitchen accessories, as well as home and holiday decorations. Ideal for tasks like fixing soap dishes, bathroom racks, and hanging window signs and small lights during festive seasons.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pvc-suction-caps-with-flat-head",
+    "title": "PVC Suction Caps with Flat Head",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e96f7070b898424339b332edbbceaeb2a9daa0d95410359111bc155a5a8e231f",
+   "en": "The rubber bands offer reliable strength and pliability. They are reusable and made of high-quality natural rubber with elasticity.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-bands",
+    "title": "Rubber Bands",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ffd33fdb90fad0447987578877c881fe920f7e846d35b9054fe8410f062a6950",
+   "en": "10x4x3 mm Our ring magnets stand out for their superior quality, strength, and versatility. Whether you're a professional in need of reliable industrial magnets or a DIY enthusiast looking for the perfect magnetic solution, our magnets are designed to meet your needs with excellence and reliability.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ring-magnets",
+    "title": "Ring Magnets",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "79759971b8167e6fcad35fd73051717b9a83ec5cb44397e454d99f9b4b43480d",
+   "en": "Explore the 1 Wire Slip Ring 12.5mm with SH1.0 Connector: compact, 360° rotation to prevent tangling, smooth operation for multiple signals/power, V-groove design with military-grade gold treatment ensures durability and minimal resistance fluctuation",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9dffdeb88b1ccd89e750c606127b966a79bb76b2712ce6b46fbe98b058e2352e",
+   "en": "0~ 240 VAC/VDC",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "specs[electrical.voltage]",
+    "near": "Voltage"
+   },
+   "dict": null
+  },
+  {
+   "h": "1abde7ffdb45a205d38acd131756d88de1b969ac0eab4a0c8366784fbb764c8f",
+   "en": "2A per line",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "specs[electrical.current]",
+    "near": "Current"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b84130a2561bcc74edf1f27836257432b2e396d256718121397a7d1609912f1",
+   "en": "-10°C to +80°C",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "specs[physical.operating_temp]",
+    "near": "Operating temperature"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a38f91382e494341236fcd20b13fab95496d3f3981e2f4de38a6e1476726bdf",
+   "en": "Speed Range",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "specs[x.speed_range].label",
+    "near": "0 to 250 rpm"
+   },
+   "dict": null
+  },
+  {
+   "h": "fae454757151fe86ba64e16ad368e82f1b7f20767357d97244fa7e6dbaa94299",
+   "en": "0 to 250 rpm",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "specs[x.speed_range]",
+    "near": "Speed Range"
+   },
+   "dict": null
+  },
+  {
+   "h": "6cd4dcb2cc5da2dc7dad25b8d66067345392281a935d2b36e4b9f2bf8d94106d",
+   "en": "International Protection Rating",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "1-wire-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "1 Wire Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "specs[x.international_protection_rating].label",
+    "near": "IP54"
+   },
+   "dict": null
+  },
+  {
+   "h": "008bc347a3635adc25cf2e414c0ca767fceb01702414958817a0744adc9c55a8",
+   "en": "Explore the 2 Wire Slip Ring 12.5mm with SH1.0 Connector: precision design with 360° rotation prevents tangling, stable operation for multiple signals/power, V-groove design with military-grade gold treatment ensures durability and minimal resistance fluctuation",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "2-wires-slip-ring-12-5mm-with-sh1-0-connector",
+    "title": "2 Wires Slip Ring 12.5mm with SH1.0 Connector",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7456a6111833e2cf56a35752124ce0abdb1821bb2bff0c8c696ba6b91e475d84",
+   "en": "COB LED Strip Light - Used with the 100mm Y type PH2.0 to Dual SH1.0 Conversion Wire and the Power Distribution Board - 4 Channels, the brightness can be adjusted via the Potentiometer Board with SH1.0 Connector.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7b6a01eacbd894e21c5a315c84433e812b12f887fe58d27fa88b72bf01e2321d",
+   "en": "Used with the 100mm Y type PH2.0 to Dual SH1.0 Conversion Wire and the Power Distribution Board - 4 Channels, the brightness can be adjusted via the Potentiometer Board with SH1.0 Connector.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e73918bd6c85d2a46c788bcf7bc40cd73e8841bf72cdd8a8f78cf4bed3818d56",
+   "en": "Strip Light Material",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "specs[x.strip_light_material].label",
+    "near": "Silicone"
+   },
+   "dict": null
+  },
+  {
+   "h": "1fead25a60119bf05bf9c628df81fd5e4bbc291fe15d634f11508814e03ba6ff",
+   "en": "LED Board Size (mm)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "specs[x.led_board_size_mm].label",
+    "near": "13.7x9.9"
+   },
+   "dict": null
+  },
+  {
+   "h": "4995af45c430e0e039a1474a4fc547e09259efcf1a343e55c5d5f302663af547",
+   "en": "Strip Light Color",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "specs[x.strip_light_color].label",
+    "near": "Yellow"
+   },
+   "dict": null
+  },
+  {
+   "h": "0087d9948d3fc076548890c3a3ecf5ec35b5207cdee6a61d7f969bfa536074a3",
+   "en": "1 pcs",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cob-led-strip-light",
+    "title": "COB LED Strip Light",
+    "field": "specs[contents.pieces]",
+    "near": "Pieces per pack"
+   },
+   "dict": {
+    "ar": "1 قطعة",
+    "ckb": "1 دانە"
+   }
+  },
+  {
+   "h": "e64bfb0cfb7ca463651498c19a9caa044c003a8361328f0499baf2fe68578af6",
+   "en": "Remote Controlled 16-color RGBW Puck Lights offer versatile lighting options with adjustable brightness to meet different needs such as sleeping, stair lighting, and reading. Easily integrated into 3D printed models, these lights support 16 color changes and can be timed to turn off, saving energy.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c0e12c95f5ebcc7a429cc92ebe21b90630a7a6c7955e155bbb22b37879f5b9c8",
+   "en": "Operating Instructions",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "24c70a995d7c5fa86bfc95707b3439abbfa27fb3275afd74d5614ac3a942d27c",
+   "en": "You can operate the Remote Controlled 16-Color RGBW Puck Lights both manually and via remote control. Press the button on the light to turn it on/off and cycle through colors. Use the remote to easily switch colors, adjust brightness, select modes, and set a timer for convenient control.Additionally, use Reclosable Fastener Mounting Tape to securely attach the Puck Lights in place.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "usage[0].body.line[0]",
+    "near": "Note: Click to download the 3D file of Halloween Jack-O'-Lantern on Maker World.The model in this file includes a base designed for an LED Lamp, not the RGBW li"
+   },
+   "dict": null
+  },
+  {
+   "h": "40725354ff91432d7b21f5b06dbdd58cc331c4fc3d0ff336272555e18170fba7",
+   "en": "Note: Click to download the 3D file of Halloween Jack-O'-Lantern on Maker World.The model in this file includes a base designed for an LED Lamp, not the RGBW light. If you plan to use the RGBW light (KC007) to fit the base of the Halloween Jack-O'-Lantern model, make sure to download the 3D file for the Jack-O'-Lantern handle for KC007 with holes.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "usage[0].body.line[1]",
+    "near": "You can operate the Remote Controlled 16-Color RGBW Puck Lights both manually and via remote control. Press the button on the light to turn it on/off and cycle "
+   },
+   "dict": null
+  },
+  {
+   "h": "6139dfd013f74f886a72276d8d6939d573b13d3d87219e6a107d63eb7dbbc496",
+   "en": "Remote Control Distance",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "specs[x.remote_control_distance].label",
+    "near": "4 to 6 meters"
+   },
+   "dict": null
+  },
+  {
+   "h": "8965d45820cb99dec1b68dd582bbef0c0ab6cbae688bd0b3dbd01eb4461335d9",
+   "en": "4 to 6 meters",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "specs[x.remote_control_distance]",
+    "near": "Remote Control Distance"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7edf1f1024282b26b098c64b05639e36616327ee56a4dc44899db8c790af389",
+   "en": "Continuous Lighting Duration",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "specs[x.continuous_lighting_duration].label",
+    "near": "40 hours"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b0d1ea45ca1a7fc6930f4723e21676c8f0a00c478b1b2128ce905bf09e8567b",
+   "en": "40 hours",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "specs[x.continuous_lighting_duration]",
+    "near": "Continuous Lighting Duration"
+   },
+   "dict": {
+    "ar": "40 ساعة",
+    "ckb": "40 کاتژمێر"
+   }
+  },
+  {
+   "h": "e52a0d8d3af87bebc527d142f973c248414693ce1ea8f052a6ca62fcdd888ef9",
+   "en": "RGBW",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "specs[x.light_color]",
+    "near": "Light Color"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec811d30a89ce96d1c7555ffaede78b188fedb1d283adf7cdf55a4edae6697a7",
+   "en": "Brightness",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "specs[x.brightness].label",
+    "near": "30LM"
+   },
+   "dict": null
+  },
+  {
+   "h": "d39ad54845abea1b7ea3befc119d7ee6f837d9e1ac1391a13f9a6bf75672fa99",
+   "en": "Maker World",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "documents[3]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a4b3ba9bb2edbb4645112376562cf74d9fa291468665c0c1aa855b2c25ffbeb",
+   "en": "Jack-O'-Lantern handle for KC007 with holes",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "remote-controlled-16-color-rgbw-puck-lights",
+    "title": "Remote Controlled 16-color RGBW Puck Lights",
+    "field": "documents[4]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "76df122e833260c3f5ac2725942bf2df749210dc4d9d19b7dbe8bd67cbb4e7fd",
+   "en": "This compact, durable, and portable device allows you to monitor temperature and humidity values with ease. It features a fast response time, providing measurements every 10 seconds. You can switch between Fahrenheit and Celsius by double-clicking the ℃/℉ conversion button on the back. The thermometer hygrometer operates at a rated voltage of DC 1.5V, powered by a single LR44 button cell battery.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7a3516f089819f5f781d4a4cfd9b2820d732f0509c990cd1093ec0bda88ebd9e",
+   "en": "Shell Material",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.shell_material].label",
+    "near": "ABS"
+   },
+   "dict": null
+  },
+  {
+   "h": "b8b8e1b2ad7ab769c6da4dd871878755c17f54e2eec4e7ace27780afd136050e",
+   "en": "Device Operating Temperature",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.device_operating_temperature].label",
+    "near": "-10°C to 60°C"
+   },
+   "dict": null
+  },
+  {
+   "h": "393fb99f283de75e6cb1b28d998fb930ee72c8d375da5304de27d58b0400f49e",
+   "en": "-10°C to 60°C",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.device_operating_temperature]",
+    "near": "Device Operating Temperature"
+   },
+   "dict": null
+  },
+  {
+   "h": "20ebba9ccdfb53d619b9163eff462e48e4bd461b109227c605574fc8c984132d",
+   "en": "Temperature Measurement Range",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.temperature_measurement_range].label",
+    "near": "-50°C to 70℃"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea99224c5ddbce7431c5db87fe95aacea4c9f774c50c3ee4de4c72ceac5147d3",
+   "en": "-50°C to 70℃",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.temperature_measurement_range]",
+    "near": "Temperature Measurement Range"
+   },
+   "dict": null
+  },
+  {
+   "h": "40b9e0f75a2a0037f5748d0500d333898ac3ec2aab7d048782f35fbf7fd57210",
+   "en": "Temperature Accuracy",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.temperature_accuracy].label",
+    "near": "±1℃"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ad934f58217ae0a2522236a6884130a8018a1a56264ee2d98006776b52d0f5d",
+   "en": "Display Screen",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.display_screen].label",
+    "near": "LCD"
+   },
+   "dict": null
+  },
+  {
+   "h": "a33df5092e2559241ce2a23c12b0782f393eeb7e0f2b858edaa4c13e4e9e4720",
+   "en": "Display Operating Temperature",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.display_operating_temperature].label",
+    "near": "-5°C to 50°C"
+   },
+   "dict": null
+  },
+  {
+   "h": "159153d095f8d9f09245e0427493e84a7c702e1b40c37bfb0bfcb9bc9aac13c5",
+   "en": "-5°C to 50°C",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.display_operating_temperature]",
+    "near": "Display Operating Temperature"
+   },
+   "dict": null
+  },
+  {
+   "h": "66a4b31a38c1e9afdb176cc50f2c355eabd2cc55ccfbba32c17578c06e055254",
+   "en": "Humidity Measurement Range",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.humidity_measurement_range].label",
+    "near": "20% to 90%"
+   },
+   "dict": null
+  },
+  {
+   "h": "94db399a3ce3af3178e3b8d3c9fc17e8d66cf098001d4290ab0f41374b56d4e7",
+   "en": "20% to 90%",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.humidity_measurement_range]",
+    "near": "Humidity Measurement Range"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5e468ee750e9c02cc0a4ed8ebd5ff33af3dc3c98381a53dc599c4f82fbd3859",
+   "en": "Humidity Accuracy",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-1pcs-xf001",
+    "title": "Circular Embedded Electronic Digital Thermometer Hygrometer",
+    "field": "specs[x.humidity_accuracy].label",
+    "near": "±5%"
+   },
+   "dict": null
+  },
+  {
+   "h": "3108c54f8439c65b7b2b5f69b8a39f94849cf9181966fe72a11121636447c1af",
+   "en": "Dissatisfied with commercially available card shufflers? This kit was created to elevate both style and function. Please note, this kit includes only the non-3D-printed parts needed to assemble the card shuffler. Inspired by old printing presses with cast iron frames, it boasts a unique, stylistic design that resembles a boiler. Sized for standard playing cards (64x89mm), it can shuffle a full Skip-Bo deck of 160 cards or about 80 sleeved cards.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "card-shuffler",
+    "title": "Card Shuffler Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b53be9e4f013b439e13ceb5cbbe2d37540761f96b45583cb39e687d6f442c30b",
+   "en": "Introducing a set of printable cases, slim and stylish, available in two sizes! Originally designed for Bambu swatches, these cases now offer more versatility.Please note, this kit includes only the non-3D-printed parts needed to assemble the card shuffler. Each size includes a swatch insert (40 and 80 swatch capacity) and empty inserts, allowing them to be used as regular cases. Unlike other cases, this design relies on a friction fit to keep the lid closed, eliminating the need for magnets. Note that a loose hinge pin can affect the friction fit.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "compact-multi-use-case-in-two-sizes",
+    "title": "Compact Multi-Use Case",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "08dc7bb06c97916a0f269717e3c5b16155e40e32120104278bd528d5763161a3",
+   "en": "The Ring Magnetic Control Lamp is a ring shaped lamp controlled by the use of a magnet. With the magnetic light on, the user can turn the lamp on and off, adjust the brightness and color of the lamp freely. The light has three colors (red, white, blue) and multiple light modes.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2c24a15d22a867288f29b293b58e98513e7a8b86a69275fdf4e3eaac0b431d8b",
+   "en": "Magnetic Control Distance",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "ring-led-magnetic-control-switch-light",
+    "title": "Ring LED Magnetic Control Switch Light",
+    "field": "specs[x.magnetic_control_distance].label",
+    "near": "1 cm"
+   },
+   "dict": null
+  },
+  {
+   "h": "4f16572566a4f3c6bd786cfa7f48e8edb6ccfd26415d5fbc7dfca6a2a310a410",
+   "en": "The Single Magnetic Control Lamp is a ring shaped lamp controlled by the use of a magnet. With the magnetic light on, the user can turn the lamp on and off, adjust the brightness and color of the lamp freely. The light has three colors (red, white, blue) and multiple light modes.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "single-led-magnetic-control-switch-light",
+    "title": "Single LED Magnetic Control Switch Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f71135f06941355f6cdd35edb1265f73bd031dae82efd204f5ef9a76cd38206c",
+   "en": "Penetration force",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "single-led-magnetic-control-switch-light",
+    "title": "Single LED Magnetic Control Switch Light",
+    "field": "specs[x.penetration_force].label",
+    "near": "Related to the magnetic force of magnets"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e280b04dca7bbe0223de0d58f85d94afe4071a010f6aeafc8242b761b972201",
+   "en": "Related to the magnetic force of magnets",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "single-led-magnetic-control-switch-light",
+    "title": "Single LED Magnetic Control Switch Light",
+    "field": "specs[x.penetration_force]",
+    "near": "Penetration force"
+   },
+   "dict": null
+  },
+  {
+   "h": "9aa49f4789e09e68d58575e75a97cc5d86e3a30b758697d308ad74fbcc9f80a8",
+   "en": "Push to open your bottle with ease! This easy-to-print and assemble bottle opener comes with three design options: plain, knurling1, and knurling2. Perfect for DIY enthusiasts looking for a functional and stylish addition",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "push-opener-bottle-opener",
+    "title": "Push Opener (bottle opener)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d2ed365b5b9922f5fd15ecafe6ac8b0d6d31fa39e81858a891d34ac4091a0be7",
+   "en": "Create a warm ambiance in any room, perfect for weddings, parties, holidays, and decorations. With a realistic candle shape and convenient on/off sliding switch, these tea lights are easy to use. Each light comes with a pre-installed CR2032 battery, offering approximately 150 hours of long-lasting performance.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3348544bc7358977c37dcadd2b3e8815f878edb98e76c66e02b8b661dd6b780f",
+   "en": "Switch Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "specs[x.switch_type].label",
+    "near": "Slide"
+   },
+   "dict": null
+  },
+  {
+   "h": "6bb4c1177681ec4eb53bb315e71185f702e52f845cc7ff3ae114c41464f67510",
+   "en": "Slide",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "specs[x.switch_type]",
+    "near": "Switch Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "9b837bc284d9b9314e0d839d11bd8e71e8defd7581dfdd10adb1c4674465c76c",
+   "en": "Batteries Included",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "specs[x.batteries_included].label",
+    "near": "Yes (1 PCS of CR2032)"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a0199c4de9753b8e8be73114b9f55001ae0a74642477082a7be4fd3a8ab50ce",
+   "en": "Yes (1 PCS of CR2032)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "specs[x.batteries_included]",
+    "near": "Batteries Included"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c6dc91ca5b88fcbe1ff77d22a2507dddf10194301457a8a0baf0ff26dc60051",
+   "en": "Make My Lantern",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "led-flame-tea-light-candle-set-warm-yellow",
+    "title": "D37.2x36.6mm LED Flame Tea Light Candle Set",
+    "field": "documents[0]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ef2e17f1ca2853beedf215dc33ce66831802c5b14af0506da1fc0d5f81faebd",
+   "en": "A split ring keychain is a small, durable metal ring with a coiled design that securely holds keys and small items, allowing for easy attachment and removal. Purchase a keychain and customize your 3D model to your liking.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "72cfac5f23b36e6ceafa3f03a789260c0eb287a1699951cf7a63911c2fbbce57",
+   "en": "Maker Lab",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "split-ring-keychain",
+    "title": "Split Ring Keychain",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ddfae56ca14d61f09e2af4171bec09988740a00f38f3c1f968b4e3ffe48ed2b",
+   "en": "1. Strong stress tolerance 2. Long service life 3. Various colours available 4. Easy to install and suitable for transporting liquids in a variety of DIY projects",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pvc-tubes",
+    "title": "PVC Tubes",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ec950c39c31eb077a3573280b73183fa26ae11ebb7e0267a379e8cef9cdd773f",
+   "en": "10~94mm of ID 12~18mm of OD 40~220mm of Lenth Clear Acrylic Rigid Tubes 1. Non-Toxic and Safe 2. Easy Maintenance 3. High Transparency 4. Smooth Surface for easy cleaning",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "clear-acrylic-rigid-tubes",
+    "title": "Clear Acrylic Rigid Tubes",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "30b5311523d77890bfa52ed8fff210883111d77f6f2aa605c375498f73788d61",
+   "en": "Acrylic",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "clear-acrylic-rigid-tubes",
+    "title": "Clear Acrylic Rigid Tubes",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": {
+    "ar": "أكريليك",
+    "ckb": "ئاکریلیک"
+   }
+  },
+  {
+   "h": "c0205adc206d4365bf9a79f466729da372926fb970b94700f64d84601b6d6c07",
+   "en": "Nominal Diameter of 2.5 to 3.5mm, including types of Straight and Y-Type 1. Non-Toxic and Safe 2. Easy Maintenance 3. Easy Installation 4. Barb design provides a tight and secure connection to tubes",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-hose-barb-fittings",
+    "title": "Plastic Hose Barb Fittings",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cb5f7259d67784053bb22caa5728e069d583adf3e6246022d6c53a06336ea0a1",
+   "en": "Interface Shape",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-hose-barb-fittings",
+    "title": "Plastic Hose Barb Fittings",
+    "field": "specs[x.interface_shape].label",
+    "near": "Pagoda-shaped"
+   },
+   "dict": null
+  },
+  {
+   "h": "78aeb2239189b6779383292fa23549fd14efb8d38ac53bc74dbbf1602f0443eb",
+   "en": "Pagoda-shaped",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-hose-barb-fittings",
+    "title": "Plastic Hose Barb Fittings",
+    "field": "specs[x.interface_shape]",
+    "near": "Interface Shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa5668c88f92faf409918d3f461eca8d402e953347b6029af60074c394abfd4d",
+   "en": "Translucent",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-hose-barb-fittings",
+    "title": "Plastic Hose Barb Fittings",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": null
+  },
+  {
+   "h": "59474955b8de3e18388ba38486883a1efa9447879590a3e88b7cd7fb6d925cb2",
+   "en": "Carve out a moment of mindfulness with this captivating desktop train model. Its mesmerizing movements and calming sounds create a tranquil oasis on your desk. All non-3D printed parts can be purchased through Maker's Supply service, saving you the hassle of finding parts locally. Detailed instructions are included for easy assembly.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "endless-loop-express",
+    "title": "Endless Loop Express (Extended Version)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7d8eb44e8fed2115d2791567f01213aeab79e779595e57c01289965c0018065b",
+   "en": "Experience the excitement of the Mini Motorized Basketball Game, a collaborative project with MakerWorld showcasing the endless possibilities of the Maker's Supply kit! Featuring a motorized moving hoop, stadium lights, a customizable sign, and an aimable basketball launcher, this game brings innovation and fun together. The hoop rotates twice in one direction before reversing, thanks to a clever gear system that alternates directions automatically. Perfect for DIY enthusiasts and basketball fans alike.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "mini-motorized-basketball-game",
+    "title": "Mini Motorized Basketball Game",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4e8c745445359778cdb3601460af61b81696cd1c63aa153d42d740e457a60d97",
+   "en": "Discover our high-quality black nylon cord, neatly stored for your convenience. Durable and strong, it's perfect for all crafting levels, ensuring lasting use and reliability in your projects.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "black-nylon-cord",
+    "title": "Black Nylon Cord",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "508c35d94fdae994f72cd6cfa1b31429e145f1b6d8e3c87706dbce65912e60d9",
+   "en": "Extension Springs 1. Stainless steel high-lifespan compression springs. 2. Installed between moving parts to allow them to return to their original position after compression.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "extension-springs",
+    "title": "Extension Springs",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3569fe3a03541e0f73643d7eb747c239a33fe7a36e02c8db32bc7de0bd29a7f1",
+   "en": "Hook Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "extension-springs",
+    "title": "Extension Springs",
+    "field": "specs[x.hook_type].label",
+    "near": "Round Hook"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea7ba57590d3c6faee7e0e96e62feb4df180fda843c971d64cc96def394e0909",
+   "en": "Round Hook",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "extension-springs",
+    "title": "Extension Springs",
+    "field": "specs[x.hook_type]",
+    "near": "Hook Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "3966db81663bc88c3b7955875826d2aa0eec9805579306b3897bb9e1fe259e70",
+   "en": "Relative Position",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "extension-springs",
+    "title": "Extension Springs",
+    "field": "specs[x.relative_position].label",
+    "near": "Side by side ; Inline"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d73a4f42a0cfbc0b0296c22f681ec9155b86aec958e2198c9eb6539dba31fd7",
+   "en": "Side by side ; Inline",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "extension-springs",
+    "title": "Extension Springs",
+    "field": "specs[x.relative_position]",
+    "near": "Relative Position"
+   },
+   "dict": null
+  },
+  {
+   "h": "d87fd45c57a236f06739751543b2c77784e291c9f99a46c3c33c42550b75c4f7",
+   "en": "Extension spring",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "extension-springs",
+    "title": "Extension Springs",
+    "field": "specs[part.type]",
+    "near": "Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "535e17947a6caf0b08526620ee0b348627b22c4c6664ce3c8c669cdaee755ebe",
+   "en": "Maker Lab Make My Sign",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "magnets-for-make-my-sign",
+    "title": "Magnets for Make My Sign",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "b91565141d1b466cd189537618bfd8bbf2299dd183e31948c3d0f62e64f99890",
+   "en": "Experience the joy of 3D printing and assembly with the lifelike Running Dinosaur model! This automaton can mimic the motion of a running dinosaur and is powered by USB, making it easy to connect to a computer or other USB-powered devices. Additionally, you can connect a speed controller to adjust the dinosaur's running speed as needed. Enjoy the excitement of creating and controlling this realistic Running Dinosaur automaton!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "running-dinosaur-automaton",
+    "title": "Running Dinosaur Automaton",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "db8b8cd99d2ace08e764054cc3263268cecc3fab3c4723ec00ce369f9d2c1e1c",
+   "en": "High-quality 2-pin L-shaped connectors for 8mm LED strips. Facilitates 90-degree angles, ensuring strong and efficient electrical connections in your LED projects.Perfect for indoor LED lighting setups, ensuring neat and reliable connections.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "98deb92a3eba08d118d76f347eaeb17e3e86437837deef0a223fb80ebb6e0475",
+   "en": "Installation Tutorial",
+   "kind": "usage_title",
+   "freq": 3,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4f92f0762ec10daa95240a134d76be2f79d4130b37fefa2f1a24dc2039cc6c6c",
+   "en": "How to connect your COB LED strip light with this connector",
+   "kind": "usage_body",
+   "freq": 3,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7a1f1da12380ae1a2bc6dd3d4288615794b52e01a681aa78d6a44dfbef8bc6b9",
+   "en": "2-pin L-shaped",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "specs[x.product_type]",
+    "near": "Product Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7ff0ab79f0ab9ccc52c7e064c28eed72a539f7c835bed9ce15c5e20c876c105",
+   "en": "Size（Working LED Width）",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "specs[x.size_working_led_width].label",
+    "near": "8mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ffee86115c3528e42f15963e6858c500549cf4cde94b1b1acee9b7f634d895e",
+   "en": "Light Source Type",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "specs[x.light_source_type].label",
+    "near": "COB"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a8b0555f1e81fc1effdde08c7d55e39debf441df55af86d76cb2ce4c560fd53",
+   "en": "COB",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "specs[x.light_source_type]",
+    "near": "Light Source Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "74006f4bd8a3e5084a159f32f8ea3a8e207f56d79a14d4abe370876f81c8fd82",
+   "en": "Outer Material",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "specs[x.outer_material].label",
+    "near": "Plastic"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b5573d73d832d330762ad14bdc0074b253c2826b5c0867aad89fa70a7b2472d",
+   "en": "Contact Material",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "specs[x.contact_material].label",
+    "near": "Metal"
+   },
+   "dict": null
+  },
+  {
+   "h": "21e679159b95278bd42e558ad64b474ca5fef3216c95827fc75007972cf2d662",
+   "en": "Quantities",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2-pin-8mm-l-shaped-led-strip-connectors",
+    "title": "2-pin 8mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "specs[x.quantities].label",
+    "near": "10PCS"
+   },
+   "dict": null
+  },
+  {
+   "h": "0a0b43d6b5db4fab2bf48c1dd19d6e0e97f6b67dcab67f3e29a6d6b437a456f9",
+   "en": "High-quality 3-pin L-shaped connectors for 10mm LED strips. Facilitates 90-degree angles, ensuring strong and efficient electrical connections in your LED projects.Perfect for indoor LED lighting setups, ensuring neat and reliable connections.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "3-pin-10mm-l-shaped-led-strip-connectors",
+    "title": "3-pin 10mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "71808aa2c067e40f7e4d430de5d0f7fa5e7cb641aa8b33c5bfd950b1a6172e3f",
+   "en": "3-pin L-shaped",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "3-pin-10mm-l-shaped-led-strip-connectors",
+    "title": "3-pin 10mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "specs[x.product_type]",
+    "near": "Product Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "634e81ab831b96e2fab42e6cdac3312b21ed3e806cfb163ffcecd68617289069",
+   "en": "Size（Working LED width）",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "3-pin-10mm-l-shaped-led-strip-connectors",
+    "title": "3-pin 10mm L-shaped LED Strip Connectors (10PCS)",
+    "field": "specs[x.size_working_led_width].label",
+    "near": "10mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "93063812c0ec6058f75b6e4a4a60f5e3383ae09e8c7f0fc673f1952d116fe83f",
+   "en": "Explore the Bambu Lab STEMFIE project: a DIY educational kit that includes the STEMFIE Battery Pack with a 4x AAA battery box, the STEMFIE Infinity Gears demonstrating gear reduction with a 17-tooth and 58-tooth gear setup, and a DIY electric demo combining these components to illustrate mechanical principles. Expandable with 3D-printed parts for further experimentation. Handle carefully to avoid pinching or entanglement, and be prepared to disconnect the motor if needed.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "stemfie-electronics-components",
+    "title": "STEMFIE Projects",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f25ff9ef45e4d0eb3c68b48828f416bf42bf1a907398f70e305b81d5d3a0020b",
+   "en": "Click here to explore more about STEMFIE3D on MakerWorld",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "stemfie-electronics-components",
+    "title": "STEMFIE Projects",
+    "field": "documents[1]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "f77a4e5e8f6a7246f1604b7d0fa1a9ecf2667ffd795709f863c1ab92e471dc1f",
+   "en": "This fitting is perfect for connecting both PTFE (Teflon) tubes and PU, ensuring smooth and consistent flow during your DIY projects.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c976bc4ed49dc2593c96b8b9d65e93d61044b0328990611f0648ea38f0004a1f",
+   "en": "Model Number",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "specs[x.model_number].label",
+    "near": "PC4-M6"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d59829c1e15afe1a7fae93e8e5e32d8511bec5fd598a09f4fea6033b31e8a66",
+   "en": "Usage",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "specs[x.usage].label",
+    "near": "For 4mm PTFE Tube"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4b9d4f8678dd6b47e3ce171bc12f8d2a6b73aa222d5808ebfb63fe1a36b06eb",
+   "en": "For 4mm PTFE Tube",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "specs[x.usage]",
+    "near": "Usage"
+   },
+   "dict": null
+  },
+  {
+   "h": "ab0a5fc7baa5e0ac8030a55aa95bb4053494a29b282c3b62c823eefdbf39783f",
+   "en": "Main Body Material",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "specs[x.main_body_material].label",
+    "near": "H59 Brass"
+   },
+   "dict": null
+  },
+  {
+   "h": "dc3e5fbf0df433d25ebf3f43dead53a130203bfc9d14bd1163bb9d06e43e0464",
+   "en": "H59 Brass",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "pc4-m6-pneumatic-connector-for-ptfe-tube",
+    "title": "PC4-M6 Pneumatic Connector for PTFE Tube",
+    "field": "specs[x.main_body_material]",
+    "near": "Main Body Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e95bad966c40858c862efd80ee6985b40b52b4b6d17ce6f69427cec6b2fc8b3",
+   "en": "Bring your images to life! By combining 3D printing technology with the PLA CMYK Lithophane Bundle, you can effortlessly design and create stunning Lithophane artworks at home. Simply use the Lithophane LED Backlight Board Kit to illuminate your creations and make them truly shine!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ab1408f94897328711b8512c302caf5094d7e56b345e288ca3596c4307ea0290",
+   "en": "48/pcs",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "lithophane-led-backlight-board-kit",
+    "title": "Lithophane LED Backlight Board Kit",
+    "field": "specs[part.led_count]",
+    "near": "Number of LEDs"
+   },
+   "dict": null
+  },
+  {
+   "h": "b0af7a21a385f17ff706319e4ad568864c6006b6bcef539d5f86a5d0558a2ac4",
+   "en": "TEC-9 Disc Shooter, a fun and engaging 3D-printed model that combines creativity with play. This model is primarily constructed using a 3D printer, with assembly aided by Maker's Supply rubber bands and screws. The design features a trigger mechanism that allows you to shoot discs, making it an enjoyable project for hobbyists and a unique addition to any collection. Perfect for hands-on learning or simply for fun, the TEC-9 Disc Shooter brings a playful twist to 3D printing.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "tec-9-disc-shooter",
+    "title": "T-15/TEC-9 Disc Shooter",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "202c2545411dd635c05aa0792db45ae50797bee2fba3c66b77c55c1f606b4556",
+   "en": "Enjoy a gentle breeze wherever you go with BreezeBuddy, the 3D-printed handheld fan that's lightweight, eco-friendly, and easy to assemble. Perfect for warm days, BreezeBuddy delivers a soothing, portable breeze through innovative 3D printing technology.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "breezebuddy",
+    "title": "BreezeBuddy",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9e8a027041bf57cd9f5a31a37c09a84eb541c8726e54975e8ffb0217ebe754df",
+   "en": "The Adhesive Foam Sponge Strip Roll offers versatile functions including noise reduction, gap filling, sealing, dustproofing, shock absorption, and light blocking. It is safe and eco-friendly with high flame resistance, leaving no residue or contamination on equipment and being non-corrosive to metals. Suitable for temperatures from -40℃ to 90℃, it features excellent surface wettability, making it easy to adhere, fabricate, and cut.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0bfe9bf4b3235a2df3f175a52989b5e88a95169203c9328a30d6a2e7946671bb",
+   "en": "Tape Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "specs[x.tape_type].label",
+    "near": "Single-Sided Tape"
+   },
+   "dict": null
+  },
+  {
+   "h": "944f318eddd83b293e866675229468ec7d12f213c2af0b424c09db49089bf910",
+   "en": "Single-Sided Tape",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "adhesive-foam-sponge-strip-roll",
+    "title": "Adhesive Foam Sponge Strip Roll",
+    "field": "specs[x.tape_type]",
+    "near": "Tape Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "31f43098f18d1f9975c82577d064115cbb2f448eec3687fcda636acd11951e3d",
+   "en": "Piano Music Box Bottom Winding Kit",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "piano-music-box-winding-kit",
+    "title": "Piano Music Box Winding Kit",
+    "field": "documents[3]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "be0fbd03cf109c865133c781d07953a9d186980cc7cb1138dc53093dfc452172",
+   "en": "Piano Music Box Hand Winding Kit",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "piano-music-box-winding-kit",
+    "title": "Piano Music Box Winding Kit",
+    "field": "documents[4]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad58be3d0e8d6e1a51e5aa1a14e2764b6374beafc1d03d3d69424febdb941327",
+   "en": "This eco-friendly Water Bladder features a lightweight and foldable design that doesn't take up space, making it the perfect companion for outdoor activities or daily use. Made from TPU, this new material offers excellent wear resistance, low-temperature durability, and superior flexibility. Additionally, it is odorless and does not release harmful substances, ensuring safety and health.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4ac6ff1203b8a20339e97ce611f3c198f2af065511d2fd2948d5657a0b75159d",
+   "en": "-20℃ to 55℃",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "specs[part.temperature_range]",
+    "near": "Temperature range"
+   },
+   "dict": null
+  },
+  {
+   "h": "09decad7d469cf9046752d869baa7baa8ce8f2765a3850d5645239eb38ee84b5",
+   "en": "Mouth Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "specs[x.mouth_type].label",
+    "near": "Pull-out Silicone Mouth"
+   },
+   "dict": null
+  },
+  {
+   "h": "16a69f540c20cd03c81774a46119ca0335a5fab764d9038bdf0a6e412eaf3f17",
+   "en": "Pull-out Silicone Mouth",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "specs[x.mouth_type]",
+    "near": "Mouth Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "04d143ead431c445e6c3355f438fcd79bbfd4fc1bd92d2c2751c9869f7a2aefb",
+   "en": "TPU (Body) + Silicone ( Mouthpiece)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "water-bladder",
+    "title": "Water Bladder",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "c1f193bafbac8d1e429a7af80385c7919a93ca32a6327a4f914b247be745498b",
+   "en": "Made from durable stainless steel, the Smooth Ball Spring Plunger offers exceptional strength and reliable resistance in various environments.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "73e74a1d8d4f8cd42c290cbd9f5f1a3b83595fd98f00a5770fd95dfee25b2feb",
+   "en": "304 Stainless Steel",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "9b847e327a8c9012affa92d8f1e3147044ebe368a1253cb7e3e9bb1c7907d6af",
+   "en": "Head Style",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "smooth-ball-spring-plunger",
+    "title": "Smooth Ball Spring Plunger",
+    "field": "specs[x.head_style].label",
+    "near": "Round"
+   },
+   "dict": null
+  },
+  {
+   "h": "ada68883653908e1b59702ba5ef740199350aef050716bee8e02e331cb717a49",
+   "en": "High-performance electric actuator with protective design and heat shrink tubing to prevent motor wire breakage, extending product lifespan. ROHS2.0 compliant, energy-efficient, and features a rotatable telescopic rod for versatile applications.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "electric-push-rod",
+    "title": "Electric Push Rod",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1d01085daa3b6debe4d355f94d21df372e1576c1341a6ddaabc88130da7abdc7",
+   "en": "Soild Model",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "electric-push-rod",
+    "title": "Electric Push Rod",
+    "field": "blocks[3].line[0]",
+    "near": "3D Files with Structure and Dimensions."
+   },
+   "dict": null
+  },
+  {
+   "h": "a3fdc3eb3aa09fda40302fbedc7383e04258de5a384dbe5099a5f5acaacb3275",
+   "en": "Upgrade your 3D printing setup with our premium GT2 Timing Belt. Designed for high load and high torque drive systems, this belt ensures precise synchronization of motors and connected components, essential for high-quality 3D prints. The innovative arc tooth design enhances torque transmission and meshing performance, reducing tooth slippage for smoother, more accurate motion control. This results in superior print quality and detailed output.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "gt2-timing-belt",
+    "title": "GT2 Timing Belt",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a522a30d77521bc3ef97867336965f5a03040f26acc5515d138fcb5b3d092b0e",
+   "en": "NFC (Near Field Communication) coin cards and tags are compact and versatile tools that allow for wireless communication between devices over short distances. These devices are commonly used for contactless payments, smart home automation, and secure access control. In 3D printing, NFC tags can add an extra layer of functionality to your projects. Whether embedded within a 3D-printed object or attached externally, these tags can store information such as print settings or model data, making the final product more interactive and easier to manage.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ab1310987454976fb14949bf1fcf474477f1fc818f07abd308f93be41c35df73",
+   "en": "Prepare Your Device",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "usage[0].body.line[0]",
+    "near": "Ensure your device (smartphone, NFC reader, etc.) supports NFC functionality."
+   },
+   "dict": null
+  },
+  {
+   "h": "d9bdc1ffd1acd01b1b03fb93cd9bb9fa155bfc382cbb30bef2073042832abcb8",
+   "en": "Ensure your device (smartphone, NFC reader, etc.) supports NFC functionality.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "usage[0].body.line[1]",
+    "near": "Prepare Your Device"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e73383713119c9d065f3c9f439d68f11e836513ddc8a673a8f248e29f964b1d",
+   "en": "Write Data",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "usage[0].body.line[2]",
+    "near": "Ensure your device (smartphone, NFC reader, etc.) supports NFC functionality."
+   },
+   "dict": null
+  },
+  {
+   "h": "6e6f361cfb6ac22ea7ca1e6ef1fcd3d4975340652d3cd7c906dfc34b5edc8ea9",
+   "en": "Download an NFC programming app like \"NFC Tools.\"",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "usage[0].body.line[3]",
+    "near": "Write Data"
+   },
+   "dict": null
+  },
+  {
+   "h": "508e5a0a3b3c2a86873b17f9fb8d103694020e3569be913d8bc25e66c2f97e03",
+   "en": "Open the app, select the “Write” option, and input the desired data (e.g., URL, text, or commands).",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "usage[0].body.line[4]",
+    "near": "Download an NFC programming app like \"NFC Tools.\""
+   },
+   "dict": null
+  },
+  {
+   "h": "4e3f84c2574147a4f5c239c664b1fac538b5ea51f2b0fb032b116499d0a511ff",
+   "en": "Bring the NFC tag close to the device’s NFC area to complete the writing process.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "usage[0].body.line[5]",
+    "near": "Open the app, select the “Write” option, and input the desired data (e.g., URL, text, or commands)."
+   },
+   "dict": null
+  },
+  {
+   "h": "e340c00865dbeb8e95746f809b401b39a32c22aeb1bc5399732cf2a255d5c4f1",
+   "en": "Test Your Tag",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "usage[0].body.line[6]",
+    "near": "Bring the NFC tag close to the device’s NFC area to complete the writing process."
+   },
+   "dict": null
+  },
+  {
+   "h": "ba4d08124aabb5bbe01561bb74493066fc908fe11a309b4ac6db420970455a1b",
+   "en": "Test the tag by bringing it near your device to confirm successful data writing.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "usage[0].body.line[7]",
+    "near": "Test Your Tag"
+   },
+   "dict": null
+  },
+  {
+   "h": "150e5d52b4cdd00ffd5b3d541296e0904004078e130c7784143ae0e522916f47",
+   "en": "Attach or embed the NFC tag to your desired object or location (e.g., 3D printed models, smart devices).",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "usage[0].body.line[9]",
+    "near": "Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "061a26854f072a011d77ad317ccff94be408db18f357917b5ca08b7e426dd3e9",
+   "en": "Chip Type",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "specs[x.chip_type].label",
+    "near": "NTAG215"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec286ab0c884e3467fa5b5a4ced9ce25e1f66aff240a5c319caa1a131342adb6",
+   "en": "-25°C to 55°C",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "specs[physical.operating_temp]",
+    "near": "Operating temperature"
+   },
+   "dict": null
+  },
+  {
+   "h": "a99e00781f03338b8ca6a6baf80d2309ac50c4ea671c665e86b2f384a77fd233",
+   "en": "Read Range",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "specs[x.read_range].label",
+    "near": "0-5CM"
+   },
+   "dict": null
+  },
+  {
+   "h": "6c5a4be839b4874bb1dfe878c75ea979efa82cacbb1414842dc3ff9591198838",
+   "en": "Data Retention",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "specs[x.data_retention].label",
+    "near": "10 years"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5dbae5bc9a65f93ce2b66899d34ec42121b4629518880374f59c589fbbde20c",
+   "en": "10 years",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "specs[x.data_retention]",
+    "near": "Data Retention"
+   },
+   "dict": {
+    "ar": "10 سنة",
+    "ckb": "10 ساڵ"
+   }
+  },
+  {
+   "h": "37bf51614b956fd141aa2f9d1a2318d161a1465d91c2512c9bf27bdaa910955f",
+   "en": "Read Durability",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "specs[x.read_durability].label",
+    "near": "100,000 cycles"
+   },
+   "dict": null
+  },
+  {
+   "h": "d68285e9ed5930a09ff129247853be2c7669207f1b416a33287ccb98fd056b00",
+   "en": "100,000 cycles",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "specs[x.read_durability]",
+    "near": "Read Durability"
+   },
+   "dict": null
+  },
+  {
+   "h": "864762c6f7f15767756b1570fdb957b56049eff94e9938c06258e1a1f1326db6",
+   "en": "PVC with Adhesive Backing",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "d301302e3266653904e5d6950eb0259aa3077d481e876881a3a529ddc1d50a27",
+   "en": "20 PCS",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "nfc-tag-with-adhesive",
+    "title": "NFC Tag with Adhesive (20pcs)",
+    "field": "specs[contents.pieces]",
+    "near": "Pieces per pack"
+   },
+   "dict": {
+    "ar": "20 قطعة",
+    "ckb": "20 دانە"
+   }
+  },
+  {
+   "h": "55d1a7c049936eff283f64af8756f05a757a6b5e0e0540007df902db7afdc634",
+   "en": "Optimize your projects with this single-axis gear set, perfect for toys, robots, and small engines. This kit includes gears, screws, and shafts designed for precise, single-axis mechanical movements, making it ideal for focused DIY repairs and customizations.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "single-axis-plastic-reduction-gear-kit",
+    "title": "Single-axis Plastic Reduction Gear Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9f092bf15c17749c3023aaea617ced3a6f0979c735459df7eeec5d7bd99fd2ad",
+   "en": "Enhance your projects with this dual-axis gear set, ideal for toys, robots, and small engines. This kit includes gears, screws, and shafts tailored for precise dual-axis mechanical movements, making it perfect for more complex DIY repairs and customizations.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "dual-axis-plastic-reduction-gear-kit",
+    "title": "Dual-axis Plastic Reduction Gear Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "865df0da78b29f42166b182353b7ef8209eb6cc488260d6835b63645fc86a8d9",
+   "en": "The 030 Micro DC Motor with SH1.0 connector is a compact and efficient motor, perfect for space-constrained projects. Its 3mm output shaft and SH1.0 connector ensure easy, reliable connections, making it ideal for robotics, small appliances, and various electronic applications.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "030-micro-dc-motor-with-sh1-0",
+    "title": "030 Micro DC Motor with SH1.0 (2pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c53baaed976bf4c0a778106c1106773f3993accc4689d504ba0aca2cdfdc15af",
+   "en": "This model is a 3D-printed replica of the iconic Wingman from Apex Legends, featuring a realistic reload mechanism that perfectly captures the in-game details. Ideal for fans of cosplay and prop collection, this model offers various print profiles to ensure optimal results across different 3D printers. Users can customize their Wingman with different materials and colors, creating a unique version of this legendary weapon. Whether for display or interactive use, this model delivers an immersive experience that brings the game to life.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "apex-legends-wingman-with-reload-mechanics",
+    "title": "Apex Legends Wingman with Reload Mechanics",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "31313ba11c87a5767891ea4ec757463f8223f433d8fb2cb999107a4fce8ea268",
+   "en": "This 3D-printed Monster Tree Light is the perfect addition to your Halloween decorations, bringing a spooky glow to your space. The eerie tree design comes to life when illuminated by electric tea lights, making it an ideal centerpiece for a haunted-themed setup. Whether displayed on its own or combined with other Halloween decorations, this model will create a chilling atmosphere. With different print options, you can choose the right size and layer settings to fit your needs.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "cute-flame-devil-lights",
+    "title": "Cute Flame Devil Lights",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c4119fcc61f118aabda72170b16ecbb89b1ddcc368d1d56a334ab3b979d5a443",
+   "en": "This 3D-printed Monster Tree Light is the perfect addition to your Halloween decorations, bringing a spooky glow to your space. The eerie tree design comes to life when illuminated by electric tea lights, making it an ideal centerpiece for a haunted-themed setup. Whether displayed on its own or combined with other Halloween decorations, this model will create a chilling atmosphere. With different print options, you can choose the right size and layer settings to fit your needs",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "monster-tree-light",
+    "title": "Monster Tree Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "502e95efce0776660fcf01167a38dc913f97eb6fdb37da8fd7314dc1b9782f86",
+   "en": "Discover the Bambulab Spillproof AMS Desiccant Box, designed to keep your items moisture-free with its effective desiccant and built-in hygrometer. Ideal for preserving the quality of sensitive materials, this durable and convenient storage solution is a must-have for anyone looking to protect against humidity.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "circular-embedded-electronic-digital-thermometer-hygrometer-for-ams-or-ams-lite",
+    "title": "Circular Embedded Thermometer & Hygrometer for AMS / AMS Lite Collection",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "bc0b2c500e35132c46a5c0be9769646ed5c9c6e3228decc65db7a174436d317a",
+   "en": "This 3D-printed Halloween Classic Carved Pumpkin Lantern is the perfect addition to your Halloween decorations, adding a mysterious glow to your space. The classic pumpkin design comes to life when illuminated by electric tea lights, enhancing the spooky atmosphere of your Halloween setup. Whether displayed on its own or combined with other festive decorations, this pumpkin light will elevate your celebration. With various print options available, you can adjust the size and detail settings to achieve the ultimate effect.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-classic-carved-pumpkin-lantern",
+    "title": "Halloween Classic Carved Pumpkin Lantern",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "66d59af59fd7781525d3b77228af105b1f447d35e2526ef0c86fcf2f156889a8",
+   "en": "This 3D-printed Halloween Skull Tear Pumpkin Lantern is the perfect addition to your Halloween decorations, adding a mysterious glow to your space. The classic pumpkin design comes to life when illuminated by electric tea lights, enhancing the spooky atmosphere of your Halloween setup. Whether displayed on its own or combined with other festive decorations, this pumpkin light will elevate your celebration. With various print options available, you can adjust the size and detail settings to achieve the ultimate effect.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-skull-tear-pumpkin-lantern",
+    "title": "Halloween Skull Tear Pumpkin Lantern",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f64d0c59c6672eeac8b0ac8561a439dd0ff8fa7cdcd9bacecbd85720d8e080a9",
+   "en": "This 3D-printed Halloween Ghost Night Light is the perfect addition to your festive decor, adding a touch of mystery and spookiness to your space. The ghostly design comes to life when illuminated by electric tea lights, creating a unique and eerie atmosphere for your Halloween setup. Whether displayed on its own or combined with other Halloween decorations, this ghost light will enhance the overall effect of your celebration. With various print options available, including different sizes and layer settings, you can customize it to achieve the perfect look for your needs.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-ghost-night-light",
+    "title": "Halloween Ghost Night Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "69d5216e00d5a0e7c7c682df5ca40fc2536ea96cf75a7138e1cbac2f68edcc87",
+   "en": "This sleek, pocket-sized rubber band racer, with its intricate unibody design, is both lightweight and durable. Powered by 2 rubber bands, it’s a fun and educational demonstration of bevel gear mechanics, perfect for 3D printing enthusiasts.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pocket-rubber-band-racer",
+    "title": "Pocket Rubber Band Racer",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "13db8924c3aef1c41efe7eb8043dd6aa82ff4de4e7273ca99a49aa37b132629c",
+   "en": "A versatile 3D-printed industrial stand designed for both Apple and Samsung Galaxy watches. Featuring adjustable clamps and durable construction, it supports multiple generations of chargers, offering a sleek and practical solution for organizing your devices.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "watch-stand-for-apple-samsung-galaxy",
+    "title": "Watch Stand For Apple/Samsung Galaxy",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2776bbd0ba3823b7b393216ced3ee9297227a73d41d27371bedb811dc90dbe1e",
+   "en": "Please refer to the installation manual for the assembly of Endless Loop Express.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "endless-loop-express-kit-016",
+    "title": "Endless Loop Express Kit 016",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "89cd9998d3ea5a9a9d5586fb03a7db757d3d95f44ab91311317fc8f7045bc052",
+   "en": "installation manual",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "endless-loop-express-kit-016",
+    "title": "Endless Loop Express Kit 016",
+    "field": "documents[1]",
+    "near": "installation"
+   },
+   "dict": null
+  },
+  {
+   "h": "51bb931f35963f223130b6eb69ff252bc5eb84e3c15b7acc30f3e6a3334c5d8d",
+   "en": "This 3D-printed Halloween Cute Creepy Candle Holder is the perfect addition to your spooky decor, casting an enchanting glow throughout your space. The whimsical design comes to life when illuminated by a flickering candle, enhancing the playful yet eerie atmosphere of your Halloween celebration. Whether showcased on its own or paired with other festive decorations, this candle holder will elevate your festivities. With various print options available, you can customize the size and detail settings to achieve the perfect look for your hauntingly charming setup.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-cute-creepy-candle-holder",
+    "title": "Halloween Cute Creepy Candle Holder",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "666001156c4a0d4480dd3b6fd04bb070cc2522175358ba54acc8b333b72a5745",
+   "en": "This 3D-printed Halloween Ghost makes a delightful addition to your spooky decor, filling your space with an enchanting glow. The playful ghost design truly comes to life when lit, adding a whimsical yet eerie touch to your Halloween festivities. Whether displayed on its own or alongside other decorations, this ghost will enhance your celebration. With multiple printing options available, you can adjust the size and detail to create the perfect look for your charmingly spooky setup.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-ghost",
+    "title": "Halloween Ghost",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "86cb24edbcb4494d08c435b388624677cd94aaa8a3658af358325acb27f90175",
+   "en": "The 3D-printed Halloween Ghost Light is the ultimate addition to your Halloween decorations, casting an eerie glow that enhances the spooky ambiance of your space. Featuring a classic ghost design, it comes to life when illuminated by electric tea lights, creating an enchanting effect. Perfectly versatile, this ghost light can be displayed alone or paired with other festive decor. With various print options available, you can adjust size and detail settings, allowing you to delve into customization for your perfect Halloween setup. Add a haunting touch to your celebration with this captivating piece!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-ghost-light",
+    "title": "Halloween Ghost Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9bb5b2cda0ac58cda9210722716e901b83b20426ed4421ca7449686c5ef36f6a",
+   "en": "The 3D-printed Cauldron Light is a must-have for your Halloween setup, bringing a magical glow that adds a mysterious vibe to any room. Shaped like a bubbling witch’s cauldron, it lights up with electric tea lights, giving a warm and eerie effect that’s sure to catch everyone’s eye. Whether you display it on its own or as part of a spooky scene, this cauldron light fits right in with any Halloween decor. With customizable size and detail options, you can make it just right for your space. Give your Halloween celebration a touch of witchy charm with this enchanting light!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "cauldron-light",
+    "title": "Cauldron Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "18cd00ee460beb1dc7b3b7fa4b70ffccb655d55702059a77ed7de01c97d5593a",
+   "en": "The 3D-printed Halloween Pumpkin Light is the perfect way to bring that classic Halloween spirit into your home. With its iconic jack-o'-lantern design, this light glows warmly when paired with electric tea lights, casting a soft and spooky light around the room. Whether placed on your porch, in the window, or as a table centerpiece, this pumpkin light adds a festive touch to any space. Customizable in size and detail, you can make it the perfect fit for your Halloween decorations. Brighten up your celebration with this timeless and fun pumpkin light!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "halloween-pumpkin-light",
+    "title": "Halloween Pumpkin Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2e0e604be1d6ac82b8b3747a77cb614a6b46c24a44a37b26b7420eb4876c6ec4",
+   "en": "The Electric Water Spray Kit 02 is the perfect addition to your water toys, adding endless fun to your summer activities. Featuring an electric module installed in the water gun, it enables continuous water spraying, with pulsing water streams activated by simply holding the trigger. The mechanism also includes a simulated recoil function for added excitement. Whether for outdoor games or pool parties, this electric water spray kit will make you the center of attention.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "57f3cb4850bd98569c0e56019542ddfe870601282b7c2877f629006454f53bb0",
+   "en": "Metal and plastic",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "5de74a81b192304c10bf7b8cf50e863a19e8ae4c38a4d5c5116359db0deed29f",
+   "en": "Range",
+   "kind": "spec_label",
+   "freq": 4,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "specs[x.range].label",
+    "near": "7-8 m"
+   },
+   "dict": null
+  },
+  {
+   "h": "9975331f35f4fd833b303b8fcd77f6e0731e9ca5216e8b4cd1753a761e2359dd",
+   "en": "8 round/s",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "specs[part.rate_of_fire]",
+    "near": "Rate of fire"
+   },
+   "dict": null
+  },
+  {
+   "h": "425bc4580387dede862e75fb14a3c7e540d75892100632bbb9e9f75142c5ec6c",
+   "en": "2 round/s",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[2].line[6].cell[1]",
+    "near": "Range | 10 M | 7-8 M | 7-8 M"
+   },
+   "dict": null
+  },
+  {
+   "h": "50420ddd475609f23fb075edabb31e58d5a67e9a70f64b3fb13f3db0c3428efa",
+   "en": "Use only the officially supplied charger. The charger is not a toy.",
+   "kind": "block_line",
+   "freq": 23,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[5].line[1]",
+    "near": "Charging Precautions"
+   },
+   "dict": null
+  },
+  {
+   "h": "3906776ed5cb0c0c43e7b324c104e6f0fcdb34dc9ab68f53ca17867720f36e7f",
+   "en": "DO NOT cover the device while charging, and keep it away from high temperature, humidity, or flammable environments. Never charge the device unattended.",
+   "kind": "block_line",
+   "freq": 23,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[5].line[3]",
+    "near": "• The USB charger for this product only supports standard 5V 1-2A input. Please always use the original charger that meets the voltage/current requirements, or "
+   },
+   "dict": null
+  },
+  {
+   "h": "577c8990d909a7ec2e80528475f7376a65a4ce3e4dbe104dec7d5572bc2b95c3",
+   "en": "DO NOT charge the battery pack if it is overheating. Allow it to cool down completely before recharging.",
+   "kind": "block_line",
+   "freq": 23,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[5].line[4]",
+    "near": "• DO NOT cover the device while charging, and keep it away from high temperature, humidity, or flammable environments. Never charge the device unattended."
+   },
+   "dict": null
+  },
+  {
+   "h": "40f81c0be0f768d073da98140cc6fa2e4a2fcae953666dfab18e5329458668d4",
+   "en": "If the battery pack or charger becomes wet, ensure they are thoroughly dry before attempting to charge.",
+   "kind": "block_line",
+   "freq": 23,
+   "context": {
+    "handle": "electric-water-spray-kit-02",
+    "title": "Electric Water Spray Kit 02",
+    "field": "blocks[5].line[5]",
+    "near": "• DO NOT charge the battery pack if it is overheating. Allow it to cool down completely before recharging."
+   },
+   "dict": null
+  },
+  {
+   "h": "37e42a414cbbdaae120f4bf9179367fcbebcd8371d5501940458242d4875a605",
+   "en": "This integrated rechargeable kit features a compact PCB design with a Type-C charging port, a switch, and two ZH1.5 connectors, along with a charging indicator and protection function. Users can easily connect the battery and appliances (such as motors and LEDs) without soldering, making it perfect for creating mini handheld devices like fans and flashlights.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ced6f19537800fd50fe28d6063299d9f1f45e95fdb7cc2c7b78e3e0f2d484f09",
+   "en": "Input: 500 mA Output: 250 mA",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "specs[electrical.current]",
+    "near": "Current"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d23c6da93468dbdfe03557572c3817670535b7657040b7e53ccbf689a65650e",
+   "en": "Input: 5 V Output: 3.7 V",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "specs[electrical.voltage]",
+    "near": "Voltage"
+   },
+   "dict": null
+  },
+  {
+   "h": "94c691a376e758666ddad54e9c7349a91058f78a4c1401a316575a8cffb2a808",
+   "en": "Charger Board Size",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "rechargeable-power-kit",
+    "title": "Rechargeable Power Kit",
+    "field": "specs[x.charger_board_size].label",
+    "near": "25x25.2 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "80b7da8d1265909b93ee0d16e32fac08a9c49a429c7ace6533742fad5deae29d",
+   "en": "The Electric Water Spray Kit 01 is the perfect addition to your water toys, adding endless fun to your summer activities. Featuring an electric module installed in the water gun, it enables continuous water spraying, with pulsing water streams activated by simply holding the trigger. The mechanism also includes a simulated recoil function for added excitement. Whether for outdoor games or pool parties, this electric water spray kit will make you the center of attention.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-01",
+    "title": "Electric Water Spray Kit 01",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "259e2cb20fbf36ee54088e16c0edc78413de45c56d7b680be4c5e4c0613af58e",
+   "en": "1 A+0.5 A (Gearbox+Pump)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "electric-water-spray-kit-01",
+    "title": "Electric Water Spray Kit 01",
+    "field": "specs[electrical.current]",
+    "near": "Current"
+   },
+   "dict": null
+  },
+  {
+   "h": "5c6898e381eae12f70c6680bc4ac978ef4cdcde5a5b2d9b6ed691bc6ac542c1f",
+   "en": "This Electric Bubble Maker Kit is easy to assemble and operate. It features an electric bubble blower that produces large, delicate bubbles. The included lithium battery has overcharge and overdischarge protection for safety and reliability. The bottle cap's one-way valve design prevents leaks, even when turned upside down. With various models to choose from, it caters to all DIY needs and sparks endless creativity.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "electric-bubble-maker-kit-01",
+    "title": "Electric Bubble Maker Kit 01",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "edb9ceebff9183710341516eabb2f4047467049613fa1a5a07d6b490f0c5f11d",
+   "en": "This 3D-printed Cute Witch's Cauldron Tea Light is the perfect decoration to enhance the Halloween atmosphere. The glowing light inside mimics a bubbling witch's potion, creating a mysterious and eerie vibe. Whether placed on a windowsill, as a centerpiece for a Halloween-themed table, or combined with other decorations, this illuminated cauldron can instantly transform your space into a haunted, ghostly setting. Its playful yet spooky design makes it a must-have for adding a magical touch to your Halloween decor.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "cute-witchs-cauldron-tea-light",
+    "title": "Cute Witch's Cauldron Tea Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "acb310bbd707e18abf3dbaee0eb91b4ab5d5f3d3a8abe6efeda09468cc5c3214",
+   "en": "This 3D-printed Jack Skellington & Oogie Boogie Pumpkin TheeLight is the perfect addition to your Halloween decorations, adding a mysterious glow to your space. The classic pumpkin design comes to life when illuminated by electric tea lights, enhancing the spooky atmosphere of your Halloween setup. Whether displayed on its own or combined with other festive decorations, this pumpkin light will elevate your celebration. With various print options available, you can adjust the size and detail settings to achieve the ultimate effect.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "jack-skellington-oogie-boogie-pumpkin-theelight",
+    "title": "Jack Skellington & Oogie Boogie Pumpkin TheeLight",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c0b3188a73256b6ae9588bfe9bff27a30d1dace8951bda6fdf2936024889d80a",
+   "en": "This 3D-printed Reading Ghost Halloween Tea Light Decor is an adorable addition to your Halloween decorations. The light glows through the ghost's eyes and body, creating a warm yet mysterious effect. The ghost is holding a book as if quietly reading, adding a playful and whimsical touch. Whether used as a standalone piece or paired with other Halloween elements, this reading ghost light is perfect for enhancing the festive atmosphere. It’s a charming accent for any space, bringing a mix of humor and magic to your Halloween setup.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "reading-ghost-halloween-tea-light-decor",
+    "title": "Reading Ghost Halloween Tea Light Decor",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "97a31b33e152c63993ff94e25b657a09efb3c6312a9fd5de177f2f60cfe7a2df",
+   "en": "The Cute Flexi Pets Keychain & Magnet Collection contains non - 3D printed parts for assembly. To complete, one needs to download compatible model files and 3D print remaining parts. It's part of the Creator Program, a collaboration between Bambu Lab and creators like Valeria Momo & Mattia. The collection includes various models such as goldfish, chameleon, triceratops, raccoon, etc. Each model comes with specific items like magnets and keychains in different quantities as detailed in the box contents.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "737906895d16df5e08888a6720550028cb5ec384f340dfbf2249316cac318e44",
+   "en": "Click here to explore more about Valeria Momo & Mattia on MakerWorld",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "flexi-pets-keychain-magnet-collections",
+    "title": "Cute Flexi Pets Keychain & Magnet Collection",
+    "field": "documents[0]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d270e5f8e6a76ee91d5efa94af7774600ffd104f1872d27678bb2d60d8e4b11",
+   "en": "The 6500K White LED Light Strip Combo Kit contains 6500K White LED Light Strip (1pcs),contains USB-A to 2 Pin 8mm Solderless Quick Connectors (2pcs), and 2-pin 8mm L-shaped LED Strip Connectors (10pcs）. The 2-pin 8mm L-shaped LED Strip Connectors and the USB-A to 2 Pin 8mm Solderless Quick Connectors fit the 6500K White LED Light Strip, making it the perfect DIY LED light accessory kit.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip-combo-kit",
+    "title": "6500K White LED Light Strip Bundle",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7b1f95b2ec3460efdb6b3efaa051468115fced449661dcb6fa6d94d42afba05f",
+   "en": "USB-A to 2 Pin 8mm (2PCS) - XC002",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip-combo-kit",
+    "title": "6500K White LED Light Strip Bundle",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9b9e1f24ddbd8f67cea2305849ce2cc058c62fc08b1f1efabc25c7ff4335c296",
+   "en": "2 Pin 8mm L Shape For White LED (10PCS) - XE002",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip-combo-kit",
+    "title": "6500K White LED Light Strip Bundle",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6cbc6d5c4b405680e1f9cefce6e07301f6252b2d2ca08a3b05931872d0f57301",
+   "en": "This Standby Mode Dock for iPhone is designed to enhance user experience, ensuring that users can access information anytime while their device is in standby mode. With a sleek and modern design, it seamlessly integrates into home or office environments, while the anti-slip base provides stable support, reducing the risk of accidental slips.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "standby-mode-dock-for-iphone",
+    "title": "Standby Mode Dock for iPhone",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3c936e49b7a0e147ebfd8b36e62b2a798469226f3faf66aca4f21af08791a621",
+   "en": "The WS2812B RGB LED Strip Light Combo Kit contains WS2812B RGB LED Strip Light (1pcs) ,contains 3 Pin 10mm Cable (2pcs), and 3-pin 10mm L-shaped LED Strip Connectors (10pcs). The 3-pin 10mm L-shaped LED Strip Connectors and the 3 Pin 10mm Cable fit the WS2812B RGB LED Strip Light, making it the perfect DIY LED light accessory kit.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light-bundle",
+    "title": "WS2812B RGB LED Strip Light Bundle",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5a25c59f7736037d99f7a935120991a267b0e66932396c4082f7b167ce7162dc",
+   "en": "3 Pin 10mm Cable (2PCS) - XC001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light-bundle",
+    "title": "WS2812B RGB LED Strip Light Bundle",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e5052e9ef214eb85d4d199dfb6a8d30f5db4aa1e7b35eff349f94a8b1c75a62f",
+   "en": "The Maker's Supply Electronics Bundle contains Power Distribution Board - 4 Channels (1PCS), contains Self-Locking Button Switch (2PCS), and Potentiometer Board with SH1.0 Connector (2PCS).",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "makers-supply-electronics-bundle",
+    "title": "Maker's Supply Electronics Bundle",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f7963f79e9490883b0ba7b407136d90dcb7eb5d800fe133b57e42c21684d38e3",
+   "en": "Application instructions",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "makers-supply-electronics-bundle",
+    "title": "Maker's Supply Electronics Bundle",
+    "field": "documents[1]",
+    "near": "model_file"
+   },
+   "dict": null
+  },
+  {
+   "h": "d80145162f6515c85b2a3e0ef9c7fb3a3bbb8aa894c842ef5208e2099f6d1324",
+   "en": "The Cipher Helmet Lock Kit offers a convenient and secure solution for helmet storage. It includes all non-3D printed hardware components needed to assemble a Cipher Helmet Lock. The lock can be fixed onto a bicycle handle. It features a password-protected locking system where users can choose desired numbers as ciphers and set them.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "cipher-helmet-lock-kit",
+    "title": "Cipher Helmet Lock Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "03b4a0149f52aa8f89ca676feb9a9b18d0d5398c55b77b6a017dd55c62f17800",
+   "en": "Assembly Manual",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "cipher-helmet-lock-kit",
+    "title": "Cipher Helmet Lock Kit",
+    "field": "documents[0]",
+    "near": "manual"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b454673be64049643ff7af5beceb17701b56ae04616f3a81d112d5176b290f2",
+   "en": "Durable, versatile, and easy to use, this product offers a seamless solution for various applications. Its pre-cut design allows for quick and effortless application, while its flexibility enables it to conform to any shape or angle. The strong adhesive ensures a long-lasting bond on a wide range of surfaces, including wood, glass, plastic, and metal.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-transparent-double-sided-adhesive",
+    "title": "Rectangular Transparent Double-Sided Adhesive",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cef143210664bb0bf706493ebc5ccee5b2912101138417f18285e7440427b362",
+   "en": "This Wind-Up Walking Mechanism is a fun and interactive addition to your 3D-printed models, perfect for bringing characters like cute ghosts and grim reapers to life with just a wind-up. The smooth, burr-free surface ensures safe handling, especially for children. The compact design makes it easy to carry and enjoy anytime, anywhere. Ideal for DIY projects, this mechanism encourages hands-on creativity while adding movement to your models. Simply attach it to the base, wind it up, and watch it walk across any flat surface! Note：Be careful not to overwind the mechanism, as this may cause damage.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ab781178d420a90f54e41298405bfff9950da88d1379bafd915ae5ce2d3d158e",
+   "en": "8 PCS",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "specs[contents.pieces]",
+    "near": "Pieces per pack"
+   },
+   "dict": {
+    "ar": "8 قطعة",
+    "ckb": "8 دانە"
+   }
+  },
+  {
+   "h": "5b8800b7d3e1cf43bbd6689d827391613fc734394b0193351e1af1957011f47b",
+   "en": "The magnetic connector is an electronic component that utilizes the principle of magnetism to achieve connection. It consists of a male part and a female part. When in use, the male and female parts will automatically attract and connect together due to the magnetic force when they are close to each other, thus enabling the transmission of signals or electricity.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "7mm-round-magnetic-connector-with-sh1-0-connector-2pair",
+    "title": "7mm Round Magnetic Connector With SH1.0 Connector (2Pair)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6b280deaeb4aadc4b9ade466d04a91c5f7e6a2f0352b6b3032d839fee2220f4b",
+   "en": "The Magnetic Levitation DIY Kit features an innovative design that uses magnetic technology to make objects float smoothly in mid-air. Consisting of a base, float, and power supply, this kit creates a futuristic, tech-inspired ambiance, perfect for DIY enthusiasts eager to design custom desktop decorations. From floating collectible figures and moon lamps to unique 3D-printed pieces, your imagination is the only limit.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "328908a83269e0db2035621d0110a68fba3dad6330d66d58a7371cb377e0d5e4",
+   "en": "Quick Start",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "usage[0].body.line[0]",
+    "near": "Product Installation and Operation Guide."
+   },
+   "dict": null
+  },
+  {
+   "h": "cbdffa45498973fdae4c757fd4ca446687f8c5b5a58e154431c68c47723d2f18",
+   "en": "Design Guidelines",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "usage[0].body.line[3]",
+    "near": "Download"
+   },
+   "dict": null
+  },
+  {
+   "h": "289b4fb7a8c233ad4a721cc782c62fbab761218ed67072b38a9c0c50eb661a28",
+   "en": "Key Design Precautions for Creation.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "usage[0].body.line[4]",
+    "near": "Design Guidelines"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f694574677d2aeb8351d2d7c087d7aa3315ffd80203f9dbc7e7972dd1091eb3",
+   "en": "PrintMon Maker",
+   "kind": "doc_title",
+   "freq": 3,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "documents[6]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc15cc5b8870212055687372417b60e7c963399c362a93132b53f5bf60aa82d4",
+   "en": "Catmaw AFV is a 1/10 scale model car. Its prototype is Uro Vamtac. It can be used as a display car or installed on a remote-controlled car chassis like SCX10 III (AXI03011). It has 4 working doors, a rear hatch that can be opened and folded down, and modular design for the rear part. It also has some internal features and can be customized with additional components.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "catmaw-afv-model-car-for-scx10",
+    "title": "Catmaw AFV - Model Car For SCX10",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "486b1d1cd455887d7b2bf7df242c7a76228b25e1c6d58a37f31898c52a33a7dd",
+   "en": "The Motion-Activated Sound and Light Props Kit is a versatile multi-functional set designed specifically for handheld props, integrating lighting, sound, and motion control to deliver a personalized immersive experience. The high-brightness LED strips with diffused pearl cotton provide smooth, natural lighting effects, while the built-in speaker ensures clear sound quality. Equipped with an IMU motion sensor, it captures real-time movements, triggering corresponding lighting and sound effects, such as turning on/off with rotation.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "28c82606e559aa5dc46af0975c993173f87099e3eda1b61bad9a00d947a2600e",
+   "en": "This Decoration &amp; Display Kit includes Plastic Button Ornaments For Shoe Charms, Split Ring Keychains, Reclosable Fastener Mounting Tape, Magnet Stickers and Eye Bolts with Self-Tapping Threads, making it ideal for creating personalized shoe decorations, home displays, keychain customizations, and more. It offers flexible solutions for various needs. Whether for home organization, creative decoration, or personalized customization, this set opens up a world of possibilities.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "decoration-display-kit",
+    "title": "Decoration & Display Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "43939818398ebf776ed2d206251d1166fafb3395a3b2cfe59a80f75a0abad1ba",
+   "en": "Make My Lithophane",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "decoration-display-kit",
+    "title": "Decoration & Display Kit",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e3c502bf7ace424377cff9cf1849644183f9e9c50775c02dcb465f73bddb59e",
+   "en": "This kit is specifically designed for creators who love making motorized models. It includes 030 DC motors, reduction gear kits, power distribution board set, battery spring contact plate, and Y type wire, making it an ideal power and drive system for your motorized models.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e59f4b631c1e1e53043ba7e551b7d2a2f4668fa92dd911800c37cfbbf3fd3181",
+   "en": "The Easy Mounting Kit is a versatile mounting solution designed to effortlessly attach your creative projects to various smooth surfaces. The kit includes high-quality suction caps, double-sided tape, and reclosable fastener mounting tape, allowing you to secure models to refrigerators, tiles, cabinets, or other slick surfaces at any time. When used in combination with 3D-printed models, these components make mounting decorative or functional items more convenient and flexible. Whether you need a stable and strong hold or a way to easily move and reposition your creations, the Easy Mounting Kit has you covered.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "easy-mounting-kit",
+    "title": "Easy Mounting Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "88e637cbdc12dc252ce14eea9b318796399207396e3e835a972def018c8bf929",
+   "en": "This Dynamic Installation Art Kit is designed to help creators and art enthusiasts create exquisite interactive art pieces or dynamic mechanical devices, such as automata devices, tourbillon models, marble run models, and rotating display stands.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2cb3b4f68574dc1b506467d1ec4fc52957d31592247b0bae95bb0d8ba6d3213f",
+   "en": "The Desktop Ornament Components Kit is designed to bring endless possibilities and personalized creativity to your tabletop. The kit includes a wide variety of electronic and mechanical parts that can be easily assembled with 3D-printed models to create different styles of desktop decorations.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "desktop-ornament-components-kit",
+    "title": "Desktop Ornament Components Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e9b6c2ae705cd6c32f5cd98f5bb16ed3a6681f6fd83f5b43aa86c3e3f0725d24",
+   "en": "This Filament Protection Kit includes 12 packs of desiccant, 2 &nbsp;thermometer hygrometers, and 1 roll of adhesive foam sponge strip roll, effectively preventing filaments from being damaged by humid environments. The components in the kit can replace expired desiccants in the AMS and add standalone hygrometers. Additionally, they can be used to modify multiple filament storage boxes, providing a safer storage environment for opened filaments.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "filament-protection-kit",
+    "title": "Filament Protection Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0eecbf05dcaa4f56bdbfc5698fb011538c908c6099485ec23fdc5ada4c0b77ed",
+   "en": "This kit includes a variety of commonly used self-tapping screws, machine screws, and corresponding nuts in different specifications and lengths, meeting the fastening needs of various models and structures. From self-tapping screws for small-sized holes to machine screws and round threaded brass heat-insert nut for larger components, this set provides highly adaptable and secure connections for diverse applications.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "fastener-kit",
+    "title": "Fastener Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "53ff2e4eecbbab22e02278fb7795bdbaac9b2d69aadd460abc8a8fbbea83dcba",
+   "en": "It's time to give your 3D printing workshop an upgrade with the Workshop Modification Kit! This kit contains medium sized bearings, a thermometer hygrometer, LED light strips, magnets, pneumatic fittings, desiccant, adhesive foam sponge strip and silicone tube. Whether you need to make your own filament spool winder, drybox, AMS stand, hanging light, tool box or temperature and humidity monitoring kit, this kit will provide you with the parts you need to create the most impressive workshop.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "workshop-modification-kit",
+    "title": "Workshop Modification Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "95d0be7e94f64dd56586e2ac7ed02c7f6d7a019b2635eb054e9aca0b18c99a82",
+   "en": "The Stainless Steel Eye Bolt with Self-Tapping Thread offers a practical and versatile solution for enhancing the functionality of 3D-printed models. Their unique design—featuring a circular loop and a threaded shaft—makes them ideal for integrating mechanical, decorative, and structural capabilities into printed objects.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "44e021e3358e3bb70b782060ee5d8f8f43f161780e410c29f6654cfaa5eb8cd8",
+   "en": "Making elaborate miniature models of tourbillons, gearboxes, engineering machinery and bionic toys only to find that the strength, stiffness, tolerance and smoothness of the printed shaft system are not up to expectations? This Precision Shaft System Kit contains multiple sizes of miniature deep groove ball bearings, thrust ball bearings, bronze bushings and pins, which help to solve the strength and accuracy problems in designing the shaft system and linear motion of small-sized models. Take your miniature model to the next level.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "precision-shaft-system-kit",
+    "title": "Precision Shaft System Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e54222286528b530b1da8d374d7660851f2ba6f6d0b7abbb80c653194f5de5d8",
+   "en": "This kit contains&nbsp;a Bluetooth Remote and a USB controller. We have prepared this replacement kit for RGB LED Strip Light and S-shape LED Strip Light (WS2812B RGB) to cover any possible loss or damage during the crafting process.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-remote-controller",
+    "title": "LED Light Strip Remote Controller",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "810205b15e377ca99f383f3f194705ce1f70818f2b267ba0e176aa51097c6925",
+   "en": "Imagine having your own mini-factory at home, where you can create one-of-a-kind masterpieces! This accessory pack is your secret weapon. Packed with a variety of components, including buzzing motors, clicking gears, and warm candle lights, it's ready for you to unleash your creativity and assemble amazing models.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "716ed44ffe0cd77d7278fd56d2e4720d41a9c72446bdaae554139bcfe1f1d699",
+   "en": "Maker's Beginner Kit Model Collection",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "documents[11]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "f354ee99e2bc863ce19d80b843353476394ebc3530a51c9290d629065bacc3b3",
+   "en": "community",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "documents[12]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b7a9b04d22647701a2d4cf87d10c80361f6a88444dd9898e2f71598e56ada37",
+   "en": "Maker's Beginner Kit model contest",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "documents[13]",
+    "near": "other"
+   },
+   "dict": null
+  }
+ ]
+}

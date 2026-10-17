@@ -1,0 +1,424 @@
+{
+  "handle": "ams-lite",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T21:13:21Z",
+  "searched": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "keys": [
+        "ams.*",
+        "printing.*",
+        "extrusion.*",
+        "electrical.*",
+        "physical.*",
+        "safety.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "part.material",
+        "compat.statement"
+      ],
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "Whole page read (no tables). Numbers without a registry key (PTFE tube lengths 580/700 mm, max feeding distance 1.2 m, 50 mm placement distance, 150° auto-rotation, ~40 cm pre-load) are not recorded."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-lite",
+      "title": "AMS lite | Bambu Lab Wiki",
+      "keys": [
+        "ams.*",
+        "printing.*",
+        "electrical.*",
+        "physical.*",
+        "safety.*",
+        "package.contents"
+      ],
+      "retrieved_at": "2026-10-16T08:25:11Z",
+      "note": "A link index with no spec values; the linked pages were not cached."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "extrusion.filament_diameter"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "Section '3. AMS & AMS lite' and its compatibility table read; the column is shared by AMS and AMS lite except where a cell names 'AMS lite'."
+    }
+  ],
+  "specs": [
+    {
+      "key": "ams.slots",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "AMS Workflow › Check Filament location › paragraph 2",
+      "quote": "When all four slots have filaments inserted, AMS cannot determine which slot the filament is dispensed from based on the sensors alone.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "Corroborated on the same page: the filament hub 'holds the four tubes together' (Filament tangle detection module) and 'slots 1/2 … slots 3/4' (Precautions item 3). The store page states no slot count; its box list has 'AMS lite Rotary Spool Holder (x4)', which agrees."
+    },
+    {
+      "key": "ams.max_units",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "1 (A1 series)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "Precautions before use › item 1",
+      "quote": "The A1 series printers can be connected to a single AMS lite, limiting its support to a maximum of 4-color printing.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "The page names only the A1 series; the store page's Compatibility option reads 'A1&A2 Series', for which no unit count is stated in the documents read."
+    },
+    {
+      "key": "printing.multi_color",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Up to 4 colours",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "Precautions before use › item 1",
+      "quote": "The A1 series printers can be connected to a single AMS lite, limiting its support to a maximum of 4-color printing.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "Stated for an A1 series printer with one AMS lite."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "AMS lite feeding system › First stage feeder",
+      "quote": "Each slot in AMS lite is equipped with a feeder responsible for feeding the filament into or out of the tool head. The feeder includes a filament detection sensor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "The section 'Filament run-out detection and filament backup function' describes run-out handling through the feeder's Hall switch."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "AMS lite feeding system › First stage feeder",
+      "quote": "Each feeder is equipped with an odometer featuring a passive wheel.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:05Z"
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "ASA",
+        "PET",
+        "PA",
+        "PC",
+        "PVA (dry)",
+        "BVOH (dry)",
+        "PP",
+        "POM",
+        "HIPS",
+        "Bambu PLA-CF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite store page, AMS lite Tech Specs",
+      "locator": "AMS lite Tech Specs › row 7 (Supported Filament*¹)",
+      "quote": "PLA, PETG,ASA, PET, PA, PC, PVA (dry), BVOH (dry), PP, POM, HIPS and Bambu PLA-CF",
+      "test_method": "",
+      "test_condition": "Judged from loading / unloading; printer compatibility must also be checked (footnote *¹)",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:31Z",
+      "note": "The deterministic parse keeps this row as x.supported_filament_1 (the footnote marker '*¹' stops the registry synonym). Cross-check with the wiki filament guide 'AMS / AMS lite Compatibility' column: agrees on PLA, PETG, ASA, PC, PVA/BVOH (dry) and Bambu PLA-CF; the wiki also gives Bambu PA-CF and PAHT-CF as Compatible, ABS and ABS-GF as 'AMS lite: Not Recommended', and its prose says PLA Wood is not recommended for the AMS lite while its table row 'PLA Metal / Wood / Marble' reads Compatible. PP, POM, HIPS, PET and plain PA are not in the wiki table."
+    },
+    {
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "TPE",
+        "TPU",
+        "PVA (wet)",
+        "BVOH (wet)",
+        "Bambu PET-CF",
+        "Bambu PA6-CF",
+        "Bambu TPU 95A",
+        "other brand filament that contains carbon fiber or glass fiber"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite store page, AMS lite Tech Specs",
+      "locator": "AMS lite Tech Specs › row 9 (Unsupported Filament*³)",
+      "quote": "TPE, TPU, PVA (wet), BVOH (wet), Bambu PET-CF / PA6-CF / TPU 95A and other brand filament that contains carbon fiber or glass fiber",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:57:31Z",
+      "note": "Footnote *³: 'Filaments that are too soft, too brittle or too abrasive are not compatible with the AMS lite.' The deterministic parse keeps this row as x.unsupported_filament_3. The wiki filament guide agrees on TPU and PET-CF/GF (Not Compatible) and adds PPA-CF/GF and PPS-CF/GF as Not Compatible (recorded as relations)."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "target_family": "a1_series",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "Precautions before use › item 1",
+      "quote": "The A1 series printers can be connected to a single AMS lite, limiting its support to a maximum of 4-color printing.",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "note": "One AMS lite per A1 series printer. The store option 'A1&A2 Series' also names the A2 series, which this page (updated 2026-02-11) does not mention."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "X1 Series",
+      "target_family": "x1_series",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "Precautions before use › item 2",
+      "quote": "AMS lite is unsuitable for use with X1 and P1 series printers.",
+      "retrieved_at": "2026-10-16T08:25:05Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "P1 Series",
+      "target_family": "p1_series",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "source_title": "Introduction to the modules and functions of AMS lite | Bambu Lab Wiki",
+      "locator": "Precautions before use › item 2",
+      "quote": "AMS lite is unsuitable for use with X1 and P1 series printers.",
+      "retrieved_at": "2026-10-16T08:25:05Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "TPU",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table, column 'AMS / AMS lite Compatibility' › row TPU",
+      "quote": "TPU | Compatible | Compatible | Not Compatible |",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF/GF",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table, column 'AMS / AMS lite Compatibility' › row PET-CF/GF",
+      "quote": "PET-CF/GF | Not Recommended | Recommended | Not Compatible |",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF/GF",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table, column 'AMS / AMS lite Compatibility' › row PPA-CF/GF",
+      "quote": "PPA-CF/GF | Not Recommended | Recommended | Not Compatible |",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF/GF",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table, column 'AMS / AMS lite Compatibility' › row PPS-CF/GF",
+      "quote": "PPS-CF/GF | Not Recommended | H2 Series and X1E Compatible; Not applicable to other models | Not Compatible |",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "items": [
+        {
+          "text": "AMS lite Body",
+          "qty": null
+        },
+        {
+          "text": "AMS lite Stand",
+          "qty": null
+        },
+        {
+          "text": "AMS lite Rotary Spool Holder",
+          "qty": 4
+        },
+        {
+          "text": "Allen Key H2",
+          "qty": null
+        },
+        {
+          "text": "PTFE Tubes for AMS lite",
+          "qty": null,
+          "note": "The intro wiki page (Precautions item 3) gives two lengths: 580 mm for slots 1/2 and 700 mm for slots 3/4; the box list gives no count."
+        },
+        {
+          "text": "Screw (For AMS Stand)",
+          "qty": 5
+        },
+        {
+          "text": "Bambu Bus Cable-4Pin",
+          "qty": null
+        }
+      ],
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/ams-lite",
+      "source_title": "Bambu Lab AMS lite store page, What's in the box",
+      "locator": "What's in the box › items 1–7",
+      "quote": "AMS lite Body | AMS lite Stand | AMS lite Rotary Spool Holder (x4) | Allen Key H2 | PTFE Tubes for AMS lite | Screw (×5) (For AMS Stand) | Bambu Bus Cable-4Pin",
+      "retrieved_at": "2026-10-16T06:57:31Z",
+      "note": "The official store list; the wiki 'AMS lite Packing Guide' is not cached. The deterministic parse gives 'Screw (×5) (For AMS Stand)' qty null; the list states 5."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-lite/manual/intro-ams-lite",
+      "title": "Introduction to the modules and functions of AMS lite",
+      "read": true
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/ams-lite",
+      "title": "AMS lite wiki",
+      "read": true,
+      "note": "The store page links this hub as 'Quick Start Guide'; the hub's own 'Quick Start Guide' link goes to bambulab.com/en/support/documentation (not a document host)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "read": true
+    },
+    {
+      "kind": "faq",
+      "url": "https://wiki.bambulab.com/en/ams-lite/manual/faq",
+      "title": "FAQ for the AMS Lite",
+      "read": false,
+      "listed_on": "https://wiki.bambulab.com/en/ams-lite"
+    },
+    {
+      "kind": "installation",
+      "url": "https://wiki.bambulab.com/en/ams/maintenance/ams-lite-com",
+      "title": "Installation Guide for the AMS Lite",
+      "read": false,
+      "listed_on": "https://wiki.bambulab.com/en/ams-lite"
+    },
+    {
+      "kind": "guide",
+      "url": "https://wiki.bambulab.com/en/a1/manual/ams-lite-packing-guide",
+      "title": "AMS lite Packing Guide",
+      "read": false,
+      "listed_on": "https://wiki.bambulab.com/en/ams-lite"
+    }
+  ],
+  "not_published": [
+    "electrical.voltage",
+    "electrical.rated_power",
+    "physical.noise",
+    "physical.operating_temp",
+    "safety.certifications"
+  ]
+}

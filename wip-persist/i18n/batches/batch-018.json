@@ -1,0 +1,2642 @@
+{
+ "batch": 18,
+ "surface": "api",
+ "handles": [
+  "p2s",
+  "h2c"
+ ],
+ "strings": [
+  {
+   "h": "9125cc5c1c88b9f08fb41469b1680799ebcfad93055ae51292797040f025771a",
+   "en": "The Icon, Redefined.",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu Lab P2S"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ecebe74b8e5f2fe20abf079842004c231befaca10f9abd4d140618a6f31ecca",
+   "en": "What Makes the P Series Iconic?",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[1].line[0]",
+    "near": "Califryburger"
+   },
+   "dict": null
+  },
+  {
+   "h": "795e141772fdc304204611c925c021bb2062a5fe6e27ed3941a06b5fd64088f1",
+   "en": "Califryburger",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[1].line[1]",
+    "near": "What Makes the P Series Iconic?"
+   },
+   "dict": null
+  },
+  {
+   "h": "e2dcb9dfce353fa5e5427bab7cbe2f71b3d8e494cef31eadb48888549271170d",
+   "en": "\"I’ve been running P-series printers since the beta. The Bambu ecosystem feels like the Apple of 3D printing, with the printer, slicer, app, and cloud all working seamlessly. This lets me iterate faster and keep material costs down. My P1S setup and other P-series machines have been rock-solid for two and a half years, still running like day one.\"",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[1].line[2]",
+    "near": "Califryburger"
+   },
+   "dict": null
+  },
+  {
+   "h": "578717571bc0608b666656f668016d1f747692a0469e1ca3d279abab9eced9f1",
+   "en": "The Duty Printer",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[2].line[0]",
+    "near": "\"It shouldn't have worked, but it did! Mostly. Me being a moron, I forgot to support the MASSIVE bridge at the top. But the ole P1S just did it anyway! 280mm X "
+   },
+   "dict": null
+  },
+  {
+   "h": "45412c617fbf8ccb0645b289815cbac8459a49eba36da54859840c08f660ef7c",
+   "en": "\"It shouldn't have worked, but it did! Mostly. Me being a moron, I forgot to support the MASSIVE bridge at the top. But the ole P1S just did it anyway! 280mm X 225mm frame with a 1mm width edge contacting the build plate.\"",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[2].line[1]",
+    "near": "The Duty Printer"
+   },
+   "dict": null
+  },
+  {
+   "h": "cdffadb1a8e6578638193a0a62f15a1e0c55d3cdc3ec49fe507b229337cbc607",
+   "en": "War_Poodle",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[3].line[0]",
+    "near": "\"Since getting my P1S, I've been shocked by how easy it is to try new materials. My sister jokingly sent me a Crocs STL. I tried printing it with generic TPU, n"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e7a9ddef638b80b59a3ede8aaba87fff88807dc1d7e314672a9446c1c6292c7",
+   "en": "\"Since getting my P1S, I've been shocked by how easy it is to try new materials. My sister jokingly sent me a Crocs STL. I tried printing it with generic TPU, no adjustments needed. Twelve hours later, she's wearing a printed Crocs, claiming it's 'more comfortable than a real Crocs.' It's amazing how simple it was to go from an idea to a wearable print!\"",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[3].line[1]",
+    "near": "War_Poodle"
+   },
+   "dict": null
+  },
+  {
+   "h": "e05f9b3d973699cc6992eb455359a62e3136b013de06464597bf4d74171df9af",
+   "en": "\"I’ve been running six Bambu Lab P1S printers for a few years now and they’ve been rock solid. They’re easy to maintain and the print quality is always beautiful. I’ve been really impressed with how consistent they are hour after hour, print after print. For me, reliability is important, and these machines deliver every time.\"",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[4].line[1]",
+    "near": "TaterTotterer1"
+   },
+   "dict": null
+  },
+  {
+   "h": "934b94326cea130f1285005a3402594e5516d0880a3967d5a75bce40661e1e88",
+   "en": "DerangedKangaru",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[5].line[0]",
+    "near": "\"Well, today, my kid decided to tip over my workbench, and sent my P1S and AMS flying across the garage. The glass shattered everywhere, the front screen was de"
+   },
+   "dict": null
+  },
+  {
+   "h": "7facb4cfdba71ca5e3ba878e0c7cc68965eef6ea338a4cb1550ce26f2e69ce7b",
+   "en": "\"Well, today, my kid decided to tip over my workbench, and sent my P1S and AMS flying across the garage. The glass shattered everywhere, the front screen was destroyed, and the printer and AMS looked like they got hit by an RPG. I put the printer back on the workbench, plugged it in, and sent a print over to see how bad the damage was. Flawless, no issues with printing. I am truly amazed at the engineering of the P1S.\"",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[5].line[1]",
+    "near": "DerangedKangaru"
+   },
+   "dict": null
+  },
+  {
+   "h": "4631983b9b45d839022c9406ccc319390997164daadab7ec2a2d4e0f27547839",
+   "en": "\"The Bambu Lab P1S is an easy recommendation for a lot of different situations. For beginners, it’s a streamlined experience that requires little effort or prior knowledge from users to achieve great results. For more experienced makers, it’s a reliable machine that requires little input when you need a high-quality print quickly.\"",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[6].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "48d7386c082b0be5c1c3456b5ddbf081f6bfa13c2426902095d6f00996bd2845",
+   "en": "\"Right from unpacking, it’s clear that this printer has been meticulously crafted, from design to protection during transport.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[7].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "be6592c83fe37f2a22d3f50f206c646be898d4a36b1c179aa7ffbc555bb64486",
+   "en": "The User Experience As Good As A Smartphone.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[8].line[0]",
+    "near": "5-inch Touch Screen ｜ 2nd-Gen UI"
+   },
+   "dict": null
+  },
+  {
+   "h": "116e09a739c2e08f388191a0e1fd49c8c3d914e7edd12dad2b8f30ff9c26f6c4",
+   "en": "5-inch Touch Screen ｜ 2nd-Gen UI",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[8].line[1]",
+    "near": "The User Experience As Good As A Smartphone."
+   },
+   "dict": null
+  },
+  {
+   "h": "279b1776a9d11ace3b78d26451e3e7cde512d4f22c6c623b9f1eefe9f7a1142b",
+   "en": "The P2S features a fully upgraded touchscreen and a powerful processor, running our new intuitive second-generation UI. Enjoy smoother interactions, richer graphics, and clearer step-by-step instructions.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[8].line[2]",
+    "near": "5-inch Touch Screen ｜ 2nd-Gen UI"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbf83c6f6b8a1a129c0a31216416691c58da7568d75f82b77c70462ad7f81fbb",
+   "en": "70% More Extrusion Force & Real-Time Error Detection.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[9].line[0]",
+    "near": "PMSM Servo Architecture ｜ DynaSense Extruder"
+   },
+   "dict": null
+  },
+  {
+   "h": "9caf54433d674835dafd7cd3042dac0d7a07b782b0bd95b28cb8492309f69379",
+   "en": "PMSM Servo Architecture ｜ DynaSense Extruder",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[9].line[1]",
+    "near": "70% More Extrusion Force & Real-Time Error Detection."
+   },
+   "dict": null
+  },
+  {
+   "h": "b3cf075ed2819db25ce3cd585a8a91c93df894f57e3c4dbd48d340ea57d81e3d",
+   "en": "The PMSM servo extruder delivers up to 8.5 kg of maximum extrusion force—70% more than its predecessor—dramatically improves high-flowrate extrusion stability. Our proprietary servo architecture samples resistance and position at 20 kHz, actively detecting filament grinding and clogs in real time.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[9].line[2]",
+    "near": "PMSM Servo Architecture ｜ DynaSense Extruder"
+   },
+   "dict": null
+  },
+  {
+   "h": "fbcc1613ecfbc2fb212186a1d450abd85f53e319284105691767fe037a7fd8dc",
+   "en": "Print Smooth At Every Corner, Always.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[9].line[3]",
+    "near": "The PMSM servo extruder delivers up to 8.5 kg of maximum extrusion force—70% more than its predecessor—dramatically improves high-flowrate extrusion stability. "
+   },
+   "dict": null
+  },
+  {
+   "h": "c9d4a18e6e0a691ba35e726a0fd7d86e0a0a1283dde03b1984f05df3a0d53517",
+   "en": "Active Flowrate Compensation ｜ Eddy Current Pressure Sensor",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[9].line[4]",
+    "near": "Print Smooth At Every Corner, Always."
+   },
+   "dict": null
+  },
+  {
+   "h": "26089330f3633e6194ef8f198853a878cb95ffdea669bcdc2a2874fcf9778f14",
+   "en": "The P2S uses a high-resolution, high-frequency eddy current sensor to calibrate flow dynamics. Intelligent algorithms actively adjust the flow rate based on these readings, provide precise, consistent extrusion across every layer and corner.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[9].line[5]",
+    "near": "Active Flowrate Compensation ｜ Eddy Current Pressure Sensor"
+   },
+   "dict": null
+  },
+  {
+   "h": "e8a01133b1351e5fa434167135400d1998d3daa8ce74e3dd9bb57582fa4d7b97",
+   "en": "ON",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[0]",
+    "near": "OFF"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbda3320648f59788ab2d649a1638be9cf4c1c2529549ecd6a4e8af4ef8dded5",
+   "en": "Perfect Overhang No Matter the Filament or Temperature.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[2]",
+    "near": "OFF"
+   },
+   "dict": null
+  },
+  {
+   "h": "748b0678b64d991e6330848888594cf2dce8c2064568e3ef1a4665c49125dead",
+   "en": "Cold-Air Intake ｜ Cooling Mode",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[3]",
+    "near": "Perfect Overhang No Matter the Filament or Temperature."
+   },
+   "dict": null
+  },
+  {
+   "h": "2a986dd7f966afd2e0a11165547d2fb159ed866839a93156b8e8ae794b50ec9c",
+   "en": "Unlike traditional cooling systems that recirculate hot air, the P2S’s Adaptive Airflow System draws in cool air directly from outside the chamber. This significantly improves cooling efficiency, letting you confidently print low-temperature filaments with the door closed—without worrying about overhang quality or nozzle clogs.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[4]",
+    "near": "Cold-Air Intake ｜ Cooling Mode"
+   },
+   "dict": null
+  },
+  {
+   "h": "4c7d3606f98d2f05ae318da502ff4b2f1ada46ad7efd2eaf6e6abd4da30dfe69",
+   "en": "50°C Chamber Ready For Engineering-Grade Filaments.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[5]",
+    "near": "Unlike traditional cooling systems that recirculate hot air, the P2S’s Adaptive Airflow System draws in cool air directly from outside the chamber. This signifi"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a3a05fa12748a9d31f768a4d85f8e73c63815e417dbeb35d6f4507171960924",
+   "en": "Heat Preservation ｜ Carbon Filter",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[6]",
+    "near": "50°C Chamber Ready For Engineering-Grade Filaments."
+   },
+   "dict": null
+  },
+  {
+   "h": "79964f28e9f0379fbd899a7e73281d7389716eef42a97c64418b8b3f57277b96",
+   "en": "The P2S features a flap-controlled Adaptive Airflow System that efficiently seals heat within the chamber while actively filtering the internal air through a high-performance carbon filter. This allows you to confidently print demanding engineering filaments prone to warping, all while maintaining clean, safe air quality in your workspace.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[7]",
+    "near": "Heat Preservation ｜ Carbon Filter"
+   },
+   "dict": null
+  },
+  {
+   "h": "87559194e0df5410964a6deb4ae1e40c22dce1561ca174dd5d23ea53ab6a44c4",
+   "en": "Peace Of Mind, Everytime You Print.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[8]",
+    "near": "The P2S features a flap-controlled Adaptive Airflow System that efficiently seals heat within the chamber while actively filtering the internal air through a hi"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1add56835376f2397bc25c6ff62e880ec9ed21ae9c8e8a70c9b5a8ca093e90f",
+   "en": "AI Error Detection ｜ 2 TOPS NPU",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[9]",
+    "near": "Peace Of Mind, Everytime You Print."
+   },
+   "dict": null
+  },
+  {
+   "h": "1fe378972099b8fe933e428be7612ec4e91b432b76b0e8349cce22f62c837917",
+   "en": "The P2S introduces advanced AI computer vision that actively detects common printing issues such as spaghetti, nozzle blobbing. It also checks your print start settings, ensuring a safe and accurate start to every print job.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[10].line[10]",
+    "near": "AI Error Detection ｜ 2 TOPS NPU"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7b9fe6ef1b9adbc8ca4313aedf9bb72d491c99a28b5bec5fb903dfa64589500",
+   "en": "Start Check",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[11].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dd81cff28075d9126e35ce2ba895a3ce95a9ecdc1ac899418ace10e7a697127d",
+   "en": "Spaghetti",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[12].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "81d0d049990fdd7b683d874948ce66c384031c105b89965b9c35e0875e1562e6",
+   "en": "Nozzle Clumping",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[13].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "126770b77e8ebcc9cf7d3096f4531b5b1cf8e72dbefd9853ed9113190344a975",
+   "en": "Purge Chute Jam",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[14].line[0]",
+    "near": "30-Second Nozzle Swap."
+   },
+   "dict": null
+  },
+  {
+   "h": "ca0354c14f044466a1d2bb78a57cf1eb1a96549e78be926a90ec4b8f4ec8ee60",
+   "en": "30-Second Nozzle Swap.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[14].line[1]",
+    "near": "Purge Chute Jam"
+   },
+   "dict": null
+  },
+  {
+   "h": "318591808b096603150e05896f46d53bdd65dd8653a466fb2d8049e2ea0f7d40",
+   "en": "Quick Swap Hotend ｜ 1-Clip Design",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[14].line[2]",
+    "near": "30-Second Nozzle Swap."
+   },
+   "dict": null
+  },
+  {
+   "h": "290114e1f9a4c5c1ae0772aa4ce0edb78d8ecc7fd22074018e4d2cc0efc8b92a",
+   "en": "The P2S features a quick-swap hotend design with a simple one-clip mechanism that releases the entire nozzle and heatsink assembly—no wiring disconnection required. This drastically reduces nozzle change time and eliminates the risk of wiring errors.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[14].line[3]",
+    "near": "Quick Swap Hotend ｜ 1-Clip Design"
+   },
+   "dict": null
+  },
+  {
+   "h": "81d10821be7f417dbfc598f790b72598146f4c5565048774527f54b415b9ac39",
+   "en": "No-Lag Liveview & High-Quality Timelapse.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[15].line[0]",
+    "near": "\"Stage\" Lighting ｜ 1080P High-Rate Camera"
+   },
+   "dict": null
+  },
+  {
+   "h": "71c3b471110d0e677f4f2337985e69a40f8ac191ffdfe47cfc651afd385cd94a",
+   "en": "\"Stage\" Lighting ｜ 1080P High-Rate Camera",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[15].line[1]",
+    "near": "No-Lag Liveview & High-Quality Timelapse."
+   },
+   "dict": null
+  },
+  {
+   "h": "0886694250b23b150f42357679af45737ccb94b29ed78799909783d930a9c193",
+   "en": "Enhanced LED lighting dramatically improves the clarity of your liveview video and timelapses. Paired with a high-frame-rate camera & Dual-band Wi-Fi, you can comfortably monitor your printer remotely and capture beautifully illuminated timelapses perfect for sharing on social media.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[15].line[2]",
+    "near": "\"Stage\" Lighting ｜ 1080P High-Rate Camera"
+   },
+   "dict": null
+  },
+  {
+   "h": "521a0591b70588eccce530627101478afdb71beae45291380c18a262df35f118",
+   "en": "Reliable for Fiber-Reinforced Material Printing.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[16].line[0]",
+    "near": "Hardened Steel Nozzle ｜ Hardened Steel Extruder Gear"
+   },
+   "dict": null
+  },
+  {
+   "h": "2d2db28b59b290499da953079a5a9f7a51943534fefb75879d4ab74b10deb403",
+   "en": "Hardened Steel Nozzle ｜ Hardened Steel Extruder Gear",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[16].line[1]",
+    "near": "Reliable for Fiber-Reinforced Material Printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "b42057f75b452d2d22300357764d45a52df89af1a83fc4a08095ace9c80664a4",
+   "en": "P2S's extrusion system and nozzle are crafted from hardened steel, offering exceptional durability and wear resistance. Designed specifically for stable, long-term printing of high-performance fiber-reinforced materials.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[16].line[2]",
+    "near": "Hardened Steel Nozzle ｜ Hardened Steel Extruder Gear"
+   },
+   "dict": null
+  },
+  {
+   "h": "03d16c548529f634bf099aae1c75154ba29fd7e242d2fd0aaa72c308ffddb71a",
+   "en": "Multi-Color Printing & Filament Drying, All in One Box.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[17].line[0]",
+    "near": "Auto Venting Filament Drying ｜ Multi-Color Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "82f821f8f28ca7dc067309466894bfcaa9a1c3206aee7b1a5c394305b5c183b3",
+   "en": "Auto Venting Filament Drying ｜ Multi-Color Printing",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[17].line[1]",
+    "near": "Multi-Color Printing & Filament Drying, All in One Box."
+   },
+   "dict": null
+  },
+  {
+   "h": "af7bb2bf934cb2d05547b5f9e02d94e1ef3ec36b9a5013218d42c0d594ea418c",
+   "en": "Experience our most reliable multi-color printing system yet. The AMS 2 Pro features an enhanced design for a better user experience and, crucially, introduces long-awaited filament drying. A pioneering active venting system dries filament 30% faster than sealed heating, maintaining low humidity for superior storage and print quality.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[17].line[2]",
+    "near": "Auto Venting Filament Drying ｜ Multi-Color Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d435470cfbe8127ade79a7c8092d58550cd6d6b6cc834ed9f64a5926b4cdbae",
+   "en": "Electromagnetic Air Vent",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[17].line[3]",
+    "near": "Experience our most reliable multi-color printing system yet. The AMS 2 Pro features an enhanced design for a better user experience and, crucially, introduces "
+   },
+   "dict": null
+  },
+  {
+   "h": "8bb7923fb88e58525ca285e64510c10ddde1d622624ba4dc2ef07ce609e02d37",
+   "en": "Faster Multi-Color Printing",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[18].line[2]",
+    "near": "Moist"
+   },
+   "dict": null
+  },
+  {
+   "h": "70e52f9ce305ece1337bea76b9c56f28838c95e243b5b8ef924813b7d41ed6ad",
+   "en": "The PMSM feeding motor accelerates filament feeding by 60%, saving an average of 10 minutes for every 100 filament changes.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[18].line[3]",
+    "near": "Faster Multi-Color Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "a9a96a263bef31195da6e195f6420e3449300344fa9748fb7ac751300f52ade9",
+   "en": "Formula Race Car",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[18].line[4]",
+    "near": "The PMSM feeding motor accelerates filament feeding by 60%, saving an average of 10 minutes for every 100 filament changes."
+   },
+   "dict": null
+  },
+  {
+   "h": "1bf34a6e3cf2c768756a7e6acd624eb894d2f68a27a1b99b971ac80d2e70b2e6",
+   "en": "Steering Wheel",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[19].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6275398e9566bdea76c5ae1e68b423d8970ae98cf673dd99d331f6dccf5c3613",
+   "en": "P51 Mustang",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[20].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "93d8229b30fb90b0020701e6dd7cb945f8fe1a1026b9fd848b31ae222eb89bd7",
+   "en": "Perfection, Detail by Detail.",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[21].line[0]",
+    "near": "The P2S features numerous refinements that enhance the user experience. While these incremental improvements may not be immediately apparent, they embody the le"
+   },
+   "dict": null
+  },
+  {
+   "h": "5fb8ab849fb48fb8043f2eae98769d11bc19ca8b71fd6f3549b0b10016cd3b74",
+   "en": "The P2S features numerous refinements that enhance the user experience. While these incremental improvements may not be immediately apparent, they embody the level of perfection Bambu Lab constantly pursues.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[21].line[1]",
+    "near": "Perfection, Detail by Detail."
+   },
+   "dict": null
+  },
+  {
+   "h": "cf52b143a2e2e69e4d06df7b3ffe3ce10668bd269a15ba46a176b2ab027a5483",
+   "en": "Built-in 2-in-1 Buffer (equipped with AMS combo)",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[21].line[2]",
+    "near": "The P2S features numerous refinements that enhance the user experience. While these incremental improvements may not be immediately apparent, they embody the le"
+   },
+   "dict": null
+  },
+  {
+   "h": "946b8c9e680471458ec756f732ccf30b902880499d4c687d007bd95b79e9d532",
+   "en": "Effortlessly switch between your AMS and external filament spools for maximum flexibility.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[21].line[3]",
+    "near": "Built-in 2-in-1 Buffer (equipped with AMS combo)"
+   },
+   "dict": null
+  },
+  {
+   "h": "bd118f5b1d62b9e253904bc3b6b3eec4d0dc7e1d406cd29b4f286e400041a2d5",
+   "en": "Flat Base Plate",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[22].line[0]",
+    "near": "The smooth, flat surface makes it simple to swipe out all residue, keeping your printer clean."
+   },
+   "dict": null
+  },
+  {
+   "h": "d68a139cd2343086a3c297e2ba0f326aaee9a671ae859d2499af8ad39e7e9e1d",
+   "en": "The smooth, flat surface makes it simple to swipe out all residue, keeping your printer clean.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[22].line[1]",
+    "near": "Flat Base Plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "269ee3c18838b990ae06fd5cbef3e840a0fcbdb73e57edb01bd5132860b1192d",
+   "en": "Integrated Lift Handles",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[23].line[0]",
+    "near": "Designed for safe and easy transport, these sturdy handles protect your hands and provide a secure grip when moving the printer."
+   },
+   "dict": null
+  },
+  {
+   "h": "d02cce19c3aeeb99252842ffdc1ed8c2ab27b3cdefa8cf64b778e6220b5633e3",
+   "en": "Designed for safe and easy transport, these sturdy handles protect your hands and provide a secure grip when moving the printer.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[23].line[1]",
+    "near": "Integrated Lift Handles"
+   },
+   "dict": null
+  },
+  {
+   "h": "101d29465751b4639bd0553f23684daf2f1aa60dd5e276e578ca725caa09d62d",
+   "en": "Shatter-Safe Front Glass",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[24].line[0]",
+    "near": "Engineered for safety, the front glass is protected by a film built to resist shattering, protecting you and your workspace."
+   },
+   "dict": null
+  },
+  {
+   "h": "cc9a743c9e5096d67aadfa65f8fe0b1a69abfc2fd9eacdcdac1b277e7db636ff",
+   "en": "Engineered for safety, the front glass is protected by a film built to resist shattering, protecting you and your workspace.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[24].line[1]",
+    "near": "Shatter-Safe Front Glass"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc424afe26170a3f6c3d19631c9af376f194d6a6722cbe9d8e1853dff4b1530c",
+   "en": "1. What materials are the P2S pre-installed extruder gears and nozzle made of?",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[1]",
+    "near": "FAQ"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e26d4d783a735bd323a9d73107b01c194a7c4ca6548c40e6e4680c336f2ea8b",
+   "en": "Hardened steel.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[2]",
+    "near": "1. What materials are the P2S pre-installed extruder gears and nozzle made of?"
+   },
+   "dict": {
+    "ar": "فولاذ مقسّى.",
+    "ckb": "پۆڵای ڕەقکراو."
+   }
+  },
+  {
+   "h": "714bdc29b2ac86c81b354c860d02caf74f595434d29d9e5ec6ce50bc78d111a8",
+   "en": "2. Does the P2S require an external power supply to use the dry filament function when connected to the AMS 2 Pro?",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[4]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c0e45f5e4bccf0e37f608a41489a81db5efa15dafcf8167c9e26a234a4293c62",
+   "en": "It depends.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[5]",
+    "near": "2. Does the P2S require an external power supply to use the dry filament function when connected to the AMS 2 Pro?"
+   },
+   "dict": null
+  },
+  {
+   "h": "5fb32caf14509dcddda216f04cb21bab49667363ace78a8eab57b8daa194f901",
+   "en": "Scenario 1: No external power supply is required.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[6]",
+    "near": "It depends."
+   },
+   "dict": null
+  },
+  {
+   "h": "92b4d5fef598acd94a982cd6d81064cf7e5dfad49116944f521977e073a24976",
+   "en": "This applies when a single AMS 2 Pro is connected to the P2S via a 6-pin cable, and the P2S is in standby mode (i.e., not currently executing a print task).",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[7]",
+    "near": "Scenario 1: No external power supply is required."
+   },
+   "dict": null
+  },
+  {
+   "h": "46b6f8dbb778d5c8d042f93b029177e20690e23f4d7c231b09beb3f1ca4f4884",
+   "en": "Please note that the P2S can only supply power for the drying function of a single AMS 2 Pro. If you need to dry filament in multiple AMS 2 Pro units simultaneously, you must use an official Bambu Lab power adapter to supply power to the additional AMS 2 Pro units.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[8]",
+    "near": "This applies when a single AMS 2 Pro is connected to the P2S via a 6-pin cable, and the P2S is in standby mode (i.e., not currently executing a print task)."
+   },
+   "dict": null
+  },
+  {
+   "h": "d7f55e8eccb11be945cf24f6ec1d1b9d06165335a256fbfc50f5f7ed4e39247d",
+   "en": "Scenario 2: An external power supply is required. Typical scenarios include:",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[9]",
+    "near": "Please note that the P2S can only supply power for the drying function of a single AMS 2 Pro. If you need to dry filament in multiple AMS 2 Pro units simultaneo"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9e91fe8f5f685149617898aa56aaf50f472f8e367ada69d9abad30c88079628",
+   "en": "A single AMS 2 Pro is connected to the P2S, but the P2S is currently executing a print task—in this case, simultaneous drying is supported, but an official Bambu Lab power adapter must be used to power the AMS 2 Pro for its drying function.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[10]",
+    "near": "Scenario 2: An external power supply is required. Typical scenarios include:"
+   },
+   "dict": null
+  },
+  {
+   "h": "6714bb36767a577598cf867633497c348675aa5fcf48809acef354b3f35cdbd9",
+   "en": "Multiple AMS 2 Pro units are connected to the P2S—in this case, if the P2S is executing a print task, every AMS 2 Pro must be equipped with an additional power adapter. If the P2S is in standby mode, it can supply power for the drying function of one AMS 2 Pro, while any remaining AMS 2 Pro units will require individual additional power adapters to perform drying functions.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[11]",
+    "near": "A single AMS 2 Pro is connected to the P2S, but the P2S is currently executing a print task—in this case, simultaneous drying is supported, but an official Bamb"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3b4221d6ad0019399917e457f56ea14eaec813fced4c6352733218cd79752bb",
+   "en": "Please note that the official Bambu Lab power adapter is not included in the P2S Combo and must be purchased separately.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[12]",
+    "near": "Multiple AMS 2 Pro units are connected to the P2S—in this case, if the P2S is executing a print task, every AMS 2 Pro must be equipped with an additional power "
+   },
+   "dict": null
+  },
+  {
+   "h": "342905681720bdae9041544656615633cd29bf886e18f4967bb98fedc7e94fca",
+   "en": "3. Are the P2S buildplate and the XPA series buildplates compatible?",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[14]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "08f3f28bd3189ba5c1554f1029ebc63d6d57c86c84dbc3d7ddddc12f706ddbd2",
+   "en": "The P2S buildplate's recognition function has been optimized. Older build plates do not support the type recognition feature, but their external dimensions are consistent, so they can still be used for printing.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[15]",
+    "near": "3. Are the P2S buildplate and the XPA series buildplates compatible?"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbeefe104eabf11127944f25bd21c35affccb7b5554f748a75dea882ce4186ca",
+   "en": "4. The left side of the P2S has some mounting points. Does it support installing an auxiliary part cooling fan?",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[17]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9cc18098cf2ebabdcadab244d243c9f3d4e5fc485a3f30d201548ddc9fa163f1",
+   "en": "You can purchase an official auxiliary cooling fan for upgrading.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[18]",
+    "near": "4. The left side of the P2S has some mounting points. Does it support installing an auxiliary part cooling fan?"
+   },
+   "dict": null
+  },
+  {
+   "h": "d1cbbcdad18c19411357a709e93182d9ed3cf39ce7fd3b2e98cc82a85da11705",
+   "en": "5. Can the P2S use the nozzle of A1 and H2D?",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[20]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "06c08107eb9e45139809f4e73a8f5cc0d1eb9582335841e17d7b44443cfa0d43",
+   "en": "It's compatible with H2D nozzles but not with A1 nozzles.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[21]",
+    "near": "5. Can the P2S use the nozzle of A1 and H2D?"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c99c500d50cb9884b9ffb27b98d90eb1b7100d9a5d3e9dfa7acf9850ec3cf13",
+   "en": "6. How many AMS units can the P2S connect to at most?",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[23]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9421c4b62d0a64a16feb44522546ee2055cf7ddb3df44765e179296cf1be8a46",
+   "en": "It supports connecting to 4 AMS 2 Pro units and 4 AMS HT units, totaling 8 AMS units with 20 slots. This means it supports up to 20-color printing.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[24]",
+    "near": "6. How many AMS units can the P2S connect to at most?"
+   },
+   "dict": null
+  },
+  {
+   "h": "dffe94ea696e2541bfce96b9b91fca950167117de574c18a5284e109363bb60a",
+   "en": "7. Does the P2S support chamber temperature control, and how is the temperature controlled?",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[26]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1f406fdf95e94890ac81f60159104212c54881785507a04eeee6bc5a5c3459c0",
+   "en": "The P2S does not have an active chamber heating function, but it can regulate chamber temperature through its enclosed chamber and automatic switching flap between internal and external circulation.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[27]",
+    "near": "7. Does the P2S support chamber temperature control, and how is the temperature controlled?"
+   },
+   "dict": null
+  },
+  {
+   "h": "19d0865f8f3c54055f41cb8a7d93811f61167216e270fef8f20da2c5f7ddbc46",
+   "en": "8. Why did the P2S stop using carbon rods?",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[29]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5e5d4fa906127ea95bcdd2651ec4255184dd3dcdf198d97297141a6c8abba59b",
+   "en": "To allow for easier maintenance. Dirt residual is much simpler to clean off the surface of a smooth rod.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[30]",
+    "near": "8. Why did the P2S stop using carbon rods?"
+   },
+   "dict": null
+  },
+  {
+   "h": "76386c70cf9c31778db7bab7378cf582200af6ecaaae770dfecb37df9f522d5d",
+   "en": "9. Will the P1S stop being sold?",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[32]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9390e36cb8047b5330bcfac67903aeee7a3d1d03882f127f35800a1071cfef89",
+   "en": "There are no plans for that at the moment. Please stay tuned for official announcements.",
+   "kind": "faq_a",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[25].line[33]",
+    "near": "9. Will the P1S stop being sold?"
+   },
+   "dict": null
+  },
+  {
+   "h": "49f4e23115a62265c0192bede2d07565317a028a638a5be692b980edd3e62ee2",
+   "en": "1. Big thanks to everyone who created these amazing projects: 911 Turbo by @Mr.Rod; SVF1 by @Ouky1991; Another Lamp by @lautaro.id; 3D printed slides by @CloudBerry; Pietone 3D Printing Keyboard by @Makesenstudio; Thirst Zapper water shooter by @Neebick; Machinist Infinity Cube by @Franken 3D; Minecraft TNT by 星云丿长歌; Formula race car by @SAMPAN棱界复刻; Steering Wheel by @Marconooren; P51 Mustang by @Planes01; House scene by @BambuLab; AM Vantage by @Cormango; A1 Robot by @洞洞脑子研造社; Plant Pot Stratum by @Hplnvent",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[26].line[0]",
+    "near": "2. All product data for the P2S is based on Bambu Lab’s internal testing. Actual results may vary due to individual product differences, user habits, and enviro"
+   },
+   "dict": null
+  },
+  {
+   "h": "d93af96bd1583b57843f4547439308db2020e66b377b85f810e4c4a233964ec1",
+   "en": "2. All product data for the P2S is based on Bambu Lab’s internal testing. Actual results may vary due to individual product differences, user habits, and environmental conditions. Please refer to actual usage for reference.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[26].line[1]",
+    "near": "1. Big thanks to everyone who created these amazing projects: 911 Turbo by @Mr.Rod; SVF1 by @Ouky1991; Another Lamp by @lautaro.id; 3D printed slides by @CloudB"
+   },
+   "dict": null
+  },
+  {
+   "h": "9622334848a9dd5abaf065ba0f6fc101fa77c03365f6fab5c14c516656970fb0",
+   "en": "3. Creator projects are provided for illustrative purposes only.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[26].line[2]",
+    "near": "2. All product data for the P2S is based on Bambu Lab’s internal testing. Actual results may vary due to individual product differences, user habits, and enviro"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9f5867ff56e395d11ebee207c27a224a6582b486b548d7d18536c6c446cc069",
+   "en": "4. Filament grinding detection on the DynaSense Extruder may vary depending on filament type.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[26].line[3]",
+    "near": "3. Creator projects are provided for illustrative purposes only."
+   },
+   "dict": null
+  },
+  {
+   "h": "618f64a205292aa6ad7b5340583c8cb854beac959b9e3ed29f5a53190d36e411",
+   "en": "5. Push notifications require use of Bambu Handy and cloud connectivity.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[26].line[4]",
+    "near": "4. Filament grinding detection on the DynaSense Extruder may vary depending on filament type."
+   },
+   "dict": null
+  },
+  {
+   "h": "85087b7bd2526f2a8a2113b86a46729d38c71e5d73d15b5c5a0031dfef5d5201",
+   "en": "6. The claimed performance of P2S is based on testing results under the recommended operation environment on the spec sheet.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[26].line[5]",
+    "near": "5. Push notifications require use of Bambu Handy and cloud connectivity."
+   },
+   "dict": null
+  },
+  {
+   "h": "d31916e916072e595a2f398000828ca1dc100822d9ea64a9f56f0de5cfc1c46a",
+   "en": "Design of P2S",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[27].line[0]",
+    "near": "Bambu Lab's P2S embodies a \"Function Over Form\" philosophy. Its minimalist design conceals meticulous engineering, with every detail fine-tuned to deliver a qua"
+   },
+   "dict": null
+  },
+  {
+   "h": "71dc83dc8340a006acdf7bccfc5826cbfa6d903c4dfeaa25235923537157a2db",
+   "en": "Bambu Lab's P2S embodies a \"Function Over Form\" philosophy. Its minimalist design conceals meticulous engineering, with every detail fine-tuned to deliver a quality that is truly distinct. This isn't just a printer; it's a testament to how purposeful design can elevate the entire creative experience.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[27].line[1]",
+    "near": "Design of P2S"
+   },
+   "dict": null
+  },
+  {
+   "h": "8ea5895fc1717827867bc2b5e6c04b0263d3ed8ba8d95e4975dec750a83d89be",
+   "en": "P2S Quality Prints",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[28].line[0]",
+    "near": "The P2S embodies Bambu Lab's high standard of print quality. We have meticulously fine-tuned its performance across all print types, ensuring superior detail pr"
+   },
+   "dict": null
+  },
+  {
+   "h": "27320e28b9011c7bcdc3cfdd296b218e3898e65903f34fa05c06d44096481e48",
+   "en": "The P2S embodies Bambu Lab's high standard of print quality. We have meticulously fine-tuned its performance across all print types, ensuring superior detail preservation, sharp edges, and flawless surfaces to meet our customers' high expectations.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[28].line[1]",
+    "near": "P2S Quality Prints"
+   },
+   "dict": null
+  },
+  {
+   "h": "494e975cf7a64ca152f191653813c47e1e496aedca1bef91241569fbba8f2e1c",
+   "en": "Intuitive Touchscreen Interface: Seamless control at your fingertips.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[29].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "e591381b98e028f3791c7e5894fb68eb5756a3c2023263c2e2eec3a49e8a8fa4",
+   "en": "Fully Enclosed Chamber: Engineered for the safe and consistent printing of advanced materials.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[29].line[2]",
+    "near": "• Intuitive Touchscreen Interface: Seamless control at your fingertips."
+   },
+   "dict": null
+  },
+  {
+   "h": "6afd05fd29028394e9af7c8c1e7e83949c4c209b83d4cac5c7f5807a7839725c",
+   "en": "AI-Powered Oversight: Intelligent error detection makes 3D printing simpler and more reliable.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[29].line[3]",
+    "near": "• Fully Enclosed Chamber: Engineered for the safe and consistent printing of advanced materials."
+   },
+   "dict": null
+  },
+  {
+   "h": "e687da8d576ec33ad8d41d990de05b7a1e775000956018a69c85a201e197e9eb",
+   "en": "Integrated Filament Drying: Keep your materials in peak condition with the 2nd-Gen AMS.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[29].line[4]",
+    "near": "• AI-Powered Oversight: Intelligent error detection makes 3D printing simpler and more reliable."
+   },
+   "dict": null
+  },
+  {
+   "h": "bc838ce0a34c6c09f273e5428b66d47d0e86aec41ebea3f1a344c17b14b1ae1e",
+   "en": "Built on a Legend: The power of the best-selling P1S, completely refined and reimagined.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[29].line[5]",
+    "near": "• Integrated Filament Drying: Keep your materials in peak condition with the 2nd-Gen AMS."
+   },
+   "dict": null
+  },
+  {
+   "h": "bc8fff4b996ea401186949b6a6385d0baae02c0af27b72b24b7d37b58f1875f2",
+   "en": "Full-Scale Build Volume: A spacious 256 × 256 × 256 mm³ canvas for your biggest ideas.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "blocks[29].line[6]",
+    "near": "• Built on a Legend: The power of the best-selling P1S, completely refined and reimagined."
+   },
+   "dict": null
+  },
+  {
+   "h": "104be07673961b1546e9040db10f0b4bef00eebcee5c06200c64bd0883bbefba",
+   "en": "Uncompromising Multi-Material.",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu Lab H2C"
+   },
+   "dict": null
+  },
+  {
+   "h": "31c7e316103f10ffff624b6b5f7eb9b16ac7f551686c13a6c83f0afb9c6c5fca",
+   "en": "Paint No More, Print 7 Colors in One-Piece.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1842a098d9e657d8589608f0ad503d62fb3cbbbde6864a53ca709eafee1fdfb6",
+   "en": "No More Assembly — Print Multi-Material Parts in One Piece.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[2].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "76f5987df629d0f504034c56bcba97d5d3cdf5df511b6089b2e8b39ff8e0b723",
+   "en": "Print Durable Joints — Built Right Into the Parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[3].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b70e44bab4c0c63ff5dd3c19b7252ee69585a2caedd2b942d0ab58e422c40b29",
+   "en": "Vortek Hotend Change System",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[4].line[0]",
+    "near": "Multi-Material Printing with Minimal Purge Waste"
+   },
+   "dict": null
+  },
+  {
+   "h": "55c7a981623d40e004d9cf2a2009ac472dce5111e3fab2e951dd4e7f77ed9013",
+   "en": "Multi-Material Printing with Minimal Purge Waste",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[4].line[1]",
+    "near": "Vortek Hotend Change System"
+   },
+   "dict": null
+  },
+  {
+   "h": "93d470147ea605216b896827919b944237eb07fb3a6749fe9416e932a8ff74ae",
+   "en": "In traditional single-nozzle multi-material printing, purging is needed to clear leftover material between filament changes.Vortek changes that with an intelligent hotend-swapping system that replaces the entire hotend — delivering faster, cleaner prints with minimal waste.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[5].line[0]",
+    "near": "Fully Automatic Filament Change"
+   },
+   "dict": null
+  },
+  {
+   "h": "920091fac783e9e724429ecca0118fc3fbf88f025ca2ad48ef730cab35b0961f",
+   "en": "Fully Automatic Filament Change",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[5].line[1]",
+    "near": "In traditional single-nozzle multi-material printing, purging is needed to clear leftover material between filament changes.Vortek changes that with an intellig"
+   },
+   "dict": null
+  },
+  {
+   "h": "a072edebb5e11785e9a00f4fd6544f0a232beb8b79ff01a257043477027a0f08",
+   "en": "The Vortek system works seamlessly with our highly reliable AMS (Automatic Material System), making the entire filament change process fully automatic — no need to manually load each filament into the toolhead.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[6].line[0]",
+    "near": "Always Delivering the Most Efficient Combination"
+   },
+   "dict": null
+  },
+  {
+   "h": "1222e85401acc049ffb936d8f08fc4c4dc7d788de8b31c24000de79d912d8553",
+   "en": "Always Delivering the Most Efficient Combination",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[6].line[1]",
+    "near": "The Vortek system works seamlessly with our highly reliable AMS (Automatic Material System), making the entire filament change process fully automatic — no need"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc85a7091a880e955b7b3d388680d160c3877d2e946796d45176e96077a2f7d1",
+   "en": "The Vortek system can store filament information in the hotend’s memory, ensuring the correct filament is matched to each hotend. If you are printing with more than seven filament types, the system can calculate the optimal combination to minimize purge waste.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[7].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "04cfd90085f05498de7ca4f161b417383a616ff1a036bf3d6970716623852200",
+   "en": "Why Vortek?",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[8].line[0]",
+    "near": "Small Form Factor, More Filaments"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d63df7170b8388af6910a684256667acf417b80e448eee5823c1f0c7785e368",
+   "en": "Small Form Factor, More Filaments",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[8].line[1]",
+    "near": "Why Vortek?"
+   },
+   "dict": null
+  },
+  {
+   "h": "a45bd25e7c8c04842df51d130f2937fc8db706cf1bafe20e98862ea9312def71",
+   "en": "Because only the hotend is swapped, the system can house up to six replaceable hotends without significantly reducing the build volume.That means more materials, more colors, and more possibilities — all in one print.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[9].line[0]",
+    "near": "8-Second Induction Heating"
+   },
+   "dict": null
+  },
+  {
+   "h": "a0c7808ddfa45ea4e49b3284cdbe631baf8e21f3168dd950434c71ad30468591",
+   "en": "8-Second Induction Heating",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[9].line[1]",
+    "near": "Because only the hotend is swapped, the system can house up to six replaceable hotends without significantly reducing the build volume.That means more materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "6622d2d7b463456d6ee3842d2a801e8df1f0b225103f2b2e3c3b9baa1a8d407c",
+   "en": "Our industry-leading induction heating technology brings the nozzle to temperature in 8-sec, significantly reducing the preheating time for each material swap compared to traditional methods.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[10].line[0]",
+    "near": "Contactless Design For Reliability"
+   },
+   "dict": null
+  },
+  {
+   "h": "5b1aac5ad7dcb94a675b25051dce524a3a8d14176a027dbd9051941750f257d2",
+   "en": "Contactless Design For Reliability",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[10].line[1]",
+    "near": "Our industry-leading induction heating technology brings the nozzle to temperature in 8-sec, significantly reducing the preheating time for each material swap c"
+   },
+   "dict": null
+  },
+  {
+   "h": "13b02d78ca780bad938a9b3a1e8b01ce9ed26134097f9b419e12bd028abf3a75",
+   "en": "Our high standards for reliability led us to move away from contact-based metal pins, which are prone to oxidation and unstable connections.We developed a contactless solution that ensures a stable, high-frequency connection — the foundation for precise temperature control and intelligent hotend sync.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[11].line[0]",
+    "near": "Colors Are No Longer Limited By How Many Toolheads You Have"
+   },
+   "dict": null
+  },
+  {
+   "h": "82b59fac7119ad7b1d57cad56bb71ab71ba2c959bf0665a41a202d0f7f701f2b",
+   "en": "Colors Are No Longer Limited By How Many Toolheads You Have",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[11].line[1]",
+    "near": "Our high standards for reliability led us to move away from contact-based metal pins, which are prone to oxidation and unstable connections.We developed a conta"
+   },
+   "dict": null
+  },
+  {
+   "h": "36816e0e024045a2305f6ade6134fafcfc7ff8c0a0d2173684c0ee3d6676de7e",
+   "en": "Unlike traditional toolchanger printers that limit color count by the number of toolheads, the H2C supports up to 24 materials in a single print through parallel-connected AMS units. Its intelligent algorithm optimizes filament-to-hotend allocation to minimize purge waste while delivering outstanding multi-color and multi-material results.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[12].line[0]",
+    "near": "Enclosed for High-Performance Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "5fa680625e6abb824af62a181df5880ca0a583b41c510350a2f930a6444ae7dd",
+   "en": "Enclosed for High-Performance Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[12].line[1]",
+    "near": "Unlike traditional toolchanger printers that limit color count by the number of toolheads, the H2C supports up to 24 materials in a single print through paralle"
+   },
+   "dict": null
+  },
+  {
+   "h": "39e16e5d1d92b76ae4f219d899095e3b63ba4dcb83a8d48edb659bed517da020",
+   "en": "With its seamless enclosure and adaptive airflow system, the H2C maintains a stable chamber temperature for high-performance materials and filters the air to keep your workspace clean and safe.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[13].line[0]",
+    "near": "Fully Automatic Nozzle Offset Calibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "721ae924e08851f064acf45adb8408619531b75c9e8544076d7ac4ee89f20c86",
+   "en": "Fully Automatic Nozzle Offset Calibration",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[13].line[1]",
+    "near": "With its seamless enclosure and adaptive airflow system, the H2C maintains a stable chamber temperature for high-performance materials and filters the air to ke"
+   },
+   "dict": null
+  },
+  {
+   "h": "640a17735aaf108cca221853d4a5e9ea6e71357ec9117f3870e5f7a2374d8a78",
+   "en": "Our inductive nozzle offset calibration is fully automated — no manual steps, no calibration plates, no extra setup. In just a few minutes, the H2C precisely calibrates nozzle offset to within 25 microns.*",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[14].line[0]",
+    "near": "Dedicated Hotends for Specific Filaments"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0af837c538caac13cddb6f00c1f6981378577cb767f96f9cb76c07465586e70",
+   "en": "Dedicated Hotends for Specific Filaments",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[14].line[1]",
+    "near": "Our inductive nozzle offset calibration is fully automated — no manual steps, no calibration plates, no extra setup. In just a few minutes, the H2C precisely ca"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0875c175671ed9478467d68036ea8b919774313d3c7fbebcef42d446651540d",
+   "en": "The H2C's Vortek system lets you dedicate one of its six interchangeable hotends to specific filaments — a game-changer for valuable engineering materials.This ensures superior consistency and reliability across prints. Each hotend can even automatically store filament information, so the next time you load that material, it's instantly matched to the correct hotend.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[15].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a2706311c876d12b3bd2b8a8edac5ad0a977df3ff8ee1a49471bdc7bf7ece9a2",
+   "en": "Top Tier Printing Performance",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[16].line[0]",
+    "near": "Better High-Speed Reliability & Real-Time Error Detection."
+   },
+   "dict": null
+  },
+  {
+   "h": "cfec78781ab370ce8a1e0946b6007a279dfc7f32b79a4a712f2444794fc43b57",
+   "en": "Better High-Speed Reliability & Real-Time Error Detection.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[16].line[1]",
+    "near": "Top Tier Printing Performance"
+   },
+   "dict": null
+  },
+  {
+   "h": "91d9ddb49b5aac660896558df025b87199ed71e527d7620e2ea998e00970315e",
+   "en": "The PMSM servo extruder delivers up to 10 kg of maximum extrusion force—70% more than stepper motor—dramatically improves high-flowrate extrusion stability. Our proprietary servo architecture samples resistance and position at 20 kHz, actively detecting filament grinding and clogs in real time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[16].line[2]",
+    "near": "Better High-Speed Reliability & Real-Time Error Detection."
+   },
+   "dict": null
+  },
+  {
+   "h": "a1b743f807ff502e8518db8f151195092ef6180d8344852056b6f57316ac320f",
+   "en": "50 µm Ultra-Fine Motion Accuracy*",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[16].line[3]",
+    "near": "The PMSM servo extruder delivers up to 10 kg of maximum extrusion force—70% more than stepper motor—dramatically improves high-flowrate extrusion stability. Our"
+   },
+   "dict": null
+  },
+  {
+   "h": "15d64c59461d4b18a07bd78bfea626b9324e2cd98ee85004c61f54484b586710",
+   "en": "With its Vision Encoder, the H2C achieves a distance-independent motion accuracy of less than 50 μm—thinner than human hair. The system automatically compensates for any mechanical drift during calibration, ensuring consistent precision and peak performance over time.*",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[16].line[4]",
+    "near": "50 µm Ultra-Fine Motion Accuracy*"
+   },
+   "dict": null
+  },
+  {
+   "h": "794283ce0701fc2190706b001e1d8c75d8d130e28dedc62882f4c0108be1860d",
+   "en": "Smooth Surface, Sharp Edges",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[16].line[5]",
+    "near": "With its Vision Encoder, the H2C achieves a distance-independent motion accuracy of less than 50 μm—thinner than human hair. The system automatically compensate"
+   },
+   "dict": null
+  },
+  {
+   "h": "41f35dd426a183d0027c19f8203845b5205e4010fa86f76e931fe2d01c6117e1",
+   "en": "The H2C leverages both the servo motor on the extruder and the high-resolution eddy current sensors on the nozzle to sense extrusion dynamics. This enables precise extrusion control and automatic calibration of Pressure Advance (PA) parameters for each filament, resulting in smoother surfaces and cleaner, sharper edges.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[16].line[6]",
+    "near": "Smooth Surface, Sharp Edges"
+   },
+   "dict": null
+  },
+  {
+   "h": "26de1ccc5a01d11edf2af998828f03df7d1bf326cd6585eb7e59f194159a857f",
+   "en": "Unleash The Full Potential of High-Performance Materials",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[17].line[2]",
+    "near": "OFF"
+   },
+   "dict": null
+  },
+  {
+   "h": "64ea6193938d5c12e396543546c992f77164ed7c442397da9da438c30b8911c9",
+   "en": "The H2C's 65 °C actively heated chamber & 350°C Nozzles minimizes warping and deformation while enhancing layer adhesion for high-performance, high-temperature filaments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[17].line[3]",
+    "near": "Unleash The Full Potential of High-Performance Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "76b78a7a1fba17d5e497ba878094633c56aed5dc8f64f33df30b780df811de27",
+   "en": "Chamber Heater",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[18].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3994f2b74eae138229d334dbdad559a29e7f0f914f9e66023a4036c706ff50d6",
+   "en": "350°C Nozzles",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[19].line[0]",
+    "near": "Comprehensive Print Monitoring"
+   },
+   "dict": null
+  },
+  {
+   "h": "7204b29cf014dacad2143b165e619ce0240be0ceba0f2ad40d534061704ec7fe",
+   "en": "Comprehensive Print Monitoring",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[19].line[1]",
+    "near": "350°C Nozzles"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b3cc98169019cc64fef5deb29f02bfeb9a199847c60797fee059ed9944d4e8f",
+   "en": "The H2C is equipped with an array of 59 sensors* and a quad-camera computer vision system, all orchestrated by our proprietary neural algorithm. During printing, this system delivers intelligent, real-time diagnostics that can detect even the most subtle print anomalies as they happen. You don't have to be an expert to solve problems—your printer does the job for you.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[19].line[2]",
+    "near": "Comprehensive Print Monitoring"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c16bd201e23d052040ece1a7e3f8645946252a1c56f46298b37d94cf2988d4a",
+   "en": "AI Camera",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[20].line[0]",
+    "near": "The H2C features an AI-backed camera system. This intelligent monitoring system continuously tracks extrusion patterns, immediately detecting material accumulat"
+   },
+   "dict": {
+    "ar": "كاميرا AI",
+    "ckb": "کامێرا AI"
+   }
+  },
+  {
+   "h": "0df3e5c9ab16142ec4d9af2a6be988beb55dc34ab67aad9a366ec5d3daeab1b9",
+   "en": "The H2C features an AI-backed camera system. This intelligent monitoring system continuously tracks extrusion patterns, immediately detecting material accumulation, filament deviations, and extrusion failures. Also runs a pre-flight scan to ensure a safe start.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[20].line[1]",
+    "near": "AI Camera"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4e22a353112917dcfb81d5b5143ee096d7cad625142e136bc0135c8ea79fdcc",
+   "en": "Pre-Flight",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[21].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f0a950d3f391314224083e20590c4b0b7bb3dd7e2534ea51a42e627affbd2b66",
+   "en": "Air Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[24].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1a41799f33bfbb7fe9b9c4e3a0f42f062b6de033e14027cde6edd5bd09ab98af",
+   "en": "Safety, Checked!",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[25].line[0]",
+    "near": "Best-In-Class Air Filtration"
+   },
+   "dict": null
+  },
+  {
+   "h": "7afdc42a5acd1739bf9545ca344dd853948f1c42dee738b90560fb20935e32ae",
+   "en": "Best-In-Class Air Filtration",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[25].line[1]",
+    "near": "Safety, Checked!"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6feea17129f2021624753dab8e5c1bf923069949c93c70e60297d0b043e0622",
+   "en": "The H2C's three-stage filtration system is essential for printing with engineering filaments. This powerful combination of a G3 pre-filter, an H12 HEPA filter, and a coconut shell activated carbon filter effectively minimizes the odors and harmful particulates often released by engineering materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[25].line[2]",
+    "near": "Best-In-Class Air Filtration"
+   },
+   "dict": null
+  },
+  {
+   "h": "39d2a3ccb757eed42f1059b96a1a041c02e849bf7bd712b3726486f3adc004c5",
+   "en": "Fire-Retardant Construction",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[26].line[2]",
+    "near": "OFF"
+   },
+   "dict": null
+  },
+  {
+   "h": "16cc53f9a4b9205674a568c8c6b76f8ed7554c03f62f9caf9a4ef045febad37b",
+   "en": "The H2C's chamber is constructed entirely with flame-retardant material, providing robust, passive fire safety protection across the entire enclosure.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[26].line[3]",
+    "near": "Fire-Retardant Construction"
+   },
+   "dict": null
+  },
+  {
+   "h": "b719ffb66ef8e07ad0d7e02374d06fdbfb3f7e4ceabdc3367298733c0c55ca78",
+   "en": "Flexible Network Security & Connectivity",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[27].line[0]",
+    "near": "The H2C offers convenient cloud connectivity for remote control from any device. For security-sensitive applications, it also provides full offline functionalit"
+   },
+   "dict": null
+  },
+  {
+   "h": "135828503113b6fb46d54a9aaac8b7c4612d35ba9ae5a2f02dac26a8d6a60bae",
+   "en": "The H2C offers convenient cloud connectivity for remote control from any device. For security-sensitive applications, it also provides full offline functionality, ensuring complete physical isolation. Users can operate the printer, send files, and update firmware without an internet connection. For advanced users, Developer Mode enables MQTT port access for integrating third-party components and software.*",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[27].line[1]",
+    "near": "Flexible Network Security & Connectivity"
+   },
+   "dict": null
+  },
+  {
+   "h": "8bb1ce44f644bdd65db5ca75c7d61645675b9e4476d9903118551c3b12438017",
+   "en": "1. What hotends are included in the H2C Combo?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[1]",
+    "near": "FAQ"
+   },
+   "dict": null
+  },
+  {
+   "h": "9eace33561f7de8f406958292087f2ec2543e138ca74c202b5f961e4547e36be",
+   "en": "The H2C AMS Combo/Laser Full Combo includes 8 hotends and 1 AMS 2 Pro: Right hotends (Induction hotends): 4 × 0.4 mm hardened steel induction hotends, of which 1 is pre-installed on the printer and 3 are included in the accessory box. The accessory box also includes 1 × 0.2 mm induction hotend and 1 × 0.6 mm induction hotend. Left hotends (Standard hotends): 2 × 0.4 mm hardened steel standard hotends, of which 1 is pre-installed and 1 is included in the accessory box.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[2]",
+    "near": "1. What hotends are included in the H2C Combo?"
+   },
+   "dict": null
+  },
+  {
+   "h": "566746891882e96df8521877349489f28f7bbdbee58791cc62ea1e60b7348a7b",
+   "en": "Currently, the firmware supports mixed flow-rate printing (standard flow + high flow), but does not yet support mixing different nozzle sizes during printing. If this feature is added in the future, we will provide details through a software update.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[3]",
+    "near": "The H2C AMS Combo/Laser Full Combo includes 8 hotends and 1 AMS 2 Pro: Right hotends (Induction hotends): 4 × 0.4 mm hardened steel induction hotends, of which "
+   },
+   "dict": null
+  },
+  {
+   "h": "cc4b538ec19013a38ad680167939e324d9ecc74c8d798e16f3c39ce022bb68af",
+   "en": "2. If I want full hotend-swap capability, what additional hotends do I need? How should the AMS be connected?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[5]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b5c4b9a8ca1c95b8884e53e3967134f2e53a30818fe0bcc23e28c36c49620a29",
+   "en": "Combined with the AMS 2 Pro that comes with the H2C Combo, you will then have 2 × AMS 2 Pro + 1 × AMS HT.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[6]",
+    "near": "2. If I want full hotend-swap capability, what additional hotends do I need? How should the AMS be connected?"
+   },
+   "dict": null
+  },
+  {
+   "h": "b03e9891f3f674b786b0dbf36ce143678c623fd647626a0286cbb75d87a3854a",
+   "en": "To setup: Two AMS 2 Pro feed the right induction hotends; AMS HT feeds the left hotends. This gives you full 7-hotend automatic swapping with AMS support on both sides.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[7]",
+    "near": "Combined with the AMS 2 Pro that comes with the H2C Combo, you will then have 2 × AMS 2 Pro + 1 × AMS HT."
+   },
+   "dict": null
+  },
+  {
+   "h": "f8f6c46cd0a6b8db3ed2ea62df65791cfd0fa6512de27ff77263aff54a2d6840",
+   "en": "In addition to the above options, you can also try:",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[8]",
+    "near": "To setup: Two AMS 2 Pro feed the right induction hotends; AMS HT feeds the left hotends. This gives you full 7-hotend automatic swapping with AMS support on bot"
+   },
+   "dict": null
+  },
+  {
+   "h": "82fa7dada6fa682f10e72c5d251dbb7af365b18accf8905bee8fa75cc25fa292",
+   "en": "Multi-AMS Setup: Add 2 × AMS HT. All three AMS feed the right-side hotends.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[9]",
+    "near": "In addition to the above options, you can also try:"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b661e2f4f9f9176048f66bdc404f6e81022fb555fd2d1df7e17f406b3a15b59",
+   "en": "Future Setup (2026): A Filament Track Switch Module will be released, allowing full 7-hotend support with only 2 AMS units, enabling free filament switching between left & right filament paths.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[10]",
+    "near": "Multi-AMS Setup: Add 2 × AMS HT. All three AMS feed the right-side hotends."
+   },
+   "dict": null
+  },
+  {
+   "h": "6207436b38b95695cfbb775154c6e2c524784ef190417ff5909ea2af3298375d",
+   "en": "3. Does the H2C support laser and blade-cutting functions?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[12]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "de1a542603009273566ac526ac53c7f26f03d6a87b757fd78673107f0815095e",
+   "en": "The H2C Laser Edition supports both 10W and 40W laser modules and is also compatible with the blade-cutting module.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[13]",
+    "near": "3. Does the H2C support laser and blade-cutting functions?"
+   },
+   "dict": null
+  },
+  {
+   "h": "b3e615c0384c8f9c671cb6260b3a18bd01aa4a53129078771d7256b0d7531288",
+   "en": "The non-laser H2C supports blade-cutting by default, but can be upgraded to support laser functions via an upgrade kit.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[14]",
+    "near": "The H2C Laser Edition supports both 10W and 40W laser modules and is also compatible with the blade-cutting module."
+   },
+   "dict": null
+  },
+  {
+   "h": "7bca8c87fdb36cabebda03a702e974ae3fee7379353c019841642aafcc65752f",
+   "en": "4. Can H2S or H2D be upgraded to H2C?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[16]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e3fa81b919d7c8c8bdc2e1af19aff6ee812643335ad92646f8ca1b0a6ba135de",
+   "en": "Both H2D and H2S users may upgrade to H2C by installing the Vortek Upgrade Kit.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[17]",
+    "near": "4. Can H2S or H2D be upgraded to H2C?"
+   },
+   "dict": null
+  },
+  {
+   "h": "4eb7e7e5beca4f6e9b3c21ced6095096479be36cfa8bf46f4ca1cd7f4b14ad37",
+   "en": "5. Can H2C dual-nozzle printing be used with different nozzle sizes simultaneously?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[19]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e4eb71225c8d9ed699abd430e05ed2339649b7af8960ee23ee6fc51ca0868ac9",
+   "en": "Not currently.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[20]",
+    "near": "5. Can H2C dual-nozzle printing be used with different nozzle sizes simultaneously?"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9dd1d616451384466ce1c6c000cf5d387fe71457f8a5efdbf141f4f5114b6c6",
+   "en": "The firmware does not yet support mixing nozzle sizes (left vs. right or within Vortek hotend sets).",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[21]",
+    "near": "Not currently."
+   },
+   "dict": null
+  },
+  {
+   "h": "a2a677c0bbe449e07ace5280d9aecafe9263b98250ff3ee6e08bdd1055ce87bb",
+   "en": "However, mixed nozzle types of the same size (e.g., 0.4 mm standard flow + 0.4 mm high flow) are supported.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[22]",
+    "near": "The firmware does not yet support mixing nozzle sizes (left vs. right or within Vortek hotend sets)."
+   },
+   "dict": null
+  },
+  {
+   "h": "3e7c345a9cf772e78691caea08edc157451ebd0a70ba74234b821fc596d330ac",
+   "en": "6. Are the H2C buildplates, calibration plates, laser platform, and blade-cutting mats compatible with H2D?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[24]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "de6185ed0b06909971d2c248fd102f04191cd8dcdb159b925846768a8aec601a",
+   "en": "Because the Vortek hotend rack occupies additional space, the H2C print bed is slightly smaller than the H2D.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[25]",
+    "near": "6. Are the H2C buildplates, calibration plates, laser platform, and blade-cutting mats compatible with H2D?"
+   },
+   "dict": null
+  },
+  {
+   "h": "1522e7326a85aee117c299562d9d9910f25522ff5464b71b0d15eff5df10c9ac",
+   "en": "Therefore, buildplates are not interchangeable between H2C and H2D.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[26]",
+    "near": "Because the Vortek hotend rack occupies additional space, the H2C print bed is slightly smaller than the H2D."
+   },
+   "dict": null
+  },
+  {
+   "h": "859341facfc0fb87fddc82a8b927d87e1d0e7124b45fd20aad6395d4d155cf4c",
+   "en": "However, the vision calibration plates, laser platform, and blade-cutting mats are fully compatible across all H2 series models. For more details, please refer to Wiki.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[27]",
+    "near": "Therefore, buildplates are not interchangeable between H2C and H2D."
+   },
+   "dict": null
+  },
+  {
+   "h": "2003c4cab739aff55b1a9c06db3276641aa81ef3b89eb494d64c29ac47e0893f",
+   "en": "8. Are there any limitation of the Left and Right Hotends when using different filaments？",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[29]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f63e0c89649deced7db0f03f30ad82bde270059a42cd61df4246689f1409e7f6",
+   "en": "Please check WIKI for detailed information. For TPU please check TPU 85A&90A printing guide for H2 series.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[28].line[30]",
+    "near": "8. Are there any limitation of the Left and Right Hotends when using different filaments？"
+   },
+   "dict": null
+  },
+  {
+   "h": "1150f05446e4d34452b320c78645f5d7f717b745ab3165abde97c15ddc650da5",
+   "en": "Note:",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[0]",
+    "near": "* All the demonstrated print time & purge waste data are calculated results by Bambu Studio."
+   },
+   "dict": null
+  },
+  {
+   "h": "9e735ea6096803ea2cf924e7f671ec399f976c142b7c176912dc6c66faad521e",
+   "en": "All the demonstrated print time & purge waste data are calculated results by Bambu Studio.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[1]",
+    "near": "Note:"
+   },
+   "dict": null
+  },
+  {
+   "h": "cd7353308e142cf556d02448ad1ae3e0bf49c97b5bc5f241f834a7f366a81e77",
+   "en": "The advertised Vortek features & advantages are based on fully utilizing 6 induction hotends of same diameter and corresponding AMS units.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[2]",
+    "near": "* All the demonstrated print time & purge waste data are calculated results by Bambu Studio."
+   },
+   "dict": null
+  },
+  {
+   "h": "cf9ea83bdc2a3173d7907ed8389bc7087e02b4ff09c6cd89cf4489c5f9b8231b",
+   "en": "All product data for the H2C is based on Bambu Lab’s internal testing. Actual results may vary due to individual product differences, user habits, and environmental conditions. Please refer to actual usage for reference.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[3]",
+    "near": "* The advertised Vortek features & advantages are based on fully utilizing 6 induction hotends of same diameter and corresponding AMS units."
+   },
+   "dict": null
+  },
+  {
+   "h": "15f8168c37d296ad18ccc63bbb74b86b0d1a1ee315d095679c7e0398e68284bb",
+   "en": "The optional Vision Encoder is required for Motion Accuracy Enhancement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[4]",
+    "near": "* All product data for the H2C is based on Bambu Lab’s internal testing. Actual results may vary due to individual product differences, user habits, and environ"
+   },
+   "dict": null
+  },
+  {
+   "h": "c996fc311e532d70b6cebe93c4695f369dc62c6864d01ff02aea105564bd88a4",
+   "en": "Auto Holes-contour Compensation must be enabled in Bambu Studio, and designated Bambu filament must be used.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[5]",
+    "near": "* The optional Vision Encoder is required for Motion Accuracy Enhancement."
+   },
+   "dict": null
+  },
+  {
+   "h": "75d92abd022efa75b8b9cb3bf139ecb23b72e977ece86700382c850bb9079c54",
+   "en": "DynaSense Extruder filament grinding feature limited by filament type.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[6]",
+    "near": "* Auto Holes-contour Compensation must be enabled in Bambu Studio, and designated Bambu filament must be used."
+   },
+   "dict": null
+  },
+  {
+   "h": "3fcc7e0a15c032b5b002c1e8812b83f7114dc60d770750891ea61ca808120605",
+   "en": "\"59 sensors\" is refer to fully equipped H2C Laser Edition with Bird's Eye camera and 6 induction hotends.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[7]",
+    "near": "* DynaSense Extruder filament grinding feature limited by filament type."
+   },
+   "dict": null
+  },
+  {
+   "h": "9769827330f677d00c4a74e883a22c34cbcc1a3108cc13a7955f1dc4e61b54d7",
+   "en": "Due to safety protocol, Developer mode cannot be enabled when using Laser and Cutting functions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[8]",
+    "near": "* \"59 sensors\" is refer to fully equipped H2C Laser Edition with Bird's Eye camera and 6 induction hotends."
+   },
+   "dict": null
+  },
+  {
+   "h": "80242727929e1280a0fcefba1250557afa6ccc11a1f61e399508ba8326fa954e",
+   "en": "Push notifications require use of Bambu Handy and cloud connectivity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[9]",
+    "near": "* Due to safety protocol, Developer mode cannot be enabled when using Laser and Cutting functions."
+   },
+   "dict": null
+  },
+  {
+   "h": "15d3d375e3f0295b729ffb9960bf0401121c7cf8b977edb1d04611dd97eb4241",
+   "en": "Creator projects are provided for illustrative purposes only.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[10]",
+    "near": "* Push notifications require use of Bambu Handy and cloud connectivity."
+   },
+   "dict": null
+  },
+  {
+   "h": "9994bbc65957195e35c0373bd195ea44be5a62ed813ca09d9d5b98598fe39b4a",
+   "en": "The 8-second heating time for induction hotend is based on Bambu PLA Basic printing temperature.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[11]",
+    "near": "* Creator projects are provided for illustrative purposes only."
+   },
+   "dict": null
+  },
+  {
+   "h": "1d18f7c2c6b16c2082e2d5c9b6aeeff00b545795ab61f64b2c66a4231aed165f",
+   "en": "The “no purging” claim does not include the initial purge required when loading a brand-new filament into a hotend.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[12]",
+    "near": "* The 8-second heating time for induction hotend is based on Bambu PLA Basic printing temperature."
+   },
+   "dict": null
+  },
+  {
+   "h": "74a9750c2130b40ac9b7dabd55e4aeaba6c9dae8f8502ddba5334cbf7ae3bbb6",
+   "en": "The fire-retardant chamber is made using UL94 V-0 grade materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[13]",
+    "near": "* The “no purging” claim does not include the initial purge required when loading a brand-new filament into a hotend."
+   },
+   "dict": null
+  },
+  {
+   "h": "410a4ca7264f9cdb092feec75f1007a2fd13d0b622cc4745d552cd9b8b1d512c",
+   "en": "Big thanks to everyone who created these amazing projects: Geminaraptor by @FireBird(Sophie); Bambu Lab Racer by @Mr.Rod; Blériot Rider - XI by @CrazyJN; Heavy Second Core Mecha by @Kit Crafters; Aero Mobius Drone Frame by @极尘悦; Multi-color Sneaker by @CloudBerry; Gridfinity Anatomical Kidney by @Azrael; Plant Cell by @suezou; EV Charger by @Bambu Lab",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[29].line[14]",
+    "near": "* The fire-retardant chamber is made using UL94 V-0 grade materials."
+   },
+   "dict": null
+  },
+  {
+   "h": "10f0de5c185e43078c17a46e491dea13a76b34960efa1b60cebce6dedfdba5e0",
+   "en": "Hotend Change Multi-material Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[30].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "528f414c1e3f3360cecf24ecba29342400e4fa62a412141d9bc822bbbae6831a",
+   "en": "Minimal Purge Waste Multi-Color Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[30].line[2]",
+    "near": "• Hotend Change Multi-material Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "28e6a45c7bdecbe811874cc9d3e73489ce9694a51424904f8bf2d030fdb7e5ba",
+   "en": "Precise & Fast Inductive Nozzle Heating",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[30].line[3]",
+    "near": "• Minimal Purge Waste Multi-Color Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "adec3f58300abe613b8bf4ad6e8d31921481077960efab890b618b69bfd026f9",
+   "en": "Close-loop Servo Extruder",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[30].line[4]",
+    "near": "• Precise & Fast Inductive Nozzle Heating"
+   },
+   "dict": null
+  },
+  {
+   "h": "04423e9f961e62092b8879417099b1dc56c9e0cb815caad6dce1b6083e16d604",
+   "en": "Full Filament Path AI Error Detection",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[30].line[5]",
+    "near": "• Close-loop Servo Extruder"
+   },
+   "dict": null
+  },
+  {
+   "h": "09314b9e31367ecb432ef924a4d4ab19d930e6115e62d35d3ff0074fc494b535",
+   "en": "350°C Nozzles & 65°C Active Heated Chamber",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[30].line[6]",
+    "near": "• Full Filament Path AI Error Detection"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e5935b1f227be11b7e1e69d6c55b4bc67cbd6b2b2697f56ceb33d4b8dab53a6",
+   "en": "330*320*325 mm³ Build Volume",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[30].line[7]",
+    "near": "• 350°C Nozzles & 65°C Active Heated Chamber"
+   },
+   "dict": null
+  },
+  {
+   "h": "da0439d624b769a7b9b75f04e18f50deb379c19259004a91bb9c070e3786bd6d",
+   "en": "* To connect more than two AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "blocks[30].line[8]",
+    "near": "• 330*320*325 mm³ Build Volume"
+   },
+   "dict": null
+  }
+ ]
+}

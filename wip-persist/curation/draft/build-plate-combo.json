@@ -1,0 +1,610 @@
+{
+  "handle": "build-plate-combo",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T16:14:41Z",
+  "searched": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "keys": [
+        "product.*",
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "package.*",
+        "contents.pieces",
+        "compat.statement",
+        "safety.certifications"
+      ],
+      "note": "Cached copy read in full from the HTML (the text extract drops the tabbed \"Build Plate Types\" panels): Build Plate (dimensions table, Important Notice on the two 256x256 plate generations), the Textured PEI, Engineering Plate and Cool Plate SuperTack tabs (the three plates this combo contains) with their Features, Notes and FAQs, and the Appendix. No weight, thickness, package or contents figures for any plate, and nothing about the combo itself."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "part.max_temperature",
+        "compat.statement"
+      ],
+      "note": "Cached copy read in full; the plate facts are in \"Build Plate Settings\" (glue / bed-temperature table, and the build plate / bed temperature table whose columns are \"Bambu Cool Plate / PLA Plate\", \"Bambu Engineering Plate\", \"Bambu Smooth PEI / High-Temperature Plate\", \"Bambu Textured PEI Plate\"). Its \"Cool Plate / PLA Plate\" column marks PETG \"Not recommended\", which contradicts the plates wiki for the Cool Plate SuperTack (PLA and PETG), so that column is not read as the SuperTack."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/build-plate-combo",
+      "title": "Build Plate Combo (store page)",
+      "retrieved_at": "2026-10-16T07:09:59Z",
+      "keys": [
+        "product.*",
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "package.*",
+        "contents.pieces",
+        "compat.statement"
+      ],
+      "note": "Corpus copy parsed with extractPage/buildImportPayload (sections_html): the comparison table, three plate sections (Textured PEI, Engineering Plate, Cool Plate SuperTack) each with its own Product Specifications table, the Product Features, the Printer Model (Compatibility) and Combo Type options, and the X2D/P2S variant notes. No net weight, no in-the-box list, no package size or weight of the combo itself (only each plate's own packaging, per printer size)."
+    }
+  ],
+  "specs": [
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769076186876784641",
+        "value_text": "X1/P1/A1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (\"Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions\"); every plate in this combo, whichever Combo Type, is the size of the selected Printer Model. First number of the cell. The store page agrees: the Engineering Plate and Cool Plate SuperTack \"Usable Print Size\" rows give \"X1C/P1P/P1S/A1/P2S/X2D - 256*256mm\", and the Textured PEI row lists the same size."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769076186876784641",
+        "value_text": "X1/P1/A1 Series"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (\"Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions\"); every plate in this combo, whichever Combo Type, is the size of the selected Printer Model. Second number of the cell. The store page agrees: the Engineering Plate and Cool Plate SuperTack \"Usable Print Size\" rows give \"X1C/P1P/P1S/A1/P2S/X2D - 256*256mm\", and the Textured PEI row lists the same size."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149697",
+        "value_text": "H2D"
+      },
+      "value": 350,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (\"Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions\"); every plate in this combo, whichever Combo Type, is the size of the selected Printer Model. First number of the cell. The store page agrees: the Engineering Plate and Cool Plate SuperTack \"Usable Print Size\" rows give \"H2D/H2S - 350*320mm\", and the Textured PEI row lists the same size."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149697",
+        "value_text": "H2D"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (\"Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions\"); every plate in this combo, whichever Combo Type, is the size of the selected Printer Model. Second number of the cell. The store page agrees: the Engineering Plate and Cool Plate SuperTack \"Usable Print Size\" rows give \"H2D/H2S - 350*320mm\", and the Textured PEI row lists the same size."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149698",
+        "value_text": "H2S"
+      },
+      "value": 350,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (\"Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions\"); every plate in this combo, whichever Combo Type, is the size of the selected Printer Model. First number of the cell. The store page agrees: the Engineering Plate and Cool Plate SuperTack \"Usable Print Size\" rows give \"H2D/H2S - 350*320mm\", and the Textured PEI row lists the same size."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149698",
+        "value_text": "H2S"
+      },
+      "value": 320,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (\"Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions\"); every plate in this combo, whichever Combo Type, is the size of the selected Printer Model. Second number of the cell. The store page agrees: the Engineering Plate and Cool Plate SuperTack \"Usable Print Size\" rows give \"H2D/H2S - 350*320mm\", and the Textured PEI row lists the same size."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "773409830743355393",
+        "value_text": "X2D/P2S"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (\"Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions\"); every plate in this combo, whichever Combo Type, is the size of the selected Printer Model. First number of the cell. The store page agrees: the Engineering Plate and Cool Plate SuperTack \"Usable Print Size\" rows give \"X1C/P1P/P1S/A1/P2S/X2D - 256*256mm\", and the Textured PEI row lists the same size."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "773409830743355393",
+        "value_text": "X2D/P2S"
+      },
+      "value": 256,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (\"Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions\"); every plate in this combo, whichever Combo Type, is the size of the selected Printer Model. Second number of the cell. The store page agrees: the Engineering Plate and Cool Plate SuperTack \"Usable Print Size\" rows give \"X1C/P1P/P1S/A1/P2S/X2D - 256*256mm\", and the Textured PEI row lists the same size."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769076186876784641",
+        "value_text": "X1/P1/A1 Series"
+      },
+      "value": "256*256mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/build-plate-combo",
+      "source_title": "Build Plate Combo (store page)",
+      "locator": "Engineering Plate › Product Specifications › row 4 (Usable Print Size) › segment 1; Cool Plate SuperTack › Product Specifications › row 4 (Usable Print Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:59Z",
+      "note": "The same model-labelled segment appears in both plate tables that every Combo Type contains (Engineering Plate, Cool Plate SuperTack); the Textured PEI table (3-plate option only) lists the same sizes without model labels (\"350*320mm 256*256mm 180*180mm\"). The deterministic layer keeps these rows per plate as x.*_printing_usable_print_size (product scope, unverified); this is the selected Printer Model's segment. The segment's \"H2C/A2L - 330*320mm\" line is not offered by this product (no such option)."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149697",
+        "value_text": "H2D"
+      },
+      "value": "350*320mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/build-plate-combo",
+      "source_title": "Build Plate Combo (store page)",
+      "locator": "Engineering Plate › Product Specifications › row 4 (Usable Print Size) › segment 2; Cool Plate SuperTack › Product Specifications › row 4 (Usable Print Size) › segment 2",
+      "quote": "H2D/H2S - 350*320mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:59Z",
+      "note": "The same model-labelled segment appears in both plate tables that every Combo Type contains (Engineering Plate, Cool Plate SuperTack); the Textured PEI table (3-plate option only) lists the same sizes without model labels (\"350*320mm 256*256mm 180*180mm\"). The deterministic layer keeps these rows per plate as x.*_printing_usable_print_size (product scope, unverified); this is the selected Printer Model's segment. The segment's \"H2C/A2L - 330*320mm\" line is not offered by this product (no such option)."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149698",
+        "value_text": "H2S"
+      },
+      "value": "350*320mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/build-plate-combo",
+      "source_title": "Build Plate Combo (store page)",
+      "locator": "Engineering Plate › Product Specifications › row 4 (Usable Print Size) › segment 2; Cool Plate SuperTack › Product Specifications › row 4 (Usable Print Size) › segment 2",
+      "quote": "H2D/H2S - 350*320mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:59Z",
+      "note": "The same model-labelled segment appears in both plate tables that every Combo Type contains (Engineering Plate, Cool Plate SuperTack); the Textured PEI table (3-plate option only) lists the same sizes without model labels (\"350*320mm 256*256mm 180*180mm\"). The deterministic layer keeps these rows per plate as x.*_printing_usable_print_size (product scope, unverified); this is the selected Printer Model's segment. The segment's \"H2C/A2L - 330*320mm\" line is not offered by this product (no such option)."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "773409830743355393",
+        "value_text": "X2D/P2S"
+      },
+      "value": "256*256mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/build-plate-combo",
+      "source_title": "Build Plate Combo (store page)",
+      "locator": "Engineering Plate › Product Specifications › row 4 (Usable Print Size) › segment 1; Cool Plate SuperTack › Product Specifications › row 4 (Usable Print Size) › segment 1",
+      "quote": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:59Z",
+      "note": "The same model-labelled segment appears in both plate tables that every Combo Type contains (Engineering Plate, Cool Plate SuperTack); the Textured PEI table (3-plate option only) lists the same sizes without model labels (\"350*320mm 256*256mm 180*180mm\"). The deterministic layer keeps these rows per plate as x.*_printing_usable_print_size (product scope, unverified); this is the selected Printer Model's segment. The segment's \"H2C/A2L - 330*320mm\" line is not offered by this product (no such option)."
+    },
+    {
+      "key": "part.max_temperature",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149704",
+        "value_text": "Cool Plate + Engineering (with Glue Stick)"
+      },
+      "value": 120,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/build-plate-combo",
+      "source_title": "Build Plate Combo (store page)",
+      "locator": "Engineering Plate › Product Specifications › row 2 (Surface Temperature Resistance); Cool Plate SuperTack › Product Specifications › row 3 (Surface Temperature Resistance)",
+      "quote": "Surface Temperature Resistance | Up to 120℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:59Z",
+      "note": "Both plates of the 2-plate Combo Type state \"Up to 120℃\" (the row appears in each table with the same words). Not given for the 3-plate Combo Type: its Textured PEI Plate states \"Up to 180℃\" while the other two state 120 ℃, so no single value holds for that option. The material-table wiki agrees for the Engineering Plate (its highest bed temperature is 100 - 120 ℃)."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Engineering Plate: The Engineering Plate is compatible with the full range of Bambu Lab filaments. Simply apply a thin layer of glue before printing. Cool Plate SuperTack: This plate is designed only for printing PLA and PETG. Using any other materials may damage the surface coating.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Engineering Plate tab › Features › Compatible with All Filaments; Build Plate Types › Cool Plate SuperTack tab › paragraph 4 (⚠️ Note)",
+      "quote": "The Engineering Plate is compatible with the full range of Bambu Lab filaments. Simply apply a thin layer of glue before printing. … This plate is designed only for printing PLA and PETG.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The two plates every Combo Type contains, each sentence verbatim under its wiki tab name (the store page's \"Which Build Plate Is Right for You?\" table gives the same two sentences as the Filament Precautions of these plates). The Cool Plate SuperTack sentence continues \"Using any other materials may damage the surface coating.\" The store page adds for the SuperTack \"Do NOT print with TPU filament, as it will damage the build plate.\" and does not recommend Bambu PLA Silk on it. The Textured PEI Plate (3-plate option only) is the option-scoped row below.",
+      "conflict": "The store page's product-scope compat.statement (\"PEI enables printing not only with common materials such as PLA, TPU, PETG, but also with materials that require high temperatures like ABS and Nylon.\") describes only the Textured PEI Plate, which the 2-plate Combo Type does not contain; it is kept as the 3-plate option row."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149707",
+        "value_text": "Cool Plate + Engineering (with Glue Stick) + Texture PEl"
+      },
+      "value": "Textured PEI Plate: PEI enables printing not only with common materials such as PLA, TPU, PETG, but also with materials that require high temperatures like ABS and Nylon.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › Features › Compatible with Various Filaments",
+      "quote": "PEI enables printing not only with common materials such as PLA, TPU, PETG, but also with materials that require high temperatures like ABS and Nylon.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The third plate of the 3-plate Combo Type; shown with the product-scope row (Engineering Plate, Cool Plate SuperTack). The wiki and the store page continue: \"When printing PC/PA/ABS/ASA filaments on a Textured PEI Plate, it may be necessary to apply a layer of glue stick.\"",
+      "conflict": "Same sentence as the store page's product-scope compat.statement, here prefixed with its plate name and scoped to the only Combo Type that contains the Textured PEI Plate (the product-scope row now names the two plates of every Combo Type)."
+    },
+    {
+      "key": "part.life_cycle",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Consumable part, which will degrade over time",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/build-plate-combo",
+      "source_title": "Build Plate Combo (store page)",
+      "locator": "Engineering Plate › Considerations › bullet 9, sentence 1; Cool Plate SuperTack › Considerations › bullet 5, sentence 1",
+      "quote": "The Engineering Plate plate is considered a consumable part, which will degrade over time. … Bambu Cool Plate SuperTack is considered a consumable part, which will degrade over time.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:09:59Z",
+      "note": "Stated for each plate of the combo; the Textured PEI section (3-plate option) says the same (\"The Textured PEI plate is considered a consumable part, which will degrade over time.\"). The warranty sentences that follow in the same bullets are not used (they stay owner-only manufacturer_terms rows, §C.10 / L-19)."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769076186876784641",
+        "value_text": "X1/P1/A1 Series"
+      },
+      "target_label": "X1 Series",
+      "target_kind": "family",
+      "target_family": "x1_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells the combo with the Printer Model option \"X1/P1/A1 Series\" (the deterministic layer already writes this relation from the option value); the wiki row is the size evidence. The wiki's Important Notice: the 256×256 mm Textured PEI Plate and Cool Plate SuperTack come in two generations (first generation for A1 and X1/P1, second generation for P2S/X2D; P2S/X2D can physically use first-generation plates without automatic plate recognition). The store page does not say which generation each option ships; its own note on the X2D/P2S variants asks to disable Build Plate Position Detection when printing with the Cool Plate SuperTack."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769076186876784641",
+        "value_text": "X1/P1/A1 Series"
+      },
+      "target_label": "P1 Series",
+      "target_kind": "family",
+      "target_family": "p1_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells the combo with the Printer Model option \"X1/P1/A1 Series\" (the deterministic layer already writes this relation from the option value); the wiki row is the size evidence. The wiki's Important Notice: the 256×256 mm Textured PEI Plate and Cool Plate SuperTack come in two generations (first generation for A1 and X1/P1, second generation for P2S/X2D; P2S/X2D can physically use first-generation plates without automatic plate recognition). The store page does not say which generation each option ships; its own note on the X2D/P2S variants asks to disable Build Plate Position Detection when printing with the Cool Plate SuperTack."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769076186876784641",
+        "value_text": "X1/P1/A1 Series"
+      },
+      "target_label": "A1",
+      "target_kind": "family",
+      "target_family": "model_a1",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells the combo with the Printer Model option \"X1/P1/A1 Series\" (the deterministic layer already writes this relation from the option value); the wiki row is the size evidence. \"A1 Series\" here is the A1 only (256*256 mm); the A1 mini takes a 180*180 mm plate (compat-targets by_subject: excludes_a1_mini). The wiki's Important Notice: the 256×256 mm Textured PEI Plate and Cool Plate SuperTack come in two generations (first generation for A1 and X1/P1, second generation for P2S/X2D; P2S/X2D can physically use first-generation plates without automatic plate recognition). The store page does not say which generation each option ships; its own note on the X2D/P2S variants asks to disable Build Plate Position Detection when printing with the Cool Plate SuperTack."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149697",
+        "value_text": "H2D"
+      },
+      "target_label": "H2D",
+      "target_kind": "family",
+      "target_family": "model_h2d",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells the combo with the Printer Model option \"H2D\" (the deterministic layer already writes this relation from the option value); the wiki row is the size evidence."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "769090749173149698",
+        "value_text": "H2S"
+      },
+      "target_label": "H2S",
+      "target_kind": "printer",
+      "target_source_handle": "h2s",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 1",
+      "quote": "350*320 mm | H2D / H2S",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells the combo with the Printer Model option \"H2S\" (the deterministic layer already writes this relation from the option value); the wiki row is the size evidence."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "773409830743355393",
+        "value_text": "X2D/P2S"
+      },
+      "target_label": "X2D",
+      "target_kind": "printer",
+      "target_source_handle": "x2d",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells the combo with the Printer Model option \"X2D/P2S\" (the deterministic layer already writes this relation from the option value); the wiki row is the size evidence. The wiki's Important Notice: the 256×256 mm Textured PEI Plate and Cool Plate SuperTack come in two generations (first generation for A1 and X1/P1, second generation for P2S/X2D; P2S/X2D can physically use first-generation plates without automatic plate recognition). The store page does not say which generation each option ships; its own note on the X2D/P2S variants asks to disable Build Plate Position Detection when printing with the Cool Plate SuperTack."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "773409830743355393",
+        "value_text": "X2D/P2S"
+      },
+      "target_label": "P2S",
+      "target_kind": "family",
+      "target_family": "model_p2s",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 3",
+      "quote": "256*256 mm | X2D / P2S / P1 Series / X1 Series / A1",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The store page sells the combo with the Printer Model option \"X2D/P2S\" (the deterministic layer already writes this relation from the option value); the wiki row is the size evidence. The wiki's Important Notice: the 256×256 mm Textured PEI Plate and Cool Plate SuperTack come in two generations (first generation for A1 and X1/P1, second generation for P2S/X2D; P2S/X2D can physically use first-generation plates without automatic plate recognition). The store page does not say which generation each option ships; its own note on the X2D/P2S variants asks to disable Build Plate Position Detection when printing with the Cool Plate SuperTack."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "A1 mini",
+      "target_kind": "printer",
+      "target_source_handle": "a1-mini",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions (sentence and table row 4)",
+      "quote": "Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions. … 180*180 mm | A1 mini",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "No Printer Model option of this product offers a 180*180 mm plate: the options are 256*256 mm (X1/P1/A1 Series, X2D/P2S) and 350*320 mm (H2D, H2S). The wiki says each printer model requires a build plate of its own dimensions and gives 180*180 mm for the A1 mini. Read from the size table, not from a sentence naming this product. It guards against reading the option \"X1/P1/A1 Series\" as including the A1 mini."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "H2C",
+      "target_kind": "printer",
+      "target_source_handle": "h2c",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions (sentence and table row 2)",
+      "quote": "Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions. … 330*320 mm | H2C / A2L",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "No Printer Model option of this product offers a 330*320 mm plate: the options are 256*256 mm (X1/P1/A1 Series, X2D/P2S) and 350*320 mm (H2D, H2S). The wiki says each printer model requires a build plate of its own dimensions and gives 330*320 mm for the H2C and A2L. Read from the size table, not from a sentence naming this product. The plate tables on the store page still print an \"H2C/A2L - 330*320mm\" line copied from the single-plate pages."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_label": "A2L",
+      "target_kind": "printer",
+      "target_source_handle": "a2l",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions (sentence and table row 2)",
+      "quote": "Since different printer models have different heatbed sizes, they require build plates of corresponding dimensions. … 330*320 mm | H2C / A2L",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "No Printer Model option of this product offers a 330*320 mm plate: the options are 256*256 mm (X1/P1/A1 Series, X2D/P2S) and 350*320 mm (H2D, H2S). The wiki says each printer model requires a build plate of its own dimensions and gives 330*320 mm for the H2C and A2L. Read from the size table, not from a sentence naming this product. The plate tables on the store page still print an \"H2C/A2L - 330*320mm\" line copied from the single-plate pages."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates",
+      "text": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    }
+  ],
+  "not_published": [
+    "product.net_weight"
+  ],
+  "notes": [
+    "A bundle of two or three different plates: the registry has no per-component scope, so facts that differ between the plates (material, thickness, surface, each plate's packaging size and weight, its own filament list and bed temperatures) stay as the deterministic per-plate x.* rows and description blocks, and only facts true for every plate of a scope are curated here.",
+    "Not curated: part.max_temperature for the 3-plate Combo Type (180 ℃ Textured PEI vs 120 ℃ for the other two); printing.supported_filament / unsupported_filament (they differ per plate; the compat.statement rows carry each plate's statement); a \"requires glue\" relation (only the Engineering Plate needs glue, and both Combo Types include a glue stick).",
+    "No in-the-box list is published; the Combo Type option names (\"Cool Plate + Engineering (with Glue Stick)\", \"... + Texture PEl\") are the only statement of contents, so in_the_box stays empty and package.contents is neither curated nor declared not_published.",
+    "package.* of the combo itself is not published, but each plate's own packaging is, so package.* is not declared not_published."
+  ]
+}

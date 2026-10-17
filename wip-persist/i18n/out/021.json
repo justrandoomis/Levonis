@@ -1,0 +1,1669 @@
+[
+ {
+  "h": "c1a58b1d36a64b80fb4551ceb8eeb5514071be4b24dd4cfd5fa89c3918a00b24",
+  "en": "Extraordinary UV Resistance",
+  "ar": "مقاومة استثنائية للأشعة UV",
+  "ckb": "بەرگەی نایابی تیشکی UV",
+  "kind": "block_line"
+ },
+ {
+  "h": "f0f009718ba08c41ba6dc1483ba9407c4e14f52bdbc140ec0eb664c815d277e0",
+  "en": "Exceptional Temperature Resistance",
+  "ar": "مقاومة استثنائية للحرارة",
+  "ckb": "بەرگەی نایابی پلەی گەرمی",
+  "kind": "block_line"
+ },
+ {
+  "h": "bcc305f54ad3c36f102d4a46a4e828b8d5bd33b0261b098c2412fac5063d1a06",
+  "en": "Extraordinary Weather & UV Resistance",
+  "ar": "مقاومة استثنائية للعوامل الجوية والأشعة UV",
+  "ckb": "بەرگەی نایاب لە بەرامبەر کەشوهەوا و تیشکی UV",
+  "kind": "block_title"
+ },
+ {
+  "h": "6e30777abffe23d529d543b8ba06d6ceaabadb1552a3217f44ebfbeb8d8d0d60",
+  "en": "Bambu ASA offers extraordinary UV, oxidation, and aging resistance, providing effective protection against breakage and color degradation when used outdoors for long-term purposes.",
+  "ar": "يوفّر Bambu ASA مقاومة استثنائية للأشعة UV والأكسدة والتقادم، ما يمنحه حماية فعّالة من الكسر وتدهور اللون عند استخدامه في الأماكن الخارجية لفترات طويلة.",
+  "ckb": "فیلامێنتی Bambu ASA بەرگەیەکی نایاب لە بەرامبەر تیشکی UV، ئۆکسانبوون و کۆنبوون پێشکەش دەکات، و پاراستنێکی کارا لە شکان و کاڵبوونەوەی ڕەنگ دابین دەکات کاتێک بۆ ماوەیەکی درێژ لە دەرەوە بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e43e6481bbd3fe3cf09a286bc64f2083e05c3ae6db67605fcf707c321f16b47a",
+  "en": "Suitable for outdoor applications and regular structural requirements due to its toughness and high impact strength.",
+  "ar": "مناسب للاستخدامات الخارجية والمتطلبات الإنشائية المعتادة بفضل متانته ضد الكسر ومقاومته العالية للصدمات.",
+  "ckb": "بەهۆی پتەوی و بەرگەی بەرزی لێدانەوە، گونجاوە بۆ بەکارهێنانی دەرەوە و پێداویستییە پێکهاتەییە ئاساییەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3b766001984d79d53f2ddfa995f86e0dfb85bc3b3e173d9b4a62f741d610ceaa",
+  "en": "Better Temperature Resistance",
+  "ar": "مقاومة أفضل للحرارة",
+  "ckb": "بەرگەی باشتر بۆ پلەی گەرمی",
+  "kind": "block_title"
+ },
+ {
+  "h": "15519f09e2294218c29d1df943d0da7c8fe840e15102f9450f141f625b7bb644",
+  "en": "Compared to normal PETG or ABS, Bambu ASA can remain in shape even at a temperature of 100°C.",
+  "ar": "مقارنةً بفلامنت PETG أو ABS العادي، يحافظ Bambu ASA على شكله حتى عند درجة حرارة 100°C.",
+  "ckb": "بە بەراورد لەگەڵ فیلامێنتی ئاسایی PETG یان ABS، فیلامێنتی Bambu ASA تەنانەت کاتێک پلەی گەرمی دەگاتە 100°C شێوەی خۆی دەپارێزێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1d843172886c994acd58cd8a41042419ea70648fb359b817efe152cb79edc834",
+  "en": "1.What's the difference between ABS and ASA?",
+  "ar": "1. ما الفرق بين ABS وASA؟",
+  "ckb": "1. جیاوازیی نێوان ABS و ASA چییە؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "b2213dd7455d8f75b5f8973c6eb1efe1ee8e1cd19b103a6c65b6470738ef5640",
+  "en": "ABS is composed of acrylonitrile, butadiene, and styrene, while ASA is composed of acrylonitrile, styrene, and acrylate.",
+  "ar": "يتكوّن ABS من الأكريلونيتريل والبيوتادايين والستايرين، بينما يتكوّن ASA من الأكريلونيتريل والستايرين والأكريلات.",
+  "ckb": "ماددەی ABS لە ئەکریلۆنایتریل، بیوتادایین و ستایرین پێکدێت، لە کاتێکدا ASA لە ئەکریلۆنایتریل، ستایرین و ئەکریلەیت پێکدێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "e6f7f4b83ad7d59fc8de1ec41deacc8a6d161f59d6b3b0cc9717353ab262f029",
+  "en": "ASA is a modified version of ABS that contains an additional acrylate component, which improves its weather adaptability and UV resistance.",
+  "ar": "يُعد ASA نسخة معدّلة من ABS تحتوي على مكوّن إضافي من الأكريلات، ما يحسّن قدرته على تحمّل العوامل الجوية ومقاومته للأشعة UV.",
+  "ckb": "ماددەی ASA وەشانێکی گۆڕدراوە لە ABS کە پێکهاتەیەکی زیادەی ئەکریلەیتی تێدایە، ئەمەش گونجانی لەگەڵ کەشوهەوا و بەرگەی تیشکی UV باشتر دەکات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "2922c08ba70d032012634a694c2565d373bba631054ce566804be8ddc7803b27",
+  "en": "ASA retains the impact resistance and processability of ABS while providing better resistance to fading, yellowing, and degradation from sunlight exposure. Both of them may release pungent and unpleasant odors during printing, but the pungent odor of ASA is notably lighter than ABS.",
+  "ar": "يحتفظ ASA بمقاومة الصدمات وسهولة المعالجة اللتين يتميّز بهما ABS، مع توفير مقاومة أفضل لبهتان اللون والاصفرار والتدهور الناتج عن التعرّض لأشعة الشمس. وقد يُطلق كلاهما روائح نفّاذة وغير مستحبة أثناء الطباعة، لكن رائحة ASA النفّاذة أخف بشكل ملحوظ من رائحة ABS.",
+  "ckb": "ماددەی ASA بەرگەی لێدان و ئاسانیی کارپێکردنی ABS دەپارێزێت، لە هەمان کاتدا بەرگەی باشتری هەیە لە بەرامبەر کاڵبوونەوە، زەردبوون و تێکچوون بەهۆی بەرکەوتنی تیشکی خۆرەوە. هەردووکیان لەوانەیە لە کاتی چاپدا بۆنی تیژ و ناخۆش دەربکەن، بەڵام بۆنی تیژی ASA بە شێوەیەکی بەرچاو لە بۆنی ABS سووکترە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "0b73b529ceb6cc7f3f1dd893f5e54ad725a3cecc32b16812daf7170e7894c53a",
+  "en": "2.What are the different applications of ABS and ASA?",
+  "ar": "2. ما الاستخدامات المختلفة لكل من ABS وASA؟",
+  "ckb": "2. بەکارهێنانە جیاوازەکانی ABS و ASA چین؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "352d6e1be8de6491a05183d9461fa62b08c137f25cddb0dab8cbe23dd5cbc982",
+  "en": "ASA is ideal for outdoor applications, such as automotive exterior parts, signage, and outdoor equipment, thanks to its enhanced weather resistance and color stability. ABS is a versatile material with excellent mechanical properties that is commonly used for indoor applications.",
+  "ar": "يُعد ASA مثاليًا للاستخدامات الخارجية، مثل القطع الخارجية للسيارات واللافتات والمعدات الخارجية، بفضل مقاومته المحسّنة للعوامل الجوية وثبات لونه. أما ABS فهو مادة متعددة الاستخدامات ذات خصائص ميكانيكية ممتازة، ويُستخدم عادةً في الاستخدامات الداخلية.",
+  "ckb": "ماددەی ASA گونجاوترینە بۆ بەکارهێنانی دەرەوە، وەک پارچە دەرەکییەکانی ئۆتۆمبێل، تابلۆ و ئامێرەکانی دەرەوە، بەهۆی بەرگەی باشترکراوی لە بەرامبەر کەشوهەوا و جێگیریی ڕەنگەکەیەوە. ماددەی ABS کەرەستەیەکی فرەبەکارە بە تایبەتمەندیی میکانیکیی نایاب و زۆرجار بۆ بەکارهێنانی ناوەوە بەکاردێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "363f3ebe1fac9794c6b3da963c60bea42eae4ac88d6df121a4ad1d9a27ace4ce",
+  "en": "3.What are the similarities between ABS and ASA?",
+  "ar": "3. ما أوجه التشابه بين ABS وASA؟",
+  "ckb": "3. لێکچوونەکانی نێوان ABS و ASA چین؟",
+  "kind": "faq_q"
+ },
+ {
+  "h": "c77472ed7f5cc89c246e80de2eab61a43aadcabbb31cb3b8b03d604b1336ffbf",
+  "en": "In terms of physical and mechanical properties, both exhibit good impact resistance and high tensile strength, with almost the same levels of strength, toughness, and stiffness. Both ABS and ASA may release pungent and unpleasant odors during printing and the same warping tendency and enclosed printer requirement when printing large-size and/or high infill density models.",
+  "ar": "من حيث الخصائص الفيزيائية والميكانيكية، يتمتع كلاهما بمقاومة جيدة للصدمات ومقاومة شد عالية، مع مستويات شبه متطابقة من القوة والمتانة ضد الكسر والصلابة. وقد يُطلق كل من ABS وASA روائح نفّاذة وغير مستحبة أثناء الطباعة، ولديهما الميل نفسه إلى التقوّس والحاجة نفسها إلى طابعة مغلقة عند طباعة نماذج كبيرة الحجم و/أو عالية كثافة الحشوة الداخلية.",
+  "ckb": "لە ڕووی تایبەتمەندییە فیزیکی و میکانیکییەکانەوە، هەردووکیان بەرگەی لێدانی باش و بەرگەی ڕاکێشانی بەرزیان هەیە، لەگەڵ ئاستێکی نزیکەی یەکسان لە بەهێزی، پتەوی و سەختی. هەردوو ABS و ASA لەوانەیە لە کاتی چاپدا بۆنی تیژ و ناخۆش دەربکەن، و هەمان مەیلی چەمانەوەی لێواریان هەیە و هەردووکیان پێویستیان بە چاپکەری داخراو هەیە کاتێک مۆدێلی قەبارە گەورە و/یان چڕیی پڕکەرەوەی ناوەوەی بەرز چاپ دەکرێن.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "4cdceae49ed570c1c339ef026b6aac4926f2c85a425c593b451f36b0358593f4",
+  "en": "Not compatible with Cool Plate SuperTack.",
+  "ar": "غير متوافق مع صفيحة Cool Plate SuperTack.",
+  "ckb": "لەگەڵ پلێتی Cool Plate SuperTack گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3b580d6a54b1638d2a43a64d83f81d9abf3a2ac8697571a0d11220bb2eb70a95",
+  "en": "3.Ventilation & Odor Notice",
+  "ar": "3. تنبيه بشأن التهوية والرائحة",
+  "ckb": "3. ئاگاداری دەربارەی هەواگۆڕکێ و بۆن",
+  "kind": "faq_q"
+ },
+ {
+  "h": "9e0d2fd0744d650c189626ae3b6f4d9c923d8597d9b65b02b48d6790b4f5489b",
+  "en": "4.Warping Prevention Tips",
+  "ar": "4. نصائح لمنع التقوّس",
+  "ckb": "4. ئامۆژگاری بۆ ڕێگریکردن لە چەمانەوەی لێوار",
+  "kind": "faq_q"
+ },
+ {
+  "h": "30102f45a6613e9ebbf26b94150280a8374c30b227a62f08ace8de0c629e737b",
+  "en": "ASA is prone to warping when printing large size and/or high infill density model. To avoid warping: 1) Not recommended to print too large size and/or high infill density models. 2) Use enclosure printers and ensure the build plate is properly glued before printing. 3) Set lower printing speed and higher heatbed temperature. For more details, please refer to: Common print quality problems and solutions on WIKI.",
+  "ar": "يكون ASA عرضة للتقوّس عند طباعة نموذج كبير الحجم و/أو عالي كثافة الحشوة الداخلية. لتجنّب التقوّس: 1) لا يُوصى بطباعة نماذج كبيرة جدًا و/أو عالية كثافة الحشوة الداخلية. 2) استخدم طابعات مغلقة وتأكّد من وضع الغراء على صفيحة الطباعة بشكل صحيح قبل الطباعة. 3) اضبط سرعة طباعة أقل وحرارة أعلى للسرير الساخن. لمزيد من التفاصيل، يرجى الرجوع إلى: مشكلات جودة الطباعة الشائعة وحلولها على الويكي.",
+  "ckb": "ماددەی ASA مەیلی چەمانەوەی لێواری هەیە کاتێک مۆدێلی قەبارە گەورە و/یان چڕیی پڕکەرەوەی ناوەوەی بەرز چاپ دەکرێت. بۆ ڕێگریکردن لە چەمانەوەی لێوار: 1) چاپکردنی مۆدێلی زۆر گەورە و/یان چڕیی پڕکەرەوەی ناوەوەی بەرز پێشنیار ناکرێت. 2) چاپکەری داخراو بەکاربهێنە و دڵنیابەرەوە کە پێش چاپکردن چەسپ بە دروستی لە پلێتی چاپ دراوە. 3) خێرایی چاپی نزمتر و پلەی گەرمیی بەرزتری بێدی گەرم دابنێ. بۆ وردەکاریی زیاتر، تکایە سەیری کێشە باوەکانی جۆرایەتیی چاپ و چارەسەرەکانیان لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "c8d6d591af6c1b0feca59935ab9183d89557a4a91d76600f5ea9fd39366d1023",
+  "en": "Outdoor Use for Long-Term Purpose",
+  "ar": "للاستخدام الخارجي طويل الأمد",
+  "ckb": "بۆ بەکارهێنانی درێژخایەن لە دەرەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "6bb07e0705bc250a25460efd9adcf59653cb37caf1eb7ee1d2b2c9b283e449ab",
+  "en": "Specialized for printing 3D RC planes",
+  "ar": "مخصّص للطباعة 3D لطائرات RC",
+  "ckb": "تایبەتە بۆ چاپکردنی فڕۆکەی RC بە چاپکەری 3D",
+  "kind": "block_line"
+ },
+ {
+  "h": "86c509895e3b117fc217468f3ae3bb16c3960813a5f6b85b334197e23e1ac597",
+  "en": "Relatively tough with good impact resistance",
+  "ar": "متين نسبيًا مع مقاومة جيدة للصدمات",
+  "ckb": "بە ڕێژەیی پتەوە و بەرگەی لێدانی باشی هەیە",
+  "kind": "block_line"
+ },
+ {
+  "h": "6ed7516545fa76c2ba1fcbc305a36d48900c51fcb67e84bfaf4dfb19e6cb320f",
+  "en": "Easy to paint with matte texture",
+  "ar": "سهل الطلاء بملمس مطفي",
+  "ckb": "بە ئاسانی ڕەنگ دەکرێت و ڕووکارێکی ماتی هەیە",
+  "kind": "block_line"
+ },
+ {
+  "h": "a69785face63f60564d4e1da150433a9d251fb62b22b0f77afc4e472182e12f0",
+  "en": "Low Density and Light Weight",
+  "ar": "كثافة منخفضة ووزن خفيف",
+  "ckb": "چڕیی کەم و کێشی سووک",
+  "kind": "block_title"
+ },
+ {
+  "h": "bd92b6927332a9f1529138f20cd669452db7282bd09d429972b68d6eb1f0dd39",
+  "en": "Bambu PLA Aero has almost the same filament density as regular PLA, while the prints density is only 50% to 80%.",
+  "ar": "يتمتع Bambu PLA Aero بكثافة فلامنت تكاد تماثل كثافة PLA العادي، بينما تبلغ كثافة مطبوعاته 50% إلى 80% فقط.",
+  "ckb": "فیلامێنتی Bambu PLA Aero چڕییەکی نزیکەی وەک فیلامێنتی ئاسایی جۆری PLA هەیە، بەڵام چڕیی چاپکراوەکانی تەنها 50% تا 80% دەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8eb4e77329d4955d6063eb625440cba54f26e573a400211e5773e7aab8800cc1",
+  "en": "When printing models of the same volume, PLA Aero is about half the weight of PLA Basic.",
+  "ar": "عند طباعة نماذج بالحجم نفسه، يبلغ وزن PLA Aero نحو نصف وزن PLA Basic.",
+  "ckb": "کاتێک مۆدێلی هەمان قەبارە چاپ دەکرێن، کێشی PLA Aero نزیکەی نیوەی کێشی PLA Basic دەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0e2f35bf5dba61964eda1bfec967baa3652ed515ccc0a9a4b207c8485a946ef5",
+  "en": "Controllable Model Density",
+  "ar": "كثافة نموذج قابلة للتحكم",
+  "ckb": "چڕیی مۆدێلی کۆنترۆڵکراو",
+  "kind": "block_title"
+ },
+ {
+  "h": "3843338e1d32f15a0108dd11c266b1739877bdd76aa06edb77072e084411415d",
+  "en": "Achieve lower density of the prints by increasing printing temperature and lowering flow rate.",
+  "ar": "احصل على كثافة أقل للمطبوعات برفع حرارة الطباعة وخفض معدل التدفق.",
+  "ckb": "بە بەرزکردنەوەی پلەی گەرمیی چاپ و نزمکردنەوەی ڕێژەی ڕۆیشتن، چڕیی کەمتر بۆ چاپکراوەکان بەدەست بهێنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5f50ec1e8f766a5ed0d6792d80bc294ecd20bb15c6a300333a7d4d2eb3ca10f2",
+  "en": "The average density of prints will vary with changes in parameters such as actual printing temperature, flow rate ratio, printing speed, model size, wall thickness and infill density.",
+  "ar": "يتغيّر متوسط كثافة المطبوعات بتغيّر إعدادات مثل حرارة الطباعة الفعلية، ونسبة معدل التدفق، وسرعة الطباعة، وحجم النموذج، وسماكة الجدار، وكثافة الحشوة الداخلية.",
+  "ckb": "تێکڕای چڕیی چاپکراوەکان بە گۆڕانی ڕێکخستنەکانی وەک پلەی گەرمیی ڕاستەقینەی چاپ، ڕێژەی ڕۆیشتن، خێرایی چاپ، قەبارەی مۆدێل، ئەستووریی دیوار و چڕیی پڕکەرەوەی ناوەوە دەگۆڕێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f7e939df5004af953f6c1f2305a5fc46587a663d6e638fb186cd4728141ba65b",
+  "en": "The relationship between the maximum foaming rate, minimum print density, and printing temperature of PLA Aero.",
+  "ar": "العلاقة بين أقصى معدل للتمدد الرغوي وأدنى كثافة للمطبوعات وحرارة الطباعة لفلامنت PLA Aero.",
+  "ckb": "پەیوەندیی نێوان زۆرترین ڕێژەی کەفکردن، کەمترین چڕیی چاپکراو و پلەی گەرمیی چاپ بۆ PLA Aero.",
+  "kind": "block_line"
+ },
+ {
+  "h": "09d32efc784f7cac8710ec7f1bd9db254799a4d1447757a4f6e598c2a0434738",
+  "en": "Specimen Test: Nozzle Type: 0.4 mm; Printing Speed: 80 mm/s; Model size (L*W*H): 80*10*4 mm³ (the XY direction)",
+  "ar": "اختبار العيّنة: نوع النوزل: 0.4 mm؛ سرعة الطباعة: 80 mm/s؛ أبعاد النموذج (الطول*العرض*الارتفاع): 80*10*4 mm³ (باتجاه XY)",
+  "ckb": "تاقیکردنەوەی نموونە: جۆری نۆزڵ: 0.4 mm؛ خێرایی چاپ: 80 mm/s؛ قەبارەی مۆدێل (درێژی*پانی*بەرزی): 80*10*4 mm³ (بە ئاراستەی XY)",
+  "kind": "block_line"
+ },
+ {
+  "h": "a17ba91827dc304035ae16664efb8b60491312662e79793342d5d45c76d5ac1f",
+  "en": "The actual required flow rate ratio and final model density may vary with different models.",
+  "ar": "قد تختلف نسبة معدل التدفق المطلوبة فعليًا والكثافة النهائية للنموذج باختلاف النماذج.",
+  "ckb": "ڕێژەی ڕۆیشتنی پێویستی ڕاستەقینە و چڕیی کۆتایی مۆدێل لەوانەیە بەپێی مۆدێلە جیاوازەکان بگۆڕێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bbe50d75e898d01f17057faead9a8440a6839fb1a9ab6839c2c683ae56f6c8ff",
+  "en": "Tough with Good Impact Resistance",
+  "ar": "متين مع مقاومة جيدة للصدمات",
+  "ckb": "پتەو لەگەڵ بەرگەی لێدانی باش",
+  "kind": "block_title"
+ },
+ {
+  "h": "65f15fd50f0c02f55dad5c993290248923f8559b00579d1791b7055efb8a204d",
+  "en": "Compared to pre-foaming Wood PLA, Bambu PLA Aero and its prints are tougher and more resistant to impact, collision, and falling.",
+  "ar": "مقارنةً بفلامنت Wood PLA مسبق التمدد الرغوي، يتميّز Bambu PLA Aero ومطبوعاته بمتانة أكبر ضد الكسر ومقاومة أعلى للصدمات والارتطام والسقوط.",
+  "ckb": "بە بەراورد لەگەڵ فیلامێنتی پێشوەختە کەفکراوی Wood PLA، فیلامێنتی Bambu PLA Aero و چاپکراوەکانی پتەوترن و بەرگەیان لە بەرامبەر لێدان، پێکدادان و کەوتن زیاترە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "907f67de3124fad7edd88fc5bcd2a783b8d8cffbbc2033c97eb253c812bc3f1e",
+  "en": "Matte Finish For Easy Coloring",
+  "ar": "تشطيب مطفي لتلوين سهل",
+  "ckb": "ڕووکاری مات بۆ ڕەنگکردنی ئاسان",
+  "kind": "block_title"
+ },
+ {
+  "h": "afb8b683be347d13b1ea6721aadc8cd20a75d4eaad452756bc0bc0675d1671d2",
+  "en": "Bambu PLA Aero provides an easy-to-color matte surface texture with better dyeing results as compared to PLA Basic.",
+  "ar": "يوفّر Bambu PLA Aero سطحًا بملمس مطفي سهل التلوين، مع نتائج صبغ أفضل مقارنةً بـ PLA Basic.",
+  "ckb": "فیلامێنتی Bambu PLA Aero ڕووکارێکی مات پێشکەش دەکات کە بە ئاسانی ڕەنگ دەکرێت، و ئەنجامی بۆیەکردنی باشترە بە بەراورد لەگەڵ PLA Basic.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a08b3fabd48aff56b46becab793e9b99e2f36acad6a79741fada6b4d04a3b89c",
+  "en": "Not compatible with Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+  "ar": "غير متوافق مع رأس الصهر المزوّد بنوزل من الفولاذ المقسّى 0.6 mm / 0.8 mm، ولا مع رأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm.",
+  "ckb": "لەگەڵ سەری تواندنەوەی خاوەن نۆزڵی پۆڵای ڕەقکراوی 0.6 mm / 0.8 mm و سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3885b09202e1b3abe199c4dfd599ab5faca5b8e0dabccce82001be65c9b4ef35",
+  "en": "PLA Aero is highly sensitive to humidity. To achieve optimal printing performance, it is recommended further drying before use and after storage. For more details, please refer to the filament drying instructions on WIKI.",
+  "ar": "فلامنت PLA Aero شديد الحساسية للرطوبة. لتحقيق أفضل أداء طباعة، يُوصى بتجفيفه تجفيفًا إضافيًا قبل الاستخدام وبعد التخزين. لمزيد من التفاصيل، يرجى الرجوع إلى تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "فیلامێنتی PLA Aero زۆر هەستیارە بە شێ. بۆ بەدەستهێنانی باشترین کارایی چاپ، پێشنیار دەکرێت پێش بەکارهێنان و دوای هەڵگرتن جارێکی تر وشک بکرێتەوە. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "16ce9b71b0629e4a8e930ca386c7e7495ec2504513869de7db45ea1b18a2b905",
+  "en": "3.AMS Compatibility Warning",
+  "ar": "3. تحذير بشأن التوافق مع وحدة AMS",
+  "ckb": "3. ئاگاداری دەربارەی گونجاوی لەگەڵ یەکەی AMS",
+  "kind": "faq_q"
+ },
+ {
+  "h": "c84d01bea6478179a55a2004c29b39c5bff97e586977d6d56c3a0fb164ac9c61",
+  "en": "PLA Aero filament is relatively soft which may result in material loading and unloading failures during AMS printing.",
+  "ar": "فلامنت PLA Aero طري نسبيًا، ما قد يؤدي إلى فشل تحميل المادة وتفريغها أثناء الطباعة باستخدام وحدة AMS.",
+  "ckb": "فیلامێنتی PLA Aero بە ڕێژەیی نەرمە، ئەمەش لەوانەیە ببێتە هۆی شکستی بارکردن و دەرهێنانی کەرەستە لە کاتی چاپکردن بە یەکەی AMS.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "856a83a46a5c1418523a57fc99bf8224a5b09659593868c3e2067c015e699cf5",
+  "en": "4.Printing RC model",
+  "ar": "4. طباعة نماذج RC",
+  "ckb": "4. چاپکردنی مۆدێلی RC",
+  "kind": "faq_q"
+ },
+ {
+  "h": "4a03e01281333b38e52f6ba1f1a01c124bc803c428b8844115fab14597de284a",
+  "en": "Foaming PLA materials (PLA Aero) have high requirements for material drying and parameter settings. Please carefully read the instructions for printing aircraft model with foaming PLA (PLA Aero) before starting the printing process.",
+  "ar": "لمواد PLA الرغوية (PLA Aero) متطلبات عالية في تجفيف المادة وضبط الإعدادات. يرجى قراءة تعليمات طباعة نموذج طائرة باستخدام PLA الرغوي (PLA Aero) بعناية قبل بدء عملية الطباعة.",
+  "ckb": "کەرەستە کەفکەرەکانی PLA (PLA Aero) پێداویستیی بەرزیان هەیە بۆ وشککردنەوەی کەرەستە و ڕێکخستنی پارامیتەرەکان. تکایە پێش دەستپێکردنی پرۆسەی چاپ، بە وردی ڕێنماییەکانی چاپکردنی مۆدێلی فڕۆکە بە فیلامێنتی کەفکەری PLA (PLA Aero) بخوێنەرەوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "bdbea196e32ed96cf10e8bde059157f8db507eaaee8d13aa17c85fcd5f77ee5a",
+  "en": "Specialized for 3D RC Planes Printing",
+  "ar": "مخصّص للطباعة 3D لطائرات RC",
+  "ckb": "تایبەتە بۆ چاپکردنی فڕۆکەی RC بە چاپکەری 3D",
+  "kind": "block_line"
+ },
+ {
+  "h": "e18c4ca690d99220cec6628eae1aedd81a58d3434a381c9b1911451fcd78f2c7",
+  "en": "Recommended to dry out before use",
+  "ar": "يُوصى بتجفيفه قبل الاستخدام",
+  "ckb": "پێشنیار دەکرێت پێش بەکارهێنان وشک بکرێتەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "1c978e78506a0b122705558b4d5d8fb834ae2901c720e1cb646f1bf0c3c1774d",
+  "en": "Superior Strength and Stiffness",
+  "ar": "متانة وصلابة فائقتان",
+  "ckb": "بەهێزی و سەختیی باڵا",
+  "kind": "block_line"
+ },
+ {
+  "h": "d56d6b1ec22fe79d33ce55e0294bedfda942fffc32cbd2ae58ed0e394d73a84e",
+  "en": "Toughness & Vibration Resistance",
+  "ar": "متانة ضد الكسر ومقاومة للاهتزاز",
+  "ckb": "پتەوی و بەرگەی لەرینەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "7028bd95d8821288a795003c5ab483ba5b1398c6c437140d2074e640b4bbd61d",
+  "en": "As a new member of Bambu high performance filaments, PA6-CF keeps superior stiffness and strength properties in dry environments, it is perfect for printing load-bearing structural components.",
+  "ar": "بصفته عضوًا جديدًا في عائلة فلامنتات Bambu عالية الأداء، يحافظ PA6-CF على صلابة ومتانة فائقتين في البيئات الجافة، ما يجعله مثاليًا لطباعة المكوّنات الإنشائية الحاملة للأحمال.",
+  "ckb": "وەک ئەندامێکی نوێی فیلامێنتە کارایی بەرزەکانی Bambu، فیلامێنتی PA6-CF لە ژینگەی وشکدا سەختی و بەهێزیی باڵای خۆی دەپارێزێت، و گونجاوترینە بۆ چاپکردنی پارچە پێکهاتەییە بارهەڵگرەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1b99e0d4c455508ce0815c202f9fda9d65db6b883665e96eed09eeaedbca9323",
+  "en": "Impact & Vibration Resistance",
+  "ar": "مقاومة الصدمات والاهتزاز",
+  "ckb": "بەرگەی لێدان و لەرینەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "79ced0924a6523010800405f73a2dcdf0a21f69c46204b4d06c402a43f951285",
+  "en": "Bambu PA6-CF offers excellent impact resistance, ensuring effective vibration resistance for your prints. It is commonly used to print models that need to withstand impact, collision, and vibration.",
+  "ar": "يوفّر Bambu PA6-CF مقاومة ممتازة للصدمات، ما يضمن لمطبوعاتك مقاومة فعّالة للاهتزاز. ويُستخدم عادةً لطباعة النماذج التي تحتاج إلى تحمّل الصدمات والارتطام والاهتزاز.",
+  "ckb": "فیلامێنتی Bambu PA6-CF بەرگەی لێدانی نایاب پێشکەش دەکات، کە بەرگەی کارای لەرینەوە بۆ چاپکراوەکانت دەستەبەر دەکات. زۆرجار بۆ چاپکردنی ئەو مۆدێلانە بەکاردێت کە پێویستە بەرگەی لێدان، پێکدادان و لەرینەوە بگرن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e0cec7287d3abcf5e8faa1553868b1cd39c30f54a07fe292793d393159870541",
+  "en": "The prints of PA6-CF will be tougher after putting in humid environment more than 1 day.",
+  "ar": "تصبح مطبوعات PA6-CF أكثر متانة ضد الكسر بعد وضعها في بيئة رطبة لأكثر من 1 يوم.",
+  "ckb": "چاپکراوەکانی PA6-CF دوای ئەوەی زیاتر لە 1 ڕۆژ لە ژینگەیەکی شێداردا دابنرێن پتەوتر دەبن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5a20da077f4a1d8d7aa4f0a5b8f89a30b9605c767737fff31a8ded14dece6694",
+  "en": "Not compatible with AMS Series, Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm.",
+  "ar": "غير متوافق مع AMS Series وصفيحة Cool Plate SuperTack ورأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm.",
+  "ckb": "لەگەڵ AMS Series، پلێتی Cool Plate SuperTack و سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a539ba4a47a37fc0cf6c0649e297cf27c7b9e25c7b74b86539ee3cf21147feb6",
+  "en": "3.Mechanical Properties & Moisture Impact",
+  "ar": "3. الخصائص الميكانيكية وتأثير الرطوبة",
+  "ckb": "3. تایبەتمەندییە میکانیکییەکان و کاریگەریی شێ",
+  "kind": "faq_q"
+ },
+ {
+  "h": "6e9a41de6c85aa7fb440a38008807b1a085a4962bb52243d79ca7d283cdbfdd6",
+  "en": "Bambu PA6-CF will experience a decrease in strength and stiffness after absorbing water, making it not recommended for printing models with high requirements for strength, stiffness, and dimensional stability, especially thin and elongated models. The prints of PA6-CF usually become tougher and more resistant to impacts, drops, and collisions when they get damp; you can dampen and soften the prints in advance if the model requires high toughness.",
+  "ar": "تنخفض متانة Bambu PA6-CF وصلابته بعد امتصاصه الماء، لذا لا يُوصى به لطباعة النماذج التي تتطلب متانة وصلابة وثبات أبعاد عالية، ولا سيما النماذج الرفيعة والطويلة. وعادةً ما تصبح مطبوعات PA6-CF أكثر متانة ضد الكسر وأكثر مقاومة للصدمات والسقوط والارتطام عندما تكتسب رطوبة؛ ويمكنك ترطيب المطبوعات وتليينها مسبقًا إذا كان النموذج يتطلب متانة عالية ضد الكسر.",
+  "ckb": "فیلامێنتی Bambu PA6-CF دوای هەڵمژینی ئاو بەهێزی و سەختییەکەی کەم دەبێتەوە، بۆیە بۆ چاپکردنی ئەو مۆدێلانە پێشنیار ناکرێت کە پێویستییان بە بەهێزی، سەختی و جێگیریی ڕەهەندەکانی بەرز هەیە، بە تایبەتی مۆدێلە باریک و درێژەکان. چاپکراوەکانی PA6-CF بە زۆری کاتێک شێ هەڵدەمژن پتەوتر دەبن و بەرگەیان لە بەرامبەر لێدان، کەوتن و پێکدادان زیاتر دەبێت؛ ئەگەر مۆدێلەکە پێویستی بە پتەویی بەرز هەبێت، دەتوانیت پێشوەختە چاپکراوەکان شێدار و نەرم بکەیت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "185cd580f55bc83a362f62f482e2e68e4ab9b7337e820db48ca35902dd7cb966",
+  "en": "4.Support Removal & Post-Printing Timing",
+  "ar": "4. إزالة الدعامات وتوقيتها بعد الطباعة",
+  "ckb": "4. لابردنی پاڵپشت و کاتەکەی دوای چاپ",
+  "kind": "faq_q"
+ },
+ {
+  "h": "362131cd16c479e9dd2bdcbcae8db428af58243aea37049814e4b510fbccc5d6",
+  "en": "When printing a model with support, it is necessary to remove the support structure within 2 hours to prevent it from being difficult to remove after being damp and softened. Please dry the prints and let them cool down if it is difficult to remove the support, and then remove the support in time.",
+  "ar": "عند طباعة نموذج بدعامات، من الضروري إزالة هيكل الدعامات خلال 2 ساعة لتجنّب صعوبة إزالته بعد أن يكتسب رطوبة ويلين. إذا صعُبت إزالة الدعامات، يرجى تجفيف المطبوعات وتركها حتى تبرد، ثم إزالة الدعامات في الوقت المناسب.",
+  "ckb": "کاتێک مۆدێلێک بە پاڵپشتەوە چاپ دەکەیت، پێویستە پێکهاتەی پاڵپشت لە ماوەی 2 کاتژمێردا لاببرێت، بۆ ئەوەی دوای شێدار و نەرمبوونی لابردنی قورس نەبێت. ئەگەر لابردنی پاڵپشت قورس بوو، تکایە چاپکراوەکان وشک بکەرەوە و بهێڵە سارد ببنەوە، پاشان لە کاتی خۆیدا پاڵپشتەکە لاببە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "6f8cc97fb7f33bd5417cd0d86e6b8568fdb83f96073fce88b3d453f112ccec93",
+  "en": "5.Surface Protection & Treatment",
+  "ar": "5. حماية السطح ومعالجته",
+  "ckb": "5. پاراستن و چارەسەرکردنی ڕووکار",
+  "kind": "faq_q"
+ },
+ {
+  "h": "e66a059df167d0fbe7555cf263dccccc9957821174f28c36aaef2c6ef3c620d0",
+  "en": "Fully impregnating the surface of the prints with paint, wax and other waterproof coatings can inhibit water absorption and prevent them from becoming soft.",
+  "ar": "يمكن أن يحدّ تشريب سطح المطبوعات بالكامل بالدهان والشمع وغيرهما من الطلاءات المقاومة للماء من امتصاص الماء ويمنعها من أن تصبح طرية.",
+  "ckb": "تێرکردنی تەواوی ڕووی چاپکراوەکان بە بۆیە، مۆم و ڕووپۆشی دژە ئاوی تر دەتوانێت ڕێگری لە هەڵمژینی ئاو بکات و نەهێڵێت نەرم ببن.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "7e083ae67dea73db927392cbca2680c2767f7b449b1f772c295ed4ad6c83c143",
+  "en": "High-speed Printing TPU",
+  "ar": "فلامنت TPU للطباعة عالية السرعة",
+  "ckb": "فیلامێنتی TPU بۆ چاپی خێرا",
+  "kind": "block_line"
+ },
+ {
+  "h": "262db0e7f31fb46cd3897caae0b4952a545e7c1e53bd3dbd8b8090b2e2230cab",
+  "en": "Excellent Flexibility and Elasticity",
+  "ar": "مرونة ومطاطية ممتازتان",
+  "ckb": "نەرمونیانی و لاستیکیی نایاب",
+  "kind": "block_line"
+ },
+ {
+  "h": "70ca322f496a77f42db98f6c22f0576f2fd884b01fe81ae47886f98a70d6b702",
+  "en": "High Speed Printing",
+  "ar": "طباعة عالية السرعة",
+  "ckb": "چاپی خێرایی بەرز",
+  "kind": "block_title"
+ },
+ {
+  "h": "b6759866d1c549e59524b1a8c048f52f7cbf740aa6d335ae80585ca25e24c89d",
+  "en": "Elevate your TPU printing efficiency to the next level with Bambu TPU 95A HF, featuring a print speed that's 3 times faster than standard TPU 95A.",
+  "ar": "ارتقِ بكفاءة طباعة TPU إلى مستوى جديد مع Bambu TPU 95A HF، الذي يتميّز بسرعة طباعة أسرع بـ 3 مرات من TPU 95A القياسي.",
+  "ckb": "کارایی چاپکردنی TPU بەرز بکەرەوە بۆ ئاستێکی نوێ لەگەڵ Bambu TPU 95A HF، کە خێرایی چاپەکەی 3 جار خێراترە لە فیلامێنتی ستانداردی TPU 95A.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7a329a0e31e0e00868bc617e5d3fe35c7840cd9d3364fb12e5150db52fd132e9",
+  "en": "Soft and Flexible",
+  "ar": "طري ومرن",
+  "ckb": "نەرم و نەرمونیان",
+  "kind": "block_title"
+ },
+ {
+  "h": "c73dbad886ddaf5187e9941716982fde17a4d8a317081466f231942af9529da8",
+  "en": "Bambu TPU HF is an exceptionally soft and flexible filament with extraordinary impact resistance, enabling you to print parts that need withstand impact, collision, and falling.",
+  "ar": "يُعد Bambu TPU HF فلامنتًا طريًا ومرنًا بشكل استثنائي، يتمتع بمقاومة فائقة للصدمات، ما يتيح لك طباعة قطع تحتاج إلى تحمّل الصدمات والارتطام والسقوط.",
+  "ckb": "فیلامێنتی Bambu TPU HF بە شێوەیەکی نائاسایی نەرم و نەرمونیانە و بەرگەی لێدانی نایابی هەیە، بۆیە دەتوانیت ئەو پارچانە چاپ بکەیت کە پێویستە بەرگەی لێدان، پێکدادان و کەوتن بگرن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "eb9ec76f4cf4940a7b384bd74009638ab4f7bf13cf9e5698c59a685cf5ba42dd",
+  "en": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm.",
+  "ar": "غير متوافق مع صفيحة Cool Plate SuperTack ورأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm.",
+  "ckb": "لەگەڵ پلێتی Cool Plate SuperTack و سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "46466acf93bbc498ed16ea7f484e4d2f55652a110997f6e13ce86da741585893",
+  "en": "TPU 95A HF is highly sensitive to humidity. To achieve optimal printing performance, it is recommended further drying before use and after storage. For more details, please refer to: Filament drying instructions on WIKI.",
+  "ar": "فلامنت TPU 95A HF شديد الحساسية للرطوبة. لتحقيق أفضل أداء طباعة، يُوصى بتجفيفه تجفيفًا إضافيًا قبل الاستخدام وبعد التخزين. لمزيد من التفاصيل، يرجى الرجوع إلى: تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "فیلامێنتی TPU 95A HF زۆر هەستیارە بە شێ. بۆ بەدەستهێنانی باشترین کارایی چاپ، پێشنیار دەکرێت پێش بەکارهێنان و دوای هەڵگرتن جارێکی تر وشک بکرێتەوە. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "c89bafe49a91960026f5fc4a8d88cc7148e9147bd43255493ad11124f0f12fe8",
+  "en": "3.Printing Guide",
+  "ar": "3. دليل الطباعة",
+  "ckb": "3. ڕێبەری چاپکردن",
+  "kind": "faq_q"
+ },
+ {
+  "h": "7f662cc885fbc32f9536b635ec1160c48d055a38afaeb93280fb160a6d9079e1",
+  "en": "To obtain higher printing quality, please check the TPU Printing Guide before printing.",
+  "ar": "للحصول على جودة طباعة أعلى، يرجى الاطلاع على دليل طباعة TPU قبل الطباعة.",
+  "ckb": "بۆ بەدەستهێنانی جۆرایەتیی چاپی بەرزتر، تکایە پێش چاپکردن سەیری ڕێبەری چاپکردنی TPU بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "97396f4ccaf6992a9d7b054bc38a6163953cfeda337ed1d42c61c86ccb214558",
+  "en": "As this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing.",
+  "ar": "نظرًا لأن هذا الفلامنت شديد الامتصاص للرطوبة، يرجى وضع أي فلامنت غير مستخدم فورًا في وعاء محكم الإغلاق مع مادة مجففة، وتجفيفه جيدًا قبل الطباعة.",
+  "ckb": "لەبەر ئەوەی ئەم فیلامێنتە زۆر شێ هەڵدەمژێت، تکایە هەر فیلامێنتێکی بەکارنەهاتوو دەستبەجێ لە دەفرێکی داخراو لەگەڵ ماددەی وشککەرەوە دابنێ، و پێش چاپکردن بە تەواوی وشکی بکەرەوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "c6d4c3bf76b0e52fbd99ebbb6ee50f5dc3f6e86582b841fdc02c50d25d513460",
+  "en": "As this filament contains highly hygroscopic wood fibers, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing.",
+  "ar": "نظرًا لأن هذا الفلامنت يحتوي على ألياف خشبية شديدة الامتصاص للرطوبة، يرجى وضع أي فلامنت غير مستخدم فورًا في وعاء محكم الإغلاق مع مادة مجففة، وتجفيفه جيدًا قبل الطباعة.",
+  "ckb": "لەبەر ئەوەی ئەم فیلامێنتە ڕیشاڵی داری تێدایە کە زۆر شێ هەڵدەمژن، تکایە هەر فیلامێنتێکی بەکارنەهاتوو دەستبەجێ لە دەفرێکی داخراو لەگەڵ ماددەی وشککەرەوە دابنێ، و پێش چاپکردن بە تەواوی وشکی بکەرەوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "1b530aee091ef2e936ff824336f17f94cf10f7c44acec3209cd7df9b5f319ab1",
+  "en": "High-speed printing TPU",
+  "ar": "فلامنت TPU للطباعة عالية السرعة",
+  "ckb": "فیلامێنتی TPU بۆ چاپی خێرا",
+  "kind": "block_line"
+ },
+ {
+  "h": "4fb0176bd939a8e2181db6130d62e5033673f70d39e84aed7e2478dd47eba22d",
+  "en": "Soft, Flexible & Tough",
+  "ar": "طري ومرن ومتين",
+  "ckb": "نەرم، نەرمونیان و پتەو",
+  "kind": "block_line"
+ },
+ {
+  "h": "f1bea062c43e46efb4b94a0896583367001e7e035ccaeb0cbac9523a6f65b1a5",
+  "en": "Outstanding Impact Resistance and Flexibility",
+  "ar": "مقاومة فائقة للصدمات ومرونة عالية",
+  "ckb": "بەرگەی لێدان و نەرمونیانیی نایاب",
+  "kind": "block_line"
+ },
+ {
+  "h": "fe2e34f00ff4286e067e21b66b5f4febeff4f018aae8d7697122f23b69b6feff",
+  "en": "Unique Glow in Low Light Conditions",
+  "ar": "توهّج فريد في ظروف الإضاءة المنخفضة",
+  "ckb": "درەوشانەوەیەکی بێهاوتا لە ڕووناکیی کەمدا",
+  "kind": "block_line"
+ },
+ {
+  "h": "2ea4a9eee63b1972c922b33056c79a3034593e95de9cf81724901e5d4ebcb562",
+  "en": "Bambu PLA Glow incorporates a distinct additive: luminous powder, which imparts a special property to printed objects, causing them to emit a captivating glow in the dark.",
+  "ar": "يحتوي Bambu PLA Glow على مادة مضافة مميّزة: مسحوق مضيء، يمنح القطع المطبوعة خاصية فريدة تجعلها تُصدر توهّجًا آسرًا في الظلام.",
+  "ckb": "فیلامێنتی Bambu PLA Glow ماددەیەکی زیادکراوی تایبەتی تێدایە: تۆزی درەوشاوە، کە تایبەتمەندییەکی تایبەت بە پارچە چاپکراوەکان دەبەخشێت و وایان لێدەکات لە تاریکیدا درەوشانەوەیەکی سەرنجڕاکێش دەربکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6a559979940494616cb73dcd42bfb56bbaf127cc8366ff28c819dc79a912366b",
+  "en": "Not compatible with Hotend with Stainless Steel Nozzle 0.2mm, and AMS lite.",
+  "ar": "غير متوافق مع رأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2mm، ولا مع AMS lite.",
+  "ckb": "لەگەڵ سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2mm و AMS lite گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "79b9f73e29e6efca1aed72ab785d2920802fca069bee5e79f22ea9e6457668a9",
+  "en": "Utilizing AMS lite may result in high feed resistance and an increased risk of feed failure. Consider alternative methods such as pre-use drying for better outcomes.",
+  "ar": "قد يؤدي استخدام AMS lite إلى مقاومة عالية للتغذية وزيادة خطر فشل التغذية. فكّر في طرق بديلة مثل التجفيف قبل الاستخدام للحصول على نتائج أفضل.",
+  "ckb": "بەکارهێنانی AMS lite لەوانەیە ببێتە هۆی بەرگریی زۆر لە پێداندا و زیادبوونی مەترسیی شکستی پێدان. بۆ ئەنجامی باشتر، بیر لە ڕێگای جێگرەوە بکەرەوە وەک وشککردنەوە پێش بەکارهێنان.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "46efbd30ddd64a4a3484cc67c20902118a1ca998dedea0dac5a5bf68ad5acf25",
+  "en": "3. Appearance Change",
+  "ar": "3. تغيّر المظهر",
+  "ckb": "3. گۆڕانی ڕواڵەت",
+  "kind": "faq_q"
+ },
+ {
+  "h": "038001f86da8a187fd7ddca231343a914b9324069777f20ac0c6e80af0ab5b0e",
+  "en": "The model's luminous intensity diminishes over time, but exposure to ultraviolet or sunlight for a brief period (approximately 2 hours) can rejuvenate its glow. However, prolonged or frequent irradiation may expedite PLA aging.",
+  "ar": "تتضاءل شدة توهّج النموذج بمرور الوقت، لكن تعريضه للأشعة فوق البنفسجية أو لأشعة الشمس لفترة قصيرة (نحو 2 ساعة) يمكن أن يجدّد توهّجه. ومع ذلك، قد يؤدي التعريض الطويل أو المتكرر إلى تسريع تقادم PLA.",
+  "ckb": "توندیی درەوشانەوەی مۆدێلەکە لەگەڵ تێپەڕبوونی کات کەم دەبێتەوە، بەڵام بەرکەوتنی بە تیشکی سەرووی وەنەوشەیی یان تیشکی خۆر بۆ ماوەیەکی کورت (نزیکەی 2 کاتژمێر) دەتوانێت درەوشانەوەکەی نوێ بکاتەوە. لەگەڵ ئەوەشدا، بەرکەوتنی درێژخایەن یان دووبارە لەوانەیە کۆنبوونی PLA خێراتر بکات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "83443ced4c3af57cfc2aff80c36fbfb3e9c47a73978b2f102fb11c9afc8b50ec",
+  "en": "Where dynamic color shifts meet",
+  "ar": "حيث تلتقي تحوّلات الألوان الديناميكية",
+  "ckb": "لەو شوێنەی گۆڕانە زیندووەکانی ڕەنگ بەیەک دەگەن",
+  "kind": "block_line"
+ },
+ {
+  "h": "461839283d644c5ec0171c9ade258999e279510907901bfdb6136aaec6a44e4f",
+  "en": "Captivating silk elegance",
+  "ar": "أناقة حريرية آسرة",
+  "ckb": "جوانیی ئاوریشمیی سەرنجڕاکێش",
+  "kind": "block_line"
+ },
+ {
+  "h": "f63e1715daad7ddd17b1da3a6ce6f2d004ed28588d90e72244caa001377cdb79",
+  "en": "PLA Silk Dual Color: Captivating Silk Appearance with Dynamic Effects",
+  "ar": "فلامنت PLA Silk Dual Color: مظهر حريري آسر بتأثيرات ديناميكية",
+  "ckb": "فیلامێنتی PLA Silk Dual Color: ڕواڵەتی ئاوریشمیی سەرنجڕاکێش لەگەڵ کاریگەریی زیندوو",
+  "kind": "block_title"
+ },
+ {
+  "h": "c5526f9f234338fafb33bd741d7bdb51b5d92576866d337ca843e9fe44c913a3",
+  "en": "Experience stunning dual-color effects with Bambu PLA Silk Dual Color. Each filament combines two distinct hues, seamlessly merged into one strand. As you rotate the printed object, shifting color perspectives reveal vibrant, ever-changing patterns. Ideal for decorative models, figurines, and display pieces.",
+  "ar": "استمتع بتأثيرات مذهلة ثنائية اللون مع Bambu PLA Silk Dual Color. يجمع كل فلامنت بين لونين مميّزين مدموجين بسلاسة في خيط واحد. وعند تدوير القطعة المطبوعة، تكشف زوايا الألوان المتغيّرة عن أنماط نابضة بالحياة ومتجددة باستمرار. مثالي للنماذج الزخرفية والمجسّمات الصغيرة وقطع العرض.",
+  "ckb": "چێژ لە کاریگەرییە سەرسوڕهێنەرە دوو ڕەنگییەکان وەربگرە لەگەڵ Bambu PLA Silk Dual Color. هەر فیلامێنتێک دوو ڕەنگی جیاواز پێکەوە کۆدەکاتەوە کە بە ڕەوانی لە یەک دەزوودا تێکەڵ کراون. کاتێک پارچە چاپکراوەکە دەسووڕێنیت، گۆڕانی ڕەنگ لە گۆشە جیاوازەکانەوە نەخشی زیندوو و هەمیشە گۆڕاو دەردەخات. گونجاوترینە بۆ مۆدێلی ڕازاندنەوە، پەیکەرۆچکە و پارچەی نمایش.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9f1cf47aa962682f034f0e8dbccf5b2a4aad383007736e8ca69f0ecfbd80ad1b",
+  "en": "PLA Silk Gradient: Smooth, Stunning Color Transitions in One Spool",
+  "ar": "فلامنت PLA Silk Gradient: انتقالات لونية سلسة ومذهلة في بكرة واحدة",
+  "ckb": "فیلامێنتی PLA Silk Gradient: گواستنەوەی ڕەنگی لووس و سەرسوڕهێنەر لە یەک ماسوورەدا",
+  "kind": "block_title"
+ },
+ {
+  "h": "cb119cbd1e3b97c98d8789ec52e91f51e0fe78cb51302ff24c0194f3d0325869",
+  "en": "Bambu PLA Silk Gradient offers 2 to 4 graceful color shifts within a single spool, producing elegant, eye-catching prints. Whether you're creating vases, sculptures, or decorative designs, this filament brings depth and brilliance through its flowing, silk-like gradients.",
+  "ar": "يقدّم Bambu PLA Silk Gradient من 2 إلى 4 تحوّلات لونية أنيقة ضمن بكرة (spool) واحدة، لينتج مطبوعات راقية تلفت الأنظار. وسواء كنت تصنع مزهريات أو منحوتات أو تصاميم زخرفية، يضفي هذا الفلامنت عمقًا وبريقًا بفضل تدرّجاته الانسيابية الشبيهة بالحرير.",
+  "ckb": "فیلامێنتی Bambu PLA Silk Gradient لە 2 تا 4 گۆڕانی ڕەنگی ناسک لە ناو یەک ماسوورە (spool) پێشکەش دەکات، و چاپکراوی جوان و سەرنجڕاکێش بەرهەم دەهێنێت. جا گوڵدان، پەیکەر یان دیزاینی ڕازاندنەوە دروست بکەیت، ئەم فیلامێنتە بە پلەبەندییە ڕەوان و ئاوریشمئاساکانی قووڵی و درەوشانەوە دەبەخشێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2ca2ff70f249bf66270c8f7e1c4a1d0c054313c56efb894c25ae2a36ea3aaabb",
+  "en": "Not Compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm.",
+  "ar": "غير متوافق مع صفيحة Cool Plate SuperTack ورأس الصهر المزوّد بنوزل من الفولاذ المقسّى 0.6 mm / 0.8 mm.",
+  "ckb": "لەگەڵ پلێتی Cool Plate SuperTack و سەری تواندنەوەی خاوەن نۆزڵی پۆڵای ڕەقکراوی 0.6 mm / 0.8 mm گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "37ffbaa06de732cb89546710fff84204a75f02a41d60b8026bfce6abdabe023c",
+  "en": "2.Gradient Effects",
+  "ar": "2. تأثيرات التدرّج اللوني",
+  "ckb": "2. کاریگەرییەکانی ڕەنگی پلەپلە",
+  "kind": "faq_q"
+ },
+ {
+  "h": "2483b5396a5cebd9716d471f204c764c5081550bb499c97fb510321a14fcc4b9",
+  "en": "The gradient effect depends on the amount of filament used, which can be influenced by adjusting sparse infill density, print quantity, or the filament spool starting point.",
+  "ar": "يعتمد تأثير التدرّج على كمية الفلامنت المستخدمة، والتي يمكن التأثير فيها بضبط كثافة الحشوة الداخلية المتفرّقة، أو عدد القطع المطبوعة، أو نقطة بداية الفلامنت على البكرة (spool).",
+  "ckb": "کاریگەریی ڕەنگی پلەپلە پشت بە بڕی فیلامێنتی بەکارهاتوو دەبەستێت، کە دەتوانرێت بە ڕێکخستنی چڕیی پڕکەرەوەی ناوەوەی پەرشوبڵاو، ژمارەی پارچە چاپکراوەکان، یان خاڵی دەستپێکی فیلامێنت لەسەر ماسوورە (spool) کاریگەریی لەسەر دابنرێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "7d701b8cb2a2294d4343eb29c92c8f279e271916967ec63c32993bfd27c2b9af",
+  "en": "Each color segment in Bambu PLA Silk Gradient spans approximately 20m (65g+).",
+  "ar": "يمتد كل مقطع لوني في Bambu PLA Silk Gradient على نحو 20m (65g+).",
+  "ckb": "هەر بەشێکی ڕەنگ لە Bambu PLA Silk Gradient نزیکەی 20m (65g+) درێژە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "54187b6c1cc4f597fbb75c440c34be03fcda669125ec31093f6784d58ba46812",
+  "en": "Using 40m (125g+) of filament guarantees at least one two-color transition.",
+  "ar": "استخدام 40m (125g+) من الفلامنت يضمن انتقالًا واحدًا على الأقل بين لونين.",
+  "ckb": "بەکارهێنانی 40m (125g+) فیلامێنت لانیکەم یەک گواستنەوە لە نێوان دوو ڕەنگدا مسۆگەر دەکات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "b66f7f4f2685143abbb8e69572ea877b5607747388aef864d7870b8bbeff3e80",
+  "en": "For four-color transitions (e.g., Bambu PLA Gradient – Dawn Radiance), using 80m (250g+) or more ensures the full effect.",
+  "ar": "للانتقالات بين أربعة ألوان (مثل Bambu PLA Gradient – Dawn Radiance)، يضمن استخدام 80m (250g+) أو أكثر الحصول على التأثير الكامل.",
+  "ckb": "بۆ گواستنەوەی چوار ڕەنگ (بۆ نموونە Bambu PLA Gradient – Dawn Radiance)، بەکارهێنانی 80m (250g+) یان زیاتر کاریگەرییە تەواوەکە مسۆگەر دەکات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "20158ab50cbabb0a9cc68a4dbbfd4fdc282b3044825ccd690e182d6e45fa3887",
+  "en": "3.Printing Tips",
+  "ar": "3. نصائح الطباعة",
+  "ckb": "3. ئامۆژگارییەکانی چاپکردن",
+  "kind": "faq_q"
+ },
+ {
+  "h": "c311303c417d0737c5cfe616a0d64dd44d55f8f1b0e2a03167c67a557de69b7b",
+  "en": "It's strongly recommended to reduce the outer wall speed to 40 mm/s to optimize print quality.",
+  "ar": "يُوصى بشدة بخفض سرعة الجدار الخارجي إلى 40 mm/s لتحسين جودة الطباعة.",
+  "ckb": "زۆر پێشنیار دەکرێت خێرایی دیواری دەرەوە بۆ 40 mm/s کەم بکرێتەوە بۆ باشترکردنی جۆرایەتیی چاپ.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "174bbeb27a13c5a21464c75fa24bfda1059ea0465be390fecdd0b4409ebd407e",
+  "en": "When printing with PLA Silk Dual Color filament, there is a small chance of filament rotation, potentially causing uneven color transitions. The A-series printers have a higher risk due to their special structure, so use of this filament with A-series printers is not recommended.",
+  "ar": "عند الطباعة بفلامنت PLA Silk Dual Color، هناك احتمال ضئيل لدوران الفلامنت، ما قد يسبّب انتقالات لونية غير متجانسة. وتكون طابعات A-series أكثر عرضة لذلك بسبب بنيتها الخاصة، لذا لا يُوصى باستخدام هذا الفلامنت مع طابعات A-series.",
+  "ckb": "کاتێک بە فیلامێنتی PLA Silk Dual Color چاپ دەکەیت، ئەگەرێکی کەم هەیە فیلامێنتەکە بسووڕێتەوە، کە لەوانەیە ببێتە هۆی گواستنەوەی ناڕێکی ڕەنگ. چاپکەرەکانی A-series بەهۆی پێکهاتە تایبەتەکەیانەوە مەترسییان زیاترە، بۆیە بەکارهێنانی ئەم فیلامێنتە لەگەڵ چاپکەرەکانی A-series پێشنیار ناکرێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "7c199f482d7f5b2774086caf29274d61d078c79ffb9e3c9eb8f2570366baab4b",
+  "en": "4.Drying Recommendations",
+  "ar": "4. توصيات التجفيف",
+  "ckb": "4. پێشنیارەکانی وشککردنەوە",
+  "kind": "faq_q"
+ },
+ {
+  "h": "503f09a62a4414c55075d36bc081ce48df53c31cb8b588125445f25968007105",
+  "en": "Although PLA Silk Multi-Color is thoroughly dried and vacuum-sealed prior to shipping, variations in transport conditions may affect its moisture level. We strongly recommend drying it right after opening and storing it in a sealed container with desiccant or AMS. Repeat drying and moisture-proofing before each long-term storage period.",
+  "ar": "على الرغم من أن PLA Silk Multi-Color يُجفَّف جيدًا ويُغلَّف بالتفريغ الهوائي قبل الشحن، فقد تؤثر اختلافات ظروف النقل في مستوى رطوبته. نوصي بشدة بتجفيفه فور فتحه وحفظه في وعاء محكم الإغلاق مع مادة مجففة أو في وحدة AMS. كرّر التجفيف والحماية من الرطوبة قبل كل فترة تخزين طويلة.",
+  "ckb": "هەرچەندە PLA Silk Multi-Color پێش ناردن بە تەواوی وشک دەکرێتەوە و بە ڤاکیوم دادەخرێت، بەڵام جیاوازیی بارودۆخی گواستنەوە لەوانەیە کاریگەری لەسەر ئاستی شێکەی هەبێت. زۆر پێشنیار دەکەین دەستبەجێ دوای کردنەوە وشکی بکەیتەوە و لە دەفرێکی داخراو لەگەڵ ماددەی وشککەرەوە یان لە ناو یەکەی AMS هەڵیبگریت. پێش هەر ماوەیەکی هەڵگرتنی درێژخایەن، وشککردنەوە و پاراستن لە شێ دووبارە بکەرەوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "45f53112d3d50fa255d50b07364937e7b66b2e04931c57db03fa92c6db4ac178",
+  "en": "Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to the filament drying instructions on WIKI.",
+  "ar": "جفّفه قبل الاستخدام لضمان أفضل جودة طباعة وتشطيب متجانس. احفظه في مكان جاف بعد الاستخدام. لمزيد من التفاصيل، يرجى الرجوع إلى تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "پێش بەکارهێنان وشکی بکەرەوە بۆ دڵنیابوون لە باشترین جۆرایەتیی چاپ و ڕووکارێکی یەکدەست. دوای بەکارهێنان لە شوێنێکی وشکدا هەڵیبگرە. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "336f0f4396e8209f2d76a32c0c820a2440bc358d2bcdccc20eb094bc2975a6e4",
+  "en": "Silk finish with dynamic color transformations",
+  "ar": "لمعة حريرية مع تحوّلات لونية ديناميكية",
+  "ckb": "بریسکەی ئاوریشمی لەگەڵ گۆڕانی زیندووی ڕەنگ",
+  "kind": "block_line"
+ },
+ {
+  "h": "1f56d5150ccbea70a38c85f72b97976b9a34a2e304ff22f5bc04be96aa576365",
+  "en": "Dry Out Before Use",
+  "ar": "جفّفه قبل الاستخدام",
+  "ckb": "پێش بەکارهێنان وشکی بکەرەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "36b0b38fd0ebf8b7de7ceac0cbaee0bdab3ab156a2a31b04fa998001895c6538",
+  "en": "Note: It's strongly recommended to slow down the Outer wall speed to 40 mm/s to optimize printing results.",
+  "ar": "ملاحظة: يُوصى بشدة بخفض سرعة الجدار الخارجي إلى 40 mm/s لتحسين نتائج الطباعة.",
+  "ckb": "تێبینی: زۆر پێشنیار دەکرێت خێرایی دیواری دەرەوە بۆ 40 mm/s کەم بکرێتەوە بۆ باشترکردنی ئەنجامەکانی چاپ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5b6af78af9cd928aeaac6309d2b3139c8c01b158b4816b8c4aa95c860ed49754",
+  "en": "Translucent Appearance",
+  "ar": "مظهر شبه شفاف",
+  "ckb": "ڕواڵەتی نیمچە ڕوون",
+  "kind": "block_line"
+ },
+ {
+  "h": "bda3d3d0c829c00ddcde8406114209c1b8fe24a0069599d2c4c0ce96c2f9df1d",
+  "en": "Robust Endurance",
+  "ar": "تحمّل قوي",
+  "ckb": "بەرگەگریی بەهێز",
+  "kind": "block_line"
+ },
+ {
+  "h": "1c2f739c068a8ad71b18ef38fb257c4f64a3000cceefd9ca8a5c17ff617ca365",
+  "en": "Effortless Printing Experience",
+  "ar": "تجربة طباعة سهلة",
+  "ckb": "ئەزموونی چاپی بێ زەحمەت",
+  "kind": "block_line"
+ },
+ {
+  "h": "b341622ef7f7d20ba56a0f034fae53b5b2180fdfcd497b689c89171c54926c4f",
+  "en": "Minimal Warping",
+  "ar": "تقوّس في حدّه الأدنى",
+  "ckb": "کەمترین چەمانەوەی لێوار",
+  "kind": "block_line"
+ },
+ {
+  "h": "ff0f2f2849a416bb9ae14f83177aa024dc60fb5f497e020c0b5e68b1705b9f8d",
+  "en": "Bambu PETG Translucent stands out with its exceptional printing characteristics, setting it apart from standard PETG materials. This specially tuned filament minimizes common issues like nozzle sticking, leakage, and clumping during the printing process, providing a hassle-free experience compared to ordinary PETG materials. The filament also exhibits water resistance, UV resistance, and resistance to temperature changes, making it an excellent choice for outdoor applications.",
+  "ar": "يتميّز Bambu PETG Translucent بخصائص طباعة استثنائية تميّزه عن مواد PETG القياسية. فهذا الفلامنت المضبوط خصيصًا يقلّل المشكلات الشائعة مثل الالتصاق بالنوزل والتسرّب والتكتّل أثناء عملية الطباعة، ما يوفّر تجربة خالية من المتاعب مقارنةً بمواد PETG العادية. كما يتمتع الفلامنت بمقاومة الماء ومقاومة الأشعة UV ومقاومة تغيّرات الحرارة، ما يجعله خيارًا ممتازًا للاستخدامات الخارجية.",
+  "ckb": "فیلامێنتی Bambu PETG Translucent بە تایبەتمەندییە نایابەکانی چاپکردن جیا دەکرێتەوە، کە لە کەرەستە ستانداردەکانی PETG جیای دەکاتەوە. ئەم فیلامێنتە بە تایبەتی ڕێکخراوە و کێشە باوەکانی وەک نووسان بە نۆزڵەوە، دزەکردن و گرێبوون لە کاتی پرۆسەی چاپدا کەم دەکاتەوە، و بە بەراورد لەگەڵ کەرەستە ئاساییەکانی PETG ئەزموونێکی بێ گرفت دابین دەکات. هەروەها فیلامێنتەکە بەرگەی ئاو، بەرگەی تیشکی UV و بەرگەی گۆڕانی پلەی گەرمی هەیە، بۆیە هەڵبژاردەیەکی نایابە بۆ بەکارهێنانی دەرەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "da86334983b4b436d09273e71d9c0c8e76217b81a4baa56b7c1bd18646603563",
+  "en": "Create with Light, Shadow and a Wide Range of Colors",
+  "ar": "أبدِع بالضوء والظل وتشكيلة واسعة من الألوان",
+  "ckb": "بە ڕووناکی، سێبەر و کۆمەڵێکی فراوانی ڕەنگ داهێنان بکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "461e64e39a3abc2c88ebe0c4cbe7e470eaf290140c8a259b9776430c00a6c3b0",
+  "en": "Bambu PETG Translucent offers 8 vibrant colors for you to choose from. Elevate your prints by seamlessly blending different colors and experimenting with various thicknesses of layers and walls.",
+  "ar": "يقدّم Bambu PETG Translucent تشكيلة من 8 ألوان زاهية لتختار منها. ارتقِ بمطبوعاتك عبر مزج ألوان مختلفة بسلاسة وتجربة سماكات متنوعة للطبقات والجدران.",
+  "ckb": "فیلامێنتی Bambu PETG Translucent کۆمەڵێک لە 8 ڕەنگی زیندوو پێشکەش دەکات بۆ ئەوەی هەڵیبژێریت. چاپکراوەکانت بەرز بکەرەوە بە تێکەڵکردنی ڕەوانی ڕەنگە جیاوازەکان و تاقیکردنەوەی ئەستووریی جۆراوجۆری چین و دیوارەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f6bd62f3135a68d1b4a70dfd66bed27bc15dddfe04cfbcc47ad11d59f48e523f",
+  "en": "Durable, Weather-Resistant, and Long-Lasting",
+  "ar": "متين ومقاوم للعوامل الجوية وطويل العمر",
+  "ckb": "پتەو، بەرگەگر لە کەشوهەوادا و تەمەن درێژ",
+  "kind": "block_title"
+ },
+ {
+  "h": "0494b500150d50870296936b6027cefddd3973fd51d04b0385ed53016440c1c4",
+  "en": "Bambu PETG Translucent series, designed to withstand the elements with exceptional impact resistance. This filament is not only waterproof but also exhibits impressive resilience under prolonged exposure to UV.",
+  "ar": "صُمّمت مجموعة Bambu PETG Translucent لتتحمّل العوامل الجوية بمقاومة استثنائية للصدمات. وهذا الفلامنت ليس مقاومًا للماء فحسب، بل يُظهر أيضًا قدرة تحمّل مثيرة للإعجاب عند التعرّض المطوّل للأشعة UV.",
+  "ckb": "کۆمەڵەی فیلامێنتی Bambu PETG Translucent بۆ بەرگەگرتن لە بەرامبەر کەشوهەوا دیزاین کراوە و بەرگەی لێدانی نایابی هەیە. ئەم فیلامێنتە نەک تەنها دژە ئاوە، بەڵکو لە کاتی بەرکەوتنی درێژخایەن بە تیشکی UV، بەرگەگرییەکی سەرسوڕهێنەریش نیشان دەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1f0a77d334429805b475d2dd21c05c188fa27f53127135bcf02bbb91933cb1ae",
+  "en": "Excellent light transmittance",
+  "ar": "نفاذية ممتازة للضوء",
+  "ckb": "تێپەڕاندنی نایابی ڕووناکی",
+  "kind": "block_title"
+ },
+ {
+  "h": "5f27ef0eb2316d80d43c29c9d7cd57dc4f0912d3748db2e361a80ba3d83b3da1",
+  "en": "Optimized for exceptional light transmittance, Bambu PETG Translucent provides unmatched levels of translucency.",
+  "ar": "بفضل تحسينه لنفاذية استثنائية للضوء، يوفّر Bambu PETG Translucent مستويات لا مثيل لها من الشفافية الجزئية.",
+  "ckb": "فیلامێنتی Bambu PETG Translucent بۆ تێپەڕاندنی نایابی ڕووناکی باشتر کراوە و ئاستێکی بێوێنەی نیمچە ڕوونی پێشکەش دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a0b43b34ecb704e81f1dd41fe22c2ea8e88f77594f9162aced572530b818cf70",
+  "en": "Please note that the transparency of the prints may vary depending on factors such as size and structure, as well as printing parameters (including speed, nozzle temperature, and infill density).",
+  "ar": "يرجى ملاحظة أن شفافية المطبوعات قد تختلف تبعًا لعوامل مثل الحجم والبنية، وكذلك إعدادات الطباعة (بما فيها السرعة وحرارة النوزل وكثافة الحشوة الداخلية).",
+  "ckb": "تکایە ئاگاداربە کە ڕوونیی چاپکراوەکان لەوانەیە بەپێی هۆکارەکانی وەک قەبارە و پێکهاتە، هەروەها ڕێکخستنەکانی چاپ (لەوانە خێرایی، پلەی گەرمیی نۆزڵ و چڕیی پڕکەرەوەی ناوەوە) جیاواز بێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e2dff947980d8e7ed397d829ed421695b96f9fdccca2e51fad394180bb691725",
+  "en": "Bambu PETG Translucent series boasts an optimized formula that ensures a seamless 3D printing process. This formula helps minimize common challenges such as stringing, clumping, nozzle sticking, and leaking, this filament guarantees a hassle-free experience.",
+  "ar": "تتميّز مجموعة Bambu PETG Translucent بتركيبة محسّنة تضمن عملية طباعة 3D سلسة. إذ تساعد هذه التركيبة على تقليل التحديات الشائعة مثل التخييط والتكتّل والالتصاق بالنوزل والتسرّب، ويضمن هذا الفلامنت تجربة خالية من المتاعب.",
+  "ckb": "کۆمەڵەی فیلامێنتی Bambu PETG Translucent فۆرمولێکی باشترکراوی هەیە کە پرۆسەیەکی ڕەوانی چاپی 3D دەستەبەر دەکات. ئەم فۆرمولە یارمەتی دەدات ئاستەنگە باوەکانی وەک دەزووبەستن، گرێبوون، نووسان بە نۆزڵەوە و دزەکردن کەم بکرێنەوە، و ئەم فیلامێنتە ئەزموونێکی بێ گرفت مسۆگەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d0f64e7586bfc70c15c72265697173fdfb24d949ab489a1b1bd54c6df95e3878",
+  "en": "Experience enhanced printing versatility with Bambu PETG Translucent, featuring exceptional anti-warping performance. This filament is designed to be used with closed or open printers, providing you with the flexibility to explore a wide range of printing setups. Additionally, Bambu PETG Translucent ensures reliable dimensional stability after the printing process, allowing you to achieve precise and accurate results.",
+  "ar": "استمتع بمرونة أكبر في الطباعة مع Bambu PETG Translucent، الذي يتميّز بأداء استثنائي في مقاومة التقوّس. صُمّم هذا الفلامنت للاستخدام مع الطابعات المغلقة أو المفتوحة، ما يمنحك حرية تجربة مجموعة واسعة من إعدادات الطباعة. بالإضافة إلى ذلك، يضمن Bambu PETG Translucent ثباتًا موثوقًا في الأبعاد بعد عملية الطباعة، ما يتيح لك الحصول على نتائج دقيقة ومضبوطة.",
+  "ckb": "چێژ لە فرەلایەنیی زیاتری چاپکردن وەربگرە لەگەڵ Bambu PETG Translucent، کە کاراییەکی نایابی دژە چەمانەوەی لێواری هەیە. ئەم فیلامێنتە بۆ بەکارهێنان لەگەڵ چاپکەری داخراو یان کراوە دیزاین کراوە، و ئازادیت پێدەدات کۆمەڵێکی فراوان لە ڕێکخستنەکانی چاپ تاقی بکەیتەوە. هەروەها، Bambu PETG Translucent دوای پرۆسەی چاپ جێگیرییەکی متمانەپێکراوی ڕەهەندەکان دەستەبەر دەکات، و ڕێگەت پێدەدات ئەنجامی ورد و دروست بەدەست بهێنیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5925f6d7e7aeced15746adbff13dc228b5ff239b4a82b3e9013b4cad949ea6c2",
+  "en": "PETG Translucent must be dried before use and moisture protection is required for the printing process, otherwise the quality of prints will be low due to bubbles. For more details, please refer to: Filament drying instructions on WIKI.",
+  "ar": "يجب تجفيف PETG Translucent قبل الاستخدام، ويلزم حمايته من الرطوبة أثناء عملية الطباعة، وإلا ستكون جودة المطبوعات منخفضة بسبب الفقاعات. لمزيد من التفاصيل، يرجى الرجوع إلى: تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "پێویستە PETG Translucent پێش بەکارهێنان وشک بکرێتەوە و لە کاتی پرۆسەی چاپدا لە شێ بپارێزرێت، ئەگەرنا جۆرایەتیی چاپکراوەکان بەهۆی بڵقەوە نزم دەبێت. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "1d65ff268e5e7b29bab519fa5e9c47c5b41b6ee1c2c1887cbb4a03fb7cdb359d",
+  "en": "4.Transparency Printing Tips",
+  "ar": "4. نصائح لطباعة قطع شفافة",
+  "ckb": "4. ئامۆژگارییەکانی چاپکردنی ڕوون",
+  "kind": "faq_q"
+ },
+ {
+  "h": "d212992ec5f68e502b0ce5c5eb7be0125869cb069281843a1c404d5cb5a45c8c",
+  "en": "Printing PETG Translucent with the appropriate print parameters can achieve an appearance ranging from tinted translucent to tinted transparent. Learn more about Printing tips for transparent PETG on WIKI.",
+  "ar": "يمكن أن تحقق طباعة PETG Translucent بإعدادات الطباعة المناسبة مظهرًا يتراوح بين شبه الشفاف الملوّن والشفاف الملوّن. تعرّف أكثر على نصائح طباعة PETG الشفاف على الويكي.",
+  "ckb": "چاپکردنی PETG Translucent بە ڕێکخستنی گونجاوی چاپ دەتوانێت ڕواڵەتێک بەدەست بهێنێت کە لە نیمچە ڕوونی ڕەنگکراوەوە تا ڕوونی ڕەنگکراو دەگۆڕێت. زیاتر دەربارەی ئامۆژگارییەکانی چاپکردنی فیلامێنتی ڕوونی PETG لە ویکی بزانە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "ba93f6658191faca519a717fc40345d9f94b6771fa9959094f82380d8616e99c",
+  "en": "Please note that the transparency of the prints may vary depending on such factors as size, thickness and structure, as well as printing parameters (including speed, nozzle temperature, and infill density).",
+  "ar": "يرجى ملاحظة أن شفافية المطبوعات قد تختلف تبعًا لعوامل مثل الحجم والسماكة والبنية، وكذلك إعدادات الطباعة (بما فيها السرعة وحرارة النوزل وكثافة الحشوة الداخلية).",
+  "ckb": "تکایە ئاگاداربە کە ڕوونیی چاپکراوەکان لەوانەیە بەپێی هۆکارەکانی وەک قەبارە، ئەستووری و پێکهاتە، هەروەها ڕێکخستنەکانی چاپ (لەوانە خێرایی، پلەی گەرمیی نۆزڵ و چڕیی پڕکەرەوەی ناوەوە) جیاواز بێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "11ea2b1c93bbbfd9104da74d6be596ebd817aa5a244123ee5f6aa962f888b80f",
+  "en": "Before printing, please kindly refer to the Printing Tips for optimal results.",
+  "ar": "قبل الطباعة، يرجى الرجوع إلى نصائح الطباعة للحصول على أفضل النتائج.",
+  "ckb": "پێش چاپکردن، تکایە سەیری ئامۆژگارییەکانی چاپکردن بکە بۆ بەدەستهێنانی باشترین ئەنجام.",
+  "kind": "block_line"
+ },
+ {
+  "h": "73f041e641f926d89810c14d34e4f8f98e0385339a26e3080700d1b19c2ef5aa",
+  "en": "Appealing from Every Angle",
+  "ar": "جذّاب من كل زاوية",
+  "ckb": "سەرنجڕاکێش لە هەموو گۆشەیەکەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "7f784366bc9cdb2b44656e706972efa6039d92edcfbb0a7e0663c73768d57768",
+  "en": "Sleek Glossy Finish",
+  "ar": "تشطيب لامع وأنيق",
+  "ckb": "ڕووکاری بریسکەدار و ڕێکوپێک",
+  "kind": "block_line"
+ },
+ {
+  "h": "55563eb07de9b63eecda5cbd40e1adcf4e960d4f6507e954903de041c59c6da6",
+  "en": "Effortless Printing",
+  "ar": "طباعة سهلة",
+  "ckb": "چاپکردنی بێ زەحمەت",
+  "kind": "block_line"
+ },
+ {
+  "h": "80f85cad7db7cd69dac6f1d37bcb82d29fccfdbdf2ab866a746adbae01630238",
+  "en": "PLA Galaxy's glass microsphere additives create unique light effects, offering dynamic reflections from various perspectives.",
+  "ar": "تُنتج إضافات الكريات الزجاجية الدقيقة في PLA Galaxy تأثيرات ضوئية فريدة، وتوفّر انعكاسات ديناميكية من زوايا مختلفة.",
+  "ckb": "ماددە زیادکراوەکانی تۆپەڵەی شووشەیی وردی ناو PLA Galaxy کاریگەریی ڕووناکیی بێهاوتا دروست دەکەن و ڕەنگدانەوەی زیندوو لە گۆشە جیاوازەکانەوە پێشکەش دەکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "17e7e922c4d4955039f38454ed4e80c0003ce9f245dd536e5041683fa804c820",
+  "en": "Enriched with glass microsphere additives, PLA Galaxy ensures a clear, seamlessly smooth surface texture, enhancing your prints with a captivating fluidity that is both dynamic and refined.",
+  "ar": "بفضل إثرائه بإضافات الكريات الزجاجية الدقيقة، يضمن PLA Galaxy ملمس سطح صافيًا وناعمًا بسلاسة، ويمنح مطبوعاتك انسيابية آسرة تجمع بين الحيوية والرقي.",
+  "ckb": "فیلامێنتی PLA Galaxy بە ماددەی زیادکراوی تۆپەڵەی شووشەیی ورد دەوڵەمەند کراوە، و ڕووکارێکی ڕوون و تەواو لووس دەستەبەر دەکات، و ڕەوانییەکی سەرنجڕاکێش کە هەم زیندوو و هەم ناسکە دەبەخشێتە چاپکراوەکانت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1714ff284e3f1bff21f6410e3c4e2d695cd494e4a19266e188708ad21dc4569a",
+  "en": "Crafted with premium materials, PLA Galaxy inherits the exceptional printability of PLA Basic, ensuring a hassle-free printing process.",
+  "ar": "صُنع PLA Galaxy من مواد عالية الجودة، ويرث قابلية الطباعة الاستثنائية لفلامنت PLA Basic، ما يضمن عملية طباعة خالية من المتاعب.",
+  "ckb": "فیلامێنتی PLA Galaxy لە کەرەستەی باڵا دروستکراوە و وەک فیلامێنتی PLA Basic بە ئاسانییەکی نایاب چاپ دەکرێت، بۆیە پرۆسەیەکی چاپی بێ گرفت دەستەبەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "db1ad895ca2deff1b03b0acd3005abfdd7bd71422f70290776777fd960624905",
+  "en": "Not compatible with Engineering Plate and Hotend with Stainless Steel Nozzle 0.2 mm.",
+  "ar": "غير متوافق مع صفيحة Engineering Plate ورأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm.",
+  "ckb": "لەگەڵ پلێتی Engineering Plate و سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "1f09f87b2012eaa3f2cf339e61321de798959c5771c6856b18bedf75240248f0",
+  "en": "Soak and Dissolve",
+  "ar": "انقع وأذِب",
+  "ckb": "بیخووسێنە و بیتوێنەرەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "b5a165a54211b4d07b878faec8df0de46c761e6df790a63aa629716d6a67b142",
+  "en": "Smooth Support Contact Surface",
+  "ar": "سطح تلامس أملس مع الدعامات",
+  "ckb": "ڕووی بەریەککەوتنی لووسی پاڵپشت",
+  "kind": "block_line"
+ },
+ {
+  "h": "d8824d9df4f299b246498f22a29486e44dd79934a2d0063fd32fd32c0c42ae1e",
+  "en": "Thorough and Clean Dissolution",
+  "ar": "ذوبان كامل ونظيف",
+  "ckb": "توانەوەی تەواو و پاک",
+  "kind": "block_line"
+ },
+ {
+  "h": "92696f9ad679da492b56d8901358cfb6b3ff58ae10ab757615e6a3bb79a26b4a",
+  "en": "Soak and Dissolve for Supporting Intricate Details",
+  "ar": "انقع وأذِب لدعم التفاصيل المعقّدة",
+  "ckb": "بیخووسێنە و بیتوێنەرەوە بۆ پاڵپشتیکردنی وردەکارییە ئاڵۆزەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "1096a4d294e8fd7b4486c26ca2a18057300548f436935dd9f619ddc2a5545e15",
+  "en": "Bambu PVA possesses the ability to dissolve in water, penetrating deep into the intricacies to provide support where regular supports fall short. With Bambu PVA you can design and print models that were previously impossible.",
+  "ar": "يتمتع Bambu PVA بقدرة على الذوبان في الماء، ويتغلغل عميقًا في التفاصيل الدقيقة ليوفّر الدعم حيث تعجز الدعامات العادية. ومع Bambu PVA يمكنك تصميم وطباعة نماذج كانت مستحيلة من قبل.",
+  "ckb": "فیلامێنتی Bambu PVA توانای توانەوەی لە ئاودا هەیە، و تا قووڵایی وردەکارییە ئاڵۆزەکان دەچێت بۆ دابینکردنی پاڵپشت لەو شوێنانەی پاڵپشتە ئاساییەکان کورت دەهێنن. بە Bambu PVA دەتوانیت ئەو مۆدێلانە دیزاین و چاپ بکەیت کە پێشتر مەحاڵ بوون.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3aef9dd513c906c1604a9173a53d89ef630bf2d632bd42852ac9c42af5f21117",
+  "en": "Seamless Support Interface Surface",
+  "ar": "سطح تلامس سلس مع الدعامات",
+  "ckb": "ڕووی بەریەککەوتنی پاڵپشتی بێ کەلێن",
+  "kind": "block_title"
+ },
+ {
+  "h": "504d2987c8c92c201aa687af5a60df1bd71c1e607e124f81e1ff1304b2ce6657",
+  "en": "Water-soluble support material can accommodate zero top interface spacing, guaranteeing a seamless bond with the print surface, resulting in precise and smooth support contact surfaces for your prints.",
+  "ar": "تتيح مادة الدعامات القابلة للذوبان في الماء استخدام مسافة صفرية لسطح التلامس العلوي، ما يضمن ترابطًا سلسًا مع سطح المطبوعة، وينتج عنه أسطح تلامس دقيقة وملساء بين الدعامات ومطبوعاتك.",
+  "ckb": "کەرەستەی پاڵپشتی تواوە لە ئاودا ڕێگە بە بۆشایی سفری ڕووی بەریەککەوتنی سەرەوە دەدات، کە پەیوەندییەکی بێ کەلێن لەگەڵ ڕووی چاپکراوەکە مسۆگەر دەکات، و لە ئەنجامدا ڕووی بەریەککەوتنی ورد و لووسی پاڵپشت بۆ چاپکراوەکانت دروست دەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f393ac5a29148d4cd73f17f5a12c7c0854ef90ecb1eff46ed5319b5f75f7a2f2",
+  "en": "Bambu PVA utilizes a high-quality formula that dissolves easily and thoroughly in water, effortlessly removing support material and eliminating the hassle of manual cleaning.",
+  "ar": "يعتمد Bambu PVA على تركيبة عالية الجودة تذوب في الماء بسهولة وبشكل كامل، ما يزيل مادة الدعامات دون عناء ويغنيك عن متاعب التنظيف اليدوي.",
+  "ckb": "فیلامێنتی Bambu PVA فۆرمولێکی جۆرایەتی بەرز بەکاردەهێنێت کە بە ئاسانی و بە تەواوی لە ئاودا دەتوێتەوە، کەرەستەی پاڵپشت بێ زەحمەت لادەبات و زەحمەتی پاککردنەوەی دەستی نەهێڵێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c78924066c71a4dd1852532de93048527f40cd6e231357dfeef68c0db124c548",
+  "en": "3.Pre-Printing & Storage",
+  "ar": "3. ما قبل الطباعة والتخزين",
+  "ckb": "3. پێش چاپکردن و هەڵگرتن",
+  "kind": "faq_q"
+ },
+ {
+  "h": "465bd2c5df59c8ce66ff3889b5f5c887b1e637f499f9e5b05eee061e164b5bac",
+  "en": "Please carefully read PVA Printing Guide before starting the printing process.",
+  "ar": "يرجى قراءة دليل طباعة PVA بعناية قبل بدء عملية الطباعة.",
+  "ckb": "تکایە پێش دەستپێکردنی پرۆسەی چاپ، بە وردی ڕێبەری چاپکردنی PVA بخوێنەرەوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "b150de611ab643b837336b63b47be3e3ec5d3f50085f0e809b51b530cacccdff",
+  "en": "PVA is suitable for use with AMS and AMS lite in a dry state. If the filament becomes soft or sticky due to moisture, it must be dried again before use to prevent issues such as feeding failure, nozzle clogging, and low print quality.",
+  "ar": "فلامنت PVA مناسب للاستخدام مع AMS وAMS lite وهو في حالة جافة. وإذا أصبح الفلامنت طريًا أو لزجًا بسبب الرطوبة، فيجب تجفيفه مجددًا قبل الاستخدام لتجنّب مشكلات مثل فشل التغذية وانسداد النوزل وانخفاض جودة الطباعة.",
+  "ckb": "فیلامێنتی PVA کاتێک وشکە گونجاوە بۆ بەکارهێنان لەگەڵ AMS و AMS lite. ئەگەر فیلامێنتەکە بەهۆی شێوە نەرم یان لینج بوو، پێویستە پێش بەکارهێنان دووبارە وشک بکرێتەوە بۆ ڕێگریکردن لە کێشەی وەک شکستی پێدان، گیرانی نۆزڵ و نزمیی جۆرایەتیی چاپ.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "921d4260a8cc5a3e6a31ff0431f52df650c761e7d178c57abbad599e066fdb6a",
+  "en": "PVA may darken in color after extended storage or multiple drying cycles, but it won't affect its printing performance or support capabilities.",
+  "ar": "قد يغمق لون PVA بعد التخزين الطويل أو دورات التجفيف المتعددة، لكن ذلك لا يؤثر في أداء طباعته أو قدرته على الدعم.",
+  "ckb": "لەوانەیە ڕەنگی PVA دوای هەڵگرتنی درێژخایەن یان چەند جار وشککردنەوە تاریکتر ببێت، بەڵام کاریگەری لەسەر کارایی چاپکردن یان توانای پاڵپشتیکردنی نابێت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "169a0ea5266ebe33b66a1cd3fba9c9a29a52389255897397ff0c9a7667c5fef5",
+  "en": "4.Slicing & Printing Settings",
+  "ar": "4. إعدادات التقطيع والطباعة",
+  "ckb": "4. ڕێکخستنەکانی سلایسکردن و چاپ",
+  "kind": "faq_q"
+ },
+ {
+  "h": "bc3daf3d553332dbb15e56be6fe402b49dd87b9821676c291a9fdaab102e7956",
+  "en": "Recommend to use normal support instead of tree support. Tree support is more likely to collapse during printing.",
+  "ar": "نوصي باستخدام الدعامات العادية بدلًا من الدعامات الشجرية، فالدعامات الشجرية أكثر عرضة للانهيار أثناء الطباعة.",
+  "ckb": "پێشنیار دەکەین پاڵپشتی ئاسایی لە جیاتی پاڵپشتی درەختی بەکاربهێنیت. ئەگەری داڕمانی پاڵپشتی درەختی لە کاتی چاپدا زیاترە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "67dec7a1293c367c299b4ae46961e55cfa73f98b16897631d38cb8b2683d5315",
+  "en": "Depending on the use case, Bambu PVA can also be used solely for printing the support interface to minimize material waste and printing time.",
+  "ar": "بحسب حالة الاستخدام، يمكن أيضًا استخدام Bambu PVA لطباعة سطح تلامس الدعامات فقط، لتقليل هدر المادة ووقت الطباعة.",
+  "ckb": "بەپێی جۆری بەکارهێنان، دەتوانرێت Bambu PVA تەنها بۆ چاپکردنی ڕووی بەریەککەوتنی پاڵپشت بەکاربهێنرێت، بۆ کەمکردنەوەی بەفیڕۆچوونی کەرەستە و ماوەی چاپ.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "2a619fa80bd886ef8b6b058855750abab22ea803175c52ee938a5891b40f4295",
+  "en": "5.Dissolution Process",
+  "ar": "5. عملية الإذابة",
+  "ckb": "5. پرۆسەی توانەوە",
+  "kind": "faq_q"
+ },
+ {
+  "h": "5f8648dd010c834b9db0607888bb04ce9d94e7ac580dc86ed60935c244e20340",
+  "en": "Use warm water to speed up the dissolving process. But if supporting PLA, the maximum water soaking temperature should not exceed 50°C to prevent deformation of the main model.",
+  "ar": "استخدم ماءً دافئًا لتسريع عملية الإذابة. لكن إذا كانت الدعامات لقطعة من PLA، فيجب ألا تتجاوز حرارة ماء النقع 50°C لتجنّب تشوّه النموذج الرئيسي.",
+  "ckb": "ئاوی شیرەتێن بەکاربهێنە بۆ خێراکردنی پرۆسەی توانەوە. بەڵام ئەگەر پاڵپشت بۆ PLA بێت، نابێت پلەی گەرمیی ئاوی خووساندن لە 50°C تێپەڕێت بۆ ڕێگریکردن لە شێوە تێکچوونی مۆدێلی سەرەکی.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "03e2c0981ea4086d86426f663344071566d3e0bddc5a9582d30fbfc5036ad9d2",
+  "en": "Waiting for complete dissolution is not necessary when soaking and dissolving PVA support. You can manually remove the partially dissolved PVA support to reduce the waiting time.",
+  "ar": "لا حاجة إلى انتظار الذوبان الكامل عند نقع دعامات PVA وإذابتها. يمكنك إزالة دعامات PVA الذائبة جزئيًا يدويًا لتقليل وقت الانتظار.",
+  "ckb": "لە کاتی خووساندن و توانەوەی پاڵپشتی PVA، پێویست ناکات چاوەڕێی توانەوەی تەواو بکەیت. دەتوانیت بە دەست ئەو بەشەی پاڵپشتی PVA لاببەیت کە تا ڕادەیەک تواوەتەوە، بۆ کەمکردنەوەی ماوەی چاوەڕوانی.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "63aa6f4e1bd7cfd13c77e6a117ed7ce7f67354b85b186368b74c4f4909c56b72",
+  "en": "6.Post-Processing Safety",
+  "ar": "6. السلامة في المعالجة اللاحقة",
+  "ckb": "6. سەلامەتی لە چارەسەرکردنی دوای چاپدا",
+  "kind": "faq_q"
+ },
+ {
+  "h": "6fd3a007e27b838b16a5ffe2e592dc0c08e5e140d82b9bdd3d3b472ebfae1cc9",
+  "en": "When dissolving supports in water, some parts of the main model may leak in water. To mitigate this risk, please refer to the Reduce the risk of prints leakage guide on WIKI.",
+  "ar": "عند إذابة الدعامات في الماء، قد يتسرّب الماء إلى بعض أجزاء النموذج الرئيسي. وللحدّ من هذا الخطر، يرجى الرجوع إلى دليل تقليل خطر تسرّب المطبوعات على الويكي.",
+  "ckb": "لە کاتی توانەوەی پاڵپشتەکان لە ئاودا، لەوانەیە ئاو بچێتە ناو هەندێک بەشی مۆدێلی سەرەکییەوە. بۆ کەمکردنەوەی ئەم مەترسییە، تکایە سەیری ڕێبەری کەمکردنەوەی مەترسیی دزەکردنی چاپکراوەکان لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "318c08461db31f863362036c2d793d83e65307efd114e960edb7a83bc94cecf0",
+  "en": "7.Safety Tips",
+  "ar": "7. نصائح السلامة",
+  "ckb": "7. ئامۆژگارییەکانی سەلامەتی",
+  "kind": "faq_q"
+ },
+ {
+  "h": "9225bbc0d94934a466b9b7375b114e1045309b8438e926b2c110e4c85b3c9536",
+  "en": "Easily dissolved in water",
+  "ar": "يذوب في الماء بسهولة",
+  "ckb": "بە ئاسانی لە ئاودا دەتوێتەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "806ef8aa3fc22842bd80e15a070665a36019e5d158b93ab1188499b7463c45b0",
+  "en": "Smooth support interface",
+  "ar": "سطح تلامس أملس للدعامات",
+  "ckb": "ڕووی بەریەککەوتنی لووس بۆ پاڵپشت",
+  "kind": "block_line"
+ },
+ {
+  "h": "3a296b1dd2710fac346fbac9c44cf1d80d5b6a4c76d507f3da4037ed376ee31d",
+  "en": "Recommended for all PLA",
+  "ar": "موصى به لجميع أنواع PLA",
+  "ckb": "پێشنیارکراوە بۆ هەموو جۆرەکانی PLA",
+  "kind": "block_line"
+ },
+ {
+  "h": "695b0c8521dd9ec615945da6a3dd12420cfe54520aa0da880d2e26c610b5bfef",
+  "en": "ONLY used for support",
+  "ar": "يُستخدم للدعامات فقط",
+  "ckb": "تەنها بۆ پاڵپشت بەکاردێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "d3b1f71f3d3b9e4ce35facf3f655535a84484cf023b839e99438ab188a872f11",
+  "en": "Not to be used for standalone models",
+  "ar": "لا يُستخدم لطباعة نماذج مستقلة",
+  "ckb": "بۆ مۆدێلی سەربەخۆ بەکارناهێنرێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "8d15e84a0478b12feb251d9e77bae6226f4738d83425cc4a1c86462232110afe",
+  "en": "Note: Before printing, please kindly refer to the Printing Tips for optimal results.",
+  "ar": "ملاحظة: قبل الطباعة، يرجى الرجوع إلى نصائح الطباعة للحصول على أفضل النتائج.",
+  "ckb": "تێبینی: پێش چاپکردن، تکایە سەیری ئامۆژگارییەکانی چاپکردن بکە بۆ بەدەستهێنانی باشترین ئەنجام.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2bce0daa7c6deef9f32216e750de8ed82ab4afe80162493bd865eca1b6d22599",
+  "en": "Built to Last",
+  "ar": "مصمّم ليدوم طويلًا",
+  "ckb": "بۆ ماوەیەکی درێژ دروستکراوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "ad3db6ae9843334a5909ccb0bfa4f38d38216823610b87509fb5d4c323d413f2",
+  "en": "Dimensional Stability",
+  "ar": "ثبات الأبعاد",
+  "ckb": "جێگیریی ڕەهەندەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "8cf3e524e81944584a4b0c7188f1246b1f67db237f1254f067b9ae29375700c2",
+  "en": "Exceptional Thermal Properties",
+  "ar": "خصائص حرارية استثنائية",
+  "ckb": "تایبەتمەندیی گەرمیی نایاب",
+  "kind": "block_line"
+ },
+ {
+  "h": "128f12c4e716a6d0ac3849ff4a9263533ba1a1ca4661c515d59c4b563e983b9a",
+  "en": "Chemical Resistance",
+  "ar": "مقاومة المواد الكيميائية",
+  "ckb": "بەرگەی ماددە کیمیاییەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "57071fdb41fd74913de00653c676ddb8a7573e676e79fbf62ca81e4d0fe63665",
+  "en": "Smooth Surface and More Colors",
+  "ar": "سطح أملس وألوان أكثر",
+  "ckb": "ڕووی لووس و ڕەنگی زیاتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "a035ccf264c4e9c1cdc6b062dc35011d5403a4b204d247fc913f292350c8d781",
+  "en": "Bambu PA6-GF is exceptionally strong and durable due to reinforced glass fibers, making it the perfect choice for prints that need to withstand heavy use and resist bending or breaking.",
+  "ar": "يتميّز Bambu PA6-GF بقوة ومتانة استثنائيتين بفضل تقويته بألياف الزجاج، ما يجعله الخيار الأمثل للمطبوعات التي تحتاج إلى تحمّل الاستخدام المكثّف ومقاومة الانحناء أو الكسر.",
+  "ckb": "فیلامێنتی Bambu PA6-GF بەهۆی بەهێزکردنی بە ڕیشاڵی شووشە، بە شێوەیەکی نائاسایی بەهێز و بەرگەگرە، بۆیە باشترین هەڵبژاردەیە بۆ ئەو چاپکراوانەی پێویستە بەرگەی بەکارهێنانی قورس بگرن و لە بەرامبەر چەمانەوە یان شکاندا خۆڕاگر بن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b86b5980f6fe257737d8563e9158e3f770210b9d4be8d18e404cd7e63a3ffd83",
+  "en": "Note: The printed part achieves better toughness after exposure to moisture.",
+  "ar": "ملاحظة: تكتسب القطعة المطبوعة متانة أفضل ضد الكسر بعد تعرّضها للرطوبة.",
+  "ckb": "تێبینی: پارچە چاپکراوەکە دوای بەرکەوتنی بە شێ پتەویی باشتر بەدەست دەهێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "953cc5bc3f77a9aad0bffe5d9a814e2103b1e01b2db95dd5068f1de78c8108f9",
+  "en": "PA6-GF boasts unparalleled dimensional stability thanks to its glass fiber reinforcement, minimizing warping in comparison to standard PA filaments. Print with precise dimensions, even in the most intricate geometries.",
+  "ar": "يتمتع PA6-GF بثبات أبعاد لا مثيل له بفضل تقويته بألياف الزجاج، ما يقلّل التقوّس مقارنةً بفلامنتات PA القياسية. اطبع بأبعاد دقيقة حتى في أكثر الأشكال الهندسية تعقيدًا.",
+  "ckb": "فیلامێنتی PA6-GF بەهۆی بەهێزکردنی بە ڕیشاڵی شووشە، جێگیرییەکی بێوێنەی ڕەهەندەکانی هەیە، و چەمانەوەی لێوار بە بەراورد لەگەڵ فیلامێنتە ستانداردەکانی PA کەم دەکاتەوە. تەنانەت لە ئاڵۆزترین شێوە ئەندازەییەکاندا بە ڕەهەندی ورد چاپ بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e491ecd313b4fc9e581eade5a9c8d49f95ce9366dd8533955e6008ed3767ef03",
+  "en": "PA6-GF boasts a high heat deflection temperature and superior dimensional stability, enabling it to retain its mechanical properties even under elevated temperatures. This makes it ideal for demanding industrial and automotive applications.",
+  "ar": "يتمتع PA6-GF بدرجة حرارة انحراف حراري عالية وثبات أبعاد فائق، ما يمكّنه من الحفاظ على خصائصه الميكانيكية حتى في درجات الحرارة المرتفعة. وهذا يجعله مثاليًا للاستخدامات الصناعية واستخدامات السيارات الصعبة.",
+  "ckb": "فیلامێنتی PA6-GF پلەی گەرمیی لاربوونەوەی بەرز و جێگیریی باڵای ڕەهەندەکانی هەیە، کە ڕێگەی پێدەدات تەنانەت لە پلەی گەرمیی بەرزیشدا تایبەتمەندییە میکانیکییەکانی بپارێزێت. ئەمەش وای لێدەکات گونجاوترین بێت بۆ بەکارهێنانە پیشەسازی و ئۆتۆمبێلییە قورسەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f8e1428fd0c9cbf84ec8810bdb3df4a2a69a2bd056dde1b635f18efee9f4d2be",
+  "en": "PA6-GF offers excellent resistance to chemicals, oils, and many kinds of solvents, ensuring long-term performance in challenging environments.",
+  "ar": "يوفّر PA6-GF مقاومة ممتازة للمواد الكيميائية والزيوت وأنواع كثيرة من المذيبات، ما يضمن أداءً طويل الأمد في البيئات الصعبة.",
+  "ckb": "فیلامێنتی PA6-GF بەرگەیەکی نایاب لە بەرامبەر ماددە کیمیاییەکان، ڕۆن و زۆر جۆری توێنەرەوە پێشکەش دەکات، کە کارایی درێژخایەن لە ژینگە قورسەکاندا مسۆگەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2df175ecb8761d788edeb60059bb7beab63da35edc0d0ae1af55feaf227d661c",
+  "en": "Bambu PA6-GF filaments are compatible with the Bambu AMS system, ready to print in multi-color. The special surface texture also blurs the layer lines, providing a smooth surface quality.",
+  "ar": "فلامنتات Bambu PA6-GF متوافقة مع نظام Bambu AMS، وجاهزة للطباعة متعددة الألوان. كما أن ملمس السطح الخاص يُخفي خطوط الطبقات، ما يمنح جودة سطح ملساء.",
+  "ckb": "فیلامێنتەکانی Bambu PA6-GF گونجاون لەگەڵ سیستەمی Bambu AMS و ئامادەن بۆ چاپی فرەڕەنگ. هەروەها هەستی ڕووکارە تایبەتەکەی هێڵەکانی چین لێڵ دەکات، و جۆرایەتیی ڕووکارێکی لووس دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c846035f3d74333b9243655c8deaed1ae3989703aa786beae749595ffbd0916a",
+  "en": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, Liquid Glue, and AMS lite.",
+  "ar": "غير متوافق مع صفيحة Cool Plate SuperTack، ورأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm، وغراء Liquid Glue، وAMS lite.",
+  "ckb": "لەگەڵ پلێتی Cool Plate SuperTack، سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm، چەسپی Liquid Glue و AMS lite گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "5a4d9f7cfd9b9e93729e408aa722d5910415c3e47db4f63cc0fc5d22c8b3815e",
+  "en": "As this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing. For more details, please refer to: Printing tips for Engineering materials on WIKI.",
+  "ar": "نظرًا لأن هذا الفلامنت شديد الامتصاص للرطوبة، يرجى وضع أي فلامنت غير مستخدم فورًا في وعاء محكم الإغلاق مع مادة مجففة، وتجفيفه جيدًا قبل الطباعة. لمزيد من التفاصيل، يرجى الرجوع إلى: نصائح طباعة المواد الهندسية على الويكي.",
+  "ckb": "لەبەر ئەوەی ئەم فیلامێنتە زۆر شێ هەڵدەمژێت، تکایە هەر فیلامێنتێکی بەکارنەهاتوو دەستبەجێ لە دەفرێکی داخراو لەگەڵ ماددەی وشککەرەوە دابنێ، و پێش چاپکردن بە تەواوی وشکی بکەرەوە. بۆ وردەکاریی زیاتر، تکایە سەیری ئامۆژگارییەکانی چاپکردنی کەرەستە ئەندازیارییەکان لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "ca1d896d99e041dcccf910f5c04a62332cb15d87d2ad6132755686e7fefa8410",
+  "en": "3.Warping Prevention Tips",
+  "ar": "3. نصائح لمنع التقوّس",
+  "ckb": "3. ئامۆژگاری بۆ ڕێگریکردن لە چەمانەوەی لێوار",
+  "kind": "faq_q"
+ },
+ {
+  "h": "e03a173096c352dedf7da8628177ab3832ec694c9e539f1059357d75bfabe8f2",
+  "en": "To minimize warping, avoid printing large-sized high-infill-density models. Use enclosed printers and ensure the build plate is properly applied with glue for better print adhesion before printing.",
+  "ar": "لتقليل التقوّس، تجنّب طباعة نماذج كبيرة الحجم وعالية كثافة الحشوة الداخلية. استخدم طابعات مغلقة وتأكّد قبل الطباعة من وضع الغراء على صفيحة الطباعة بشكل صحيح لتحسين التصاق المطبوعة.",
+  "ckb": "بۆ کەمکردنەوەی چەمانەوەی لێوار، خۆت لە چاپکردنی مۆدێلی قەبارە گەورە و چڕیی پڕکەرەوەی ناوەوەی بەرز بپارێزە. چاپکەری داخراو بەکاربهێنە و پێش چاپکردن دڵنیابەرەوە کە چەسپ بە دروستی لە پلێتی چاپ دراوە بۆ لکانی باشتری چاپکراوەکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "1b90de1cc8a1a4e6d8c61d153f1fa57e99c5b4a0834d2249831662d053a01e17",
+  "en": "4.Post-processing Tips",
+  "ar": "4. نصائح المعالجة اللاحقة",
+  "ckb": "4. ئامۆژگارییەکانی چارەسەرکردنی دوای چاپ",
+  "kind": "faq_q"
+ },
+ {
+  "h": "cd61bb75c38797c7111e65c22364ab0704ebf3919ef8f4a0ad5bae1ec54316bb",
+  "en": "We recommend removing the support structures within 2 hours after printing to prevent them from sticking after absorbing moisture. If sticking occurs, dry the model to ease the removal.",
+  "ar": "نوصي بإزالة هياكل الدعامات خلال 2 ساعة بعد الطباعة لمنع التصاقها بعد امتصاص الرطوبة. وإذا حدث الالتصاق، فجفّف النموذج لتسهيل الإزالة.",
+  "ckb": "پێشنیار دەکەین پێکهاتەکانی پاڵپشت لە ماوەی 2 کاتژمێر دوای چاپکردن لاببەیت بۆ ئەوەی دوای هەڵمژینی شێ نەنووسێن. ئەگەر نووسان ڕوویدا، مۆدێلەکە وشک بکەرەوە بۆ ئاسانکردنی لابردن.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "bf5f1ab4ee583b68eb210bfac43708fce196915c586ab1825ad010006c1de6cc",
+  "en": "Placing the printed part in a convection oven set between 80 to 130 degrees Celsius for 5 to 12 hours can further enhance the strength and rigidity of the print. Note: The effectiveness of this process depends on the structure, size, and conditions of the printed model. Some models may warp or deform after annealing. For more details, please refer to: Work after Printing Finished on WIKI.",
+  "ar": "إن وضع القطعة المطبوعة في فرن بالحمل الحراري مضبوط بين 80 و130 درجة مئوية لمدة 5 إلى 12 ساعة يمكن أن يعزّز متانة المطبوعة وصلابتها أكثر. ملاحظة: تعتمد فعالية هذه العملية على بنية النموذج المطبوع وحجمه وظروفه. وقد يتقوّس بعض النماذج أو يتشوّه بعد التلدين. لمزيد من التفاصيل، يرجى الرجوع إلى: الأعمال بعد انتهاء الطباعة على الويكي.",
+  "ckb": "دانانی پارچە چاپکراوەکە لە فڕنێکی کۆنڤێکشن کە لە نێوان 80 تا 130 پلەی سیلیزی ڕێکخرابێت بۆ ماوەی 5 تا 12 کاتژمێر، دەتوانێت بەهێزی و سەختیی چاپکراوەکە زیاتر بەرز بکاتەوە. تێبینی: کاریگەریی ئەم پرۆسەیە پشت بە پێکهاتە، قەبارە و بارودۆخی مۆدێلە چاپکراوەکە دەبەستێت. هەندێک مۆدێل لەوانەیە دوای گەرمکردن و ساردکردنەوەی کۆنترۆڵکراو (annealing) بچەمێنەوە یان شێوەیان تێکبچێت. بۆ وردەکاریی زیاتر، تکایە سەیری کارەکانی دوای تەواوبوونی چاپ لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "a2ecc6ccdba4b40067573e43e9d1a2ccf78477c790a3fd513c11605f0684cea0",
+  "en": "This product is a glass fiber reinforced filament that may produce fine fiber debris during use, post-processing, or contact with rough or fractured surfaces, posing a risk of mechanical skin punctures or foreign body irritation. To ensure safety, please avoid rubbing or touching rough edges and cross-sections with bare hands; it is highly recommended to wear gloves when loading or unloading the filament, as well as during cutting, sanding, or other post-processing operations, while using additional protective equipment as required by your specific working conditions.",
+  "ar": "هذا المنتج فلامنت مقوّى بألياف الزجاج، وقد يُنتج شظايا ألياف دقيقة أثناء الاستخدام أو المعالجة اللاحقة أو عند ملامسة الأسطح الخشنة أو المكسورة، ما يشكّل خطر حدوث وخز ميكانيكي في الجلد أو تهيّج بسبب جسم غريب. لضمان السلامة، يرجى تجنّب فرك الحواف الخشنة والمقاطع العرضية أو لمسها باليدين العاريتين؛ ويُوصى بشدة بارتداء القفازات عند تحميل الفلامنت أو إخراجه، وكذلك أثناء القص أو الصنفرة أو غيرها من عمليات المعالجة اللاحقة، مع استخدام معدات حماية إضافية حسب ما تتطلبه ظروف العمل الخاصة بك.",
+  "ckb": "ئەم بەرهەمە فیلامێنتێکی بەهێزکراوە بە ڕیشاڵی شووشە کە لەوانەیە لە کاتی بەکارهێنان، چارەسەرکردنی دوای چاپ، یان بەرکەوتن لەگەڵ ڕووی زبر یان شکاو، وردە پاشماوەی ڕیشاڵ دروست بکات، کە مەترسیی کونبوونی میکانیکیی پێست یان هەستیاری بەهۆی تەنی بیانییەوە دروست دەکات. بۆ دڵنیابوون لە سەلامەتی، تکایە خۆت بپارێزە لە خشاندن یان دەستلێدانی لێوارە زبرەکان و ڕووە بڕاوەکان بە دەستی ڕووت؛ زۆر پێشنیار دەکرێت لە کاتی بارکردن یان دەرهێنانی فیلامێنت، هەروەها لە کاتی بڕین، سمتەکردن یان کارەکانی تری چارەسەرکردنی دوای چاپ دەستکێش لەبەر بکەیت، لەگەڵ بەکارهێنانی کەرەستەی پاراستنی زیادە بەپێی پێویستیی بارودۆخی کارکردنی تایبەتی خۆت.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "430fdc7c42a3f4c1e1330fca7f517c1b048f8f2d163b94ca2429905e16c855ef",
+  "en": "Note: PA6-GF Yellow, Lime and Brown have been discontinued.",
+  "ar": "ملاحظة: توقّف إنتاج PA6-GF بالألوان Yellow وLime وBrown.",
+  "ckb": "تێبینی: بەرهەمهێنانی PA6-GF بە ڕەنگەکانی Yellow، Lime و Brown ڕاگیراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "37cad77333db0b27d5fc249b07ea63d74d65be7704bcabf7439718ddfb3893e5",
+  "en": "Ultra-lightweight & Low Density",
+  "ar": "خفيف الوزن للغاية ومنخفض الكثافة",
+  "ckb": "زۆر سووک و چڕیی کەم",
+  "kind": "block_line"
+ },
+ {
+  "h": "8aef98db384b448dc6188865819bd8088371068038e70d570ced4dbbb15cb7ee",
+  "en": "Water & UV Resistance",
+  "ar": "مقاومة الماء والأشعة UV",
+  "ckb": "بەرگەی ئاو و تیشکی UV",
+  "kind": "block_line"
+ },
+ {
+  "h": "63640c244ddb5cf7ce741082dd12b40502d2dd1359581b0073249d340f2c5ea1",
+  "en": "Impact Resistance & Built to Last",
+  "ar": "مقاومة الصدمات ومصمّم ليدوم طويلًا",
+  "ckb": "بەرگەی لێدان و دروستکراو بۆ ماوەیەکی درێژ",
+  "kind": "block_title"
+ },
+ {
+  "h": "2e5ed3c70c863885ba19465fffcac56ddf5957149766eeb1e825776fd7007048",
+  "en": "Compared with other foaming filament, ASA Aero is tougher with higher layer strength, making it more resistant to impact, collision, and falling, perfect for high-stress demanding applications.",
+  "ar": "مقارنةً بالفلامنتات الرغوية الأخرى، يتميّز ASA Aero بمتانة أكبر ضد الكسر وقوة أعلى بين الطبقات، ما يجعله أكثر مقاومة للصدمات والارتطام والسقوط، ومثاليًا للاستخدامات الصعبة ذات الإجهاد العالي.",
+  "ckb": "بە بەراورد لەگەڵ فیلامێنتە کەفکەرەکانی تر، ASA Aero پتەوترە و بەهێزیی نێوان چینەکانی بەرزترە، بۆیە بەرگەی زیاتری لە بەرامبەر لێدان، پێکدادان و کەوتندا هەیە، و گونجاوترینە بۆ بەکارهێنانە قورسەکان کە فشاری زۆریان لەسەرە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b5dd11818e363b43637f1513403267d939142ffd53ca0bcd29f8f3c41c7a7c62",
+  "en": "Ultra-lightweight, Controllable Density",
+  "ar": "خفيف الوزن للغاية بكثافة قابلة للتحكم",
+  "ckb": "زۆر سووک، بە چڕیی کۆنترۆڵکراو",
+  "kind": "block_title"
+ },
+ {
+  "h": "cb06d42bba0737e2b58cdb58f43f2e9906a77f0d750bdb74693374e72b541a54",
+  "en": "Only 50%-75% the density of regular ASA prints, ASA Aero is as light as feather, designed for weight-sensitive objects, such as RC planes and unmanned aerial vehicles (UAVs). With controllable foaming characteristic, ASA Aero achieves lower density of prints by increasing printing temperature or lowering flow rate.",
+  "ar": "بكثافة لا تتجاوز 50%-75% من كثافة مطبوعات ASA العادية، يأتي ASA Aero خفيفًا كالريشة، وهو مصمّم للأجسام الحساسة للوزن، مثل طائرات RC والطائرات بدون طيار (UAVs). وبفضل خاصية التمدد الرغوي القابلة للتحكم، يحقق ASA Aero كثافة أقل للمطبوعات عبر رفع حرارة الطباعة أو خفض معدل التدفق.",
+  "ckb": "فیلامێنتی ASA Aero چڕییەکەی تەنها 50%-75% لە چڕیی چاپکراوە ئاساییەکانی ASA دەبێت و وەک پەڕ سووکە، بۆ تەنە هەستیارەکان بە کێش دیزاین کراوە، وەک فڕۆکەی RC و فڕۆکەی بێ فڕۆکەوان (UAVs). بە تایبەتمەندیی کەفکردنی کۆنترۆڵکراو، ASA Aero بە بەرزکردنەوەی پلەی گەرمیی چاپ یان نزمکردنەوەی ڕێژەی ڕۆیشتن، چڕیی کەمتری چاپکراو بەدەست دەهێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "38cc57f0f6c13171712f5bddd8b987aac8bf45333fafa18f1c3f6bd0cd1249c5",
+  "en": "Content Block-9",
+  "ar": "Content Block-9",
+  "ckb": "Content Block-9",
+  "kind": "block_title",
+  "keep": true
+ },
+ {
+  "h": "05eef21965662d164d90a0e7e7aadefe50fff8348d38b18a21beda41100fdc6e",
+  "en": "The relationship between the maximum foaming rate, minimum print density, and printing temperature of ASA Aero.",
+  "ar": "العلاقة بين أقصى معدل للتمدد الرغوي وأدنى كثافة للمطبوعات وحرارة الطباعة لفلامنت ASA Aero.",
+  "ckb": "پەیوەندیی نێوان زۆرترین ڕێژەی کەفکردن، کەمترین چڕیی چاپکراو و پلەی گەرمیی چاپ بۆ ASA Aero.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9937b013ec904e1b0a7782b650e7d2b1713abedab19fe59ff9200bec2ae157fd",
+  "en": "Ready for Harsh Environment & Outdoor",
+  "ar": "جاهز للبيئات القاسية والاستخدام الخارجي",
+  "ckb": "ئامادە بۆ ژینگەی سەخت و دەرەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "55fba23dc6090501df69258c5237ac1fcd898cdd2a9d7c977e857053b6188d66",
+  "en": "Compared with PLA Aero, the overwhelming performance in temperature, water, and UV resistance makes ASA Aero stand out for long-lasting outdoor use and harsh environments.",
+  "ar": "مقارنةً بـ PLA Aero، يتفوّق ASA Aero بوضوح في مقاومة الحرارة والماء والأشعة UV، ما يجعله مميّزًا للاستخدام الخارجي طويل الأمد وفي البيئات القاسية.",
+  "ckb": "بە بەراورد لەگەڵ PLA Aero، ASA Aero بە کارایی زۆر باڵاتری لە بەرگەی پلەی گەرمی، ئاو و تیشکی UV، بۆ بەکارهێنانی درێژخایەن لە دەرەوە و ژینگە سەختەکان جیا دەکرێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a5a5cb650b29fbd332a7d67876899000635dc0c38495c36adb5e2c3f939f0ef6",
+  "en": "Bambu ASA Aero provides an easy-to-color matte surface texture with better dyeing results as compared with regular ASA.",
+  "ar": "يوفّر Bambu ASA Aero سطحًا بملمس مطفي سهل التلوين، مع نتائج صبغ أفضل مقارنةً بـ ASA العادي.",
+  "ckb": "فیلامێنتی Bambu ASA Aero ڕووکارێکی مات پێشکەش دەکات کە بە ئاسانی ڕەنگ دەکرێت، و ئەنجامی بۆیەکردنی باشترە بە بەراورد لەگەڵ فیلامێنتی ئاسایی ASA.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b4660cc16fea227b088117daf6f79760da157089e15120adfe72948ecb075ab8",
+  "en": "Not compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+  "ar": "غير متوافق مع صفيحة Cool Plate SuperTack، ورأس الصهر المزوّد بنوزل من الفولاذ المقسّى 0.6 mm / 0.8 mm، ورأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm.",
+  "ckb": "لەگەڵ پلێتی Cool Plate SuperTack، سەری تواندنەوەی خاوەن نۆزڵی پۆڵای ڕەقکراوی 0.6 mm / 0.8 mm و سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "1b5e9d3ff0ce8137106f82dd39776c2e02f84d1cca99026b91713ad2b23a3f65",
+  "en": "ASA Aero is highly sensitive to humidity. To achieve optimal printing performance, it is recommended further drying before use and after storage. For more details, please refer to the filament drying instructions on WIKI.",
+  "ar": "فلامنت ASA Aero شديد الحساسية للرطوبة. لتحقيق أفضل أداء طباعة، يُوصى بتجفيفه تجفيفًا إضافيًا قبل الاستخدام وبعد التخزين. لمزيد من التفاصيل، يرجى الرجوع إلى تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "فیلامێنتی ASA Aero زۆر هەستیارە بە شێ. بۆ بەدەستهێنانی باشترین کارایی چاپ، پێشنیار دەکرێت پێش بەکارهێنان و دوای هەڵگرتن جارێکی تر وشک بکرێتەوە. بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "d11febff086e8e7621d71eaabed85f7695c91ec3a495a7b37ee4d8a52f322ca7",
+  "en": "To minimize warping, avoid printing large-sized high infill density models. Use enclosed printers and ensure the build plate is properly applied with glue for better print adhesion before printing. Set lower printing speed and higher heatbed temperature. For more details, please refer to: Common print quality problems and solutions on WIKI.",
+  "ar": "لتقليل التقوّس، تجنّب طباعة نماذج كبيرة الحجم وعالية كثافة الحشوة الداخلية. استخدم طابعات مغلقة وتأكّد قبل الطباعة من وضع الغراء على صفيحة الطباعة بشكل صحيح لتحسين التصاق المطبوعة. اضبط سرعة طباعة أقل وحرارة أعلى للسرير الساخن. لمزيد من التفاصيل، يرجى الرجوع إلى: مشكلات جودة الطباعة الشائعة وحلولها على الويكي.",
+  "ckb": "بۆ کەمکردنەوەی چەمانەوەی لێوار، خۆت لە چاپکردنی مۆدێلی قەبارە گەورە و چڕیی پڕکەرەوەی ناوەوەی بەرز بپارێزە. چاپکەری داخراو بەکاربهێنە و پێش چاپکردن دڵنیابەرەوە کە چەسپ بە دروستی لە پلێتی چاپ دراوە بۆ لکانی باشتری چاپکراوەکە. خێرایی چاپی نزمتر و پلەی گەرمیی بەرزتری بێدی گەرم دابنێ. بۆ وردەکاریی زیاتر، تکایە سەیری کێشە باوەکانی جۆرایەتیی چاپ و چارەسەرەکانیان لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "e2b98f66600e4c1b0ecc63aa28d611dc79f9f16737d7f733315e6589e8d418aa",
+  "en": "4.Ventilation & Odor Notice",
+  "ar": "4. تنبيه بشأن التهوية والرائحة",
+  "ckb": "4. ئاگاداری دەربارەی هەواگۆڕکێ و بۆن",
+  "kind": "faq_q"
+ },
+ {
+  "h": "81700466ed4a1f9f2fd7e42c6ad6d4c791dfa40b45ed0ceb90c364ab3c74674b",
+  "en": "Pungent and unpleasant odors may be released during printing. Make sure your printer is placed in a well-ventilated area and use enclosed printers.",
+  "ar": "قد تنبعث روائح نفّاذة وغير مستحبة أثناء الطباعة. تأكّد من وضع طابعتك في مكان جيد التهوية واستخدم طابعات مغلقة.",
+  "ckb": "لەوانەیە لە کاتی چاپدا بۆنی تیژ و ناخۆش دەربچێت. دڵنیابەرەوە کە چاپکەرەکەت لە شوێنێکی هەواگۆڕکێی باشدا دانراوە و چاپکەری داخراو بەکاربهێنە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "10490cef0de59b8f5110869f49475ad7e777f42c2af5f3442d19377169035cf4",
+  "en": "5.Usage Tips",
+  "ar": "5. نصائح الاستخدام",
+  "ckb": "5. ئامۆژگارییەکانی بەکارهێنان",
+  "kind": "faq_q"
+ },
+ {
+  "h": "3d4ebee3b8c2094376b7a15a15cecac5f75109160cf94399d6b8bfc9d0276de1",
+  "en": "Foaming ASA materials (ASA Aero) have high requirements for material drying and parameter settings. Please carefully read the ASA Aero Printing Guide before starting the printing process.",
+  "ar": "لمواد ASA الرغوية (ASA Aero) متطلبات عالية في تجفيف المادة وضبط الإعدادات. يرجى قراءة دليل طباعة ASA Aero بعناية قبل بدء عملية الطباعة.",
+  "ckb": "کەرەستە کەفکەرەکانی ASA (ASA Aero) پێداویستیی بەرزیان هەیە بۆ وشککردنەوەی کەرەستە و ڕێکخستنی پارامیتەرەکان. تکایە پێش دەستپێکردنی پرۆسەی چاپ، بە وردی ڕێبەری چاپکردنی ASA Aero بخوێنەرەوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "5e78a4128fbe362bbd15055fc861befe38a2c5b5dd8ef627b6eb06a11d583b3a",
+  "en": "Greater Dimensional Stability",
+  "ar": "ثبات أكبر في الأبعاد",
+  "ckb": "جێگیریی زیاتری ڕەهەندەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "d3e9c54444bc77bd560cfa8bc3540403d76ddcc8232938d1f60f59fd6e175c9f",
+  "en": "Fine Matte Finish",
+  "ar": "تشطيب مطفي ناعم",
+  "ckb": "ڕووکاری ماتی ورد",
+  "kind": "block_line"
+ },
+ {
+  "h": "5c13d2b734c68c3e241bbd466392650b2ee50ec0491d298502711a1706b44f70",
+  "en": "ABS-GF outclasses regular ABS in strength and stiffness, making it perfect for load-bearing and bending-resistance parts.",
+  "ar": "يتفوّق ABS-GF على ABS العادي في المتانة والصلابة، ما يجعله مثاليًا للقطع الحاملة للأحمال والمقاومة للانحناء.",
+  "ckb": "فیلامێنتی ABS-GF لە بەهێزی و سەختیدا لە فیلامێنتی ئاسایی ABS باشترە، بۆیە گونجاوترینە بۆ پارچە بارهەڵگرەکان و ئەو پارچانەی دەبێت بەرگەی چەمانەوە بگرن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3f6029edbd13b69c3525a6468d310933a4e3bc1f795a8e8f714b99c0bb1bcdb2",
+  "en": "Glass fiber reinforcement gives ABS-GF better dimensional stability than regular ABS, minimizing warping and deformation during printing. This makes it ideal for intricate mechanical assembly parts or geometric components.",
+  "ar": "يمنح التقوية بألياف الزجاج فلامنت ABS-GF ثباتًا في الأبعاد أفضل من ABS العادي، ما يقلّل التقوّس والتشوّه أثناء الطباعة. وهذا يجعله مثاليًا لقطع التجميع الميكانيكية المعقّدة أو المكوّنات الهندسية الشكل.",
+  "ckb": "بەهێزکردن بە ڕیشاڵی شووشە جێگیریی ڕەهەندەکانی ABS-GF لە فیلامێنتی ئاسایی ABS باشتر دەکات، و چەمانەوەی لێوار و شێوە تێکچوون لە کاتی چاپدا کەم دەکاتەوە. ئەمەش وای لێدەکات گونجاوترین بێت بۆ پارچە ئاڵۆزەکانی پێکەوەنانی میکانیکی یان پێکهاتە ئەندازەییەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5ff7a8b9876139f60557980e38f5894b11b5f9fb048d026effb82b1738ba18a7",
+  "en": "*Specimen Test: Model size (L*W*H): 240*50*20 mm³ (the XY direction); Infill Density: 25%",
+  "ar": "*اختبار العيّنة: أبعاد النموذج (الطول*العرض*الارتفاع): 240*50*20 mm³ (باتجاه XY)؛ كثافة الحشوة الداخلية: 25%",
+  "ckb": "*تاقیکردنەوەی نموونە: قەبارەی مۆدێل (درێژی*پانی*بەرزی): 240*50*20 mm³ (بە ئاراستەی XY)؛ چڕیی پڕکەرەوەی ناوەوە: 25%",
+  "kind": "block_line"
+ },
+ {
+  "h": "5db39007c27a3a2db8567154382321888134065a298107afd1919b65b79ff1e6",
+  "en": "The seamless matte finish, coupled with nearly invisible layer lines, gives ABS-GF a smooth appearance, making it ideal for decorative and fine-grained parts.",
+  "ar": "يمنح التشطيب المطفي المتجانس، مع خطوط طبقات تكاد لا تُرى، فلامنت ABS-GF مظهرًا أملس، ما يجعله مثاليًا للقطع الزخرفية والقطع ذات التفاصيل الدقيقة.",
+  "ckb": "ڕووکاری ماتی یەکدەست، لەگەڵ هێڵەکانی چین کە بە زەحمەت دەبینرێن، ڕواڵەتێکی لووس بە ABS-GF دەبەخشێت، بۆیە گونجاوترینە بۆ پارچەی ڕازاندنەوە و پارچەی وردەکاریی ورد.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2389c456ea1f8ce46ddabbe095af9175be6e16ad16d4b3df3c5c45066b775369",
+  "en": "Water Resistance & Built to Last",
+  "ar": "مقاومة الماء ومصمّم ليدوم طويلًا",
+  "ckb": "بەرگەی ئاو و دروستکراو بۆ ماوەیەکی درێژ",
+  "kind": "block_title"
+ },
+ {
+  "h": "e97430b720a9ea51ff41b12ff98d09ce4c5d75599659d5cf72ef18cbd13155cc",
+  "en": "With improved water resistance and durability, Bambu ABS-GF is ideal for printing long-lasting production and household items, like mechanical casings, connectors and molds.",
+  "ar": "بفضل مقاومته المحسّنة للماء ومتانته، يُعد Bambu ABS-GF مثاليًا لطباعة القطع الإنتاجية والمنزلية طويلة العمر، مثل الأغلفة الميكانيكية والموصلات والقوالب.",
+  "ckb": "بە بەرگەی باشترکراوی ئاو و بەرگەگری، Bambu ABS-GF گونجاوترینە بۆ چاپکردنی کاڵای بەرهەمهێنان و ناوماڵی تەمەن درێژ، وەک بەرگی میکانیکی، گەیەنەر و قاڵب.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4c27921122bf753157398ccde2f5a32d1ec67e7edfaaaccda121052dc4dc0b27",
+  "en": "Not compatible with Cool Plate SuperTack, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+  "ar": "غير متوافق مع صفيحة Cool Plate SuperTack، ولا مع رأس الصهر المزوّد بنوزل من الفولاذ المقاوم للصدأ 0.2 mm.",
+  "ckb": "لەگەڵ پلێتی Cool Plate SuperTack و سەری تواندنەوەی خاوەن نۆزڵی پۆڵای زەنگنەگری 0.2 mm گونجاو نییە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "f6cfbc1d1c29d007cde6879d8b136032869932ae6723b2ae307b3fe677c0b893",
+  "en": "To minimize warping, avoid printing large-sized high infill density models. Use enclosed printers and ensure the build plate is properly applied with glue for better print adhesion before printing. Set lower printing speed and higher heatbed temperature. For more details please refer to: Common print quality problems and solutions on WIKI.",
+  "ar": "لتقليل التقوّس، تجنّب طباعة نماذج كبيرة الحجم وعالية كثافة الحشوة الداخلية. استخدم طابعات مغلقة وتأكّد قبل الطباعة من وضع الغراء على صفيحة الطباعة بشكل صحيح لتحسين التصاق المطبوعة. اضبط سرعة طباعة أقل وحرارة أعلى للسرير الساخن. لمزيد من التفاصيل، يرجى الرجوع إلى: مشكلات جودة الطباعة الشائعة وحلولها على الويكي.",
+  "ckb": "بۆ کەمکردنەوەی چەمانەوەی لێوار، خۆت لە چاپکردنی مۆدێلی قەبارە گەورە و چڕیی پڕکەرەوەی ناوەوەی بەرز بپارێزە. چاپکەری داخراو بەکاربهێنە و پێش چاپکردن دڵنیابەرەوە کە چەسپ بە دروستی لە پلێتی چاپ دراوە بۆ لکانی باشتری چاپکراوەکە. خێرایی چاپی نزمتر و پلەی گەرمیی بەرزتری بێدی گەرم دابنێ. بۆ وردەکاریی زیاتر، تکایە سەیری کێشە باوەکانی جۆرایەتیی چاپ و چارەسەرەکانیان لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "309531542bd70f79a6b2dc9f3fd412ff2802f06e273ed182cd791221f3d742f7",
+  "en": "Durability and Water Resistance",
+  "ar": "المتانة ومقاومة الماء",
+  "ckb": "بەرگەگری و بەرگەی ئاو",
+  "kind": "block_line"
+ },
+ {
+  "h": "5305847d613676613d41e70182d997fa98addc6f8d489925ab592050d39fc507",
+  "en": "Easy, Tool-free Removal",
+  "ar": "إزالة سهلة دون أدوات",
+  "ckb": "لابردنی ئاسان بێ ئامراز",
+  "kind": "block_line"
+ },
+ {
+  "h": "314b0fdb8ddbc9e48570dc7f54c1f12c0a479640374ac27c91754736e970178d",
+  "en": "Smooth Support Interface",
+  "ar": "سطح تلامس أملس للدعامات",
+  "ckb": "ڕووی بەریەککەوتنی لووسی پاڵپشت",
+  "kind": "block_line"
+ },
+ {
+  "h": "7b467ec89e39ef62c92b5052ea9373f7777c90ae43a8e9de87081567e0956208",
+  "en": "Recommended for All PLA & PETG",
+  "ar": "موصى به لجميع أنواع PLA وPETG",
+  "ckb": "پێشنیارکراوە بۆ هەموو جۆرەکانی PLA و PETG",
+  "kind": "block_line"
+ },
+ {
+  "h": "cbf229b046870f33722abe6bd1a4287730cc71ecedecd157740e4d7d9e2e9004",
+  "en": "Transparent Appearance",
+  "ar": "مظهر شفاف",
+  "ckb": "ڕواڵەتی ڕوون",
+  "kind": "block_line"
+ },
+ {
+  "h": "a08ccfb81f861dfaf5d6941651c03840ce4c9d47bc8786d3e58eeec613f6a9e1",
+  "en": "Support PLA/PETG is specially formulated to minimize fusion with PLA and PETG, thanks to differences in polarity. This unique characteristic ensures hassle-free removal of the support interface, reducing the risk of damage to your printed object.",
+  "ar": "صُمّمت تركيبة Support PLA/PETG خصيصًا لتقليل اندماجها مع PLA وPETG بفضل اختلاف القطبية. وتضمن هذه الخاصية الفريدة إزالة سطح تلامس الدعامات دون متاعب، ما يقلّل خطر إتلاف القطعة المطبوعة.",
+  "ckb": "فۆرمولی Support PLA/PETG بە تایبەتی دانراوە بۆ کەمکردنەوەی تێکەڵبوونی لەگەڵ PLA و PETG، بەهۆی جیاوازیی جەمسەرییەوە. ئەم تایبەتمەندییە بێهاوتایە لابردنی ڕووی بەریەککەوتنی پاڵپشت بێ گرفت مسۆگەر دەکات، و مەترسیی زیانگەیاندن بە پارچە چاپکراوەکەت کەم دەکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "caa5a6508c9bfcff668002f3ee4e0c480b2c1231bd86bd7191ba5313375d2783",
+  "en": "Support PLA/PETG offers consistently smooth surface quality at the contact area, ensuring optimal support for intricate details. With zero top interface spacing & Z distance, our support material provides precision and reliability, allowing you to print even the most complex designs with ease.",
+  "ar": "يوفّر Support PLA/PETG جودة سطح ملساء ومتسقة في منطقة التلامس، ما يضمن دعمًا مثاليًا للتفاصيل المعقّدة. ومع مسافة صفرية لسطح التلامس العلوي ومسافة Z صفرية، توفّر مادة الدعامات لدينا الدقة والموثوقية، ما يتيح لك طباعة حتى أكثر التصاميم تعقيدًا بسهولة.",
+  "ckb": "فیلامێنتی Support PLA/PETG جۆرایەتیی ڕووکاری بەردەوام لووس لە ناوچەی بەریەککەوتندا پێشکەش دەکات، و باشترین پاڵپشت بۆ وردەکارییە ئاڵۆزەکان دەستەبەر دەکات. بە بۆشایی سفری ڕووی بەریەککەوتنی سەرەوە و دووریی سفر لە تەوەری Z، کەرەستەی پاڵپشتەکەمان وردی و متمانە دابین دەکات، و ڕێگەت پێدەدات تەنانەت ئاڵۆزترین دیزاینەکانیش بە ئاسانی چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6493853f66e48f013d3b53db6261d5466ae807ee8544101efeef859469c8016e",
+  "en": "3.Support Setting",
+  "ar": "3. إعدادات الدعامات",
+  "ckb": "3. ڕێکخستنی پاڵپشت",
+  "kind": "faq_q"
+ },
+ {
+  "h": "86ad08c0c7150984cbea8167d368136b5df3c1b380e5c97ac254d22027a37436",
+  "en": "Recommended for use with PLA or PETG filament only. Select \"Support for PLA/PETG\" in the \"Support/Raft Interface\" settings in your slicer.",
+  "ar": "يُوصى باستخدامه مع فلامنت PLA أو PETG فقط. اختر \"Support for PLA/PETG\" في إعدادات \"Support/Raft Interface\" في برنامج التقطيع لديك.",
+  "ckb": "پێشنیار دەکرێت تەنها لەگەڵ فیلامێنتی PLA یان PETG بەکاربهێنرێت. لە نەرمەکاڵای سلایسەرەکەتدا، لە ناو ڕێکخستنەکانی \"Support/Raft Interface\" بژاردەی \"Support for PLA/PETG\" هەڵبژێرە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "9acf2c5339b4c6c20a3d5e5b3a804e8bb73a1ba24e527abce0516029015ff5c5",
+  "en": "When using tree supports, please avoid using support filament for the \"Support/raft base\".",
+  "ar": "عند استخدام الدعامات الشجرية، يرجى تجنّب استخدام فلامنت الدعامات لطبقة \"Support/raft base\".",
+  "ckb": "کاتێک پاڵپشتی درەختی بەکاردەهێنیت، تکایە فیلامێنتی پاڵپشت بۆ \"Support/raft base\" بەکارمەهێنە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "f996addca15dbcd3136590ea3c4592f7341a11e51a43006c5505c5f247be89e7",
+  "en": "For more support-related settings, please refer to the Support on WIKI.",
+  "ar": "لمزيد من الإعدادات المتعلقة بالدعامات، يرجى الرجوع إلى صفحة الدعامات (Support) على الويكي.",
+  "ckb": "بۆ ڕێکخستنی زیاتری پەیوەست بە پاڵپشت، تکایە سەیری پەڕەی پاڵپشت (Support) لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "eb0894de389441c6846c1464ddce7a45ab86cd1dba5854770fb46338eb7ffdb1",
+  "en": "Easy & Tool-free Removal",
+  "ar": "إزالة سهلة دون أدوات",
+  "ckb": "لابردنی ئاسان بێ ئامراز",
+  "kind": "block_line"
+ },
+ {
+  "h": "b12d4bdcbfc7c4cf826c8806cf5f06aa0d3f25aa01fc40991548ae706d77ce9c",
+  "en": "Only Used for Printing the Support Interface",
+  "ar": "يُستخدم لطباعة سطح تلامس الدعامات فقط",
+  "ckb": "تەنها بۆ چاپکردنی ڕووی بەریەککەوتنی پاڵپشت بەکاردێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "def5809f0ef9229a24e45ff2c62c7701e37170e9d903263ba0b6016624045e54",
+  "en": "Avoid Printing Individual Models",
+  "ar": "تجنّب استخدامه لطباعة نماذج مستقلة",
+  "ckb": "بۆ چاپکردنی مۆدێلی سەربەخۆ بەکاری مەهێنە",
+  "kind": "block_line"
+ },
+ {
+  "h": "8c7e24e010b2ba6ac1fdf6c22dfe0fec1b317756d41a52adabe2187e34e91495",
+  "en": "Recommended Drying before Use",
+  "ar": "يُوصى بالتجفيف قبل الاستخدام",
+  "ckb": "وشککردنەوە پێش بەکارهێنان پێشنیار دەکرێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "f352e94426de23b1fe3771a7ca5f9c1b9b9cd521b8e24b1c170e31977dd7fbef",
+  "en": "Easy Support Removal",
+  "ar": "إزالة سهلة للدعامات",
+  "ckb": "لابردنی ئاسانی پاڵپشت",
+  "kind": "block_line"
+ },
+ {
+  "h": "f6594ac261c54355c1d56ea8d335ef0d23cd719d7e9b964e4002158ef2c438cb",
+  "en": "Superior Support Interface Quality",
+  "ar": "جودة فائقة لسطح تلامس الدعامات",
+  "ckb": "جۆرایەتیی باڵای ڕووی بەریەککەوتنی پاڵپشت",
+  "kind": "block_line"
+ },
+ {
+  "h": "0ddddc47553d26e6036266dbd7eb7a8485484cc0b5a30b6d9416788ee45a1e91",
+  "en": "Specially formulated for ABS, our support material adheres precisely to the ABS surface, allowing for easy support removal. This streamlines your post-processing work, ensuring a more efficient workflow.",
+  "ar": "صُمّمت مادة الدعامات لدينا بتركيبة خاصة لـ ABS، فهي تلتصق بدقة بسطح ABS مع إتاحة إزالة الدعامات بسهولة. وهذا يبسّط أعمال المعالجة اللاحقة ويضمن سير عمل أكثر كفاءة.",
+  "ckb": "کەرەستەی پاڵپشتەکەمان بە تایبەتی بۆ ABS فۆرمولە کراوە، بە وردی لەسەر ڕووی ABS جێگیر دەبێت و ڕێگە دەدات پاڵپشت بە ئاسانی لاببرێت. ئەمەش کاری چارەسەرکردنی دوای چاپ ئاسانتر دەکات و ڕەوتی کارێکی کاراتر دەستەبەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "99ec79f47634d74b5f58ab580471086c69d1b634c74026ae01a3645991b7918c",
+  "en": "Support for ABS enables a 0 Top Z distance and 0 Top interface spacing when printing, ensuring a scar free support surface. This enhances the sharpness of details, improving the overall appearance and integrity of your final prints.",
+  "ar": "يتيح Support for ABS ضبط مسافة Z العلوية على 0 ومسافة سطح التلامس العلوي على 0 أثناء الطباعة، ما يضمن سطح دعامات خاليًا من الندوب. وهذا يعزّز حدّة التفاصيل ويحسّن المظهر العام والسلامة البنيوية لمطبوعاتك النهائية.",
+  "ckb": "فیلامێنتی Support for ABS لە کاتی چاپدا ڕێگە دەدات دووریی سەرەوەی Z بکرێتە 0 و بۆشایی ڕووی بەریەککەوتنی سەرەوە بکرێتە 0، کە ڕووکارێکی پاڵپشتی بێ شوێنەوار دەستەبەر دەکات. ئەمەش تیژیی وردەکارییەکان زیاد دەکات و ڕواڵەتی گشتی و تەواوێتیی چاپکراوە کۆتاییەکانت باشتر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1d1f31934c736307941b70f3fb0a1207372abe50b816b6643c5c6a11b3039d92",
+  "en": "3.Limonene Dissolution Guidelines",
+  "ar": "3. إرشادات الإذابة بالليمونين",
+  "ckb": "3. ڕێنماییەکانی توانەوە بە لیمۆنین",
+  "kind": "faq_q"
+ },
+ {
+  "h": "e48f53df98cbe13fbdb5608c884bcf7b6d7e84561c118950b3a378e9c535ed48",
+  "en": "Support for ABS is soluble in limonene. Please pay attention to the usage norms and safety.",
+  "ar": "فلامنت Support for ABS قابل للذوبان في الليمونين. يرجى الانتباه إلى قواعد الاستخدام والسلامة.",
+  "ckb": "فیلامێنتی Support for ABS لە لیمۆنیندا دەتوێتەوە. تکایە ئاگاداری ڕێساکانی بەکارهێنان و سەلامەتی بە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "f11029cd90d79cf377e395a7f3598abb6a3d8ec30bac0a57d4d6a1bd46fc4338",
+  "en": "Pungent and unpleasant odors may be released during printing. Make sure your printer is enclosed and placed in a well-ventilated area.",
+  "ar": "قد تنبعث روائح نفّاذة وغير مستحبة أثناء الطباعة. تأكّد من أن طابعتك مغلقة وموضوعة في مكان جيد التهوية.",
+  "ckb": "لەوانەیە لە کاتی چاپدا بۆنی تیژ و ناخۆش دەربچێت. دڵنیابەرەوە کە چاپکەرەکەت داخراوە و لە شوێنێکی هەواگۆڕکێی باشدا دانراوە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "49d372f68bffb82269128c9b66d0c2984e6355c4b862f6fbfcc670ba1ccf332e",
+  "en": "When layer strength is required, it is recommended to increase the flushing volume to above 800 mm³. If the flushing is not thorough, it may reduce the layer adhesion of the model at surfaces that are on the same horizontal plane as the support surface.",
+  "ar": "عندما تكون قوة الطبقات مطلوبة، يُوصى بزيادة حجم طرد الفلامنت (flushing volume) إلى أكثر من 800 mm³. وإذا لم يكن الطرد كافيًا، فقد يقلّ التصاق الطبقات في النموذج عند الأسطح الواقعة في المستوى الأفقي نفسه لسطح الدعامات.",
+  "ckb": "کاتێک بەهێزیی چینەکان پێویستە، پێشنیار دەکرێت قەبارەی دەرکردنی فیلامێنت (flushing volume) بۆ زیاتر لە 800 mm³ زیاد بکرێت. ئەگەر دەرکردنەکە تەواو نەبێت، لەوانەیە لکانی چینەکانی مۆدێلەکە لەو ڕووانەدا کەم بکاتەوە کە لەسەر هەمان ئاستی ئاسۆیی ڕووی پاڵپشتن.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "69979ed5c6903ed64f9abaf977b4fb699feb4fdb924ca51e2280c54ab03a8af5",
+  "en": "By increasing the \"initial layer speed\", a more peelable support can be obtained. However, this will increase the risk of warping.",
+  "ar": "بزيادة \"سرعة الطبقة الأولى\" (initial layer speed) يمكن الحصول على دعامات أسهل في النزع، لكن ذلك سيزيد خطر التقوّس.",
+  "ckb": "بە زیادکردنی \"خێرایی چینی یەکەم\" (initial layer speed)، دەتوانرێت پاڵپشتێکی ئاسانتر بۆ لێکردنەوە بەدەست بهێنرێت. بەڵام ئەمە مەترسیی چەمانەوەی لێوار زیاد دەکات.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "81309b9e922638f501aca64832cf63f94ee80f382984aff1f3ef766b8d1043dc",
+  "en": "For more support-related settings, please refer to Support on WIKI.",
+  "ar": "لمزيد من الإعدادات المتعلقة بالدعامات، يرجى الرجوع إلى صفحة الدعامات (Support) على الويكي.",
+  "ckb": "بۆ ڕێکخستنی زیاتری پەیوەست بە پاڵپشت، تکایە سەیری پەڕەی پاڵپشت (Support) لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "91acdc5489115600274b36fb3975d1629862d1831b7d49322aedd52a7d7c583a",
+  "en": "Optional to Dry before Use",
+  "ar": "التجفيف قبل الاستخدام اختياري",
+  "ckb": "وشککردنەوە پێش بەکارهێنان ئارەزوومەندانەیە",
+  "kind": "block_line"
+ },
+ {
+  "h": "bce9e5e1ab17026717737727776557524ff11adb7b514abc8f96eccc63de7e9d",
+  "en": "The PETG that prints as effortlessly as PLA",
+  "ar": "فلامنت PETG الذي يُطبع بسهولة PLA نفسها",
+  "ckb": "فیلامێنتی PETG کە بە هەمان ئاسانیی PLA چاپ دەکرێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "dd9409c6b6c5035a8499e84e66fde0a56adb63257ea42e4584cffaba9ed3e8fb",
+  "en": "Designed for Speed",
+  "ar": "مصمّم للسرعة",
+  "ckb": "بۆ خێرایی دیزاین کراوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "b7b79bb1ad4e96bf311b7b903dbed0635a6bc03adb3e107e54e1ba627996abee",
+  "en": "Twice as fast as standard PETG*, PETG HF significantly boosts your productivity without compromising the quality of your prints.",
+  "ar": "بسرعة تبلغ ضعف سرعة PETG القياسي*، يعزّز PETG HF إنتاجيتك بشكل كبير دون التضحية بجودة مطبوعاتك.",
+  "ckb": "بە خێرایی دوو هێندەی فیلامێنتی ستانداردی PETG*، فیلامێنتی PETG HF بە شێوەیەکی بەرچاو بەرهەمهێنانت زیاد دەکات بەبێ ئەوەی جۆرایەتیی چاپکراوەکانت کەم بکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "470b0d5e33b6f3f7102674b9d9986913ec6f6ef861ea180a6b3cc820be9b79c0",
+  "en": "The speed of PETG HF can be twice as fast compared to regular PETG, but achieving this speed is highly dependent on model size and geometry.",
+  "ar": "يمكن أن تبلغ سرعة PETG HF ضعف سرعة PETG العادي، لكن تحقيق هذه السرعة يعتمد بدرجة كبيرة على حجم النموذج وشكله الهندسي.",
+  "ckb": "خێرایی PETG HF دەتوانێت دوو هێندەی فیلامێنتی ئاسایی PETG بێت، بەڵام گەیشتن بەم خێراییە زۆر پشت بە قەبارە و شێوەی ئەندازەیی مۆدێلەکە دەبەستێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7c1313a570d463bace5e143f039f30addce99d2593dffb4d8b0dd373d23f13b8",
+  "en": "Print Flawlessly with Minimal Tuning",
+  "ar": "اطبع بلا عيوب مع أقل قدر من الضبط",
+  "ckb": "بێ کەموکوڕی چاپ بکە بە کەمترین ڕێکخستن",
+  "kind": "block_title"
+ },
+ {
+  "h": "25c76cf10f07e3a6e4725c3a028c7ea3ba5ec5e91224bd36d6a558ee3a3d8548",
+  "en": "PETG HF excels in printability among PETG filaments with its higher adaptability for printers and printing settings, achieving ideal print results without fine-tuning parameters. Thanks to advanced formula optimization, PETG HF bids farewell to oozing and clumping, ensuring smoother prints with crisp details.",
+  "ar": "يتفوّق PETG HF في سهولة الطباعة بين فلامنتات PETG بفضل قدرته الأعلى على التكيّف مع الطابعات وإعدادات الطباعة، فيحقق نتائج طباعة مثالية دون الحاجة إلى ضبط دقيق للإعدادات. وبفضل التحسين المتقدّم لتركيبته، يودّع PETG HF مشكلات التنقيط والتكتّل، ما يضمن مطبوعات أنعم بتفاصيل حادة.",
+  "ckb": "لە نێو هەموو فیلامێنتەکانی جۆری PETG، فیلامێنتی PETG HF لە ئاسانیی چاپکردندا باشترینە، بەهۆی گونجانی زیاتری لەگەڵ چاپکەرەکان و ڕێکخستنەکانی چاپ، و بەبێ ڕێکخستنی وردی پارامیتەرەکان ئەنجامی چاپی گونجاو بەدەست دەهێنێت. بەهۆی باشترکردنی پێشکەوتووی فۆرمولەکەیەوە، PETG HF کۆتایی بە دڵۆپەکردن و گرێبوون دەهێنێت، و چاپکراوی لووستر بە وردەکاریی تیژ دەستەبەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "65323ba6f4c549f693d4369a53c756efee3d153080f7b28a84681e64dfcf42d4",
+  "en": "Smooth, Soft Texture",
+  "ar": "ملمس أملس وناعم",
+  "ckb": "هەستی ڕووکاری لووس و نەرم",
+  "kind": "block_title"
+ },
+ {
+  "h": "5f822dd23eea60dadf13b011b115a17a7847d258328597d3e6d841ead04ce1d0",
+  "en": "PETG HF provides a smooth texture and consistent gloss at any printing speed, ensuring uniformity and sharp details in every print.",
+  "ar": "يوفّر PETG HF ملمسًا أملس ولمعانًا ثابتًا بأي سرعة طباعة، ما يضمن التجانس والتفاصيل الحادة في كل مطبوعة.",
+  "ckb": "فیلامێنتی PETG HF لە هەر خێرایییەکی چاپدا هەستی ڕووکاری لووس و بریسکەی یەکسان پێشکەش دەکات، و یەکدەستی و وردەکاریی تیژ لە هەموو چاپکراوێکدا دەستەبەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "216f7997476eada3fd4bc589c4c32c374416828ed54b9d887e86f1e9c376bb9a",
+  "en": "PETG HF maintains the inherent strengths of regular PETG, providing superior resistance to water, UV, and temperatures. Tougher and more durable than PLA, with higher temperature resistance, it's the perfect choice for printing outdoor items such as planter pots, bird cages, watering cans, and automotive parts. Additionally, it's ideal for outdoor toys that require long-term exposure and the ability to withstand impacts, collisions, and falls.",
+  "ar": "يحافظ PETG HF على نقاط القوة الأصيلة في PETG العادي، إذ يوفّر مقاومة فائقة للماء والأشعة UV والحرارة. وبما أنه أمتن وأكثر تحمّلًا من PLA ويتمتع بمقاومة أعلى للحرارة، فهو الخيار الأمثل لطباعة الأغراض الخارجية مثل أصص النباتات وأقفاص الطيور ومرشّات الري وقطع السيارات. بالإضافة إلى ذلك، فهو مثالي لألعاب الهواء الطلق التي تتطلب التعرّض الطويل للعوامل الخارجية والقدرة على تحمّل الصدمات والارتطام والسقوط.",
+  "ckb": "فیلامێنتی PETG HF خاڵە بەهێزە بنەڕەتییەکانی فیلامێنتی ئاسایی PETG دەپارێزێت، و بەرگەی باڵا لە بەرامبەر ئاو، تیشکی UV و پلەی گەرمی پێشکەش دەکات. لە PLA پتەوتر و بەرگەگرترە و بەرگەی پلەی گەرمیی زیاترە، بۆیە باشترین هەڵبژاردەیە بۆ چاپکردنی کەلوپەلی دەرەوە وەک گوڵدانی ڕووەک، قەفەسی باڵندە، ئاوپڕژێن و پارچەی ئۆتۆمبێل. هەروەها، گونجاوترینە بۆ کەلوپەلی یاریی دەرەوە کە پێویستیان بە مانەوەی درێژخایەن لە دەرەوە و توانای بەرگەگرتنی لێدان، پێکدادان و کەوتن هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "af80654f3a1de958a2960c011c890efb1bd376078b79e7ba5494af9cbc1f874b",
+  "en": "Dry before use to ensure the best print quality and consistent finish. PETG HF must be dried before use and remain moisture-free during the printing process, especially for longer print times (over 6 hours). For more details, please refer to: Filament drying instructions on WIKI.",
+  "ar": "جفّفه قبل الاستخدام لضمان أفضل جودة طباعة وتشطيب متجانس. يجب تجفيف PETG HF قبل الاستخدام وإبقاؤه خاليًا من الرطوبة أثناء عملية الطباعة، خصوصًا عند الطباعة لفترات أطول (أكثر من 6 ساعات). لمزيد من التفاصيل، يرجى الرجوع إلى: تعليمات تجفيف الفلامنت على الويكي.",
+  "ckb": "پێش بەکارهێنان وشکی بکەرەوە بۆ دڵنیابوون لە باشترین جۆرایەتیی چاپ و ڕووکارێکی یەکدەست. پێویستە PETG HF پێش بەکارهێنان وشک بکرێتەوە و لە کاتی پرۆسەی چاپدا بێ شێ بمێنێتەوە، بە تایبەتی بۆ ماوەی چاپی درێژتر (زیاتر لە 6 کاتژمێر). بۆ وردەکاریی زیاتر، تکایە سەیری ڕێنماییەکانی وشککردنەوەی فیلامێنت لە ویکی بکە.",
+  "kind": "faq_a"
+ },
+ {
+  "h": "3030cdabc2e6fe030a3ebcb260f921065ba136a11c6a6806913ed1f04253b7ec",
+  "en": "PETG HF must be dried before use to achieve optimal print quality.",
+  "ar": "يجب تجفيف PETG HF قبل الاستخدام لتحقيق أفضل جودة طباعة.",
+  "ckb": "پێویستە PETG HF پێش بەکارهێنان وشک بکرێتەوە بۆ بەدەستهێنانی باشترین جۆرایەتیی چاپ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e99235c60df6b9a06ac911655fecafc59cf2b577d1aab4bd590f66756d4711e1",
+  "en": "A new and improved PETG is available now!",
+  "ar": "فلامنت PETG جديد ومحسّن متاح الآن!",
+  "ckb": "ئێستا فیلامێنتێکی نوێ و باشترکراوی PETG بەردەستە!",
+  "kind": "block_line"
+ }
+]

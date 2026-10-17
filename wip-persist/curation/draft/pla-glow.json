@@ -1,0 +1,854 @@
+{
+  "handle": "pla-glow",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T12:38:16Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer and rendered pages): Basic Info, Specifications, Recommended Printing Settings, Properties (Physical, Mechanical, Other Physical and Chemical), Specimen Test, Disclaimer."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/4a35986db81f466fa7ff4f84344ef57a/SDS20251127A12_Bambu_PLA_Glow.pdf",
+      "title": "Bambu PLA Glow Safety Data Sheet SDS20251127A12",
+      "retrieved_at": "2026-10-16T08:24:09Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read. Section 3 gives the composition; section 9 says \"No data available\" for melting point, density and the other physical data; sections 14-15 classify it as not hazardous goods and not listed under the named regulations."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Glow",
+      "retrieved_at": "2026-10-16T08:24:10Z",
+      "keys": [],
+      "note": "One page, 5 colours: read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, build plate and storage tables. PLA Glow has its own rows in the nozzle table (0.2 mm not compatible, hardened steel required, nozzle temperature 210 - 240 ±10 °C) and the AMS table; the build-plate and storage tables have no PLA Glow row."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility table (row \"PLA Glow\"), its tip, and the PLA-Glow section; the drying table covers other PLA types only; the HDT remark is for PLA in general."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I has no PLA Glow row."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-glow",
+      "title": "Bambu Lab US store product page: PLA Glow",
+      "retrieved_at": "2026-10-16T07:01:10Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections, Printing Tips FAQ, Download block."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Polylactic acid",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polylactic acid",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "note": "The SDS (p.4, section 3) gives the composition as Polylactic acid 80-98 % by wt (CAS 26100-51-6) and an additive 2-20 % by wt; the TDS Basic Info names the additive \"luminous powder\"."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "note": "Agrees with the store page (Product Features › bullet 3: \"Diameter: 1.75mm +/- 0.03mm\"); the tolerance is the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681970243366924",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "note": "Scoped to the store page's only Net weight (Size) value \"1 kg\"; agrees with the store page row (option Size › 1 kg)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.26,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.26 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 155,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 155 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 55 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 56,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 56 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (the TDS row reads \"Vicar Softening Temperature\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 52,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 52 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value. The next row gives 55 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "note": "Not a product disagreement: the PLA wiki says \"heat deflection temperature of only 57°C\" for PLA in general (no load stated), which is not a PLA Glow value. The product TDS value is kept."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 32,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 32 ± 3 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8.6,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 8.6 ± 1.2 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2640,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2640 ± 130 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 76,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 76 ± 4 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 27.3,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 27.3 ± 2.2 kJ/m²； 8.8 ± 1.7 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing). First value of the cell (unnotched); the same cell gives 8.8 ± 1.7 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 190,
+        "max": 230
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 190 - 230 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "conflict": "The material-table wiki (2. Nozzle, row \"PLA Glow\", column \"Nozzle temperature /℃ ( ±10 °C)\") gives 210 - 240. Both are official Bambu sources; the product TDS (official_doc) is kept by source rank. Left to review."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate type Cool Plate, High Temperature Plate or Textured PEI Plate; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "note": "The material-table wiki's bed-temperature tables have no PLA Glow row (their \"PLA\" rows are standard PLA), so no wiki value is compared."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 250 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 250 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented. The material-table wiki's general guideline for particle-filled materials with a 0.4 mm hardened steel nozzle (\"maximum speed approx. 100 mm/s\") is not a PLA Glow value."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C, 8 h",
+      "test_method": "",
+      "test_condition": "Drying before printing in a blast drying oven, 8 h",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "note": "The same cell gives a second method, \"X1 Series Printer Heatbed: 65 - 75 °C, 12 h\", which is not stored (one key per scope). The drying wiki (Appendix I) and the material-table wiki's storage table have no PLA Glow row."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C, 8 h",
+      "test_method": "",
+      "test_condition": "Drying before printing in a blast drying oven at 55 °C",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:06Z"
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Basic Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/pla-glow",
+      "source_title": "Bambu Lab US store product page: PLA Glow",
+      "locator": "Product Features › bullet 2",
+      "quote": "Comes with Basic Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:01:10Z",
+      "note": "Unverified: an unlabelled store-page bullet. The store page's only Spool value is \"Filament with spool\"; the TDS (p.1, Specifications) gives the spool material as \"PC + ABS (Temperature resistance 90 °C)\", diameter 200 mm, height 67 mm."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Glow Green (15500)",
+      "source_value_id": "564681970243366918",
+      "hex": "#A1FFAC",
+      "source_url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Glow",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Glow Green Hex:#A1FFAC",
+      "retrieved_at": "2026-10-16T08:24:10Z",
+      "note": "The table states: \"The hex code indicates the daytime color of PLA Glow.\""
+    },
+    {
+      "value_text": "Glow Yellow (15400)",
+      "source_value_id": "564681970243366921",
+      "hex": "#F8FF80",
+      "source_url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Glow",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Glow Yellow Hex:#F8FF80",
+      "retrieved_at": "2026-10-16T08:24:10Z",
+      "note": "The table states: \"The hex code indicates the daytime color of PLA Glow.\""
+    },
+    {
+      "value_text": "Glow Pink (15200)",
+      "source_value_id": "564681970243366919",
+      "hex": "#F17B8F",
+      "source_url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Glow",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Glow Pink Hex:#F17B8F",
+      "retrieved_at": "2026-10-16T08:24:10Z",
+      "note": "The table states: \"The hex code indicates the daytime color of PLA Glow.\""
+    },
+    {
+      "value_text": "Glow Blue (15600)",
+      "source_value_id": "564681970243366922",
+      "hex": "#7AC0E9",
+      "source_url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Glow",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Glow Blue Hex:#7AC0E9",
+      "retrieved_at": "2026-10-16T08:24:10Z",
+      "note": "The table states: \"The hex code indicates the daytime color of PLA Glow.\""
+    },
+    {
+      "value_text": "Glow Orange (15300)",
+      "source_value_id": "564681970243366920",
+      "hex": "#FF9D5B",
+      "source_url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Glow",
+      "locator": "p.1, row 3",
+      "quote": "Glow Orange Hex:#FF9D5B",
+      "retrieved_at": "2026-10-16T08:24:10Z",
+      "note": "The table states: \"The hex code indicates the daytime color of PLA Glow.\""
+    }
+  ],
+  "relations": [
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hardened steel nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-glow",
+      "source_title": "Bambu Lab US store product page: PLA Glow",
+      "retrieved_at": "2026-10-16T07:01:10Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "A Hardened Steel Nozzle is required when printing",
+      "note": "Agreed by the material-table wiki (2. Nozzle, row \"PLA Glow\", \"Is it necessary to use hardened steel nozzles?\": \"Required\") and the PLA wiki (PLA-Glow: \"It is necessary to use a hardened steel nozzle.\"). A concept, not one store product, so no target handle is named."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Stainless Steel Nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-glow",
+      "source_title": "Bambu Lab US store product page: PLA Glow",
+      "retrieved_at": "2026-10-16T07:01:10Z",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "Stainless Steel Nozzles NOT Compatible",
+      "note": "Agreed by the material-table wiki's guideline for particle-filled materials naming PLA Glow (\"Do not use a stainless steel or brass nozzle.\") and the PLA wiki (\"not recommended to use 0.2 mm and 0.4 mm stainless steel nozzles\"). compat-targets.json reviews \"Stainless Steel Nozzles\" as unresolvable (component_concept_not_a_product)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-glow",
+      "source_title": "Bambu Lab US store product page: PLA Glow",
+      "retrieved_at": "2026-10-16T07:01:10Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "0.2 mm nozzles NOT Compatible",
+      "note": "Agreed by the store FAQ (Printing Tips › 1.Accessory Compatibility: \"Not compatible with Hotend with Stainless Steel Nozzle 0.2mm, and AMS lite.\"), the material-table wiki (row \"PLA Glow\", 0.2 mm Nozzle: \"Not Compatible\") and the PLA wiki (\"excluding 0.2 mm nozzle\"). compat-targets.json reviews \"0.2 mm nozzles\" as unresolvable, so no target handle is named."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-glow",
+      "source_title": "Bambu Lab US store product page: PLA Glow",
+      "retrieved_at": "2026-10-16T07:01:10Z",
+      "locator": "Product Features › Cautions for Use › bullet 5",
+      "quote": "AMS lite NOT Compatible",
+      "note": "Agreed by the store FAQ (\"Utilizing AMS lite may result in high feed resistance and an increased risk of feed failure.\") and the PLA wiki (row \"PLA Glow\": \"AMS lite is not compatible\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-glow",
+      "source_title": "Bambu Lab US store product page: PLA Glow",
+      "retrieved_at": "2026-10-16T07:01:10Z",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible, but can lead to faster wear",
+      "conflict": "The material-table wiki (3. AMS & AMS lite, row \"PLA Glow\") rates \"AMS / AMS lite Compatibility\" as \"Not Recommended\" and warns that glow filaments \"can eventually grind down the internal PTFE feed channels\". The store page says \"Compatible, but can lead to faster wear\". Left to review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-glow",
+      "source_title": "Bambu Lab US store product page: PLA Glow",
+      "retrieved_at": "2026-10-16T07:01:10Z",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible, but can lead to faster wear",
+      "conflict": "The material-table wiki (3. AMS & AMS lite, row \"PLA Glow\") rates \"AMS / AMS lite Compatibility\" as \"Not Recommended\" and warns that glow filaments \"can eventually grind down the internal PTFE feed channels\". The store page says \"Compatible, but can lead to faster wear\". Left to review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-glow",
+      "source_title": "Bambu Lab US store product page: PLA Glow",
+      "retrieved_at": "2026-10-16T07:01:10Z",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible, but can lead to faster wear",
+      "conflict": "The material-table wiki (3. AMS & AMS lite, row \"PLA Glow\") rates \"AMS / AMS lite Compatibility\" as \"Not Recommended\" and warns that glow filaments \"can eventually grind down the internal PTFE feed channels\". The store page says \"Compatible, but can lead to faster wear\". Left to review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "Open-frame or enclosed printer",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table › row \"PLA Glow\" › Open-frame printer, Enclosed printer",
+      "quote": "PLA Glow | Compatible | Compatible | Not Recommended",
+      "target_family": "all_bambu_printers",
+      "note": "Column heads: \"Open-frame printer (A Series, P1P, etc.)\" and \"Enclosed printer (H2 Series, X2D, P2S, X1 Series, P1S, etc.)\". The PLA wiki row \"PLA Glow\" also reads \"All printers compatible\" (column \"Print Bed Compatibility (Description)\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "note": "Hardened steel only (see the \"requires\" relation). The material-table wiki row \"PLA Glow\" gives 0.4 mm \"Bambu PLA Glow: Recommended\", 0.6 and 0.8 mm \"Compatible\", and its guideline says a 0.4 mm hardened steel nozzle is \"highly recommended as the first choice\" for Bambu PLA Glow."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High-flow nozzles (0.4, 0.6, 0.8 mm)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA Glow\" › Nozzle Compatibility",
+      "quote": "PLA Glow | Only compatible with hardened steel and high-flow nozzles (excluding 0.2 mm nozzle) | All printers compatible | AMS lite is not compatible",
+      "note": "The material-table wiki row \"PLA Glow\" gives \"Compatible\" for the 0.4, 0.6 and 0.8 mm high flow nozzle columns. A nozzle concept, not one store product, so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "No store product is the plain Bambu Cool Plate (bambu-cool-plate-supertack is a different plate), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\", which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, High Temperature Plate or Textured PEI Plate"
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PLA Glow",
+      "retrieved_at": "2026-10-16T08:24:06Z",
+      "sha256": "7ebb92f0abcb8ebfe225d1fda4556454eaaf20bc27c42a06831d67d56e3ae919"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/4a35986db81f466fa7ff4f84344ef57a/SDS20251127A12_Bambu_PLA_Glow.pdf",
+      "title": "Bambu PLA Glow Safety Data Sheet SDS20251127A12",
+      "retrieved_at": "2026-10-16T08:24:09Z",
+      "sha256": "c876cfda30ba2740b6ea4d0bd9e0f61df24e73041b57e345042b2660f5a97e58"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Glow",
+      "retrieved_at": "2026-10-16T08:24:10Z",
+      "sha256": "b1f4e137651a1a22a3ba5ecc5a156a0faa6c613884dae7c420426b8afbd4221c"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 26 ± 3 MPa, elongation 6.5 ± 0.8 %, bending modulus 2230 ± 110 MPa, bending strength 55 ± 3 MPa, impact 19.8 ± 1.8 kJ/m²) are not stored. Density, melting and glass transition temperatures are raw-material properties (ISO 1183, DSC) and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 2030 ± 210 MPa, Z 1750 ± 180 MPa), melt index (23.3 ± 2.4 g/10 min at 210 °C, 2.16 kg), crystallization temperature (\"/\"), heat deflection temperature 55 °C at 0.45 MPa, saturated water absorption rate (0.46 % at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed with desiccant), nozzle size (0.4, 0.6, 0.8 mm; kept as a relation), bed surface preparation (glue), retraction length (0.6 - 1.0 mm) and speed (20 - 40 mm/s), chamber temperature (25 - 45 °C), max overhang angle (~ 55°), max bridging length (30 mm), support material (Support for PLA), spool material (PC + ABS, temperature resistance 90 °C) and spool size (diameter 200 mm, height 67 mm), suggested annealing (50 to 60 °C, 6 to 12 hours), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows.",
+    "The TDS recommended chamber temperature (25 - 45 °C) is not written to thermal.chamber_temp: that key is a printer capability (number, template field chamber_temp_max), not a filament print setting.",
+    "The TDS \"Bed Surface Preparation Glue\" is a recommended setting, not a stated requirement, so no \"requires\" relation is written.",
+    "SDS facts with no registry key are not stored: model \"A12-xx\", CLP \"Not classified\", and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO-TI/IATA-DGR) transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Nozzle temperature disagreement left to review: TDS p.1 \"190 - 230 °C\" (stored) against the material-table wiki row \"PLA Glow\" \"210 - 240\" (±10 °C).",
+    "AMS disagreement left to review: the store page says \"AMS 2 Pro, AMS HT & AMS Compatible, but can lead to faster wear\"; the material-table wiki rates PLA Glow's AMS / AMS lite compatibility \"Not Recommended\". AMS lite is not compatible in every source.",
+    "The material-table wiki's \"PLA\" rows (bed temperatures, drying, storage) are for standard PLA; PLA Glow has its own rows in the nozzle and AMS tables and is named among the particle-filled materials, so the \"PLA\" values are not applied to this product.",
+    "Marketing prose proves no number: \"Unique Glow in Low Light Conditions\", \"exceptional overall mechanical properties\" (TDS Basic Info) and the store FAQ's \"approximately 2 hours\" of ultraviolet or sunlight to rejuvenate the glow are not stored as values.",
+    "Hex: all 5 store colours have exactly one hex cell, matched by the colour name without the code in parentheses. The table states the hex is the daytime colour.",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/2c7b9c30a9014c65bb4aeacd9c70e6af.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 3); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store FAQ (4.Safety Tips) says the filament \"is not food-grade\"; no registry key holds it."
+  ]
+}

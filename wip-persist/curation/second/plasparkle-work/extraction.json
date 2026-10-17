@@ -1,0 +1,712 @@
+{
+ "sourceProductId": "7225380929672",
+ "handle": "pla-sparkle",
+ "canonicalUrl": "https://us.store.bambulab.com/products/pla-sparkle",
+ "title": "PLA Sparkle",
+ "seoMetaDescription": "Unleash your creativity with Bambu PLA Sparkle, a shiny, sparkling PLA. Perfect for adding a touch of glamour to your prints, and stand out from the normal PLA prints.",
+ "route": "552709755819347968>552709755857096704>552709756133920768",
+ "isFilament": true,
+ "groups": [
+  {
+   "propertyKeyId": "9329898225800",
+   "propertyKey": "Color",
+   "type": 1,
+   "title": "",
+   "position": 1,
+   "values": [
+    {
+     "id": "564681919551008776",
+     "value": "Alpine Green Sparkle (13501)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/237d208680e14916970892c267ca6e00/8246b8e6a11e49868ad15c121c6613f1.media"
+    },
+    {
+     "id": "564681919551008777",
+     "value": "Slate Gray Sparkle (13102)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/6b33ef78e008497bbae68140505c42d8/fa9db10ecf7a4587a7e242b069b41cda.media"
+    },
+    {
+     "id": "564681919551008778",
+     "value": "Royal Purple Sparkle (13700)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/7bd462202b384a8aad1a67b63b6c8a88/dbd75d2187f24cdcb31a6e19399189ff.media"
+    },
+    {
+     "id": "564681919551008779",
+     "value": "Crimson Red Sparkle (13200)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/7fe7da4a95164b5095cb1e1eef14a1ef/7ce5463b91f942489dccfe3660ac8167.media"
+    },
+    {
+     "id": "564681919551008780",
+     "value": "Onyx Black Sparkle (13101)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/c94563c3b70a46c285eeb00340edacaa/39cb6cb6eeee4eb088b240625c54450d.media"
+    },
+    {
+     "id": "564681919551008781",
+     "value": "Classic Gold Sparkle (13402)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/e45a7321ed4542388dbbe7bf115d1205/fa6f82dee4bb4abaa5d35ba0336e8cc2.media"
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "9329898160264",
+   "propertyKey": "Type",
+   "type": 1,
+   "title": "",
+   "position": 2,
+   "values": [
+    {
+     "id": "564681919551008782",
+     "value": "Filament with spool",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "9329898193032",
+   "propertyKey": "Size",
+   "type": 1,
+   "title": "",
+   "position": 3,
+   "values": [
+    {
+     "id": "564681919551008783",
+     "value": "1kg",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  }
+ ],
+ "skus": [
+  {
+   "id": "41002885349512",
+   "props": [
+    {
+     "propertyKeyId": "9329898225800",
+     "propertyKey": "Color",
+     "value": "Alpine Green Sparkle (13501)"
+    },
+    {
+     "propertyKeyId": "9329898160264",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9329898193032",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "35953396449416",
+    "url": "https://store.bblcdn.com/s7/default/49600549250e48c090ccdec0b1dd7061/Sparkle_green.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "41002885382280",
+   "props": [
+    {
+     "propertyKeyId": "9329898225800",
+     "propertyKey": "Color",
+     "value": "Crimson Red Sparkle (13200)"
+    },
+    {
+     "propertyKeyId": "9329898160264",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9329898193032",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "32187284357256",
+    "url": "https://store.bblcdn.com/s7/default/f809b82a992647fb94cf34d2f2cd44ea/PLA-Sparkle_Crimson-Red-Sparkle.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "41002885415048",
+   "props": [
+    {
+     "propertyKeyId": "9329898225800",
+     "propertyKey": "Color",
+     "value": "Onyx Black Sparkle (13101)"
+    },
+    {
+     "propertyKeyId": "9329898160264",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9329898193032",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "32187284390024",
+    "url": "https://store.bblcdn.com/s7/default/f97e08749626411f89ac590ecd696b74/PLA-Sparkle_Onyx-Black-Sparkle.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "41158137544840",
+   "props": [
+    {
+     "propertyKeyId": "9329898225800",
+     "propertyKey": "Color",
+     "value": "Slate Gray Sparkle (13102)"
+    },
+    {
+     "propertyKeyId": "9329898160264",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9329898193032",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "32388306403464",
+    "url": "https://store.bblcdn.com/s7/default/715852b15d6a4342a0cbd7bb13fa7e6f/PLASparkle-SlateGray.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "41158137577608",
+   "props": [
+    {
+     "propertyKeyId": "9329898225800",
+     "propertyKey": "Color",
+     "value": "Royal Purple Sparkle (13700)"
+    },
+    {
+     "propertyKeyId": "9329898160264",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9329898193032",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "32388306337928",
+    "url": "https://store.bblcdn.com/s7/default/d34f98f6d5fd4efcba3b675018392895/PLASparkle-RoyalPurpleSparkle.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "42259081789576",
+   "props": [
+    {
+     "propertyKeyId": "9329898225800",
+     "propertyKey": "Color",
+     "value": "Classic Gold Sparkle (13402)"
+    },
+    {
+     "propertyKeyId": "9329898160264",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "9329898193032",
+     "propertyKey": "Size",
+     "value": "1kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "34677475606664",
+    "url": "https://store.bblcdn.com/s7/default/6d253f46ee464ca2b75c6ea613efb05c/sparkle_gold.png"
+   },
+   "description": "",
+   "soldOut": false
+  }
+ ],
+ "gallery": [
+  {
+   "resourceFileId": "35953393696904",
+   "url": "https://store.bblcdn.com/s7/default/b33fcdd91bfc4dffa7ec8ddbe7b50a91/Sparklegreen.png"
+  },
+  {
+   "resourceFileId": "35963335344264",
+   "url": "https://store.bblcdn.com/s7/default/f85fca41c8db45b493d1019db7604c25/PLASparkle.jpg"
+  },
+  {
+   "resourceFileId": "32388306403464",
+   "url": "https://store.bblcdn.com/s7/default/715852b15d6a4342a0cbd7bb13fa7e6f/PLASparkle-SlateGray.png"
+  },
+  {
+   "resourceFileId": "32388306337928",
+   "url": "https://store.bblcdn.com/s7/default/d34f98f6d5fd4efcba3b675018392895/PLASparkle-RoyalPurpleSparkle.png"
+  },
+  {
+   "resourceFileId": "32187284357256",
+   "url": "https://store.bblcdn.com/s7/default/f809b82a992647fb94cf34d2f2cd44ea/PLA-Sparkle_Crimson-Red-Sparkle.png"
+  },
+  {
+   "resourceFileId": "32187284390024",
+   "url": "https://store.bblcdn.com/s7/default/f97e08749626411f89ac590ecd696b74/PLA-Sparkle_Onyx-Black-Sparkle.png"
+  },
+  {
+   "resourceFileId": "34677475606664",
+   "url": "https://store.bblcdn.com/s7/default/6d253f46ee464ca2b75c6ea613efb05c/sparkle_gold.png"
+  },
+  {
+   "resourceFileId": "35953396449416",
+   "url": "https://store.bblcdn.com/s7/default/49600549250e48c090ccdec0b1dd7061/Sparkle_green.png"
+  }
+ ],
+ "featuresTitle": "Product Features",
+ "features": [
+  {
+   "title": "Product Features",
+   "html": "<div style=\"text-align: left; box-sizing: border-box;\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul style=\"margin: 0px; padding: 0px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">Special Sparkling Look</li>\n<li style=\"box-sizing: border-box;\">Relatively High Impact Strength</li>\n<li style=\"box-sizing: border-box;\">Comes with Basic Reusable Spool</li>\n<li style=\"box-sizing: border-box;\">Diameter: 1.75mm +/- 0.03mm</li>\n</ul>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<div class=\"bbl-title-4 text-bbl-grey-13 font-bold\">Cautions for Use</div>\n<ul style=\"margin: 0px; padding: 0px; margin-top: 8px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">All AMS Series Compatible</li>\n<li style=\"box-sizing: border-box;\">0.2 mm Nozzle <strong>NOT </strong>Compatible</li>\n</ul>"
+  }
+ ],
+ "videos": [],
+ "description": {
+  "kind": "page_builder",
+  "config": {
+   "schemaVersion": "1.0",
+   "templateId": "tpl-1778465914467",
+   "components": [
+    {
+     "id": "banner_1776859885795_imdr8wmzy",
+     "type": "banner",
+     "variant": "banner_1",
+     "name": "Banner",
+     "anchor": {
+      "enabled": true,
+      "name": "Overview",
+      "id": "banner_1776859885795_imdr8wmzy"
+     },
+     "modules": {
+      "media": {
+       "pc": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/be567c7af0bb429992198b7d089f8037/Bambu_PLA_Sparkle01-compressed.jpg",
+        "naturalWidth": 5120,
+        "naturalHeight": 1280
+       },
+       "mo": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/c316c54d867a436290ecfa49524bcbfc/Bambu_PLA_Sparkle_MO01-compressed.jpg",
+        "naturalWidth": 2048,
+        "naturalHeight": 960
+       }
+      },
+      "typeStyles": {
+       "content": {
+        "title": "PLA Sparkle",
+        "description": "Special Sparkling Look"
+       }
+      }
+     }
+    },
+    {
+     "id": "chapter_1776860120943_tabnn7pvy",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "卖点",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-9",
+      "id": "chapter_1776860120943_tabnn7pvy"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "",
+        "description": ""
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1776860161046_c2ynsoh65",
+       "type": "content_block",
+       "variant": "content-block-6",
+       "name": "卖点 1",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1776860161046_c2ynsoh65"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Display of PLA Sparkle Prints",
+          "description": "Bambu PLA Sparkle is a next-level aesthetic filament that combines strength and sparkle. With metal particles included in its composition, Bambu PLA Sparkle adds a special sparkling look to your prints that sets them apart from the rest.\n\nHowever, it is not recommended to use a 0.2 mm nozzle for printing as clogging may occur. Take your 3D printing projects to new heights with Bambu PLA Sparkle!"
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/5f5ef63145f2421abd5d7b0485ce4413/Bambu_PLA_Sparkle04-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/047b8ce6aaa945bbb0634d1848c2a154/Bambu_PLA_Sparkle_MO04-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789712188602_htsaac5tx"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/9f2bf63451cb4751ae4bf3c2708d7f3e/Bambu_PLA_Sparkle03-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/5747058251a841528090d2ad962098c0/Bambu_PLA_Sparkle_MO03-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789712188602_u934tdtyw"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/91f0025f3e1f4208baca1b585849a496/Bambu_PLA_Sparkle06-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/293f0c0c6fd345c7b715b2cb3147ce90/Bambu_PLA_Sparkle_MO06-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789712188602_x6oo50j8j"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/e2cb06aef16e4ed294b28259232c515a/Bambu_PLA_Sparkle05-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/b9ab5eda8970406faaf1d07951c09286/Bambu_PLA_Sparkle_MO05-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789712188602_wjcqj7h5j"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/250faa25d5284d48ae0fb745dc3bcb11/Bambu_PLA_Sparkle02-compressed.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/9016afca73d643d280e4512b225af52a/Bambu_PLA_Sparkle_MO02-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789712188602_mbpy1jdsh"
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "content_block_1776744592796_vv35dwp6b",
+     "type": "content_block",
+     "variant": "content-block-1",
+     "name": "RFID",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-6",
+      "id": "content_block_1776744592796_vv35dwp6b"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "RFID for Intelligent Printing",
+        "description": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+       }
+      },
+      "featureConfig": {
+       "tabs": [
+        {
+         "name": "Tab 1",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/eb199b5c0cf04800ae839c7ba0a8723e/RFID_for_Intelligent_Printing-compressed.jpg",
+           "naturalWidth": 2400,
+           "naturalHeight": 918
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/6110ca90547e4a07ab4bd50d327128ea/RFID_for_Intelligent_PrintingMO-compressed.jpg",
+           "naturalWidth": 1344,
+           "naturalHeight": 840
+          }
+         },
+         "id": "comp_1789712188602_ay7wu8oka"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744650085_nu31krt23",
+     "type": "content_block",
+     "variant": "content-block-17",
+     "name": "Download",
+     "anchor": {
+      "enabled": true,
+      "name": "Download",
+      "id": "content_block_1776744650085_nu31krt23"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Download"
+       }
+      },
+      "featureConfig": {
+       "items": [
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/44b88c2274b2430397da892f1de79f70/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament TDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/cbd85564aa6c4e95a4e6c2f3b9b203cc/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/3fbc77b0cdd14b08a115f7335c0a7c1f/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+         "id": "comp_1789712188602_pvmuhinr2"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/5575e961df094c9591a7faa849ca9b77/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament MSDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/ddfca48d22dd4a9eb6b9635ac0edb7ae/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/87cceda3022348889d8939b7c31666f7/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/87526cb8bcce4898b578797781045e57/SDS20251127A08_Bambu_PLA_Sparkle.pdf",
+         "id": "comp_1789712188602_zl2803ebj"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/bf5dbaee598d46e9bd8170e43facfa96/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament RoHS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/a3f72db234e14d20be4deec465eabf7f/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/0d0c436f56d04674bdb0ae74687d0973/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/088f0999da0c419a9630876c48842088.pdf",
+         "id": "comp_1789712188602_uefoj9opj"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/fdec58d7e8cd4820bb93af5ef7582247/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Hex Code",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/feb53ac100be4d4ab1f2ef0da0c9d866/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/29368c49ea0d42bba733162cf135d3ef/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+         "id": "comp_1789712188602_1f1tr35n6"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744740718_dwoqb1p7t",
+     "type": "content_block",
+     "variant": "content-block-21-pro",
+     "name": "FAQ",
+     "anchor": {
+      "enabled": true,
+      "name": "Printing Tips",
+      "id": "content_block_1776744740718_dwoqb1p7t"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Printing Tips"
+       }
+      },
+      "featureConfig": {
+       "faqs": [
+        {
+         "question": "1.Accessory Compatibility",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Not compatible with <strong>Hotend with Stainless Steel Nozzle 0.2 mm</strong>.</div>",
+           "id": "comp_1789712188602_15j2n8i8l"
+          }
+         ],
+         "id": "comp_1789712188602_ekgxtqb1q"
+        },
+        {
+         "question": "2.Drying Recommendations",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<ul>\n<li>Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: <a href=\"https://wiki.bambulab.com/en/filament-acc/filament/dry-filament\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">Filament drying instructions</span></span></a> on WIKI.</li>\n<li>For opened filament, we recommend drying before use according to the wiki&rsquo;s recommended temperature and time settings.</li>\n</ul>",
+           "id": "comp_1789712188602_ffj4wsno0"
+          }
+         ],
+         "id": "comp_1789712188602_q9qx38g73"
+        },
+        {
+         "question": "3.Safety Tips",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>\n<div data-page-id=\"UYkSd7IvUoVreQxHLV5cA0mpnBg\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul>\n<li class=\"ace-line ace-line old-record-id-doxcnwYFCemC8F1JknzOfrKazCd\">Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.</li>\n<li class=\"ace-line ace-line old-record-id-doxcnwYFCemC8F1JknzOfrKazCd\">Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.</li>\n<li class=\"ace-line ace-line old-record-id-doxcnwYFCemC8F1JknzOfrKazCd\">Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.</li>\n<li class=\"ace-line ace-line old-record-id-doxcnwYFCemC8F1JknzOfrKazCd\">As this filament is not food-grade, please avoid using finished prints for food storage or contact.</li>\n</ul>\n</div>\n</div>",
+           "id": "comp_1789712188602_3ji5p7wq5"
+          }
+         ],
+         "id": "comp_1789712188602_5cw9u6ux0"
+        }
+       ]
+      }
+     }
+    }
+   ]
+  }
+ },
+ "jsonld": {
+  "productGroupId": "7225380929672",
+  "variantSkus": [
+   "41002885349512",
+   "41002885382280",
+   "41002885415048",
+   "41158137544840",
+   "41158137577608",
+   "42259081789576"
+  ],
+  "brand": "Bambu Lab"
+ }
+}

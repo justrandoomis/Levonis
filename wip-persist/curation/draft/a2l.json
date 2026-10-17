@@ -1,0 +1,2074 @@
+{
+  "handle": "a2l",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T10:27:33Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "title": "Bambu Lab A2L Spec Sheet",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*"
+      ],
+      "note": "Both pages read (pdftotext -layout and -raw, checked against an 80 dpi render of each page). The document is headed \"A2L Spec Sheet\": one table (Body, Physical Dimensions, Toolhead, Heatbed, Speed, Cooling, Supported Filament Type, Sensor, Electrical Requirements*, Environment Requirement, Electronics, Software, Network Control, Wi-Fi, Cutting Module) and two footnotes. No package size, gross weight, layer height, noise or certification row. Linked from the store page's Specs block as a \"Download PDF\" button (downloadButton.downloadUrl)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/a2l/manual/acc-in-the-box",
+      "title": "Packaging List for A2L",
+      "retrieved_at": "2026-10-16T08:24:02Z",
+      "keys": [
+        "package.contents",
+        "extrusion.nozzle_diameter",
+        "printing.included_build_plate",
+        "connectivity.storage"
+      ],
+      "note": "Packing List table (columns \"A2L AMS Combo\" and \"A2L\"; no column for the A2L Cutting Full Combo) and the Accessories Introduction table (page updated 2026-07-13). Linked from the store box table (\"* More details\")."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "title": "A2L AMS Connection Guide",
+      "retrieved_at": "2026-10-16T08:24:08Z",
+      "keys": [
+        "printing.multi_color"
+      ],
+      "note": "Preface, the two connection procedures, the AMS ID rules and the FAQ (AMS lite / AMS / AMS 2 Pro / AMS HT, PTFE Tube coupler, 4-in-1 PTFE Adapter, AMS drying power). Used for printing.multi_color and the relations. Linked from the store FAQ 7 (\"More details\")."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/a2l",
+      "title": "Bambu Lab A2L (store page)",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): format page_builder; the payload holds seven not_found rows and one variant.note, and one document (the AMS connection guide). The page also carries a 56-row spec table (\"Bambu Lab A2L - Technical Specifications\", RSC row 1d0) and a What's-in-the-box table (RSC row 1cf) that the package does not read (featureConfig.richText is not kept by the description picker); both were read by hand and every row compared with the sheet. Also read: Product Features, the Overview chapter, FAQ 1–11 (FAQ 1 \"Installation space reference\" is an image only) and the variant descriptions."
+    },
+    {
+      "kind": "store_messages",
+      "url": "https://us.store.bambulab.com/products/a2l",
+      "title": "Bambu Lab A2L store page — messages bundle",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "keys": [
+        "electrical.*",
+        "package.*",
+        "shipment.*",
+        "physical.recommended_space"
+      ],
+      "note": "Searched for A2L 220 V / UK values (§C.6). The bundle's production namespace holds the H2D tables only (and AMSPro / AMSHT); no A2L key, so no intl_220v package size or gross weight comes from it."
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.technology",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Fused Deposition Modeling",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Printing Technology",
+      "quote": "Printing Technology Fused Deposition Modeling",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's spec table has no Printing Technology row."
+    },
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "330 × 320 × 325 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Body › Build Volume (W*D*H)",
+      "quote": "Build Volume (W*D*H) 330*320*325 mm",
+      "test_method": "",
+      "test_condition": "W × D × H",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same (\"330mm*320mm*325 mm\"); Product Features bullet 1 and FAQ 2 repeat it."
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Aluminum and Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Body › Chassis",
+      "quote": "Chassis Aluminum and Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "physical.outer_frame",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Plastic",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Body › Outer Frame",
+      "quote": "Outer Frame Plastic",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 544,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (1st of 3)",
+      "quote": "Physical Dimensions 544*529*505 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The sheet gives no axis labels for this row; the three numbers are kept in the published order (first → length, second → width, third → height), the order the package uses for the same store row. The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same (\"544mm*529mm*505 mm\")."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 529,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (2nd of 3)",
+      "quote": "Physical Dimensions 544*529*505 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The sheet gives no axis labels for this row; the three numbers are kept in the published order (first → length, second → width, third → height), the order the package uses for the same store row. The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same (\"544mm*529mm*505 mm\")."
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 505,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (3rd of 3)",
+      "quote": "Physical Dimensions 544*529*505 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The sheet gives no axis labels for this row; the three numbers are kept in the published order (first → length, second → width, third → height), the order the package uses for the same store row. The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same (\"544mm*529mm*505 mm\")."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 12800,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Net Weight",
+      "quote": "Net Weight 12.8 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same (\"12.8 kg\"), with the gross weights per version in brackets (US table; see shipment.gross_weight)."
+    },
+    {
+      "key": "extrusion.extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Gear",
+      "quote": "Extruder Gear Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Stainless Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Toolhead › Nozzle",
+      "quote": "Nozzle Stainless Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same. The packing list names the included nozzle \"0.4 mm Stainless Steel Nozzle (pre-installed in the printer)\"."
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Toolhead › Max Nozzle Temperature",
+      "quote": "Max Nozzle Temperature 300 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same (\"300 °C\")."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Toolhead › Supported Nozzle Diameter",
+      "quote": "Supported Nozzle Diameter 0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "printing.filament_cutter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Cutter",
+      "quote": "Filament Cutter Built-in",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Diameter",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "extrusion.extruder_motor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Servo Extruder Motor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Motor",
+      "quote": "Extruder Motor Servo Extruder Motor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same. The store FAQ 2 and 6 call it a \"PMSM closed-loop servo extruder\" (prose, not recorded as the value)."
+    },
+    {
+      "key": "printing.build_plate_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Flexible Steel Plate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Heatbed › Build Plate Material",
+      "quote": "Build Plate Material Flexible Steel Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Heatbed › Included Build Plate Type",
+      "quote": "Included Build Plate Type Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same. The packing list names it \"Bambu Textured PEI Plate\" for both the A2L and the A2L AMS Combo."
+    },
+    {
+      "key": "printing.build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI plate",
+        "Engineering Plate",
+        "Cool Plate SuperTack"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Engineering Plate, Cool Plate SuperTack",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Heatbed › Max Heatbed Temperature",
+      "quote": "Max Heatbed Temperature 80 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same (\"80 ℃\"); the store FAQ 5 explains the 80 °C limit (open frame, large bed, household circuits)."
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 500,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Speed › Max Speed of Toolhead",
+      "quote": "Max Speed of Toolhead 500 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 10000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Speed › Max Acceleration of Toolhead",
+      "quote": "Max Acceleration of Toolhead 10 m/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "Published as 10 m/s²; stored in the registry unit (10 m/s² = 10000 mm/s²). The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same (\"10 m/s²\")."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 28,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Speed › Max Flow for Hotend",
+      "quote": "Max Flow for Hotend 28 mm³/s (Test parameters: 150 mm round model with a single outer wall; Bambu Lab PLA Basic; 220 °C printing temperature)",
+      "test_method": "Bambu Lab test parameters (published with the value)",
+      "test_condition": "150 mm round model with a single outer wall; Bambu Lab PLA Basic; 220 °C printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same, with the same test parameters."
+    },
+    {
+      "key": "thermal.part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Cooling › Part Cooling Fan",
+      "quote": "Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "thermal.hotend_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Cooling › Hotend Cooling Fan",
+      "quote": "Hotend Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA, PETG, TPU, PVA — Suitable for Printing",
+        "PLA-CF, PETG-CF — Suitable for Printing (Replace with Hardened Steel Nozzle)"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Supported Filament Type (two rows)",
+      "quote": "Supported Filament Type PLA，PETG，TPU，PVA Suitable for Printing PLA-CF、PETG-CF Suitable for Printing (Replace with Hardened Steel Nozzle)",
+      "test_method": "",
+      "test_condition": "PLA-CF and PETG-CF only with a hardened steel nozzle (the included nozzle is stainless steel)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "Two rows kept with their ratings, as the sheet writes them (full-width commas and \"、\" normalised to \", \"). The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "printing.camera",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Low-frame-rate camera, up to 1080P, supports timelapse photography",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Sensor › Camera",
+      "quote": "Camera Low-frame-rate camera, up to 1080P, supports timelapse photography",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Sensor › Filament Run Out Sensor",
+      "quote": "Filament Run Out Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "printing.filament_tangle_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Sensor › Filament Tangle Sensor",
+      "quote": "Filament Tangle Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Sensor › Filament Odometry",
+      "quote": "Filament Odometry Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "printing.power_loss_recovery",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Sensor › Power Loss Recovery",
+      "quote": "Power Loss Recovery Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200-240 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Electrical Requirements* › Voltage › High-voltage Version",
+      "quote": "Voltage High-voltage Version: 200-240 VAC, 50/60 Hz Low-voltage Version: 100-120 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "High-voltage version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "Footnote to \"Electrical Requirements*\" (p.2): \"The printer's voltage specifications vary by sales region. Before use, check the label next to the power socket to ensure the supply voltage matches the indicated voltage.\""
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-120 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Electrical Requirements* › Voltage › Low-voltage Version",
+      "quote": "Voltage High-voltage Version: 200-240 VAC, 50/60 Hz Low-voltage Version: 100-120 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's spec table (the US table) shows only this version: \"100-120 VAC, 50/60 Hz\"."
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Electrical Requirements* › Voltage › High-voltage Version",
+      "quote": "Voltage High-voltage Version: 200-240 VAC, 50/60 Hz Low-voltage Version: 100-120 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "High-voltage version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:36Z"
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Electrical Requirements* › Voltage › Low-voltage Version",
+      "quote": "Voltage High-voltage Version: 200-240 VAC, 50/60 Hz Low-voltage Version: 100-120 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:36Z"
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Electrical Requirements* › Max Power* › High-voltage Version",
+      "quote": "Max Power* High-voltage Version: 1000 W@220 V Low-voltage Version: 1000 W@110 V",
+      "test_method": "",
+      "test_condition": "High-voltage version, @220 V",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "Footnote to \"Max Power*\" (p.2): \"To ensure the heatbed quickly reaches the needed temperature, the printer will maintain maximum power for about 3 minutes.\""
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Electrical Requirements* › Max Power* › Low-voltage Version",
+      "quote": "Max Power* High-voltage Version: 1000 W@220 V Low-voltage Version: 1000 W@110 V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V), @110 V",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's spec table states the same US value (\"1000 W@110 V\")."
+    },
+    {
+      "key": "physical.operating_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "15 °C – 30 °C",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Environment Requirement",
+      "quote": "Environment Requirement 15 - 30 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The sheet's label is \"Environment Requirement\" (operating environment temperature). The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same (\"15 -30 °C\")."
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "3.5 inch, 240*320 Touchscreen",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Electronics › Touchscreen",
+      "quote": "Touchscreen 3.5 inch, 240*320 Touchscreen",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "connectivity.storage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "MicroSD Card",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Electronics › Storage",
+      "quote": "Storage MicroSD Card",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "conflict": "Wording only: the store page's spec table reads \"32g MicroSD Card\" (Electronics › Storage) and the packing list \"32 GB MicroSD card (pre-installed in the printer)\". The sheet value is kept by source rank; the 32 GB card is in the box list."
+    },
+    {
+      "key": "connectivity.control_interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Touchscreen",
+        "mobile App",
+        "PC App"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Electronics › Control Interface",
+      "quote": "Control Interface Touchscreen, mobile App, PC App",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "connectivity.motion_controller",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Single-core Cortex-M4 Processor & Single-core Cortex-M7 Processor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Electronics › Motion Controller",
+      "quote": "Motion Controller Single-core Cortex-M4 Processor & Single-core Cortex-M7 Processor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "connectivity.interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Wi-Fi, Bambu-Bus",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Electronics › Communication",
+      "quote": "Communication Wi-Fi，Bambu-Bus",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The sheet's label is \"Communication\" (not a registry synonym); it lists the printer's communication interfaces, the meaning of connectivity.interface (the A1 sheet's \"Connectivity: Wi-Fi, Bambu-Bus\" row is filed under the same key). The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Studio / Supports third-party slicers which export standard Gcode, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Software › Slicer",
+      "quote": "Slicer Bambu Studio Supports third-party slicers which export standard Gcode, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "MacOS",
+        "Windows",
+        "Linux"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Software › Supported Operating System",
+      "quote": "Supported Operating System MacOS、Windows、Linux",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "connectivity.ethernet",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Network Control › Ethernet",
+      "quote": "Ethernet Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "connectivity.wireless_network",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "2.4G Wi-Fi",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Network Control › Wireless Network",
+      "quote": "Wireless Network 2.4G Wi-Fi",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "connectivity.network_kill_switch",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Network Control › Network Kill Switch",
+      "quote": "Network Kill Switch Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "Sheet only: the store page's spec table lists Ethernet and Wireless Network under Network Control, not this row."
+    },
+    {
+      "key": "connectivity.removable_network_module",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Network Control › Removable Network Module",
+      "quote": "Removable Network Module Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "Sheet only: the store page's spec table lists Ethernet and Wireless Network under Network Control, not this row."
+    },
+    {
+      "key": "connectivity.network_access_control",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Network Control › 802.1X Network Access Control",
+      "quote": "802.1X Network Access Control Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "Sheet only: the store page's spec table lists Ethernet and Wireless Network under Network Control, not this row."
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Operating Frequency — 2412 - 2472 MHz (CE/MIC); 2412 - 2462 MHz (FCC); 2400 - 2483.5 MHz (SRRC)\nWi-Fi Transmitter Power (EIRP) — <23 dBm (FCC), <20 dBm (CE/SRRC)\nWi-Fi Protocol — IEEE 802.11 b/g/n",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Wi-Fi › Operating Frequency; Wi-Fi Transmitter Power (EIRP); Wi-Fi Protocol",
+      "quote": "Operating Frequency 2412 - 2472 MHz (CE/MIC) 2412 - 2462 MHz (FCC) 2400 - 2483.5 MHz (SRRC) Wi-Fi Transmitter Power (EIRP) <23 dBm (FCC)，<20 dBm (CE/SRRC) Wi-Fi Protocol IEEE 802.11 b/g/n",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "note": "The three Wi-Fi rows in the store parse's layout (label — value, one per line). The store page's own spec table (\"Bambu Lab A2L - Technical Specifications\") states the same."
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/acc-in-the-box",
+      "source_title": "Packaging List for A2L",
+      "locator": "Packing List table › columns \"A2L AMS Combo\" and \"A2L\" › item 4",
+      "quote": "0.4 mm Stainless Steel Nozzle (pre-installed in the printer)",
+      "test_method": "",
+      "test_condition": "Included nozzle (pre-installed)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:02Z",
+      "note": "The spec sheet gives the supported diameters only; the packing list of both versions names the pre-installed 0.4 mm nozzle."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "736733711756750851",
+        "value_text": "A2L Combo"
+      },
+      "value": [
+        "A2L Printer Base Housing",
+        "A2L Printer Frame",
+        "32 GB MicroSD card (pre-installed in the printer)",
+        "0.4 mm Stainless Steel Nozzle (pre-installed in the printer)",
+        "Bambu Textured PEI Plate",
+        "AMS lite Body (includes 4-pin connection cable)",
+        "AMS lite Stand",
+        "AMS lite Rotary Spool Holder",
+        "Power Cable",
+        "Purge Wiper",
+        "Spool Holder",
+        "PTFE Tube for AMS lite (includes 2 PTFE Tube Silicone Clamps; 2 x 975 mm, 2 x 905 mm)",
+        "PTFE Tube (for external spool, 1 x 975 mm)",
+        "Filament Sample",
+        "Accessory Box",
+        "Quick Start Guide",
+        "Warranty Terms",
+        "Disclaimer and Safety Guidelines",
+        "Lubricant Oil",
+        "Lubricant Grease",
+        "Filament Cutter Blade",
+        "Scraper Blade",
+        "Silicone Footpad",
+        "Foam Footpad",
+        "Unclogging Pin",
+        "Z Motor Cover",
+        "PTFE Tube Coupler",
+        "Allen Key (H1.5 and H2.0)",
+        "Screws for Heatbed (M4-7)",
+        "Screws for Base Housing (M4-22)",
+        "Screws for Integrated Cable (BT3-12)",
+        "Screw for Purge Wiper (M3-12 or M3-14. Please refer to the model indicated on the specific package.)",
+        "AMS Base Bracket Screws (BT3-8)",
+        "Scraper Screws (BT2.6-8)",
+        "Top Frame Latch Pivot Screws (BT3-23)",
+        "AMS Top Mount Screws (BT3-12)"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/acc-in-the-box",
+      "source_title": "Packaging List for A2L",
+      "locator": "Packing List table › column \"A2L AMS Combo\" (all rows)",
+      "quote": "A2L Printer Base Housing A2L Printer Frame 32 GB MicroSD card (pre-installed in the printer) 0.4 mm Stainless Steel Nozzle (pre-installed in the printer)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:02Z",
+      "note": "The wiki column is headed \"A2L AMS Combo\": the store's \"A2L Combo\" (the store box table calls it \"A2L Combo Version\" and adds the AMS lite). Items of the \"Accessory Box\" list follow the leaflets. The wiki says: \"The types and quantities of accessories may change at any time. Please refer to the actual items received.\""
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "736733711756750850",
+        "value_text": "A2L"
+      },
+      "value": [
+        "A2L Printer Base Housing",
+        "A2L Printer Frame",
+        "32 GB MicroSD card (pre-installed in the printer)",
+        "0.4 mm Stainless Steel Nozzle (pre-installed in the printer)",
+        "Bambu Textured PEI Plate",
+        "Power Cable",
+        "Purge Wiper",
+        "Spool Holder",
+        "PTFE Tube (for external spool, 1 x 975 mm)",
+        "Filament Sample",
+        "Accessory Box",
+        "Quick Start Guide",
+        "Warranty Terms",
+        "Disclaimer and Safety Guidelines",
+        "Lubricant Oil",
+        "Lubricant Grease",
+        "Filament Cutter Blade",
+        "Scraper Blade",
+        "Silicone Footpad",
+        "Foam Footpad",
+        "Unclogging Pin",
+        "Z Motor Cover",
+        "PTFE Tube Coupler",
+        "PTFE Tube Silicone Clamp",
+        "Allen Key (H1.5 and H2.0)",
+        "Screws for Heatbed (M4-7)",
+        "Screws for Base Housing (M4-22)",
+        "Screws for Integrated Cable (BT3-12)",
+        "Screw for Purge Wiper (M3-12 or M3-14. Please refer to the model indicated on the specific package.)",
+        "Scraper Screws (BT2.6-8)"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/acc-in-the-box",
+      "source_title": "Packaging List for A2L",
+      "locator": "Packing List table › column \"A2L\" (all rows)",
+      "quote": "A2L Printer Base Housing A2L Printer Frame 32 GB MicroSD card (pre-installed in the printer) 0.4 mm Stainless Steel Nozzle (pre-installed in the printer)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:02Z",
+      "note": "Items of the \"Accessory Box\" list follow the leaflets. The wiki says: \"The types and quantities of accessories may change at any time. Please refer to the actual items received.\" The store page's own \"What's in the box\" table (A2L | A2L Combo Version: A2L, Tool Box, Build Plate, Spool Holder; AMS lite (Combo version) only in the Combo) agrees and links this wiki page (\"* More details\")."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "758126085396279297",
+        "value_text": "A2L Cutting Full Combo"
+      },
+      "value": [
+        "A2L Combo",
+        "Cutting Upgrade Kit"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "locator": "Variant \"A2L Cutting Full Combo\" (758126085396279298) › description",
+      "quote": "Include A2L Combo and Cutting Upgrade Kit",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "note": "The only official statement of this version's contents (a variant description sentence, so unverified). The packing list has no column for it; the A2L Combo items are those of the \"A2L AMS Combo\" column, and the kit's own contents are on its product page (cutting-upgrade-kit-h2-series-a2l)."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "736733711756750850",
+        "value_text": "A2L"
+      },
+      "value": 17000,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "locator": "Bambu Lab A2L - Technical Specifications › Dimensions and Weight › Net Weight (row 5) › Gross Weight › segment 1 (A2L)",
+      "quote": "12.8 kg (Gross Weight: A2L 17.0 kg, A2L AMS Combo 18.9kg)",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "note": "The US store table (its Voltage row is \"100-120 VAC, 50/60 Hz\"), so us_110v per §C.6. The spec sheet carries no gross weight and the page's messages bundle has no A2L keys, so no intl_220v gross weight exists. The package does not parse this table (page-builder richText), so the value is not in the deterministic payload."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "736733711756750851",
+        "value_text": "A2L Combo"
+      },
+      "value": 18900,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "locator": "Bambu Lab A2L - Technical Specifications › Dimensions and Weight › Net Weight (row 5) › Gross Weight › segment 2 (A2L AMS Combo)",
+      "quote": "12.8 kg (Gross Weight: A2L 17.0 kg, A2L AMS Combo 18.9kg)",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "note": "The table names the version \"A2L AMS Combo\": the store option value \"A2L Combo\" (the wiki packing list uses the same name for it). The US store table (its Voltage row is \"100-120 VAC, 50/60 Hz\"), so us_110v per §C.6. The spec sheet carries no gross weight and the page's messages bundle has no A2L keys, so no intl_220v gross weight exists. The package does not parse this table (page-builder richText), so the value is not in the deterministic payload."
+    },
+    {
+      "key": "printing.auto_leveling",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Full-auto calibration: hands-free leveling and offset",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "locator": "Product Features › bullet 3",
+      "quote": "Full-Auto Calibration: Hands-free leveling and offset for instant out-of-the-box printing.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "note": "A Product Features bullet (prose), so unverified; no spec-sheet row."
+    },
+    {
+      "key": "printing.multi_color",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Up to 19 colors: up to 4 AMS units (AMS / AMS 2 Pro / AMS HT) and 1 AMS lite connected together",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "source_title": "A2L AMS Connection Guide",
+      "locator": "Preface, paragraph 2",
+      "quote": "The A2L supports connecting up to 4 AMS units and 1 AMS lite simultaneously (as shown below), enabling printing with up to 19 colors.",
+      "test_method": "",
+      "test_condition": "4 AMS units give 16 feeding channels and the AMS lite 3 (one filament-hub inlet is kept for the AMS units)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:08Z",
+      "note": "Manual prose, so unverified. The store FAQ 7 agrees: \"supporting up to 4 box-style AMS units and 1 AMS lite connected in series, enabling up to 19-color printing. (Connecting the box-style AMS uses up one buffer path, so one AMS lite slot will be unavailable.)\""
+    },
+    {
+      "key": "physical.noise",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Below 49 dB (Silent Mode); about 52 dB peak (Standard Mode)",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "locator": "FAQ › 4",
+      "quote": "In Silent Mode, noise levels stay below 49 dB (comparable to a quiet library whisper). In Standard Mode, peak noise is approximately 52 dB. (Data source: Bambu Lab internal testing)",
+      "test_method": "Bambu Lab internal testing",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "note": "An FAQ answer (prose), so unverified; the sheet has no noise row."
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "UL 2904 GREENGUARD",
+        "EU RED Article 3.3(d)(e)",
+        "ETSI EN 303 645 V2.1.1:2020"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "locator": "Product Features › bullets 7 and 8",
+      "quote": "Indoor Safe: UL 2904 GREENGUARD certified for emission safety. … * Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020.",
+      "test_method": "",
+      "test_condition": "UL 2904: indoor emissions (the Overview says \"when used with official filaments\"); EU RED / ETSI: cybersecurity compliance",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "note": "Feature bullets (prose), so unverified. The Overview section \"UL Clean Air Certified\" says the A2L \"is certified under the UL 2904 standard for 3D printing indoor air quality when used with official filaments\"."
+    },
+    {
+      "key": "printing.camera_birdseye",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not available",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "locator": "FAQ › 11",
+      "quote": "The A2L does not have a BirdsEye camera",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "note": "An FAQ answer (prose), so unverified. Stated, so not listed as not_published."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Heatbed › Included Build Plate Type; Supported Build Plate Type",
+      "quote": "Included Build Plate Type Textured PEI Plate Supported Build Plate Type Textured PEI plate, Engineering Plate, Cool Plate SuperTack",
+      "condition": "Included with the printer; the plate in its A2L size",
+      "note": "The plate's store page offers an \"A2L\" printer-model option (compat-targets: \"Printer Model: A2L\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Engineering Plate, Cool Plate SuperTack",
+      "condition": "Supported; the plate in its A2L size",
+      "note": "The plate's store page offers an \"A2L\" option."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Engineering Plate, Cool Plate SuperTack",
+      "condition": "Supported; the plate in its A2L size",
+      "note": "The plate's store page offers an \"A2L\" option."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "source_title": "A2L AMS Connection Guide",
+      "locator": "Preface, paragraph 1",
+      "quote": "The A2L printer supports connection with external spool, AMS lite and AMS / AMS 2 Pro / AMS HT (hereinafter collectively referred to as AMS).",
+      "condition": "One AMS lite (included in the A2L Combo); with box-style AMS units also connected, 3 of its 4 slots are usable",
+      "note": "Store FAQ 7: \"(Connecting the box-style AMS uses up one buffer path, so one AMS lite slot will be unavailable.)\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "source_title": "A2L AMS Connection Guide",
+      "locator": "Preface, paragraphs 1–2",
+      "quote": "The A2L supports connecting up to 4 AMS units and 1 AMS lite simultaneously (as shown below), enabling printing with up to 19 colors.",
+      "condition": "Up to 4 AMS units (AMS, AMS 2 Pro, AMS HT) together with 1 AMS lite; connected through the PTFE Tube Coupler from the accessory box",
+      "note": "Wiki FAQ: \"The A2L filament hub has a built-in buffering function, so there is no need to use the A1 series AMS hub. The AMS can be connected directly.\" Do not use a first-generation AMS 6-pin cable with an AMS 2 Pro / AMS HT."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "source_title": "A2L AMS Connection Guide",
+      "locator": "Preface, paragraph 1; FAQ \"Can the A2L use AMS 2 Pro / AMS HT for drying?\"",
+      "quote": "The A2L printer supports connection with external spool, AMS lite and AMS / AMS 2 Pro / AMS HT (hereinafter collectively referred to as AMS).",
+      "condition": "Up to 4 AMS units in total; drying needs the AMS 2 Pro's own power adapter (it cannot draw drying power from the printer)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "source_title": "A2L AMS Connection Guide",
+      "locator": "Preface, paragraph 1; FAQ \"Can the A2L use AMS 2 Pro / AMS HT for drying?\"",
+      "quote": "The A2L printer supports connection with external spool, AMS lite and AMS / AMS 2 Pro / AMS HT (hereinafter collectively referred to as AMS).",
+      "condition": "Up to 4 AMS units in total; drying needs the AMS HT's power cable (it cannot draw drying power from the printer)"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "source_title": "A2L AMS Connection Guide",
+      "locator": "FAQ \"I already own an AMS. If I purchase an A2L, can I connect it to my existing AMS directly?\"",
+      "quote": "When connecting two or more AMS units (up to 4), you will also need to purchase a 4-in-1 PTFE adapter.",
+      "condition": "Only to connect 2 to 4 AMS units (not for one AMS or the AMS lite)",
+      "note": "The adapter's own store page lists A2L in its compatibility (\"Compatibility: A2L/X2D/P2S/P1/X1\")."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "AMS 2 Pro Switching Adapter",
+      "target_source_handle": "ams-2-pro-switching-adapter",
+      "evidence_kind": "manual",
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "source_title": "A2L AMS Connection Guide",
+      "locator": "FAQ \"Can the A2L use AMS 2 Pro / AMS HT for drying?\"",
+      "quote": "AMS units with drying functionality cannot draw power directly from the printer for drying. The AMS 2 Pro requires connection to its power adapter",
+      "condition": "Only for the AMS 2 Pro drying function on the A2L",
+      "note": "The same answer names it: \"The Switching Adapter for AMS 2 Pro is rated at 24V 4A.\" Store FAQ 8 agrees (external power for AMS 2 Pro / AMS HT drying)."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hardened Steel Nozzle",
+      "target_source_handle": "bambu-hotend-a1-a2",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.1, Supported Filament Type › row 2",
+      "quote": "PLA-CF、PETG-CF Suitable for Printing (Replace with Hardened Steel Nozzle)",
+      "condition": "Only to print PLA-CF or PETG-CF (the included nozzle is stainless steel)",
+      "note": "The sheet names no product. Bambu Hotend - A1/A2 offers \"A2L / 0.4mm Hardened Steel\", \"A2L / 0.6mm Hardened Steel\" and \"A2L / 0.8mm Hardened Steel\" options on its store page."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cutting Upgrade Kit",
+      "target_source_handle": "cutting-upgrade-kit-h2-series-a2l",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "locator": "FAQ › 9 and 10",
+      "quote": "However, the modular mounting point allows for a blade-cutting module for precision cutting and pen-plotting functions.",
+      "condition": "Blade cutting and pen plotting; included in the A2L Cutting Full Combo",
+      "note": "FAQ 10: \"You only need to purchase the \"Blade Cutting Upgrade Kit,\" which includes the cutting module, a pen module, a dedicated cutting mat, and related accessories.\" The Cutting Full Combo variant description links the kit (\"Include A2L Combo and Cutting Upgrade Kit\"); the spec sheet has a Cutting Module section."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "LightGrip Cutting Mat",
+      "target_source_handle": "lightgrip-cutting-mat",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Cutting Module › Cutting Mat Type",
+      "quote": "Cutting Mat Type LightGrip and StrongGrip Cutting Mats",
+      "condition": "Blade cutting with the cutting module"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "StrongGrip Cutting Mat",
+      "target_source_handle": "stronggrip-cutting-mat",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "source_title": "Bambu Lab A2L Spec Sheet",
+      "locator": "p.2, Cutting Module › Cutting Mat Type",
+      "quote": "Cutting Mat Type LightGrip and StrongGrip Cutting Mats",
+      "condition": "Blade cutting with the cutting module"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "laser_module",
+      "target_label": "Laser modules",
+      "target_source_handle": "laser-module",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "locator": "FAQ › 9",
+      "quote": "For safety reasons related to its open-frame design, the A2L does not support laser modules."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "736733711756750851",
+        "value_text": "A2L Combo"
+      },
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/acc-in-the-box",
+      "source_title": "Packaging List for A2L",
+      "retrieved_at": "2026-10-16T08:24:02Z",
+      "locator": "Packing List table › column \"A2L AMS Combo\" (rows 1–3)",
+      "quote": "A2L Printer Base Housing A2L Printer Frame 32 GB MicroSD card (pre-installed in the printer) 0.4 mm Stainless Steel Nozzle (pre-installed in the printer)",
+      "note": "The wiki column \"A2L AMS Combo\" is the store option \"A2L Combo\". The wiki says: \"The types and quantities of accessories may change at any time. Please refer to the actual items received.\"",
+      "items": [
+        {
+          "text": "A2L Printer Base Housing",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "A2L Printer Frame",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "32 GB MicroSD card (pre-installed in the printer)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "0.4 mm Stainless Steel Nozzle (pre-installed in the printer)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Bambu Textured PEI Plate",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "AMS lite Body (includes 4-pin connection cable)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "AMS lite Stand",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "AMS lite Rotary Spool Holder",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Power Cable",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Purge Wiper",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Spool Holder",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "PTFE Tube for AMS lite (includes 2 PTFE Tube Silicone Clamps; 2 x 975 mm, 2 x 905 mm)",
+          "qty": 4,
+          "section": ""
+        },
+        {
+          "text": "PTFE Tube (for external spool, 1 x 975 mm)",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "Filament Sample",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Accessory Box",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Warranty Terms",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Filament Cutter Blade",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Silicone Footpad",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Foam Footpad",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Z Motor Cover",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "PTFE Tube Coupler",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Allen Key (H1.5 and H2.0)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Screws for Heatbed (M4-7)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Screws for Base Housing (M4-22)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Screws for Integrated Cable (BT3-12)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Screw for Purge Wiper (M3-12 or M3-14. Please refer to the model indicated on the specific package.)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "AMS Base Bracket Screws (BT3-8)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Scraper Screws (BT2.6-8)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Top Frame Latch Pivot Screws (BT3-23)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "AMS Top Mount Screws (BT3-12)",
+          "qty": null,
+          "section": "Accessory Box"
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "736733711756750850",
+        "value_text": "A2L"
+      },
+      "source_url": "https://wiki.bambulab.com/en/a2l/manual/acc-in-the-box",
+      "source_title": "Packaging List for A2L",
+      "retrieved_at": "2026-10-16T08:24:02Z",
+      "locator": "Packing List table › column \"A2L\" (rows 1–3)",
+      "quote": "A2L Printer Base Housing A2L Printer Frame 32 GB MicroSD card (pre-installed in the printer) 0.4 mm Stainless Steel Nozzle (pre-installed in the printer)",
+      "note": "The wiki says: \"The types and quantities of accessories may change at any time. Please refer to the actual items received.\" The store page's own \"What's in the box\" table (A2L | A2L Combo Version: A2L, Tool Box, Build Plate, Spool Holder; AMS lite (Combo version) only in the Combo) agrees and links this wiki page (\"* More details\").",
+      "items": [
+        {
+          "text": "A2L Printer Base Housing",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "A2L Printer Frame",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "32 GB MicroSD card (pre-installed in the printer)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "0.4 mm Stainless Steel Nozzle (pre-installed in the printer)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Bambu Textured PEI Plate",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Power Cable",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Purge Wiper",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Spool Holder",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "PTFE Tube (for external spool, 1 x 975 mm)",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "Filament Sample",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Accessory Box",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Warranty Terms",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Filament Cutter Blade",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Silicone Footpad",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Foam Footpad",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Z Motor Cover",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "PTFE Tube Coupler",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "PTFE Tube Silicone Clamp",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Allen Key (H1.5 and H2.0)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Screws for Heatbed (M4-7)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Screws for Base Housing (M4-22)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Screws for Integrated Cable (BT3-12)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Screw for Purge Wiper (M3-12 or M3-14. Please refer to the model indicated on the specific package.)",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Scraper Screws (BT2.6-8)",
+          "qty": null,
+          "section": "Accessory Box"
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "758126085396279297",
+        "value_text": "A2L Cutting Full Combo"
+      },
+      "source_url": "https://us.store.bambulab.com/products/a2l",
+      "source_title": "Bambu Lab A2L (store page)",
+      "retrieved_at": "2026-10-16T06:55:51Z",
+      "locator": "Variant \"A2L Cutting Full Combo\" (758126085396279298) › description",
+      "quote": "Include A2L Combo and Cutting Upgrade Kit",
+      "note": "No packing-list column exists for this version; the store's variant description is the only official statement. The A2L Combo items are the \"A2L AMS Combo\" column above; the kit's contents are on its own product page.",
+      "items": [
+        {
+          "text": "A2L Combo",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Cutting Upgrade Kit",
+          "qty": null,
+          "section": ""
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/s7/mqxkp/c59dc3c5d00e4c8284872e2304018c4f/npdf.pdf",
+      "title": "Bambu Lab A2L Spec Sheet",
+      "retrieved_at": "2026-10-16T08:21:36Z",
+      "sha256": "abda03fbba296bf1d04a8833d9444b642531685b447845509c57a7f97e13394f",
+      "note": "Two pages headed \"A2L Spec Sheet\". The store \"Specs\" block links it as a \"Download PDF\" button (downloadButton.downloadUrl); the package collects no document from that block, so this curated entry is its only document row."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/a2l/manual/acc-in-the-box",
+      "title": "Packaging List for A2L",
+      "retrieved_at": "2026-10-16T08:24:02Z",
+      "sha256": "961d097e57188af868396a498b5dcead7c77b9d467a52ca4abe64090df15738b",
+      "note": "Linked from the store box table (\"* More details\"), which the package does not read."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/a2l/manual/a2l-ams-connection-guide",
+      "title": "A2L AMS Connection Guide",
+      "retrieved_at": "2026-10-16T08:24:08Z",
+      "sha256": "c61056ddb1f9508818b874e3acd2bd5e703610f7c73083ee9e12915dcc3cfa93",
+      "note": "Already in the deterministic payload (link text \"More details\" in FAQ 7, same URL), so mergeCurated skips it as a duplicate."
+    }
+  ],
+  "not_published": [
+    "printing.layer_height",
+    "printing.unsupported_filament",
+    "printing.camera_toolhead",
+    "printing.camera_nozzle",
+    "extrusion.hotend",
+    "thermal.control_board_fan",
+    "thermal.aux_part_cooling_fan",
+    "electrical.rated_power",
+    "electrical.current",
+    "electrical.standby_power",
+    "electrical.steady_state_power",
+    "connectivity.bluetooth",
+    "connectivity.application_processor",
+    "connectivity.npu",
+    "package.length",
+    "package.width",
+    "package.height",
+    "package.weight"
+  ],
+  "notes": [
+    "Package gap, not a data gap: for this page-builder page the package reads none of the three tables the page carries (content-block-19 \"Specs\" and content-block-18 \"What's in the box\" are featureConfig.richText references the description picker drops) and collects no document from the \"Download PDF\" button. The deterministic payload therefore holds only seven not_found rows, one variant.note and the AMS connection guide. Every store-table value was compared by hand with the sheet: all agree except the wording of Storage (\"32g MicroSD Card\"), noted on connectivity.storage.",
+    "Not recorded (no registry key): the sheet's \"Clumping Detection: Supported\" row (Sensor group) and the eleven Cutting Module rows (Cutting Area 300mm*300mm, Drawing Area 300mm*255 mm, Supported Pen Diameter 10.5 mm–12.5 mm, Cutting Mat Type, Blade Type 45°*0.35 mm, Blade Pressure Range 50 gf–600 gf, Max Cutting Thickness 0.5 mm, Blade and Pen Recognition, Cutting Mat Type Detection, Supported Image Type, Supported Material Type). printing.working_area is the laser key and was not stretched to the cutting area. The cutting mats are recorded as relations.",
+    "Left out on purpose (neither a spec nor not_published): the enclosure keys of an open-frame printer (store FAQ 5 \"As an open-frame printer\"; FAQ 9 \"its open-frame design\"): thermal.chamber_temp, thermal.chamber_heating, thermal.chamber_circulation_fan, thermal.chamber_exhaust_fan, printing.door_sensor, safety.prefilter_grade, safety.hepa_grade, safety.carbon_filter, safety.voc_filtration, safety.particulate_filtration; the dual-nozzle keys (FAQ 3: no dual nozzle): extrusion.main_/aux_extruder_*, printing.filament_main_hotend / filament_aux_hotend*; motion.max_flow_high_flow (no optional high-flow hotend is named for the A2L); printing.working_area (laser; FAQ 9: no laser module); electrical.requirements (a group heading whose footnote is region evidence), electrical.battery / electrical.connector; and the keys no product document carries (identity.*, carton.*, compat.statement, part.material, variant.note, package.volume_m3, manufacturer_terms.*).",
+    "physical.recommended_space is neither a spec nor not_published: the store FAQ 1 \"Installation space reference\" answers with an image only (FAQ_Size.jpg), which was not read offline.",
+    "Marketing numbers not recorded: \"105% more space than the 256 mm class\", \"20kHz\" PMSM sampling, \"2M+\" models, \"Over a million users\", \"40 fidget toys\". Noise (FAQ 4) is kept unverified.",
+    "The payload's region-free not_found row for electrical.voltage stays beside the curated intl_220v / us_110v rows: mergeCurated matches key, scope and region, so a regional statement does not replace it."
+  ]
+}

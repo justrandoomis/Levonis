@@ -1,0 +1,1871 @@
+{
+  "handle": "p2s",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T20:09:39Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "title": "P2S Spec Sheet",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "safety.*",
+        "product.*",
+        "package.*",
+        "shipment.*"
+      ],
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "2 pages, every row read (pdftotext layout and raw). The store page links it with the text \"TDS\"; it is the printer spec sheet. No package size, gross weight, layer height, chamber, noise, Bluetooth or rated/standby power rows."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "title": "P2S Packaging List",
+      "keys": [
+        "package.contents"
+      ],
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "note": "Packing List table (P2S Combo and P2S columns) and Accessories Overview."
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.technology",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Fused Deposition Modeling",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Printing Technology",
+      "quote": "Printing Technology Fused Deposition Modeling",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "256 × 256 × 256 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Body › Build Volume (W*D*H)",
+      "quote": "Build Volume (W*D*H) 256*256*256 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Object key written as text W × D × H (mergeCurated has no object form; the text equals the store parse's value text). Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Plastic and Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Body › Chassis",
+      "quote": "Chassis Plastic and Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "physical.outer_frame",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Plastic and Glass",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Body › Outer Frame",
+      "quote": "Outer Frame Plastic and Glass",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 392,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions",
+      "quote": "Physical Dimensions 392*406*478 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "First of three dimensions; order as published (no axis labels in the cell), mapped as the package parser maps it. Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 406,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions",
+      "quote": "Physical Dimensions 392*406*478 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 478,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions",
+      "quote": "Physical Dimensions 392*406*478 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 14900,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Net Weight",
+      "quote": "Net Weight 14.9 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The printer's net weight (14.9 kg as published; the merge's weight rule keeps the text «14.9 kg»).",
+      "conflict_note": "Store page Weight row says \"P2S Net Weight: 15.0kg\" and \"P2S Combo (AMS 2 Pro included) Net Weight: 16.4kg\" (parsed as one unscoped unverified row \"15000 / 16400 g\"). The spec sheet says 14.9 kg; 15.0 vs 14.9 kg is unresolved. The Combo figure is kept as its own option-value row."
+    },
+    {
+      "key": "extrusion.extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Gear",
+      "quote": "Extruder Gear Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Nozzle",
+      "quote": "Nozzle Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Max Nozzle Temperature",
+      "quote": "Max Nozzle Temperature 300 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Included Nozzle Diameter",
+      "quote": "Included Nozzle Diameter 0.4 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Supported Nozzle Diameter",
+      "quote": "Supported Nozzle Diameter 0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "printing.filament_cutter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Cutter",
+      "quote": "Filament Cutter Built-in",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Diameter",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "extrusion.extruder_motor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Motor",
+      "quote": "Extruder Motor Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "printing.build_plate_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Flexible Steel Plate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Build Plate Material",
+      "quote": "Build Plate Material Flexible Steel Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Included Build Plate Type",
+      "quote": "Included Build Plate Type Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "printing.build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI plate",
+        "Smooth PEI Plate",
+        "Cool Plate SuperTack"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate, Cool Plate SuperTack",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 110,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Max Heatbed Temperature",
+      "quote": "Max Heatbed Temperature 110 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page (\"110 ℃\") and with the sheet's footnote range 35-110℃."
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 600,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Speed › Max Speed of Toolhead",
+      "quote": "Max Speed of Toolhead 600 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Speed › Max Acceleration of Toolhead",
+      "quote": "Max Acceleration of Toolhead 20,000 mm/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Speed › Max Flow for Hotend (Standard Flow Hotend)",
+      "quote": "Max Flow for Hotend (Standard Flow Hotend) 40 mm³/s (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 ℃ printing temperature)",
+      "test_method": "250 mm round model with a single outer wall",
+      "test_condition": "Standard Flow Hotend; Bambu Lab ABS; 280 °C printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page (40 mm³/s, same test parameters; the store row is unverified because its cell also holds the test text). No High Flow figure is published (see not_published)."
+    },
+    {
+      "key": "safety.carbon_filter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Granulated Coconut Shell",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Air Purification › Activated Carbon Filter Type",
+      "quote": "Activated Carbon Filter Type Granulated Coconut Shell",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Store page groups it under \"Filtration\". Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "safety.voc_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Air Purification › VOC Filtration",
+      "quote": "VOC Filtration Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "safety.particulate_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Air Purification › Particulate Matter Filtration",
+      "quote": "Particulate Matter Filtration Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "thermal.part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Cooling › Part Cooling Fan",
+      "quote": "Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "thermal.hotend_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Cooling › Cooling Fan for Hotend",
+      "quote": "Cooling Fan for Hotend Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "thermal.aux_part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Cooling › Auxiliary Part Cooling Fan",
+      "quote": "Auxiliary Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table. The store FAQ (Q4) answers \"You can purchase an official auxiliary cooling fan for upgrading\" to whether the P2S supports installing one; neither source says the fan is pre-installed. For review."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "ABS",
+        "ASA",
+        "TPU",
+        "Support for PLA",
+        "Support for PLA/PETG",
+        "Support for ABS",
+        "PET",
+        "PA",
+        "PC",
+        "PVA",
+        "PLA-CF",
+        "PETG-CF",
+        "ABS-GF",
+        "ASA-CF",
+        "PA6-CF",
+        "PA6-GF",
+        "PAHT-CF",
+        "PPA-CF",
+        "PET-CF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Filament Supported",
+      "quote": "Filament Supported PLA, PETG, ABS, ASA, TPU, Support for PLA, Support for PLA/PETG, Support for ABS, PET, PA, PC, PVA, PLA-CF, PETG-CF, ABS-GF, ASA-CF, PA6-CF, PA6-GF, PAHT-CF, PPA-CF, PET-CF",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table. The cell wraps onto two lines in the PDF."
+    },
+    {
+      "key": "printing.camera",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080; 30 fps HD",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Sensor › Camera",
+      "quote": "Camera Built-in; 1920*1080; 30 fps HD",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "printing.door_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Sensor › Door Sensor",
+      "quote": "Door Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Boolean key written as the published wording, which is also the store page's text, so the merge sees agreement; the sense is true (supported)."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Sensor › Filament Run Out Sensor",
+      "quote": "Filament Run Out Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Boolean key written as the published wording, which is also the store page's text, so the merge sees agreement; the sense is true (supported)."
+    },
+    {
+      "key": "printing.filament_tangle_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Sensor › Filament Tangle Sensor",
+      "quote": "Filament Tangle Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Boolean key written as the published wording, which is also the store page's text, so the merge sees agreement; the sense is true (supported). The store's P2S variant note adds that without the filament buffer the accuracy of tangle detection is affected."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported with AMS",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Sensor › Filament Odometry",
+      "quote": "Filament Odometry Supported with AMS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Boolean key written as the published wording (the qualifier \"with AMS\" matters); equals the store page's text."
+    },
+    {
+      "key": "printing.power_loss_recovery",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Sensor › Power Loss Recovery",
+      "quote": "Power Loss Recovery Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Boolean key written as the published wording, which is also the store page's text, so the merge sees agreement; the sense is true (supported)."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200-240 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The 220 V half of the sheet's dual-voltage row (§C.6). The store page shows only the US half."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-120 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The 110 V half of the same row; us_110v rows are unverified by rule. Agrees with the store page (\"100-120 VAC, 50/60 Hz\")."
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1200,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Max Power*",
+      "quote": "Max Power* 1200 W@220 V / 1000 W@110 V",
+      "test_method": "",
+      "test_condition": "@220 V",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Footnote *: \"To ensure the heatbed quickly reaches the needed temperature (35-110℃), the printer will maintain maximum power for about 3-5 minutes.\""
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Max Power*",
+      "quote": "Max Power* 1200 W@220 V / 1000 W@110 V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The 110 V figure of the same row. Agrees with the store page (\"1000 W@110 V\")."
+    },
+    {
+      "key": "electrical.steady_state_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200 W@220 V（PLA printing）",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › PLA Steady-State Power",
+      "quote": "PLA Steady-State Power 200 W@220 V / 200 W@110 V（PLA printing）",
+      "test_method": "",
+      "test_condition": "@220 V, PLA printing",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "String key; the 220 V half of the row, written in the sheet's own form."
+    },
+    {
+      "key": "electrical.steady_state_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200 W@110 V（PLA printing）",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › PLA Steady-State Power",
+      "quote": "PLA Steady-State Power 200 W@220 V / 200 W@110 V（PLA printing）",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The 110 V half; equals the store page's text."
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "5-inch 854*480 Touchscreen",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electronics › Touchscreen",
+      "quote": "Touchscreen 5-inch 854*480 Touchscreen",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table. The wiki accessories overview says \"5-inch, 854×480 full-color touchscreen\"."
+    },
+    {
+      "key": "connectivity.storage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in 8 GB EMMC and USB Port",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electronics › Storage",
+      "quote": "Storage Built-in 8 GB EMMC and USB Port",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "connectivity.control_interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Touchscreen",
+        "mobile App",
+        "PC App"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electronics › Control Interface",
+      "quote": "Control Interface Touchscreen, mobile App, PC App",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "connectivity.motion_controller",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-core Cortex-M4 and Single-core Cortex-M7",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electronics › Motion Controller",
+      "quote": "Motion Controller Dual-core Cortex-M4 and Single-core Cortex-M7",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "connectivity.application_processor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Quad-core 1.5 GHz ARM A7",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electronics › Application Processor",
+      "quote": "Application Processor Quad-core 1.5 GHz ARM A7",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "connectivity.npu",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "2 TOPS",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Electronics › Neural Processing Unit",
+      "quote": "Neural Processing Unit 2 TOPS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Studio / Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Software › Slicer",
+      "quote": "Slicer Bambu Studio Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Two lines in the cell, joined with \" / \" exactly as the store parse joins them. Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "MacOS",
+        "Windows",
+        "Linux"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Software › Supported Operating System",
+      "quote": "Supported Operating System MacOS, Windows, Linux",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "connectivity.ethernet",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Network Control › Ethernet",
+      "quote": "Ethernet Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "connectivity.wireless_network",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-Band Wi-Fi",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Network Control › Wireless Network",
+      "quote": "Wireless Network Dual-Band Wi-Fi",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "connectivity.network_kill_switch",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Network Control › Network Kill Switch",
+      "quote": "Network Kill Switch Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Boolean key written as the published wording, equal to the store page's text; the sense is false (not available)."
+    },
+    {
+      "key": "connectivity.removable_network_module",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Network Control › Removable Network Module",
+      "quote": "Removable Network Module Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Boolean key written as the published wording, equal to the store page's text; the sense is false (not available)."
+    },
+    {
+      "key": "connectivity.network_access_control",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Network Control › 802.1X Network Access Control",
+      "quote": "802.1X Network Access Control Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Boolean key written as the published wording, equal to the store page's text; the sense is false (not available)."
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Operating Frequency — 2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE) 2400 - 2483.5 MHz, 5150 - 5850 MHz (SRRC)\nWi-Fi Transmitter Power (EIRP) — 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) 5 GHz Band1/2: <23 dBm (FCC/CE/SRRC/MIC) 5 GHz Band3: <30 dBm (CE); <24 dBm (FCC) 5 GHz Band4: <23 dBm (FCC/SRRC); <14 dBm (CE)\nWi-Fi Protocol — IEEE 802.11 a/b/g/n",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.2, Wi-Fi › Operating Frequency; Wi-Fi Transmitter Power (EIRP); Wi-Fi Protocol",
+      "quote": "Operating Frequency 2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE) 2400 - 2483.5 MHz, 5150 - 5850 MHz (SRRC) … Wi-Fi Protocol IEEE 802.11 a/b/g/n",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Three rows in one string, written exactly as the store parse writes them so the merge sees agreement; the quote is elided to fit 200 characters. Agrees with the store page P2S Specs table."
+    },
+    {
+      "key": "physical.operating_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "10 °C – 30 °C",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "P2S Specs › row 40 (Working Temperature)",
+      "quote": "Working Temperature 10 °C – 30 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "Not in the spec sheet. The store table states it, but the package's table parse writes no row for it (the row's middle cell is empty), so it is neither a deterministic row nor not_published."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410306",
+        "value_text": "P2S Combo"
+      },
+      "value": 16400,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "P2S Specs › row 7 (Physical Dimensions › Weight) › segment 2",
+      "quote": "P2S Combo (AMS 2 Pro included) Net Weight: 16.4kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "The Combo's net weight (AMS 2 Pro included), scoped to its version; the store parse could not attribute it and wrote one unscoped unverified row. Not region-dependent."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410305",
+        "value_text": "P2S"
+      },
+      "value": 18580,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "P2S Specs › row 7 (Physical Dimensions › Weight) › segment 1",
+      "quote": "P2S Net Weight: 15.0kg Gross weight: 18.58kg",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "The store table is a US table (100-120 VAC, 1000 W@110 V, \"Please purchase the version corresponding to your region's voltage\"), so the printer gross weight is us_110v and unverified (§C.6). No 220 V gross weight is published. Scoped to the P2S version; the store parse wrote one unscoped row \"18580 / 21330 g\"."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410306",
+        "value_text": "P2S Combo"
+      },
+      "value": 21330,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "P2S Specs › row 7 (Physical Dimensions › Weight) › segment 2",
+      "quote": "P2S Combo (AMS 2 Pro included) Net Weight: 16.4kg Gross weight: 21.33kg",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "As the P2S row: us_110v and unverified (§C.6); scoped to the P2S Combo version."
+    },
+    {
+      "key": "thermal.chamber_heating",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Frequently Asked Questions › Q7",
+      "quote": "The P2S does not have an active chamber heating function, but it can regulate chamber temperature through its enclosed chamber and automatic switching flap",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "Store FAQ answer (official page). The spec sheet has no chamber row. The page's marketing headline \"50°C Chamber Ready\" is marketing prose and proves no number, so thermal.chamber_temp is neither written nor listed as not_published."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410306",
+        "value_text": "P2S Combo"
+      },
+      "value": [
+        "P2S (with Filament Buffer)",
+        "AMS 2 Pro",
+        "Build Plate (pre-installed on the heatbed)",
+        "Anti-Vibration Feet (pre-installed on the printer)",
+        "Power Cord",
+        "Bambu Bus Cable 6-pin",
+        "Spool Holder Assembly",
+        "PTFE Tubes ×3 (600 mm, 555 mm, 350 mm)",
+        "Touchscreen",
+        "Hotend Silicone Sock",
+        "Filament Cutter",
+        "Unclogging Pin",
+        "Nozzle Wiping Pad",
+        "Scraper Blade",
+        "Screws for Scraper",
+        "Allen Key (H1.5 & H2.0)",
+        "Lubricant Oil",
+        "Lubricant Grease",
+        "Desiccant for AMS",
+        "Quick Start Guide",
+        "Disclaimer and Safety Guidelines"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "source_title": "P2S Packaging List",
+      "locator": "¶ Packing List › table column \"P2S Combo\"",
+      "quote": "P2S(with Filament Buffer) AMS 2 Pro Build Plate (pre-installed on the heatbed) Anti-Vibration Feet (pre-installed on the printer)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "note": "The official packing list of the Combo version (Warranty Leaflet withheld, L-19). The store page's product-level box list (Bambu Lab P2S, AMS 2 Pro (combo version), Filament Buffer (combo version), Buildplate, Accessory Box, Spool Holder) is coarser and does not conflict."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410305",
+        "value_text": "P2S"
+      },
+      "value": [
+        "P2S",
+        "Build Plate (pre-installed on the heatbed)",
+        "Anti-Vibration Feet (pre-installed on the printer)",
+        "Spool Holder Assembly",
+        "Touchscreen",
+        "PTFE Tubes ×2 (555 mm, 180 mm)",
+        "Power Cord",
+        "Hotend Silicone Sock",
+        "Filament Cutter",
+        "Unclogging Pin",
+        "Nozzle Wiping Pad",
+        "Scraper Blade",
+        "Screws for Scraper",
+        "Allen Key (H1.5 & H2.0)",
+        "Lubricant Oil",
+        "Lubricant Grease",
+        "Quick Start Guide",
+        "Disclaimer and Safety Guidelines"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "source_title": "P2S Packaging List",
+      "locator": "¶ Packing List › table column \"P2S\"",
+      "quote": "P2S Build Plate (pre-installed on the heatbed) Anti-Vibration Feet (pre-installed on the printer)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "note": "The official packing list of the standalone P2S (no AMS, no filament buffer, no desiccant; Warranty Leaflet withheld, L-19). The store page's product-level list names the AMS 2 Pro and buffer as \"(combo version)\", which agrees."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate, Cool Plate SuperTack",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate, Cool Plate SuperTack",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "spec_row",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate, Cool Plate SuperTack",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "source_title": "P2S Packaging List",
+      "locator": "¶ Accessories Overview › Bambu Bus Cable 6-pin",
+      "quote": "Bambu Bus Cable 6-pin | Connect the AMS 2 Pro to the printer.",
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "note": "Also the store FAQ Q6: \"It supports connecting to 4 AMS 2 Pro units and 4 AMS HT units, totaling 8 AMS units with 20 slots.\" The Combo ships with an AMS 2 Pro (wiki packing list)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Frequently Asked Questions › Q6",
+      "quote": "It supports connecting to 4 AMS 2 Pro units and 4 AMS HT units, totaling 8 AMS units with 20 slots. This means it supports up to 20-color printing.",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "Store page FAQ (official page)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "variant 664977091405410307 (P2S) › description",
+      "quote": "For AMS/AMS 2 Pro owners, to connect P2S you may need to have a Filament Buffer - P2S (SA011) and Bambu Bus Cable (CAB035).",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "The P2S variant's note names AMS owners connecting a P2S; the spec sheet's \"Filament Odometry Supported with AMS\" also refers to the AMS. \"AMS\" resolves to the AMS product as in the reviewed compat targets (kind ams, same_model)."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410305",
+        "value_text": "P2S"
+      },
+      "target_kind": "buffer",
+      "target_label": "Filament Buffer - P2S (SA011)",
+      "target_source_handle": "filament-buffer-p2s",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "variant 664977091405410307 (P2S) › description",
+      "quote": "For AMS/AMS 2 Pro owners, to connect P2S you may need to have a Filament Buffer - P2S (SA011) and Bambu Bus Cable (CAB035).",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "condition": "Only to connect an AMS or AMS 2 Pro to the standalone P2S (the source says \"may need\"); the Combo has a built-in buffer.",
+      "note": "SA011 is the frozen SKU code of filament-buffer-p2s in the manifest (variant 652730009259991043). \"Note: The standalone P2S (without AMS) does not include a filament buffer.\""
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410305",
+        "value_text": "P2S"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Bus Cable (CAB035)",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "variant 664977091405410307 (P2S) › description",
+      "quote": "For AMS/AMS 2 Pro owners, to connect P2S you may need to have a Filament Buffer - P2S (SA011) and Bambu Bus Cable (CAB035).",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "condition": "Only to connect an AMS or AMS 2 Pro to the standalone P2S (\"may need\").",
+      "note": "The same note calls it \"a 6pin Bambu Bus Cable (CAB035)\". Probably bambu-bus-cable-6pin-for-ams-2-pro-and-ams-ht, but no frozen SKU code links CAB035 to a handle, so the handle is left empty (pending)."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410305",
+        "value_text": "P2S"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter (FAZ013-N)",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "variant 664977091405410307 (P2S) › description",
+      "quote": "*To connect more than 2 AMS(including AMS 2 Pro, AMS HT), Filament Buffer - P2S (SA011), a 6pin Bambu Bus Cable (CAB035) ,and a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "condition": "Only to connect more than 2 AMS units (AMS 2 Pro, AMS HT included), together with the Filament Buffer - P2S and the 6-pin Bambu Bus Cable.",
+      "note": "Probably bambu-4-in-1-ptfe-adapter, but no frozen SKU code links FAZ013-N to a handle, so the handle is left empty (pending)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "H2D nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Frequently Asked Questions › Q5",
+      "quote": "Can the P2S use the nozzle of A1 and H2D? It's compatible with H2D nozzles but not with A1 nozzles.",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "Store page FAQ (official page)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "A1 nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Frequently Asked Questions › Q5",
+      "quote": "Can the P2S use the nozzle of A1 and H2D? It's compatible with H2D nozzles but not with A1 nozzles.",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "Store page FAQ (official page)."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410306",
+        "value_text": "P2S Combo"
+      },
+      "section": "P2S Combo",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "source_title": "P2S Packaging List",
+      "locator": "¶ Packing List › table column \"P2S Combo\"",
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "items": [
+        {
+          "text": "P2S (with Filament Buffer)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Build Plate (pre-installed on the heatbed)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Anti-Vibration Feet (pre-installed on the printer)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Bambu Bus Cable 6-pin",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Spool Holder Assembly",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "PTFE Tubes ×3 (600 mm, 555 mm, 350 mm)",
+          "qty": 3,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Touchscreen",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Hotend Silicone Sock",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Screws for Scraper",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Desiccant for AMS",
+          "qty": null,
+          "section": "Desiccant"
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": "Documents"
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null,
+          "section": "Documents",
+          "withheld": "warranty (L-19): the package's prose scrub withholds this item; listed here as published, never shown to customers"
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": "Documents"
+        }
+      ],
+      "note": "\"The type and quantity of accessories may vary. Please refer to the actual items you receive.\" Quantities only where the list states them (PTFE Tubes ×3)."
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410305",
+        "value_text": "P2S"
+      },
+      "section": "P2S",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "source_title": "P2S Packaging List",
+      "locator": "¶ Packing List › table column \"P2S\"",
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "items": [
+        {
+          "text": "P2S",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Build Plate (pre-installed on the heatbed)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Anti-Vibration Feet (pre-installed on the printer)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Spool Holder Assembly",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Touchscreen",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "PTFE Tubes ×2 (555 mm, 180 mm)",
+          "qty": 2,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Hotend Silicone Sock",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Screws for Scraper",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": "Documents"
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null,
+          "section": "Documents",
+          "withheld": "warranty (L-19): the package's prose scrub withholds this item; listed here as published, never shown to customers"
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": "Documents"
+        }
+      ],
+      "note": "The P2S column's accessory cell has no \"Accessory Box\" heading; its items are filed under it as in the Combo column. Desiccant for AMS is \"/\" (not included). Quantities only where stated (PTFE Tubes ×2). The source closes \"(555 mm, 180 mm）\" with a full-width parenthesis, normalised here."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "title": "P2S Spec Sheet",
+      "language": "en",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "sha256": "c7290dbe5b14377f7a95a546f92e44b04dc7aea597b42810d0955bd3aecd134a",
+      "pages": 2,
+      "note": "The store page links this file as \"TDS\", so the deterministic layer files it as kind tds titled \"TDS\"; it is the P2S printer spec sheet."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "title": "P2S Packaging List",
+      "language": "en",
+      "published_on": "2025-10-14",
+      "updated_on": "2026-09-01",
+      "retrieved_at": "2026-10-16T08:23:44Z"
+    }
+  ],
+  "not_published": [
+    "printing.layer_height",
+    "printing.unsupported_filament",
+    "printing.auto_leveling",
+    "printing.camera_toolhead",
+    "printing.camera_nozzle",
+    "printing.camera_birdseye",
+    "motion.max_flow_high_flow",
+    "extrusion.hotend",
+    "thermal.chamber_circulation_fan",
+    "thermal.control_board_fan",
+    "thermal.chamber_exhaust_fan",
+    "electrical.rated_power",
+    "electrical.current",
+    "electrical.standby_power",
+    "connectivity.bluetooth",
+    "physical.noise",
+    "safety.prefilter_grade",
+    "safety.hepa_grade"
+  ]
+}

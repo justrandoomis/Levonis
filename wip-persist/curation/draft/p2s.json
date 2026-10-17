@@ -1,0 +1,1896 @@
+{
+  "handle": "p2s",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T10:03:41Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "title": "Bambu Lab P2S Spec Sheet",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*"
+      ],
+      "note": "Both pages read in full (text layer checked against the rendered pages). Linked from the store table \"P2S Specs\" (link). No package size, gross weight or package weight on the sheet."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/p2s",
+      "title": "Bambu Lab P2S store page",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): the \"P2S Specs\" table and its note, Product Features, the sell-point and detail sections, What's in the box, the FAQ (9 answers) and the variant descriptions."
+    },
+    {
+      "kind": "store_messages",
+      "url": "https://us.store.bambulab.com/products/p2s",
+      "title": "Bambu Lab P2S store page, messages bundle",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "keys": [
+        "electrical.*",
+        "package.*",
+        "shipment.*",
+        "product.*"
+      ],
+      "note": "Searched for P2S 220 V / UK values (§C.6). The bundle's production messages are the A1 description and the H2D tables only; nothing for the P2S, so no intl_220v package or gross weight comes from it."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "title": "P2S Packaging List",
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "keys": [
+        "package.contents"
+      ],
+      "note": "The Packing List table (P2S Combo and P2S columns) and the Accessories Overview table."
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.technology",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Fused Deposition Modeling",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Printing Technology",
+      "quote": "Printing Technology Fused Deposition Modeling",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "256 × 256 × 256 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Body › Build Volume (W*D*H)",
+      "quote": "Build Volume (W*D*H) 256*256*256 mm³",
+      "test_method": "",
+      "test_condition": "W × D × H",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Plastic and Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Body › Chassis",
+      "quote": "Chassis Plastic and Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "physical.outer_frame",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Plastic and Glass",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Body › Outer Frame",
+      "quote": "Outer Frame Plastic and Glass",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 392,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (1st of 3)",
+      "quote": "Physical Dimensions 392*406*478 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The sheet gives no axis labels for this row; the three numbers are kept in the published order (first → length, second → width, third → height), the order the package uses for the same store row."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 406,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (2nd of 3)",
+      "quote": "Physical Dimensions 392*406*478 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The sheet gives no axis labels for this row; the three numbers are kept in the published order (first → length, second → width, third → height), the order the package uses for the same store row."
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 478,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (3rd of 3)",
+      "quote": "Physical Dimensions 392*406*478 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The sheet gives no axis labels for this row; the three numbers are kept in the published order (first → length, second → width, third → height), the order the package uses for the same store row."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 14900,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Net Weight",
+      "quote": "Net Weight 14.9 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "conflict": "The store table (P2S Specs › row 7, Weight) says \"P2S Net Weight: 15.0kg\" and \"P2S Combo (AMS 2 Pro included) Net Weight: 16.4kg\"; the spec sheet the same table links says \"Net Weight 14.9 kg\" with no version. The 0.1 kg difference is unresolved: by source rank the sheet value is kept at product scope and the conflict is recorded. The Combo figure includes the AMS 2 Pro and is kept separately (option value \"P2S Combo\"). No P2S-only row is written from the store, so the sheet value is not overridden for that option."
+    },
+    {
+      "key": "extrusion.extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Gear",
+      "quote": "Extruder Gear Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The store FAQ 1 agrees: \"Hardened steel.\""
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Nozzle",
+      "quote": "Nozzle Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The store FAQ 1 agrees: \"Hardened steel.\""
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Max Nozzle Temperature",
+      "quote": "Max Nozzle Temperature 300 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Included Nozzle Diameter",
+      "quote": "Included Nozzle Diameter 0.4 mm",
+      "test_method": "",
+      "test_condition": "Included nozzle",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Supported Nozzle Diameter",
+      "quote": "Supported Nozzle Diameter 0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "printing.filament_cutter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Cutter",
+      "quote": "Filament Cutter Built-in",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Diameter",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "extrusion.extruder_motor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Motor",
+      "quote": "Extruder Motor Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "printing.build_plate_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Flexible Steel Plate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Build Plate Material",
+      "quote": "Build Plate Material Flexible Steel Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Included Build Plate Type",
+      "quote": "Included Build Plate Type Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "printing.build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI plate",
+        "Smooth PEI Plate",
+        "Cool Plate SuperTack"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate, Cool Plate SuperTack",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 110,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Max Heatbed Temperature",
+      "quote": "Max Heatbed Temperature 110 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 600,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Speed › Max Speed of Toolhead",
+      "quote": "Max Speed of Toolhead 600 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Speed › Max Acceleration of Toolhead",
+      "quote": "Max Acceleration of Toolhead 20,000 mm/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Speed › Max Flow for Hotend (Standard Flow Hotend)",
+      "quote": "Max Flow for Hotend (Standard Flow Hotend) 40 mm³/s (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 ℃ printing temperature)",
+      "test_method": "",
+      "test_condition": "Standard Flow Hotend; 250 mm round model with a single outer wall; Bambu Lab ABS; 280 ℃ printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "safety.carbon_filter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Granulated Coconut Shell",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Air Purification › Activated Carbon Filter Type",
+      "quote": "Activated Carbon Filter Type Granulated Coconut Shell",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "safety.voc_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Air Purification › VOC Filtration",
+      "quote": "VOC Filtration Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "safety.particulate_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Air Purification › Particulate Matter Filtration",
+      "quote": "Particulate Matter Filtration Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "thermal.part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Cooling › Part Cooling Fan",
+      "quote": "Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "thermal.hotend_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Cooling › Cooling Fan for Hotend",
+      "quote": "Cooling Fan for Hotend Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "thermal.aux_part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Cooling › Auxiliary Part Cooling Fan",
+      "quote": "Auxiliary Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "ABS",
+        "ASA",
+        "TPU",
+        "Support for PLA",
+        "Support for PLA/PETG",
+        "Support for ABS",
+        "PET",
+        "PA",
+        "PC",
+        "PVA",
+        "PLA-CF",
+        "PETG-CF",
+        "ABS-GF",
+        "ASA-CF",
+        "PA6-CF",
+        "PA6-GF",
+        "PAHT-CF",
+        "PPA-CF",
+        "PET-CF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Filament Supported",
+      "quote": "Filament Supported PLA, PETG, ABS, ASA, TPU, Support for PLA, Support for PLA/PETG, Support for ABS, PET, PA, PC, PVA, PLA-CF, PETG-CF, ABS-GF, ASA-CF, PA6-CF, PA6-GF, PAHT-CF, PPA-CF, PET-CF",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "printing.camera",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080; 30 fps HD",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Sensor › Camera",
+      "quote": "Camera Built-in; 1920*1080; 30 fps HD",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "printing.door_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Sensor › Door Sensor",
+      "quote": "Door Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "conflict": "Agrees with the store table row (same words). The registry types this key boolean, so the row is written as Yes/No (value_bool); mergeCurated compares value_text, so it records a wording-only difference against the store row."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Sensor › Filament Run Out Sensor",
+      "quote": "Filament Run Out Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "conflict": "Agrees with the store table row (same words). The registry types this key boolean, so the row is written as Yes/No (value_bool); mergeCurated compares value_text, so it records a wording-only difference against the store row."
+    },
+    {
+      "key": "printing.filament_tangle_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Sensor › Filament Tangle Sensor",
+      "quote": "Filament Tangle Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "The P2S variant description adds: \"the absence of the filament buffer will affect the accuracy of filament tangle detection feature\" (the standalone P2S has no buffer).",
+      "conflict": "Agrees with the store table row (same words). The registry types this key boolean, so the row is written as Yes/No (value_bool); mergeCurated compares value_text, so it records a wording-only difference against the store row."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Sensor › Filament Odometry",
+      "quote": "Filament Odometry Supported with AMS",
+      "test_method": "",
+      "test_condition": "With AMS",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "conflict": "Agrees with the store table row (same words). The registry types this key boolean, so the row is written as Yes/No (value_bool); mergeCurated compares value_text, so it records a wording-only difference against the store row."
+    },
+    {
+      "key": "printing.power_loss_recovery",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Sensor › Power Loss Recovery",
+      "quote": "Power Loss Recovery Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "conflict": "Agrees with the store table row (same words). The registry types this key boolean, so the row is written as Yes/No (value_bool); mergeCurated compares value_text, so it records a wording-only difference against the store row."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200-240 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage (2nd of 2)",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "220 V version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-120 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage (1st of 2)",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "220 V version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1200,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Max Power* (1st of 2) and footnote *",
+      "quote": "Max Power* 1200 W@220 V / 1000 W@110 V",
+      "test_method": "",
+      "test_condition": "@220 V; footnote *: the printer holds maximum power for about 3-5 minutes so the heatbed quickly reaches the needed temperature (35-110 ℃)",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Max Power* (2nd of 2) and footnote *",
+      "quote": "Max Power* 1200 W@220 V / 1000 W@110 V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V), @110 V; footnote *: the printer holds maximum power for about 3-5 minutes so the heatbed quickly reaches the needed temperature (35-110 ℃)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "electrical.steady_state_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200 W@220 V (PLA printing)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › PLA Steady-State Power (1st of 2)",
+      "quote": "PLA Steady-State Power 200 W@220 V / 200 W@110 V（PLA printing）",
+      "test_method": "",
+      "test_condition": "@220 V, PLA printing",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "electrical.steady_state_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200 W@110 V（PLA printing）",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electrical Requirements › PLA Steady-State Power (2nd of 2)",
+      "quote": "PLA Steady-State Power 200 W@220 V / 200 W@110 V（PLA printing）",
+      "test_method": "",
+      "test_condition": "US version (100–120 V), @110 V, PLA printing",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "5-inch 854*480 Touchscreen",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electronics › Touchscreen",
+      "quote": "Touchscreen 5-inch 854*480 Touchscreen",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.storage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in 8 GB EMMC and USB Port",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electronics › Storage",
+      "quote": "Storage Built-in 8 GB EMMC and USB Port",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.control_interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Touchscreen",
+        "mobile App",
+        "PC App"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electronics › Control Interface",
+      "quote": "Control Interface Touchscreen, mobile App, PC App",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.motion_controller",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-core Cortex-M4 and Single-core Cortex-M7",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electronics › Motion Controller",
+      "quote": "Motion Controller Dual-core Cortex-M4 and Single-core Cortex-M7",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.application_processor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Quad-core 1.5 GHz ARM A7",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electronics › Application Processor",
+      "quote": "Application Processor Quad-core 1.5 GHz ARM A7",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.npu",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "2 TOPS",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Electronics › Neural Processing Unit",
+      "quote": "Neural Processing Unit 2 TOPS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Studio / Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Software › Slicer",
+      "quote": "Slicer Bambu Studio Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "MacOS",
+        "Windows",
+        "Linux"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Software › Supported Operating System",
+      "quote": "Supported Operating System MacOS, Windows, Linux",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.ethernet",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Network Control › Ethernet",
+      "quote": "Ethernet Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.wireless_network",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-Band Wi-Fi",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Network Control › Wireless Network",
+      "quote": "Wireless Network Dual-Band Wi-Fi",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z"
+    },
+    {
+      "key": "connectivity.network_kill_switch",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Network Control › Network Kill Switch",
+      "quote": "Network Kill Switch Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "conflict": "Agrees with the store table row (same words). The registry types this key boolean, so the row is written as Yes/No (value_bool); mergeCurated compares value_text, so it records a wording-only difference against the store row."
+    },
+    {
+      "key": "connectivity.removable_network_module",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Network Control › Removable Network Module",
+      "quote": "Removable Network Module Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "conflict": "Agrees with the store table row (same words). The registry types this key boolean, so the row is written as Yes/No (value_bool); mergeCurated compares value_text, so it records a wording-only difference against the store row."
+    },
+    {
+      "key": "connectivity.network_access_control",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Network Control › 802.1X Network Access Control",
+      "quote": "802.1X Network Access Control Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "conflict": "Agrees with the store table row (same words). The registry types this key boolean, so the row is written as Yes/No (value_bool); mergeCurated compares value_text, so it records a wording-only difference against the store row."
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Operating Frequency — 2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE) 2400 - 2483.5 MHz, 5150 - 5850 MHz (SRRC)\nWi-Fi Transmitter Power (EIRP) — 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) 5 GHz Band1/2: <23 dBm (FCC/CE/SRRC/MIC) 5 GHz Band3: <30 dBm (CE); <24 dBm (FCC) 5 GHz Band4: <23 dBm (FCC/SRRC); <14 dBm (CE)\nWi-Fi Protocol — IEEE 802.11 a/b/g/n",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.2, Wi-Fi › Operating Frequency; Wi-Fi Transmitter Power (EIRP); Wi-Fi Protocol",
+      "quote": "Operating Frequency 2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE) 2400 - 2483.5 MHz, 5150 - 5850 MHz (SRRC)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "note": "Three sheet rows joined in the store parse's own form (label — value, one per line); the quote is the first row, the other two read \"2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) …\" and \"Wi-Fi Protocol IEEE 802.11 a/b/g/n\"."
+    },
+    {
+      "key": "physical.operating_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "10 °C – 30 °C",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "P2S Specs › row 40 (Working Temperature)",
+      "quote": "Working Temperature 10 °C – 30 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "Store table only (the spec sheet has no such row). The package's table parse does not emit this row (its middle cell is empty), so it is not in the deterministic payload."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410306",
+        "value_text": "P2S Combo"
+      },
+      "value": 16400,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "P2S Specs › row 7 (Weight) › segment 2 (P2S Combo (AMS 2 Pro included)) › Net Weight",
+      "quote": "P2S Combo (AMS 2 Pro included) Net Weight: 16.4kg",
+      "test_method": "",
+      "test_condition": "AMS 2 Pro included",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "Net weight of the Combo with its AMS 2 Pro, from the store table; the printer alone is the sheet's 14.9 kg (product scope)."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410305",
+        "value_text": "P2S"
+      },
+      "value": 18580,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "P2S Specs › row 7 (Weight) › segment 1 (P2S) › Gross weight",
+      "quote": "P2S Net Weight: 15.0kg Gross weight: 18.58kg",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "The US store table (110 V version); the spec sheet and the page's messages bundle carry no 220 V gross weight."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410306",
+        "value_text": "P2S Combo"
+      },
+      "value": 21330,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "P2S Specs › row 7 (Weight) › segment 2 (P2S Combo (AMS 2 Pro included)) › Gross weight",
+      "quote": "P2S Combo (AMS 2 Pro included) Net Weight: 16.4kg Gross weight: 21.33kg",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "The US store table (110 V version); the spec sheet and the page's messages bundle carry no 220 V gross weight."
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "EU RED Article 3.3(d)(e)",
+        "ETSI EN 303 645 V2.1.1:2020"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "Product Features › footnote *",
+      "quote": "* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020.",
+      "test_method": "",
+      "test_condition": "Cybersecurity",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "A Product Features footnote, not a table row, so unverified."
+    },
+    {
+      "key": "printing.multi_color",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Up to 20 colours: up to 8 AMS units (4 AMS 2 Pro and 4 AMS HT, 20 slots)",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "FAQ › 6 (How many AMS units can the P2S connect to at most?)",
+      "quote": "It supports connecting to 4 AMS 2 Pro units and 4 AMS HT units, totaling 8 AMS units with 20 slots . This means it supports up to 20-color printing .",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "An FAQ answer (prose), so unverified.",
+      "conflict": "The package fills this key from a Product Features marketing bullet (\"Unlock limitless creativity with AMS-powered multi-material printing.\") and marks it verified. Same rank (official_page), so mergeCurated keeps the page text and flags the conflict; this FAQ answer is the factual capacity and should be preferred on review."
+    },
+    {
+      "key": "thermal.chamber_heating",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "FAQ › 7 (Does the P2S support chamber temperature control …?)",
+      "quote": "The P2S does not have an active chamber heating function",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "An FAQ answer (prose), so unverified. The same answer says the chamber temperature is regulated by the enclosed chamber and an automatic flap between internal and external circulation."
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 50,
+      "unit": "°C",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "Highlights › sell point 5 title (subtitle \"Heat Preservation ｜ Carbon Filter\")",
+      "quote": "50°C Chamber Ready For Engineering-Grade Filaments.",
+      "test_method": "",
+      "test_condition": "Passive (no active chamber heating, FAQ 7)",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:18Z",
+      "note": "A marketing heading, so it proves nothing and stays unverified; neither the spec sheet nor the store table states a chamber temperature."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Included Build Plate Type; Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate, Cool Plate SuperTack",
+      "condition": "Included (Textured PEI Plate)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate, Cool Plate SuperTack",
+      "condition": "Supported"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "source_title": "Bambu Lab P2S Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate, Cool Plate SuperTack",
+      "condition": "Supported"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Older X/P/A series build plates",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "FAQ › 3 (Are the P2S buildplate and the XPA series buildplates compatible?)",
+      "quote": "Older build plates do not support the type recognition feature, but their external dimensions are consistent, so they can still be used for printing.",
+      "condition": "Printing only; no build plate type recognition",
+      "note": "No single target product: the store sells these plates as the same plate products in other printer sizes."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "H2D nozzles (Bambu Hotend - H2/P2S/X2D)",
+      "target_source_handle": "bambu-hotend-h2-p2s",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "FAQ › 5 (Can the P2S use the nozzle of A1 and H2D?)",
+      "quote": "It's compatible with H2D nozzles but not with A1 nozzles.",
+      "condition": "",
+      "note": "The FAQ names \"H2D nozzles\"; the target is matched by title (that product is titled for H2/P2S/X2D)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "A1 nozzles (Bambu Hotend - A1/A2)",
+      "target_source_handle": "bambu-hotend-a1-a2",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "FAQ › 5 (Can the P2S use the nozzle of A1 and H2D?)",
+      "quote": "It's compatible with H2D nozzles but not with A1 nozzles.",
+      "condition": "",
+      "note": "The target is matched by title."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "FAQ › 6 (How many AMS units can the P2S connect to at most?)",
+      "quote": "It supports connecting to 4 AMS 2 Pro units and 4 AMS HT units, totaling 8 AMS units with 20 slots .",
+      "condition": "Up to 4 units; one is included in the P2S Combo"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "FAQ › 6 (How many AMS units can the P2S connect to at most?)",
+      "quote": "It supports connecting to 4 AMS 2 Pro units and 4 AMS HT units, totaling 8 AMS units with 20 slots .",
+      "condition": "Up to 4 units"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "664977091405410307",
+        "value_text": "P2S"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "Variant \"P2S\" › description, paragraph 2",
+      "quote": "For AMS/AMS 2 Pro owners, to connect P2S you may need to have a Filament Buffer - P2S (SA011) and Bambu Bus Cable (CAB035).",
+      "condition": "May need a Filament Buffer - P2S (SA011) and a Bambu Bus Cable (CAB035)"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "664977091405410307",
+        "value_text": "P2S"
+      },
+      "target_kind": "buffer",
+      "target_label": "Filament Buffer - P2S (SA011)",
+      "target_source_handle": "filament-buffer-p2s",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "Variant \"P2S\" › description, paragraphs 2 and 5",
+      "quote": "*To connect more than 2 AMS(including AMS 2 Pro, AMS HT), Filament Buffer - P2S (SA011), a 6pin Bambu Bus Cable (CAB035) ,and a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+      "condition": "To connect more than 2 AMS units (AMS 2 Pro, AMS HT included); paragraph 2 says AMS/AMS 2 Pro owners \"may need\" it to connect any AMS",
+      "note": "The package resolves this requirement to \"filament-buffer\" (SA003, X1/P1 buffer); the text names SA011, which the manifest harvests for filament-buffer-p2s."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "664977091405410307",
+        "value_text": "P2S"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Bus Cable - 6pin (CAB035)",
+      "target_source_handle": "bambu-bus-cable-6pin-for-ams-2-pro-and-ams-ht",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "Variant \"P2S\" › description, paragraphs 2 and 5",
+      "quote": "*To connect more than 2 AMS(including AMS 2 Pro, AMS HT), Filament Buffer - P2S (SA011), a 6pin Bambu Bus Cable (CAB035) ,and a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+      "condition": "To connect more than 2 AMS units (AMS 2 Pro, AMS HT included); paragraph 2 says AMS/AMS 2 Pro owners \"may need\" it to connect any AMS",
+      "note": "Matched by name (\"6pin Bambu Bus Cable\"); the code CAB035 does not appear on that product's page in the corpus."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "variant",
+        "source_variant_id": "664977091405410307",
+        "value_text": "P2S"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter (FAZ013-N)",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "Variant \"P2S\" › description, paragraph 5",
+      "quote": "*To connect more than 2 AMS(including AMS 2 Pro, AMS HT), Filament Buffer - P2S (SA011), a 6pin Bambu Bus Cable (CAB035) ,and a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+      "condition": "To connect more than 2 AMS units (AMS 2 Pro, AMS HT included)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Auxiliary Part Cooling Fan (Left) - P2S",
+      "target_source_handle": "auxiliary-part-cooling-fan-left",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/p2s",
+      "source_title": "Bambu Lab P2S store page",
+      "locator": "FAQ › 4 (… Does it support installing an auxiliary part cooling fan?)",
+      "quote": "The left side of the P2S has some mounting points. Does it support installing an auxiliary part cooling fan? You can purchase an official auxiliary cooling fan for upgrading .",
+      "condition": "Optional upgrade on the left-side mounting points",
+      "note": "The FAQ does not name the product; matched by title (that product is the P2S left-side auxiliary fan, \"an optional accessory\")."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410306",
+        "value_text": "P2S Combo"
+      },
+      "source_url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "source_title": "P2S Packaging List",
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "locator": "Packing List table › column \"P2S Combo\" (rows 1, 3–6)",
+      "quote": "P2S(with Filament Buffer) AMS 2 Pro Build Plate (pre-installed on the heatbed) Anti-Vibration Feet (pre-installed on the printer)",
+      "note": "The wiki says: \"The type and quantity of accessories may vary. Please refer to the actual items you receive.\" The store's own box list (Bambu Lab P2S; AMS 2 Pro (combo version); Filament Buffer (combo version); Buildplate; Accessory Box; Spool Holder) agrees.",
+      "items": [
+        {
+          "text": "P2S (with Filament Buffer)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Build Plate (pre-installed on the heatbed)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Anti-Vibration Feet (pre-installed on the printer)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Bambu Bus Cable 6-pin",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Spool Holder Assembly",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "PTFE Tubes (600 mm, 555 mm, 350 mm)",
+          "qty": 3,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Touchscreen",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Hotend Silicone Sock",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Screws for Scraper",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Desiccant for AMS",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": ""
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "664977091405410305",
+        "value_text": "P2S"
+      },
+      "source_url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "source_title": "P2S Packaging List",
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "locator": "Packing List table › column \"P2S\" (rows 1, 3–6)",
+      "quote": "P2S Build Plate (pre-installed on the heatbed) Anti-Vibration Feet (pre-installed on the printer)",
+      "note": "The P2S column's third row has no heading; it sits in the same row as the Combo's \"Accessory Box\" list, so its items carry that section here. Its \"Desiccant for AMS\" cell is \"/\" (none). The wiki says: \"The type and quantity of accessories may vary. Please refer to the actual items you receive.\"",
+      "items": [
+        {
+          "text": "P2S",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Build Plate (pre-installed on the heatbed)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Anti-Vibration Feet (pre-installed on the printer)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Spool Holder Assembly",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Touchscreen",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "PTFE Tubes (555 mm, 180 mm)",
+          "qty": 2,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Hotend Silicone Sock",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Screws for Scraper",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": ""
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/s7/default/2d1a01cd2dca425eb071ccc28c26c9fa/spec.pdf",
+      "title": "Bambu Lab P2S Spec Sheet",
+      "retrieved_at": "2026-10-16T08:21:30Z",
+      "sha256": "c7290dbe5b14377f7a95a546f92e44b04dc7aea597b42810d0955bd3aecd134a",
+      "note": "Two pages, titled \"P2S Spec Sheet\". The store table links it with no link text, and the package files it as kind \"tds\"; it is a spec sheet."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/p2s/manual/acc-in-the-box",
+      "title": "P2S Packaging List",
+      "retrieved_at": "2026-10-16T08:23:44Z",
+      "sha256": "73d9d6b628b14448edcb7753cd2fda657f83638f4997205d8dee67da7ca5ae0d"
+    }
+  ],
+  "not_published": [
+    "printing.layer_height",
+    "printing.unsupported_filament",
+    "printing.auto_leveling",
+    "printing.camera_toolhead",
+    "printing.camera_nozzle",
+    "printing.camera_birdseye",
+    "motion.max_flow_high_flow",
+    "extrusion.hotend",
+    "thermal.control_board_fan",
+    "thermal.chamber_circulation_fan",
+    "thermal.chamber_exhaust_fan",
+    "electrical.rated_power",
+    "electrical.current",
+    "electrical.standby_power",
+    "connectivity.bluetooth",
+    "physical.noise",
+    "package.weight",
+    "safety.prefilter_grade",
+    "safety.hepa_grade"
+  ],
+  "notes": [
+    "Left out on purpose (neither a spec nor not_published): the dual-toolhead keys (extrusion.main_/aux_extruder_*, printing.filament_main_hotend / filament_aux_hotend*), printing.working_area (laser), the maker-electronics keys electrical.battery / electrical.connector / electrical.requirements, connectivity.interface (the sheet names a USB port only inside the Storage row and the wiki a Bambu Bus 6-pin cable for the AMS 2 Pro), and the keys no product document carries (identity.*, carton.*, compat.statement, part.material, variant.note, package.volume_m3, manufacturer_terms.*; package.contents comes from the store box list and in_the_box).",
+    "physical.recommended_space (500 × 500 × 950 mm) and package.length/width/height (490 × 490 × 560 mm, us_110v) are on the store table and already in the deterministic payload; the spec sheet does not carry them, so no curated row repeats them.",
+    "Marketing numbers not recorded: \"up to 8.5 kg of maximum extrusion force\", \"70% more\", \"60%\" feeding, \"30% faster\" drying, \"30-Second Nozzle Swap\"."
+  ]
+}

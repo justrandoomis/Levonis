@@ -1,0 +1,3336 @@
+{
+ "batch": 11,
+ "surface": "page",
+ "handles": [
+  "compression-spring",
+  "torsion-spring",
+  "round-magnet",
+  "brass-dowel-pin",
+  "plastic-deep-groove-ball-bearings",
+  "f8-14m-miniature-plane-thrust-ball-bearings",
+  "stainless-steel-balls",
+  "plastic-balls",
+  "tt-motor-dc5v-59rpm-ccw-single-axis",
+  "n20-reduction-gear-motor",
+  "usb-speed-controller-compatible-with-tt-motor",
+  "battery-case",
+  "usb-a-power-cable-with-ph2-0-connector",
+  "wire-pair-with-sh1-0",
+  "9g-servo-motor-with-clutch-protection",
+  "jumper-cable-with-sh1-0-connector",
+  "100-mm-wire-pair-with-ph2-0",
+  "3030-5v-led-board-with-sh1-0-connector",
+  "self-locking-button-switch-with-sh1-0-connector",
+  "potentiometer-board-with-sh1-0-connector",
+  "n20-m3-threaded-shaft-reduction-gear-motor",
+  "power-distribution-board-pdb-4-channels",
+  "n20-dual-shaft-worm-gear-motor",
+  "n20-single-shaft-worm-gear-motor",
+  "aaa-battery-spring-contact-plate-with-ph2-0-connector",
+  "makers-essential-kit-a",
+  "2510-5v-dc-fan-with-sh1-0-connector",
+  "m2-button-head-cap-machine-screws-bhcs",
+  "m3-socket-head-cap-machine-screws-shcs-1",
+  "m2-5-button-head-cap-machine-screws-bhcs-1",
+  "m3-button-head-cap-machine-screws-bhcs",
+  "m2-5-socket-head-cap-machine-screws-shcs-1",
+  "m2-socket-head-cap-machine-screws-shcs",
+  "m4-button-head-cap-machine-screws-bhcs",
+  "m2-double-pass-knurled-brass-stud",
+  "m2-5-double-pass-knurled-brass-stud",
+  "m3-double-pass-knurled-brass-stud",
+  "m1-6-socket-head-cap-machine-screws-shcs-1",
+  "m2-5-flat-head-cap-machine-screws-fhcs-1",
+  "m3-flat-head-cap-machine-screws-fhcs",
+  "m2-m3-carbon-steel-flat-washer",
+  "bt2-5-socket-head-cap-self-tapping-screws-shcs-new",
+  "bt3-socket-head-cap-self-tapping-screws-shcs-new",
+  "bt2-button-head-cap-self-tapping-screw-bhcs",
+  "bt2-5-button-head-cap-self-tapping-screw-bhcs",
+  "bt3-button-head-cap-self-tapping-screw-bhcs",
+  "m2-socket-head-shoulder-machine-screws-shss",
+  "d2-stainless-steel-dowel-pin",
+  "hex-nut",
+  "self-locking-hex-nut",
+  "round-threaded-brass-heat-insert-nut",
+  "square-nut",
+  "high-performance-bearings",
+  "micro-steel-deep-groove-ball-bearings",
+  "oil-impregnated-bronze-bushings",
+  "o-rings",
+  "3-pin-10mm-led-strip-connector-cable-with-sm-female-plug-for-rgb",
+  "usb-a-to-2-pin-8mm-solderless-quick-connector-for-white-led",
+  "3004-slim-micro-fan-5v-with-2pin-sh1-0",
+  "mxl-timing-belt",
+  "xl-timing-belts",
+  "high-torque-drive-timing-belt",
+  "rubber-gasket-seal-ring",
+  "50mm-ph2-0-to-sh1-0-conversion-wire",
+  "100mm-y-type-ph2-0-to-dual-sh1-0-conversion-wire",
+  "rectangular-magnetic-stickers",
+  "round-magnetic-stickers",
+  "rectangle-magnetic-stickers-with-round-corners",
+  "soft-magnetic-sheet-stickers",
+  "square-double-sided-foam-tape"
+ ],
+ "strings": [
+  {
+   "h": "2c5a534140f43a8bf4c9dd51a9299a3a45fa0f75d41fe47184051bf6ea403075",
+   "en": "Compression Spring 1. Stainless steel high-lifespan compression springs. 2. Installed between moving parts to allow them to return to their original position after compression.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "compression-spring",
+    "title": "Compression Spring",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2fcc3349da62989c8c6b89d2b90fc7fa65824ddb2949f37a1e191da7fb2dccde",
+   "en": "End Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "compression-spring",
+    "title": "Compression Spring",
+    "field": "specs[x.end_type].label",
+    "near": "Closed and Ground"
+   },
+   "dict": null
+  },
+  {
+   "h": "24170776fd0dbb640344b303f26ee188e27d7863db41f9a8bd0b53fad1c9c903",
+   "en": "Closed and Ground",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "compression-spring",
+    "title": "Compression Spring",
+    "field": "specs[x.end_type]",
+    "near": "End Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "c704f88e87e9af551089142af5d8b3b8eaac0184a3665ca065de162b72de22db",
+   "en": "304 Stainless steel/SWP-B",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "compression-spring",
+    "title": "Compression Spring",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c57106a18a5ef4b8636e7144437246fb5ab563e9ba9195f21ab623dd62b1a14",
+   "en": "304 Stainless steel",
+   "kind": "block_cell",
+   "freq": 22,
+   "context": {
+    "handle": "compression-spring",
+    "title": "Compression Spring",
+    "field": "blocks[2].line[1].cell[9]",
+    "near": "Product ID | D (mm) Outer Diameter | L (mm) Free Length | dk (mm) Wire Diameter | f (mm) Permissible Length | Solid Height (mm) | Max Load (Nmax) | Rate g/mm（±1"
+   },
+   "dict": null
+  },
+  {
+   "h": "2bb9ce60a7a92a53554aebb80de5867017895b9eb43972471737d795b7f29b60",
+   "en": "Torsion Spring 1. Stainless steel tangential force arm torsion spring. 2. Installed between moving parts to allow them to return to their original position after rotation. 3. Requires a shaft and pre-tensioning to prevent displacement.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "torsion-spring",
+    "title": "Torsion Spring",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "363d9c46450018581e73d46729927154648cb8b0c34993485777104ba8bd6027",
+   "en": "Winding Direction",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "torsion-spring",
+    "title": "Torsion Spring",
+    "field": "specs[x.winding_direction].label",
+    "near": "Right"
+   },
+   "dict": null
+  },
+  {
+   "h": "883361d5d682a1574410961ce51450b6e036a779c9f098dec71e28aec832bfa6",
+   "en": "Right",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "torsion-spring",
+    "title": "Torsion Spring",
+    "field": "specs[x.winding_direction]",
+    "near": "Winding Direction"
+   },
+   "dict": {
+    "ar": "يمين",
+    "ckb": "ڕاست"
+   }
+  },
+  {
+   "h": "4c900c5689a2da3c71293238a5b1544b2f106d7c9b67b58a45f178076d8ddb8e",
+   "en": "Leg Orientation",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "torsion-spring",
+    "title": "Torsion Spring",
+    "field": "specs[x.leg_orientation].label",
+    "near": "Tangential"
+   },
+   "dict": null
+  },
+  {
+   "h": "78027fa2c8eb84bddb6fc7c3794c08278753043b0b103037951b4cbd8bcaeacc",
+   "en": "Tangential",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "torsion-spring",
+    "title": "Torsion Spring",
+    "field": "specs[x.leg_orientation]",
+    "near": "Leg Orientation"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a67eadd1acfc28acc95e653159874489ccf9cc87b9fb3c5d15818b93f84b2a3",
+   "en": "Leg Style",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "torsion-spring",
+    "title": "Torsion Spring",
+    "field": "specs[x.leg_style].label",
+    "near": "Straight"
+   },
+   "dict": null
+  },
+  {
+   "h": "dc81306b118237b3c8ffc88d79748a5e53788865c3ca48641ed21ddde8e2cec4",
+   "en": "Straight",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "torsion-spring",
+    "title": "Torsion Spring",
+    "field": "specs[x.leg_style]",
+    "near": "Leg Style"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b1f9469753ce917327d3a34581591890d65ebd78b9d5edad4e48a3675e2b486",
+   "en": "Round Magnets 1. Installed in pairs to allow easy assembly and disassembly of end cap-type parts. 2. Fixed installation angle achieved through the arrangement of positive and negative poles. 3. High temperature resistance, with a maximum operating temperature of 80°C.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "round-magnet",
+    "title": "Round Magnet",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5252a0159baea94504bb74c3a3cd52948136a0234985671524eed541c36642b1",
+   "en": "Nickel plating",
+   "kind": "spec_value_text",
+   "freq": 8,
+   "context": {
+    "handle": "round-magnet",
+    "title": "Round Magnet",
+    "field": "specs[part.surface_treatment]",
+    "near": "Surface treatment"
+   },
+   "dict": null
+  },
+  {
+   "h": "99941d7f2f0d8886ce157033f53c706aaf3e3fc1845f096643fb94ab63312cdc",
+   "en": "Magnetic",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "round-magnet",
+    "title": "Round Magnet",
+    "field": "specs[part.mount_type]",
+    "near": "Mount type"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c3ae2c701889ea8d06a81b9a630c9c08b889600d366fa3ef3198e944ac492ec",
+   "en": "Disc",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "round-magnet",
+    "title": "Round Magnet",
+    "field": "specs[part.shape]",
+    "near": "Shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a0c1fb2513bf4a6ad7f93454a6dc4099c51cefc48d366802dd2a216940a3151",
+   "en": "Neodymium magnet",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "round-magnet",
+    "title": "Round Magnet",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "e89954c9c9f2a2d8094feae49fd45e61592753e27328216e8ee4cd0a1b85d38f",
+   "en": "Through thickness",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "round-magnet",
+    "title": "Round Magnet",
+    "field": "specs[part.magnetization]",
+    "near": "Direction of magnetization"
+   },
+   "dict": null
+  },
+  {
+   "h": "decd81b22ab606f335f460b376ef6afd871bd52ccefdf66ba8cf814ffe66ddb4",
+   "en": "Brass Dowel Pin 1. Widely used for part positioning and for various types of shafts. 2. Rounded corners at both ends for easy insertion into mounting holes. 3. The material is relatively soft, allowing for further simple processing.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "brass-dowel-pin",
+    "title": "Brass Dowel Pin",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cd9558acfc386bd3e1fb14da5d4ed7e9338f80fa29fc2447c36c94667c406295",
+   "en": "Round",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "brass-dowel-pin",
+    "title": "Brass Dowel Pin",
+    "field": "specs[part.end_shape]",
+    "near": "End shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "ef6691545d2c5523efed00424407cb261aeb0037d165ca5792f7f8bac3381362",
+   "en": "Standard",
+   "kind": "spec_value_text",
+   "freq": 26,
+   "context": {
+    "handle": "brass-dowel-pin",
+    "title": "Brass Dowel Pin",
+    "field": "specs[part.style]",
+    "near": "Style"
+   },
+   "dict": {
+    "ar": "قياسي",
+    "ckb": "ستاندارد"
+   }
+  },
+  {
+   "h": "54fb636380fa6abc133f1ebec7b7fb63ae079670acfeb8c5c29f5c9c6fdc2884",
+   "en": "Brass",
+   "kind": "spec_value_text",
+   "freq": 10,
+   "context": {
+    "handle": "brass-dowel-pin",
+    "title": "Brass Dowel Pin",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": {
+    "ar": "نحاس أصفر",
+    "ckb": "برنج"
+   }
+  },
+  {
+   "h": "ed4376c011223519ddd84a1cc0f51344da95f410dddf0892fa98d404da501bda",
+   "en": "Dowel",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "brass-dowel-pin",
+    "title": "Brass Dowel Pin",
+    "field": "specs[part.pin_type]",
+    "near": "Pin type"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7f03db3c19abe447d8c7d33829a425c760001a6e8ffe58cf2d5168274db8f85",
+   "en": "Plastic Deep Groove Ball Bearings 1. Used to support rotating shafts, capable of withstanding both axial and radial loads. 2. Compared to steel bearings of the same model, it is lighter in weight and operates with lower noise.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-deep-groove-ball-bearings",
+    "title": "Plastic Deep Groove Ball Bearings",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "28ed44416cb3c769ba6027b56d0d0e85f49131878acb2e284b6dceac78d08da0",
+   "en": "PA+GF",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-deep-groove-ball-bearings",
+    "title": "Plastic Deep Groove Ball Bearings",
+    "field": "specs[part.cage_material]",
+    "near": "Cage material"
+   },
+   "dict": null
+  },
+  {
+   "h": "ae5859eceacb8896e342285cc697d159a0107f1347a2fb94382029f2226d5444",
+   "en": "Ball",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "plastic-deep-groove-ball-bearings",
+    "title": "Plastic Deep Groove Ball Bearings",
+    "field": "specs[part.bearing_type]",
+    "near": "Bearing type"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b1850ab978d91f9501ef5a82120927998d54bd9f34dfebb4fdfe91088f38826",
+   "en": "Single row",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "plastic-deep-groove-ball-bearings",
+    "title": "Plastic Deep Groove Ball Bearings",
+    "field": "specs[part.bearing_construction]",
+    "near": "Bearing construction"
+   },
+   "dict": null
+  },
+  {
+   "h": "f123dc0e0e44a188bf18ca2c9df57c5193641ac328b8e3bafbf13f7762244636",
+   "en": "Product Type",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "plastic-deep-groove-ball-bearings",
+    "title": "Plastic Deep Groove Ball Bearings",
+    "field": "blocks[1].line[0].cell[1]",
+    "near": "EA001 | 6003 | 17 | 35 | 10 | 250 | 180 | (0, -18) | 1400 | Open"
+   },
+   "dict": null
+  },
+  {
+   "h": "c939327ca16dcf97ca32521d8b834bf1de16573d21deda3bb2a337cf403787a6",
+   "en": "Good",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "plastic-deep-groove-ball-bearings",
+    "title": "Plastic Deep Groove Ball Bearings",
+    "field": "blocks[2].line[2].cell[7]",
+    "near": "Material | Rotational Resistance | Rotational Noise | Size | Durability | Weight | Self-lubricity | Resistance to Humid Environments"
+   },
+   "dict": null
+  },
+  {
+   "h": "0dc8ee555c28ec1beeb7adcf7b2ce3ae6bfd980068f9a2413384ab019393b4b8",
+   "en": "Excellent",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "plastic-deep-groove-ball-bearings",
+    "title": "Plastic Deep Groove Ball Bearings",
+    "field": "blocks[2].line[4].cell[7]",
+    "near": "Bearing Steel | Low | Moderate | Standard | Moderate lifespan | Heavy | No | Not ideal"
+   },
+   "dict": null
+  },
+  {
+   "h": "9bea59174904f47c93ed4d780c9b48059365a6f4a36ae16848cd9d5f2ac10e1a",
+   "en": "F8-14M Miniature Plane Thrust Ball Bearing Specifically used to bear larger axial loads, such as turntables, shaft ends, etc.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "f8-14m-miniature-plane-thrust-ball-bearings",
+    "title": "Miniature Plane Thrust Ball Bearings",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b34a377135a7f9d5e18159d6e4bf08441c9ffd6a46c0fad0a12f1de918a2d6a5",
+   "en": "Washer Material",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "f8-14m-miniature-plane-thrust-ball-bearings",
+    "title": "Miniature Plane Thrust Ball Bearings",
+    "field": "specs[x.washer_material].label",
+    "near": "Steel"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea9973d1460ee95c08102b183f8c7fd7b4f05fa716cab4f91e9672ccd893a6d2",
+   "en": "Steel",
+   "kind": "spec_value_text",
+   "freq": 8,
+   "context": {
+    "handle": "f8-14m-miniature-plane-thrust-ball-bearings",
+    "title": "Miniature Plane Thrust Ball Bearings",
+    "field": "specs[x.washer_material]",
+    "near": "Washer Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e7dfc73ffa59fec41d022ecbc6040120e62f27ac92e516bc37c7a95bc8c594d",
+   "en": "Ball Material",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "f8-14m-miniature-plane-thrust-ball-bearings",
+    "title": "Miniature Plane Thrust Ball Bearings",
+    "field": "specs[x.ball_material].label",
+    "near": "Steel"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9ba1457dc4cd94fdd84515dce58f453c6e112b8a2fce74e5acd23ee45e21a0f",
+   "en": "For Load Direction",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "f8-14m-miniature-plane-thrust-ball-bearings",
+    "title": "Miniature Plane Thrust Ball Bearings",
+    "field": "specs[x.for_load_direction].label",
+    "near": "Thrust"
+   },
+   "dict": null
+  },
+  {
+   "h": "61315705d257c44078434e26d4b322d29d1657aa6ce51cc15145d56e6a4e0246",
+   "en": "Thrust",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "f8-14m-miniature-plane-thrust-ball-bearings",
+    "title": "Miniature Plane Thrust Ball Bearings",
+    "field": "specs[x.for_load_direction]",
+    "near": "For Load Direction"
+   },
+   "dict": null
+  },
+  {
+   "h": "3094e46203aafbfa116b57c038bdd9a857d7c03dd3defe1b7789fbfe3fd78ec9",
+   "en": "Stainless Steel Ball 1. High precision and low roughness, suitable for use as rolling elements in homemade simple bearings and other situations requiring spheres. 2. When used in toys with removable balls, please be cautious to prevent children from swallowing them.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-balls",
+    "title": "Stainless Steel Balls",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d490d0cfcca7f3fd5284905299d21054a36917ddb71a21db35d58b5d04a9eb4f",
+   "en": "10 pcs",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "stainless-steel-balls",
+    "title": "Stainless Steel Balls",
+    "field": "specs[contents.pieces]",
+    "near": "Pieces per pack"
+   },
+   "dict": {
+    "ar": "10 قطعة",
+    "ckb": "10 دانە"
+   }
+  },
+  {
+   "h": "db4bc3f383ab3432fc570198d20349fe299627989349ecce0a3b9357a57cd5d2",
+   "en": "Plastic Balls 1. Bright in color, with a wide range of color options, non-toxic and harmless. 2. When used in toys with removable balls, please be cautious to prevent children from swallowing them.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-balls",
+    "title": "Plastic Balls",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3196828903707969c3e31704e4b75440b5f741c53f667bd4b24e66eb1cbd9e75",
+   "en": "Purple/Pink/Blue/Green/Orange（2 balls of each color）",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "plastic-balls",
+    "title": "Plastic Balls",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": null
+  },
+  {
+   "h": "65bff453a310c52c4478d9c603544cd06979ca2c65f9737dbb1fc30142dd1c80",
+   "en": "TT Motor (DC5V 59RPM CCW Single Axis) 1. Connects to a 5V power source to drive gears, wheels, chains, and other moving parts. 2. Equipped with a USB cable, operating voltage 3-6V, compatible with most common USB power sources such as PC interfaces and charging adapters. 3. The motor terminals are coated with electronic glue to prevent detachment due to pulling.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f76f661e242775daab59a1899843780d034796a64e52af35d70a9351b72bfe02",
+   "en": "5V DC CONSTANT",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[electrical.voltage]",
+    "near": "Voltage"
+   },
+   "dict": null
+  },
+  {
+   "h": "27e130e7d3595441b21687b14f6778f903077d676a3ede2abda00d2dfdc3717f",
+   "en": "Starting Voltage",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.starting_voltage].label",
+    "near": "≤4.0V"
+   },
+   "dict": null
+  },
+  {
+   "h": "789bcb8a9d642e279b4b5c9a725425cc597fbe2345f75e963f7cdaa18d7b1f56",
+   "en": "No Load Speed",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.no_load_speed].label",
+    "near": "59±15% r/min"
+   },
+   "dict": null
+  },
+  {
+   "h": "c47792cfb26b976a1fa2c2a3539f1ed4f6aa9274423af79f1578ac1097bba8d5",
+   "en": "59±15% r/min",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.no_load_speed]",
+    "near": "No Load Speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "7970c60a765d63f592b3604441b7befe06ea728ff73da52b796a106ec8ebec4e",
+   "en": "Direction of Rotation",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.direction_of_rotation].label",
+    "near": "CCW"
+   },
+   "dict": null
+  },
+  {
+   "h": "5cae1d99786da8d9e1741f612127badf73e4a3b4f1797faa712ce05bc485c345",
+   "en": "CCW",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.direction_of_rotation]",
+    "near": "Direction of Rotation"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9a9c4e762e850dd10df035486f6d63c715d65086295c233d6c0ae75fc2339c5",
+   "en": "No Load Current",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.no_load_current].label",
+    "near": "≤ 55 mA"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff595f4f21b33aa85f4f9237296e94524a61634f2528c7ab8ef39701a6ca0872",
+   "en": "≤ 55 mA",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.no_load_current]",
+    "near": "No Load Current"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac46b7c4e5a015e48f0ffb4be2860f4ab1b20776fc16341a68d2dec3d9882ab5",
+   "en": "Starting Torque",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.starting_torque].label",
+    "near": "≥300g.cm"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7a2e16bf9c2bea03046cee23cbbba98db9bdef41e6fbc0a5975bf53148ed77f",
+   "en": "≥300g.cm",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.starting_torque]",
+    "near": "Starting Torque"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d69679065b648c7cfd6f9afbc2c6dddcc2eb939f99821d81116795c1f07aac6",
+   "en": "Humidity Range",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "specs[x.humidity_range].label",
+    "near": "30%～90%"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d393b0081b632c54654eb08c345ff76b92ae4efe0768b4c0f64b9ebbe920492",
+   "en": "PDF",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tt-motor-dc5v-59rpm-ccw-single-axis",
+    "title": "TT Motor DC5V 59RPM CCW Single Axis(1PCS) - LA001",
+    "field": "documents[0]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "5deb44163cb82ccfd007f2eaa413e4c39a72348f6cdd13d6aa0ac79be3383c83",
+   "en": "The N20 Reduction Gear Motor is a low-power reduction motor with a D-shaped output shaft, suitable for applications requiring continuous rotation of objects. This motor offers three speed options, including a low-speed version (150rpm), a medium-speed (400rpm), and a high-speed (1000rpm). The motor can be connected to the power distribution board with 4 channels using the wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "n20-reduction-gear-motor",
+    "title": "N20 Reduction Gear Motor",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d3151b18e57b1a5ea9d2ce7c15440d61e0dd6eb930323635b19500685cb69de7",
+   "en": "The N20 Reduction Gear Motor is a low-power reduction motor with a D-shaped output shaft, suitable for applications requiring continuous rotation of objects. This motor offers three speed options, including a low-speed version (150rpm), a medium-speed (400rpm), and a high-speed (1000rpm). The motor can be connected to the Power Distribution Board (PDB) with 4 Channels using the Wire Pair with SH1.0-2PIN-5CM/10CM/20CM.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "n20-reduction-gear-motor",
+    "title": "N20 Reduction Gear Motor",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "9dc0a6c5bdac847d851cec58481cd436cb5510d436e2b6840249aab24aa5e77a",
+   "en": "1. Plug the connector of the USB Speed Controller into a power source such as a phone charger, power bank, or computer USB interface (Ensure that the power of the power port is greater than the power required by the USB Speed Controller). Then, connect the TT motor with the female port of the speed controller. The speed controller defaults to output on. 2. Turn the thumbwheel counter-clockwise to increase voltage. Turn clockwise to decrease voltage. 3. Click the thumbwheel once to turn output ON/OFF 4. Double-click the thumbwheel to turn off the LED display. Press any button to wake up the digital display.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "usb-speed-controller-compatible-with-tt-motor",
+    "title": "USB Speed Controller(1PCS) - IA002",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c4f18135524e7345ad4b3fb847b258398d4d6c644efb7d593c45c1285805bdec",
+   "en": "Plug the connector of the USB Speed Controller into a power source such as a phone charger, power bank, or computer USB interface (Ensure that the power of the power port is greater than the power required by the USB Speed Controller). Then, connect the TT motor with the female port of the speed controller. The speed controller defaults to output on.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "usb-speed-controller-compatible-with-tt-motor",
+    "title": "USB Speed Controller(1PCS) - IA002",
+    "field": "usage[0].body.line[0]",
+    "near": "Turn the thumbwheel counter-clockwise to increase voltage. Turn clockwise to decrease voltage."
+   },
+   "dict": null
+  },
+  {
+   "h": "03b31ca482d50d5bd33c34a105ff540965914a0ecbaa45c3c356ec56298fa03f",
+   "en": "Turn the thumbwheel counter-clockwise to increase voltage. Turn clockwise to decrease voltage.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "usb-speed-controller-compatible-with-tt-motor",
+    "title": "USB Speed Controller(1PCS) - IA002",
+    "field": "usage[0].body.line[1]",
+    "near": "Plug the connector of the USB Speed Controller into a power source such as a phone charger, power bank, or computer USB interface (Ensure that the power of the "
+   },
+   "dict": null
+  },
+  {
+   "h": "965d1feda57e7f3830a80dc93387b014e84e399edb9a08aa7769ea70ccfa8975",
+   "en": "Click the thumbwheel once to turn output ON/OFF.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "usb-speed-controller-compatible-with-tt-motor",
+    "title": "USB Speed Controller(1PCS) - IA002",
+    "field": "usage[0].body.line[2]",
+    "near": "Turn the thumbwheel counter-clockwise to increase voltage. Turn clockwise to decrease voltage."
+   },
+   "dict": null
+  },
+  {
+   "h": "0a6f7c4aad11a9eaefc830672bd3d5f68bc744e6398aa405e1250b651048e529",
+   "en": "Double-click the thumbwheel to turn off the LED display. Press any button to wake up the digital display.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "usb-speed-controller-compatible-with-tt-motor",
+    "title": "USB Speed Controller(1PCS) - IA002",
+    "field": "usage[0].body.line[3]",
+    "near": "Click the thumbwheel once to turn output ON/OFF."
+   },
+   "dict": null
+  },
+  {
+   "h": "5effe16e4a83684f831f51a1fb31aea13646b5e7435ea71b814a7cd464bf3f84",
+   "en": "1. Four AA/AAA batteries are connected in series 2. External power supply / battery box with a PH2.0 connector 3. Includes battery holder case box with cover and ON / OFF switch and connector (Batteries are not included)",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "battery-case",
+    "title": "Battery Case",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "528ecd4019a4ed66974b063b4fe2f9ad93d823100ad1521c0c837ec8d0426513",
+   "en": "Used in conjunction with a power distribution board, it connects to the IN to provide power to the board.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "usb-a-power-cable-with-ph2-0-connector",
+    "title": "USB-A Power Cable with PH2.0 Connector",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "db2254cc1951f08b34daa0bb13c47bf138a08a7b5d735a8eb6a48339483f5ad2",
+   "en": "Used with power distribution boards, switches, and electrical appliances. It can be connected to the slot SW and switch of the power distribution board, or the slot CH and electrical appliances of the power distribution board, to achieve the connection and control of peripherals. The twisted wire design is easy to bend and wire, and will not scatter or detach from the fixed position.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "wire-pair-with-sh1-0",
+    "title": "Wire Pair with SH1.0",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "947dc005759f1c69e59f4fde02a5e4d27247aecb78424545bf55c43524a224bc",
+   "en": "Used with power distribution boards, switches, and electrical appliances. It can be connected to the SW and switch of the power distribution board, or the CH and electrical appliances of the power distribution board, to achieve the connection and control of peripherals. The twisted wire design is easy to bend and wire, and will not scatter or detach from the fixed position.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "wire-pair-with-sh1-0",
+    "title": "Wire Pair with SH1.0",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "45fd086d76010ccd1328aac680a3c871bc864e762b6d2756e158fd21cbd9d0cc",
+   "en": "High Precision Motion Control: Equipped with advanced digital control technology, the 9G Servo Motor with Clutch Protection can provide precise motion control, ensuring stable and accurate actions for models or mechanical devices. - Clutch Function: Unlike traditional servos, this servo has a clutch function to prevent overload damage. When external forces change the angle of the server during normal operation, the server can protect itself from damage through the integrated clutch mechanism. This function automatically resets and restores the servo to prevent any potential hazards. - Powerful Torque Output: Despite its compact size, the servo has excellent torque output capability. It can drive larger loads making it suitable for various applications requiring strong driving force. - Fast Response: With a quick response speed, it can rapidly respond to control signals, achieving fast and precise actions, enhancing the reaction speed and performance of models or devices. - Digital Co",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ae578be50e24c23932226b86dc94720067637b6bcdfb9f570d5778c241994dbd",
+   "en": "Standby Current",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.standby_current].label",
+    "near": "8mA at 6.0V"
+   },
+   "dict": null
+  },
+  {
+   "h": "f8c342804b7c62dfc85537d0b66953f5e813d4560bff6fa0122e08b8747c97a7",
+   "en": "8mA at 6.0V",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.standby_current]",
+    "near": "Standby Current"
+   },
+   "dict": null
+  },
+  {
+   "h": "d841befe37dcb4f350a2c4bf45e0b0ede2cef56fda2e934c3820647b80310c66",
+   "en": "Rotating Direction",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.rotating_direction].label",
+    "near": "CCW (1000→2000μs) / Counterclockwise"
+   },
+   "dict": null
+  },
+  {
+   "h": "c0f83befa524e79fd0108e1de75d7205ead8946b40a1bea3fd2941916dc0f552",
+   "en": "CCW (1000→2000μs) / Counterclockwise",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.rotating_direction]",
+    "near": "Rotating Direction"
+   },
+   "dict": null
+  },
+  {
+   "h": "f19c0bc44be5840736de06f321f3192b1b5048e8afab985df091ef3a3824c064",
+   "en": "Gear Set Material",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.gear_set_material].label",
+    "near": "Plastic gear"
+   },
+   "dict": null
+  },
+  {
+   "h": "0f830aa4e821d72819b7c92fa6aeaa6c9df08e73cfd1e1c125fed82b33084656",
+   "en": "Plastic gear",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.gear_set_material]",
+    "near": "Gear Set Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "e31172a2ec29f273a8dcb309564c35ad79692d651dad64cb07887969db17c0c3",
+   "en": "≤50mA at 4.8V / ≤60mA at 6.0V",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.no_load_current]",
+    "near": "No Load Current"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e8952fe94a9c09a5a30e1b97472e62222ef1f242ea577edbbe6f1d73056f4d0",
+   "en": "≤0.14sec/60° at 4.8V / ≤0.12sec/60° at 6.0V",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.no_load_speed]",
+    "near": "No Load Speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "2d60b008e4f439e9cd4af26ab362649e7e1f39a0e02670c65c61d55e2d1ea3a7",
+   "en": "Operating Travel Angle",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.operating_travel_angle].label",
+    "near": "PG001 - 180°+10° / (500~2500μs) / PG002 - 360°+10° / (500~2500μs)"
+   },
+   "dict": null
+  },
+  {
+   "h": "71064d15d676c2b045f8f8b31fa70e58b5c0042a4672fbbeb3b694f0237344e1",
+   "en": "Motor Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.motor_type].label",
+    "near": "Iron core"
+   },
+   "dict": null
+  },
+  {
+   "h": "bbdadca75911ee39c17376540695ee05b5f19ae7cedbb4fedf8103cd04dbc25a",
+   "en": "Iron core",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.motor_type]",
+    "near": "Motor Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff1e6d0a692c0cb39477a210ab3e8f4fdce25f3a18e204556abd4f2ac2ce6dc3",
+   "en": "Rated Torque (G*CM）",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.rated_torque_g_cm].label",
+    "near": "≥0.32kgf·cm at 4.8V / ≥0.4kgf·cm at 6.0V"
+   },
+   "dict": null
+  },
+  {
+   "h": "326d482bc5d615004dbe1e81f175e50a42f3657b11ad66ef96faf1f03ae00bb9",
+   "en": "≥0.32kgf·cm at 4.8V / ≥0.4kgf·cm at 6.0V",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.rated_torque_g_cm]",
+    "near": "Rated Torque (G*CM）"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff7d9bb74ef7406b3d1a2f13092a6ce6afb91aed886fc3506bcf449cde2ee3e8",
+   "en": "Stall Current",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.stall_current].label",
+    "near": "≤550mA at 4.8V / ≤650mA at 6.0V"
+   },
+   "dict": null
+  },
+  {
+   "h": "b8e22c99dba3627f66e2c7105ca00df9a07749ba9c4de354287debb7dc41736f",
+   "en": "≤550mA at 4.8V / ≤650mA at 6.0V",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.stall_current]",
+    "near": "Stall Current"
+   },
+   "dict": null
+  },
+  {
+   "h": "1913be4929f534d726a45eec3ecf6dfbcb2c8c312187a1e50b10b3e4c6960b77",
+   "en": "Stall Torque (G*CM）",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.stall_torque_g_cm].label",
+    "near": "≥1.0kgf·cm at4.8V / ≥1.2kgf·cm at6.0V"
+   },
+   "dict": null
+  },
+  {
+   "h": "57e215c57f58e00e06d51c2f4863c9cba0cc91a54eea1f6788767e32bb81c57c",
+   "en": "≥1.0kgf·cm at4.8V / ≥1.2kgf·cm at6.0V",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "9g-servo-motor-with-clutch-protection",
+    "title": "9g Servo Motor with Clutch Protection",
+    "field": "specs[x.stall_torque_g_cm]",
+    "near": "Stall Torque (G*CM）"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2f2cf554329ba3b0d971f32ba313b9005f5dccfd2eced9919b0eebf78882ae9",
+   "en": "Used in conjunction with a power distribution board, it connects the SW0-4 of the power distribution board to connect the corresponding switch channels, thereby achieving the function of maintaining power in the corresponding channels.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "jumper-cable-with-sh1-0-connector",
+    "title": "Jumper Cable with SH1.0 Connector",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "80207de8c210551b0ec85c095d5dfdffebfe8f990a6f11c6ba2248dec9bc7e1d",
+   "en": "Used in conjunction with a power distribution board, connecting the OUT of one power distribution board to the IN of another power distribution board for the purpose of expanding the power distribution board.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "100-mm-wire-pair-with-ph2-0",
+    "title": "100mm Wire Pair with PH2.0",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e03e575da66d8a4a5250e1a7378632c7b01c6756e31f6349f084a605d69006a7",
+   "en": "1. Provides bright and uniform lighting. 2. Easy to install. 3. Suitable for various models and creative projects, adding visual appeal to artwork.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "3030-5v-led-board-with-sh1-0-connector",
+    "title": "3030 5V LED Board with SH1.0 Connector",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6a3fc87b4691ce9c4b016f105eeea6d64b8d3013fda864ce676656f9f1085b96",
+   "en": "4 White 3030 LED Board with SH1.0 Connector 5V - KB001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "3030-5v-led-board-with-sh1-0-connector",
+    "title": "3030 5V LED Board with SH1.0 Connector",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b8b53e2b82c7c641c23d2081f33f0bc120667f0db67f82202c87598c9cd85f7",
+   "en": "KB001 x 2 PCS",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "3030-5v-led-board-with-sh1-0-connector",
+    "title": "3030 5V LED Board with SH1.0 Connector",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": {
+    "ar": "KB001 × 2 قطعة",
+    "ckb": "KB001 × 2 دانە"
+   }
+  },
+  {
+   "h": "04bf1c115567d416dd2d44779a0a56c903d6376fd88d1f1a8664b7710c0b460b",
+   "en": "Wire Pair with SH1.0 x 2 PCS",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "3030-5v-led-board-with-sh1-0-connector",
+    "title": "3030 5V LED Board with SH1.0 Connector",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fefc50f4fad4452147388a4108e2b572256397f6e3734cff8b396bf651b5734a",
+   "en": "1 White 3030 LED Board with SH1.0 Connector 5V (2 PCS) - KB002",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "3030-5v-led-board-with-sh1-0-connector",
+    "title": "3030 5V LED Board with SH1.0 Connector",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "84ff731ace6401b5e9df07cdc1275581f2dfd5c4f59f2500eee2345b73cc5bdd",
+   "en": "KB002 x 2 PCS",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "3030-5v-led-board-with-sh1-0-connector",
+    "title": "3030 5V LED Board with SH1.0 Connector",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": {
+    "ar": "KB002 × 2 قطعة",
+    "ckb": "KB002 × 2 دانە"
+   }
+  },
+  {
+   "h": "ac397cd2997d8b7d601c870a8916684cb73e2071ddfb279c9ba1b87e16e1f309",
+   "en": "Used in conjunction with a distribution board, it controls the ON/OFF state of the corresponding channel, thereby achieving switch control functionality. - The self-locking button switch uses an SH1.0-2P connector. It requires an SH1.0-2P reverse double-headed connector wire to connect to the SW0 to SW4 channels on the spring contacts plate board. - When the switch is pressed down, it locks in and performs the connection. When the switch is pressed again, it springs up and disconnects. - If the switch board is connected to any of the SW1 to SW4 channels, ensure that the maximum current of the corresponding channel's device does not exceed 1A. - If the knob board is connected to the SW0 master switch, ensure that the maximum combined current of all channels SW1 to SW4 does not exceed 1A.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "self-locking-button-switch-with-sh1-0-connector",
+    "title": "Self-Locking Button Switch (2PCS) - IA006",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "70165a51481cbb3d6c86adb94bc8c1e4bdeba6a140c31bdda009679564efaef4",
+   "en": "Used with a Power Distribution Board (PDB) - 4 Channels, it controls the ON/OFF state of the corresponding channel, thereby achieving the function of switch control.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "self-locking-button-switch-with-sh1-0-connector",
+    "title": "Self-Locking Button Switch (2PCS) - IA006",
+    "field": "usage[0].body.line[0]",
+    "near": "The Self-Locking Button Switch with SH1.0 Connector is a switch device that can be connected to SW0~4 on the Power Distribution Board (PDB) to control the switc"
+   },
+   "dict": null
+  },
+  {
+   "h": "543e9326aea1870597a6c0aec329646bfab5a0ba5d5949b6d2322edf85ab3dfa",
+   "en": "The Self-Locking Button Switch with SH1.0 Connector is a switch device that can be connected to SW0~4 on the Power Distribution Board (PDB) to control the switch of electric devices. Pressing the button down connects the circuit; pressing it again pops it up and disconnects the circuit.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "self-locking-button-switch-with-sh1-0-connector",
+    "title": "Self-Locking Button Switch (2PCS) - IA006",
+    "field": "usage[0].body.line[1]",
+    "near": "Used with a Power Distribution Board (PDB) - 4 Channels, it controls the ON/OFF state of the corresponding channel, thereby achieving the function of switch con"
+   },
+   "dict": null
+  },
+  {
+   "h": "bdfd62a8cb14e7fb3ad0ad734aebaa3a67077ae57e9c5a6d96dc028f8f9c8bc0",
+   "en": "When the Self-Locking Button Switch is connected to SW1~4, it's necessary to ensure that the maximum current of the electric devices in each corresponding channel does not exceed 1A.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "self-locking-button-switch-with-sh1-0-connector",
+    "title": "Self-Locking Button Switch (2PCS) - IA006",
+    "field": "usage[0].body.line[2]",
+    "near": "The Self-Locking Button Switch with SH1.0 Connector is a switch device that can be connected to SW0~4 on the Power Distribution Board (PDB) to control the switc"
+   },
+   "dict": null
+  },
+  {
+   "h": "f19919d5c70d9a2028e140aa7d5a4680e357fb8856ded3dfee9614742ffe1b9e",
+   "en": "When the Self-Locking Button Switch is connected to the SW0, it's necessary to ensure that the sum of the maximum currents of all electric devices does not exceed 1A.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "self-locking-button-switch-with-sh1-0-connector",
+    "title": "Self-Locking Button Switch (2PCS) - IA006",
+    "field": "usage[0].body.line[3]",
+    "near": "When the Self-Locking Button Switch is connected to SW1~4, it's necessary to ensure that the maximum current of the electric devices in each corresponding chann"
+   },
+   "dict": null
+  },
+  {
+   "h": "e3b71b2f7e5bcfac1987695c30689ff4ab51435d30afb8c4ee662b2b0260209c",
+   "en": "Secured with two M2 screws.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "self-locking-button-switch-with-sh1-0-connector",
+    "title": "Self-Locking Button Switch (2PCS) - IA006",
+    "field": "usage[0].body.line[4]",
+    "near": "When the Self-Locking Button Switch is connected to the SW0, it's necessary to ensure that the sum of the maximum currents of all electric devices does not exce"
+   },
+   "dict": null
+  },
+  {
+   "h": "469e043c791ca1b4767f3969140fad6565d394c74465ccdd2eab0f7ccbfdaf00",
+   "en": "Self-Locking Button Switch with SH1.0 Connector x2pcs",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "self-locking-button-switch-with-sh1-0-connector",
+    "title": "Self-Locking Button Switch (2PCS) - IA006",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f587607d494740702fba2b436ac1b6165155c6dc9c196739933c700e8651062",
+   "en": "Used in conjunction with a power distribution board, it is used to adjust the voltage of the corresponding channel, thereby achieving the function of adjusting the speed or brightness of the corresponding device. - The potentiometer board is used for voltage regulation with an SH1.0-2P connector. It requires an SH1.0-2P reverse double-headed connector wire to connect to the SW0 to SW4 channels on the power distribution board. When the knob is turned counterclockwise, the output voltage of the corresponding channel decreases. When the knob is turned clockwise, the output voltage of the corresponding channel increases. - If the potentiometer board is connected to any of the SW1 to SW4 channels, ensure that the maximum current of the corresponding channel's device does not exceed 0.4A, and the battery voltage does not exceed 6V. - If the potentiometer board is connected to the SW0 main switch, ensure that the combined maximum current of all channels SW1 to SW4 does not exceed 0.4A, and th",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "potentiometer-board-with-sh1-0-connector",
+    "title": "Potentiometer Board with SH1.0 Connector",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "bc6d2a6d431dad6c0fac6e4ae3c2067b196e9335cdf20a894c650ae0291a416f",
+   "en": "N20 M3 Threaded Shaft Reduction Gear Motor is a low-power reduction motor, compatible with M3 shaft, and suitable for making electric push rods and other linear drive devices. It offers a short, medium, and a long threaded shaft length option to meet different needs. The motor can be connected to the power distribution board with 4 channels using the wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "n20-m3-threaded-shaft-reduction-gear-motor",
+    "title": "N20 M3 Threaded Shaft Reduction Gear Motor",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "00a74b5780aedd3b21e614c9352a349f6cecdfdb1ffb3a82d523712dad03d262",
+   "en": "The power distribution board is used for connecting various electrical devices, switches, and power supply, supporting electrical devices with 4 channels. - The IN is for connecting to a power source, such as a USB cable or battery box. IN and OUT are interconnected, and OUT can be used to connect to another power distribution board in series. IN/OUT uses a PH2.0-2P connector. - The slot SW0 to slot SW04 is used for connecting switches such as rotary boards, switch boards or jumper cables. - The slot CH1 to slot CH4 is used for connecting electrical devices su ch as N20 motors, light panels, fans, etc. Do not connect rotary boards, switch boards or jumper cables to these channels. - SW0 is the master switch, while SW1 to SW4 are individual switches for controlling channels CH1 to CH4 respectively. The SW0 to SW4 uses a SH1.0-2P connector. - The LED indicator shows the system status. When the battery box and master switch are connected, the LED lights up white, indicating normal statu",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "de2570d41cf7dba589f410675e36b3d7b3fda81a8f9619cda74ab373d2880a21",
+   "en": "The Power Distribution Board (PDB) - 4 Channels is used for connecting various electrical devices, switches, and power supplies, supporting electric devices up to 4 channels.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "usage[0].body.line[0]",
+    "near": "Use two M2 screws for fastening (unless otherwise specified, all fastening screws used for the kit's PCBA are M2 screws)."
+   },
+   "dict": null
+  },
+  {
+   "h": "f6cad969ea499911ced9d723dc21d7bbdd018a3451951cb944de6cb8d093e9f7",
+   "en": "Use two M2 screws for fastening (unless otherwise specified, all fastening screws used for the kit's PCBA are M2 screws).",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "usage[0].body.line[1]",
+    "near": "The Power Distribution Board (PDB) - 4 Channels is used for connecting various electrical devices, switches, and power supplies, supporting electric devices up "
+   },
+   "dict": null
+  },
+  {
+   "h": "bad2643ff3f87ecf833e5df78365cdbdaa384f192416c1d04e8dc03af960fede",
+   "en": "The IN is for connecting to various power supplies, such as a USB-A Power Cable with PH2.0 Connector or battery box. IN and OUT are interconnected, and OUT can be used to connect to another Potentiometer Board with SH1.0 Connector in series. IN/OUT uses a PH2.0-2P connector.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "usage[0].body.line[2]",
+    "near": "Use two M2 screws for fastening (unless otherwise specified, all fastening screws used for the kit's PCBA are M2 screws)."
+   },
+   "dict": null
+  },
+  {
+   "h": "65f1d961b21332fc88fcaa50e91f19ad76cbb649ef2584ccc6436fbf93b9c177",
+   "en": "The SW0 to SW4 is used for connecting switches such as Potentiometer Board with SH1.0 Connector, Self-Locking Button Switch with SH1.0 Connector or Jumper Cable with SH1.0 Connector.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "usage[0].body.line[3]",
+    "near": "The IN is for connecting to various power supplies, such as a USB-A Power Cable with PH2.0 Connector or battery box. IN and OUT are interconnected, and OUT can "
+   },
+   "dict": null
+  },
+  {
+   "h": "7222dd55c9d631faeefa5014b622f637b01f475eee3b107f151c96721dfc4fa6",
+   "en": "The CH1 to CH4 is used for connecting electrical devices such as N20 Reduction Gear Motor, 3030-LED Board with SH1.0 Connector, 2510 5V DC Fan with SH1.0 Connector, etc. Please do not connect the Potentiometer Board with SH1.0 Connector, Self-Locking Button Switch with SH1.0 Connector or Jumper Cable with SH1.0 Connector to these channels.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "usage[0].body.line[4]",
+    "near": "The SW0 to SW4 is used for connecting switches such as Potentiometer Board with SH1.0 Connector, Self-Locking Button Switch with SH1.0 Connector or Jumper Cable"
+   },
+   "dict": null
+  },
+  {
+   "h": "e182970b3705eae0c618f2ca497f71690af8a27c81670ef8264fc57648f5a9d2",
+   "en": "SW0 is the master switch, while SW1 to SW4 are individual switches for controlling channels CH1 to CH4 respectively. The SW0 to SW4 uses a SH1.0-2P connector.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "usage[0].body.line[5]",
+    "near": "The CH1 to CH4 is used for connecting electrical devices such as N20 Reduction Gear Motor, 3030-LED Board with SH1.0 Connector, 2510 5V DC Fan with SH1.0 Connec"
+   },
+   "dict": null
+  },
+  {
+   "h": "f610b62706eabee3b344eec2b585f93af5124f07b856bf2175270f4ce1e547c6",
+   "en": "The LED indicator shows the system status. When the battery box and master switch are connected, the LED lights up white, indicating normal status. If the total current exceeds 1A or if a short circuit occurs in any of the CH1 to CH4 channels, the current-limiting chip will cut off the power supply, and the LED will turn off. After the overcurrent or short-circuit condition is removed, the power supply will remain disconnected. To restore normal operation, the main switch must be turned off and then reconnected.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "usage[0].body.line[6]",
+    "near": "SW0 is the master switch, while SW1 to SW4 are individual switches for controlling channels CH1 to CH4 respectively. The SW0 to SW4 uses a SH1.0-2P connector."
+   },
+   "dict": null
+  },
+  {
+   "h": "7a0fd321dfa99a16246ef55edc46f0ec3ad8c0285edd103af995dc240ba55fbc",
+   "en": "Please do not connect switches to the CH1 to CH4, and avoid connecting electrical devices to SW1 to SW4 as this may cause a short circuit.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "usage[0].body.line[7]",
+    "near": "The LED indicator shows the system status. When the battery box and master switch are connected, the LED lights up white, indicating normal status. If the total"
+   },
+   "dict": null
+  },
+  {
+   "h": "f29b64282e5ec7a6c4f9a4a6ac49085e0b809d027f31df1b05e288f5ba6bb386",
+   "en": "Power Distribution Board (PDB) x1pcs",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "14905aabfd5db3896b4e4b5739cc9ade3abc82d8821289986139d86b656d1062",
+   "en": "Wire Pair with PH2.0 x1pcs",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e6851b73fe2315d60c47a7c6bea86385882c140453894f01786f7b8f63712217",
+   "en": "Connector Model",
+   "kind": "block_title",
+   "freq": 4,
+   "context": {
+    "handle": "power-distribution-board-pdb-4-channels",
+    "title": "Power Distribution Board - 4 Channels (1PCS) - IA005",
+    "field": "blocks[3].line[0]",
+    "near": "Input | Output | SW0-4 | CH1-4"
+   },
+   "dict": null
+  },
+  {
+   "h": "8df698367b77cc8de5ed748c1420590354bc61dbdc0524c80a0f610c849dcae7",
+   "en": "N20 Dual Shaft Worm Gear Motor is a low-power reduction motor. The motor features a double D-shaped output shaft that protrudes laterally, utilizing a worm gear gearbox. It is suitable for power drive devices such as toy cars and tanks. The motor can be connected to the power distribution board with 4 channels using the wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "n20-dual-shaft-worm-gear-motor",
+    "title": "N20 Dual Shaft Worm Gear Motor (1PCS) - LA009",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2791cab9f7fe57341947a886b7f8081082e4557417219360d3ec0c2f920d3356",
+   "en": "N20 Single Shaft Worm Gear Motor is a low-power reduction motor. The motor features a D-shaped output shaft that protrudes laterally, utilizing a worm gear gearbox. It is suitable for power drive devices such as toy cars and tanks. The motor can be connected to the power distribution board with 4 channels using the wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "n20-single-shaft-worm-gear-motor",
+    "title": "N20 Single Shaft Worm Gear Motor (1PCS) - LA008",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2fc3250dba70088c2832550ddc8d3454ebca0f67637a10eaed905665d0aaf130",
+   "en": "Battery spring contact plates can be used in the battery case box for AAA batteries - This spring contact plate is tailored for connecting AAA batteries using the PH2.0 connector. Users can easily link AAA batteries in series without the hassle of complex wiring or soldering to save time. It is suitable for various devices that require AAA batteries as a power source, such as remote controls, small electronic devices or toys.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "aaa-battery-spring-contact-plate-with-ph2-0-connector",
+    "title": "AAA Battery Spring Contact Plate with PH2.0 Connector",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d5a4641bd80e02441e153bab346c90f112a900a087d508dc7377ea4ea66d9e67",
+   "en": "Battery spring contact plates can be used in the battery case box for AAA batteries.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "aaa-battery-spring-contact-plate-with-ph2-0-connector",
+    "title": "AAA Battery Spring Contact Plate with PH2.0 Connector",
+    "field": "usage[0].body.line[0]",
+    "near": "This spring contact plate is tailored for connecting AAA batteries using the PH2.0 connector. Users can easily link AAA batteries in series without the hassle o"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ba3820313788e3ea3b90b2d6c18770c96b0e369d5c33102abef29b661c0dba2",
+   "en": "This spring contact plate is tailored for connecting AAA batteries using the PH2.0 connector. Users can easily link AAA batteries in series without the hassle of complex wiring or soldering to save time. It is suitable for various devices that require AAA batteries as a power source, such as remote controls, small electronic devices or toys.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "aaa-battery-spring-contact-plate-with-ph2-0-connector",
+    "title": "AAA Battery Spring Contact Plate with PH2.0 Connector",
+    "field": "usage[0].body.line[1]",
+    "near": "Battery spring contact plates can be used in the battery case box for AAA batteries."
+   },
+   "dict": null
+  },
+  {
+   "h": "aaacca4ec3543ff1b6fa9b5487e2175a8ead65885e9519143a1b4fd6c30c8667",
+   "en": "Manganese steel nickel plated",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "aaa-battery-spring-contact-plate-with-ph2-0-connector",
+    "title": "AAA Battery Spring Contact Plate with PH2.0 Connector",
+    "field": "specs[x.ph2_0]",
+    "near": "IA008 › PH2.0"
+   },
+   "dict": null
+  },
+  {
+   "h": "d1a37aff8cb7dbf5228ee9ac3af4d3318b7a8fca713fdf758e3a66376dda1f8f",
+   "en": "Born for creators! Each electronic part is meticulously selected to ensure you are fully supported at every step of your creative journey.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ae8878f427ede6e4ddadded019f1db8c98a198e85caa3b17136d6d3bdac21751",
+   "en": "M5x12 SHCS Machine Screw (5PCS) -AA001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b5592714582196cf00467026115bd5ec475c43052b5771eb6361f53b47c0bd5",
+   "en": "M3x23 SHCS Machine Screw (10PCS) -AA003",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a27f1f4bf9174170db7e3300a71b8ebc80dbab9f1e7079602c11b54d36cb635e",
+   "en": "BT2.6x8 SHCS Self Tapping Screw (20PCS) - AA004",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d532407f0f590e56f824e1b0ad94f2805d3b651c09a269310c369856f29a342",
+   "en": "M2.5x10 SHCS Machine Screw (20PCS) - AA005",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ae99615e33011abfc71210c0f751794fbe561fd1e7498af5e9bd0399d7ca30c",
+   "en": "M2x10 FHCS Machine Screw (20PCS) - AA007",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7654230ec568ac3c7af6897e24a786e8d32d5cb1949d08604bf2b30e77fead2",
+   "en": "M2x6 FHCS Machine Screw (20PCS) - AA009",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0a53480b2be1e5de8b0b90e016ccdf0dd5cef97aa529264fa8901a3ab63852b0",
+   "en": "M2x8 FHCS Machine Screw (20PCS) - AA011",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c923119c6d8b93de4c281ea87eeaf4a89574f532f2cfba5e6856f2973659ee97",
+   "en": "M2.5x6 BHCS Machine Screw (20PCS) - AA013",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[7]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7dff209f429761bde5cbd185c7b79a96e331681076bc1e816de26bc0b2bc808c",
+   "en": "M2x12 FHCS Machine Screw (20PCS) - AA015",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[8]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "564610bdba57f6321d9a961f55dff0681d5affa6b7af6cdb14b39f025fdb19e1",
+   "en": "M2x14 FHCS Machine Screw (20PCS) - AA017",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[9]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "bf801ec1ea60ec27efcb22d1e5a1875824bebc25f37aeea5df0afe334f1a29c6",
+   "en": "BT2x8 SHCS Self Tapping Screw (20PCS) - AA019",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[10]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b378f527c09b9b731cf3a5fcba2378d53cea7efef0f93a261df42b27dc880a23",
+   "en": "0.6x12x70 mm Helical Compression Spring (5PCS) - BB001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[13]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "729b1933d9c67e8359f0669c2dd3dc19edbfb4801a987ac48424f0487802b2ba",
+   "en": "0.3x6x80 mm Helical Compression Spring (5PCS) - BB002",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[14]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1aa8a1bfd8e0b7a70b094499a23956f8088c64f572e26e19af304d44077b4e50",
+   "en": "0.3x3x10 mm Helical Compression Spring (20PCS) - BB003",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[15]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b07b920d563cbc7cfc998ecc8bcc4f50c5cc96fa6b80b42025864997edd31903",
+   "en": "0.5x5x25 mm Helical Compression Spring (5PCS) - BB004",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[16]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "45670594ba18e11e395df6e79326335564e4f000dbdaa2c6b46f566357d70c5e",
+   "en": "0.5x7x12 mm Helical Compression Spring (10PCS) - BB005",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[17]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe8b3dc003b62eb2a2bc10b217c721777a3d0fe773757658853239b59f6dbb7b",
+   "en": "1x5x3 mm 120 Degree Torsion Spring (5PCS) - BC001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[18]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f956320c8d4283af628153bf10e1a7b68693824488f5c5deb8567a4b4df19cc7",
+   "en": "0.4x4x6 mm 120 Degree Torsion Spring (10PCS) - BC002",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[19]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "94e3f6004dd39bf047be9e31dc943381552254fc487b30a9f73b2ce39b7dad02",
+   "en": "4x2 mm Round Magnet (20PCS) - CA001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[20]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e1ed40e66bd20d38e9aae66f15b28074768840a52e4470f9338f9ef04db42a68",
+   "en": "2x18 mm Stainless Steel Dowel Pin (20PCS) - DA001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[21]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "05e80655abb1fa2166d7f143702d3e8d5cf9d37e00bae50d6d57c2e407063ce4",
+   "en": "2x25 mm Stainless Steel Dowel Pin (20PCS) - DA002",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[22]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d20f42fc0dc9feaff0e082642609a2c19d3cc8adff131471d2353215d424090",
+   "en": "2x14 mm Stainless Steel Dowel Pin (20PCS) - DA003",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[23]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ad067f101b5f9af8e6c1e355dd4acf3e6f008398279e90de3fa94e3cc56a754",
+   "en": "2x13 mm Brass Dowel Pin (20PCS) - DA004",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[24]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b0cf2a0bae50407530b5036999254c263fcfedc17903ff56cb17bfce599372f3",
+   "en": "2x22 mm Brass Dowel Pin (20PCS) - DA005",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[25]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e55bc93228cd8a11462c82bb7e5856fa197faf24a0ec35204c0f02eb2bb52900",
+   "en": "2x33 mm Brass Dowel Pin (10PCS) - DA006",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[26]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a13c6c35b0d1a65a04bc73c0f77b6d45850e23994423801392710d242cd2b8c2",
+   "en": "F8-14M Miniature Plane Thrust Ball Bearing (1PCS) - EB001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[32]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec34bf61187a22b1a93b5c5dc7d96f1e22bfbba071986cd3dcb69105b2038134",
+   "en": "USB Speed Controller-Compatible with TT motor (1PCS) - IA002",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[34]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0582723381274e90fb09cea8efd43fcb4f133e5d36551071db08be16fa723116",
+   "en": "AA Battery Case with PH2.0 Connector (1PCS) - IA003",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[35]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "95e7abb27b687486e652f7daf27f29f4a7cc107e901c21a59af1b7aea8dac022",
+   "en": "AAA Battery Case with PH2.0 Connector (1PCS) - IA004",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[36]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a1348b04245525f4968713755cf2dc6dc02f98a88cfdd705d4e8403deb34f970",
+   "en": "Power Distribution Board (PDB) - 4 Channels (1PCS) - IA005",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[37]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "51b92b1db51bfb2f234eee5c6d302551aa2d8270aeb86f15998103bab7258bf7",
+   "en": "Self-Locking Button Switch with SH1.0 Connector (2PCS) - IA006",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[38]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a95fe440e550cdeff0c25ffb456dad51857eeff6b8bb11a451ef212928473b9d",
+   "en": "4 White 3030-LED Board with SH1.0 Connector 5V (2PCS) - KB001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[47]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "936c269f618ae02948094cc9b9bd191929483156fa97f473d5363bc8df0538f5",
+   "en": "1 White 3030-LED Board with SH1.0 Connector 5V (2PCS) - KB002",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[48]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "541ac6fec5bf61c6ffd93995921a2827a169faaebc41122c5e4f3fbe2f1711cb",
+   "en": "N20 M3x25 Threaded Shaft Reduction Gear Motor 400rpm (1PCS) - LA005",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[53]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "649831dd6a66e11b14e7c59fd3dd4667c83b3c6f18e570608f3f45820cca38fc",
+   "en": "N20 M3x45 Threaded Shaft Reduction Gear Motor 1000rpm (1PCS) - LA006",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[54]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e3c71810d0566b449e83145f7d9dee1c3032e23d7856b82f65032e57d653f8d",
+   "en": "N20 M3x60 Threaded Shaft Reduction Gear Motor 1000rpm (1PCS) - LA007",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[55]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8ab7fcf5505ff719036d394f5739a9cebd52a492ef9b8dcdf33e6f306694490e",
+   "en": "N20 Single Shaft Worm Gear Motor 25rpm (1PCS) - LA008",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[56]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c430ea06e6d1e61566850f632d76edcd59bf643394ee3142ceaeb9c9a8e3423",
+   "en": "N20 Dual Shaft Worm Gear Motor 130rpm (1PCS) - LA009",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[57]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "80024eaf99f99f920aee023abeed3013e8aa71082cc771252f49f1ce92b1f752",
+   "en": "14mm Plastic ball (10PCS) - ZB001",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "makers-essential-kit-a",
+    "title": "Maker's Essential Kit A",
+    "field": "box[59]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2cbf2075ead65465115b52183895f25f160409eaf1b7e294a73630bacafc6663",
+   "en": "The 2510 5V DC Fan is a low-power, low-noise and high-speed fan that can be used for heat dissipation and ventilation. It can also can be combined with 3D printing models to achieve various functions, such as mini humidifiers, purifiers, etc.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "051cc15cbb178309682f8f2583696b8fe0832dc24fb8a1cf34689442d2380cd7",
+   "en": "Rated Voltage (V)",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.rated_voltage_v].label",
+    "near": "5V"
+   },
+   "dict": null
+  },
+  {
+   "h": "34e5ed0f9a9a7a94f83fc505e73381159d021e72838f553de51554668a67095d",
+   "en": "Rated Current (A)",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.rated_current_a].label",
+    "near": "0.3A"
+   },
+   "dict": null
+  },
+  {
+   "h": "aadd8ac428daac11834b379676465732a03983e3ae7ac9a1942146867d704274",
+   "en": "Rated Speed (RPM)",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.rated_speed_rpm].label",
+    "near": "14500"
+   },
+   "dict": null
+  },
+  {
+   "h": "babd510c9d3a6bf3229e5eaf96b262c3ea0323c098792d709f6c7f3fa44290c0",
+   "en": "Air Flow at Zero Static Pressure (CFM)",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.air_flow_at_zero_static_pressure_cfm].label",
+    "near": "2.19"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ad239b41f9b951cbc9179662f763849b373fe7a8d5a887975a8dcda5bce907f",
+   "en": "Cable Length (mm)",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.cable_length_mm].label",
+    "near": "90"
+   },
+   "dict": null
+  },
+  {
+   "h": "c61527bb91de4c9101ea5e0044767e8a8f71aff31b3655974a7872dbd6c99796",
+   "en": "Hole Distance (mm)",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.hole_distance_mm].label",
+    "near": "20"
+   },
+   "dict": null
+  },
+  {
+   "h": "c51256ff8fa0459c3b362c2d9162698f46b2044e24c7a1a107617704df2d200d",
+   "en": "Noise (DB-A)",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.noise_db_a].label",
+    "near": "35DB-A (Max:38DB-A)"
+   },
+   "dict": null
+  },
+  {
+   "h": "e90b468a97d75865deb685118512a060eed14b802070958de150360bc059db9b",
+   "en": "35DB-A (Max:38DB-A)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.noise_db_a]",
+    "near": "Noise (DB-A)"
+   },
+   "dict": null
+  },
+  {
+   "h": "5c22df7df409590234d723fda8ee53580015aff953937d97922b57a5b4d05fb3",
+   "en": "Product Size (mm)",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.product_size_mm].label",
+    "near": "25.2x25.2x10"
+   },
+   "dict": null
+  },
+  {
+   "h": "4853334a34a06562e50951fd7256bd25b2208f9c010a73563ad99b73cb02a765",
+   "en": "Product Weight (lb)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.product_weight_lb].label",
+    "near": "0.044 lb"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe3010b26706d631cba3f6aab8294865ff8e45dd645abccc1078569fc4594b63",
+   "en": "0.044 lb",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "2510-5v-dc-fan-with-sh1-0-connector",
+    "title": "2510 5V DC Fan with SH1.0 Connector",
+    "field": "specs[x.product_weight_lb]",
+    "near": "Product Weight (lb)"
+   },
+   "dict": null
+  },
+  {
+   "h": "3acd98f5c73d0061a039d2f86374c05ad30062bf545af469adab5e7dee6893bf",
+   "en": "Easily get the parts you need and focus on creating! M2 Carbon Steel BHCS Machine Screw includes variou sizes from 4-30mm in length.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-button-head-cap-machine-screws-bhcs",
+    "title": "M2 Button Head Cap Machine Screws (BHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ea3847ce66c43fb6c5acfd2f318691a4316d5650dac6293d20a902bdd5065e2b",
+   "en": "Easily get the parts you need and focus on creating! M3 Carbon Steel SHCS Machine Screw includes variou sizes from 5-30mm in length.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m3-socket-head-cap-machine-screws-shcs-1",
+    "title": "M3 Socket Head Cap Machine Screws (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1e4af44207eb6c84a807304df7a398351fabc064547c47b45b012ca43c9addc5",
+   "en": "Easily get the parts you need and focus on creating! M2.5 Carbon Steel BHCS Machine Screw includes variou sizes from 5-30mm in length.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-5-button-head-cap-machine-screws-bhcs-1",
+    "title": "M2.5 Button Head Cap Machine Screws (BHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8ce8920e9cc10488f5c4854e22b8493032c04490995e76eb9e19898feb21fdd7",
+   "en": "Easily get the parts you need and focus on creating! M3 Carbon Steel BHCS Machine Screw includes variou sizes from 5-30mm in length.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m3-button-head-cap-machine-screws-bhcs",
+    "title": "M3 Button Head Cap Machine Screws (BHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cfc8d3f8c0823aede4e11dcacb96548a8df6f7103e4f505f18d2dbceea48ee32",
+   "en": "Easily get the parts you need and focus on creating! M2.5 Carbon Steel SHCS Machine Screw includes variou sizes from 5-30mm in length.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-5-socket-head-cap-machine-screws-shcs-1",
+    "title": "M2.5 Socket Head Cap Machine Screws (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ee56e6cbb9f7572c3c885a6e255f252355e28d5d4158e6490696fb06d1036a4f",
+   "en": "Easily get the parts you need and focus on creating! M2 Carbon Steel SHCS Machine Screw (10PCS) includes variou sizes from 4-30mm in length.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-socket-head-cap-machine-screws-shcs",
+    "title": "M2 Socket Head Cap Machine Screws (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7d14289e829ea54b53cc832d97a0de6f8b7607fb8e81ddf90b5d2f9dec00419f",
+   "en": "Easily get the parts you need and focus on creating! M4 Carbon Steel BHCS Machine Screw includes variou sizes from 6-30mm in length.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m4-button-head-cap-machine-screws-bhcs",
+    "title": "M4 Button Head Cap Machine Screws (BHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a747eb2b42900ac5a64f32e329bf5bdf3b9157c3d753d0e36de64b4085db4b4f",
+   "en": "M2 Double-pass Knurled Brass Stud includes variou sizes from 6-30mm in length. Light weight and durable features ensure a reliable connection, while a knurled design allows for easy handling.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-double-pass-knurled-brass-stud",
+    "title": "M2 Double-pass Knurled Brass Stud",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "85eb74ca164a4f2d4730d3bd5ec96bc46fcb8a1ca2dcab7c1a80d62f612c25b0",
+   "en": "Stud Shape",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "m2-double-pass-knurled-brass-stud",
+    "title": "M2 Double-pass Knurled Brass Stud",
+    "field": "specs[x.stud_shape].label",
+    "near": "Round knurled"
+   },
+   "dict": null
+  },
+  {
+   "h": "68fd2ce5ab20669fcfdf9d4d6a9c2173a6544b0b9e90fc1604373231c87a3ceb",
+   "en": "Round knurled",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "m2-double-pass-knurled-brass-stud",
+    "title": "M2 Double-pass Knurled Brass Stud",
+    "field": "specs[x.stud_shape]",
+    "near": "Stud Shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "62bf7e5f7ec4bd26b0159f702c8c892a90b7d3567f3f60e9d4b418f783b4ea31",
+   "en": "Stud Type",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "m2-double-pass-knurled-brass-stud",
+    "title": "M2 Double-pass Knurled Brass Stud",
+    "field": "specs[x.stud_type].label",
+    "near": "Double-pass"
+   },
+   "dict": null
+  },
+  {
+   "h": "d513d58f8daca741a9eca34af9a0f34a8414830201c23ff0da291e93f8624ab1",
+   "en": "Double-pass",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "m2-double-pass-knurled-brass-stud",
+    "title": "M2 Double-pass Knurled Brass Stud",
+    "field": "specs[x.stud_type]",
+    "near": "Stud Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "540ad6bfb2c9b79e95e397e11c4da9912b61a9a096a1b01ef2984baa0b5b8fa1",
+   "en": "M2.5 Double-pass Knurled Brass Stud includes variou sizes from 6-30mm in length. Light weight and durable features ensure a reliable connection, while a knurled design allows for easy handling.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-5-double-pass-knurled-brass-stud",
+    "title": "M2.5 Double-pass Knurled Brass Stud",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e990099a7c0c9744cb6b1e3f0ff965241f3938aed5c1208213202c820fdd94ca",
+   "en": "M3 Double-pass Knurled Brass Stud includes variou sizes from 6-30mm in length. Light weight and durable features ensure a reliable connection, while a knurled design allows for easy handling.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m3-double-pass-knurled-brass-stud",
+    "title": "M3 Double-pass Knurled Brass Stud",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "928a146b50197c20d9d97994799dfecfd6689b322d25f27450a0b8d26a33231c",
+   "en": "Easily get the parts you need and focus on creating!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m1-6-socket-head-cap-machine-screws-shcs-1",
+    "title": "M1.6 Socket Head Cap Machine Screws (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b2bc4e0de2bc59a0f181cb327c67752aef2a0634962d02c557dc74b0be54930e",
+   "en": "M2.5 Flat Head Cap Machine Screws (FHCS) 1. Stainless steel grade 4.8 countersunk hex socket full-thread screws. 2. The countersunk head can be concealed within a countersunk hole to achieve a flush surface. 3. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-5-flat-head-cap-machine-screws-fhcs-1",
+    "title": "M2.5 Flat Head Cap Machine Screws (FHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7c26a462cc39873d926c01fc19521e6f3acc504828e4bb20e46c817fb2c19180",
+   "en": "M3 Flat Head Cap Machine Screws (FHCS) 1. Stainless steel grade 4.8 countersunk hex socket full-thread screws. 2. The countersunk head can be concealed within a countersunk hole to achieve a flush surface. 3. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m3-flat-head-cap-machine-screws-fhcs",
+    "title": "M3 Flat Head Cap Machine Screws (FHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8ec16c8329f9a0a88f8e07942a6ebf3612f12cb87c522f42fc1ffb18c631f280",
+   "en": "Flat Washer 1. Carbon steel flat washers. 2. Used between screws, nuts, and parts to distribute pre-tension pressure, enhance anti-loosening effect, and prevent damage to the parts.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-m3-carbon-steel-flat-washer",
+    "title": "Carbon Steel Flat Washer",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "407d799a2ec040d269ee33539e294b35a93b0f551b0700b006ca555ba31e9652",
+   "en": "100 pcs /10 pcs",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m2-m3-carbon-steel-flat-washer",
+    "title": "Carbon Steel Flat Washer",
+    "field": "specs[contents.pieces]",
+    "near": "Pieces per pack"
+   },
+   "dict": {
+    "ar": "100 قطعة / 10 قطعة",
+    "ckb": "100 دانە / 10 دانە"
+   }
+  },
+  {
+   "h": "fbdacfc7f9268cbdd39476d861801e4e7582aa2404538c731e680b1484716a86",
+   "en": "BT2.5 Socket Head Cap Self Tapping Screw (SHCS) 1. Carbon steel cup head hex socket BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bt2-5-socket-head-cap-self-tapping-screws-shcs-new",
+    "title": "BT2.5 Socket Head Cap Self Tapping Screws (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "06b1be0d94b4123c6f6f0cd6c01bc056e107cc9f5089202980923e12ce1a3109",
+   "en": "BT3 Socket Head Cap Self Tapping Screw (SHCS) 1. Carbon steel cup head hex socket BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bt3-socket-head-cap-self-tapping-screws-shcs-new",
+    "title": "BT3 Socket Head Cap Self Tapping Screws (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b38b61774d266cc9fa1a3c2bdf1368d0538b3cd2c3c85f26dffaca741c8a0e50",
+   "en": "BT2 Button Head Cap Self Tapping Screw (BHCS) 1. Carbon steel cup head hex button BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bt2-button-head-cap-self-tapping-screw-bhcs",
+    "title": "BT2 Button Head Cap Self Tapping Screw (BHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "806aa8ddf9123c505b08e5afd41390f94ad7a7428d6d1c640365b93c1918212c",
+   "en": "BT2.5 Button Head Cap Self Tapping Screw (BHCS) 1. Carbon steel cup head hex button BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bt2-5-button-head-cap-self-tapping-screw-bhcs",
+    "title": "BT2.5 Button Head Cap Self Tapping Screw (BHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d721c1357ef1a45334a836c8460e07c93e7d1fcc1520a853ff87c9200a894d00",
+   "en": "BT3 Button Head Cap Self Tapping Screw (BHCS) 1. Carbon steel cup head hex button BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bt3-button-head-cap-self-tapping-screw-bhcs",
+    "title": "BT3 Button Head Cap Self Tapping Screw (BHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ec4c663fd2bfc97f156dccb2bfff1cfa2450117f70259aab9f414e3bbbdcfccd",
+   "en": "Easily get the parts you need and focus on creating! M3 Socket Head Shoulder Machine Screws (SHSS), 4.8 Strength grade, Half thread series, Using a shoulder section as a bare shaft for easy mounting of bearings or other components.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "m2-socket-head-shoulder-machine-screws-shss",
+    "title": "M2 Socket Head Shoulder Machine Screws (SHSS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d0bcdf4c8b3f0690035493df51083e0f82f8c58429eb589b50e4555a7975505d",
+   "en": "Stainless Steel Dowel Pin 1. Widely used for part positioning and for various types of shafts. 2. Rounded corners at both ends for easy insertion into mounting holes.",
+   "kind": "short_description",
+   "freq": 3,
+   "context": {
+    "handle": "d2-stainless-steel-dowel-pin",
+    "title": "D2 Stainless Steel Dowel Pins",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4ed5f68b374a132ea0d8e51c1f80bc3357ec1059431c3e95efb84b8921bae4f6",
+   "en": "Chamfer/Round",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "d2-stainless-steel-dowel-pin",
+    "title": "D2 Stainless Steel Dowel Pins",
+    "field": "specs[part.end_shape]",
+    "near": "End shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "2dc35b64a697d5c09dd7652bfc44b8cb63f4694b51af7368d3a9ad3ba04b68fd",
+   "en": "Carbon Steel Hex Nut 1. Carbon Steel Hex Nut. 2. Used in conjunction with screws to fasten parts, can be concealed in hexagonal slots.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "hex-nut",
+    "title": "Carbon Steel Hex Nut",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4336242a78f78008ed0e8548672d658981cfda3964f1c53e676e0cc8878347de",
+   "en": "Carbon Steel Self Locking Hex 1. Prevents screws from loosening under vibration. 2. Used in conjunction with screws to fasten parts, can be concealed in hexagonal slots.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "self-locking-hex-nut",
+    "title": "M2-M6 Self Locking Hex Nut",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "23b0fdbf14706b9869b1f14e59c013befa8b161bf9415a997faa6086a5ab41b4",
+   "en": "Round Threaded Brass Heat-Insert Nut 1. Used in conjunction with screws to fasten parts, can be concealed in hexagonal slots. 2. Better filling in the installation compared to Diamond Knurling 3. Stronger pull-out resistance than straight knurling 4. Easy to install in 3D printed parts with a heated soldering iron",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "round-threaded-brass-heat-insert-nut",
+    "title": "Round Threaded Brass Heat-Insert Nut",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "950ec9f8a3f987cf0e93442cd52abb9d21415923d5240556ef26fc81a132404a",
+   "en": "Knurling type",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "round-threaded-brass-heat-insert-nut",
+    "title": "Round Threaded Brass Heat-Insert Nut",
+    "field": "specs[x.knurling_type].label",
+    "near": "Herringbone twill knurling"
+   },
+   "dict": null
+  },
+  {
+   "h": "53b45c5d3c59cf290150c2d66022ba927d2d6fa221becfc0f0fdd68d2dc0d76a",
+   "en": "Herringbone twill knurling",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "round-threaded-brass-heat-insert-nut",
+    "title": "Round Threaded Brass Heat-Insert Nut",
+    "field": "specs[x.knurling_type]",
+    "near": "Knurling type"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d7b9bb70a138243984df209352fc0e670667912f131fe96a2de4af8838f7157",
+   "en": "Carbon Steel Square Nut 1. Used in conjunction with screws to fasten parts, can be concealed in hexagonal slots. 2. Inserting parts from the side to hide",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "square-nut",
+    "title": "Carbon Steel Square Nut",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c11092bc0861591e9ce5d9a97e83d4fae3c6954a318977865fa85f5b3eeafda8",
+   "en": "Square",
+   "kind": "spec_value_text",
+   "freq": 7,
+   "context": {
+    "handle": "square-nut",
+    "title": "Carbon Steel Square Nut",
+    "field": "specs[part.fastener_type]",
+    "near": "Fastener type"
+   },
+   "dict": null
+  },
+  {
+   "h": "b7a43b9c130e05d746c96507f064d97e42e86e5e43a60bb7c904b9ff1e9a8dd0",
+   "en": "High Performance Bearings 1. Skate board bearing and fingertip gyro bearing 1. Commonly used high-performance deep groove ball bearings 2. Higher precision for stable, durable rotation and higher load capacity",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "high-performance-bearings",
+    "title": "High Performance Bearings",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f66e7ebeea66a67e9b96362b5fc122d9eb842cc16bd188536006b9f33d60bbf1",
+   "en": "High performance",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "high-performance-bearings",
+    "title": "High Performance Bearings",
+    "field": "specs[part.ball_bearing_profile]",
+    "near": "Ball bearing profile"
+   },
+   "dict": null
+  },
+  {
+   "h": "d965efa36beadfe4e75a42fefcfbfd68eb80a9b63e3e780b53ead48f6a2f53d0",
+   "en": "Sealing Part Structure",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "high-performance-bearings",
+    "title": "High Performance Bearings",
+    "field": "specs[x.sealing_part_structure].label",
+    "near": "Metal shielded/Open"
+   },
+   "dict": null
+  },
+  {
+   "h": "d06197c67c56636beb6080d2183a8e3dbb69128873a3927e7b5db2f7f1f29286",
+   "en": "Metal shielded/Open",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "high-performance-bearings",
+    "title": "High Performance Bearings",
+    "field": "specs[x.sealing_part_structure]",
+    "near": "Sealing Part Structure"
+   },
+   "dict": null
+  },
+  {
+   "h": "c26244f5893c0cdf7b9f2904d0ef006c90086b0e01bfdf1b6ead4e42e12d9acd",
+   "en": "Outer Ring Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "high-performance-bearings",
+    "title": "High Performance Bearings",
+    "field": "specs[x.outer_ring_type].label",
+    "near": "Flat"
+   },
+   "dict": null
+  },
+  {
+   "h": "9285cedcf26a7cbb5277c70b4651a54679ee9d2c89767bc9dbe532b14f4bb697",
+   "en": "Flat",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "high-performance-bearings",
+    "title": "High Performance Bearings",
+    "field": "specs[x.outer_ring_type]",
+    "near": "Outer Ring Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "22415e29a716d8c7b661389c7d898a81f6be11476bc563d8074a2f3b295d9bdb",
+   "en": "POM/Bearing steel",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "high-performance-bearings",
+    "title": "High Performance Bearings",
+    "field": "specs[part.ring_material]",
+    "near": "Inner and outer ring material"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0c30c9b89d06a4d48aaba1224fdf5914266f94a5ec51c40efcf49d1b66be8e1",
+   "en": "Ceramic/Bearing steel",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "high-performance-bearings",
+    "title": "High Performance Bearings",
+    "field": "specs[part.ball_type]",
+    "near": "Ball type"
+   },
+   "dict": null
+  },
+  {
+   "h": "6759f22e1e54bf17b7aa0fe6d9c0366e7689c71c26cf1143d90aff27c36a4eb5",
+   "en": "Steel Deep Groove Ball Bearings 1. Used to support rotating shafts, capable of withstanding both axial and radial loads. 2. Features higher limit speed and load capacity, with smaller clearance.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "micro-steel-deep-groove-ball-bearings",
+    "title": "Micro Steel Deep Groove Ball Bearings",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cbece9881c14aa08bf224777b1b0aca0fe89fd02c95d8ca193838bb0617fd74e",
+   "en": "High-quality Oil Impregnated Bronze Bushings, wear-resistant and durable, suitable for various mechanical and industrial applications. Available in multiple specifications, precise dimensions, ensuring stable performance.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "oil-impregnated-bronze-bushings",
+    "title": "Oil Impregnated Bronze Bushings",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "da855699eacc47292e49dca517cd14498e7fd325f52f537ead56c42656e5ddf5",
+   "en": "Tubular",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "oil-impregnated-bronze-bushings",
+    "title": "Oil Impregnated Bronze Bushings",
+    "field": "specs[part.shape]",
+    "near": "Shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ad25f6356d98406b8a23e4b96f7c32c730141a110f8741465d814ae7aef6ece",
+   "en": "Enhance your 3D printing projects with our high-quality O-Rings. The circular design ensures the prevention of liquid and gas leaks, providing excellent sealing performance and durability. These O-Rings are ideal for creating reliable seals in various components such as pistons, cylinders, and hydraulic cylinders.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "o-rings",
+    "title": "O Rings",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "67644d18f914cbf391edae0823d5839e030db108fe49f9fbda0561120d5e0b59",
+   "en": "Oil-Resistance",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "o-rings",
+    "title": "O Rings",
+    "field": "specs[x.oil_resistance].label",
+    "near": "Excellent"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a4395e452d3321ad8bbeb7ecd5bf43c73450100b6e0e7e3f455b5b1ec89a80d",
+   "en": "Aging-Resistance",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "o-rings",
+    "title": "O Rings",
+    "field": "specs[x.aging_resistance].label",
+    "near": "Good"
+   },
+   "dict": null
+  },
+  {
+   "h": "78dd9242b7486a4c1e7483fff23cd734247615225cbec891f8314d9ed4bac7fe",
+   "en": "Nitrile Rubber (NBR)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "o-rings",
+    "title": "O Rings",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "d60fe26c4257a7a2973f4e90a43a5060f6d2f598a004ce53bebefa40cebe3fe8",
+   "en": "Circular",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "o-rings",
+    "title": "O Rings",
+    "field": "specs[part.shape]",
+    "near": "Shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "143616d3274159d09867bc90219ef6dd10751e0efdd345b99484c74d13361ee7",
+   "en": "3 Pin 10mm LED Strip Connector Cable fits WS2812B RGB LED Strip Light, perfect DIY led light accessory kit.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "3-pin-10mm-led-strip-connector-cable-with-sm-female-plug-for-rgb",
+    "title": "3 Pin 10mm LED Strip Connector Cable with SM Female Plug for RGB",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f1f04a736e33d617bcfc0f261d8f0762515a90ea6fbfb2fc8bffbded2813f407",
+   "en": "USB-A to 2 Pin 8mm Solderless Quick Connector fits 6500K White LED Light Strip, a perfect DIY led light accessory kit.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "usb-a-to-2-pin-8mm-solderless-quick-connector-for-white-led",
+    "title": "USB-A to 2 Pin 8mm Solderless Quick Connector For White LED",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1ea47a10e857ae1db6056308f27b2647ac73d17817d5e67e1602d803361b22dd",
+   "en": "The 3004 5V Slim Micro Fan can be combined with 3D printing models to achieve various functions, such as mini humidifiers, purifiers, etc. Compared with the same size DC Fan, 3004 5V Slim Micro Fan has a higher air pressure, more suitable for cooling and other application scenarios.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "3004-slim-micro-fan-5v-with-2pin-sh1-0",
+    "title": "3004 5V Slim Micro Fan with 2pin SH1.0",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "06eb86e392db1ba942e53ace7d72e69b6b750b4248aed2d26b1701e8aaf37f70",
+   "en": "30.7DB-A (Max:34.1DB-A)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "3004-slim-micro-fan-5v-with-2pin-sh1-0",
+    "title": "3004 5V Slim Micro Fan with 2pin SH1.0",
+    "field": "specs[x.noise_db_a]",
+    "near": "Noise (DB-A)"
+   },
+   "dict": null
+  },
+  {
+   "h": "18a32bfa5a61848c0b0c7b9a850c129ad6e51f3dc53f24745241bdb8509bc57a",
+   "en": "Product Weight (g)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "3004-slim-micro-fan-5v-with-2pin-sh1-0",
+    "title": "3004 5V Slim Micro Fan with 2pin SH1.0",
+    "field": "specs[x.product_weight_g].label",
+    "near": "4.9"
+   },
+   "dict": null
+  },
+  {
+   "h": "87df09e67084e8ad825d145721878a0dc67eed40d42b7cc024bbf1cbdae21ee2",
+   "en": "MXL Timing Belt 1. Small-sized trapezoidal teeth with high contact area and good meshing performance. 2. Suitable for light loads and precision drive systems. 3. smooth, quiet performance, along with rugged durability and enhanced longevity.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7dbb20f35c8a6db50fc63a50d452a8caa9a94c20bcf192be28b503417fe82758",
+   "en": "MXL",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "specs[part.teeth_type]",
+    "near": "Teeth type"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb393ef798833bc5969ca149371c8a53674cae406aa32a8c57881598f1c1f106",
+   "en": "Single sided",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "specs[part.surface_type]",
+    "near": "Surface type"
+   },
+   "dict": null
+  },
+  {
+   "h": "a1f1e8139476626329f4e234f383fc48b0d085279d6a6b372d6a64e348d0fdef",
+   "en": "Close loop",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "specs[part.shape]",
+    "near": "Shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "14f236709e516781cb62681deb062962b0a9515c14ae8b5de15e6e974171d950",
+   "en": "PU",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "mxl-timing-belt",
+    "title": "MXL Timing Belts",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f4a40a8c2ece0afff7073ed5b0ec64b100d04e007e974b1d1fa201e60c1cc82",
+   "en": "Enhance your precision drive systems with our XL Timing Belt, designed for light loads and accuracy. Featuring a trapezoidal tooth shape, it offers high contact area and excellent meshing performance. With a pitch of 5.08 mm (0.2 inches), this belt ensures precise timing and synchronization, making it ideal for delicate machinery.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "xl-timing-belts",
+    "title": "XL Timing Belts",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f365705bb0612eed918b30a166bd7b5d48908d58cbfb7da0deff2a7b953199ce",
+   "en": "XL",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "xl-timing-belts",
+    "title": "XL Timing Belts",
+    "field": "specs[part.teeth_type]",
+    "near": "Teeth type"
+   },
+   "dict": null
+  },
+  {
+   "h": "708cd7074b0b21da9d02bf7487c0f2f9e61c4377c1ad6dc2e6bd7dd642db16ef",
+   "en": "Upgrade your 3D printing setup with our premium HTD Timing Belt. Designed for high load and high torque drive systems, this belt ensures precise synchronization of motors and connected components, essential for high-quality 3D prints. The innovative arc tooth design enhances torque transmission and meshing performance, reducing tooth slippage for smoother, more accurate motion control. This results in superior print quality and detailed output.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "high-torque-drive-timing-belt",
+    "title": "HTD Timing Belt",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "38a497aa6da345482bc551661fa1ed0e49b7af44367daa62dbe25033e7d0baa0",
+   "en": "HTD",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "high-torque-drive-timing-belt",
+    "title": "HTD Timing Belt",
+    "field": "specs[part.teeth_type]",
+    "near": "Teeth type"
+   },
+   "dict": null
+  },
+  {
+   "h": "892c8cef383edc912cd34a3292ae02e5b89d377883fb49b096829c1d5482d2ec",
+   "en": "Rubber Gasket Seal Ring -Prevents leakage of liquids and gases, with excellent sealing performanc -Used as foot pads or cushioning pads to reduce impact during movement",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-gasket-seal-ring",
+    "title": "Rubber Gasket Seal Ring",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8b5c0853ae8313518a592ba1e6091608262bded605d1585ed9cebdc96fccfe99",
+   "en": "Elasticity",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-gasket-seal-ring",
+    "title": "Rubber Gasket Seal Ring",
+    "field": "specs[x.elasticity].label",
+    "near": "Good"
+   },
+   "dict": null
+  },
+  {
+   "h": "b3e665c7096463dfea42e970b5cb31b88f09385d6b2c2ef6dff4f3217cfaf585",
+   "en": "Designed for seamless connectivity, 50mm PH2.0 to SH1.0 Conversion Wire allows direct connection between appliances, power sources, and power supplies without the need for a distribution board. Its high-quality construction ensures reliable and efficient electrical performance, making it ideal for various applications, including 3D printing setups and other precision electronic projects. Simplify your wiring needs and ensure a stable power connection with our versatile 50mm PH2.0 to SH1.0 Conversion Wire, perfect for both professional and hobbyist use.",
+   "kind": "short_description",
+   "freq": 4,
+   "context": {
+    "handle": "50mm-ph2-0-to-sh1-0-conversion-wire",
+    "title": "50mm PH2.0 to SH1.0 Conversion Wire",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3909a973dd469988496dbcb03cbb7193c99ec318500ee9ff4ec2150b084d59cd",
+   "en": "The 50mm PH2.0 to SH1.0 Conversion Wire is used for directly connecting appliances and power sources, creating a circuit without the need for a distribution board",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "50mm-ph2-0-to-sh1-0-conversion-wire",
+    "title": "50mm PH2.0 to SH1.0 Conversion Wire",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1e8cff541cf2a64db9cb5c21b267b1631f5d2f094346f0eac088f2f08e969388",
+   "en": "Our 100mm Y-type PH2.0 to Dual SH1.0 Conversion Wire is designed for directly connecting appliances and power sources, ensuring seamless integration into your 3D printing system. It allows switches to be connected, providing direct control over circuit on/off or resistance without the need for a distribution board.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "100mm-y-type-ph2-0-to-dual-sh1-0-conversion-wire",
+    "title": "100mm Y Type PH2.0 to Dual SH1.0 Conversion Wire",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0f8fa648148b3709764c581ea7495ec03de9c03c67732978dbcdeb71cc60b129",
+   "en": "Used for directly connecting appliances and power sources, allowing switches to be connected for direct control of circuit on/off or resistance, and enabling appliance control without the need for a distribution board",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "100mm-y-type-ph2-0-to-dual-sh1-0-conversion-wire",
+    "title": "100mm Y Type PH2.0 to Dual SH1.0 Conversion Wire",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7dfdf8239b132830528d2c31971d63c95e1f5ab446d02614ef7b06cf9bbee7f9",
+   "en": "1. Easy to install, ideal for securing small and light items for a variety of DIY projects 2. Firmly bonded liner with strong magnetism 3. Easy to bend and adjust shape, suitable for curved or irregular surfaces 4. Right angled rectangles are suitable for fitting right angled edges without leaving any gaps",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "rectangular-magnetic-stickers",
+    "title": "Rectangular Magnetic Stickers",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c8dc4902a8c3f552c29ae717d242b2bd999d2351a001db954bab48927c6be2fd",
+   "en": "Adhesive",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "rectangular-magnetic-stickers",
+    "title": "Rectangular Magnetic Stickers",
+    "field": "specs[part.back_material]",
+    "near": "Back material"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e01ec31cadb642bf88a277d446624b03b3333f36b3ab7a83c0c54eb0c92b6aa",
+   "en": "Rubber ferrite",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "rectangular-magnetic-stickers",
+    "title": "Rectangular Magnetic Stickers",
+    "field": "specs[part.front_material]",
+    "near": "Front material"
+   },
+   "dict": null
+  },
+  {
+   "h": "8afbc02f6fcfeadfd3339304396cf8332baf7fad5d8d3c97def0fef1b3f6a7f6",
+   "en": "Rectangular",
+   "kind": "block_cell",
+   "freq": 7,
+   "context": {
+    "handle": "rectangular-magnetic-stickers",
+    "title": "Rectangular Magnetic Stickers",
+    "field": "blocks[0].line[5].cell[3]",
+    "near": "CD016 | 80 | 80 | Square"
+   },
+   "dict": null
+  },
+  {
+   "h": "fdd335f2eda6609b5a420bccf5c36f3d9ed731d4d2b85b4999147144ce2adeb2",
+   "en": "1. Easy to install, ideal for securing small and light items for a variety of DIY projects 2. Firmly bonded liner with strong magnetism 3. Easy to bend and adjust shape, suitable for curved or irregular surfaces 4. Rounded contours for greater aesthetics",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "round-magnetic-stickers",
+    "title": "Round Magnetic Stickers",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e04b618a8bbcc03a789301eed808e5cf209721e25b8b5f66ff065fd5e86cbef3",
+   "en": "1. Easy to install, ideal for securing small and light items for a variety of DIY projects 2. Moderate magnetism for easy attachment and detachment 3. Easy to bend and adjust shape, suitable for curved or irregular surfaces 4. Rounded corners for a more contoured fit",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "rectangle-magnetic-stickers-with-round-corners",
+    "title": "Rectangle Magnetic Stickers with Round Corners",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "043e309de0318a2a8d41737c07d33f58df00de42cb571d7b3127a3696ec68052",
+   "en": "1. Easy to install, ideal for securing small and light items for a variety of DIY projects 2. Moderate magnetism for easy attachment and removal 3. Back glue can be easily fixed to the parts 4. Durable and flexible design",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "soft-magnetic-sheet-stickers",
+    "title": "Soft Magnetic Sheet Stickers",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6a2cb64966e404c83c895746c74837092f76ecfe098cd567ec6b4af162f644c2",
+   "en": "1. Long-lasting and strong 2. Ready-to-peel cut-to-size 3. Easy to bend and adjust shape 4. Suitable for fitting right angled edges without leaving any gaps 5. Adheres to a wide range of surfaces such as wood, glass, plastic, metal, etc.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c3f00ea2f856ca6a23cb738c4be58391299178cbba1fd7cc5818c7767d7a491d",
+   "en": "Adhesion",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "specs[x.adhesion].label",
+    "near": "Strong"
+   },
+   "dict": null
+  },
+  {
+   "h": "30a04fdcb6bb10b03f55db14e88d7c1f5bcc9129d511e9b6b7dadd49bcb1a755",
+   "en": "Strong",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "square-double-sided-foam-tape",
+    "title": "Rectangular Double Sided Foam Tape",
+    "field": "specs[x.adhesion]",
+    "near": "Adhesion"
+   },
+   "dict": null
+  }
+ ]
+}

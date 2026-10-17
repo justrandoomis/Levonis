@@ -1,0 +1,2097 @@
+{
+  "handle": "h2s",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T10:00:09Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "title": "H2S & H2S Laser Edition Spec Sheet",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*"
+      ],
+      "note": "All 3 pages read (text layer, checked against the rendered pages). Pages 1–2: printer spec table; page 3: 10W laser module and cutting module spec and footnotes ¹ ². Linked from the store spec table."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/h2s",
+      "title": "Bambu Lab H2S store page",
+      "retrieved_at": "2026-10-16T06:55:07Z",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): H2S Specs table, Product Features, What's in the box, FAQ, footnotes and the marketing sections."
+    },
+    {
+      "kind": "store_messages",
+      "url": "https://us.store.bambulab.com/products/h2s",
+      "title": "Bambu Lab H2S store page, messages bundle",
+      "retrieved_at": "2026-10-16T06:55:07Z",
+      "keys": [
+        "electrical.*",
+        "package.*",
+        "shipment.*",
+        "product.*",
+        "physical.*"
+      ],
+      "note": "The bundle carries only the production.H2D namespace (H2D values: 31 kg, H2D gross weights); no H2S 220 V / UK message exists, so no intl_220v package size or gross weight was taken."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2s/manual/acc-in-the-box",
+      "title": "H2S Packaging List",
+      "retrieved_at": "2026-10-16T08:23:38Z",
+      "keys": [
+        "package.contents",
+        "printing.included_build_plate"
+      ],
+      "note": "Packing list table (H2S Laser Full Combo and H2S AMS Combo columns; no column for the printer-only H2S) and the two box-photo tables."
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.technology",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Fused Deposition Modeling",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Printing Technology",
+      "quote": "Printing Technology Fused Deposition Modeling",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "340 × 320 × 340 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Body › Build Volume (W*D*H)",
+      "quote": "Build Volume (W*D*H) 340*320*340 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "W × D × H, as the sheet writes it. The store table states the same (row \"Build Volume (W*D*H)\", 340*320*340 mm³)."
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Aluminum and Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Body › Chassis & Shell",
+      "quote": "Chassis & Shell Aluminum and Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "conflict": "The store table row \"Chassis\" reads \"Aluminum, Steel, Plastic and Glass\"; the H2S spec sheet row \"Chassis & Shell\" reads \"Aluminum and Steel\". The spec sheet is kept (higher source rank); the store wording stays as the recorded disagreement."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 492,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (1st of 3)",
+      "quote": "Physical Dimensions 492*514*626 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "The store table states the same printer size (492*514*626 mm³)."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 514,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (2nd of 3)",
+      "quote": "Physical Dimensions 492*514*626 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "The store table states the same printer size (492*514*626 mm³)."
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 626,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (3rd of 3)",
+      "quote": "Physical Dimensions 492*514*626 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "The store table states the same printer size (492*514*626 mm³)."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 30000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Net Weight",
+      "quote": "Net Weight 30 kg",
+      "test_method": "",
+      "test_condition": "The sheet covers \"H2S & H2S Laser Edition\" and gives one net weight",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "conflict": "The store table row \"Net Weight\" gives two weights, \"H2S: 30 kg\" and \"H2S Laser Edition: 30.5 kg\" (the package keeps them as one unverified product row \"30000 / 30500 g\"). The sheet's 30 kg matches the H2S; the Laser Edition's 30.5 kg is recorded on the H2S Laser Full Combo value."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "636696880147419140",
+        "value_text": "H2S Laser Full Combo"
+      },
+      "value": 30500,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "H2S Specs › row 8 (Net Weight)",
+      "quote": "H2S: 30 kg H2S Laser Edition: 30.5 kg",
+      "test_method": "",
+      "test_condition": "H2S Laser Edition, the printer of the H2S Laser Full Combo (store What's in the box: \"Bambu Lab H2S Laser Edition\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:07Z",
+      "conflict": "The H2S & H2S Laser Edition spec sheet (p.1) gives a single net weight, 30 kg; only the store table gives 30.5 kg for the Laser Edition. Two official sources disagree for this edition, so the value stays unverified."
+    },
+    {
+      "key": "extrusion.hotend",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "All Metal",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Toolhead › Hotend",
+      "quote": "Hotend All Metal",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "extrusion.extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Gear",
+      "quote": "Extruder Gear Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Toolhead › Nozzle",
+      "quote": "Nozzle Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Toolhead › Max Nozzle Temperature",
+      "quote": "Max Nozzle Temperature 350 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Toolhead › Included Nozzle Diameter",
+      "quote": "Included Nozzle Diameter 0.4 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Toolhead › Supported Nozzle Diameter",
+      "quote": "Supported Nozzle Diameter 0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "printing.filament_cutter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Cutter",
+      "quote": "Filament Cutter Built-in",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Diameter",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "extrusion.extruder_motor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Motor",
+      "quote": "Extruder Motor Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "printing.build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI plate",
+        "Smooth PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 120,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Heatbed › Max Heatbed Temperature",
+      "quote": "Max Heatbed Temperature 120 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Speed › Max Speed of Toolhead",
+      "quote": "Max Speed of Toolhead 1000 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Speed › Max Acceleration of Toolhead",
+      "quote": "Max Acceleration of Toolhead 20,000 mm/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Speed › Max Flow for Hotend (Standard Flow Hotend)",
+      "quote": "Max Flow for Hotend (Standard Flow Hotend) 40 mm³/s (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 ℃ printing temperature)",
+      "test_method": "250 mm round model with a single outer wall",
+      "test_condition": "Standard flow hotend; Bambu Lab ABS; 280 °C printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "motion.max_flow_high_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Speed › Max Flow for Hotend (Optional High Flow Hotend)",
+      "quote": "Max Flow for Hotend (Optional High Flow Hotend) 65 mm³/s (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 ℃ printing temperature)",
+      "test_method": "250 mm round model with a single outer wall",
+      "test_condition": "Optional High Flow Hotend (sold separately); Bambu Lab ABS; 280 °C printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "thermal.chamber_heating",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Chamber Temperature Control › Active Chamber Heating",
+      "quote": "Active Chamber Heating Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Chamber Temperature Control › Max Temperature",
+      "quote": "Max Temperature 65 ℃",
+      "test_method": "",
+      "test_condition": "Maximum chamber temperature with active chamber heating",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "safety.prefilter_grade",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "G3",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Air Purification › Pre-filter Grade",
+      "quote": "Pre-filter Grade G3",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "safety.hepa_grade",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H12",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Air Purification › HEPA Filter Grade",
+      "quote": "HEPA Filter Grade H12",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "safety.carbon_filter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Granulated Coconut Shell",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Air Purification › Activated Carbon Filter Type",
+      "quote": "Activated Carbon Filter Type Granulated Coconut Shell",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "safety.voc_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Superior",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Air Purification › VOC Filtration",
+      "quote": "VOC Filtration Superior",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "safety.particulate_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Air Purification › Particulate Matter Filtration",
+      "quote": "Particulate Matter Filtration Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "thermal.part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Cooling › Part Cooling Fan",
+      "quote": "Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "thermal.hotend_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Cooling › Cooling Fan for Hotend",
+      "quote": "Cooling Fan for Hotend Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "thermal.control_board_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Cooling › Main Control Board Fan",
+      "quote": "Main Control Board Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "thermal.chamber_exhaust_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Cooling › Chamber Exhaust Fan",
+      "quote": "Chamber Exhaust Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "thermal.chamber_circulation_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Cooling › Chamber Heat Circulation Fan",
+      "quote": "Chamber Heat Circulation Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "thermal.aux_part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Cooling › Auxiliary Part Cooling Fan",
+      "quote": "Auxiliary Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "TPU",
+        "PVA",
+        "BVOH",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "PET",
+        "PPS",
+        "Carbon/Glass Fiber Reinforced PLA, PETG, PA, PET, PC, ABS, ASA, PPA, PPS"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Filament Supported (two lines)",
+      "quote": "Filament Supported PLA, PETG, TPU, PVA, BVOH, ABS, ASA, PC, PA, PET, PPS; Carbon/Glass Fiber Reinforced PLA, PETG, PA, PET, PC, ABS, ASA, PPA, PPS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "conflict": "Same two lines as the store table row \"Supported Filament Type\", but the package splits the second line at every comma, so its list repeats PETG, PA, PET, PC, ABS, ASA and PPS as plain items and adds a plain \"PPA\", which the sheet lists only as a carbon/glass fibre reinforced grade. Kept the sheet's grouping.",
+      "note": "The second line is one item as the sheet writes it: the reinforced grades of the nine listed bases."
+    },
+    {
+      "key": "printing.camera",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Sensor › Live View Camera",
+      "quote": "Live View Camera Built-in; 1920*1080",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "printing.camera_toolhead",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1600*1200",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Sensor › Toolhead Camera",
+      "quote": "Toolhead Camera Built-in; 1600*1200",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "printing.camera_birdseye",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 3264*2448（Equipped with Laser Edition）",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Sensor › BirdsEye Camera",
+      "quote": "BirdsEye Camera Built-in; 3264*2448 (Equipped with Laser Edition)",
+      "test_method": "",
+      "test_condition": "Equipped with the Laser Edition (H2S Laser Full Combo)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "Value written with the store table's full-width brackets so the two identical statements compare equal; the sheet uses ASCII brackets. Store footnote 8: the BirdsEye Camera comes standard with the H2S Laser Edition, or can be added via the Laser Upgrade Kit."
+    },
+    {
+      "key": "printing.door_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Sensor › Door Sensor",
+      "quote": "Door Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Sensor › Filament Run Out Sensor",
+      "quote": "Filament Run Out Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "printing.filament_tangle_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Sensor › Filament Tangle Sensor",
+      "quote": "Filament Tangle Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Sensor › Filament Odometry",
+      "quote": "Filament Odometry Supported with AMS",
+      "test_method": "",
+      "test_condition": "With AMS",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported with AMS\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported with AMS\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "printing.power_loss_recovery",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Sensor › Power Loss Recovery",
+      "quote": "Power Loss Recovery Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200-240 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage (2nd of 2)",
+      "quote": "Voltage 100–120 VAC / 200–240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "220 V version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-120 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage (1st of 2)",
+      "quote": "Voltage 100–120 VAC / 200–240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "The store table (US store) states the same: \"100-120 VAC, 50/60 Hz\"."
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage",
+      "quote": "Voltage 100–120 VAC / 200–240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "220 V version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage",
+      "quote": "Voltage 100–120 VAC / 200–240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2050,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Max Power¹ (1st of 2); footnote ¹ on p.3",
+      "quote": "Max Power¹ 2050 W@220 V / 1170 W@110 V",
+      "test_method": "",
+      "test_condition": "@220 V; footnote ¹: the printer maintains maximum power for about 3 minutes so the heatbed quickly reaches the needed temperature",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1170,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Max Power¹ (2nd of 2); footnote ¹ on p.3",
+      "quote": "Max Power¹ 2050 W@220 V / 1170 W@110 V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V), @110 V; footnote ¹: maximum power is held for about 3 minutes",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "The store table states the same US value (row \"Max Power¹\", \"1170 W@110 V\"; the package files it under electrical.requirements)."
+    },
+    {
+      "key": "physical.operating_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "10 °C-30 °C",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Working Temperature",
+      "quote": "Working Temperature 10 ℃-30 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "Value written as the store table writes it (\"10 °C-30 °C\"); the sheet uses the ℃ sign."
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "5-inch 720*1280 Touchscreen",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electronics › Touchscreen",
+      "quote": "Touchscreen 5-inch 720*1280 Touchscreen",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.storage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in 8 GB EMMC and USB Port",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electronics › Storage",
+      "quote": "Storage Built-in 8 GB EMMC and USB Port",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.control_interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Touchscreen",
+        "mobile App",
+        "PC App"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electronics › Control Interface",
+      "quote": "Control Interface Touchscreen, mobile App, PC App",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.npu",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "2 TOPS",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Electronics › Neural Processing Unit",
+      "quote": "Neural Processing Unit 2 TOPS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Studio Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Software › Slicer",
+      "quote": "Slicer Bambu Studio Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "The sheet puts \"Bambu Studio\" and the third-party sentence on two lines; written on one line as the store table writes it."
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "MacOS",
+        "Windows",
+        "Linux"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Software › Supported Operating System",
+      "quote": "Supported Operating System MacOS, Windows, Linux",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.ethernet",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Network Control › Ethernet",
+      "quote": "Ethernet Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.wireless_network",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Wi-Fi",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Network Control › Wireless Network",
+      "quote": "Wireless Network Wi-Fi",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.network_kill_switch",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Network Control › Network Kill Switch",
+      "quote": "Network Kill Switch Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.removable_network_module",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Network Control › Removable Network Module",
+      "quote": "Removable Network Module Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.network_access_control",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Network Control › 802.1X Network Access Control",
+      "quote": "802.1X Network Access Control Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z"
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Operating Frequency — 2412-2472 MHz (CE/FCC), 2400-2483.5 MHz (SRRC), 5150-5850 MHz\nWi-Fi Transmitter Power (EIRP) — 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) 5 GHz Band1/2: <23 dBm (FCC/CE/SRRC/MIC) 5 GHz Band3: <30 dBm (CE); <24 dBm (FCC) 5 GHz Band4: <23 dBm (FCC/SRRC); <14 dBm (CE)\nWi-Fi Protocol — IEEE 802.11 a/b/g/n",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.2, Wi-Fi › Operating Frequency; Wi-Fi Transmitter Power (EIRP); Wi-Fi Protocol",
+      "quote": "Operating Frequency 2412-2472 MHz (CE/FCC), 2400-2483.5 MHz (SRRC) 5150-5850 MHz … Wi-Fi Protocol IEEE 802.11 a/b/g/n",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "note": "The three Wi-Fi rows in the store table's layout (label — value per line); same content as the sheet."
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Build Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "What's in the box › Textured PEI Build Plate (all three columns)",
+      "quote": "Textured PEI Build Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:07Z",
+      "note": "Ticked for H2S AMS Combo, H2S Laser Full Combo and H2S. The packing-list wiki writes \"Build Plate (Pre-installed on heatbed)\"."
+    },
+    {
+      "key": "printing.multi_color",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Up to 24-color printing with up to 4 AMS 2 Pro and 8 AMS HT units (12 units, 24 filament slots)",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "FAQ › 5",
+      "quote": "The H2S supports up to 4 AMS 2 Pro and 8 AMS HT units, totaling 12 units with 24 filament slots, enabling up to 24-color printing.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:07Z",
+      "note": "FAQ prose, so unverified. Product Features bullet: \"Multi-color 3D Printing\"."
+    },
+    {
+      "key": "physical.noise",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Below 50 dB",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "Accessible › Quiet by Design; footnote 11",
+      "quote": "the H2S operates below 50 dB⁽¹¹⁾ … 11. Background noise: 40 dB; Test distance: 1 m",
+      "test_method": "",
+      "test_condition": "Background noise 40 dB; test distance 1 m (store footnote 11)",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:07Z",
+      "note": "Marketing prose, so unverified; the spec sheet has no noise row."
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "EU RED Article 3.3(d)(e)",
+        "ETSI EN 303 645 V2.1.1:2020"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "Product Features › footnote 2",
+      "quote": "* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020.",
+      "test_method": "",
+      "test_condition": "Cybersecurity compliance",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:07Z"
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate",
+      "condition": "Included in every version (store What's in the box: \"Textured PEI Build Plate\")"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Smooth PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "636696880147419138",
+        "value_text": "H2S"
+      },
+      "target_kind": "part",
+      "target_label": "Laser Upgrade Kit",
+      "target_source_handle": "laser-upgrade-kit",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Body › Laser Safety Windows; Air Assist Pump",
+      "quote": "Laser Safety Windows Equipped on Laser Edition, normal H2S can upgrade through Laser Upgrade Kit",
+      "condition": "Non-laser H2S: upgrades it to the Laser Edition",
+      "note": "The laser-upgrade-kit page has a \"For H2S\" compatibility value. Store FAQ 2: the upgrade kit uses an external air pump."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "636696880147419139",
+        "value_text": "H2S AMS Combo"
+      },
+      "target_kind": "part",
+      "target_label": "Laser Upgrade Kit",
+      "target_source_handle": "laser-upgrade-kit",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Body › Laser Safety Windows; Air Assist Pump",
+      "quote": "Laser Safety Windows Equipped on Laser Edition, normal H2S can upgrade through Laser Upgrade Kit",
+      "condition": "Non-laser H2S: upgrades it to the Laser Edition"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "laser_module",
+      "target_label": "10W laser",
+      "target_source_handle": "laser-module",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "FAQ › 1",
+      "quote": "It supports 10W laser and cutting but does not support 40W laser.",
+      "condition": "10 W laser module only (the spec sheet's laser section is \"10W Laser Module Spec\")"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "laser_module",
+      "target_label": "40W laser",
+      "target_source_handle": "laser-module",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "FAQ › 1",
+      "quote": "It supports 10W laser and cutting but does not support 40W laser.",
+      "condition": "The 40 W laser module",
+      "note": "The Product Features bullet says \"Optional 10W/40W Laser and Cutting Module\"; the FAQ, the 10W-only spec sheet section and the laser-module page FAQ (\"H2S supports 10W laser but does not support 40W laser\") say 40 W is not supported."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "FAQ › 5",
+      "quote": "The H2S supports up to 4 AMS 2 Pro and 8 AMS HT units, totaling 12 units with 24 filament slots, enabling up to 24-color printing.",
+      "condition": "Up to 4 AMS 2 Pro units at a time"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "FAQ › 5",
+      "quote": "The H2S supports up to 4 AMS 2 Pro and 8 AMS HT units, totaling 12 units with 24 filament slots, enabling up to 24-color printing.",
+      "condition": "Up to 8 AMS HT units at a time"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "FAQ › 4",
+      "quote": "The first-generation AMS is fully plug-and-play compatible with the H2S for multi-color printing but does not support AMS drying.",
+      "condition": "First-generation AMS: multi-colour printing only; AMS drying is not supported"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "FAQ › 4",
+      "quote": "Due to fundamental differences in the feeding mechanism and buffer structure, the H2S does not support AMS lite."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter (FAZ013-N)",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "Product Features › footnote 1",
+      "quote": "* To connect more than one AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+      "condition": "Only to connect more than one AMS unit (AMS 2 Pro, AMS HT)"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Optional High Flow Hotend",
+      "target_source_handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "source_title": "H2S & H2S Laser Edition Spec Sheet",
+      "locator": "p.1, Speed › Max Flow for Hotend (Optional High Flow Hotend)",
+      "quote": "Max Flow for Hotend (Optional High Flow Hotend) 65 mm³/s",
+      "condition": "Optional equipment",
+      "note": "Store footnote 6: \"High Flow Hotend are optional equipment and can be purchased from the official store.\" The target page lists H2S among its Printer Model values."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Vision Encoder",
+      "target_source_handle": "vision-encoder",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2s",
+      "source_title": "Bambu Lab H2S store page",
+      "locator": "Accuracy That Works for You; footnote 1",
+      "quote": "1. Vision Encoder: Vision Encoder needs to be purchased separately on the Bambu Lab Store.",
+      "condition": "Optional, purchased separately; enables the Vision Encoder motion-accuracy calibration"
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "636696880147419140",
+        "value_text": "H2S Laser Full Combo"
+      },
+      "source_url": "https://wiki.bambulab.com/en/h2s/manual/acc-in-the-box",
+      "source_title": "H2S Packaging List",
+      "retrieved_at": "2026-10-16T08:23:38Z",
+      "locator": "Packaging List › table › column \"H2S Laser Full Combo\" (rows 2–9)",
+      "quote": "Safety Key * 2 (one attached to the rear board, one on the Emergency Stop Button)",
+      "note": "Rows of the wiki column, in order, as written. Its Accessory Box list numbers two items \"9.\" (Pen Fixture, Laser module); both are kept. The store box list names the module \"10W Laser Module\".",
+      "items": [
+        {
+          "text": "H2S Printer",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Build Plate (Pre-installed on heatbed)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Safety Key (one attached to the rear board, one on the Emergency Stop Button)",
+          "qty": 2,
+          "section": ""
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "6-pin Cable",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Marker Pen",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Spool Holder",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Emergency Stop Button",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Cutting Module",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Pen Holder",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Pen Height Calibrator",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Pen Fixture",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Laser module",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "0.4 mm Nozzle",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Hotend Silicone Sock",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Toolhead Cutter",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "45° Fine-point Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Component",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Weeding Tool",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws (for Spool Holder, Scraper)",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Laser Homing Area XY & Z Marker",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Rubber Screws for Chamber Exhaust Fan",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Camera Privacy Cover",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Desiccant",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Laser Platform",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Cutting Platform",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "StrongGrip Cutting Mat (Pre-installed on Cutting Platform)",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "LightGrip Cutting Mat (Pre-installed on Cutting Platform)",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Laser Slats Pack",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Material Pins",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Basswood Plywood",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Cork Sheet",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Heat Transfer Vinyl",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Protective Paper for Heat Transfer",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Pearlescent White Greeting Card Set",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Rectangular PU Iron-on Patch",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Round Stainless Steel Tag (Large & Small)",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Brush",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "H2.5 Allen Key",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Smoke Ventilation Pipe",
+          "qty": null,
+          "section": "Inside the AMS 2 Pro (packed at the factory)"
+        },
+        {
+          "text": "Ventilation Pipe Adapter",
+          "qty": null,
+          "section": "Inside the AMS 2 Pro (packed at the factory)"
+        },
+        {
+          "text": "Pipe Clamp",
+          "qty": null,
+          "section": "Inside the AMS 2 Pro (packed at the factory)"
+        },
+        {
+          "text": "Screws for Ventilation Pipe Adapter",
+          "qty": null,
+          "section": "Inside the AMS 2 Pro (packed at the factory)"
+        },
+        {
+          "text": "Air Pump Intake",
+          "qty": null,
+          "section": "Inside the AMS 2 Pro (packed at the factory)"
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "636696880147419139",
+        "value_text": "H2S AMS Combo"
+      },
+      "source_url": "https://wiki.bambulab.com/en/h2s/manual/acc-in-the-box",
+      "source_title": "H2S Packaging List",
+      "retrieved_at": "2026-10-16T08:23:38Z",
+      "locator": "Packaging List › table › column \"H2S AMS Combo\" (rows 2–9)",
+      "quote": "Safety Key (attached to the rear board) | Spool Holder Power Cord (in AMS) | PTFE tube (2 pcs), 6-pin cable, printer power cord",
+      "note": "Rows of the wiki column, in order. Its last row (\"packaged inside the AMS 2 Pro at the factory\") also names \"printer power cord\", the same cord as \"Power Cord (in AMS)\" above, so it is listed once. Whether the separate \"PTFE Tube\" row and the \"PTFE tube (2 pcs)\" inside the AMS overlap is not stated; both are kept as written.",
+      "items": [
+        {
+          "text": "H2S Printer",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Build Plate (Pre-installed on heatbed)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Safety Key (attached to the rear board)",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "Spool Holder",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Power Cord (in AMS)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "0.4 mm Nozzle",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Hotend Silicone Sock",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Toolhead Cutter",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Component",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws (for Spool Holder, Scraper)",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Camera Privacy Cover",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Desiccant",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "PTFE tube",
+          "qty": 2,
+          "section": "Inside the AMS 2 Pro (packed at the factory)"
+        },
+        {
+          "text": "6-pin cable",
+          "qty": null,
+          "section": "Inside the AMS 2 Pro (packed at the factory)"
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/s7/default/3f91ec86de1a4ce28fe8fb660b95cd3e/h2s.pdf",
+      "title": "H2S & H2S Laser Edition Spec Sheet",
+      "retrieved_at": "2026-10-16T08:21:29Z",
+      "sha256": "7c0aeef677273024bc407024ffdc10c1b439e0864fb66d41504a65db69fe746e",
+      "note": "Linked from the store spec table (the package files the link as kind \"tds\"); the document is the H2S & H2S Laser Edition spec sheet, 3 pages."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2s/manual/acc-in-the-box",
+      "title": "H2S Packaging List",
+      "retrieved_at": "2026-10-16T08:23:38Z",
+      "sha256": "fcfc6fb534a85eeb859f8504806e5b757b83b2f80d8579a138537ead53e75fb3",
+      "note": "Official packing list (wiki page updated 2026-08-24)."
+    }
+  ],
+  "not_published": [
+    "printing.layer_height",
+    "printing.unsupported_filament",
+    "printing.camera_nozzle",
+    "printing.auto_leveling",
+    "printing.build_plate_material",
+    "electrical.rated_power",
+    "electrical.current",
+    "electrical.standby_power",
+    "electrical.steady_state_power",
+    "connectivity.bluetooth",
+    "connectivity.motion_controller",
+    "connectivity.application_processor",
+    "package.weight"
+  ]
+}

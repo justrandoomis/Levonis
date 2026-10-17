@@ -1,0 +1,575 @@
+{
+  "handle": "hotend-expansion-kit",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T15:35:02Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "title": "Hotend Expansion Kit (store page)",
+      "keys": [
+        "compat.statement",
+        "nozzle.*",
+        "contents.pieces",
+        "thermal.max_nozzle_temp",
+        "motion.max_flow",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "product.*",
+        "package.*",
+        "part.*",
+        "electrical.*",
+        "extrusion.*",
+        "safety.certifications",
+        "variant.note"
+      ],
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Parsed with the package (extractPage + buildImportPayload, format legacy_html, route-derived productType \"accessory\"; the manifest says \"hotend\"). The page has no specification table, no In the Box list, no weight or size and no document file list (productFileList null). Option groups: Printer Model \"H2 Series/P2S/X2D\", Flow Type \"Standard Flow\", Size \"0.2mm + 0.6mm + 0.8mm\", one variant. Two description tables: (1) \"Comparison of Different Nozzle Sizes\" (usage prose per size, including a 0.4 mm column the kit does not contain): not a spec. (2) \"Filament Compatibility\" (39 filaments × 0.2 mm Stainless Steel / 0.4 mm / 0.6 mm / 0.8 mm Hardened Steel): its header gives nozzle.material for the kit's three sizes, and a filament relation is written only where the kit's three columns agree (11 all √, none all X). 28 rows are mixed across the kit's nozzles (for example PLA Silk+ (√/Not recommended/Not recommended), PLA Silk Dual Color (√/Not recommended/Not recommended), PLA Silk (√/Not recommended/Not recommended)) or \"Not recommended\" and get no relation. The kit's three diameters cannot be held by the single-number nozzle.diameter key, so they stay in the Size value text. The notes under the table (\"prone to clog a 0.2 mm nozzle\" …) are usage advice, not a spec."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "compat.statement",
+        "printing.layer_height",
+        "motion.max_flow",
+        "product.*",
+        "package.*",
+        "part.*",
+        "extrusion.*",
+        "electrical.*",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "Read in full from the cached HTML (the cached .txt omits the tab panels). The \"H2 Series/P2S/X2D Nozzle\" panel (\"Max. Printing Temp: 350 ℃ | Size: 0.2mm/ 0.4mm/ 0.6mm/ 0.8mm | Materials: Hardened steel / Stainless steel\") carries this kit's own printer value as its name but does not name the kit. Its layer-height table is general guidance per nozzle size for every Bambu nozzle and cannot be scoped to one of the kit's three hotends (one option value); not stored. Its High Flow sentence (\"increases the maximum volume velocity by 62.5%\") is about the High Flow nozzle and is marketing; this kit is Standard Flow. It states no dimensions, weight, filament diameter, flow rate or electrical value."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "compat.statement",
+        "printing.layer_height",
+        "motion.max_flow",
+        "extrusion.filament_diameter"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "Linked from the store page (\"Learn more about filament compatibility on Bambu Lab Wiki\"). A general guide for every Bambu nozzle (columns 0.2/0.4/0.6/0.8 mm and 0.4/0.6/0.8 mm High flow), so none of its rows is stored as a spec of this kit; it is used only to flag disagreements with this page's Filament Compatibility table on the relations written (PC and PC FR at 0.2 mm; the X2D auxiliary-hotend qualifier on ABS at 0.2 mm). Its nozzle temperatures are per filament, not the hotend's maximum; its 0.4 mm advice is for a size this kit does not contain. It states no filament diameter and no flow rate."
+    }
+  ],
+  "specs": [
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H2 Series/P2S/X2D",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value)",
+      "quote": "Printer Model: H2 Series/P2S/X2D",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Conflict with the parsed store page: the deterministic row for this key holds \"[Note] Learn more about filament compatibility on Bambu Lab Wiki.\" (unverified, official_page), which is the link sentence under the Filament Compatibility table, not a compatibility statement. This row (official_variant) outranks it at merge; mergeCurated records the disagreement (spec_sources_disagree). The wiki panel's finer list (H2C left hotend only) is carried by the relations."
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Max. Printing Temp",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D | Max. Printing Temp: 350 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The wiki states 350 ℃ for the H2 Series/P2S/X2D hotend type, the name of this kit's only Printer Model value; its sizes and materials (\"Size: 0.2mm/ 0.4mm/ 0.6mm/ 0.8mm | Materials: Hardened steel / Stainless steel\") match the kit. The wiki does not name this kit (its purchase link is \"Bambu Hotend - H2/P2S Standard & High Flow\"), so the value stays unverified. The store page states no maximum temperature. In range (150–350 °C)."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174022",
+        "value_text": "0.2mm + 0.6mm + 0.8mm"
+      },
+      "value": "0.2 mm: Stainless Steel; 0.6 mm: Hardened Steel; 0.8 mm: Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › header row › columns 1, 3 and 4 (the sizes of Option group \"Size\" › value 1)",
+      "quote": "Filament | 0.2 mm Stainless Steel | 0.4 mm Hardened Steel | 0.6 mm Hardened Steel | 0.8 mm Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "The page's Filament Compatibility header gives each nozzle size its material; the kit holds 0.2, 0.6 and 0.8 mm (\"Size: 0.2mm + 0.6mm + 0.8mm\"), so the 0.4 mm column is not part of it. The wiki panel agrees (\"Materials: Hardened steel / Stainless steel\"). The store page has no row for this key (the Size group is kind \"size\", not \"nozzle\"), so nothing conflicts."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174022",
+        "value_text": "0.2mm + 0.6mm + 0.8mm"
+      },
+      "value": 3,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Size\" › value 1 (the only value)",
+      "quote": "Size: 0.2mm + 0.6mm + 0.8mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "The value text names one hotend of each size without a multiplier (\"0.2mm\" + \"0.6mm\" + \"0.8mm\"), read as 1 + 1 + 1 = 3; the product subtitle says the same sizes (\"Expand beyond the standard 0.4 mm hotend with 0.2 mm, 0.6 mm, and 0.8 mm options\"). No count is printed and there is no In the Box list, so the count stays unverified."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174018",
+        "value_text": "H2 Series/P2S/X2D"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2d",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value)",
+      "quote": "Printer Model: H2 Series/P2S/X2D",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series/P2S/X2D\" → atoms H2 Series (family h2_series: h2d, h2d-pro, h2s, h2c, refurbished H2D), P2S (p2s, refurbished P2S) and X2D). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S, H2C (left hotend), P2S and X2D and does not name the H2D Pro; the store page is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174018",
+        "value_text": "H2 Series/P2S/X2D"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2d-pro",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value)",
+      "quote": "Printer Model: H2 Series/P2S/X2D",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series/P2S/X2D\" → atoms H2 Series (family h2_series: h2d, h2d-pro, h2s, h2c, refurbished H2D), P2S (p2s, refurbished P2S) and X2D). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S, H2C (left hotend), P2S and X2D and does not name the H2D Pro; the store page is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174018",
+        "value_text": "H2 Series/P2S/X2D"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2s",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value)",
+      "quote": "Printer Model: H2 Series/P2S/X2D",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series/P2S/X2D\" → atoms H2 Series (family h2_series: h2d, h2d-pro, h2s, h2c, refurbished H2D), P2S (p2s, refurbished P2S) and X2D). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S, H2C (left hotend), P2S and X2D and does not name the H2D Pro; the store page is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174018",
+        "value_text": "H2 Series/P2S/X2D"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2c",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value)",
+      "quote": "Printer Model: H2 Series/P2S/X2D",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series/P2S/X2D\" → atoms H2 Series (family h2_series: h2d, h2d-pro, h2s, h2c, refurbished H2D), P2S (p2s, refurbished P2S) and X2D). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S, H2C (left hotend), P2S and X2D and does not name the H2D Pro; the store page is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174018",
+        "value_text": "H2 Series/P2S/X2D"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "refurbished-bambu-lab-h2d-3d-printer",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value)",
+      "quote": "Printer Model: H2 Series/P2S/X2D",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series/P2S/X2D\" → atoms H2 Series (family h2_series: h2d, h2d-pro, h2s, h2c, refurbished H2D), P2S (p2s, refurbished P2S) and X2D). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S, H2C (left hotend), P2S and X2D and does not name the H2D Pro; the store page is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174018",
+        "value_text": "H2 Series/P2S/X2D"
+      },
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_family": "model_p2s",
+      "target_source_handle": "p2s",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value)",
+      "quote": "Printer Model: H2 Series/P2S/X2D",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series/P2S/X2D\" → atoms H2 Series (family h2_series: h2d, h2d-pro, h2s, h2c, refurbished H2D), P2S (p2s, refurbished P2S) and X2D). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S, H2C (left hotend), P2S and X2D and does not name the H2D Pro; the store page is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174018",
+        "value_text": "H2 Series/P2S/X2D"
+      },
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_family": "model_p2s",
+      "target_source_handle": "refurbished-bambu-lab-p2s-3d-printer",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value)",
+      "quote": "Printer Model: H2 Series/P2S/X2D",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series/P2S/X2D\" → atoms H2 Series (family h2_series: h2d, h2d-pro, h2s, h2c, refurbished H2D), P2S (p2s, refurbished P2S) and X2D). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S, H2C (left hotend), P2S and X2D and does not name the H2D Pro; the store page is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "741421579801174018",
+        "value_text": "H2 Series/P2S/X2D"
+      },
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "target_family": "",
+      "target_source_handle": "x2d",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Option group \"Printer Model\" › value 1 (the only value)",
+      "quote": "Printer Model: H2 Series/P2S/X2D",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series/P2S/X2D\" → atoms H2 Series (family h2_series: h2d, h2d-pro, h2s, h2c, refurbished H2D), P2S (p2s, refurbished P2S) and X2D). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S, H2C (left hotend), P2S and X2D and does not name the H2D Pro; the store page is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C (Left Hotend)",
+      "target_family": "",
+      "target_source_handle": "h2c",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Compatibility",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The wiki tab \"H2 Series/P2S/X2D Nozzle\" has the same name as this kit's Printer Model value and the same sizes and materials (\"Size: 0.2mm/ 0.4mm/ 0.6mm/ 0.8mm | Materials: Hardened steel / Stainless steel\"), but its purchase link is the single \"Bambu Hotend - H2/P2S Standard & High Flow\", not this kit. compat-targets.json label \"H2C (Left Hotend)\" → h2c with qualifier \"Left Hotend\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C (Right Hotend)",
+      "target_family": "",
+      "target_source_handle": "h2c",
+      "evidence_kind": "description_text",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Vortek Induction Nozzle panel › paragraph on the H2C",
+      "quote": "the right nozzle of the H2C is an induction nozzle, while the left one is a standard H2 Series nozzle.",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The H2C's right position takes the Vortek induction hotend (\"Compatibility: H2C (right hotend)\" in the induction panel); the standard H2 Series/P2S/X2D hotends go on the left only. compat-targets.json label \"H2C (Right Hotend)\" → h2c with qualifier \"Right Hotend\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 1 (PLA Basic) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA Basic | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 2 (PLA Matte) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA Matte | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 3 (PLA Basic Gradient) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA Basic Gradient | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 7 (PLA Metal) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA Metal | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 15 (PETG HF) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PETG HF | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 18 (ABS) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "ABS | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit.",
+      "conflict": "The general wiki material table qualifies the 0.2 mm cell: \"Compatible (For X2D printer: Main hotend Compatible, auxiliary hotend not recommended)\". This page marks √ without the X2D qualifier; the page is kept and the qualifier recorded."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 20 (ASA) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "ASA | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 23 (PC) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PC | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit.",
+      "conflict": "The general wiki material table disagrees for the 0.2 mm nozzle: store \"√\", wiki \"Not Recommended\" (wiki row: \"PC | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 260 - 290 |\"). The product's own page is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 24 (PC FR) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PC FR | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit.",
+      "conflict": "The general wiki material table has no PC FR row; its PC row says \"Not Recommended\" for the 0.2 mm nozzle where this page marks PC FR √. The product's own page is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 35 (Support for PLA/PETG) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "Support for PLA/PETG | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotend-expansion-kit",
+      "source_title": "Hotend Expansion Kit (store page)",
+      "locator": "Filament Compatibility › row 37 (Support for PLA (New Version)) › columns 0.2 mm Stainless Steel, 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "Support for PLA (New Version) | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:08:31Z",
+      "note": "Marked √ for each of the kit's three nozzles (0.2 mm, 0.6 mm and 0.8 mm); the 0.4 mm column is not in this kit."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles",
+      "text": "Introduction to Bambu Nozzles",
+      "note": "Not linked from the store page; the §F nozzles page. Its H2 Series/P2S/X2D Nozzle panel describes the hotend type this kit holds (replacement and unclogging guides)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "note": "Linked from the store page; the builder already records it (same id, so the merge does not add it twice)."
+    }
+  ],
+  "not_published": [
+    "product.length",
+    "product.width",
+    "product.height",
+    "product.net_weight",
+    "package.weight",
+    "package.length",
+    "package.width",
+    "package.height",
+    "package.contents",
+    "motion.max_flow",
+    "extrusion.filament_diameter"
+  ]
+}

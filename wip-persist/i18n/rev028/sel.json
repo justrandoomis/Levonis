@@ -1,0 +1,562 @@
+[
+ {
+  "i": 0,
+  "h": "33532d74b2e7b21f8282b223c94b5312ad2e90624e17fa65c5004fd973272fdb",
+  "en": "The two black connecting cables link the MC board and AP board of the P2S printer , enabling data exchange between them and supplying power to the AP board .",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "mc-ap-cable-pack-2-in-1-p2s",
+   "title": "MC AP Cable Pack (2-in-1) - P2S",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 6,
+  "h": "b920623ae9ff813489725e7605379458ef29f5c71bf1338546a95e2188cdec50",
+  "en": "This circuit board connects the extruder and the component cooling fan interface.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "extruder-connection-board-p2s",
+   "title": "Extruder Connection Board - P2S",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 12,
+  "h": "e97272dc74e989f9132afef0f14ecee660ea4145887261e2b892aa6c006638c4",
+  "en": "The Auxiliary Part Cooling Fan (Left) is a powerful 12W cooling fan, which is an optional accessory. Installed on the left side of the chamber, it provides better cooling conditions for high-speed printing.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "auxiliary-part-cooling-fan-left",
+   "title": "Auxiliary Part Cooling Fan (Left) - P2S",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 18,
+  "h": "25e9fe5e6d4a3de3cb8f35110a11315c72b4eb64810e510219c91651816d573a",
+  "en": "1. A communication and power-integrated cable between the Induction Hotend Rack Control Board and the MC Board, ensuring stable control signal transmission and power supply for the hotend rack.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "induction-hotend-rack-cables-pack",
+   "title": "Induction Hotend Rack Cables Pack",
+   "field": "blocks[0].line[2]",
+   "near": "The Induction Hotend Rack Cables Pack includes two essential connection cables for the Vortek system:"
+  },
+  "dict": null
+ },
+ {
+  "i": 24,
+  "h": "de96a5067e65b4bad0a0674eefe0d10da226ce685d3492335bc6be88f33d3e39",
+  "en": "The Induction Hotend Rack Assembly is the core component of the Vortek system, comprising key modules such as the 3513 Induction Hotend Rack Motor, Induction Hotend Rack Belt Assembly, Induction Hotend Dock Assembly, and Induction Hotend Rack Control Board (excluding the Induction Hotend Latch Actuator). As the central functional unit of the system, it integrates all core functions, including hotend storage, automated pick-and-place, in-position detection, and rack positioning calibration.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "induction-hotend-rack-assembly",
+   "title": "Induction Hotend Rack Assembly",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 30,
+  "h": "9ef3d3c264911e3628cd898ff23852fdf867ff95282794673ade6e4f2406d59d",
+  "en": "Deep Drying: Better Quality, No More Bubbles",
+  "kind": "block_title",
+  "freq": 1,
+  "context": {
+   "handle": "molecular-sieve-desiccant",
+   "title": "Molecular Sieve Desiccant",
+   "field": "blocks[1].line[0]",
+   "near": "Standard drying only hits the surface. This pulls moisture out from the inside of the filament. It stops stringing and bubbles at the source, so every print com"
+  },
+  "dict": null
+ },
+ {
+  "i": 36,
+  "h": "13c9e3062a39fd7cc874688e223abe7a1747f612ee6c0919ae40d7e318889135",
+  "en": "The auxiliary extruder is installed at the back of the printer and is used to control the feeding, stopping, and retraction of support filament.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "auxiliary-extruder-x2d",
+   "title": "Auxiliary Extruder - X2D",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 42,
+  "h": "dd83a4ea8b47a044a5471a0b0dd49bd3b904521fbeea1c0a1e88052b0268cc83",
+  "en": "A circuit board providing interfaces to connect the extruder, filament sensor board, eddy current coils, and toolhead front shell components;",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "hotend-heating-assembly-connection-board-x2d",
+   "title": "Hotend Heating Assembly Connection Board - X2D",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 49,
+  "h": "a9c5a0073d6c0f49104c6d57d6aaf98176f051fd48098b3dd7ad005b3f7f020b",
+  "en": "The toolhead camera is installed on the right side of the toolhead and is used for motion accuracy calibration, high-precision nozzle offset calibration, visual calibration, and other functions..",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "toolhead-camera-x2d",
+   "title": "Toolhead Camera - X2D",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 55,
+  "h": "ffbe454a45b591bb4c274d99d1cdf1b80912d6f6d3c38dfa8ce57df3c564d62f",
+  "en": "The MC board, or Main Control Board, is a printed circuit board with integrated microprocessors, various driver chips, connectors and circuits used to operate the various aspects of the X2D.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "mc-board-x2d",
+   "title": "MC Board - X2D",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 61,
+  "h": "b5a483d0a9b39ffea9ee12c96d197dbaf878ecb64e80f796e6341c3870134307",
+  "en": "The plastic panel that is installed on the right side of the printer when facing the screen of the printer.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "right-side-panel-x2d",
+   "title": "Right Side Panel - X2D",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 67,
+  "h": "54e241cc6f3fe864491bc1eaefd526e75e1305f8c276d44c47e3274f25f8b5ee",
+  "en": "The chamber temperature sensor is installed inside the printer's front beam, and it's used to detect the internal temperature of the printer chamber.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "chamber-temperature-sensor-x2d",
+   "title": "Chamber Temperature Sensor - X2D",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 73,
+  "h": "faadb41467463ca77aeb92a9bc76a1008fe27cfc425d6bcbeae27b887a7ed324",
+  "en": "An assembly installed on the back of the printer, used to clean the nozzle and slide the excess filament out of the printer.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "purge-chute-x2-p2",
+   "title": "Purge Chute - X2/P2",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 79,
+  "h": "aae818d2a790ef74197cd2a0663e5d3cd5b02a5affca45441177a0794f57b6f9",
+  "en": "The Y-Axis Tensioner Pulley is a crucial component within the Y-axis assembly, responsible for guiding the Y belt and maintaining proper tension, ensuring smooth movement of the heatbed along the Y direction. It is imperative to replace the Y-Axis Tensioner Pulley promptly in cases of severe wear or damage to avoid disrupting printer operations.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "y-axis-tensioner-pulley-a2l",
+   "title": "Y-Axis Tensioner Pulley - A2L",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 85,
+  "h": "8868fa199041545018cdeebcaeb52c32cc980760fe64bffdcbc865ad50627925",
+  "en": "The Y-Axis Motor is a stepper motor responsible for driving the heatbed to move back and forth along the Y direction during printing.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "y-axis-motor-a2l",
+   "title": "Y-Axis Motor - A2L",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 91,
+  "h": "58a2c1be5121e6731dc934f83f78a7c4dfca7af6b8eeb14c89fddb2eb0ab8930",
+  "en": "The Toolhead Filament Hub is a key part of reliable filament switching during multi-color or multi-filament printing.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "toolhead-filament-hub-a2l",
+   "title": "Toolhead Filament Hub - A2L",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 98,
+  "h": "02f787f9d926ac1b0f946c8e122704f14b76e7576bafbeb1800790a6f7002aff",
+  "en": "The A2L PTFE Tube Connector is used to connect filament to the PTFE tube when printing with an external spool.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "ptfe-tube-connector-a2l",
+   "title": "PTFE Tube Connector - A2L",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 104,
+  "h": "7864d3c117a212077c1d83645ce6d751662709ba89995300b5386ef69b050fb2",
+  "en": "The white plastic upper cover of the A2L.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "base-housing-a2l",
+   "title": "Base Housing - A2L",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 110,
+  "h": "070030cdaa0a10dd4e12faadf50c00ea5469901ab4a305f3ff2afd0e7e2c8576",
+  "en": "A plastic housing designed to enclose and protect the rear section of the extruder.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "extruder-rear-cover-a2l",
+   "title": "Extruder Rear Cover - A2L",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 116,
+  "h": "ce0a314dce1641abcde063d4e46a1dc1d70d251509f857389f5c155db6e7826a",
+  "en": "The toolhead holder is a structural component designed to securely mount and support the toolhead in position.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "toolhead-block-a2l",
+   "title": "Toolhead Block - A2L",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 122,
+  "h": "49892550cb88cbfd3e0d787b7efe65e6664d0a41f531127277c61838e6f9e12c",
+  "en": "Bambu Lab Cleaning Wipes are disposable wipes designed specifically for 3D printers, used for the regular cleaning and maintenance of various printer models, covering cleaning, dust removal, stain removal, and disinfection. Main ingredients include non-woven fabric, water, ethanol, surfactant, and isomeric polyol, etc.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "cleaning-wipes-50-pcs",
+   "title": "Cleaning Wipes (50 pcs)",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 128,
+  "h": "3ccf23046c2f34263d1ec034ca7269ee45df703ec846c61fc9e5b0bf34e95289",
+  "en": "The Idler Pack includes two Y-axis idlers and one X-axis idler. Select and replace them as needed.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "idler-pack-r1",
+   "title": "Idler Pack - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 134,
+  "h": "aab94b578895afc688d5851c0f5686bd75e4ab678a207cd40bc3d5fe2ce58c8f",
+  "en": "The 6-pin Cable connects components within the machine.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "6-pin-cable-r1",
+   "title": "6-pin Cable - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 140,
+  "h": "10c466793d231c8b048648c2efdbb7615fb2444a383c544cf60ece8c280627b3",
+  "en": "The Riser Base Right Assembly forms the right-side structure of the riser base.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "riser-base-right-assembly",
+   "title": "Riser Base Right Assembly",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 147,
+  "h": "be6304a8532c47f03539687356c365cda359ecaf07970ede8241dbb58ffa7882",
+  "en": "The Power Supply converts mains power to provide electricity for the machine.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "power-supply-r1",
+   "title": "Power Supply - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 153,
+  "h": "c10652cc577672085ab94c57ccee50ca364040b371590edcfbb8831ab5465f61",
+  "en": "The Slats support the workpiece on the machine's work bed during laser cutting.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "slat-r1",
+   "title": "Slat - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 159,
+  "h": "af0df6bdcdb8ed4d54c11eb8d992ccda59b906fe13fd6bc7cae6586c654052ec",
+  "en": "The 4-pin & 8-pin Extension Board expands the machine's connection ports for its 4-pin and 8-pin cables.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "4-pin-8-pin-extension-board-r1",
+   "title": "4-pin & 8-pin Extension Board - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 165,
+  "h": "281aee86c4bfa90d555a4b3ca1ad9d2f322d256cf812bdd113d852f9130bf622",
+  "en": "The Laser Power Supply provides the power needed to drive the laser tube.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "laser-power-supply-r1",
+   "title": "Laser Power Supply - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 171,
+  "h": "eadde51fab80e22a9e0590c9524b2d74124c4ad99bdc384207718f42e658e865",
+  "en": "The Front & Rear Panel Set covers and protects the front and rear of the machine.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "front-rear-panel-set-r1",
+   "title": "Front & Rear Panel Set - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 177,
+  "h": "90d1e916575ec1fd7d8f803f718f0279d895ff3a2ca96b5f05084fbffef89fbe",
+  "en": "The Laser Alignment Sensor is used solely for automatic optical path calibration. Please remove this component before regular use.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "laser-alignment-sensor-r1",
+   "title": "Laser Alignment Sensor - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 183,
+  "h": "4ea3ff3ee74c3f2e8fbd62e86a011cc473bee4937d4982ae5dfbc414f95381a0",
+  "en": "The Spiral Torsion Spring provides holding force for the Z-axis of the laser machine, preventing the Z-axis from dropping when the power is off. It helps keep the tool head securely in position during operation and standby.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "spiral-torsion-spring-r1",
+   "title": "Spiral Torsion Spring - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 189,
+  "h": "e5e1aaea4d479c80db3648cecfb5b37837baee8d9418c444b0dc2c05ae8610cf",
+  "en": "The Y-axis Linear Rod guides the movement along the Y-axis. There are two rods; the left one (viewed from the front) has a raised magnet at its synchronizing pulley end, so be careful not to mix them up.",
+  "kind": "block_line",
+  "freq": 1,
+  "context": {
+   "handle": "y-axis-linear-rod-r1",
+   "title": "Y-axis Linear Rod - R1",
+   "field": "blocks[0].line[1]",
+   "near": "Overview"
+  },
+  "dict": null
+ },
+ {
+  "i": 196,
+  "h": "3907fa7f80722a6fc58cd8c1bd30abf7638095d6774f183b6e831b7093957d1b",
+  "en": "Appearance",
+  "kind": "block_cell",
+  "freq": 7,
+  "context": {
+   "handle": "birch-plywood",
+   "title": "3mm Birch Plywood (6pcs)",
+   "field": "blocks[1].line[1].cell[1]",
+   "near": "Application Scenarios Comparison"
+  },
+  "dict": null
+ },
+ {
+  "i": 202,
+  "h": "ddbaeb4e332f0aaaea8824cd035f046b69d346cd231ed69dacf7d9339ba4c157",
+  "en": "Natural wood grain, soft wood color",
+  "kind": "block_cell",
+  "freq": 6,
+  "context": {
+   "handle": "birch-plywood",
+   "title": "3mm Birch Plywood (6pcs)",
+   "field": "blocks[1].line[3].cell[1]",
+   "near": "Basswood Plywood | Fine wood grain, beige-yellow color | Delicate crafts, puzzles, children's DIY, painting projects | Easy to cut and engrave Suitable for pain"
+  },
+  "dict": null
+ },
+ {
+  "i": 208,
+  "h": "2df9236de87e523939759c046e602f11a24fedd7d1006eaed395bfad8d687091",
+  "en": "Excellent durability Ideal for high-end customization, elegant crafts",
+  "kind": "block_cell",
+  "freq": 6,
+  "context": {
+   "handle": "birch-plywood",
+   "title": "3mm Birch Plywood (6pcs)",
+   "field": "blocks[1].line[4].cell[3]",
+   "near": "Birch Plywood | Natural wood grain, soft wood color | Home decor, office supplies, delicate crafts | Smooth surface Suitable for painting and detailed engraving"
+  },
+  "dict": null
+ },
+ {
+  "i": 214,
+  "h": "6c158a4607f472c2bc374b73a26838037e9f7b1142b972c318886dea03051bb4",
+  "en": "Bamboo ornaments and office supplies",
+  "kind": "block_cell",
+  "freq": 6,
+  "context": {
+   "handle": "birch-plywood",
+   "title": "3mm Birch Plywood (6pcs)",
+   "field": "blocks[1].line[6].cell[2]",
+   "near": "Sapele Plywood | Rose-toned reddish-brown | High-end decor, custom furniture, musical instruments, wood carving | Excellent durability Great for premium custom "
+  },
+  "dict": null
+ },
+ {
+  "i": 220,
+  "h": "fb65b13b09268bebc85ed45011a75e3ac331e733e0c7471f816148f359a84406",
+  "en": "Natural Wood Grain for Versatile Crafting",
+  "kind": "block_title",
+  "freq": 1,
+  "context": {
+   "handle": "birch-plywood",
+   "title": "3mm Birch Plywood (6pcs)",
+   "field": "blocks[4].line[0]",
+   "near": "Bambu Birch Plywood features a beautiful natural wood grain, making it perfect for household items such as nameplates, signs, boxes, and shelves. It’s also idea"
+  },
+  "dict": null
+ },
+ {
+  "i": 226,
+  "h": "64e6a4a679ad8091b7d9cdeec516aa2956132472a139f98693940c1414c3bdc5",
+  "en": "Impact Resistance: Bubble wrap provides cushioning against impacts.",
+  "kind": "block_line",
+  "freq": 7,
+  "context": {
+   "handle": "birch-plywood",
+   "title": "3mm Birch Plywood (6pcs)",
+   "field": "blocks[6].line[2]",
+   "near": "Moisture & Warp Defense: Sealed bags for moisture resistance."
+  },
+  "dict": null
+ },
+ {
+  "i": 232,
+  "h": "f1639301d4740ba2897feb76ca341a8d3e0d5d6734447b3d804c41580b02241b",
+  "en": "Click Here for More Material Guide.",
+  "kind": "block_line",
+  "freq": 6,
+  "context": {
+   "handle": "birch-plywood",
+   "title": "3mm Birch Plywood (6pcs)",
+   "field": "blocks[7].line[4]",
+   "near": "• If warping occurs, sprinkle water on the plywood and place a weight, such as filament spools, on top to improve. For detailed storage instructions, please ref"
+  },
+  "dict": null
+ },
+ {
+  "i": 238,
+  "h": "77b66ee2e053855e01b026ff51147155582fb71b0c21c28cb3b4576ec894ba05",
+  "en": "Natural wood grain may vary slightly between pieces",
+  "kind": "block_line",
+  "freq": 6,
+  "context": {
+   "handle": "birch-plywood",
+   "title": "3mm Birch Plywood (6pcs)",
+   "field": "blocks[8].line[6]",
+   "near": "• Designed for Laser Cutting and Engraving"
+  },
+  "dict": null
+ }
+]

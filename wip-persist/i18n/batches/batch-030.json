@@ -1,0 +1,3245 @@
+{
+ "batch": 30,
+ "surface": "api",
+ "handles": [
+  "wide-white-masking-tape-1-roll",
+  "20oz-stainless-steel-tumbler",
+  "40oz-stainless-steel-tumbler",
+  "pu-leather-keychain-for-airtags-holder",
+  "color-felt-fabric-squares-22pcs",
+  "bone-stainless-steel-tag",
+  "stainless-steel-military-tag-5pcs",
+  "3mm-clear-glossy-acrylic-3pcs",
+  "laser-material-starter-pack-for-r1",
+  "bambu-cmyk-backlight-board",
+  "led-lamp-kit-001",
+  "wireless-mouse-components-kit-002",
+  "marble-run-components-kit-003",
+  "toy-shooter-components-kit-004",
+  "engine-model-components-kit-005",
+  "jet-engine-model-components-kit-006",
+  "triple-axis-tourbillon-model-components-kit-007",
+  "6500k-white-led-light-strip",
+  "ws2812b-rgb-led-strip-light",
+  "white-cct-tunable-cob-led-strip-light",
+  "s-shape-led-strip-light-ws2812b-rgb",
+  "boat-model-components-kit-010",
+  "clock-components-kit-011",
+  "electric-coffee-wdt-tool-kit-k013"
+ ],
+ "strings": [
+  {
+   "h": "851e5d54ef76d88fff2d5412741171f48de8170252cc3702b0d8a5dc829321eb",
+   "en": "Wide White Masking Tape",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "wide-white-masking-tape-1-roll",
+    "title": "Wide White Masking Tape（1 Roll）",
+    "field": "blocks[0].line[0]",
+    "near": "This product is designed to elevate your laser processing results. Its key feature effectively prevents wood from scorching and darkening, protecting the materi"
+   },
+   "dict": null
+  },
+  {
+   "h": "13335aec09979b9fb0221d36af144a6c1780672500d62c625d5cb8a85fe02047",
+   "en": "Effectively prevents laser processing from scorching wood surfaces",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wide-white-masking-tape-1-roll",
+    "title": "Wide White Masking Tape（1 Roll）",
+    "field": "blocks[1].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "6085d5e41506da827d4c1baadc28bf3358d673c51e2459a6da80ca0cb33d7ac7",
+   "en": "Residue-free adhesion for easy and secure application on various surfaces",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wide-white-masking-tape-1-roll",
+    "title": "Wide White Masking Tape（1 Roll）",
+    "field": "blocks[1].line[2]",
+    "near": "• Effectively prevents laser processing from scorching wood surfaces"
+   },
+   "dict": null
+  },
+  {
+   "h": "889741e2171676b13cde244446502e36897679b34c098f8459cec57efe5f520f",
+   "en": "It's recommended to apply masking tape to both sides of the wood board",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wide-white-masking-tape-1-roll",
+    "title": "Wide White Masking Tape（1 Roll）",
+    "field": "blocks[1].line[3]",
+    "near": "• Residue-free adhesion for easy and secure application on various surfaces"
+   },
+   "dict": null
+  },
+  {
+   "h": "abc3bf39af3e7612063876098faa67d0d208f62f87da00f28024f6f9b3c61fef",
+   "en": "The Perfect Personal Touch",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "blocks[1].line[0]",
+    "near": "Bambu Suite provides recommended power parameters to help you achieve diverse colors and effects in your engraving. This allows you to meet all your personalize"
+   },
+   "dict": null
+  },
+  {
+   "h": "e3451bc6f83e4086e76baee2b96852e1b50ac45bda273279a3ac18c30b922318",
+   "en": "Bambu Suite provides recommended power parameters to help you achieve diverse colors and effects in your engraving. This allows you to meet all your personalized customization needs, making it an ideal choice for both personal use and gift-giving.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "blocks[1].line[1]",
+    "near": "The Perfect Personal Touch"
+   },
+   "dict": null
+  },
+  {
+   "h": "43f2c06e05d41a878c81a984c52f8d0c142074d7c20dd26bef682afbc10f27a5",
+   "en": "Food-Grade Safe Material",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "blocks[2].line[0]",
+    "near": "The tumbler body is made of 304 stainless steel that complies with food-contact standards, ensuring safety and odor-free use. Its double-layer structure offers "
+   },
+   "dict": null
+  },
+  {
+   "h": "e0588981b736f358792ee9699c85529f657521a55aba7c9ca36151dbd8e96370",
+   "en": "The tumbler body is made of 304 stainless steel that complies with food-contact standards, ensuring safety and odor-free use. Its double-layer structure offers excellent rust resistance, corrosion resistance, and durability for reliable long-term use.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "blocks[2].line[1]",
+    "near": "Food-Grade Safe Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4b35210b95a2184d37f302e7934c12a4109cf1dfe646ce5b0c909dc88f46628",
+   "en": "All-Day Temperature Control",
+   "kind": "block_title",
+   "freq": 4,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "blocks[3].line[0]",
+    "near": "Under normal room temperature, this tumbler can maintain your beverage hot for 6 hours, or cold for 12 hours, meeting all-day hydration needs. Whether for meeti"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c1836b07039bcee4849fe2bff341ab2cd388dd594333e4753f6772b72bcc9a5",
+   "en": "Under normal room temperature, this tumbler can maintain your beverage hot for 6 hours, or cold for 12 hours, meeting all-day hydration needs. Whether for meetings, travel, or outdoor activities, it keeps hot drinks warm and cold drinks refreshing.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "blocks[3].line[1]",
+    "near": "All-Day Temperature Control"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f15c9cba36d55a7ff62bf63aa45163422eb446185978ee7c44a03f9443790e3",
+   "en": "For detailed tutorials on accessory usage, please click here.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "blocks[4].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "d3cbb99adaeef2574932a4f6af02766b1f4918b2577b194fbd10ca144a0d1c04",
+   "en": "The Perfect Personal Touch.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "d6c010df46d6f76a49df2d12d15483ca79ac6496f849c512f517af5fb45352f2",
+   "en": "Leak-Proof Assurance & Complete Accessories",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "blocks[5].line[4]",
+    "near": "• All-Day Temperature Control"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3f66021e59224a0afb751473116dd44ab1a7f1eb80bc3ed254b774efa036909",
+   "en": "cold for 12h—from your first morning sip to late-night gatherings. Designed for life on the move, its ergonomic handle ensures a secure grip, while the tapered base fits perfectly into most car cup holders. Crafted from food-grade 304 stainless steel, the surface is optimized for laser engraving to reveal a stunning golden finish. It’s more than a vessel; it’s a personalized statement piece built for your unique lifestyle.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "40oz-stainless-steel-tumbler",
+    "title": "40oz Stainless Steel Tumbler",
+    "field": "blocks[0].line[1].cell[1]",
+    "near": "40oz Stainless Steel Tumbler"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d51b1cf61cf25ff79601906daec52a87bf900fc71769bdebdbfe7a6c04567cb",
+   "en": "Add Your Perfect Personal Touch",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "40oz-stainless-steel-tumbler",
+    "title": "40oz Stainless Steel Tumbler",
+    "field": "blocks[1].line[0]",
+    "near": "Bambu Suite provides recommended power parameters to help you achieve diverse colors and effects. Laser engraving reveals a striking golden finish, ensuring you"
+   },
+   "dict": null
+  },
+  {
+   "h": "da579b9a31507bff65558e3598254a6d811da097130b24cb2121c3c9caec1700",
+   "en": "Bambu Suite provides recommended power parameters to help you achieve diverse colors and effects. Laser engraving reveals a striking golden finish, ensuring your designs stand out with professional clarity. This seamless integration allows you to meet all your personalized customization needs, making it an ideal choice for both personal use and premium gift-giving.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "40oz-stainless-steel-tumbler",
+    "title": "40oz Stainless Steel Tumbler",
+    "field": "blocks[1].line[1]",
+    "near": "Add Your Perfect Personal Touch"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8a8c1f9cc05361975ea9dc4f318e8495c467a41a9d6f58eab3a2374c77565f6",
+   "en": "Food-Grade Safe Material & Large Capacity",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "40oz-stainless-steel-tumbler",
+    "title": "40oz Stainless Steel Tumbler",
+    "field": "blocks[2].line[0]",
+    "near": "The tumbler body is made of 304 stainless steel that complies with food-contact standards, ensuring safety and odor-free use. Its double-layer structure offers "
+   },
+   "dict": null
+  },
+  {
+   "h": "d648fed27c33692a675c02380b4b2497b2de469eeeb7617df506d89b77a75f66",
+   "en": "We recommend unscrewing the handle before engraving for a smoother process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "40oz-stainless-steel-tumbler",
+    "title": "40oz Stainless Steel Tumbler",
+    "field": "blocks[4].line[2]",
+    "near": "• For detailed tutorials on accessory usage, please click here."
+   },
+   "dict": null
+  },
+  {
+   "h": "db1b1a9889e6a206a9960bdb207a784979909bc4f905d822fe2e22709aadb4f8",
+   "en": "The straw opening isn't fully sealed, so please keep your tumbler upright to help prevent leaks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "40oz-stainless-steel-tumbler",
+    "title": "40oz Stainless Steel Tumbler",
+    "field": "blocks[4].line[3]",
+    "near": "• We recommend unscrewing the handle before engraving for a smoother process."
+   },
+   "dict": null
+  },
+  {
+   "h": "abe137e8f71660d89aebdd25986e74f8680252de53ef8a5bcd3939bffb0c6be9",
+   "en": "40oz High-Capacity",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "40oz-stainless-steel-tumbler",
+    "title": "40oz Stainless Steel Tumbler",
+    "field": "blocks[5].line[4]",
+    "near": "• All-Day Temperature Control"
+   },
+   "dict": null
+  },
+  {
+   "h": "d58ad20cee6e4afd3271ef5b0f493aff27c1e39e22c80dad757faa9871c35e39",
+   "en": "Engrave It, Make It Yours",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[1].line[0]",
+    "near": "Compatible with Bambu laser engraving, the PU leather reveals a contrasting color when engraved, creating a striking visual effect. Add names, initials, or cust"
+   },
+   "dict": null
+  },
+  {
+   "h": "4716a4f53413fe6a5ce0d9bd9fd446dbd08b4e1e29715cccbdf236f9e201de16",
+   "en": "Compatible with Bambu laser engraving, the PU leather reveals a contrasting color when engraved, creating a striking visual effect. Add names, initials, or custom patterns to craft a one-of-a-kind accessory that's uniquely yours.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[1].line[1]",
+    "near": "Engrave It, Make It Yours"
+   },
+   "dict": null
+  },
+  {
+   "h": "1cd326a66d6f2cdbf2f05c02390ee34b7d1d38bf0566ea1039ce1b6faf26b464",
+   "en": "One Pack, Two Signature Styles",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[2].line[0]",
+    "near": "This PU Leather Keychain Holder for AirTag comes in both leather texture and carbon fiber textured styles, effortlessly matching a variety of scenarios and pers"
+   },
+   "dict": null
+  },
+  {
+   "h": "04159b48f558acd88ce2e6471de7fe17a7a98a4f1fd258b9a923c9e68e25b8c7",
+   "en": "This PU Leather Keychain Holder for AirTag comes in both leather texture and carbon fiber textured styles, effortlessly matching a variety of scenarios and personal tastes. Whether attached to keys, handbags, backpacks, luggage, or pet collars, it blends seamlessly with any style.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[2].line[1]",
+    "near": "One Pack, Two Signature Styles"
+   },
+   "dict": null
+  },
+  {
+   "h": "1764f2563a79ec81066cbeb48e94ba6f4dd760b113597c19d8ea2195e6e8bd8c",
+   "en": "Easy Access, Effortless Attachment",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[3].line[0]",
+    "near": "A simple snap button securely holds your AirTag in place, making it easy to insert or remove. The spring-loaded metal ring clips effortlessly onto keys, bags, l"
+   },
+   "dict": null
+  },
+  {
+   "h": "624a4d0180333a2899ee3b80c0467777c6064eeca02c87cf7893d98ba9082627",
+   "en": "A simple snap button securely holds your AirTag in place, making it easy to insert or remove. The spring-loaded metal ring clips effortlessly onto keys, bags, luggage, or pet collars, so you can switch between items freely. Quick access when you need it, secure attachment when you don't.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[3].line[1]",
+    "near": "Easy Access, Effortless Attachment"
+   },
+   "dict": null
+  },
+  {
+   "h": "90af62a0af8be35cbe54b9b7fa14ec48dcbaa4e2613b835d9652a810296bee81",
+   "en": "Ensure that a person is always present to closely monitor the machine throughout the laser engraving process.<span data-lark-record-data=\"{\"isCut\":false,\"rootId\":\"VB5QdDMUqoxRZHxawEGc8v6pnzb\",\"parentId\":\"VB5QdDMUqoxRZHxawEGc8v6pnzb\",\"blockIds\":[70],\"recordIds\":[\"XxwCd3PLCodjmnxb2Yyc4AmPnhf\"],\"recordMap\":{\"XxwCd3PLCodjmnxb2Yyc4AmPnhf\":{\"id\":\"XxwCd3PLCodjmnxb2Yyc4AmPnhf\",\"snapshot\":{\"type\":\"text\",\"parent_id\":\"VB5QdDMUqoxRZHxawEGc8v6pnzb\",\"comments\":[],\"revisions\":[],\"locked\":false,\"hidden\":false,\"author\":\"7456609764839899164\",\"children\":[],\"text\":{\"apool\":{\"nextNum\":1,\"numToAttrib\":{\"0\":[\"author\",\"7456609764839899164\"]}},\"initialAttributedTexts\":{\"attribs\":{\"0\":\"*0+31\"},\"text\":{\"0\":\"Ensure that a person is always present to closely monitor the machine throughout the laser engraving process.\"}}},\"align\":\"\",\"folded\":false}},\"VB5QdDMUqoxRZHxawEGc8v6pnzb\":{\"id\":\"VB5QdDMUqoxRZHxawEGc8v6pnzb\",\"snapshot\":{\"type\":\"page\",\"parent_id\":\"\",\"comments\":[\"7639676460180966602\",\"7639676380942175454\"],\"revisions\":[],\"locked\":false,\"hidden\":false,\"author\":\"7456609764839899164\",\"children\":[\"KcTrdFvy4o17qox2r8fcNJTfnfb\",\"PtHrdgKAloZ03RxNBwectK3Cnzf\",\"ND1sdQFfgoxGA5xn2OecWuZmnWd\",\"SClqdmFImoByTdx2J6ncjWKLn8f\",\"SoRgd3qjQoVcWNx2jTgcwYypnvg\",\"Uw4fdE1lio3w2ZxorGfcZVsinPh\",\"GjT9dvvOPo9OnWxFEtDcZ5H9nCg\",\"OyjOdAimaotAgixugRWctevwnQe\",\"WJBEdVC2qocIZ5x3YLacb3O9nmg\",\"WNe0dXNnXooa4IxgwC5c67uWnkf\",\"WLPcdDpvyouAqSxWGo6cNPFOndh\",\"J7ZWdvXu4o08yXxwW1dc7QHxndf\",\"ROqedXBPQohtNAxI8BJczyJtnsc\",\"FtP1d2BdIoLkhVxGIRucXgUZnUf\",\"UG0OdX9DZojKOhxhM2XcTBLMnmh\",\"BaaWdP5yGokDXIxMxejc0CmWnmg\",\"WYYjdzew2or2YnxA0nEcncyhnPe\",\"VzUidmf1Coxuzwx4LDsczjtbnuR\",\"AbA3dXqyaoaF4JxwfIIcEP2gnKt\",\"XxwCd3PLCodjmnxb2Yyc4AmPnhf\",\"OvQ4d3wljooJPbxIEjGcQ8A0nlc\",\"LE7wdcfgmoWs9SxLi2nc0RTintc\",\"GzbOd2e93oGuPQxjP0Vc04WEnOb\",\"E1qwdMtvco814PxQ1UccMTKfnbd\",\"Dg84dJsSookLcEx9EqOcNSpCnNb\",\"Nppidlx8goislZx33Aec1HlOnAh\",\"CZXfdAID3oT98hxpcaHcJg69nrb\",\"R9ludcTaeopks4x38fKcP79unpg\",\"UIzJdnNW0ouUeuxljDxcb4Otnmd\",\"MyzJd4GjWobiAJxTdpjcTWzjndd\"],\"text\":{\"apool\":{\"nextNum\":3,\"numToAttrib\":{\"0\":[\"author\",\"7456609764839899164\"],\"1\":[\"comment-id-7639676460180966602\",\"true\"],\"2\":[\"comment-id-7639676380942175454\",\"true\"]}},\"initialAttributedTexts\":{\"attribs\":{\"0\":\"*0|1+c*0*1+n*0*2*1+f\"},\"text\":{\"0\":\"激光雕刻PU皮革钥匙链\\nPU Leather Keychain for Airtags Holder\"}}},\"align\":\"\",\"doc_info\":{\"editors\":[\"7456609764839899164\",\"7503365633934737436\"],\"options\":[\"editors\",\"edit_time\"],\"deleted_editors\":[],\"option_modified\":null}}}},\"payloadMap\":{\"XxwCd3PLCodjmnxb2Yyc4AmPnhf\":{\"level\":1}},\"extra\":{\"channel\":\"saas\",\"pasteRandomId\":\"42ac64ed-bdc8-478a-aca0-27c7f68476a9\",\"mention_page_title\":{},\"external_mention_url\":{},\"isEqualBlockSelection\":true},\"isKeepQuoteContainer\":false,\"selection\":[{\"id\":70,\"type\":\"block\",\"recordId\":\"XxwCd3PLCodjmnxb2Yyc4AmPnhf\"}],\"pasteFlag\":\"ba2472fc-eb31-4b1f-8a94-38fbb8490bba\"}\" data-lark-record-format=\"docx/record\">",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[4].line[1]",
+    "near": "Using Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "350871bbd70e975886c94d5a4b336d1ff2344575f377405e9b630f831ec9189e",
+   "en": "Custom Laser Engraving",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9ea0fbab754f1d14255d01c8f2b52ef8058346cacc0cf46847d9c00fee58249",
+   "en": "Two Signature Styles",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[5].line[2]",
+    "near": "• Custom Laser Engraving"
+   },
+   "dict": null
+  },
+  {
+   "h": "7c85b20510cd5f9f36320840e6d946283fa50301b433ae66eb2cad47d49db2a1",
+   "en": "Secure & Easy to Attach",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "blocks[5].line[3]",
+    "near": "• Two Signature Styles"
+   },
+   "dict": null
+  },
+  {
+   "h": "e6885a916b4de75d15535737c719f300b9bbc0e39aecf8141cae4c4749d3af8e",
+   "en": "Unleash Limitless Creativity",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "blocks[1].line[0]",
+    "near": "Perfect for everything from intricate DIY projects and educational games to unique home decor, these squares are your go-to for inspiring imagination and bringi"
+   },
+   "dict": null
+  },
+  {
+   "h": "23c71ce351671ff07224825a7cefdbaa0ef92ad2788b9ca3710313267f7e8334",
+   "en": "Perfect for everything from intricate DIY projects and educational games to unique home decor, these squares are your go-to for inspiring imagination and bringing any creative vision to life with ease.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Unleash Limitless Creativity"
+   },
+   "dict": null
+  },
+  {
+   "h": "84449f2ee4f34992a421b965d48b4c578cff9acd42d75aa5474f446b28fbf8f6",
+   "en": "Bring Out Detail with Laser",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "blocks[2].line[0]",
+    "near": "Unlock intricate designs with our felt fabric squares, fully compatible with laser engraving and laser cutting. Each sheet delivers a clean, precise edge and vi"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ad7a2bd78752cdb282868fb841657a348260f420cfdeff39b07f6169dc5e0d3",
+   "en": "Unlock intricate designs with our felt fabric squares, fully compatible with laser engraving and laser cutting. Each sheet delivers a clean, precise edge and vibrant color retention, making it ideal for detailed projects from custom patches to delicate cutouts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Bring Out Detail with Laser"
+   },
+   "dict": null
+  },
+  {
+   "h": "da4720b6484616e71d894f66fa226b88c9fdc4f52e4d5cea0c16a4c1bf57c50d",
+   "en": "Rich Color Assortment",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "blocks[3].line[0]",
+    "near": "Unleash your imagination with our curated collection of 11 practical and aesthetically pleasing felt fabric colors. From soft natural tones to lively bright sha"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b624fcef8fbb3f8993d1d45f52160ad24ff4192c3e3418f837e1d65fa9d6610",
+   "en": "Unleash your imagination with our curated collection of 11 practical and aesthetically pleasing felt fabric colors. From soft natural tones to lively bright shades, this rich palette is designed to ignite your creative spark, perfect for classroom projects, decorative crafts, or any DIY dream.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Rich Color Assortment"
+   },
+   "dict": null
+  },
+  {
+   "h": "9862b615bd389f3bce2e605e320b999ea76778e2c91b27153f6aa662f65983f6",
+   "en": "11 Colors Included",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "52970164e88e496c377d6b57c8500526bd478e0cb520e8226309d776c4b2dbbc",
+   "en": "Suitable for Laser Cutting",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "blocks[5].line[2]",
+    "near": "• 11 Colors Included"
+   },
+   "dict": null
+  },
+  {
+   "h": "c0a6f74f27ce8a20221ef9c50ef32f3ead613ad1374f5ec450bc71b540ad91a8",
+   "en": "Versatile for DIY Creations",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "blocks[5].line[3]",
+    "near": "• Suitable for Laser Cutting"
+   },
+   "dict": null
+  },
+  {
+   "h": "ae8a4d0a2a03378a47c58dbedce31d3a912bfe5893f2c6396ebfb0981e63f7c0",
+   "en": "Laser Engraved, Made for Your Pet",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bone-stainless-steel-tag",
+    "title": "Bone Stainless Steel Tag",
+    "field": "blocks[1].line[0]",
+    "near": "The tag features a smooth, polished surface that is ideal for laser engraving, producing crisp text and fine details that resist fading and wear. Easily add you"
+   },
+   "dict": null
+  },
+  {
+   "h": "e22e24e0b74b49a59494864bd240adda5918742e5cc0b1604ef9e371edd69c73",
+   "en": "The tag features a smooth, polished surface that is ideal for laser engraving, producing crisp text and fine details that resist fading and wear. Easily add your pet's name, phone number, and address to create a truly one-of-a-kind tag.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bone-stainless-steel-tag",
+    "title": "Bone Stainless Steel Tag",
+    "field": "blocks[1].line[1]",
+    "near": "Laser Engraved, Made for Your Pet"
+   },
+   "dict": null
+  },
+  {
+   "h": "39a7a8a176626c9a53a70419b4ebe03d5b487e648e54ffc9ddedd91cdd015a08",
+   "en": "Durability and Longevity",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bone-stainless-steel-tag",
+    "title": "Bone Stainless Steel Tag",
+    "field": "blocks[2].line[0]",
+    "near": "Crafted from premium 304 stainless steel, built tough to handle everything from muddy puddles to saltwater splashes. Rust-proof, corrosion-resistant, and scratc"
+   },
+   "dict": null
+  },
+  {
+   "h": "42916bc6d152a18b9afeb1ada6e5ec13921a1d22e9f66060fc5012726b50cc16",
+   "en": "Crafted from premium 304 stainless steel, built tough to handle everything from muddy puddles to saltwater splashes. Rust-proof, corrosion-resistant, and scratch-resistant, keeping engraved details crisp through every adventure.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bone-stainless-steel-tag",
+    "title": "Bone Stainless Steel Tag",
+    "field": "blocks[2].line[1]",
+    "near": "Durability and Longevity"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8f1e6c4ca197387fd51a6f6bcdfc058168834c868b8607952f5a3bce582def5",
+   "en": "Two Sizes for a Comfortable Fit",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bone-stainless-steel-tag",
+    "title": "Bone Stainless Steel Tag",
+    "field": "blocks[3].line[0]",
+    "near": "We offer two sizes, so you can choose the best fit for your pet. Lightweight and comfortable, it won't weigh them down."
+   },
+   "dict": null
+  },
+  {
+   "h": "1d03dd0bc49eee679d3ef131c37fb24c783c7f40dfb4210dbdff3e5d7f6e6957",
+   "en": "We offer two sizes, so you can choose the best fit for your pet. Lightweight and comfortable, it won't weigh them down.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bone-stainless-steel-tag",
+    "title": "Bone Stainless Steel Tag",
+    "field": "blocks[3].line[1]",
+    "near": "Two Sizes for a Comfortable Fit"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe5756a8a6a18645da030bfd4b82aa0b4588c3af6b8b1694ad48610c4603cdbf",
+   "en": "Two Sizes Available.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bone-stainless-steel-tag",
+    "title": "Bone Stainless Steel Tag",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "c1f597a6ff35a256b0fc238ef39e84fde5cfb14dc092c70f883a82644c24b2b5",
+   "en": "Waterproof & Rust-Proof.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "bone-stainless-steel-tag",
+    "title": "Bone Stainless Steel Tag",
+    "field": "blocks[5].line[2]",
+    "near": "• Two Sizes Available."
+   },
+   "dict": null
+  },
+  {
+   "h": "49b68c46f86f60679bc4ba906abf22a1c36a83df58780c8e12bb76b2fa342daa",
+   "en": "Stainless Steel Military Tag",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "blocks[0].line[0]",
+    "near": "Bambu Mmilitary Tags are made from premium stainless steel, durable enough to withstand daily wear, with a smooth surface ideal for laser engraving. Whether as "
+   },
+   "dict": null
+  },
+  {
+   "h": "f51c64788c11b7ea2e940d70d521b7279b0241a8e8a0557f30cc5555f58410bb",
+   "en": "Bambu Mmilitary Tags are made from premium stainless steel, durable enough to withstand daily wear, with a smooth surface ideal for laser engraving. Whether as a gift, a keepsake, or an ID tag, these long-lasting tags help you preserve memories, express your personality, and unleash your creativity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "blocks[0].line[1]",
+    "near": "Stainless Steel Military Tag"
+   },
+   "dict": null
+  },
+  {
+   "h": "36ab9e0a037964290cefddb3998b85f8fc454e1320ba7f99dd1e273f9a8c8a55",
+   "en": "Versatile Personalization",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "blocks[1].line[0]",
+    "near": "Beyond names and dates, customize your tag with medical alerts, emergency contacts, pet information, or motivational quotes. Wear it as a necklace, attach it to"
+   },
+   "dict": null
+  },
+  {
+   "h": "8518ebab746c70638d502a72e9febf7769275996d1541e6a3df9a1b78fe6bdea",
+   "en": "Beyond names and dates, customize your tag with medical alerts, emergency contacts, pet information, or motivational quotes. Wear it as a necklace, attach it to keys, or use it as a unique identifier for bags and gear.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "blocks[1].line[1]",
+    "near": "Versatile Personalization"
+   },
+   "dict": null
+  },
+  {
+   "h": "21015c9ca6aa0428b1c8559e335765a9d168ecbb145b8d977b50970459bfd654",
+   "en": "Great as a Gift",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "blocks[2].line[0]",
+    "near": "Engrave a name, a special date, or a meaningful message on the tag, and it becomes a thoughtful gift. Whether for a birthday, graduation, or holiday, this compa"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a42dd5adca20ef788f9530cbdcc27d4567ec389842483298effbf3f2b68103d",
+   "en": "Engrave a name, a special date, or a meaningful message on the tag, and it becomes a thoughtful gift. Whether for a birthday, graduation, or holiday, this compact tag is easy to carry, letting the recipient feel your care.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "blocks[2].line[1]",
+    "near": "Great as a Gift"
+   },
+   "dict": null
+  },
+  {
+   "h": "8321c138d804f67e40f08a22c61dd2c21b1ddb6231078c0ad12ace41ab13c57a",
+   "en": "Quality Stainless Steel",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "blocks[3].line[0]",
+    "near": "Crafted from high-quality 304 stainless steel, our tags are resistant to rust, corrosion, and tarnishing. This ensures long-lasting durability and a consistentl"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb2ee7cbf348751eb2786e242a5a038550deacc885d6dd42fcc693af84ef0ca5",
+   "en": "Crafted from high-quality 304 stainless steel, our tags are resistant to rust, corrosion, and tarnishing. This ensures long-lasting durability and a consistently polished look, even with daily use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "blocks[3].line[1]",
+    "near": "Quality Stainless Steel"
+   },
+   "dict": null
+  },
+  {
+   "h": "a2bb74070bff7c756e4955286c6bf8a5496594d5c632f9d73a5e91ba7ebff3d6",
+   "en": "Great for Personalized Gifts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "4558a2ae45d297fffa490b9baa5a461c724117fdc2a0d654055035588c27a1fa",
+   "en": "Clear, glossy acrylic gives signs, displays, and décor a glass-like finish without the fragility of glass. The durable sheet keeps signs, displays, and décor looking clean while standing up to everyday handling.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-clear-glossy-acrylic-3pcs",
+    "title": "3mm Clear Glossy Acrylic (3 pcs)",
+    "field": "blocks[1].line[1]",
+    "near": "Superior Quality"
+   },
+   "dict": null
+  },
+  {
+   "h": "c35a3bddc56f01436232575ee92c0cb24ba39b29c9807424546679f089b1eb64",
+   "en": "Ready for the Laser",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-clear-glossy-acrylic-3pcs",
+    "title": "3mm Clear Glossy Acrylic (3 pcs)",
+    "field": "blocks[2].line[0]",
+    "near": "Made for CO2 laser cutting and engraving, this acrylic helps turn detailed artwork into crisp finished pieces. Clean edges and a glossy finish help logos, names"
+   },
+   "dict": null
+  },
+  {
+   "h": "3cfbfec8d234381a7f90a353d17be1a676428f22d63e8264b007fe0323d667b4",
+   "en": "Made for CO2 laser cutting and engraving, this acrylic helps turn detailed artwork into crisp finished pieces. Clean edges and a glossy finish help logos, names, and decorative details look sharp with less post-processing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-clear-glossy-acrylic-3pcs",
+    "title": "3mm Clear Glossy Acrylic (3 pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Ready for the Laser"
+   },
+   "dict": null
+  },
+  {
+   "h": "da5cbdbd7a5a73935ab1b40a54854031de374594af7d82fd0f2e5ccb8301fd0f",
+   "en": "Bambu Clear Glossy Acrylic Sheet comes with protective film on both sides, safeguarding the surface from scratches and ensuring it arrives in pristine condition.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-clear-glossy-acrylic-3pcs",
+    "title": "3mm Clear Glossy Acrylic (3 pcs)",
+    "field": "blocks[3].line[1]",
+    "near": "Protective Film for a Flawless Start"
+   },
+   "dict": null
+  },
+  {
+   "h": "72ac6d960d12926fa81e9a0cd1d99079f4b2c834b27e3a8fab11014927da3535",
+   "en": "Bambu Clear Glossy Acrylic Sheet is guaranteed for reliable quality and consistency. By precisely controlling thickness, it minimizes variations in each sheet, improving the consistency of your projects and making assembly easier. Whether crafting intricate decor or mass-producing for your business, you can rely on Bambu Acrylic sheets for smooth, uniform cuts and stress-free accuracy.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-clear-glossy-acrylic-3pcs",
+    "title": "3mm Clear Glossy Acrylic (3 pcs)",
+    "field": "blocks[4].line[1]",
+    "near": "Engineered for Consistency: Tight Thickness Tolerance, Every Sheet"
+   },
+   "dict": null
+  },
+  {
+   "h": "2fc498849cf81e08a6078d863f62d831d509424fe4707b20d7ac9bb8bebfd7a2",
+   "en": "DIY Without Limits",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-clear-glossy-acrylic-3pcs",
+    "title": "3mm Clear Glossy Acrylic (3 pcs)",
+    "field": "blocks[5].line[0]",
+    "near": "From personalized gifts to home decor and small business signage, each sheet gives makers room to test, cut, and build. The 3-piece pack keeps extra material on"
+   },
+   "dict": null
+  },
+  {
+   "h": "1cf9c875e82a5af9694cbf038a57da8296b108b71f2dd7f65e50363e6626f7c7",
+   "en": "From personalized gifts to home decor and small business signage, each sheet gives makers room to test, cut, and build. The 3-piece pack keeps extra material on hand for prototypes, replacements, or matching sets.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3mm-clear-glossy-acrylic-3pcs",
+    "title": "3mm Clear Glossy Acrylic (3 pcs)",
+    "field": "blocks[5].line[1]",
+    "near": "DIY Without Limits"
+   },
+   "dict": null
+  },
+  {
+   "h": "25e3cc2519a9b948d3c62473d7c3bcfc9843122b7fabd076047b191008ed1406",
+   "en": "Laser Material Starter Pack",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-starter-pack-for-r1",
+    "title": "Laser Material - Starter Pack (For R1)",
+    "field": "blocks[0].line[0]",
+    "near": "This all-in-one material set includes plywood, acrylic, cork sheets, paper, and leather, perfect for both laser beginners and enthusiasts. Whether you want to c"
+   },
+   "dict": null
+  },
+  {
+   "h": "f52f5136829ff36cd8fdc1e76aa32261ee2b62065342712051624be49bbb8ad0",
+   "en": "Plywood, acrylic, cork sheets, paper, leather...7 categories, 56 pieces. The most popular Bambu Lab laser-compatible materials included to fully support your creative designs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-starter-pack-for-r1",
+    "title": "Laser Material - Starter Pack (For R1)",
+    "field": "blocks[1].line[1]",
+    "near": "True All-in-One"
+   },
+   "dict": null
+  },
+  {
+   "h": "a48c95012c262de9e2199bb0e677c182d6daf01094b2e40851ce36e39504e4c0",
+   "en": "Bambu Suite comes with pre-tested calibration settings for every material. Just load the material, choose your preferred effect, and you’re ready to go.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-starter-pack-for-r1",
+    "title": "Laser Material - Starter Pack (For R1)",
+    "field": "blocks[2].line[1]",
+    "near": "Easy to Use, Beginner-Friendly"
+   },
+   "dict": null
+  },
+  {
+   "h": "0895f83ba39a39027172b56ef806c5fb0aac589d880c1b315681df734aeecf62",
+   "en": "For processing PU iron-on patches or aluminum cards, we strongly recommend using a Laser Grid Panel to ensure a smoother engraving process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-material-starter-pack-for-r1",
+    "title": "Laser Material - Starter Pack (For R1)",
+    "field": "blocks[4].line[4]",
+    "near": "• Please make sure to remove the protective film from the acrylic surface before processing."
+   },
+   "dict": null
+  },
+  {
+   "h": "1af851907331c0ed99e7c63b4e55df808bc5fc4c990a1cf80ca8c0f76daf1f3b",
+   "en": "Size",
+   "kind": "block_cell",
+   "freq": 15,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[1].cell[0]",
+    "near": "Product Information"
+   },
+   "dict": {
+    "ar": "المقاس",
+    "ckb": "قەبارە"
+   }
+  },
+  {
+   "h": "82d955979367b80003976824474578888663abcb191c05a081c5929813d3b3ef",
+   "en": "156 mm*120 mm",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[1].cell[1]",
+    "near": "Product Information"
+   },
+   "dict": null
+  },
+  {
+   "h": "933aa4c509e414e3b4eef0372794428ce010afbdcce99321c1f5803ccc67cb2d",
+   "en": "144 mm*108 mm (Light Bead Aera)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[2].cell[1]",
+    "near": "Size | 156 mm*120 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "14b561f7e9e4859cc42c4793823d082c04ed5777abdd1c8e30377b038f9b3b2b",
+   "en": "Light Type",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[3].cell[0]",
+    "near": "Size | 144 mm*108 mm (Light Bead Aera)"
+   },
+   "dict": null
+  },
+  {
+   "h": "2435dad7c41031b5f0279278c845a982b735b9cf611deb38cdb1523fb24f2157",
+   "en": "Power Source",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[4].cell[0]",
+    "near": "Light Type | LED"
+   },
+   "dict": null
+  },
+  {
+   "h": "61237e9e3a98444267783e975c4f36e88e057da7611aea48ec175c93c0e322e1",
+   "en": "Corded Electric",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[4].cell[1]",
+    "near": "Light Type | LED"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1d509ef2ad5e4e4589893ad123e2a396a8e33812b8260242a7433d1ac197df1",
+   "en": "Power Port Type",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[5].cell[0]",
+    "near": "Power Source | Corded Electric"
+   },
+   "dict": null
+  },
+  {
+   "h": "dfee15323a7817db4ea4d5f596c7506f66500420e8241f0bb4a62fcda43219ad",
+   "en": "Bead Count",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[7].cell[0]",
+    "near": "Light Color | White"
+   },
+   "dict": null
+  },
+  {
+   "h": "89785ba49599a265ff74231eb847218eaf8cdb60a0c675ad34c8326a71746e76",
+   "en": "Wattage",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[8].cell[0]",
+    "near": "Bead Count | 99"
+   },
+   "dict": null
+  },
+  {
+   "h": "204e0d8796432df7de78a92d1829a7716a47d86471ec9ece771d0d08cfed94de",
+   "en": "Temperature during Operation",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[9].cell[0]",
+    "near": "Wattage | 5W"
+   },
+   "dict": null
+  },
+  {
+   "h": "81d27ef6d5033c3e1d46b7b2b50868604fd432ddb77716b5ed9383c30c08432f",
+   "en": "Weight",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[10].cell[0]",
+    "near": "Temperature during Operation | 70 ℃"
+   },
+   "dict": {
+    "ar": "الوزن",
+    "ckb": "کێش"
+   }
+  },
+  {
+   "h": "3ff9fd90d6ae7f671cb942367d30f4eadc1bd61be816205cbe06aac1ea111fb0",
+   "en": "Download Frame and Light Guide Plate.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[1].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2076a6aa1232c7f9da6a1db9b16e1ccc33e676a9218db3c9a8486f6714a22a1a",
+   "en": "3D Model Application Instruction",
+   "kind": "block_line",
+   "freq": 12,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[0].line[1]",
+    "near": "Documentation"
+   },
+   "dict": null
+  },
+  {
+   "h": "70f58db47b1df12576bfe8bf326b99c2f6f6bd4f44c70c0f0f166e781a24dc6f",
+   "en": "The LED Lamp Kit contains all the necessary hardware components for assembling an LED Lamp. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d84cc179131de7fe857d380841fe22908239a13dd456dbf1ba1e5d1a13a18fc",
+   "en": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, while Bambu Lab provides compatible hardware kits for those designs.",
+   "kind": "block_line",
+   "freq": 95,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[1].line[2]",
+    "near": "The LED Lamp Kit contains all the necessary hardware components for assembling an LED Lamp. To complete the assembly for an entirely functional piece, users als"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4a0aed40a540ae071afb6a15f36a974145e713f010a9190a50c71adc857b307",
+   "en": "LED Lamp",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[1].cell[0]",
+    "near": "Compatible Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc68a7f9e537b259325a98241a41160b0e7c254dc8a010e2b06ce404859c87b8",
+   "en": "Lin and Gleason (Bambu Lab)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Compatible Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "db59bf12dd40b50cbb1791f542fe7828654a8a7ba2be2f600dcea5c9570cdf3b",
+   "en": "Arc Reactor MK1",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[2].cell[0]",
+    "near": "LED Lamp | Lin and Gleason (Bambu Lab) | LED Lamp"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec58f30d205cc4a6b40bf0840aed341cea9716c06b1f36dd61f245b47c00336c",
+   "en": "Moon Globe for LED Lamp 001",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[3].cell[0]",
+    "near": "Arc Reactor MK1 | Mc2.project3D | Arc Reactor MK1"
+   },
+   "dict": null
+  },
+  {
+   "h": "f78da3f7b0d1c652d1bc536343d8e2ec4f670b4eabdcb9544e8ec74db2fb40ee",
+   "en": "TBone_427120",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[3].cell[1]",
+    "near": "Arc Reactor MK1 | Mc2.project3D | Arc Reactor MK1"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe7cdab7af36574f97a700d965e4b775737a83da448278316af9a7b0107d37de",
+   "en": "lampshade for LED Lamp Kit",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[4].cell[0]",
+    "near": "Moon Globe for LED Lamp 001 | TBone_427120 | Moon Globe for LED Lamp 001"
+   },
+   "dict": null
+  },
+  {
+   "h": "c02f0493dc7637965510af55570b8fa413800d4af56d5712acd24177283e8001",
+   "en": "wuguigui",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[4].cell[1]",
+    "near": "Moon Globe for LED Lamp 001 | TBone_427120 | Moon Globe for LED Lamp 001"
+   },
+   "dict": null
+  },
+  {
+   "h": "25b570247b362f12742bec0b46c7e3723dca4b8a16ce1a18c4838d4d52407c40",
+   "en": "Easter Bunny Egg Lamp",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[5].cell[0]",
+    "near": "lampshade for LED Lamp Kit | wuguigui | lampshade for LED Lamp Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "36f5e756bff36995bba4a09d64b7e554dec0f0d46ef36fa3cbf0daf8080d6b65",
+   "en": "NUKDDD",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[5].cell[1]",
+    "near": "lampshade for LED Lamp Kit | wuguigui | lampshade for LED Lamp Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "df9635d056705b63b424f29b5642e4b6e7f14d45709a98be170be9ba8216a8bb",
+   "en": "Cozy Minecraft Lantern",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[6].cell[0]",
+    "near": "Easter Bunny Egg Lamp | NUKDDD | Easter Bunny Egg Lamp"
+   },
+   "dict": null
+  },
+  {
+   "h": "2523fda43f13577dce2a09dc7dcd81aaa4eaf970fbb3aa9d20073b89ba7f5b68",
+   "en": "Sakul",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[6].cell[1]",
+    "near": "Easter Bunny Egg Lamp | NUKDDD | Easter Bunny Egg Lamp"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7ce7a6c82778f509f04a1085e4927ca03012ad7cd6b4e0b2cef5044aecdfbf8",
+   "en": "Japanese Kumiko Large Lamp LED KIT",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[7].cell[0]",
+    "near": "Cozy Minecraft Lantern | Sakul | Cozy Minecraft Lantern"
+   },
+   "dict": null
+  },
+  {
+   "h": "5bbcd839afc0b651cc868365e196b8f96dd230bcdabed47e9d3283223c8fcf77",
+   "en": "Foxwood",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[7].cell[1]",
+    "near": "Cozy Minecraft Lantern | Sakul | Cozy Minecraft Lantern"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8524713221c2ec511a97953d8ecbcd9c8e5f4dce7818502c227e8abd1600a8a",
+   "en": "BellSprout Lamp LED Kit",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[8].cell[0]",
+    "near": "Japanese Kumiko Large Lamp LED KIT | Foxwood | Japanese Kumiko Large Lamp LED KIT"
+   },
+   "dict": null
+  },
+  {
+   "h": "d08f17040a27edcc3f5cf2dbe3b3d86122af210b6ec27af04e4f8ce3167062cd",
+   "en": "SavageLau",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[8].cell[1]",
+    "near": "Japanese Kumiko Large Lamp LED KIT | Foxwood | Japanese Kumiko Large Lamp LED KIT"
+   },
+   "dict": null
+  },
+  {
+   "h": "1217687b4b7e48193e1ed083ccebfccd78c2b0e25cf8fcf67f901ff8fe2808b1",
+   "en": "Design Lamp - The Wave",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[9].cell[0]",
+    "near": "BellSprout Lamp LED Kit | SavageLau | BellSprout Lamp LED Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "cde7f037db6ff7748bffc8eb9d767c0a22b2ff2e979f115100957f44e51b45cc",
+   "en": "SJANBERRY DESIGN",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[9].cell[1]",
+    "near": "BellSprout Lamp LED Kit | SavageLau | BellSprout Lamp LED Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "9798ab5df56b5d0b80e2b02fda78a70431d9a97c9a393391ffa8fc9ed41d0355",
+   "en": "Bonsai Desk Lamp",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[2].line[10].cell[0]",
+    "near": "Design Lamp - The Wave | SJANBERRY DESIGN | Design Lamp - The Wave"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a7525b1492fb84833f5c4a69b30f4bfbb134f9b666b61a2c1872d63d234c085",
+   "en": "Notes",
+   "kind": "block_title",
+   "freq": 11,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[3].line[0]",
+    "near": "1. Please power the device using a USB power supply with the specified voltage."
+   },
+   "dict": null
+  },
+  {
+   "h": "ea984ea7bbfcc48faf1d8c7e268ace11eadb5291ca77c0d6888ff025663954b3",
+   "en": "1. Please power the device using a USB power supply with the specified voltage.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[3].line[1]",
+    "near": "Notes"
+   },
+   "dict": null
+  },
+  {
+   "h": "32f5dc31a5d2160077155ca1428cf0ca5dccd954db35d989ffb61ecca1643560",
+   "en": "2. It is recommended for indoor use at room temperature.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[3].line[2]",
+    "near": "1. Please power the device using a USB power supply with the specified voltage."
+   },
+   "dict": null
+  },
+  {
+   "h": "ab8717241a80146599264f8771531b72e103c8023018ecd9268b6586b2eec853",
+   "en": "3. Wipe with a clean cloth and avoid splashing or immersing in water.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[3].line[3]",
+    "near": "2. It is recommended for indoor use at room temperature."
+   },
+   "dict": null
+  },
+  {
+   "h": "b5b8dffba3aa99effe31739a8ec460a844571a9e39678c7f7b5626d9af6b8334",
+   "en": "4. BT3x12 SHCS Self Tapping Screw is the alternative to the screws included in the kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[3].line[4]",
+    "near": "3. Wipe with a clean cloth and avoid splashing or immersing in water."
+   },
+   "dict": null
+  },
+  {
+   "h": "7f9e41edc986dbc090cf137b3ab758ca6d08a869e8c70ff7cb1edcf469520cad",
+   "en": "Please note that all variants on this page ship the same physical product. Some variants are creator-exclusive SKUs from Creator Program, the item you receive is identical. No need to repurchase if you already own this product.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "blocks[4].line[2]",
+    "near": "• Please note that the product does not include the 3D printed parts as shown in the main image."
+   },
+   "dict": null
+  },
+  {
+   "h": "2b78104eef2b965d688bd6174a4113ded56b37094c58b70fcdab844ac1903c63",
+   "en": "The Wireless Mouse Components Kit contains all the necessary hardware components for assembling a Wireless Mouse. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "41bb3c4404eedee69c463b98b324a83122f7a22a3d2aca67145a75818fbbb492",
+   "en": "Wireless Mouse 002",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[4].cell[0]",
+    "near": "Compatible Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9822b4f2f0775bb501f3d88def0bde69b3b2f3d2c630648edd86f665c4b0759",
+   "en": "Batmobile Ⅴ Wireless mouse",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[5].cell[0]",
+    "near": "Wireless Mouse 002 | Bambu Lab | Wireless Mouse 002"
+   },
+   "dict": null
+  },
+  {
+   "h": "3734f6b884576560fac33f5dfb3986ec40c449001aca75cda1e82c3d8d7ec2bb",
+   "en": "Millennium Falcon Wireless Mouse",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[6].cell[0]",
+    "near": "Batmobile Ⅴ Wireless mouse | W.drop2027 | Batmobile Ⅴ Wireless mouse"
+   },
+   "dict": null
+  },
+  {
+   "h": "0157f678e4379d3a8c67887e3cba6713101b2d62fa557790b2c0759e33cd5bca",
+   "en": "parkeryaojj",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[6].cell[1]",
+    "near": "Batmobile Ⅴ Wireless mouse | W.drop2027 | Batmobile Ⅴ Wireless mouse"
+   },
+   "dict": null
+  },
+  {
+   "h": "26fa8c6b690b614981f641bcc3047e94326584aca423e2fcb034c4ed7c719f85",
+   "en": "ERGONOMIC + Easy click wireless mouse cover",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[7].cell[0]",
+    "near": "Millennium Falcon Wireless Mouse | parkeryaojj | Millennium Falcon Wireless Mouse"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ee1b34310708aac39331a00b37ebe6e693165c2050681ce7a0e96aec954a304",
+   "en": "FADY",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[7].cell[1]",
+    "near": "Millennium Falcon Wireless Mouse | parkeryaojj | Millennium Falcon Wireless Mouse"
+   },
+   "dict": null
+  },
+  {
+   "h": "9498e7b67bf2160f7b6caa58fb607d53d1c3c21c8095f6a8d0f6771a1e55f640",
+   "en": "Ergo Mouse - Snake edition",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[8].cell[0]",
+    "near": "ERGONOMIC + Easy click wireless mouse cover | FADY | ERGONOMIC + Easy click wireless mouse cover"
+   },
+   "dict": null
+  },
+  {
+   "h": "84edae4a07192e454451783c676ac14e67253b1d30f9989b04f0b6ac90b184fa",
+   "en": "Jorge Rui",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[8].cell[1]",
+    "near": "ERGONOMIC + Easy click wireless mouse cover | FADY | ERGONOMIC + Easy click wireless mouse cover"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0b621978b0e3386ca45b54e10496dba759dd6511881942c3d88c39f676e2bb5",
+   "en": "Ergo Vertical Mouse V2 Left and Right Handed",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[9].cell[0]",
+    "near": "Ergo Mouse - Snake edition | Jorge Rui | Ergo Mouse - Snake edition"
+   },
+   "dict": null
+  },
+  {
+   "h": "1af1dd71d8182930d1ac48a56835aed4b21ca3c802e416f0a639d904d88bd86f",
+   "en": "PrintMint",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[9].cell[1]",
+    "near": "Ergo Mouse - Snake edition | Jorge Rui | Ergo Mouse - Snake edition"
+   },
+   "dict": null
+  },
+  {
+   "h": "52a3e7a3861ee0af5246e61dec858284a9172f060d3b234ea5dd86497dc75ad5",
+   "en": "The Mouse - Bambu Lab Mouse Kit Compatible",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[10].cell[0]",
+    "near": "Ergo Vertical Mouse V2 Left and Right Handed | PrintMint | Ergo Vertical Mouse V2 Left and Right Handed"
+   },
+   "dict": null
+  },
+  {
+   "h": "503368945059dc826ae575d3bbec790d2d146ccdbf710a25e392059d9f804fe1",
+   "en": "\"Manta\" mouse - Bambu Lab Mouse kit Compatible",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[2].line[11].cell[0]",
+    "near": "The Mouse - Bambu Lab Mouse Kit Compatible | Jorge Rui | The Mouse - Bambu Lab Mouse Kit Compatible"
+   },
+   "dict": null
+  },
+  {
+   "h": "45f0d3adfdd9cdfef55b6d7b8f94cb02213b07a82299d9e3d1f33dd273ab9c06",
+   "en": "1. Please use AA batteries. (not included in the box)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[3].line[1]",
+    "near": "Notes"
+   },
+   "dict": null
+  },
+  {
+   "h": "b591e24d41ce8af83b8ccefcaf2029c9ca8c985a02e6d305ed61aabd1e4c9093",
+   "en": "2. It is recommended to use indoors at room temperature and avoid using on glass or reflective surfaces.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[3].line[2]",
+    "near": "1. Please use AA batteries. (not included in the box)"
+   },
+   "dict": null
+  },
+  {
+   "h": "865cf00627d5193c21923ec863369fd392c79001d799d0ee85b6228d563e7fc3",
+   "en": "The Marble Run Components Kit contains all the necessary hardware components for assembling a Marble Run. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "marble-run-components-kit-003",
+    "title": "Marble Run Components Kit 003",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e3c5b9e15f9b78fe597e9e8eae53648985e608e8d41cdfed7791260fb7bbd524",
+   "en": "To download the model files of Marble Run and obtain detailed information, please visit the Marble Run on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "marble-run-components-kit-003",
+    "title": "Marble Run Components Kit 003",
+    "field": "blocks[1].line[2]",
+    "near": "The Marble Run Components Kit contains all the necessary hardware components for assembling a Marble Run. To complete the assembly for an entirely functional pi"
+   },
+   "dict": null
+  },
+  {
+   "h": "cec8e99bc99b75adbc6f8769596e1e52e995ddfae5b94f718821b31cac6562af",
+   "en": "1. Please power the device using a USB power supply with the specified voltage. Please ensure that the conveyor belt is pre-folded smoothly. After power is applied, confirm the operational status of the motor and take precautions to prevent motor blockage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "marble-run-components-kit-003",
+    "title": "Marble Run Components Kit 003",
+    "field": "blocks[2].line[1]",
+    "near": "Notes"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a6bbfd30f275911f6662ed94fa2efe8c564c583f6d6a71af84b7b8bc708af0a",
+   "en": "2. It is recommended to use indoors at room temperature.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "marble-run-components-kit-003",
+    "title": "Marble Run Components Kit 003",
+    "field": "blocks[2].line[2]",
+    "near": "1. Please power the device using a USB power supply with the specified voltage. Please ensure that the conveyor belt is pre-folded smoothly. After power is appl"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac2a51388b137b2f2a64bd3713a66318b0dd55be898be77751836ef0e7c22912",
+   "en": "3. The product contains small parts. Please take precautions to prevent children from inhaling or swallowing them.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "marble-run-components-kit-003",
+    "title": "Marble Run Components Kit 003",
+    "field": "blocks[2].line[3]",
+    "near": "2. It is recommended to use indoors at room temperature."
+   },
+   "dict": null
+  },
+  {
+   "h": "c041cffe4561a9a6b1e8f6a58fe034cac9db28475c715df0203fde22369f3eba",
+   "en": "The Toy Shooter Components Kit contains all the necessary hardware components for assembling a Toy Shooter. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toy-shooter-components-kit-004",
+    "title": "Toy Shooter Components Kit 004",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "182bb8854ad80db2a4b3507ed20317ce6439c84a597bfac8d68524c199b97942",
+   "en": "*This is a cartoon-style toy shooter that does not have any firing capability, only ejecting shells from the top to ensure safe play.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toy-shooter-components-kit-004",
+    "title": "Toy Shooter Components Kit 004",
+    "field": "blocks[1].line[2]",
+    "near": "The Toy Shooter Components Kit contains all the necessary hardware components for assembling a Toy Shooter. To complete the assembly for an entirely functional "
+   },
+   "dict": null
+  },
+  {
+   "h": "72a547e260167ceaa95838af4423b3e8fbef431da32d3a28d85bd4325f7118b0",
+   "en": "To download the model files and obtain detailed information, please visit the Toy Shooter on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toy-shooter-components-kit-004",
+    "title": "Toy Shooter Components Kit 004",
+    "field": "blocks[1].line[3]",
+    "near": "*This is a cartoon-style toy shooter that does not have any firing capability, only ejecting shells from the top to ensure safe play."
+   },
+   "dict": null
+  },
+  {
+   "h": "cc522ef210f826f94527b3f47af4f65fb732614892f61d35504f08349d5e25af",
+   "en": "1. This toy shooter is designed without any firing capability.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toy-shooter-components-kit-004",
+    "title": "Toy Shooter Components Kit 004",
+    "field": "blocks[2].line[1]",
+    "near": "Notes"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7e31ef7037007d456b2f95abef33b432043068359f18d3e66e80e125fa6e0ad",
+   "en": "2. Please wear appropriate eye protection such as goggles or safety glasses to prevent any ejected shells or debris from causing eye injuries.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toy-shooter-components-kit-004",
+    "title": "Toy Shooter Components Kit 004",
+    "field": "blocks[2].line[2]",
+    "near": "1. This toy shooter is designed without any firing capability."
+   },
+   "dict": null
+  },
+  {
+   "h": "73b6e59acb78074cf15d96187a0b35476011890ccfec90cfa192b4459d1e515f",
+   "en": "3. It is recommended to use PLA Basic for the printed part. To ensure proper functionality of the feeding mechanism, please avoid using PLA Matte for printing the feeding components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toy-shooter-components-kit-004",
+    "title": "Toy Shooter Components Kit 004",
+    "field": "blocks[2].line[3]",
+    "near": "2. Please wear appropriate eye protection such as goggles or safety glasses to prevent any ejected shells or debris from causing eye injuries."
+   },
+   "dict": null
+  },
+  {
+   "h": "6bf26799dcd7bd530b08386f2828f6d9f9c1586c7b62e9d39e5eb0deccdb0e9e",
+   "en": "The Engine Model Components Kit contains all the necessary hardware components for assembling an Engine Model. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "61e88d737c798ae2799d73e05a54436555268987027a32b16e0ed9fe743fc287",
+   "en": "To download the model files of Engine Model and obtain detailed information, please visit the Engine Model on MakerWorld",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "blocks[1].line[2]",
+    "near": "The Engine Model Components Kit contains all the necessary hardware components for assembling an Engine Model. To complete the assembly for an entirely function"
+   },
+   "dict": null
+  },
+  {
+   "h": "62d07b60075b3023be5b053d8548f8929d05c358b6cb85ffa736277b35fdee2b",
+   "en": "Please power the device using a USB power supply with the specified voltage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "blocks[2].line[1]",
+    "near": "Notes"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6b0a275b3014d61230f11ac825794b78a85447573cefa603243b63b5f237682",
+   "en": "Please test the operation of the mechanism by rotating the control handle before powering. After powering, verify the operational status of the motor and be cautious to prevent motor blockage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "blocks[2].line[2]",
+    "near": "• Please power the device using a USB power supply with the specified voltage."
+   },
+   "dict": null
+  },
+  {
+   "h": "bf230bbda24afa862c75467be4ed9eb50713523b3c496a99c48dd5761559c9e3",
+   "en": "It is recommended to use indoors at room temperature.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "blocks[2].line[3]",
+    "near": "• Please test the operation of the mechanism by rotating the control handle before powering. After powering, verify the operational status of the motor and be c"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2d642984c841f55aae07f454d466c316dc0e2e2fe02e812ee9e98681ace503a",
+   "en": "The Jet Engine Model Components Kit contains all the necessary hardware components for assembling an Engine Model. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "jet-engine-model-components-kit-006",
+    "title": "Jet Engine Kit Collection",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "88447b83090cded58b10214c752813d476fa21c8c1d8dcbccbd2e2676231aab9",
+   "en": "Creator",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "jet-engine-model-components-kit-006",
+    "title": "Jet Engine Kit Collection",
+    "field": "blocks[1].line[3].cell[1]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "dfb522debd8c70f4163d320eca89788f684a65c717617021f0e9ab6dc2e2d565",
+   "en": "Model Link",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "jet-engine-model-components-kit-006",
+    "title": "Jet Engine Kit Collection",
+    "field": "blocks[1].line[3].cell[2]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "8f7fda1b03e93a0325e5e9cb83ea981a6c0f82a344bb23762e0c98df017fed54",
+   "en": "3D Printable Jet Engine",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "jet-engine-model-components-kit-006",
+    "title": "Jet Engine Kit Collection",
+    "field": "blocks[1].line[4].cell[0]",
+    "near": "Model | Creator | Model Link"
+   },
+   "dict": null
+  },
+  {
+   "h": "6a22b84b086e555b9a6e183c40a14780c5d5c8ba1777bae5be3de5a460f385cb",
+   "en": "3d Printable Turbojet Engine",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "jet-engine-model-components-kit-006",
+    "title": "Jet Engine Kit Collection",
+    "field": "blocks[1].line[5].cell[0]",
+    "near": "3D Printable Jet Engine | CATIAV5FTW | 3D Printable Jet Engine"
+   },
+   "dict": null
+  },
+  {
+   "h": "9cc45f24b911335364e652b22c554e30ffc837f2fb2259ed388ceb1b46fbf023",
+   "en": "The Triple-axis Tourbillon Model Components Kit contains all the necessary hardware components for assembling a Triple-axis Tourbillon Model. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "triple-axis-tourbillon-model-components-kit-007",
+    "title": "Triple-axis Tourbillon Model Components Kit 007",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c02a40d673c5d67e138f3c8401207c8769d81fe6c599faf2166b3a98adcfcb02",
+   "en": "Triple-axis Tourbillon Model",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "triple-axis-tourbillon-model-components-kit-007",
+    "title": "Triple-axis Tourbillon Model Components Kit 007",
+    "field": "blocks[1].line[4].cell[0]",
+    "near": "Model | Creator | Model Link"
+   },
+   "dict": null
+  },
+  {
+   "h": "d47145321f640f88d46f256709691875ba73a34032d865fffe6dff9f63d735ba",
+   "en": "mcmaven",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "triple-axis-tourbillon-model-components-kit-007",
+    "title": "Triple-axis Tourbillon Model Components Kit 007",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "Model | Creator | Model Link"
+   },
+   "dict": null
+  },
+  {
+   "h": "c37f95581dcdddbca51531f4d0c4295982c3e05de0c64e57719b8bc6ecf25538",
+   "en": "TT Furious Tourbillon",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "triple-axis-tourbillon-model-components-kit-007",
+    "title": "Triple-axis Tourbillon Model Components Kit 007",
+    "field": "blocks[1].line[4].cell[2]",
+    "near": "Model | Creator | Model Link"
+   },
+   "dict": null
+  },
+  {
+   "h": "eaab19563b81f1342dd508cb287a33ba21e2f10f1d764281592359b496be6dda",
+   "en": "To download the model files of Triple-axis Tourbillon Model and obtain detailed information, please visit the Triple-axis Tourbillon Model on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "triple-axis-tourbillon-model-components-kit-007",
+    "title": "Triple-axis Tourbillon Model Components Kit 007",
+    "field": "blocks[1].line[5]",
+    "near": "Triple-axis Tourbillon Model | mcmaven | TT Furious Tourbillon"
+   },
+   "dict": null
+  },
+  {
+   "h": "528e7e02b4dae4e9febfb4ab03216d96e0cc05f60b6cc66938017e34cd415ff4",
+   "en": "2. Please test the operation of the mechanism by rotating the control handle before powering. After powering, verify the operational status of the motor and be cautious to prevent motor blockage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "triple-axis-tourbillon-model-components-kit-007",
+    "title": "Triple-axis Tourbillon Model Components Kit 007",
+    "field": "blocks[2].line[2]",
+    "near": "1. Please power the device using a USB power supply with the specified voltage."
+   },
+   "dict": null
+  },
+  {
+   "h": "52f057eb2483176dcbac6cd13467af7fbeeb7750ecb434518560106f23bd502c",
+   "en": "3. It is recommended to use indoors at room temperature.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "triple-axis-tourbillon-model-components-kit-007",
+    "title": "Triple-axis Tourbillon Model Components Kit 007",
+    "field": "blocks[2].line[3]",
+    "near": "2. Please test the operation of the mechanism by rotating the control handle before powering. After powering, verify the operational status of the motor and be "
+   },
+   "dict": null
+  },
+  {
+   "h": "9d9a55a4807a0a2a0d57db3d693a421bad42fce6cd8259cc2d919cbe03b12951",
+   "en": "Combining Design and Practicality",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[0].line[0]",
+    "near": "This 6500K white LED light is designed with the ability to be cut into any desired length, catering to your specific model requirements. Regardless of the lengt"
+   },
+   "dict": null
+  },
+  {
+   "h": "d6d3e97f7dc1340e4b96e3685d792766675f7c1c1df11e31584aca82db2a08ba",
+   "en": "This 6500K white LED light is designed with the ability to be cut into any desired length, catering to your specific model requirements. Regardless of the length you desire, it allows you to freely engage in various DIY creations while achieving a perfect blend of functionality and design.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[0].line[1]",
+    "near": "Combining Design and Practicality"
+   },
+   "dict": null
+  },
+  {
+   "h": "26f13eb0bbdfcf426e0ff3585157c706aaa5c400b249f51c62c268422417a343",
+   "en": "Suitable for P1 Series",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[1].line[0]",
+    "near": "This LED light strip operates on 5V power and features a built-in USB plug, allowing for easy connection to the external power port of P1P or P1S printers. It c"
+   },
+   "dict": null
+  },
+  {
+   "h": "32bcc159c593bc117b43b6b107554783800d52be94ba35a3244a9aa776f694a8",
+   "en": "This LED light strip operates on 5V power and features a built-in USB plug, allowing for easy connection to the external power port of P1P or P1S printers. It can provide internal illumination, enabling better observation or capturing of the printing process of your models.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[1].line[1]",
+    "near": "Suitable for P1 Series"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2c368f3f65e86b0eb00ebefa0505239e0823a9dbbbea1074aed5c73a55dc30e",
+   "en": "Product Specification",
+   "kind": "block_cell",
+   "freq": 21,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[0].cell[0]",
+    "near": "Voltage | DC 5V"
+   },
+   "dict": null
+  },
+  {
+   "h": "6de13525e64c619792b4575a05e2debe62e2576ec3bdbf11a891e2f106656a47",
+   "en": "6500 Kelvin",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[2].cell[1]",
+    "near": "Voltage | DC 5V"
+   },
+   "dict": null
+  },
+  {
+   "h": "ee09fdf958d8918d41c5247a7ebcc32a3e90257cfce8282c010ba9e9de4124f3",
+   "en": "USB cable length",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[3].cell[0]",
+    "near": "Color Temperature | 6500 Kelvin"
+   },
+   "dict": null
+  },
+  {
+   "h": "243188d7401cd8f99cbb79703c24b279a9a16e9978b97e8ef2eb0175af599336",
+   "en": "LED model",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[6].cell[0]",
+    "near": "Product Specification |"
+   },
+   "dict": null
+  },
+  {
+   "h": "554237d91839d7cac0422cdf185d0b90bb81b5bd78f28c7294f0983b9c93afd3",
+   "en": "Number of Lights",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[7].cell[0]",
+    "near": "LED model | 2835"
+   },
+   "dict": null
+  },
+  {
+   "h": "739a6152ead7ea4d036a91d5dd02775291a40ef604ca77211d2ed8ca8a8684e1",
+   "en": "300 LEDs (60LEDs/M)",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[7].cell[1]",
+    "near": "LED model | 2835"
+   },
+   "dict": null
+  },
+  {
+   "h": "fc8806ada000b657e6fb0d176a02566c948ab14accd5e90cbef33c4918145464",
+   "en": "Length of the strip light",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[8].cell[0]",
+    "near": "Number of Lights | 300 LEDs (60LEDs/M)"
+   },
+   "dict": null
+  },
+  {
+   "h": "a1f2e1977b8b57b293a575da7ce1ad0e654d32a063cf534070e78093ae684226",
+   "en": "5 Meters",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[8].cell[1]",
+    "near": "Number of Lights | 300 LEDs (60LEDs/M)"
+   },
+   "dict": null
+  },
+  {
+   "h": "eecb86b86a9a32fb1cc5ca7ee50466c1d02bfb9f39aa734be291ba4e94d3f10f",
+   "en": "IP 20",
+   "kind": "block_cell",
+   "freq": 5,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[9].cell[1]",
+    "near": "Length of the strip light | 5 Meters"
+   },
+   "dict": null
+  },
+  {
+   "h": "720fd84f0498d5c9c9fa526bd1ae8e2340fc41e34c29d2b18d5786746e001c60",
+   "en": "Solder Point",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[3].line[0]",
+    "near": "The LED strip is constructed with a 100cm Flexible Printed Circuit Board (FPCB), featuring a solder point at every 100cm interval. This design ensures convenien"
+   },
+   "dict": null
+  },
+  {
+   "h": "8434431550adbb7270bc5403fc46d14e50ab2cc527dc8d24c2a2b81c99f174ff",
+   "en": "The LED strip is constructed with a 100cm Flexible Printed Circuit Board (FPCB), featuring a solder point at every 100cm interval. This design ensures convenient connectivity and easy customization along the strip.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[3].line[1]",
+    "near": "Solder Point"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e8a10d41024fd0dd38f6f8fc732bce48758620075671effde5f803aeb9476d3",
+   "en": "Before making any modifications to the device, ensure that the LED strip is unplugged. Electrical currents can be dangerous and may result in electrical shock or injury in certain cases.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[4].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe3ba7aa7064b3119fc5881a8ef822867ae25c3d908c5f1b60e1ce1bd731edee",
+   "en": "This product is not a toy. Please keep it out of reach of children.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[4].line[2]",
+    "near": "• Before making any modifications to the device, ensure that the LED strip is unplugged. Electrical currents can be dangerous and may result in electrical shock"
+   },
+   "dict": null
+  },
+  {
+   "h": "4cdb84eab150ee6840557c1e2e64f40fe85a2f94b94df22b1c91a4303a040833",
+   "en": "The bulbs are sealed and cannot be replaced.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[4].line[3]",
+    "near": "• This product is not a toy. Please keep it out of reach of children."
+   },
+   "dict": null
+  },
+  {
+   "h": "6cddf751779a5218803eeab4672c3af568ab7e8ee7892c219fda8fc0b82b3639",
+   "en": "Avoid immersing the lights in the water.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[4].line[4]",
+    "near": "• The bulbs are sealed and cannot be replaced."
+   },
+   "dict": null
+  },
+  {
+   "h": "6e216bee6d3048793ab357af597c028fb40df1bab4778c587c4fccd24045cb28",
+   "en": "Do not illuminate the lights while they are still inside the packaging.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[4].line[5]",
+    "near": "• Avoid immersing the lights in the water."
+   },
+   "dict": null
+  },
+  {
+   "h": "ffd0a25209dce1f2d22fb64ba62fbcc0eb5f38d0bdaf5abe5b5d7bbb6e6743d1",
+   "en": "Programmable (1LED/IC)",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[0].line[0]",
+    "near": "Discover new possibilities with full-color programmable led strips. Customize every led to create stunning colors and adjust brightness to suit your mood."
+   },
+   "dict": null
+  },
+  {
+   "h": "250efe1b07fbe300948cb139f13c0fe641fab1bf1e08e77e7a509c167f1f241d",
+   "en": "Discover new possibilities with full-color programmable led strips. Customize every led to create stunning colors and adjust brightness to suit your mood.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[0].line[1]",
+    "near": "Programmable (1LED/IC)"
+   },
+   "dict": null
+  },
+  {
+   "h": "71cff29feade53189185f25f4a0c7a58a4ba88267aa45260ba5d5420bba2cd15",
+   "en": "The USB controller comes with preset modes, but to access additional modes, a separate micro-controller board and software support are required, which are not included.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[0].line[2]",
+    "near": "Discover new possibilities with full-color programmable led strips. Customize every led to create stunning colors and adjust brightness to suit your mood."
+   },
+   "dict": null
+  },
+  {
+   "h": "41f87d24a6d194ebaec84dc3652c3ae7a9b8790a1b805e5c23841e351d069d3a",
+   "en": "Ideal for DIY",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[1].line[0]",
+    "near": "Experience the magic of effortless lighting with the included controller, choose from a wide range of patterns to make your led strip shine brightly and beautif"
+   },
+   "dict": null
+  },
+  {
+   "h": "f12b9fafbf4ff9b1857777eb0e3aa072896566e00f8358ebc355fe754229b1dd",
+   "en": "Experience the magic of effortless lighting with the included controller, choose from a wide range of patterns to make your led strip shine brightly and beautifully. No programming skills are needed if you are new.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[1].line[1]",
+    "near": "Ideal for DIY"
+   },
+   "dict": null
+  },
+  {
+   "h": "d17d2d78d76e6a6cd13048de225e107ac73de4aa5f8914e58a0cfaa9698c373e",
+   "en": "Models",
+   "kind": "block_cell",
+   "freq": 28,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[0].cell[0]",
+    "near": "Lovers Valentine Day Shadowbox | technerd | Lovers Valentine Da Shadowbox"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d2389aa1273629afb281b0023010e6ecb95321b1bff3538d9f88ef98d467577",
+   "en": "Lovers Valentine Day Shadowbox",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[1].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "b39e8219cc64eb8b5402f30453c7d11da969e9613aefaac55abf64aa57d68682",
+   "en": "technerd",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d18fda3731f424d163881003880cf8d269702355f111af3affe1b6518108183",
+   "en": "Lovers Valentine Da Shadowbox",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[1].cell[2]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4d896c0899769ef377c71e538a1c626e59d60503d716c34e514d41fe4f60aba",
+   "en": "Painting Light Arch",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[2].cell[0]",
+    "near": "Lovers Valentine Day Shadowbox | technerd | Lovers Valentine Da Shadowbox"
+   },
+   "dict": null
+  },
+  {
+   "h": "060e3b25ba002668ae2f1499aef4eaafec2fb21cb6d16b0b8cb6dce87e86bcbd",
+   "en": "davedamon",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[2].cell[1]",
+    "near": "Lovers Valentine Day Shadowbox | technerd | Lovers Valentine Da Shadowbox"
+   },
+   "dict": null
+  },
+  {
+   "h": "cd7edaef00b2ce7174be240409b222f04f3161b52aca03e6ab9872f2b017c58b",
+   "en": "IC type",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[5].cell[0]",
+    "near": "LED Type | WS2812B RGB LED Strip Light"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7b814c53a0d9fc2b39ee5647c7627457ac77d4858914d0067cca5e2fe7f386d",
+   "en": "WS2812B IC",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[5].cell[1]",
+    "near": "LED Type | WS2812B RGB LED Strip Light"
+   },
+   "dict": null
+  },
+  {
+   "h": "0af9b7193fec1d0db49ef89b5881c758e83ab32af791af6932ee9f96ddec6fd2",
+   "en": "LED chip dimensions",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[6].cell[0]",
+    "near": "IC type | WS2812B IC"
+   },
+   "dict": null
+  },
+  {
+   "h": "9659eea2436a889c38b45e24447051d6604dc3197acffe66e9cfa4bd0c222e15",
+   "en": "5050 LED chip size",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[6].cell[1]",
+    "near": "IC type | WS2812B IC"
+   },
+   "dict": null
+  },
+  {
+   "h": "633c6ad8441bc6597efbc139240b8343c2f60c766ccd259da14caed466d07e4c",
+   "en": "Led Quantity",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[7].cell[0]",
+    "near": "LED chip dimensions | 5050 LED chip size"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4d73cf13c63d85439f22059d5529d41dcb8061999de35a59a6e38a6e92850bb",
+   "en": "Operating Temperature",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[10].cell[0]",
+    "near": "Input Voltage | DC5V"
+   },
+   "dict": {
+    "ar": "درجة حرارة التشغيل",
+    "ckb": "پلەی گەرمی کارکردن"
+   }
+  },
+  {
+   "h": "adc95605a1b30c73959fbaf21e60f9723efe855c482fa336a957924d4ea0a08b",
+   "en": "Length",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[11].cell[0]",
+    "near": "Operating Temperature | -4℉~104℉（-20℃~+40℃ ）"
+   },
+   "dict": {
+    "ar": "الطول",
+    "ckb": "درێژی"
+   }
+  },
+  {
+   "h": "67169063dbbf6780ebad75619ad1186c3ecf9f4dc7d2e557e8d3059478485e46",
+   "en": "The app has different versions that aren't compatible with each other. If there is no response when controlling the LED strip, please make sure you're using the correct app version.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[3].line[2]",
+    "near": "• Before making any modifications to the device, ensure that the LED strip is unplugged. Electrical currents can be dangerous and may result in electrical shock"
+   },
+   "dict": null
+  },
+  {
+   "h": "97feb72d11027229f2b45a88c121e57fbf378dcbeb3ba9d94adedf64cf75a7c0",
+   "en": "Avoid immersing the lights in the fire.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[3].line[5]",
+    "near": "• The bulbs are sealed and cannot be replaced."
+   },
+   "dict": null
+  },
+  {
+   "h": "a9893605c38a778105cf6ce7c75080595916e126c498bfdf26c38edfe5be74fb",
+   "en": "Tunable White COB LED Strip Light",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[0].line[0]",
+    "near": "As a core component of the White CCT Tunable COB LED Strip Light Combo Kit, this LED light strip offers adjustable white light with a color temperature range fr"
+   },
+   "dict": null
+  },
+  {
+   "h": "093e8f1e042d9009a874fbba35bfaf0efe231abdee24d86459db51b3d9a24366",
+   "en": "As a core component of the White CCT Tunable COB LED Strip Light Combo Kit, this LED light strip offers adjustable white light with a color temperature range from warm white to cool white (2700K-6500K). You can automatically select the appropriate mode based on your own model design. It fulfills your various needs, providing you with more possibilities for your creations.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[0].line[1]",
+    "near": "Tunable White COB LED Strip Light"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e7f161f78ebbb55f40df600b5420a5fe49cf9f3508a1884fe108eb96668c55e",
+   "en": "Illuminate Your Printing Journey",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[1].line[0]",
+    "near": "Experience enhanced visibility of the printing process with the internal illumination provided by this LED light strip. Watch as your models come to life layer "
+   },
+   "dict": null
+  },
+  {
+   "h": "996810d0c793e4c32d9eb83d69a15eb010d6da3d690c748968846658c3940094",
+   "en": "Experience enhanced visibility of the printing process with the internal illumination provided by this LED light strip. Watch as your models come to life layer by layer, with improved clarity and precision. Perfect for detailed observation and capturing stunning visuals, this lighting solution takes your printing experience to the next level.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[1].line[1]",
+    "near": "Illuminate Your Printing Journey"
+   },
+   "dict": null
+  },
+  {
+   "h": "1ff5fbfef55f3bf290d3c625f050e87630a92e06c751ea14a50d8516853230e7",
+   "en": "Type of Strip",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[1].cell[0]",
+    "near": "Product Specification | Product Specification"
+   },
+   "dict": null
+  },
+  {
+   "h": "69fd0a3986ec56ba35d3951df6ca03fd2ee367ac11d53c2d5afb72baf3b3d465",
+   "en": "COB (chip on board)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Product Specification | Product Specification"
+   },
+   "dict": null
+  },
+  {
+   "h": "69e630a36a69a502c7b166819143dee3cc8f436f5722b1d263eb9acf47c5cdb3",
+   "en": "LED Model",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[3].cell[0]",
+    "near": "IC type | 16703"
+   },
+   "dict": null
+  },
+  {
+   "h": "d38002301d668fcf724beaa0bbc7bc758cda45c3c267cc8b247be3595734bb4f",
+   "en": "2160 LEDs (432 LEDs/M)",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[4].cell[1]",
+    "near": "LED Model | 2835"
+   },
+   "dict": null
+  },
+  {
+   "h": "3510eb913e3a4b9502714d1207498c88a339221e963a1946518c59d045ee03a2",
+   "en": "Input Voltage Power",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[7].cell[0]",
+    "near": "Product Specification | Product Specification"
+   },
+   "dict": null
+  },
+  {
+   "h": "e61a6c9c5f603982089be5b41698a916a0af4f05ef957bd80abb24ea7cf9f1f4",
+   "en": "LED Strip Width",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[8].cell[0]",
+    "near": "Input Voltage Power | DC24V 16.3W/m"
+   },
+   "dict": null
+  },
+  {
+   "h": "6b73191a0a4b67420e61d51c9f207c35277eaf18fbbf5beb52a320a23fe09653",
+   "en": "Color",
+   "kind": "block_cell",
+   "freq": 9,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[9].cell[0]",
+    "near": "LED Strip Width | 12 mm"
+   },
+   "dict": {
+    "ar": "اللون",
+    "ckb": "ڕەنگ"
+   }
+  },
+  {
+   "h": "356944f4a9eda1ed438b9d1432a7cc1a26f53728d68d42bbb6233bb7584a01fa",
+   "en": "Dual temperature",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[9].cell[1]",
+    "near": "LED Strip Width | 12 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "35cff33e35161329d9d08932745b0103ce91d4b0a8c82b3450a3ca472e3c0418",
+   "en": "FPCB Color",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[11].cell[0]",
+    "near": "Color Temperature | 2700K-6500K"
+   },
+   "dict": null
+  },
+  {
+   "h": "f89282e3542cbe2edc1428af4d8316fc4386e3cc938835f71c6ba9f4dcfd5941",
+   "en": "Control Distance",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[14].cell[0]",
+    "near": "Operating Temperature | -4℉~104℉（-20℃~+40℃ ）"
+   },
+   "dict": null
+  },
+  {
+   "h": "710de6090456320df27ca6a9178c376990f3e18c3b8c2e324e23aee5099d4a88",
+   "en": "Battery Type",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[15].cell[0]",
+    "near": "Control Distance | 20-30M"
+   },
+   "dict": null
+  },
+  {
+   "h": "5b76df2ae3288072c82e0f2a211016180a40f0d1ab8cd4a889d9747d741a2403",
+   "en": "Cutting Unit",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[2].line[16].cell[0]",
+    "near": "Battery Type | CR2025"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd1dda3c2c7eb71fadc02c4544f06f465165cfb1745daa84c2d37f0a7075af77",
+   "en": "Disconnect the power before installation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[3].line[1]",
+    "near": "Considerations"
+   },
+   "dict": null
+  },
+  {
+   "h": "167063545b345e3c6915cfbc11e6dad48d014078437105aea4c6b502d9f271ff",
+   "en": "The product must be cut only along the pre-defined cutting lines to avoid product damage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[3].line[2]",
+    "near": "• Disconnect the power before installation."
+   },
+   "dict": null
+  },
+  {
+   "h": "6a3e7ac93bd55f198e658429f423d2fa5f314b0f18bf639e9b0836ac0f4aec64",
+   "en": "An electric soldering iron must be used to solder the wiring head after cutting the product.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[3].line[3]",
+    "near": "• The product must be cut only along the pre-defined cutting lines to avoid product damage."
+   },
+   "dict": null
+  },
+  {
+   "h": "7f2431a2a2b81f683de184b7484e3717e0b7d9c2a52b70aecfb41fed918c14a9",
+   "en": "This product can accept proper bending.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[3].line[4]",
+    "near": "• An electric soldering iron must be used to solder the wiring head after cutting the product."
+   },
+   "dict": null
+  },
+  {
+   "h": "9cb20e2a567fb03df78d3abe8783acd333481d0f88086a83e6872ae7912dfaec",
+   "en": "Do not use any voltage other than the voltage marked on the product to access the product.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[3].line[5]",
+    "near": "• This product can accept proper bending."
+   },
+   "dict": null
+  },
+  {
+   "h": "f38a09213e3d74364b7d4e5836cde71045c9f0a8eef3b4d67d208d287aa07f55",
+   "en": "Avoid luminescent zone colloid contact with high temperature objects, so as not to burn the colloid and affect the linear effect.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[3].line[6]",
+    "near": "• Do not use any voltage other than the voltage marked on the product to access the product."
+   },
+   "dict": null
+  },
+  {
+   "h": "da2542aada25c8a2f084de6de6142844afb5dfffd93027315c6a7e743f6a4147",
+   "en": "Do not bend or twist the lamp strip at a short distance to avoid damage to the rubber strip or damage to the electrical structure of the chip.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "blocks[3].line[7]",
+    "near": "• Avoid luminescent zone colloid contact with high temperature objects, so as not to burn the colloid and affect the linear effect."
+   },
+   "dict": null
+  },
+  {
+   "h": "956c78607b677aa9d2604d5537fd26f907691d8a0e0dc507bc7ec90e061d59d9",
+   "en": "Create Any Shape with Bending Capability",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "s-shape-led-strip-light-ws2812b-rgb",
+    "title": "S-shape LED Strip Light (WS2812B RGB)",
+    "field": "blocks[0].line[0]",
+    "near": "S-shape LED light strip that offers exceptional flexibility, allowing you to effortlessly design and mold it into any desired shape. Its unique construction ens"
+   },
+   "dict": null
+  },
+  {
+   "h": "b011caa2d03440bfab83698cfbc95997c3456eb4a5e137f09fa1bcfbb14418ac",
+   "en": "S-shape LED light strip that offers exceptional flexibility, allowing you to effortlessly design and mold it into any desired shape. Its unique construction ensures that bending the strip will not cause any damage to the FPCB (Flexible Printed Circuit Board) board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "s-shape-led-strip-light-ws2812b-rgb",
+    "title": "S-shape LED Strip Light (WS2812B RGB)",
+    "field": "blocks[0].line[1]",
+    "near": "Create Any Shape with Bending Capability"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0610851546e6e681c39f89428f09aadd1a82977e23dd060d05e4f4cee8947bb",
+   "en": "Discover new possibilities with full-color programmable LED strips. Customize every LED to create stunning colors and adjust brightness to suit your mood.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "s-shape-led-strip-light-ws2812b-rgb",
+    "title": "S-shape LED Strip Light (WS2812B RGB)",
+    "field": "blocks[1].line[1]",
+    "near": "Programmable (1LED/IC)"
+   },
+   "dict": null
+  },
+  {
+   "h": "13aa08f8b12e24f66f3655b4d992eccd9a16159f5c5abcf431b9d6e220360dce",
+   "en": "Experience the magic of effortless lighting with the included controller, choose from a wide range of patterns to make your LED strip shine brightly and beautifully. No programming skills are needed if you are new.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "s-shape-led-strip-light-ws2812b-rgb",
+    "title": "S-shape LED Strip Light (WS2812B RGB)",
+    "field": "blocks[2].line[1]",
+    "near": "Ideal for DIY"
+   },
+   "dict": null
+  },
+  {
+   "h": "16dadf9e89c536561357268faf7eef9d63d4559fb98860fe75ec1094fbd79f65",
+   "en": "LED Size",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "s-shape-led-strip-light-ws2812b-rgb",
+    "title": "S-shape LED Strip Light (WS2812B RGB)",
+    "field": "blocks[3].line[3].cell[0]",
+    "near": "IC type | WS2812B IC"
+   },
+   "dict": null
+  },
+  {
+   "h": "5cb975abffc51c2cca46f04457fd3ad2237de4b3d8770ab000d7c40b2cc38f07",
+   "en": "LED Quantity",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "s-shape-led-strip-light-ws2812b-rgb",
+    "title": "S-shape LED Strip Light (WS2812B RGB)",
+    "field": "blocks[3].line[4].cell[0]",
+    "near": "LED Size | 3535"
+   },
+   "dict": null
+  },
+  {
+   "h": "9b6fe10648f98ceeea12edf5a235ff436774f19383a247084577a5eaeae7ede0",
+   "en": "The Boat Model Components Kit contains all the non-3D printed parts for assembling an entirely functional Windup-motor Boat. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "boat-model-components-kit-010",
+    "title": "Boat Kit Collection",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "55ca2e1027d1ea68976823211e7e1c28eb25fd310a1d470de9bf76f0a2d9e65a",
+   "en": "The Windup-motor Boat",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "boat-model-components-kit-010",
+    "title": "Boat Kit Collection",
+    "field": "blocks[1].line[4].cell[0]",
+    "near": "Compatible Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "654aa0424133f5d9460cb63897e1d7befffb357ebc92f052409b9e500ea93814",
+   "en": "vandragon_de",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "boat-model-components-kit-010",
+    "title": "Boat Kit Collection",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "Compatible Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "9130444aeafb05cf351bf292b3062b52ba7126c60103b9e4bdc30ecbbd6a4a83",
+   "en": "Thunder Boat Kit 010",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "boat-model-components-kit-010",
+    "title": "Boat Kit Collection",
+    "field": "blocks[1].line[5].cell[0]",
+    "near": "The Windup-motor Boat | vandragon_de | The Windup-motor Boat"
+   },
+   "dict": null
+  },
+  {
+   "h": "e6e3aa0864933e4bee7ca7ba5a8c7ceb03a6862d2cf1a00292a6dc963fe8b04c",
+   "en": "Sevro",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "boat-model-components-kit-010",
+    "title": "Boat Kit Collection",
+    "field": "blocks[1].line[5].cell[1]",
+    "near": "The Windup-motor Boat | vandragon_de | The Windup-motor Boat"
+   },
+   "dict": null
+  },
+  {
+   "h": "41127f922a12170d4a23377c8ec7fcaa91856ecf65339d3a8ba2bf7b6481da7d",
+   "en": "DSV Bambu Kit 010 Submarine",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "boat-model-components-kit-010",
+    "title": "Boat Kit Collection",
+    "field": "blocks[1].line[6].cell[0]",
+    "near": "Thunder Boat Kit 010 | Sevro | Thunder Boat Kit 010"
+   },
+   "dict": null
+  },
+  {
+   "h": "42228c8d7128e1a7fefdf4c3dd19d3c1acae242f4605760ef635ff3fd97fbf9a",
+   "en": "SillyGoose Speed Boat Model Components Kit",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "boat-model-components-kit-010",
+    "title": "Boat Kit Collection",
+    "field": "blocks[1].line[7].cell[0]",
+    "near": "DSV Bambu Kit 010 Submarine | atm473 | DSV Bambu Kit 010 Submarine"
+   },
+   "dict": null
+  },
+  {
+   "h": "078fc09ad437df94c91f4b15ba175b24d83b6489bfe19320a225874f7f1e2743",
+   "en": "SillyGoose",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "boat-model-components-kit-010",
+    "title": "Boat Kit Collection",
+    "field": "blocks[1].line[7].cell[1]",
+    "near": "DSV Bambu Kit 010 Submarine | atm473 | DSV Bambu Kit 010 Submarine"
+   },
+   "dict": null
+  },
+  {
+   "h": "b6378a97dea60119cce970e0809cc8f4b3dd258029d19014c73cade7665571ec",
+   "en": "Everything you need to download the model files, choose a compatible design, install the clock mechanism, and understand what is included in the kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[0].line[1]",
+    "near": "Documentation"
+   },
+   "dict": null
+  },
+  {
+   "h": "3403769416210f30b2e9673027bafae35591fdc4d75f38327a8c7d329bab2a48",
+   "en": "The Clock Components Kit contains all the non-3D printed parts for assembling an entirely functional Maker World Clock. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3dd8865da80fce1fa6b0d1db239543b5fc1a7e392049c513ab4c777d058d37e",
+   "en": "Maker World Clock Preview from MakerWorld",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[3].cell[0]",
+    "near": "Compatible Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4281e452e8e78487dd5c7cba88cdf6a934caf21e4933a34f29ff5fabd5ad600",
+   "en": "B-Lab 3D",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[3].cell[1]",
+    "near": "Compatible Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "513db1d24242fe48a07595d5a7d39d25e38659ebe84d0e2f603b02a54622ccd9",
+   "en": "View model",
+   "kind": "block_cell",
+   "freq": 5,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[3].cell[2]",
+    "near": "Compatible Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "7947ee98947bfdb4d5e78707674e66c7001933ff1d2c9b98508b04df587cbfa1",
+   "en": "Rotating dial clock Preview from MakerWorld",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[4].cell[0]",
+    "near": "Maker World Clock Preview from MakerWorld | B-Lab 3D | View model"
+   },
+   "dict": null
+  },
+  {
+   "h": "f616d577792a210b3debd096d8bd8ccd2075c755c5e00911cac2a13478608c49",
+   "en": "Waveform Modern Minimalist Desk Clock Preview image; if needed, replace this URL with the latest MakerWorld cover image.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[5].cell[0]",
+    "near": "Rotating dial clock Preview from MakerWorld | simas1017 | View model"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e748dff5fc5428efd8e36c3ca4ac123fb27725fae00cea1ff5af2015ce78db7",
+   "en": "Mike.stl",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[5].cell[1]",
+    "near": "Rotating dial clock Preview from MakerWorld | simas1017 | View model"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f657c416e66c0439acc98923e589afd0dd3f0fb8c3920cb1fc60a54218e28e5",
+   "en": "Royal POP - Wall Clock Preview from MakerWorld",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[6].cell[0]",
+    "near": "Waveform Modern Minimalist Desk Clock Preview image; if needed, replace this URL with the latest MakerWorld cover image. | Mike.stl | View model"
+   },
+   "dict": null
+  },
+  {
+   "h": "ba1b7530402e3887704775097c150fdd47cda05c65968b471f3282e8d37e9497",
+   "en": "josteb",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[6].cell[1]",
+    "near": "Waveform Modern Minimalist Desk Clock Preview image; if needed, replace this URL with the latest MakerWorld cover image. | Mike.stl | View model"
+   },
+   "dict": null
+  },
+  {
+   "h": "d31cd32eeb384d18f0433b7f4c38c36a5fac1fcdddd2b5d5f09039068b15aa18",
+   "en": "Modern Desktop Clock, Modular Clock Kit Preview from MakerWorld",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[7].cell[0]",
+    "near": "Royal POP - Wall Clock Preview from MakerWorld | josteb | View model"
+   },
+   "dict": null
+  },
+  {
+   "h": "452d0985d8bbebba4bd03bc39835556b11054a183f00275eaa87f41447953a36",
+   "en": "Abstractia Design",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[7].cell[1]",
+    "near": "Royal POP - Wall Clock Preview from MakerWorld | josteb | View model"
+   },
+   "dict": null
+  },
+  {
+   "h": "54afba86cff07d84d7f364894f4fc536acbfd96d49c48aba418ed042a7a24ea9",
+   "en": "To download the model files of the Maker World Clock and obtain detailed information, please visit the MakerWorld model page.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[2].line[8]",
+    "near": "Modern Desktop Clock, Modular Clock Kit Preview from MakerWorld | Abstractia Design | View model"
+   },
+   "dict": null
+  },
+  {
+   "h": "e5b0ccd825ce906b4543f0f2ddd9550cee24f9210dc5b80bef6f9f3b2048ad66",
+   "en": "Battery not includedThe Clock Components Kit does not come with batteries. Please bring your own AA battery to power the clock.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[3].line[1]",
+    "near": "Notes"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d0d8819465702787f939191fbed1f1d9c2683ae80bd03f030ea7fa9dbb4ef34",
+   "en": "3D printing requiredThe kit contains non-3D printed parts only. Download the model files and print the remaining parts before assembly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "blocks[3].line[2]",
+    "near": "Battery not includedThe Clock Components Kit does not come with batteries. Please bring your own AA battery to power the clock."
+   },
+   "dict": null
+  },
+  {
+   "h": "23e606b46bae57206cd7109726b35b4f2b5399d902198f7567d3825565be7018",
+   "en": "The Electric Coffee WDT Tool Kit contains all the non-3D printed parts for assembling an entirely functional Electric Coffee WDT Tool. To complete the work, you need to download the model files and 3D print the parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-coffee-wdt-tool-kit-k013",
+    "title": "Electric Coffee WDT Tool Kit-K013",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d468f41e899353912bca577ad1fbccb83e1b9dbb88e4fe75d92ed6ef334a0c17",
+   "en": "To download the model files and obtain detailed information, please visit the BooKoo Coffee Electric WDT on Makerworld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-coffee-wdt-tool-kit-k013",
+    "title": "Electric Coffee WDT Tool Kit-K013",
+    "field": "blocks[0].line[2]",
+    "near": "The Electric Coffee WDT Tool Kit contains all the non-3D printed parts for assembling an entirely functional Electric Coffee WDT Tool. To complete the work, you"
+   },
+   "dict": null
+  },
+  {
+   "h": "eeb4246e4230125c1860a6916c395de7ac9b1922be89686a4c1eeb14e5093b68",
+   "en": "1. The needles in the kit are made of stainless steel and have undergone strict sterilization before packaging. It is recommended to sterilize them again before use to ensure food safety. Please be careful not to get injured by the needles when installing them.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-coffee-wdt-tool-kit-k013",
+    "title": "Electric Coffee WDT Tool Kit-K013",
+    "field": "blocks[1].line[1]",
+    "near": "Note"
+   },
+   "dict": null
+  },
+  {
+   "h": "d6f62f3d152ddbb5ed46e185947a08541e0107d35ef2cb373b9b00378e4ea283",
+   "en": "2. It is compatible with most 2-ear 58mm coffee portafilters (with ear width within 30mm).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "electric-coffee-wdt-tool-kit-k013",
+    "title": "Electric Coffee WDT Tool Kit-K013",
+    "field": "blocks[1].line[2]",
+    "near": "1. The needles in the kit are made of stainless steel and have undergone strict sterilization before packaging. It is recommended to sterilize them again before"
+   },
+   "dict": null
+  },
+  {
+   "h": "1464ba9a26cf27caa635f9ae92d08f95d5a0afacbf58d667c91063caa1e36b90",
+   "en": "Bookoo Coffee",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "electric-coffee-wdt-tool-kit-k013",
+    "title": "Electric Coffee WDT Tool Kit-K013",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "Compatible Models | Creators | Model Links"
+   },
+   "dict": null
+  }
+ ]
+}

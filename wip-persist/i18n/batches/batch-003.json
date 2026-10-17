@@ -1,0 +1,3321 @@
+{
+ "batch": 3,
+ "surface": "page",
+ "handles": [
+  "hwb-hauntedhouse",
+  "bambu-hotend-x1c",
+  "bambu-hotend-p1-series",
+  "bambu-high-flow-hotend-h2-p2s-x2d",
+  "bambu-hotend-h2-p2s",
+  "obxidian-high-flow-hotend",
+  "hotends-combo-h2-series",
+  "tungsten-carbide-nozzle-h2-p2s",
+  "h2c-induction-hotend-right",
+  "vortek-utility-hotends-bundle",
+  "h2d-tpu-high-flow-kit",
+  "bambu-smooth-pei-plate",
+  "bambu-dual-texture-pei-plate",
+  "bambu-3d-effect-plate",
+  "bambu-cool-plate-supertack",
+  "bambu-engineering-plate",
+  "build-plate-combo",
+  "glue-stick-for-build-plate",
+  "ams-hub",
+  "liquid-glue-for-build-plate",
+  "anti-vibration-feet",
+  "p1p-enclosure-kit",
+  "bambu-4-in-1-ptfe-adapter",
+  "lubricant-grease",
+  "lubricant-oil",
+  "stronggrip-cutting-mat",
+  "lightgrip-cutting-mat",
+  "fine-point-blade",
+  "material-pins",
+  "smoke-purifier-air-filter",
+  "vision-encoder",
+  "smoke-purifier",
+  "laser-grid-panel",
+  "silicone-desiccant",
+  "ams-2-pro-switching-adapter",
+  "hardened-steel-upgrade-combo",
+  "sandisk-ultra-fit-usb-3-2-flash-drive",
+  "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+  "heat-stake-nut-tool-tip-set-1pcs",
+  "l-type-hex-wrench",
+  "accessory-box-for-ams",
+  "laser-upgrade-kit",
+  "cutting-upgrade-kit-h2-series-a2l",
+  "ams-hub-a1-series",
+  "toolhead-enhanced-cooling-fan",
+  "maker-s-supply-screwdriver-kit",
+  "vortek-upgrade-kit"
+ ],
+ "strings": [
+  {
+   "h": "aca25ac54cc55128165861b73da8904ee2a0f1b94bfbc8f45c1eda43606729d3",
+   "en": "Create a spooky Halloween haunted house display with one Black PLA Basic filament roll, one White PLA Basic filament roll, and one MH001 Kit. A seasonal bundle for haunted house models, Halloween decorations, and atmospheric tabletop scenes.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "885cfd13c62074aace140ecbe474fd11eda4c0c4457858aa90f0af02b278d070",
+   "en": "PLA Basic - Black (10101)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "specs[x.pla_basic_black_10101].label",
+    "near": "1"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c74cdd20ff32c6119b2075462ccd8767f3f6e699b78aedf159929c3b0df81ac",
+   "en": "PLA Basic - Jade White (10100)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "specs[x.pla_basic_jade_white_10100].label",
+    "near": "1"
+   },
+   "dict": null
+  },
+  {
+   "h": "caa938ef46cfd2f8a3151b2fa013ed9d771c036813573e877cec17643ef510f6",
+   "en": "LED Lamp Kit (1pcs) - MH001",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "specs[x.led_lamp_kit_1pcs_mh001].label",
+    "near": "1"
+   },
+   "dict": null
+  },
+  {
+   "h": "1149f943b52a912aed9a82729ff111d0740de82cfb032107870840b118ebefc6",
+   "en": "Everything you need to start building a classic haunted house scene in one bundle.",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-hauntedhouse",
+    "title": "Halloween Special Bundle - Haunted House",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "927a1690cfe5493d74f94ecbfafecadca57ac5e8320a7b1a032523bc70676d85",
+   "en": "The Complete Hotend Assembly - X1 Series is specially designed for the Bambu Lab X1 Series 3D Printers. The hardened steel nozzle (0.4mm/0.6mm/0.8mm*) is capable of printing engineering filaments like carbon fiber nylon, glass fiber nylon, etc.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-x1c",
+    "title": "Bambu Hotend - X1C",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "59e66b450ec095299d8dfebcc0b83cc6586ae855ab2e39c004a1d29df9c1033e",
+   "en": "[*Note] Learn more about filament compatibility on Bambu Lab Wiki.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-hotend-x1c",
+    "title": "Bambu Hotend - X1C",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb94e7f87c5e5bd5323ca0c9339a45886e8f753850f3db96be94f24453d749ac",
+   "en": "The Complete Hotend Assembly - P1P is specially designed for the Bambu Lab P1P 3D Printers. The hardened steel nozzle (0.4mm/0.6mm/0.8mm*) is capable of printing engineering filaments like carbon fiber nylon, glass fiber nylon, etc.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-p1-series",
+    "title": "Bambu Hotend - P1 Series",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a9d88e507eb39f2d950aee07be7441c9eb39bcc74ae71e4226a7bd27e6073126",
+   "en": "Learn more about filament compatibility on Bambu Lab Wiki. For Dual-Nozzle printers (H2D, H2C, X2D) : 1. If you print only single-color filament, we recommend using the Fixed Hotend for printing. 2. If you need multi-color printing with the AMS, connect the AMS to the Fixed Hotend. 3. If you want to use the second hotend for support-material printing, we recommend using the Liftable Hotend. 4. TPU85A is only supported on the Fixed Hotend. TPU95AHF/90A is expected to be supported on the Liftable Hotend starting from firmware version U2. 5. PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+    "title": "Bambu High Flow Hotend - H2/P2S/X2D",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "dca5c9007da73d5d6f9c839853f00fca0941d977ad35dfb475aed2ece0bb908c",
+   "en": "Please learn about the installation on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 128,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cef37768db780efd0befd68ff6f75a3b5ce4aff9ae35f874971b1c6396b2f335",
+   "en": "Standard Flow › Max. Printing Temp.",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "specs[x.standard_flow_thermal_max_nozzle_temp].label",
+    "near": "350 ℃"
+   },
+   "dict": null
+  },
+  {
+   "h": "511c186e5e28312cdd3469034d72f35ed797161c17a35604d6fd6ef45c1c2c08",
+   "en": "Standard Flow › Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "specs[x.standard_flow_product_length].label",
+    "near": "49.2 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f67dd8034b5a9b68f95bbfa0c47f9c15547c35f8f1efd4e16ecafd0de41c3f5",
+   "en": "Standard Flow › Packaging Weight",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "specs[x.standard_flow_package_weight].label",
+    "near": "0.026 kg"
+   },
+   "dict": null
+  },
+  {
+   "h": "f9a7e7068e7f7e4aa2c85a60c2c7ae96cf58b339fce824d2257defca2e5524a6",
+   "en": "Standard Flow › Packaging Size",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "specs[x.standard_flow_package_length].label",
+    "near": "60 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "c211e3f0528212a5a56b462fcaa8ea77de112ad939eaf0dbecd1d1ffaeb6d236",
+   "en": "High Flow › Max. Printing Temp.",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "specs[x.high_flow_thermal_max_nozzle_temp].label",
+    "near": "350 ℃"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9c1e768dd4c355339401284d06e9ff6a42064c6d8e9a20fc13001729bc60159",
+   "en": "High Flow › Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "specs[x.high_flow_product_length].label",
+    "near": "49.2 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f66f43e7a3daa285a539a2cc0958ce958f71fbefda4f1c8b814766b6be2fca3",
+   "en": "High Flow › Packaging Weight",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "specs[x.high_flow_package_weight].label",
+    "near": "0.028 kg"
+   },
+   "dict": null
+  },
+  {
+   "h": "855673a15892cf3f17897157b779c3c9f642fb297e9c2a2534ceec9ec53edf60",
+   "en": "High Flow › Packaging Size",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "specs[x.high_flow_package_length].label",
+    "near": "60 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "a41a2660235c918a9ded52fc6a6a8a5aa8be6e83d88bb65588ee1377a4018f0e",
+   "en": "[Note] Learn more about filament compatibility on Bambu Lab Wiki. Learn more about filament compatibility on Bambu Lab Wiki. For Dual-Nozzle printers (H2D, H2C, X2D) : 1. If you print only single-color filament, we recommend using the Fixed Hotend for printing. 2. If you need multi-color printing with the AMS, connect the AMS to the Fixed Hotend. 3. If you want to use the second hotend for support-material printing, we recommend using the Liftable Hotend. 4. TPU85A is only supported on the Fixed Hotend. TPU95AHF/90A is expected to be supported on the Liftable Hotend starting from firmware version U2. 5. PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-hotend-h2-p2s",
+    "title": "Bambu Hotend - H2/P2S/X2D",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6cfe6e4f129a34671d10c1bbe158eff05197d388727e331951b0ec2637c194e",
+   "en": "Black",
+   "kind": "spec_value_text",
+   "freq": 340,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أسود",
+    "ckb": "ڕەش"
+   }
+  },
+  {
+   "h": "09da7e78bf592e9f4775b8ccfc70c3598624fab220cbf84315dcfb53cfb9277f",
+   "en": "in the wiki",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "documents[0]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "c35e1aa14d604ce8702174faa4faca354f27aae6af662e83ff46d12be69e1f98",
+   "en": "@Printing Perspective",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "obxidian-high-flow-hotend",
+    "title": "E3D High Flow ObXidian™ Hotend",
+    "field": "documents[3]",
+    "near": "video"
+   },
+   "dict": null
+  },
+  {
+   "h": "58f203eb2a6c759f2baca604275049f4860a1a9b80436a484038de18c6cab145",
+   "en": "[Note] Learn more about filament compatibility on Bambu Lab Wiki.",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "hotends-combo-h2-series",
+    "title": "Hotends Combo - H2 Series",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "7ef8973be03da9d03890862d18564996163e7628d001745a88e48203624a1b58",
+   "en": "HRA 90 Tougher nozzle, lower maintenance",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2ec2b117a61594a2fc5758dd8e0c5b2f67245985aa0b2c8a9798176e9a332b01",
+   "en": "With HRA 90 compared to hardened steel's 74, the Tungsten Carbide nozzle provides exceptional wear resistance. This results in a 50% increase in lifespan when printing abrasive, high-performance fiber-reinforced filaments.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f634466244cde9824bf5bd602ccbf4fb1f9e247ed268fe3ce21ede387dd32351",
+   "en": "Tungsten Carbide",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "specs[nozzle.material]",
+    "near": "Nozzle material"
+   },
+   "dict": {
+    "ar": "كربيد التنغستن",
+    "ckb": "کاربایدی تەنگستن"
+   }
+  },
+  {
+   "h": "b65ea22d9ad66e63571cef098829daedf487dfdcc635d99fd6d9816d4a34852a",
+   "en": "Tungsten Carbide Nozzle",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b50a2011ede4feb38906ad5a386621192f699e557d764be156519e09fa3797a",
+   "en": "Learn more about filament compatibility on Bambu Lab Wiki. 1. If you need multi-color printing with the AMS, connect the AMS to the right-side Fixed Hotend. 2. If you want to use the second hotend for support-material printing, we recommend using the Liftable Hotend. 3. TPU85A is only supported on the right-side Fixed Hotend. TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2. 4. PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend. H2 Series/P2S/X2D",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "tungsten-carbide-nozzle-h2-p2s",
+    "title": "Tungsten Carbide Hotend - H2/P2S/X2D",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "a0640028017d9636d96c73fd0c5d9008c8855e6c895d3da05f8f9033c2c92a84",
+   "en": "Learn more about filament compatibility on Bambu Lab Wiki. 1. If you print only single-color filament, we recommend using the Fixed Hotend (Induction Hotend) for printing. 2. If you need multi-color printing with the AMS, connect the AMS to the right-side Fixed Hotend. 3. If you want to use the second hotend for support-material printing, we recommend using the Liftable Hotend. 4. TPU85A is only supported on the right-side Fixed Hotend. TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2. 5. PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend. 6. CF/GF-reinforced filaments are not compatible with stainless steel nozzles. H2C and H2C Laser",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2c-induction-hotend-right",
+    "title": "H2C Induction Hotend (Right)",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "c2e6cae7aed2e292bfdb98b1454b837eb21fa41af4407c8ae55cedef37fdb185",
+   "en": "0.4mm Induction Hotend (RHS)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "12a9b85894a94496eacabde3f25a263b8d656088a8863f6c5b71118bc00b2eca",
+   "en": "0.2mm Hotend (LHS)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "511ae5834cde76aa2607fe5c063b6676b485497266aa92167669e0285b19282b",
+   "en": "0.6mm Hotend (LHS)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5b6f2ec9c24fda940647668a3b17aff1f9f799a291c7cd5a949709aa1e6a0904",
+   "en": "Learn more about filament compatibility on Bambu Lab Wiki. 1. If you print only single-color filament, we recommend using the Fixed Hotend (Induction Hotend) for printing. 2. If you need multi-color printing with the AMS, connect the AMS to the right-side Fixed Hotend. 3. If you want to use the second hotend for support-material printing, we recommend using the Liftable Hotend. 4. TPU85A is only supported on the right-side Fixed Hotend. TPU95AHF/90A is expected to be supported on the left-side Liftable Hotend starting from firmware version U2. 5. PET-CF / PPA-CF / PPS-CF are supported only on the left-side Liftable Hotend. 6. CF/GF-reinforced filaments are not compatible with stainless steel nozzles. H2C",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-utility-hotends-bundle",
+    "title": "Vortek Utility Hotends Bundle",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ef47e84b35c2b45120a75cb640fe5598d932295019f697f338e44a0571cc462",
+   "en": "Easy Installation",
+   "kind": "usage_title",
+   "freq": 3,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b5fd5fbebeb2ebfc548c1e7fbbdc92b4e65325f086a4f06d7c06147488d8c32f",
+   "en": "Installation takes just a few minutes. Simply pop off the front cover, remove the filament cutter, and slide in the High-Flow hotend—ready to print in no time.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "806190eb61019071dfc0e0d6a3c16e673c9141a8c6884ceb6ab029cc5ae89d84",
+   "en": "Installation Guide",
+   "kind": "usage_title",
+   "freq": 9,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "usage[1].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9f8204e33113fb793b82ecf4b2b78d2914df05beba093cac474549d972474071",
+   "en": "Please refer to the installation guide for the H2D TPU High-Flow Kit available on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "usage[1].body.line[0]",
+    "near": "For TPU printing recommendations, please also refer to the TPU 85A & 90A Printing Guide for the H2 Series on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "0799d4535abd2589e2de65baa37fb8385a2e37a0cc0e9f8a858fbfce97f4b56c",
+   "en": "For TPU printing recommendations, please also refer to the TPU 85A & 90A Printing Guide for the H2 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "usage[1].body.line[1]",
+    "near": "Please refer to the installation guide for the H2D TPU High-Flow Kit available on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "95fe147fbefe4767025ed1899a20631b0299fe789ca2af2162b665a634c703f9",
+   "en": "Bambu TPU 85A Bambu TPU 90A Bambu TPU 95A Bambu TPU 95A HF Generic TPU",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-tpu-high-flow-kit",
+    "title": "H2D TPU High-Flow Kit",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb6e6059adcfad560e5f37ced6f4d3f542c612cc6326aa58d5faf478e346969e",
+   "en": "Considerations If bubbles appear on the bottom of the sheet, heating it on the heatbed at a temperature of no less than 80 degrees for several hours can be helpful in eliminating the bubbles. Deposition of dust and grease on the build plate decrease adhesion. It is recommended to regularly clean the surface with detergent and water to to maintain best adhesion.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "37eb9faea8c6c763c2ccf70a5ae07d580c47b351a70d9736c26b156e4768ce11",
+   "en": "Installation Steps for X1 Series/P1 Series/A1/P2S",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0b1cb72a009a15a04184e94c1a0f5a7db816453378b6faecca66d18fc2f3fc34",
+   "en": "Installation Steps for H2D and H2S",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "usage[1].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e03d16e7dfe0e045b72cdb0453b0e4c544600fafc81db96c1c3255ed2ec6f06e",
+   "en": "Smooth PEI Sheet + Magnetic Spring Steel Plate",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "974d8b579801885b33c2e61c71f6243ce897a1fe88fbb8ed1734c3ae245965b9",
+   "en": "Up to 120℃",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "specs[x.surface_temperature_resistance]",
+    "near": "Surface Temperature Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "76445a77d10f2cae67e014c52579a9adf261fe6ed5a30bd9b2ba7daf82cc40fd",
+   "en": "Smooth PEI Sheet - 0.125mm / Spring Steel Plate - 0.5mm/0.4mm",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "specs[physical.thickness]",
+    "near": "Thickness"
+   },
+   "dict": null
+  },
+  {
+   "h": "20b1879c471eac0866a819f62cc8d8ca210e94abd3e5923394f265eea54294e0",
+   "en": "PEI enables printing not only with common materials such as PLA, TPU, PETG, but also with materials that require high temperatures like ABS and Nylon. Note: Please apply glue to prevent the sheet from tearing if printing with filaments other than PLA.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-smooth-pei-plate",
+    "title": "Bambu Smooth PEI Plate",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "12b5c9e74272806cbfcd13286f27187083caf92f65f52d5f097a5548510a00a3",
+   "en": "Installation Steps for Usable Print Size of 256*256mm",
+   "kind": "usage_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dd1c4ebf3121966a34ee2a560077a8c58b69e1c784026539728c9538eb3df7a1",
+   "en": "Installation Steps for Usable Print Size of 180*180mm",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "usage[1].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "07e979a87954e0174eafbf4e53d99c61b486a224f9e4b0cc8f7bcaf359714290",
+   "en": "PEI Powder Coating + Magnetic Stainless Steel Plate + Smooth PEI Sheet",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "a946623b7574ca99454c465b39562ccbdd28eab893ea15db327a5fdb4524982c",
+   "en": "Textured PEI - 0.075mm / Smooth PEI - 0.125mm / Stainless Steel Plate - 0.4mm",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "specs[physical.thickness]",
+    "near": "Thickness"
+   },
+   "dict": null
+  },
+  {
+   "h": "6919449ea412165959de4916000581379c4fdeca46a41cae09b8f86bfbb0fbf6",
+   "en": "Gold and Charcoal Grey",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b93962d296c29c2cd49ce48b21e85c27753d284dffdd19666b1a43f714a42ff",
+   "en": "The older 256mm×256mm build plate does not support the build plate type detection feature available on 2nd Gen machines (P2S and future models).",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "dc14e46f9b302731797b929431a1f7c7cc978d734a148ff2ae7cb689273fb024",
+   "en": "For X2D and P2S users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the Dual-Texture PEI Plate to avoid error reports.",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-dual-texture-pei-plate",
+    "title": "Bambu Dual-Texture PEI Plate",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "33c3ea21132a8cc0becb699667e1e0d612ab0d33eea5b846ff7d971a3a11d66f",
+   "en": "For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "bambu-3d-effect-plate",
+    "title": "Bambu 3D Effect Plate",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "e93f6a4a104bdd58c2250ce7ac0a4ab2d0ce471d1f55bbe4fb320a9c4f4f2251",
+   "en": "How to remove prints from SuperTack",
+   "kind": "usage_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "bbb619ba51c5b09852170978084f2d5ccf4f5d31b26f85df12b0c6af23e1f454",
+   "en": "(The instruction below shows you how to remove the prints without damaging the coating)",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "usage[0].body.line[0]",
+    "near": "Use the scraper included with your printer to gently lift the print, then pry it off carefully. If the print is sticking too tightly, heat the plate on the heat"
+   },
+   "dict": null
+  },
+  {
+   "h": "808a344a0ad06facc396bbc7cc8cd7c6a281a4fccc6485d3da93919ff63cd93c",
+   "en": "Use the scraper included with your printer to gently lift the print, then pry it off carefully. If the print is sticking too tightly, heat the plate on the heatbed to 50°C to assist with removal.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "usage[0].body.line[1]",
+    "near": "(The instruction below shows you how to remove the prints without damaging the coating)"
+   },
+   "dict": null
+  },
+  {
+   "h": "230b244d1cf9a3a86bf67dcbb8599d04df05841390697256e3ae46de3ab90654",
+   "en": "Installation Steps for Usable Print Size of 350/330*320mm",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "usage[2].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0fbab44e06e9d3ed7e72bee4db300af1ec62b8f6eb03d9f185733a0a14ba9db4",
+   "en": "Specially Designed Coating / Spring Steel Plate",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "86d575ea8106d709811c8e04b177b707f1e6143c4bd5ef26793cd5a375b2f73c",
+   "en": "Coating - 0.05mm / Steel Plate - 0.4mm",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "specs[physical.thickness]",
+    "near": "Thickness"
+   },
+   "dict": null
+  },
+  {
+   "h": "62a2e8e925b1383c99a5a76a62411f57bdd0f2e43a9e8fcabf2c13ec13f69fe8",
+   "en": "For X2D and P2S users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the Cool Plate SuperTack to avoid error reports.",
+   "kind": "spec_value_text",
+   "freq": 7,
+   "context": {
+    "handle": "bambu-cool-plate-supertack",
+    "title": "Bambu Cool Plate SuperTack Series",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "04458c44f61616302565b9859ca144b9c2b3feb824cbc5a94cbe9ec9e08442f5",
+   "en": "Polyester powder + manganese steel",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5f9ee56183e8d2f1abebe5a4e5c9c90a4ecd0b8ef73f7c71f3037ff876c59ab",
+   "en": "Includes Glue Stick (1 pc) and Liquid Glue (1 pc)",
+   "kind": "spec_value_text",
+   "freq": 9,
+   "context": {
+    "handle": "bambu-engineering-plate",
+    "title": "Bambu Engineering Plate",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5e1b73030a0875b65dfb373e42e98501c3534d83e7b51b955b464c2d6ffbacf",
+   "en": "Textured PEI › Material",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.textured_pei_part_material].label",
+    "near": "PEI Powder Coating + Magnetic Stainless Steel Plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "566c6e40bf4417a26e827981c60c76643384b56c8225acb834b5524e8266b8c4",
+   "en": "Textured PEI › Surface Temperature Resistance",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.textured_pei_surface_temperature_resistance].label",
+    "near": "Up to 180℃"
+   },
+   "dict": null
+  },
+  {
+   "h": "752d6e0293532a77c16de82ab19de5701b8cdc3fad0350ea87603e4d2755a31e",
+   "en": "Textured PEI › Thickness",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.textured_pei_physical_thickness].label",
+    "near": "PEI Powder Coating - 0.075mm / Stainless Steel Plate - 0.5mm/0.4mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "cf3d67204a851e774b396ef84a0eae297ebc4e19b65a4ddeb8b3e2988da94634",
+   "en": "Textured PEI › Usable Print Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.textured_pei_printing_usable_print_size].label",
+    "near": "350*320mm / 256*256mm / 180*180mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca2fa6505041796206bf01c74613384675f3c8a356ac5e65fbeaefa5b4904ebf",
+   "en": "Textured PEI › Packaging Size",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.textured_pei_package_length].label",
+    "near": "408 / 300 / 220 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "e543b0163ed77c91dbc0c4d5549eeb7b2683051131c50f77b5fe6aaa34fe254b",
+   "en": "Textured PEI › Packaging Weight",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.textured_pei_package_weight].label",
+    "near": "0.78 / 0.45 / 0.23 kg"
+   },
+   "dict": null
+  },
+  {
+   "h": "a1376ac9c9aa7713149caca963d29f2c522fdd1ee2c29bc6c92d6743561713c0",
+   "en": "Engineering Plate › Material",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.engineering_plate_part_material].label",
+    "near": "Polyester powder + manganese steel"
+   },
+   "dict": null
+  },
+  {
+   "h": "75bfecef9596b7696605a429199320e17cfff5f83500a2fa08edd2c02a2b94c3",
+   "en": "Engineering Plate › Surface Temperature Resistance",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.engineering_plate_surface_temperature_resistance].label",
+    "near": "Up to 120℃"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b2a7d9588908da044a9cf0f8f1309f6ec067348d4b288d3a478042d59364cb7",
+   "en": "Engineering Plate › Thickness",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.engineering_plate_physical_thickness].label",
+    "near": "0.5mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "66e6f4d24c038c2e6187a73c0e32b420a07aefda4e5e884efe1e119f4ac704e6",
+   "en": "Engineering Plate › Usable Print Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.engineering_plate_printing_usable_print_size].label",
+    "near": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e3f1480c414ad0baf30403f1423a0f866fa16df20c2483bd06c5f707b5fb19a",
+   "en": "Engineering Plate › Packaging Size",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.engineering_plate_package_length].label",
+    "near": "315 / 393 / 393 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "8448fdd31da23a59b33daf964c10445211c8d0995481aae66ac1332b862a8b26",
+   "en": "Engineering Plate › Packaging Weight",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.engineering_plate_package_weight].label",
+    "near": "0.5 / 0.78 / 0.78 kg"
+   },
+   "dict": null
+  },
+  {
+   "h": "a285d4ddf4ccd37163854bb3c0ebae47b8e7ebe409c1d46725be7e1517dd8bf7",
+   "en": "Cool Plate SuperTack › Material",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.cool_plate_supertack_part_material].label",
+    "near": "Specially Designed Coating / Spring Steel Plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "4483680041e573eedf4e343307dd082716e0585e87072037603eb81dd543751c",
+   "en": "Cool Plate SuperTack › Thickness",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.cool_plate_supertack_physical_thickness].label",
+    "near": "Coating - 0.05mm / Steel Plate - 0.4mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "859f368e5c88c97302cb4796e683a55c14965982f1f9e12c5352fe9c9cf2da81",
+   "en": "Cool Plate SuperTack › Surface Temperature Resistance",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.cool_plate_supertack_surface_temperature_resistance].label",
+    "near": "Up to 120℃"
+   },
+   "dict": null
+  },
+  {
+   "h": "82d529e130f05134f64834d3482fdaaa589e8bc4cb9d98ea784ecbe782072271",
+   "en": "Cool Plate SuperTack › Usable Print Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.cool_plate_supertack_printing_usable_print_size].label",
+    "near": "X1C/P1P/P1S/A1/P2S/X2D - 256*256mm / H2D/H2S - 350*320mm / H2C/A2L - 330*320mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "4756bb330b931f7d82da0c63b105a0c56e0a25485821a3423e36c417e6150e63",
+   "en": "Cool Plate SuperTack › Packaging Size",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.cool_plate_supertack_package_length].label",
+    "near": "315 / 393 / 393 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "ecb05e0ff0c39418f92ef53316bf1007f908d20083004921e6134ddb4ff2ef15",
+   "en": "Cool Plate SuperTack › Packaging Weight",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "build-plate-combo",
+    "title": "Build Plate Combo",
+    "field": "specs[x.cool_plate_supertack_package_weight].label",
+    "near": "0.22 / 0.48 / 0.46 kg"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a369b820205f955051a873b3523d6352931e054b8b2b2d935dbe622e269a727",
+   "en": "Bambu glue stick provides suitable adhesion between the build plate and the model, and also it's formaldehyde-free. Compatibility: X1 Series, P1P",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d131ef7f9b5e2b457faba856dcc5f90438b46b97df6a849234432e76c63f6cbd",
+   "en": "User Guide",
+   "kind": "usage_title",
+   "freq": 2,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "33f66141acc669379912f8f5b0855c4a2ea76edf072e3ebc19b3e0133ffeefb2",
+   "en": "Apply evenly to the cleaned build plate before printing and cover all print areas. Please wash the plate after printing has been completed.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e7ad522ea327e5ba95534ef8355038ef7f7b86328c7cf9175886f60464c40d28",
+   "en": "Application",
+   "kind": "spec_label",
+   "freq": 11,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "specs[x.application].label",
+    "near": "PLA/ABS/PETG/PC/PA/TPU"
+   },
+   "dict": null
+  },
+  {
+   "h": "d5c23976b54d13f81a436b3e78575bfacd00a47775a84717afd239a89954ac61",
+   "en": "Water dissolvable",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "specs[part.feature]",
+    "near": "Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "3145a7f470e15c338b034475b88dd2623c27eaf42b6caaffa1a95d08d1fbaefe",
+   "en": "24 months",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "specs[part.life_cycle]",
+    "near": "Life cycle"
+   },
+   "dict": {
+    "ar": "24 شهر",
+    "ckb": "24 مانگ"
+   }
+  },
+  {
+   "h": "3495e757855a5c678addcf32516274e2962d0572f065378dba689e22168f28dd",
+   "en": "White",
+   "kind": "spec_value_text",
+   "freq": 45,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أبيض",
+    "ckb": "سپی"
+   }
+  },
+  {
+   "h": "762b2a266a1cd97aec782dbd4d0fcecba6ef24993f28a3042def78f4777f2397",
+   "en": "Material Safety Data Sheets",
+   "kind": "doc_title",
+   "freq": 4,
+   "context": {
+    "handle": "glue-stick-for-build-plate",
+    "title": "Glue Stick",
+    "field": "documents[0]",
+    "near": "sds"
+   },
+   "dict": null
+  },
+  {
+   "h": "38c721f79f5fc400f06ace02125aa675e4c0639ff8936210b850d7d9e63bf3e4",
+   "en": "The AMS Hub is used to expand the number of AMS connected to Bambu X1 series printers from 1 (4 channels) to a maximum of 4 (16 channels) to improve the refueling speed across your multiple AMS units and support the redundancy of a buffered signal.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c4dd1bfdfbfd498a2a53a123400efab833d6b84d3b0f9f207eef2c410bc63049",
+   "en": "Install the AMS Hub on the back of the printer, replacing the Filament buffer if you have one, and use the matching Bambu 4 Pin cable to connect to the printer, use the Bambu 6 Pin cable to connect to the first AMS, then continue to use the 6-pin cable to connect the remaining AMS in series.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "usage[0].body.line[0]",
+    "near": "Use the matching PTFE Tube to connect the AMS Hub and the air tube connector on the back of the printer, the tube should pass between the 4-pin plug and the spo"
+   },
+   "dict": null
+  },
+  {
+   "h": "d25772ed91ffa9affcd45ce0cc33b3b1e09d027e3b22ecd8a1bec953034a41fe",
+   "en": "Use the matching PTFE Tube to connect the AMS Hub and the air tube connector on the back of the printer, the tube should pass between the 4-pin plug and the spool holder to reduce the resistance.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "usage[0].body.line[1]",
+    "near": "Install the AMS Hub on the back of the printer, replacing the Filament buffer if you have one, and use the matching Bambu 4 Pin cable to connect to the printer,"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f72ae6b4e060720bc00cfc2695d00c027fa6dfa5fccf74e6bef4b66673730eb",
+   "en": "According to the placement of the AMS and the printer, you can choose the appropriate length of the PTFE tube to connect the AMS and the AMS Hub. The tube should be as short as possible and avoid winding to reduce the feeding resistance.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "usage[0].body.line[2]",
+    "near": "Use the matching PTFE Tube to connect the AMS Hub and the air tube connector on the back of the printer, the tube should pass between the 4-pin plug and the spo"
+   },
+   "dict": null
+  },
+  {
+   "h": "12feb40d7b861f7cfb23dbc2965f5155c35f795b6a585b3bf56dc8416b29a8c5",
+   "en": "Plastic, metal, printed circuit board",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "36ecb4f8669133ce744c21982ba4abe2ecd7086e1dc2226ccd6f266f3a5005f8",
+   "en": "Input",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "specs[x.input].label",
+    "near": "24V 3A"
+   },
+   "dict": null
+  },
+  {
+   "h": "d21a9eb0f26c6dea293f94969cddf4f6a1798c26c7a7652dc26b47ddb7aeac70",
+   "en": "Bus Cable - (2x)6pin（1.5m）",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3f955b2083b3516e98b817533b6065728e7d8cceffa83ff398fe5b5217d6bbe",
+   "en": "M3*28 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub",
+    "title": "Bambu Lab AMS Hub",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe4cbd6594c14c517e22549f9a6c974aed8668d00baa3165e50b0f84c031d8ba",
+   "en": "The Bambu Lab Liquid Glue is an adhesive specially developed for 3D printing, suitable for printing materials such as PLA, ABS, and PETG on appropriate surfaces, including the Cool Plate, High-Temperature Plate, and Textured PEI Plate.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "934652dce41d62d3c9ff34b2c5e44e3addaedc67d6137328a9fe75a63c51dbac",
+   "en": "Instructions",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "530958a469881f83ada74821c344a674ec1ae776c482e7cb40e4bac8375b2c94",
+   "en": "Apply pressure to the applicator head to open the internal valve; then, spread glue evenly over the print area. After printing, simply clean the build plate and the bottom of the model with water.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "da18abab87aab72e3ed4825130f540c0b821af43ba2ee90bbe52495c2c4a795a",
+   "en": "Working Life",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "specs[x.working_life].label",
+    "near": "100 times（coat the full plate）"
+   },
+   "dict": null
+  },
+  {
+   "h": "ef4361162cf90f7f1e8173c718106366ddcefe038c499375516ad7558d291621",
+   "en": "100 times（coat the full plate）",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "specs[x.working_life]",
+    "near": "Working Life"
+   },
+   "dict": null
+  },
+  {
+   "h": "f101507cdb7b99ac1b06fb8e29843a0f5b077b1dc12e054d76a4c27c583469e6",
+   "en": "Liquid_Glue_MSDS.pdf",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "liquid-glue-for-build-plate",
+    "title": "Liquid Glue",
+    "field": "documents[0]",
+    "near": "sds"
+   },
+   "dict": null
+  },
+  {
+   "h": "c78ba597f334c19565d5680a2a93c118e9ad2dc77efd310a7fb44cefe8d48fd0",
+   "en": "When multiple printers are placed on the same desktop, the anti-vibration feet can effectively reduce the impact of machine vibration on nearby machines.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b789b555811ef1796f63d6e0220ef90d5f30826c5d8b4f6e55cf2e87f532e70d",
+   "en": "Silica gel",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e81b15c5bd0a1c2d641bfbc4a38c7172da793d9aa71463d3a24cca41e1dfbb5",
+   "en": "Anti-Vibration Feet Adapter",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet",
+    "title": "Anti-Vibration Feet",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "0bd115a3c19fbe13c000ca5c2ab1a3c3c09cfebaf6cd8dae6e3d6db14a8b837d",
+   "en": "The Bambu Lab P1P Enclosure Kit packs all the parts needed to enclose the P1P 3D printer. After enclosing the P1P, the printer definition will remain the same. It is not possible to change the printer definition from P1P to P1S after the enclosure. The glass cover plate, front glass door, left/right plastic panels, rear metal panel, front cover can enclose the P1P 3D printer. The auxiliary part cooling fan, control board fan, and chamber temperature regulator fan can aid heat dissipation to achieve higher-speed printing. The cable chain and P1S toolhead cable can ensure reliable performance during repetitive bending as a result of motion. The 550mm PTFE tube (for P1S and X1 Series) allows more ample movement of the filament and lowers the extra abrasion.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "acdf391e37e02e1fa6805ffb37e3a764102418be743a608697e3e699d3ab4150",
+   "en": "1. Please finish the installation of Cable Chain Assembly and P1S Toolhead Cable first by following the instructions on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "usage[0].body.line[0]",
+    "near": "2. Please thoroughly read the instruction article on Bambu Lab Wiki for the Enclosure Kit installation."
+   },
+   "dict": null
+  },
+  {
+   "h": "36216a67acc6e4466f834ac2d1f228a53200b98926e4cdf939a78427cc0db6a0",
+   "en": "2. Please thoroughly read the instruction article on Bambu Lab Wiki for the Enclosure Kit installation.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "usage[0].body.line[1]",
+    "near": "1. Please finish the installation of Cable Chain Assembly and P1S Toolhead Cable first by following the instructions on Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "76f55d14a0fd02fdfd0703d308ba6bce045fd60ab7085bd594acc42eb18a9348",
+   "en": "3. Please note that the left and right side panels of the P1P may be incompatible with the base and require shaving off two tabs on the bottom of the side panels for successful installation.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "usage[0].body.line[2]",
+    "near": "2. Please thoroughly read the instruction article on Bambu Lab Wiki for the Enclosure Kit installation."
+   },
+   "dict": null
+  },
+  {
+   "h": "08de64ecd3178f4a987390322bca3ab37074a910a45ad5fb2bbe6c5ab7524d23",
+   "en": "4. Left Plastic Panel",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff832b8e7282e386d0ce158522562909aa3c32c1f66fcad8f448b35e3ff4f028",
+   "en": "5. Right Plastic Panel",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "957bddbf64a22db78b7134c5021add04956b898f4bbf5d439b086270e539983f",
+   "en": "6. Rear Metal Panel",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "41bfe21c3809069211249093848b2faa6ca79668f5c5baf3c9b2728d918b2fb8",
+   "en": "7. Front Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "dc29f34a9323ef0d6d7248cce15c56c07f2cd95b9891e4f7641f0df9f0ae14e0",
+   "en": "12. P1S Toolhead Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "box[11]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "63a7e03adbc67b97e2d6597c838be24f090352b80f8d951c87d7740c88dd4345",
+   "en": "14. Heatsink for MC Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "box[12]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "09cc31de11331dfed216e434927f2df6bf90c23c88946adf76a3131665660bc8",
+   "en": "15. Activated Carbon Filter",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "box[13]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "44472d61e29792c2c5dc56e92431cac33897389b5adebb62777e2c52191a779d",
+   "en": "Total Weight: 6.5 kg",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "p1p-enclosure-kit",
+    "title": "P1P Enclosure Kit",
+    "field": "box[14]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa768075614382d0088ccba7fbdc2846796cc9d11e781250775e94be2372b764",
+   "en": "Learn more about the replacement of Bambu 4-in-1 PTFE Adapter on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ee73c9b52901f2e34700585882d94e127e4841d2ff2e1320fd6c8b620507b37b",
+   "en": "Instructions for use",
+   "kind": "usage_title",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "usage[1].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "019b37130196ee3bf003dcf260019f00ad57c7fe548a58ad8c156153cd639934",
+   "en": "The Bambu 4-in-1 PTFE Adapter is designed with a clear direction of use, as shown in the figure below.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "usage[1].body.line[0]",
+    "near": "1. When using AMS:"
+   },
+   "dict": null
+  },
+  {
+   "h": "23ab1e57fc368ef43c43913a997cff0e9993c4f6795136a529d6d8ab2a7a60af",
+   "en": "1. When using AMS:",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "usage[1].body.line[1]",
+    "near": "The Bambu 4-in-1 PTFE Adapter is designed with a clear direction of use, as shown in the figure below."
+   },
+   "dict": null
+  },
+  {
+   "h": "db81ea49a1de1dd470ffbd0a1a7a19dcc08f90d98aa0c0f167fb91032f3f0bba",
+   "en": "Connect the PTFE tube from the tool head to the OUT end of the Bambu 4-in-1 PTFE Adapter.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "usage[1].body.line[2]",
+    "near": "1. When using AMS:"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e9acce9e907b2c345714ee8746cb8ce5cb70146b9e630e97679cf6a348fa9b2",
+   "en": "Connect the PTFE tube from the buffer output to one of its IN ends. - Directly insert a maximum of three filament wires into each hole of the Bambu 4-in-1 PTFE Adapter IN end.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "usage[1].body.line[3]",
+    "near": "- Connect the PTFE tube from the tool head to the OUT end of the Bambu 4-in-1 PTFE Adapter."
+   },
+   "dict": null
+  },
+  {
+   "h": "2e3f14ee3e49aa569519ded00c936fdc5703f3d6692090c9b343f187dae242f0",
+   "en": "2. When the AMS is not being used:",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "usage[1].body.line[4]",
+    "near": "- Connect the PTFE tube from the buffer output to one of its IN ends. - Directly insert a maximum of three filament wires into each hole of the Bambu 4-in-1 PTF"
+   },
+   "dict": null
+  },
+  {
+   "h": "adb659a6de605810fc8ea951d3540451c977f5cb02650deacd1ceaaf8235f485",
+   "en": "Directly insert a maximum of four filament wires into each hole of the Bambu 4-in-1 PTFE Adapter IN end.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "usage[1].body.line[6]",
+    "near": "- Connect the PTFE tube from the tool head to the OUT end of the Bambu 4-in-1 PTFE Adapter."
+   },
+   "dict": null
+  },
+  {
+   "h": "348f3e2ca52cfbb370fc034bbad4a5f52883ac672ccb245d0c9e68e8c339bf0a",
+   "en": "It is important to note that reversing connections may cause filament blockage. Therefore, it is essential to ensure that the installation direction is correct.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "usage[1].body.line[7]",
+    "near": "- Directly insert a maximum of four filament wires into each hole of the Bambu 4-in-1 PTFE Adapter IN end."
+   },
+   "dict": null
+  },
+  {
+   "h": "d7931e231689841242d349767968c915576daa64e9907879694711efede83a4c",
+   "en": "Black, White",
+   "kind": "spec_value_text",
+   "freq": 23,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أسود، أبيض",
+    "ckb": "ڕەش، سپی"
+   }
+  },
+  {
+   "h": "401008b9a7184217f2a1669ca6dadda489c4d1382002efe3ca37eab899cb8ee0",
+   "en": "4-In-1 PTFE Adapter II",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "63f5e3d5c5f37dd0c291bd6b340af23c00b3d645a2c25f00ac8b690ad2120032",
+   "en": "4-in-1 PTFE adapter filament II cleaning pad",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-4-in-1-ptfe-adapter",
+    "title": "Bambu 4-in-1 PTFE Adapter",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "423d5a5c0e088cc46725deb736ee534db433e66a66e4849cb07b408a95060be6",
+   "en": "Learn more about the Lubricant Grease on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "lubricant-grease",
+    "title": "Lubricant Grease",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d9607a5345f7bc7e70b94aa837ef7a0966bec2a57d2f92ef41e2d3478bac87f3",
+   "en": "Grease",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "lubricant-grease",
+    "title": "Lubricant Grease",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "3bfa0ee70724575955b460662e20b8ef248723f18d0597fd97f6e6895d385983",
+   "en": "Lubricant Grease_MSDS.pdf",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "lubricant-grease",
+    "title": "Lubricant Grease",
+    "field": "documents[0]",
+    "near": "sds"
+   },
+   "dict": null
+  },
+  {
+   "h": "f23ca30958a87a2ca4eb208c4fa21a0b49b1cf765965019be9d4acfcf8c14a8e",
+   "en": "Learn more about the Lubricant Oil on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "lubricant-oil",
+    "title": "Lubricant Oil",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2378bdd2cf4f491cf401e6b215cbb4fdfec6f76b21801d6bcd3cad070abb156c",
+   "en": "Oil",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "lubricant-oil",
+    "title": "Lubricant Oil",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "aac7e89fcd0eec2dcec673320d8c1f6378a59affaf1bd4d16686a039014d6ed4",
+   "en": "Transparent",
+   "kind": "spec_value_text",
+   "freq": 15,
+   "context": {
+    "handle": "lubricant-oil",
+    "title": "Lubricant Oil",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "شفاف",
+    "ckb": "ڕوون"
+   }
+  },
+  {
+   "h": "eb0af07971505097485594b8ea2613a9d7c36833ff91517684c00d0707bbb92c",
+   "en": "Lubricant_Oil_MSDS.pdf",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "lubricant-oil",
+    "title": "Lubricant Oil",
+    "field": "documents[0]",
+    "near": "sds"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb006397b9d4431f33819f2aa07af9b465945fe20dc69cfa0bdbd711a893cac6",
+   "en": "Learn more about the StrongGrip Cutting Mat on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "stronggrip-cutting-mat",
+    "title": "StrongGrip Cutting Mat",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b16bf181f1687c56552fecbdd6e9a19357e6e9cb6a98a7895afc1e26756b7e99",
+   "en": "Metal, Plastic",
+   "kind": "spec_value_text",
+   "freq": 55,
+   "context": {
+    "handle": "stronggrip-cutting-mat",
+    "title": "StrongGrip Cutting Mat",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "3975cb8466137db72cfba5625051e8b497dafd0b8e414a9a45872d30bf2cfcd6",
+   "en": "Learn more about the LightGrip Cutting Mat on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "lightgrip-cutting-mat",
+    "title": "LightGrip Cutting Mat",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "91a641050eb2025a422ca6d9394d7131a8a7b40bf613dccbb180096cec82002d",
+   "en": "Learn more about the Fine Point Blade on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "fine-point-blade",
+    "title": "Fine Point Blade",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d05d349d1cae240c7ef73607fa4ae82c670ef7624e56800d0ad56b5b4a2c888f",
+   "en": "Silver, Red",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "fine-point-blade",
+    "title": "Fine Point Blade",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "فضي، أحمر",
+    "ckb": "زیوی، سوور"
+   }
+  },
+  {
+   "h": "493dd42a46ae81191209881e0419ec56ed55eda3bd2fd097e7bb73464ee7df36",
+   "en": "Learn more about the Material Pins on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "material-pins",
+    "title": "Material Pins",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ecf783a585cbdf9274c4dc944727f6b8e7ad3f9de6f4eebc2d1bb8f69def3625",
+   "en": "Metal",
+   "kind": "spec_value_text",
+   "freq": 107,
+   "context": {
+    "handle": "material-pins",
+    "title": "Material Pins",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": {
+    "ar": "معدن",
+    "ckb": "کانزا"
+   }
+  },
+  {
+   "h": "b739be1527db21f3d0f5ade16116189660e15b3d99fb8d3c967da9db574237b0",
+   "en": "Material Pins (big)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "material-pins",
+    "title": "Material Pins",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "97c0eeb7402694463639000b903d3211ea55b9ab9fcc8a65598581e112d7ec4e",
+   "en": "Material Pins (small)",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "material-pins",
+    "title": "Material Pins",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4fe21db5deb3c149430d40829f19f846332ba344de00a9df25702658ba53ad8",
+   "en": "Learn more about the Smoke Purifier Air Filter on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a6e92a43654318604ae1f3cac421e77e0b22d573ebb683e5eb78654198d178ae",
+   "en": "Smoke Purifier Air Filter Combo - Cotton, Plastic / Smoke Purifier Primary Filter - Cotton / Smoke Purifier Medium Efficient Particulate Filter - Cotton",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "b13f27aa176f23133911a3287719523abf49b6866e34e0d2caa274ed970ad6da",
+   "en": "Smoke Purifier Air Filter Combo - White, Gray / Smoke Purifier Primary Filter - White / Smoke Purifier Medium Efficient Particulate Filter - White",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": null
+  },
+  {
+   "h": "f89497fc40fac49dc8a8345e063a4186786b26b63b1bb7b888675f288095901d",
+   "en": "Smoke Purifier Primary Filter",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "42c15062fd4113281a2262b5db97bd14f0d6f9701e7140a5bcd5bf62d8714d53",
+   "en": "Smoke Purifier Medium Efficient Particulate Filter",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "36ece174f97e6f50fae611f4be96133878600dde44743cf2476047c3538ac15d",
+   "en": "Smoke Purifier High Efficient Particulate Filter",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier-air-filter",
+    "title": "Smoke Purifier Air Filter",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7dac32ab61687bf86f0e5536e7769cecc9abdf159614ea3f15a8929cf5f998c0",
+   "en": "Usage tips",
+   "kind": "usage_title",
+   "freq": 4,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "de47d9a63444f6157190030648a967ef7b9a3d932e203daeea5600fe5b00df05",
+   "en": "1. Machine performance characteristics inevitably evolve due to temporal factors, operational usage patterns, and environmental influences. This process manifests through mechanisms including:",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[0]",
+    "near": "• Ambient temperature fluctuations"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4b0769060fcde7d76b48c276408de8d177a61be8ee894c5e9de357657374b65",
+   "en": "Ambient temperature fluctuations",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[1]",
+    "near": "1. Machine performance characteristics inevitably evolve due to temporal factors, operational usage patterns, and environmental influences. This process manifes"
+   },
+   "dict": null
+  },
+  {
+   "h": "4b252cfca96cd513a2706a7fca2fd2d56001c387842f75cc4b5403680b3608bb",
+   "en": "Structural micro-deformations from operational vibration or relocation",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[2]",
+    "near": "• Ambient temperature fluctuations"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a5679a145aebc529d3f00a58c0295b3c1ba0821a2885575c95c62d9ab7d1d80",
+   "en": "Stress relaxation in housing materials",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[3]",
+    "near": "• Structural micro-deformations from operational vibration or relocation"
+   },
+   "dict": null
+  },
+  {
+   "h": "d93153ea681bcf6b5e19beaec0e2a635bd9c176e5617d69df595943ddfa59a3e",
+   "en": "Consequently, calibration efficacy exhibits progressive attenuation. The degradation rate correlates directly with environmental severity and usage intensity parameters. For applications requiring high-precision maintenance, we recommend implementing biweekly calibration protocols to ensure sustained measurement accuracy.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[4]",
+    "near": "• Stress relaxation in housing materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "de5a53194153cb622d99d397ec3a93760f0fbb6b8a7f5fa77b552f7efbbcfcd5",
+   "en": "2. Bambu Lab Vision Encoder is only used for motion accuracy calibration and must not be used as build plate. Please remove and store the Vision Encoder properly after calibration.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[5]",
+    "near": "Consequently, calibration efficacy exhibits progressive attenuation. The degradation rate correlates directly with environmental severity and usage intensity pa"
+   },
+   "dict": null
+  },
+  {
+   "h": "089856a81b05be36e9b8977d3f251e3b55380be2217ebf3fc2b3c0374f318c2d",
+   "en": "3. Before calibrating with Bambu Lab Vision Encoder, please ensure the following:",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[6]",
+    "near": "2. Bambu Lab Vision Encoder is only used for motion accuracy calibration and must not be used as build plate. Please remove and store the Vision Encoder properl"
+   },
+   "dict": null
+  },
+  {
+   "h": "bda626435fe3c2bf2377346030125838d9ce68be10ac59a0f0334d23385bdd37",
+   "en": "Please remove the transparent plastic protective film from the surface of the Vision Encoder before use.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[7]",
+    "near": "3. Before calibrating with Bambu Lab Vision Encoder, please ensure the following:"
+   },
+   "dict": null
+  },
+  {
+   "h": "48a0caeba6351042dec3542c9a5f48ed4a3f94991806b98cc31b22f2073f6e71",
+   "en": "Ensure the toolhead camera is functioning properly, with no HMS errors (e.g., dirty lenses).",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[8]",
+    "near": "• Please remove the transparent plastic protective film from the surface of the Vision Encoder before use."
+   },
+   "dict": null
+  },
+  {
+   "h": "fd00f4620b54f44ea1aa1385ad40fb01eff8457b55d8b39c0bbafa6f5751a018",
+   "en": "Clear all debris from the heatbed.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[9]",
+    "near": "• Ensure the toolhead camera is functioning properly, with no HMS errors (e.g., dirty lenses)."
+   },
+   "dict": null
+  },
+  {
+   "h": "edcd56fad5e658704d67792d09ece07020ac506a2057ba5229cb19bb206d498f",
+   "en": "Ensure the surface of Vision Encoder is clean, with all grid patterns clearly visible.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[10]",
+    "near": "• Clear all debris from the heatbed."
+   },
+   "dict": null
+  },
+  {
+   "h": "ead2ae4aa71140f77e5ffd17111daafc773ee9f358ecae56b6ac25f2f9e7e5b9",
+   "en": "Before calibration, ensure that the heatbed is at room temperature. Avoid placing the Vision Encoder on the heatbed when it is hot to prevent errors caused by thermal expansion.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "usage[0].body.line[11]",
+    "near": "• Ensure the surface of Vision Encoder is clean, with all grid patterns clearly visible."
+   },
+   "dict": null
+  },
+  {
+   "h": "a07d50d635166130e2cef4761da16b8531de1f81645010207f9f4e726605ec65",
+   "en": "Metal, plastic",
+   "kind": "spec_value_text",
+   "freq": 13,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4c1ab2520693ff98c1b8d19e3bc0fed22a3ff5558ba6c06e5df26cb370de9e8",
+   "en": "Black, white",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "vision-encoder",
+    "title": "Vision Encoder",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أسود، أبيض",
+    "ckb": "ڕەش، سپی"
+   }
+  },
+  {
+   "h": "f7d679dc5dc2adb3ecac38caf66d5fbe7c49d91bd8ce00e479ac47ea099ab6d9",
+   "en": "1. The smoke purifier will emit an audible beep when filters reach the end of their service life. For details on replacement and additional instructions, please refer to the quick start guide.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "usage[0].body.line[0]",
+    "near": "2. After assembly, manually pull the ventilation pipe to confirm that it does not detach. Ensure the clamp is fully secured. The ventilation pipe can extend out"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4a190b3d1082cc35504a05269195411f16779e7c9cdce05696c69c77fd68264",
+   "en": "2. After assembly, manually pull the ventilation pipe to confirm that it does not detach. Ensure the clamp is fully secured. The ventilation pipe can extend outside the window. (Safety Warning: The smoke ventilation pipe must be firmly fixed to prevent it from falling due to extreme weather conditions.)",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "usage[0].body.line[1]",
+    "near": "1. The smoke purifier will emit an audible beep when filters reach the end of their service life. For details on replacement and additional instructions, please"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d7a95a0cf0d5d165774ade3f70000f5550fd0c8dd530bbddb5fe722b03c0441",
+   "en": "3. Air Filter Replacement Recommendations",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "usage[0].body.line[2]",
+    "near": "2. After assembly, manually pull the ventilation pipe to confirm that it does not detach. Ensure the clamp is fully secured. The ventilation pipe can extend out"
+   },
+   "dict": null
+  },
+  {
+   "h": "625343326829b5f7f3a1b7ff76704fe9cc9f2f4e9d872df75ba7bf02fc05028a",
+   "en": "Primary Filter (Recommended replacement: every 80–100 hours)",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "usage[0].body.line[3]",
+    "near": "3. Air Filter Replacement Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "4f940bb9389eb436438a8fbb930d01d5e841188f3b6caa97d5714ae44c0bcc69",
+   "en": "Medium Efficient Particulate Filter (Recommended replacement: every 300–500 hours)",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "usage[0].body.line[4]",
+    "near": "- Primary Filter (Recommended replacement: every 80–100 hours)"
+   },
+   "dict": null
+  },
+  {
+   "h": "a50d7f39c5f2b51bf8f1312821baa454f82cd791818013e8d67e337376b13b6a",
+   "en": "High Efficient Particulate Filter (Recommended replacement: every 800–1000 hours)",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "usage[0].body.line[5]",
+    "near": "- Medium Efficient Particulate Filter (Recommended replacement: every 300–500 hours)"
+   },
+   "dict": null
+  },
+  {
+   "h": "b83700147fd748ac3e56451c4d48283e1de5740d33ffa6b49785109c507fb236",
+   "en": "Plastic",
+   "kind": "spec_value_text",
+   "freq": 112,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f9929f8a2c3823e12dc254576f54a946b41ed72838cf68e9939891d77f808d7",
+   "en": "quick start guide",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-purifier",
+    "title": "Smoke Purifier",
+    "field": "documents[0]",
+    "near": "quick_start"
+   },
+   "dict": null
+  },
+  {
+   "h": "1070519c87472f85fb4c5fc1d113e85a04c8faf846f300f754251062f8c4aee6",
+   "en": "Learn more about the Laser Grid Panel on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "laser-grid-panel",
+    "title": "Laser Grid Panel",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d27551cbbaa81a4cb24a4c209d3ff3920ab5e58d243e7b652f56a5749f0aee99",
+   "en": "Stainless steel",
+   "kind": "spec_value_text",
+   "freq": 12,
+   "context": {
+    "handle": "laser-grid-panel",
+    "title": "Laser Grid Panel",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": {
+    "ar": "فولاذ مقاوم للصدأ",
+    "ckb": "پۆڵای زەنگ‌نەگر"
+   }
+  },
+  {
+   "h": "42a749ae6ed7ca1b89116f944be4c78ce12b793251f73bcca73dbc9d8fde05a5",
+   "en": "Silicone",
+   "kind": "spec_value_text",
+   "freq": 6,
+   "context": {
+    "handle": "silicone-desiccant",
+    "title": "Silicone Desiccant",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "598d134642234898db43430069a39e26083ca29c760e4c26aa9ff43c80841d32",
+   "en": "Learn more about the AMS 2 Pro Switching Adapter on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-switching-adapter",
+    "title": "AMS 2 Pro Switching Adapter",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c77e934cb4f4297a79c64289b6790c206bc949735e2f3f3b0fb2e1c4d308d03e",
+   "en": "Learn more about the replacement of hardened steel extruder gear for P1 Series on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-upgrade-combo",
+    "title": "Hardened Steel Upgrade Combo",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e5a48a3a7ad0ffe86c2db63f2a9d6ea47726ceaa9cbd780185cbff35c35f387e",
+   "en": "Hardened Steel Complete Hotend 0.4mm - P1 Series",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-upgrade-combo",
+    "title": "Hardened Steel Upgrade Combo",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a2a2af3a53fb7b7a1a564eeb8ae52c87873b645353ad65238589572dfd94bbdd",
+   "en": "Learn more about SanDisk Ultra Fit USB 3.2 Flash Drive on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "sandisk-ultra-fit-usb-3-2-flash-drive",
+    "title": "SanDisk Ultra Fit USB 3.2 Flash Drive",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8c6877b7ba9fd4b08d5ea49a828bfd9da20b422844e54b43c538f1eaf833edb6",
+   "en": "Capacities",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "sandisk-ultra-fit-usb-3-2-flash-drive",
+    "title": "SanDisk Ultra Fit USB 3.2 Flash Drive",
+    "field": "specs[x.capacities].label",
+    "near": "32GB"
+   },
+   "dict": null
+  },
+  {
+   "h": "542126ed9d16330cc5eb006e01de3b510e4ac385d2bd702194d4a7436acd97d1",
+   "en": "Storage Temperature",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "sandisk-ultra-fit-usb-3-2-flash-drive",
+    "title": "SanDisk Ultra Fit USB 3.2 Flash Drive",
+    "field": "specs[x.storage_temperature].label",
+    "near": "14° - 158°F (-10° - 70°C)"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a6c8e9e14611c92a96aef392e63626e86630eca93be2f906ac9dc9eada1869e",
+   "en": "This Smart Soldering Iron Kit is ideal for electronics repair, circuit board work, and DIY prototyping. Designed for both portability and precision, it delivers fast heat-up times, accurate temperature control, and a compact form factor—making it a reliable tool for hobbyists, students, and professionals alike.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b78d10ed216fad9517eced5b99bc0853fdc15ceed42989577822ead6df93f5c8",
+   "en": "Dedicated Tips for Direct Heat-Insert Installation",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b8e088f662dcbcd8b93c5986535b952611bb6622eac2fc5258a67ac56e1b785a",
+   "en": "The 100W USB‑C Smart Soldering Iron Kit includes two custom tips designed specifically for heat-set insert installation, allowing inserts to be installed directly with fast heating and accurate control. This provides a cleaner and more reliable way to add threaded metal fastening points to printed parts.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "16e6ed0b9e75abede8929e558f0df5bb9f4d01c11773e83c3546ad9b3a2f491f",
+   "en": "Straighter Installation with Better Control",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "usage[1].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5538d2b5f171133516c904f4a614236ee7d348f76af2d6107a5e9cea0ac48766",
+   "en": "Compared with using a standard soldering tip directly, dedicated insert tips help guide heat-set inserts more steadily during installation. This reduces the risk of tilting, slipping, or uneven insertion, which is especially important for printed parts that require accurate alignment and secure fastening.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "usage[1].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a2d5f54eae3891a22731efb35f94b7f81599af209eb895ec2a1a533359175b89",
+   "en": "HS-02A",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.model]",
+    "near": "Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4463916c49e60c878ff3b532d1953613752a5dcecec556aba486e147fc27330",
+   "en": "Heat-Up Time",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.heat_up_time].label",
+    "near": "2s @100W (melt tin)"
+   },
+   "dict": null
+  },
+  {
+   "h": "232a67b91c057e48f9686b620940a82f92782ac43b267482ebeff40acaa0dbf9",
+   "en": "2s @100W (melt tin)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.heat_up_time]",
+    "near": "Heat-Up Time"
+   },
+   "dict": null
+  },
+  {
+   "h": "5791cddf26c193d87713cc9d5a8077043444e326a53c4d51bee5df82913bb29e",
+   "en": "9V/12V/15V/20V, max 100W",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[electrical.rated_power]",
+    "near": "Rated power"
+   },
+   "dict": null
+  },
+  {
+   "h": "f393adf878da92cfd3bd54a2d4b322d5c05dc2a6ba9ac91959f95624da7b3d2f",
+   "en": "0.96\" IPS HD color screen",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[connectivity.display]",
+    "near": "Display"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8684d32a079f82fc898fc3247540a3c1a66b5920e0c42c3b72f2d2f829ea163",
+   "en": "Input Port",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.input_port].label",
+    "near": "Type-C"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e600b5024431bf32e69796a57a0e6512c07b5ea78ecd7512b434fe7fba6fd7e",
+   "en": "Type-C",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.input_port]",
+    "near": "Input Port"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b4426f24e4ac09c6d9a084a6f4f4aa96a773905a9204ff2e6c4574df385be28",
+   "en": "Charging Protocol",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.charging_protocol].label",
+    "near": "PD & QC"
+   },
+   "dict": null
+  },
+  {
+   "h": "053204597c59ef1e78143cadc6b9aab76e3358adbf6e56a83c4471650aedd8bb",
+   "en": "PD & QC",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.charging_protocol]",
+    "near": "Charging Protocol"
+   },
+   "dict": null
+  },
+  {
+   "h": "eaf9795dc7839efd4924e4e4f6d4d0fa1a61eb921893caebbfb3ec0b6d828830",
+   "en": "Cable",
+   "kind": "spec_label",
+   "freq": 5,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.cable].label",
+    "near": "C2C 250W (E-marker chip), 1.2m, anti-scald/oxidation"
+   },
+   "dict": null
+  },
+  {
+   "h": "513c304b56fc76b9151191a724a2ecef4970caea5c1f1a61f42ee91cd9a86d3a",
+   "en": "C2C 250W (E-marker chip), 1.2m, anti-scald/oxidation",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.cable]",
+    "near": "Cable"
+   },
+   "dict": null
+  },
+  {
+   "h": "d86cfafaa96235072509afce4ed0bd2501124c77cbde84d87569501b92fd9834",
+   "en": "ESD Protection",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[x.esd_protection].label",
+    "near": "Yes"
+   },
+   "dict": null
+  },
+  {
+   "h": "4aba44acad6d241147fe1729120d78aeefe8e356018d01b50aab7f5717428d77",
+   "en": "Light Bulb Silver",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": null
+  },
+  {
+   "h": "f08dbc0455dfdab70b51ca83fa7378a21f5313c0adfa006b888367beef06475a",
+   "en": "High Temperature Caution: The soldering iron heats up quickly and can reach temperatures up to 450°C. Always operate with care to avoid burns or accidental contact with heated parts.",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1b66a9f7dd34477ccff689daa55613bf2e2e5a8e97ee0203921ec7452f04a6f",
+   "en": "Unplug When Not in Use: For your safety and to prevent fire hazards, please disconnect the power source when the device is not in use.",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "usb‑c-soldering-iron-kit-for-heat-set-inserts",
+    "title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7929e3992f1e674ee574e3176083c472f4c6e81bcbca762b147e25e3267329ea",
+   "en": "The Heat-Stake Nut Tool Tip Set is a specialized tool kit designed for embedding brass heat-set inserts into plastic components. It is ideal for enhancing connections between 3D printed parts and reinforcing the structural integrity of plastic enclosures. This tool set is compatible with a variety of materials including PLA, ABS, PETG and other popular thermoplastics.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "heat-stake-nut-tool-tip-set-1pcs",
+    "title": "Heat-Stake Nut Tool Tip Set",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e8d7283101a85cee6bef51ef2a00ed3987b5c7847cd494035e914c64571bb158",
+   "en": "The included adapter is designed for 900M / T18-style removable-tip soldering irons. Other soldering iron systems may require a different adapter. Hakko FX-888D / FX-888, T18-style irons Fits? Yes Notes Included adapter replaces the standard removable tip Hakko 936 / 937 / 907 handle 900M-style tip interface 936-style stations (Yihua, Baku, Kaisi, Aoyue, Vastar, etc.) Compatible if the iron uses 900M-style removable tips Generic adjustable iron using 900M tips 60 W or higher recommended TS100 / TS101 / SQ-001 / Pinecil V1 No — different adapter required Needs a TS100-style shank; not included Pinecil V2 No Different tip interface; TS100 adapters do not fit T12 / T15 cartridge irons Cartridge heater — this set cannot attach JBC C245 / C210, Aixun, Sugon, Sequre, FNIRSI HS-02A Cartridge irons; also a different thread than this kit Weller ET / LT / XT Proprietary tip series ERSA 102 / 832 / 842 Butane or fixed-tip irons Tip must be removable For the best heat-set insert installation exper",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "heat-stake-nut-tool-tip-set-1pcs",
+    "title": "Heat-Stake Nut Tool Tip Set",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "52f8c40ea415a449e76e5466f96432728303adfe8ccda21e5a936b5d3c6df313",
+   "en": "Crafted from high-strength carbon steel, the L Type Hex Wrench delivers exceptional durability and resistance to deformation. Its ergonomic L-shaped design leverages the lever principle for greater torque and effortless operation—perfect for quickly installing or removing hex screws in various repair and assembly scenarios.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "l-type-hex-wrench",
+    "title": "L Type Hex Wrench",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9c2968eb7327596ed2df4c63ea03280a4c2f67b8981cdf319648a7014f7d624f",
+   "en": "Learn more about the replacement of the Accessory Box for AMS on Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "accessory-box-for-ams",
+    "title": "Accessory Box for AMS",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ba877042836f6a099718788102ea4db90528c3a68753dfdacb4b11182b3e4fb4",
+   "en": "For H2D/H2C Laser Upgrade Kit: Bambu Lab Wiki",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "usage[0].body.line[0]",
+    "near": "For H2S Laser Upgrade Kit: Bambu Lab Wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "7ea79f934dc082c6445842f924454cacecff5b93ac113a01100288cf20ea5ab5",
+   "en": "For H2S Laser Upgrade Kit: Bambu Lab Wiki",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "usage[0].body.line[1]",
+    "near": "For H2D/H2C Laser Upgrade Kit: Bambu Lab Wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb98ab087302a05a4f433bef38d5f105b754d7a5f5b4b8dc4adb0765afa605e8",
+   "en": "Laser Type",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.laser_type].label",
+    "near": "Semiconductor Laser"
+   },
+   "dict": null
+  },
+  {
+   "h": "ebc7075b020b2bca1eddc38eb6395744ac5ae781268ab4c25028e929e95280a3",
+   "en": "Laser Wavelength",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.laser_wavelength].label",
+    "near": "Engraving Laser: 455 nm ± 5 nm Blue Light / Height Measuring Laser: 850 nm ± 5 nm Infrared Light"
+   },
+   "dict": {
+    "ar": "الطول الموجي لليزر",
+    "ckb": "درێژی شەپۆلی لەیزەر"
+   }
+  },
+  {
+   "h": "af16195a9de9d5a9c4e9d46fbf8b325c781e67b97932219d154a2f6fe980a20f",
+   "en": "Laser Power",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.laser_power].label",
+    "near": "10 W ± 1 W / 40 W ± 2 W"
+   },
+   "dict": {
+    "ar": "قدرة الليزر",
+    "ckb": "وزەی لەیزەر"
+   }
+  },
+  {
+   "h": "2739925951552b081cfc24deedca3e17d741ca6a7ca16a7644f394ea4d0a8825",
+   "en": "Laser Spot Dimension",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.laser_spot_dimension].label",
+    "near": "10 W：0.14 x 0.03 mm / 40 W：0.14 x 0.2 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "2873129ec42fe9164ba55acb79f6c32ab616993ae0e0d838d322568abb0a63e6",
+   "en": "Supported Material Type",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.supported_material_type].label",
+    "near": "Wood, rubber, metal sheet, leather, dark acrylic, stone, and more"
+   },
+   "dict": null
+  },
+  {
+   "h": "06f534cb0f47f5a8fc7f081d89ed8e41e49a7c2c2f58f1b27543bafb8c809f7c",
+   "en": "Wood, rubber, metal sheet, leather, dark acrylic, stone, and more",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.supported_material_type]",
+    "near": "Supported Material Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "560e8e939f39789909c2e790ea5b3b3aab332e5f2269a856fd91e6c634d86bd8",
+   "en": "Max Engraving Speed",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.max_engraving_speed].label",
+    "near": "10 W：400 mm/s / 40 W： 1000 mm/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3380748a8dd990e44d082f36c68e378480e33c4640a7f6681e7a87b0ce71e1b",
+   "en": "Laser Safety Class for Laser Module",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.laser_safety_class_for_laser_module].label",
+    "near": "Class 4"
+   },
+   "dict": null
+  },
+  {
+   "h": "93d4406d3836a47d3c9597ab26a4c400290a80eb36e13549985b59c919e213d7",
+   "en": "Overall Laser Safety Class",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.overall_laser_safety_class].label",
+    "near": "Class 1"
+   },
+   "dict": null
+  },
+  {
+   "h": "6fd36f1e0a831e7d346722904b63eef8fd1d30fbb90ff8eb0e5bb08a423c05b8",
+   "en": "Engraving Area",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.engraving_area].label",
+    "near": "10 W: 310 mm x 270 mm / 40 W: 310 mm x 250 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f425f0362bb7f78f732faabee3b5c593b37661aeb6996e2ed1e02c0d4ac0cbe",
+   "en": "Ventilation Pipe Adapter Outer Diameter",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "laser-upgrade-kit",
+    "title": "Laser Upgrade Kit",
+    "field": "specs[x.ventilation_pipe_adapter_outer_diameter].label",
+    "near": "100 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "7076bcb0a92fce157c015a11a716a0042eb4650602553ad15a974e1ba6b1fd8e",
+   "en": "Please refer to the installation guide for the Cutting Upgrade Kit available on Bambu Lab Wiki. For a visual walkthrough, we also recommend watching the step-by-step installation video.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-upgrade-kit-h2-series-a2l",
+    "title": "Cutting Upgrade Kit - H2 Series/A2L",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c7509660449d450218981adf99ed819c6e4725ec0e0ec73eae48888933e293c4",
+   "en": "The Cutting Upgrade Kit with Material Pack includes the Cutting Upgrade Kit plus a curated selection of cutting materials for immediate creative use: - PU Leatherette Fabric ×5 - Matte Removable Vinyl ×10 - Reflective Decal Sheets ×5 - Matte Heat Transfer Vinyl ×10 - 250g White Cardstock ×25 - Carbon Fiber Textured Vinyl ×10 - Pearlescent White Greeting Card Set ×2",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-upgrade-kit-h2-series-a2l",
+    "title": "Cutting Upgrade Kit - H2 Series/A2L",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "2236e71aa311f9a4243abf14e6b2b9d71805295909fa1ef9a3f980f092d5a8e2",
+   "en": "White, Black",
+   "kind": "spec_value_text",
+   "freq": 6,
+   "context": {
+    "handle": "ams-hub-a1-series",
+    "title": "AMS Hub - A1 Series",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "أبيض، أسود",
+    "ckb": "سپی، ڕەش"
+   }
+  },
+  {
+   "h": "c561a498057584ec20a0b5c9115c47670b184ce310041af8bb2d699f257cf190",
+   "en": "4 Pin Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub-a1-series",
+    "title": "AMS Hub - A1 Series",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e6296dd345a174b1ba4bddf176832dcdb31745f0500ae41c7a0a1bc534f58a9",
+   "en": "PTFE Tube (about 600mm)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub-a1-series",
+    "title": "AMS Hub - A1 Series",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8662bd764858ed52bd6e9081a6924b1dd98b4fa45f8a97d6bf2498d1e763d715",
+   "en": "PTFE Tube (about 520mm)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-hub-a1-series",
+    "title": "AMS Hub - A1 Series",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a82b89a2a18546d88bd5f2024e1d3d9b36a687386ae1ab7c2e7a594fbb3f9ab",
+   "en": "Learn more about the replacement of Toolhead Enhanced Cooling Fan on Bambu Lab Wiki. If you are an H2D Pro or H2C user, the cable management clips included in the package can be discarded or kept for future use; if you are an H2D user and want to install this fan, please refer to this tutorial first to determine whether the cable management clips need to be installed. For more information, please visit this Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-enhanced-cooling-fan",
+    "title": "Toolhead Enhanced Cooling Fan",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4ff288fde08f190af87d0ae0ba18cb298574517f34a78748d3d8179a8c9cc871",
+   "en": "Designed for 3D Printing Maintenance and Assembly",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0f188b65618553dc35886996dfef9a1249edf8043539778edf7aaf21afed9792",
+   "en": "Routine maintenance, upgrades, and printed part assembly often require accessing tightly spaced screws on hotends, extruders, frames, and small mechanical components. This precision screwdriver kit provides the essential tools needed to handle these tasks efficiently and safely.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d3e4aa8f39a5b03b8ed91a0f89f801b68d755e5e90129a4fef8385b5c97e8650",
+   "en": "Instructions & Notes",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[1].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "53ce381556d1c896460ff0ea5b9c0c02547a604dc06c879039a2420204c29412",
+   "en": "Magnetic Self-Locking Mechanism:",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[1].body.line[0]",
+    "near": "Push the black self-locking collar upward, insert the bit into the handle, then release the collar to automatically lock the bit."
+   },
+   "dict": null
+  },
+  {
+   "h": "b7b636c8dc688ad8f8f680606a428b2eac89327eddf152af27c536528013bbcc",
+   "en": "Push the black self-locking collar upward, insert the bit into the handle, then release the collar to automatically lock the bit.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[1].body.line[1]",
+    "near": "Magnetic Self-Locking Mechanism:"
+   },
+   "dict": null
+  },
+  {
+   "h": "167774c244138491d1d07081d58b80ad70ddd5e72758d4e5f977f3aa52751641",
+   "en": "To remove a bit, push the collar upward again and pull the bit out.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[1].body.line[2]",
+    "near": "Push the black self-locking collar upward, insert the bit into the handle, then release the collar to automatically lock the bit."
+   },
+   "dict": null
+  },
+  {
+   "h": "78c4000d38bcc0d9db6fe2c24ebbc1246ebc8e9e2b580448e2410cffdabd25eb",
+   "en": "Always match the bit size to your screw to prevent damage.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[1].body.line[3]",
+    "near": "To remove a bit, push the collar upward again and pull the bit out."
+   },
+   "dict": null
+  },
+  {
+   "h": "9ddea63b51d4158e84e56641528724de928e07844c466a9427ebaed6d129dd20",
+   "en": "Wipe bits dry after use in humid environments to maintain rust resistance.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[1].body.line[4]",
+    "near": "Always match the bit size to your screw to prevent damage."
+   },
+   "dict": null
+  },
+  {
+   "h": "219228508216c422fd3f9f3b9a89703fb6490dc92d3d9be041fb718f3df3386c",
+   "en": "Store in a dry location when not in use.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[1].body.line[5]",
+    "near": "Wipe bits dry after use in humid environments to maintain rust resistance."
+   },
+   "dict": null
+  },
+  {
+   "h": "1397ed140e4496ad9cd8b54fb70cad12651ce447c0b8baf224107a879de47579",
+   "en": "Designed for precision work—avoid high-torque applications.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "usage[1].body.line[6]",
+    "near": "Store in a dry location when not in use."
+   },
+   "dict": null
+  },
+  {
+   "h": "a46b777e4bd5f7690f36ac9f24f82d25c93c07c3a2214bc29ad21c81940bd05c",
+   "en": "Aluminum alloy / with anti-slip finish",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "specs[part.handle_material]",
+    "near": "Handle material"
+   },
+   "dict": null
+  },
+  {
+   "h": "d32d97e5d1e0de55e1b42c25677d6723f40e1f40f0ee276c1fc61a743bfa34d0",
+   "en": "Bit Material",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "specs[x.bit_material].label",
+    "near": "S2 steel, nickel-plated"
+   },
+   "dict": null
+  },
+  {
+   "h": "05be27de1b69ff3849ccfd9ab5827843cc7d96e4bd9ffb37b3a088822675fa95",
+   "en": "S2 steel, nickel-plated",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "specs[x.bit_material]",
+    "near": "Bit Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "be75fab84019f7703403ef31b04cf394f01add1a9475c8ca9e3feffbe0ae5451",
+   "en": "Bit Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "specs[x.bit_length].label",
+    "near": "Approx. 100 mm, suitable for blind holes up to 60 mm depth"
+   },
+   "dict": null
+  },
+  {
+   "h": "76c128129073e80a292354dfed9a92409fc933f5c24578fbf19bcac652b082da",
+   "en": "Approx. 100 mm, suitable for blind holes up to 60 mm depth",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "specs[x.bit_length]",
+    "near": "Bit Length"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d62bb01df4edd9592050745c6ec8d6f399ef4dc24f6336cd4d8978b89593ff2",
+   "en": "Packaging",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "specs[x.packaging].label",
+    "near": "Transparent storage case"
+   },
+   "dict": null
+  },
+  {
+   "h": "73329e5c4adf630e919f1e3371882a8150720e6a5fa170d12fb21e101d9fd1c6",
+   "en": "Transparent storage case",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "maker-s-supply-screwdriver-kit",
+    "title": "Maker's Supply Screwdriver Kit",
+    "field": "specs[x.packaging]",
+    "near": "Packaging"
+   },
+   "dict": null
+  },
+  {
+   "h": "67999574f9933342de675061a9ca6d8571cd29ee2d398adecbe51f221e1be157",
+   "en": "For the Vortek Upgrade Kit (H2D Compatibility Pack): Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-upgrade-kit",
+    "title": "Vortek Upgrade Kit",
+    "field": "usage[0].body.line[0]",
+    "near": "For the Vortek Upgrade Kit (H2S Compatibility Pack): Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "bec84e1a8b86cd3cd9f8f131ddeb6cae90485dbdec053b6ec2cf9c614aeb85a2",
+   "en": "For the Vortek Upgrade Kit (H2S Compatibility Pack): Bambu Lab Wiki.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "vortek-upgrade-kit",
+    "title": "Vortek Upgrade Kit",
+    "field": "usage[0].body.line[1]",
+    "near": "For the Vortek Upgrade Kit (H2D Compatibility Pack): Bambu Lab Wiki."
+   },
+   "dict": null
+  },
+  {
+   "h": "c77812a91d682309fe9129d5f1e5ad65ddd8ef584dc8f1c64db3b2489d2d1487",
+   "en": "Gray, Black",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "vortek-upgrade-kit",
+    "title": "Vortek Upgrade Kit",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": {
+    "ar": "رمادي، أسود",
+    "ckb": "خۆڵەمێشی، ڕەش"
+   }
+  }
+ ]
+}

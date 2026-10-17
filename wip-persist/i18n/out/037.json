@@ -1,0 +1,1749 @@
+[
+ {
+  "h": "f18c06289135b3d994eccfe4b739c990574e5b8a1db9ebff5994fbb906dd4e7e",
+  "en": "The LED Mini Spotlight is a professional-grade lighting solution designed to perfectly showcase your 3D printed masterpieces with precision and clarity. Designed to bring museum-quality illumination to your desktop, it is the ideal choice for highlighting intricate details in model display cabinets, protective cases, and custom DIY Maker projects. Whether you are showcasing a complex architectural print or a detailed figure, this spotlight provides the perfect focused ambiance.",
+  "ar": "يُعد LED Mini Spotlight حلّ إضاءة احترافيًا مصمّمًا لعرض تحفك المطبوعة بطابعة 3D بشكل مثالي وبدقة ووضوح. صُمّم ليمنح مكتبك إضاءة بمستوى المتاحف، وهو الخيار المثالي لإبراز التفاصيل الدقيقة في خزائن عرض النماذج وصناديق الحماية ومشاريع DIY الخاصة بالصنّاع. وسواء كنت تعرض طبعة معمارية معقّدة أو مجسّمًا مفصّلًا، يوفّر هذا الكشّاف أجواءً مركّزة مثالية.",
+  "ckb": "گڵۆپی LED Mini Spotlight چارەسەرێکی ڕووناککردنەوەی ئاست پرۆفیشناڵە کە بۆ پیشاندانی تەواوی شاکارە چاپکراوەکانت بە 3D بە وردی و ڕوونی دیزاین کراوە. دیزاین کراوە بۆ ئەوەی ڕووناکییەکی ئاستی مۆزەخانە بهێنێتە سەر مێزەکەت، و باشترین هەڵبژاردەیە بۆ دەرخستنی وردەکارییە ئاڵۆزەکان لە کابینەی پیشاندانی مۆدێل، سندوقی پاراستن و پڕۆژە تایبەتەکانی DIY بۆ دروستکەران. جا تەلارێکی ئاڵۆزی چاپکراو پیشان بدەیت یان پەیکەرێکی پڕ وردەکاری، ئەم گڵۆپە ئاراستەکراوە کەشێکی چڕکراوەی تەواو دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d660fc2587ddd9ab6024b9782192d31b68fe49b9bbeb74292ffe218255185561",
+  "en": "Precision 25° Beam Angle: Equipped with a high-quality optical lens that provides a concentrated 25° beam, ensuring your models are illuminated with precision and zero light leakage.",
+  "ar": "زاوية حزمة دقيقة بمقدار 25°: مزوّد بعدسة بصرية عالية الجودة توفّر حزمة ضوئية مركّزة بزاوية 25°، لتضيء نماذجك بدقة ومن دون أي تسرّب للضوء.",
+  "ckb": "گۆشەی تیشکی وردی 25°: هاوێنەیەکی ئۆپتیکیی جۆرایەتی بەرزی تێدایە کە تیشکێکی چڕکراوەی 25° دابین دەکات، بۆ ئەوەی مۆدێلەکانت بە وردی ڕووناک بکرێنەوە بەبێ هیچ دزەکردنێکی ڕووناکی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c9597bfd4aec7e8869b6298cc9cc1ac3aba3a6ae9c44295603775f738315f90d",
+  "en": "Premium Aluminum Build: Crafted with a sleek black aluminum alloy housing, offering superior durability and excellent heat dissipation for long-term use.",
+  "ar": "هيكل فاخر من الألمنيوم: مصنوع بغلاف أنيق من سبيكة ألمنيوم سوداء، يوفّر متانة فائقة وتبديدًا ممتازًا للحرارة للاستخدام طويل الأمد.",
+  "ckb": "دروستکراوی ئەلەمنیۆمی نایاب: بە بەرگێکی شیکی ڕەش لە ئاوێتەی ئەلەمنیۆم دروست کراوە، و بەرگەگرییەکی بەرز و بڵاوکردنەوەیەکی نایابی گەرمی بۆ بەکارهێنانی درێژخایەن پێشکەش دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "32491a590af110c3a879047657ee70856e7aed19b8e690d067e6e4b4ff893115",
+  "en": "Integrated Control: Features an inline switch on a 1.5-meter cable, allowing for easy operation without disconnecting the USB power source.",
+  "ar": "تحكّم مدمج: يأتي بمفتاح تشغيل مدمج في كابل بطول 1.5 متر، ما يتيح تشغيله بسهولة دون فصل مصدر الطاقة USB.",
+  "ckb": "کۆنترۆڵی یەکگرتوو: کلیلێکی لەسەر کێبڵێکی 1.5 مەتری هەیە، کە ڕێگە بە کارپێکردنی ئاسان دەدات بەبێ پچڕاندنی سەرچاوەی وزەی USB.",
+  "kind": "block_line"
+ },
+ {
+  "h": "03e2b3de230f36dcbacd2a05a6b689af80710cea798d5da401f65153d6cc2a5d",
+  "en": "Power Supply: Ensure use with a standard DC 5V power adapter or USB port. Excessive voltage may damage the internal circuitry.",
+  "ar": "مزوّد الطاقة: احرص على استخدامه مع محوّل طاقة قياسي DC 5V أو منفذ USB. قد يؤدي الجهد الكهربائي الزائد إلى إتلاف الدوائر الداخلية.",
+  "ckb": "دابینکەری وزە: دڵنیابە لە بەکارهێنانی لەگەڵ ئەداپتەرێکی وزەی ستانداردی DC 5V یان دەرچەی USB. ڤۆڵتیەی زیادە لەوانەیە زیان بە بازنە ناوەکییەکان بگەیەنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f593db7d7c34671e9c76b41ff27228520e88b3e881e62bd0d3f9fc16939bdf29",
+  "en": "Indoor Use Only: This product is not waterproof; please use it in a dry, indoor environment.",
+  "ar": "للاستخدام الداخلي فقط: هذا المنتج غير مقاوم للماء؛ يرجى استخدامه في مكان داخلي جاف.",
+  "ckb": "تەنها بۆ بەکارهێنانی ناوەوە: ئەم بەرهەمە دژە ئاو نییە؛ تکایە لە شوێنێکی وشکی ناوەوە بەکاری بهێنە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "dfc801a6a80f88834913fc7db8d92d1c459f6c4325782434e02606b436dbc304",
+  "en": "Installation: When mounting in enclosed display cases, ensure there is adequate ventilation to assist with the aluminum housing's natural heat dissipation.",
+  "ar": "التركيب: عند التركيب داخل خزائن عرض مغلقة، تأكّد من وجود تهوية كافية تساعد غلاف الألمنيوم على تبديد الحرارة بشكل طبيعي.",
+  "ckb": "دامەزراندن: کاتێک لە ناو کابینەی پیشاندانی داخراودا دایدەمەزرێنیت، دڵنیابە لە بوونی هەواگۆڕکێی پێویست بۆ یارمەتیدانی بەرگە ئەلەمنیۆمییەکە لە بڵاوکردنەوەی سروشتیی گەرمی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "113fb21ceac8993b640fdcaf8918ce13d7e62da8c86d905b8a8ff4550b3980b4",
+  "en": "The Crazy Factory is an engaging 3D-printed game where players guide a robot through a chaotic factory filled with gears and misaligned conveyor belts. Its key selling points include dual controller options (standard remote or custom joystick), A1-Mini compatibility, adjustable package release speed, and clever mechanical design that challenges players to deliver packages without dropping them. Built around CyberBrick, it offers hands-on, chaotic fun for 3D printing enthusiasts.",
+  "ar": "لعبة The Crazy Factory لعبة مطبوعة (3D-printed) مشوّقة، يوجّه فيها اللاعبون روبوتًا عبر مصنع فوضوي مليء بالتروس والسيور الناقلة غير المتراصّة. ومن أبرز مزاياها: خياران للتحكم (جهاز تحكم قياسي أو عصا تحكم مخصّصة)، والتوافق مع A1-Mini، وسرعة قابلة للتعديل لإطلاق الطرود، وتصميم ميكانيكي ذكي يتحدّى اللاعبين لإيصال الطرود دون إسقاطها. وهي مبنية على CyberBrick، وتقدّم متعة عملية مليئة بالفوضى لعشّاق الطباعة 3D.",
+  "ckb": "یاریی The Crazy Factory یارییەکی چاپکراوی (3D-printed) سەرنجڕاکێشە کە تێیدا یاریزانان ڕۆبۆتێک بە ناو کارگەیەکی شێواودا ڕێنمایی دەکەن کە پڕە لە چەرخی ددانەدار و قایشی گواستنەوەی ناڕێک. گرنگترین تایبەتمەندییەکانی بریتین لە: دوو بژاردەی کۆنترۆڵ (ڕیمۆتی ستاندارد یان جۆیستیکی تایبەت)، گونجاوی لەگەڵ A1-Mini، خێرایی ڕێکخراوی بەردانی پاکەتەکان، و دیزاینێکی میکانیکیی زیرەکانە کە یاریزانان تاقی دەکاتەوە بۆ گەیاندنی پاکەتەکان بەبێ ئەوەی بکەون. لەسەر بنەمای CyberBrick دروست کراوە، و چێژێکی کرداری و پڕ لە شێواوی بۆ دڵدارانی چاپی 3D پێشکەش دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2c91e068c3f481dbf2df162ebd1211c220dad1ecd24b54b59f1663e687051075",
+  "en": "*The Crazy Factory is continuously improved based on feedback from our players and makers. The Creator is actively refining models, mechanics, and components based on community feedback. For the latest updates, upgrade files, and additional content, be sure to follow the project’s page on MakerWorld.",
+  "ar": "*يجري تحسين The Crazy Factory باستمرار بناءً على ملاحظات اللاعبين والصنّاع لدينا. ويعمل المصمّم بنشاط على تحسين النماذج والآليات والمكوّنات وفقًا لملاحظات المجتمع. وللاطلاع على أحدث التحديثات وملفات الترقية والمحتوى الإضافي، احرص على متابعة صفحة المشروع على MakerWorld.",
+  "ckb": "*پڕۆژەی The Crazy Factory بە بەردەوامی باشتر دەکرێت بە پشتبەستن بە ڕاوبۆچوونی یاریزان و دروستکەرەکانمان. دروستکەرەکە بە چالاکی خەریکی باشترکردنی مۆدێل، میکانیزم و پێکهاتەکانە بە پێی ڕاوبۆچوونی کۆمەڵگە. بۆ نوێترین نوێکارییەکان، فایلەکانی نوێکردنەوە و ناوەڕۆکی زیاتر، دڵنیابە لە شوێنکەوتنی پەڕەی پڕۆژەکە لە MakerWorld.",
+  "kind": "block_line"
+ },
+ {
+  "h": "421ad9cabb67d128e6da2bf7b2af28048312f46d5b5b302db0bf5b9924d73f65",
+  "en": "Package Dispatch Mechanism",
+  "ar": "آلية إطلاق الطرود",
+  "ckb": "میکانیزمی بەردانی پاکەتەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "c885cb190498c9fe26b5ca78a7891864e957df83fdc827bef13162a69557014f",
+  "en": "Packages are dispatched automatically at two selectable speeds, letting you control the pace and difficulty of the game. Start with up to 6 cubes loaded at once, or continue refilling them while the factory is in motion.",
+  "ar": "تُطلق الطرود تلقائيًا بسرعتين يمكنك الاختيار بينهما، ما يتيح لك التحكم في إيقاع اللعبة وصعوبتها. ابدأ بتحميل ما يصل إلى 6 مكعبات دفعة واحدة، أو واصل إعادة تعبئتها أثناء عمل المصنع.",
+  "ckb": "پاکەتەکان بە شێوەی خۆکار بە دوو خێرایی هەڵبژێردراو بەردەدرێن، کە ڕێگەت پێدەدات کۆنترۆڵی ڕیتم و قورسیی یارییەکە بکەیت. دەست پێبکە بە بارکردنی تا 6 کیوب لە یەک کاتدا، یان بەردەوام بە لە پڕکردنەوەیان لە کاتێکدا کارگەکە لە جووڵەدایە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4b29e986b5c5ad9a4843a9bf2522f55999ba1f45046b538387b708fcb8bb0973",
+  "en": "Playful Factory Theme",
+  "ar": "مصنع بطابع مرح",
+  "ckb": "کارگەیەک بە شێوازێکی یاریئامێز",
+  "kind": "block_title"
+ },
+ {
+  "h": "d568fb82e8e4ea7f27b9aaf4def484659ce02462568243a33332e0d52857f7b0",
+  "en": "Crazy conveyor belts, charming details, and a choice between visible or hidden mechanisms give the model its unique factory character. The playful design makes it entertaining to explore, enjoyable to watch, and full of surprises.",
+  "ar": "سيور ناقلة مجنونة، وتفاصيل جذّابة، وإمكانية الاختيار بين آليات ظاهرة أو مخفية، تمنح النموذج طابع المصنع الفريد. ويجعل التصميم المرح استكشافه مسلّيًا ومشاهدته ممتعة، وهو مليء بالمفاجآت.",
+  "ckb": "قایشی گواستنەوەی شێتانە، وردەکاریی سەرنجڕاکێش، و توانای هەڵبژاردن لە نێوان میکانیزمی ئاشکرا یان شاراوە، کەسایەتیی تایبەتی کارگە بە مۆدێلەکە دەبەخشن. دیزاینە یاریئامێزەکەی گەڕان بە ناویدا سەرگەرمکەر و سەیرکردنی خۆش دەکات، و پڕە لە سەرسوڕمان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "998040f11d039709d3b9233e2ce9c3bae5a153be9d9d7f3ce937dc80336ec40d",
+  "en": "Fast and Precise Robot Movement",
+  "ar": "حركة روبوت سريعة ودقيقة",
+  "ckb": "جووڵەی خێرا و وردی ڕۆبۆت",
+  "kind": "block_title"
+ },
+ {
+  "h": "a089d03f084df737749b5ab26d1b64205be35c81f41fc4764fd4da3405370416",
+  "en": "The robot’s quick movement puts your timing and skill to the test. Master fast and smooth control to catch every package before it drops.",
+  "ar": "تضع حركة الروبوت السريعة توقيتك ومهارتك على المحك. أتقِن التحكم السريع والسلس لالتقاط كل طرد قبل أن يسقط.",
+  "ckb": "جووڵە خێراکەی ڕۆبۆتەکە کاتگرتن و شارەزاییت تاقی دەکاتەوە. کۆنترۆڵی خێرا و نەرم فێربە بۆ ئەوەی هەموو پاکەتێک بگریت پێش ئەوەی بکەوێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ee45c33d8849a32e0d1f461cdd4499a82ca61d8fd99e75255021f4b8030a00db",
+  "en": "Stop Time at the Push of a Button",
+  "ar": "أوقِف الزمن بضغطة زر",
+  "ckb": "بە پەستانی دوگمەیەک کات ڕابگرە",
+  "kind": "block_title"
+ },
+ {
+  "h": "f018b079200131752e3ce30b9e6662c11da98180210225a466c343831634c47c",
+  "en": "CPause the conveyor action instantly with the push of a button and use the moment to catch two packages at once. But stay alert — new packages can still be released even while the conveyors are stopped.Pause the conveyor action instantly with the push of a button and use the moment to catch two packages at once. But stay alert — new packages can still be released even while the conveyors are stopped.",
+  "ar": "أوقِف حركة السيور الناقلة فورًا بضغطة زر، واستغل اللحظة لالتقاط طردين في آن واحد. لكن ابقَ متيقّظًا — فقد تُطلق طرود جديدة حتى أثناء توقف السيور. أوقِف حركة السيور الناقلة فورًا بضغطة زر، واستغل اللحظة لالتقاط طردين في آن واحد. لكن ابقَ متيقّظًا — فقد تُطلق طرود جديدة حتى أثناء توقف السيور.",
+  "ckb": "جووڵەی قایشە گواستنەوەکان بە پەستانی دوگمەیەک دەستبەجێ ڕابگرە و ئەو ساتە بقۆزەرەوە بۆ گرتنی دوو پاکەت لە یەک کاتدا. بەڵام ئاگادار بە — پاکەتی نوێ هێشتا دەتوانن بەربدرێن تەنانەت لە کاتێکدا قایشەکان وەستاون. جووڵەی قایشە گواستنەوەکان بە پەستانی دوگمەیەک دەستبەجێ ڕابگرە و ئەو ساتە بقۆزەرەوە بۆ گرتنی دوو پاکەت لە یەک کاتدا. بەڵام ئاگادار بە — پاکەتی نوێ هێشتا دەتوانن بەربدرێن تەنانەت لە کاتێکدا قایشەکان وەستاون.",
+  "kind": "block_line"
+ },
+ {
+  "h": "039f36898c9ce4a8699aa2a1fd3e9da3535cb0b8c7cf0419a267ca8095e7c483",
+  "en": "Download View More",
+  "ar": "تنزيل، عرض المزيد",
+  "ckb": "داگرتن، زیاتر ببینە",
+  "kind": "block_line"
+ },
+ {
+  "h": "2ca4637a5b8a2ab0e37b147184b6240092906053c71e33baf069ea3aa2eadd43",
+  "en": "Project Details",
+  "ar": "تفاصيل المشروع",
+  "ckb": "وردەکارییەکانی پڕۆژە",
+  "kind": "block_line"
+ },
+ {
+  "h": "f5faf22b8e2bab6b5a6a7292f67457ada572df0d983b831f024793c3c56321a7",
+  "en": "Printable files for the crowdfunding models need to be purchased separately on the project page.",
+  "ar": "يجب شراء ملفات الطباعة الخاصة بنماذج التمويل الجماعي بشكل منفصل من صفحة المشروع.",
+  "ckb": "فایلە شیاوەکانی چاپ بۆ مۆدێلەکانی دارایی بەکۆمەڵ پێویستە بە جیا لە پەڕەی پڕۆژەکە بکڕدرێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cbec77220d5f298c1135528d4128a35460e9a09d989f8f17253b52e1311e472d",
+  "en": "Garden Races is a 3D-printable ecosystem for building a customizable all-wheel-drive RC truck and off-road track. Optimized for compact home 3D printers, it requires minimal supports for rapid assembly. The design seamlessly integrates with standard CyberBrick electronics and controllers, making the build process incredibly accessible. Drivers can fully personalize their racing experience using interchangeable wheels, bumpers, body styles, and modular track obstacles like bridges and ramps.",
+  "ar": "مشروع Garden Races منظومة متكاملة قابلة للطباعة (3D-printable) لبناء شاحنة RC قابلة للتخصيص بدفع على جميع العجلات ومضمار للطرق الوعرة. وهو مُحسَّن لطابعات 3D المنزلية الصغيرة، ويتطلب حدًّا أدنى من الدعامات لتجميع سريع. يندمج التصميم بسلاسة مع إلكترونيات CyberBrick ووحدات التحكم القياسية، ما يجعل عملية البناء في متناول الجميع. ويمكن للسائقين تخصيص تجربة السباق بالكامل باستخدام عجلات ومصدّات وأشكال هياكل قابلة للتبديل، وعوائق مضمار معيارية مثل الجسور والمنحدرات.",
+  "ckb": "پڕۆژەی Garden Races سیستەمێکی تەواوی شیاوی چاپە (3D-printable) بۆ دروستکردنی بارهەڵگرێکی تایبەتکراوی RC بە هێزی هەموو تایەکان و ڕێڕەوێک بۆ دەرەوەی ڕێگا. بۆ چاپکەرە بچووکە ماڵییەکانی 3D گونجێنراوە، و پێویستی بە کەمترین پاڵپشت هەیە بۆ پێکەوەنانی خێرا. دیزاینەکە بە ئاسانی لەگەڵ ئەلیکترۆنیات و کۆنترۆڵەرە ستانداردەکانی CyberBrick یەکدەگرێتەوە، و پرۆسەی دروستکردن بۆ هەمووان ئاسان دەکات. شۆفێران دەتوانن ئەزموونی پێشبڕکێکەیان بە تەواوی تایبەت بکەن بە بەکارهێنانی تایە، بەمپەر و شێوازی لاشەی گۆڕاو، و بەربەستی مۆدیوڵاری ڕێڕەو وەک پرد و لێژی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "28a5bedced3a268572fb96212127c7cb5972a083ee5349809ba380ce46704852",
+  "en": "*Relic Rush is continuously improved based on feedback from our players and makers. The Creator is actively refining models, mechanics, and components based on community feedback. For the latest updates, upgrade files, and additional content, be sure to follow the project’s page on MakerWorld.",
+  "ar": "*يجري تحسين Relic Rush باستمرار بناءً على ملاحظات اللاعبين والصنّاع لدينا. ويعمل المصمّم بنشاط على تحسين النماذج والآليات والمكوّنات وفقًا لملاحظات المجتمع. وللاطلاع على أحدث التحديثات وملفات الترقية والمحتوى الإضافي، احرص على متابعة صفحة المشروع على MakerWorld.",
+  "ckb": "*پڕۆژەی Relic Rush بە بەردەوامی باشتر دەکرێت بە پشتبەستن بە ڕاوبۆچوونی یاریزان و دروستکەرەکانمان. دروستکەرەکە بە چالاکی خەریکی باشترکردنی مۆدێل، میکانیزم و پێکهاتەکانە بە پێی ڕاوبۆچوونی کۆمەڵگە. بۆ نوێترین نوێکارییەکان، فایلەکانی نوێکردنەوە و ناوەڕۆکی زیاتر، دڵنیابە لە شوێنکەوتنی پەڕەی پڕۆژەکە لە MakerWorld.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e97661aef8112a83e9bbc868b0e641562f13edafef0530c47f74fa79adb4958e",
+  "en": "Start Strong, Race Anywhere",
+  "ar": "انطلاقة قوية وسباق في كل مكان",
+  "ckb": "بە هێز دەست پێبکە، لە هەر شوێنێک پێشبڕکێ بکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "3cf3e33a35c24fcdc80a8c78a9bcca3336d218cf9c62b527c2f830cec325dd65",
+  "en": "Two trucks launch from the start gate and tackle the first obstacles with ease. Smooth control and stable traction make every run feel fast and satisfying right from the start.",
+  "ar": "تنطلق شاحنتان من بوابة البداية وتتجاوزان العوائق الأولى بسهولة. ويجعل التحكم السلس والتماسك الثابت كل جولة سريعة وممتعة منذ البداية.",
+  "ckb": "دوو بارهەڵگر لە دەروازەی دەستپێکەوە دەردەچن و بە ئاسانی بەسەر یەکەم بەربەستەکاندا زاڵ دەبن. کۆنترۆڵی نەرم و گرتنی جێگیری زەوی هەموو گەڕێک هەر لە سەرەتاوە خێرا و دڵخۆشکەر دەکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "17396207139abad656e1b29f4546debb5a55212391f914f52bb4922b2fb0afe9",
+  "en": "Balance, Skill, Control",
+  "ar": "توازن ومهارة وتحكّم",
+  "ckb": "هاوسەنگی، شارەزایی، کۆنترۆڵ",
+  "kind": "block_title"
+ },
+ {
+  "h": "508b284841df8f6a67f2915b8127ccd6779800f054e808c1b8633421126a3807",
+  "en": "Master the seesaw bridge and test your driving precision. Weight balance and throttle control turn simple obstacles into fun, skill-based challenges.",
+  "ar": "أتقِن عبور الجسر المتأرجح واختبر دقة قيادتك. فتوازن الوزن والتحكم في دواسة السرعة يحوّلان العوائق البسيطة إلى تحديات ممتعة تعتمد على المهارة.",
+  "ckb": "فێری تێپەڕین بە پردە هەڵبەز و دابەزەکەدا ببە و وردیی لێخوڕینت تاقی بکەرەوە. هاوسەنگیی کێش و کۆنترۆڵی خێرایی بەربەستە سادەکان دەکەنە ئاستەنگی خۆش کە پشت بە شارەزایی دەبەستن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "095c5c9d9ebf442e62794a7d74c7bc3a9b9dfae2aee0a76fa73d54810583faa3",
+  "en": "Tight Turns, Clean Lines",
+  "ar": "منعطفات حادّة ومسارات نظيفة",
+  "ckb": "پێچی تەسک، هێڵی پاک",
+  "kind": "block_title"
+ },
+ {
+  "h": "e770e63b8e77d66c4fb16bdb47a2aa7c260143db34b2c587ecc02bedb4f670c2",
+  "en": "Weave through pillars and barriers at speed. The compact design and responsive steering let you stay in control while pushing the limits of your track.",
+  "ar": "تنقّل بسرعة بين الأعمدة والحواجز. يتيح لك التصميم المدمج والتوجيه سريع الاستجابة البقاء مسيطرًا وأنت تدفع حدود مضمارك إلى أقصاها.",
+  "ckb": "بە خێرایی بە نێوان ستوون و بەربەستەکاندا پێچ بکەرەوە. دیزاینە بچووکەکە و ئاراستەکردنی وەڵامدەرەوە ڕێگەت پێدەدەن کۆنترۆڵت بپارێزیت لە کاتێکدا سنوورەکانی ڕێڕەوەکەت تاقی دەکەیتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7c7928f0011f397a9528e12227c08a53ed9ec51d7e509e14e04ccffac310dd91",
+  "en": "Garden Races is a 3D-printable ecosystem for building customizable all-wheel-drive RC trucks and modular tracks. Optimized for small printers and CyberBrick electronics, it offers rapid assembly with minimal supports. Personalize your experience with interchangeable parts and obstacles, creating an engaging, hands-on racing hobby perfect for any indoor or outdoor environment.",
+  "ar": "مشروع Garden Races منظومة قابلة للطباعة (3D-printable) لبناء شاحنات RC قابلة للتخصيص بدفع على جميع العجلات ومضامير معيارية. وهو مُحسَّن للطابعات الصغيرة وإلكترونيات CyberBrick، ويوفّر تجميعًا سريعًا بحدّ أدنى من الدعامات. خصّص تجربتك بقطع وعوائق قابلة للتبديل، لتصنع هواية سباق عملية ومشوّقة مثالية لأي مكان داخلي أو خارجي.",
+  "ckb": "پڕۆژەی Garden Races سیستەمێکی شیاوی چاپە (3D-printable) بۆ دروستکردنی بارهەڵگری تایبەتکراوی RC بە هێزی هەموو تایەکان و ڕێڕەوی مۆدیوڵاری. بۆ چاپکەرە بچووکەکان و ئەلیکترۆنیاتی CyberBrick گونجێنراوە، و پێکەوەنانی خێرا بە کەمترین پاڵپشت پێشکەش دەکات. ئەزموونەکەت بە پارچە و بەربەستی گۆڕاو تایبەت بکە، و خولیایەکی پێشبڕکێی کرداری و سەرنجڕاکێش دروست بکە کە گونجاوە بۆ هەر شوێنێکی ناوەوە یان دەرەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "79de14c8e9e5084c9e32ea2842cebc41aaec926920d1fd8a0125a5e1724fb7fb",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional AquaPulse – Sci‑Fi Water Blaster. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع AquaPulse – Sci‑Fi Water Blaster يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی AquaPulse – Sci‑Fi Water Blaster بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "343b1a3b4503581563f5b19764d7c39123f75752653258cb035850fde663a862",
+  "en": "To download the model files please visit the AquaPulse – Sci‑Fi Water Blaster on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة AquaPulse – Sci‑Fi Water Blaster على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی AquaPulse – Sci‑Fi Water Blaster لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0ccdbd4727a23843c2563ae2511237dc4efb2e22a16d358b78536d8b5524e80b",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Manta ray automaton - manual/motor. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Manta ray automaton - manual/motor يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Manta ray automaton - manual/motor بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e569efb0232abc114084466f42d9eace98a4a80528e039c9b7c1153211d9318d",
+  "en": "To download the model files please visit the Manta ray automaton - manual/motor on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Manta ray automaton - manual/motor على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Manta ray automaton - manual/motor لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0610696fc5690f2c817a9838aaf7e32d5efb87396e6462fce16e12a7e393b8d6",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Haunted House — A Halloween Scene. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Haunted House — A Halloween Scene يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Haunted House — A Halloween Scene بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f50454c836803d9ee12df590614e6467875df0158d28d98d33bc229d6c95aeb0",
+  "en": "To download the model files please visit the Haunted House — A Halloween Scene on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Haunted House — A Halloween Scene على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Haunted House — A Halloween Scene لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6a80eadaf84b25581ad30f8754eb3d4084a3aa58a1827ea3b766bbf878bab107",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Flip Flop Dual AMS Stacker. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Flip Flop Dual AMS Stacker يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Flip Flop Dual AMS Stacker بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ec2846dd9ff47975f407b22dd324ee59802e4c19c472d9d3c7453fc3f729665b",
+  "en": "To download the model files please visit the Flip Flop Dual AMS Stacker on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Flip Flop Dual AMS Stacker على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Flip Flop Dual AMS Stacker لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "32bf5653c802e1b790445592f306a269f9a51137ac2f3521a08d9f2169e49392",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional AMS drawer stacker. The filaments and AMS shown in the product images are for demonstration purposes only. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع AMS drawer stacker يعمل بكامل وظائفه. الفلامنت ووحدة AMS الظاهرة في صور المنتج هي لأغراض العرض فقط. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی AMS drawer stacker بە شێوەیەکی تەواو کارا پێویستن. فیلامێنتەکان و یەکەی AMS کە لە وێنەکانی بەرهەمەکەدا دەبینرێن تەنها بۆ نمایشکردنن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e0355daf6a0543200ed1fe7b59644404b00a3ce759735c88415a702f0e481c14",
+  "en": "To download the model files please visit the AMS drawer stacker on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة AMS drawer stacker على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی AMS drawer stacker لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "41459b6b02707dae73e8cb5c10def1e9a2e259ce3c32f7acf12cf7a483e54032",
+  "en": "Experience the CyberBrick RC L-ONE Desktop Robotic Arm",
+  "ar": "جرّب الذراع الروبوتية المكتبية L-ONE من CyberBrick RC",
+  "ckb": "ئەزموونی قۆڵی ڕۆبۆتیی سەرمێزی L-ONE لە CyberBrick RC بکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "57fb927c61bcfeb9a9c757094b4baead06e51a9acaedc2e74a24534ffe16e2ea",
+  "en": "Build your own functional robotic arm with the L-ONE. This 3D printable marvel brings industrial vibe to your desktop, offering a hands-on experience in robotics and engineering. It's designed for enthusiasts and makers, combining intricate mechanics with accessible assembly. Get ready to explore the world of remote-controlled precision.",
+  "ar": "ابنِ ذراعك الروبوتية العاملة بنفسك مع L-ONE. تضفي هذه التحفة القابلة للطباعة 3D طابعًا صناعيًا على مكتبك، وتقدّم تجربة عملية في الروبوتات والهندسة. صُمّمت للهواة والصنّاع، فتجمع بين ميكانيكا دقيقة وتجميع سهل. استعدّ لاستكشاف عالم الدقة بالتحكم عن بُعد.",
+  "ckb": "قۆڵێکی ڕۆبۆتیی کارای خۆت لەگەڵ L-ONE دروست بکە. ئەم شاکارەی کە بە 3D چاپ دەکرێت کەشێکی پیشەسازی دەهێنێتە سەر مێزەکەت، و ئەزموونێکی کرداری لە ڕۆبۆتیک و ئەندازیاری پێشکەش دەکات. بۆ دڵداران و دروستکەران دیزاین کراوە، و میکانیکی ئاڵۆز لەگەڵ پێکەوەنانی ئاسان تێکەڵ دەکات. ئامادە بە بۆ گەڕان بە جیهانی وردیی کۆنترۆڵکراو لە دوورەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9f088dbebd6c3c70a5ddbc2c943b11e4ca9acea5757b0b4f2b32479f0dbb747e",
+  "en": "Advanced",
+  "ar": "متقدم",
+  "ckb": "پێشکەوتوو",
+  "kind": "block_line"
+ },
+ {
+  "h": "9bccad3c699262232666643f649e6dd2144cba823b1ee3c968d934a347ae733d",
+  "en": "Quick Assembly, Ready to Act",
+  "ar": "تجميع سريع وجاهزية فورية للعمل",
+  "ckb": "پێکەوەنانی خێرا، ئامادە بۆ کار",
+  "kind": "block_title"
+ },
+ {
+  "h": "7a49f72d629a5e2c77b11e9375919a4d9860676637bba2012fdba3eb039e1718",
+  "en": "Putting the L-ONE together is straightforward. Follow the clear steps and watch your robotic arm take shape, moving from parts to a fully functional unit in no time. It's designed for a smooth build experience, letting you get to the fun part faster.",
+  "ar": "تجميع L-ONE أمر سهل ومباشر. اتبع الخطوات الواضحة وشاهد ذراعك الروبوتية تتشكّل، من مجرد قطع إلى وحدة تعمل بكامل وظائفها في وقت قصير. صُمّمت لتجربة بناء سلسة، لتصل إلى الجزء الممتع بشكل أسرع.",
+  "ckb": "پێکەوەنانی L-ONE ئاسان و ڕاستەوخۆیە. هەنگاوە ڕوونەکان بگرەبەر و سەیری قۆڵە ڕۆبۆتییەکەت بکە کە شێوە وەردەگرێت، لە پارچەوە بۆ یەکەیەکی تەواو کارا لە ماوەیەکی کەمدا. بۆ ئەزموونێکی دروستکردنی نەرم دیزاین کراوە، تا زووتر بگەیتە بەشە خۆشەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "94814b085cd9fc22397bfae5ea1262b8e7e14ce8ad83fadb638a46ecb7113dc0",
+  "en": "Intuitive Control at Your Fingertips",
+  "ar": "تحكّم سهل وبديهي بين أصابعك",
+  "ckb": "کۆنترۆڵی ئاسان و سروشتی لە نێو پەنجەکانتدا",
+  "kind": "block_title"
+ },
+ {
+  "h": "2d4f20072505afc4f204dc7c0606e225d5fcaeae52960a90ab7637348fddb682",
+  "en": "Four dedicated joysticks and buttons put you in complete command of the L-ONE. Guide the arm with natural, fluid movements, making complex tasks feel intuitive. Pick up, place, and manipulate objects with impressive accuracy from your very first try.",
+  "ar": "تمنحك أربع عصي تحكّم وأزرار مخصّصة سيطرة كاملة على L-ONE. وجّه الذراع بحركات طبيعية وانسيابية تجعل المهام المعقّدة تبدو بديهية. التقط الأشياء وضعها وحرّكها بدقة مبهرة من محاولتك الأولى.",
+  "ckb": "بە چوار جۆیستیک و دوگمەی تایبەت، بە تەواوی کۆنترۆڵی L-ONE دەکەیت. قۆڵەکە بە جووڵەی سروشتی و نەرم ئاراستە بکە، کە ئەرکە ئاڵۆزەکان ئاسان و سروشتی دەردەخات. شتەکان هەڵبگرە، دایانبنێ و بیانجووڵێنە بە وردییەکی سەرسوڕهێنەر هەر لە یەکەم هەوڵتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5a9a586be99851804bda3fdc4588c0d988f508bf9f0ca223613878f13e6d3b48",
+  "en": "Precision in Every Movement",
+  "ar": "دقة في كل حركة",
+  "ckb": "وردی لە هەموو جووڵەیەکدا",
+  "kind": "block_title"
+ },
+ {
+  "h": "5bc1716fdaa4f1ac2107fe83d0da971f5de5591e9b8ea92c099cd544a02b42b0",
+  "en": "Watch the L-ONE execute tasks with impressive agility. Its joints move smoothly, allowing for delicate maneuvers and accurate positioning. Each axis responds precisely, making it capable of handling a variety of small objects with confidence.",
+  "ar": "شاهد L-ONE ينفّذ المهام برشاقة مبهرة. تتحرك مفاصله بسلاسة، ما يتيح مناورات دقيقة وتموضعًا محكمًا. ويستجيب كل محور بدقة، ما يجعله قادرًا على التعامل مع مجموعة متنوعة من الأشياء الصغيرة بثقة.",
+  "ckb": "سەیری L-ONE بکە کە بە چالاکییەکی سەرسوڕهێنەر ئەرکەکان جێبەجێ دەکات. جومگەکانی بە نەرمی دەجووڵێن، کە ڕێگە بە جووڵەی ناسک و دانانی ورد دەدات. هەر تەوەرێک بە وردی وەڵام دەداتەوە، کە وای لێدەکات بە متمانەوە مامەڵە لەگەڵ جۆرەها شتی بچووک بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b0c42de6b7e451df09be79e8f59384d0e7fe33b33fc433d433ba591aceeb205b",
+  "en": "Choose from two remote controls",
+  "ar": "اختر من بين جهازَي تحكم عن بُعد",
+  "ckb": "لە نێوان دوو ڕیمۆت کۆنترۆڵ هەڵبژێرە",
+  "kind": "block_title"
+ },
+ {
+  "h": "4a9c79bef3f44e28a15b0b6f818fae2022f7d7b1459a28c4f0060a1b9a7e41dd",
+  "en": "Pick the remote that fits your style. Whether you prefer a classic joystick feel for precise movements or a more lightweight option, you've got choices. Control the L-ONE exactly how you like it.",
+  "ar": "اختر جهاز التحكم الذي يناسب أسلوبك. سواء كنت تفضّل إحساس عصا التحكم الكلاسيكية للحركات الدقيقة أو خيارًا أخف وزنًا، فالخيارات أمامك. تحكّم في L-ONE تمامًا كما تحب.",
+  "ckb": "ئەو ڕیمۆتە هەڵبژێرە کە لەگەڵ شێوازەکەتدا دەگونجێت. جا هەستی جۆیستیکی کلاسیکت بۆ جووڵەی ورد پێ باشتر بێت یان بژاردەیەکی سووکتر، چەند هەڵبژاردەیەکت لەبەردەستە. کۆنترۆڵی L-ONE بکە هەر وەک خۆت حەزی لێدەکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b9cf6f49e213c862503fcc15f50bec7361f913674597b9bf6da3f6dfb848abbf",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Victorian Clock Tower - A Book Nook Timepiece. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Victorian Clock Tower - A Book Nook Timepiece يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Victorian Clock Tower - A Book Nook Timepiece بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "50d42cdc0e799af73f4931795e5c18d14be8d4bd05c8625cfe5c03d05f065c38",
+  "en": "To download the model files please visit the Victorian Clock Tower - A Book Nook Timepiece on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Victorian Clock Tower - A Book Nook Timepiece على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Victorian Clock Tower - A Book Nook Timepiece لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "df0bf19bd787bdf95c45ace0e1cb719beb7c76d019c9cc56602d3281a6f3acea",
+  "en": "The Cryptatrope: A Sci-Fi Journey Through Light and Geometry",
+  "ar": "جهاز Cryptatrope: رحلة خيال علمي عبر الضوء والهندسة",
+  "ckb": "ئامێری Cryptatrope: گەشتێکی زانستی-خەیاڵی بە ناو ڕووناکی و ئەندازەدا",
+  "kind": "block_title"
+ },
+ {
+  "h": "3466d987aaf4f1f26619e34cd489dfbe50583b62210e3e4eb7aa02a6221e96bc",
+  "en": "Long-hidden secrets await in this one-of-a-kind sci-fi adventure for makers. The cryptatrope is an original 3D-printed device that reveals hidden animations and messages using only geometry, motion, and light. Your journey unfolds across three chapters, beginning with printing the base device and decoding a message sent from the past.",
+  "ar": "أسرار ظلّت مخفية طويلًا تنتظرك في مغامرة الخيال العلمي الفريدة هذه المخصّصة للصنّاع. جهاز Cryptatrope جهاز أصلي مطبوع (3D-printed) يكشف رسومًا متحركة ورسائل مخفية باستخدام الهندسة والحركة والضوء فقط. تتكشّف رحلتك عبر ثلاثة فصول، تبدأ بطباعة الجهاز الأساسي وفكّ شيفرة رسالة مُرسلة من الماضي.",
+  "ckb": "نهێنییە ماوە درێژ شاراوەکان لەم سەرکێشییە زانستی-خەیاڵییە بێهاوتایەدا بۆ دروستکەران چاوەڕێت دەکەن. ئامێری Cryptatrope ئامێرێکی ڕەسەنی چاپکراوە (3D-printed) کە تەنها بە بەکارهێنانی ئەندازە، جووڵە و ڕووناکی وێنەی جووڵاو و پەیامی شاراوە ئاشکرا دەکات. گەشتەکەت بە درێژایی سێ بەش دەردەکەوێت، بە چاپکردنی ئامێرە بنەڕەتییەکە و کردنەوەی کۆدی پەیامێک دەست پێدەکات کە لە ڕابردووەوە نێردراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c67275c45a13e15cb6156ae79763576e5857c4bb203788780767c63e03d8a0ed",
+  "en": "Each recovered secret unlocks the next set of files, revealing new optical upgrades and deeper layers of the story. By the end, you will have built a collection of three naked-eye illusions, culminating in a stereoscopic 3D “mechanical hologram.”",
+  "ar": "يفتح كل سرّ تستعيده المجموعة التالية من الملفات، كاشفًا عن ترقيات بصرية جديدة وطبقات أعمق من القصة. وفي النهاية، ستكون قد بنيت مجموعة من ثلاث خدع بصرية تُرى بالعين المجردة، تتوَّج بـ«هولوغرام ميكانيكي» مجسّم 3D.",
+  "ckb": "هەر نهێنییەک کە دەیدۆزیتەوە کۆمەڵە فایلی داهاتوو دەکاتەوە، و نوێکردنەوەی ئۆپتیکیی نوێ و چینی قووڵتری چیرۆکەکە ئاشکرا دەکات. لە کۆتاییدا، کۆمەڵەیەک لە سێ فێڵی بینایی بە چاوی ئاسایی دروست کردووە، کە بە «هۆلۆگرامێکی میکانیکیی» ستێریۆسکۆپیی 3D کۆتایی دێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f63c815b0f8c8327fc3c29c7145b811747d279837859793595f05c29e0370ebf",
+  "en": "“This is truly a groundbreaking concept and prop that we haven't seen used anywhere else in the puzzle realm.”- ESCAPETHEROOMers",
+  "ar": "“هذه حقًا فكرة وقطعة رائدة لم نرَ استخدامًا لها في أي مكان آخر في عالم الألغاز.” - ESCAPETHEROOMers",
+  "ckb": "“ئەمە بەڕاستی بیرۆکە و ئامرازێکی پێشەنگە کە لە هیچ شوێنێکی تری جیهانی مەتەڵەکاندا نەمانبینیوە بەکاربهێنرێت.” - ESCAPETHEROOMers",
+  "kind": "block_line"
+ },
+ {
+  "h": "c865ebb3052c863b4aea0f38f327e5522d9da1516fb3ac5d9d6b77e50cc74dc8",
+  "en": "Beginner",
+  "ar": "مبتدئ",
+  "ckb": "دەستپێکەر",
+  "kind": "block_line"
+ },
+ {
+  "h": "b68ca0811f132f73edc68e9d3bebb288ef036c1fef8aabe6d2c63a2b6bfa859c",
+  "en": "Years",
+  "ar": "سنة",
+  "ckb": "ساڵ",
+  "kind": "block_line"
+ },
+ {
+  "h": "5c25946ebd5f27198f547ef00b2abd2c14c7efccb6b141d8e13a72aa64a5db77",
+  "en": "The Situation",
+  "ar": "الموقف",
+  "ckb": "دۆخەکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "8b3cfcd3094f6f40cf9ac9b3ac40194a1dd995237bbfe5ffbd23fbb2e84c8e23",
+  "en": "Mike is trapped in the year 1503. To ensure his return, while keeping his time travel secrets from being revealed too soon, he invented a device with a message that could only be decoded once 3D printing technology existed. The blueprints are now in your hands.",
+  "ar": "مايك عالق في عام 1503. ولضمان عودته، مع الحفاظ على أسرار سفره عبر الزمن من الانكشاف قبل الأوان، اخترع جهازًا يحمل رسالة لا يمكن فكّ شيفرتها إلا بعد ظهور تقنية الطباعة 3D. والمخططات الآن بين يديك.",
+  "ckb": "مایک لە ساڵی 1503 گیری خواردووە. بۆ دڵنیابوون لە گەڕانەوەی، و بۆ ئەوەی نهێنییەکانی گەشتی بە ناو کاتدا زوو ئاشکرا نەبن، ئامێرێکی داهێنا کە پەیامێکی تێدایە و تەنها دوای پەیدابوونی تەکنەلۆژیای چاپی 3D کۆدەکەی دەکرێتەوە. ئێستا نەخشەکان لە دەستی تۆدان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "65c0713138df14d77fce8fbb3d327e17392555f2aff489aefb79383056d1f427",
+  "en": "Print → Decode → Advance",
+  "ar": "اطبع ← فكّ الشيفرة ← تقدّم",
+  "ckb": "چاپ بکە ← کۆدەکە بکەرەوە ← بچۆ پێشەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "89068712c34034f012ab0f931d7169ec3df91328ab97c4e1128d235b20b45845",
+  "en": "Print the base device. Spin it. Look through it. Decode and transmit the message through the web portal to unlock the next chapter’s downloads. Each step reveals more intricate designs and new pieces of the story.",
+  "ar": "اطبع الجهاز الأساسي. أدِره. انظر من خلاله. فكّ شيفرة الرسالة وأرسلها عبر البوابة الإلكترونية لفتح تنزيلات الفصل التالي. وتكشف كل خطوة عن تصاميم أكثر تعقيدًا وأجزاء جديدة من القصة.",
+  "ckb": "ئامێرە بنەڕەتییەکە چاپ بکە. بیسووڕێنە. لە ناویەوە سەیر بکە. کۆدی پەیامەکە بکەرەوە و لە ڕێگەی دەروازە ئەلیکترۆنییەکەوە بینێرە بۆ کردنەوەی داگرتنەکانی بەشی داهاتوو. هەر هەنگاوێک دیزاینی ئاڵۆزتر و پارچەی نوێی چیرۆکەکە ئاشکرا دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b7ac362084eb7afaeef6fa1867a06ba1864e6bf7990da3c11d3b5e9e31839f8c",
+  "en": "Collect Tokens",
+  "ar": "اجمع الرموز التذكارية",
+  "ckb": "نیشانەکان کۆبکەرەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "152cbf4208a4065070384fcca557aee8e441359849b7442a93f4bd6263ddd3d0",
+  "en": "Complete each chapter to unlock a commemorative token, including a special MakerChip at the end of the full adventure. Display these optional prints in the deluxe stand or relic holder as a record of your progress.",
+  "ar": "أكمل كل فصل لفتح رمز تذكاري، بما في ذلك رقاقة MakerChip خاصة في نهاية المغامرة كاملة. واعرض هذه المطبوعات الاختيارية على الحامل الفاخر أو حامل القطع الأثرية سجلًّا لتقدّمك.",
+  "ckb": "هەر بەشێک تەواو بکە بۆ کردنەوەی نیشانەیەکی یادگاری، لەوانە نیشانەیەکی تایبەتی MakerChip لە کۆتایی تەواوی سەرکێشییەکەدا. ئەم چاپکراوە ئارەزوومەندانانە لەسەر وەستێنەرە نایابەکە یان هەڵگری شوێنەوارەکە پیشان بدە وەک تۆمارێکی پێشکەوتنەکەت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1177c8c665b73860e54406ae29be4f76bcd7e6fbeb93c14894955a84cee2b569",
+  "en": "A Conversation Starter",
+  "ar": "قطعة تفتح باب الحديث",
+  "ckb": "دەستپێکی گفتوگۆیەک",
+  "kind": "block_title"
+ },
+ {
+  "h": "aa7e96daeccd9ff4f13cd4d6a6470f6572220c59a4b3a6b0f4e9ba7709cda66c",
+  "en": "Unlock a bonus planetary cryptatrope at the end of the adventure. With no text or instructions, it becomes a pure visual artifact to spark the curiosity of any visitors.",
+  "ar": "افتح جهاز cryptatrope كوكبيًا إضافيًا في نهاية المغامرة. ومن دون أي نص أو تعليمات، يصبح قطعة بصرية خالصة تثير فضول أي زائر.",
+  "ckb": "لە کۆتایی سەرکێشییەکەدا ئامێرێکی هەسارەییی زیادەی cryptatrope بکەرەوە. بەبێ هیچ دەق یان ڕێنماییەک، دەبێتە پارچەیەکی بینراوی پەتی کە کونجکۆڵیی هەر میوانێک دەوروژێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "892c1fcc1bb8427666f974196d6d4c4fd6dbc03cf0006afc5a1945ae3881fd72",
+  "en": "1. Get the model files",
+  "ar": "1. احصل على ملفات النموذج",
+  "ckb": "1. فایلەکانی مۆدێل بەدەست بهێنە",
+  "kind": "block_title"
+ },
+ {
+  "h": "c4918ee141b47b4502afaac9c457523c1b87e9b3b7e53f75ccdfd544b6e16cc1",
+  "en": "Back the project on MakerWorld to access Chapter 1.",
+  "ar": "ادعم المشروع على MakerWorld للوصول إلى الفصل 1.",
+  "ckb": "پشتگیریی پڕۆژەکە لە MakerWorld بکە بۆ دەستگەیشتن بە بەشی 1.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b4f66e5c22137f6ccb8bab439f8d13a0640da2b76b940cb37c7345e67f97db37",
+  "en": "Watch the video and download the first set of models.",
+  "ar": "شاهد الفيديو ونزّل المجموعة الأولى من النماذج.",
+  "ckb": "سەیری ڤیدیۆکە بکە و یەکەم کۆمەڵەی مۆدێلەکان دابگرە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5314894000c8c288688f8d16894c2f8eee15c7b42ad046d4ce8ef37a1cf113bd",
+  "en": "2. Print, assemble, and decode",
+  "ar": "2. اطبع وجمّع وفكّ الشيفرة",
+  "ckb": "2. چاپ بکە، پێکەوەی بنێ و کۆدەکە بکەرەوە",
+  "kind": "block_title"
+ },
+ {
+  "h": "676f397277ce5773528104e18d33ac6696c5c6a25d607cf1ed1ad803417edcb5",
+  "en": "Print and assemble the model.",
+  "ar": "اطبع النموذج وجمّعه.",
+  "ckb": "مۆدێلەکە چاپ بکە و پێکەوەی بنێ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6a32c3f0c06b4101e5a61bf20b97a58195a20869046ad63db7c5c65a39864dfb",
+  "en": "Follow the viewing instructions in Chapter 1 to reveal the hidden message.",
+  "ar": "اتبع تعليمات المشاهدة في الفصل 1 للكشف عن الرسالة المخفية.",
+  "ckb": "ڕێنماییەکانی سەیرکردن لە بەشی 1 جێبەجێ بکە بۆ ئاشکراکردنی پەیامە شاراوەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "767a5c7f7bfa23fff8adb8b365273231bb7935a94c5d79375626d7e0d495fb9b",
+  "en": "3. Upload the message to unlock subsequent storylines",
+  "ar": "3. ارفع الرسالة لفتح أحداث القصة التالية",
+  "ckb": "3. پەیامەکە باربکە بۆ کردنەوەی بەشەکانی دواتری چیرۆکەکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "6f17f68888726251b85142577c639a12c24a063a1ebd5aba3b241c2c15e9c5ad",
+  "en": "Enter the decoded message at a dedicated web portal in Chapter 1 to unlock the next stage of the adventure.",
+  "ar": "أدخل الرسالة بعد فكّ شيفرتها في بوابة إلكترونية مخصّصة في الفصل 1 لفتح المرحلة التالية من المغامرة.",
+  "ckb": "پەیامەکە دوای کردنەوەی کۆدەکەی لە دەروازەیەکی ئەلیکترۆنیی تایبەت لە بەشی 1 بنووسە بۆ کردنەوەی قۆناغی داهاتووی سەرکێشییەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ef83fdc3d8ac9bc67a56e7e78dde412d98337bfb0c74ab2964cf1229128bc1d4",
+  "en": "Repeat the process to continue through all three chapters, each with its own video and model files to download.",
+  "ar": "كرّر العملية لمتابعة الفصول الثلاثة كلها، ولكل فصل فيديو خاص وملفات نماذج للتنزيل.",
+  "ckb": "پرۆسەکە دووبارە بکەرەوە بۆ بەردەوامبوون بە هەر سێ بەشەکەدا، کە هەر یەکەیان ڤیدیۆ و فایلی مۆدێلی تایبەت بە خۆی هەیە بۆ داگرتن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "26ac7374e9e773cb32df1a9e45628753a736f580c1acf3617f9f381b450bf67a",
+  "en": "This product is intended for ages 12 and up. Users under the age of 12 must be under direct adult supervision throughout use.",
+  "ar": "هذا المنتج مخصّص للأعمار من 12 عامًا فما فوق. ويجب أن يكون المستخدمون دون سن 12 عامًا تحت إشراف مباشر من شخص بالغ طوال فترة الاستخدام.",
+  "ckb": "ئەم بەرهەمە بۆ تەمەنی 12 ساڵ و سەرووترە. بەکارهێنەرانی خوار تەمەنی 12 ساڵ پێویستە لە ماوەی بەکارهێناندا لە ژێر چاودێریی ڕاستەوخۆی کەسێکی گەورەدا بن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f942801a7cf30184da873348639ea81ceccd88cc642f796ff34d80774fee7952",
+  "en": "Please remember to turn off the LED Lights after you're done playing with this model.",
+  "ar": "يرجى تذكّر إطفاء أضواء LED بعد الانتهاء من اللعب بهذا النموذج.",
+  "ckb": "تکایە لەبیرت بێت گڵۆپەکانی LED بکوژێنیتەوە دوای تەواوبوونی یاریکردن بەم مۆدێلە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6d9241332948ff2162fec4bea5265b0072f4edda605eba85be2fe6249f609b8d",
+  "en": "A one-of-a-kind sci-fi adventure for makers, where a 3D-printed device reveals hidden messages and animations through geometry, motion, and light. Print, decode, and transmit clues to unlock new optical illusion designs and progress deeper into the three-chapter story.",
+  "ar": "مغامرة خيال علمي فريدة للصنّاع، يكشف فيها جهاز مطبوع (3D-printed) رسائل ورسومًا متحركة مخفية عبر الهندسة والحركة والضوء. اطبع وفكّ الشيفرات وأرسل الأدلّة لفتح تصاميم جديدة للخدع البصرية والتعمّق أكثر في القصة ذات الفصول الثلاثة.",
+  "ckb": "سەرکێشییەکی زانستی-خەیاڵیی بێهاوتا بۆ دروستکەران، کە تێیدا ئامێرێکی چاپکراو (3D-printed) پەیام و وێنەی جووڵاوی شاراوە لە ڕێگەی ئەندازە، جووڵە و ڕووناکییەوە ئاشکرا دەکات. چاپ بکە، کۆدەکان بکەرەوە و سەرەداوەکان بنێرە بۆ کردنەوەی دیزاینی نوێی فێڵی بینایی و چوونە قووڵایی زیاتری چیرۆکە سێ بەشییەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "11186271fa2f53f02332b388e00cb7dd276efd40af5a0a151f6c4d70ffae26b4",
+  "en": "Bring Your Miniatures to Life — Without Wires.",
+  "ar": "امنح مجسّماتك المصغّرة الحياة — من دون أسلاك.",
+  "ckb": "ژیان بە مینیاتۆرەکانت ببەخشە — بەبێ وایەر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3d9bf4893501314d65098359e38ccd0ccf2e344a379eecccba6673e3b27f60d7",
+  "en": "Traditional miniature lighting often requires visible wires, complex routing, and limited placement options. The Wireless Inductive Lighting Kit delivers power wirelessly through electromagnetic induction, allowing your models to light up naturally and cleanly — without exposed cables. Perfect for dioramas, vehicles, architectural scenes, and creative DIY projects.",
+  "ar": "غالبًا ما تتطلب إضاءة المجسّمات المصغّرة التقليدية أسلاكًا ظاهرة وتمديدات معقّدة وخيارات محدودة لأماكن التركيب. أما طقم Wireless Inductive Lighting Kit فيوصل الطاقة لاسلكيًا عبر الحثّ الكهرومغناطيسي، لتضيء نماذجك بشكل طبيعي ونظيف — من دون كابلات مكشوفة. مثالي للديوراما والمركبات والمشاهد المعمارية ومشاريع DIY الإبداعية.",
+  "ckb": "ڕووناککردنەوەی مینیاتۆری نەریتی زۆرجار پێویستی بە وایەری دیار، ڕاکێشانی ئاڵۆز و بژاردەی سنووردار بۆ شوێنی دانان هەیە. کیتی Wireless Inductive Lighting Kit وزە بە شێوەی بێتەل لە ڕێگەی ئیندەکشنی ئەلیکترۆموگناتیسییەوە دەگەیەنێت، و ڕێگە دەدات مۆدێلەکانت بە شێوەیەکی سروشتی و پاک ڕووناک ببنەوە — بەبێ کێبڵی ئاشکرا. گونجاوە بۆ دیۆراما، ئۆتۆمبێل، دیمەنی تەلارسازی و پڕۆژە داهێنەرانەکانی DIY.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9dd2e42778b8fd2b8a22e0f8f9b460cca1d242f74be1cc9dea841b04153d747b",
+  "en": "Note. Click the model images to explore the full project details on MakerWorld and build your own miniature scene.",
+  "ar": "ملاحظة: انقر على صور النماذج لاستكشاف تفاصيل المشروع كاملة على MakerWorld وبناء مشهدك المصغّر الخاص.",
+  "ckb": "تێبینی: کلیک لە وێنەکانی مۆدێل بکە بۆ بینینی هەموو وردەکارییەکانی پڕۆژەکە لە MakerWorld و دروستکردنی دیمەنی مینیاتۆریی خۆت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a1fb7e200cc9f48ec4386fe84155b56b581c70a7aa05f695088df8c089e49e3e",
+  "en": "Create Immersive Wireless Lighting Effects",
+  "ar": "اصنع تأثيرات إضاءة لاسلكية غامرة",
+  "ckb": "کاریگەریی ڕووناکیی بێتەلی سەرنجڕاکێش دروست بکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "866ec99c0bb7c841bd7e02ee963bbaaae1eac6b038579f3d1d3b9559ee331482",
+  "en": "Automatic Inductive Activation",
+  "ar": "تشغيل تلقائي بالحثّ",
+  "ckb": "چالاکبوونی خۆکار بە ئیندەکشن",
+  "kind": "block_line"
+ },
+ {
+  "h": "2aafc88c73f121328657bb5655224f586674229a5e5e0e1f08b4c036541add59",
+  "en": "Lights turn on automatically when entering the inductive power area. Create immersive interactive scenes with a more realistic presentation experience.",
+  "ar": "تضيء الأضواء تلقائيًا عند دخولها منطقة الطاقة الحثّية. اصنع مشاهد تفاعلية غامرة بتجربة عرض أكثر واقعية.",
+  "ckb": "گڵۆپەکان بە شێوەی خۆکار هەڵدەبن کاتێک دەچنە ناو ناوچەی وزەی ئیندەکشنەوە. دیمەنی کارلێککەری سەرنجڕاکێش دروست بکە بە ئەزموونێکی پیشاندانی ڕاستەقینەتر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6ea36f0be163acbeeff16e955965caa1dafdb251a14184cc7b511b3efcf2bbe5",
+  "en": "One Button, Multiple Lighting Modes",
+  "ar": "زر واحد وأوضاع إضاءة متعددة",
+  "ckb": "یەک دوگمە، چەندین دۆخی ڕووناکی",
+  "kind": "block_line"
+ },
+ {
+  "h": "c70f37a66e8c1fed9f9722baaa4f7c3ac72cf6287bcd466f65269081b45c2db5",
+  "en": "Easily switch between different lighting effects using the wireless controller board. Choose between: slow flash mode, fast flash mode, always on mode, off mode.",
+  "ar": "بدّل بسهولة بين تأثيرات الإضاءة المختلفة باستخدام لوحة التحكم اللاسلكية. اختر من بين: وضع الوميض البطيء، ووضع الوميض السريع، ووضع التشغيل الدائم، ووضع الإيقاف.",
+  "ckb": "بە ئاسانی لە نێوان کاریگەرییە جیاوازەکانی ڕووناکیدا بگۆڕە بە بەکارهێنانی بۆردی کۆنترۆڵی بێتەل. لە نێوان ئەمانە هەڵبژێرە: دۆخی ترووسکەی هێواش، دۆخی ترووسکەی خێرا، دۆخی هەمیشە هەڵکراو، دۆخی کوژاوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8dbd6598496fc458f45bcbe43b348c99118f32f49d1846e2425e5a058ab47da6",
+  "en": "Perfect for vehicle headlights, architectural lighting, decorative lanterns, and interactive miniature displays — allowing you to quickly adapt your lighting setup for different scenes and effects.",
+  "ar": "مثالي للمصابيح الأمامية للمركبات والإضاءة المعمارية والفوانيس الزخرفية وعروض المجسّمات المصغّرة التفاعلية — ما يتيح لك تكييف إعداد الإضاءة بسرعة مع المشاهد والتأثيرات المختلفة.",
+  "ckb": "گونجاوە بۆ گڵۆپی پێشەوەی ئۆتۆمبێل، ڕووناکیی تەلارسازی، فانۆسی ڕازاندنەوە و پیشاندانی مینیاتۆریی کارلێککەر — کە ڕێگەت پێدەدات بە خێرایی ڕێکخستنی ڕووناکییەکەت بۆ دیمەن و کاریگەرییە جیاوازەکان بگونجێنیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c1879525c75cb5c2f2f3bcd2db2554aeca020ede722bdbe6949b8f5f51d885d2",
+  "en": "How It Works",
+  "ar": "طريقة العمل",
+  "ckb": "چۆن کار دەکات",
+  "kind": "block_title"
+ },
+ {
+  "h": "e8bf2ab4b4642c6b27be2f5df7cb133042d0768f78f9635ebd29f70f647ce311",
+  "en": "How Wireless Inductive Lighting Works",
+  "ar": "كيف تعمل الإضاءة الحثّية اللاسلكية",
+  "ckb": "ڕووناکیی ئیندەکشنیی بێتەل چۆن کار دەکات",
+  "kind": "block_line"
+ },
+ {
+  "h": "a935f316c1642a12614cee1c2f3cc1e67e5693a8c3ed07c894babc78627cae84",
+  "en": "Choose Your Lighting Setup",
+  "ar": "اختر إعداد الإضاءة المناسب لك",
+  "ckb": "ڕێکخستنی ڕووناکییەکەت هەڵبژێرە",
+  "kind": "block_line"
+ },
+ {
+  "h": "f8c5b9ef3556f077847908aff3a4bdc4435ac202077861a69380a2a2939c3821",
+  "en": "Two wireless lighting solutions designed for different miniature lighting applications.",
+  "ar": "حلّان للإضاءة اللاسلكية مصمّمان لاستخدامات مختلفة في إضاءة المجسّمات المصغّرة.",
+  "ckb": "دوو چارەسەری ڕووناکیی بێتەل کە بۆ بەکارهێنانە جیاوازەکانی ڕووناککردنەوەی مینیاتۆر دیزاین کراون.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b0a92443f9fedd27e6abb935dfe9a498bf9ed92e59a949cbf9cd8e240840cefa",
+  "en": "Choose between built-in inductive LED lighting or expandable COB light strip setups depending on your project needs.",
+  "ar": "اختر بين إضاءة LED حثّية مدمجة أو إعدادات شرائط إضاءة COB قابلة للتوسعة حسب احتياجات مشروعك.",
+  "ckb": "بە پێی پێداویستییەکانی پڕۆژەکەت، لە نێوان ڕووناکیی ئیندەکشنیی ناوخۆیی بە LED یان ڕێکخستنی فراوانکراوی شریتی ڕووناکیی COB هەڵبژێرە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "45aaacba7ea1a668da79cff4034c6573c6ab9399bb868b878f7e844fd0b6ea75",
+  "en": "Option",
+  "ar": "الخيار",
+  "ckb": "بژاردە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0a071793aabbd08a0490e585c3d9460a9a9d70287261e0a96a17182744a2f725",
+  "en": "Option A Inductive LED Lights",
+  "ar": "الخيار A: أضواء LED حثّية",
+  "ckb": "بژاردەی A: گڵۆپی ئیندەکشنیی LED",
+  "kind": "block_cell"
+ },
+ {
+  "h": "a19bf9b602c42e7d3c6b15fd415759c4bfcf16e2fdb02bb6019b9410021017b1",
+  "en": "Option B COB Light Strip Setup",
+  "ar": "الخيار B: إعداد شريط إضاءة COB",
+  "ckb": "بژاردەی B: ڕێکخستنی شریتی ڕووناکیی COB",
+  "kind": "block_cell"
+ },
+ {
+  "h": "22967648691b0b8c54e7b4023e8c08ea02f97e33063042966f0a4b9fe36d76f8",
+  "en": "Best For",
+  "ar": "الأنسب لـ",
+  "ckb": "گونجاوترینە بۆ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f0d9562a7fe1ef863374bc494122a8c0d755c97ed269271df27f09ea8ecbb84d",
+  "en": "Small miniatures Vehicle headlights Decorative lighting Compact scenes",
+  "ar": "المجسّمات المصغّرة الصغيرة، المصابيح الأمامية للمركبات، الإضاءة الزخرفية، المشاهد المدمجة",
+  "ckb": "مینیاتۆری بچووک، گڵۆپی پێشەوەی ئۆتۆمبێل، ڕووناکیی ڕازاندنەوە، دیمەنی بچووک",
+  "kind": "block_cell"
+ },
+ {
+  "h": "67b54470ff09db5933912fb42574bc55220c14c7ddf48ea7ed8f5e32b6f63a0d",
+  "en": "Large illuminated areas Ambient lighting Scene base lighting Architectural models",
+  "ar": "المساحات المضاءة الكبيرة، الإضاءة المحيطة، إضاءة قاعدة المشهد، النماذج المعمارية",
+  "ckb": "ڕووبەری گەورەی ڕووناککراو، ڕووناکیی دەوروبەر، ڕووناکیی بنکەی دیمەن، مۆدێلی تەلارسازی",
+  "kind": "block_cell"
+ },
+ {
+  "h": "b8185e959982465e873a0cd447eef709550f386761138cc4825bcf9a54982e93",
+  "en": "Required Products",
+  "ar": "المنتجات المطلوبة",
+  "ckb": "بەرهەمە پێویستەکان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "8c9569db2043d98a81bb06d75932458703a75c14060bee34eccfcdde9a27848e",
+  "en": "✔ Wireless Inductive Coil Kit (Includes 20 pcs LED lights) CD54 Size : Red / Green / Blue / Warm White / Cold White (2 pcs per color, 10 pcs total) CD43 Size : Red / Green / Blue / Warm White / Cold White (2 pcs per color, 10 pcs total)",
+  "ar": "✔ طقم Wireless Inductive Coil Kit (يتضمن 20 قطعة من أضواء LED) مقاس CD54: أحمر / أخضر / أزرق / أبيض دافئ / أبيض بارد (2 قطعة لكل لون، 10 قطع إجمالًا) مقاس CD43: أحمر / أخضر / أزرق / أبيض دافئ / أبيض بارد (2 قطعة لكل لون، 10 قطع إجمالًا)",
+  "ckb": "✔ کیتی Wireless Inductive Coil Kit (20 دانە گڵۆپی LED لەخۆ دەگرێت) قەبارەی CD54: سوور / سەوز / شین / سپیی گەرم / سپیی سارد (2 دانە بۆ هەر ڕەنگێک، کۆی گشتی 10 دانە) قەبارەی CD43: سوور / سەوز / شین / سپیی گەرم / سپیی سارد (2 دانە بۆ هەر ڕەنگێک، کۆی گشتی 10 دانە)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "928ece2209331873399ce89d332b8e00131aab358ed15768428600993ed3525b",
+  "en": "✔ Wireless Inductive Coil Kit ✔ Receiver Module (15mm / 50mm) ✔ COB Light Strip",
+  "ar": "✔ طقم Wireless Inductive Coil Kit ✔ وحدة استقبال (15mm / 50mm) ✔ شريط إضاءة COB",
+  "ckb": "✔ کیتی Wireless Inductive Coil Kit ✔ مۆدیولی وەرگر (15mm / 50mm) ✔ شریتی ڕووناکیی COB",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9ab29256868b41c81a7edf852c345d6fe0610d7809e5608a6b19ff2b9f9ef94b",
+  "en": "Includes wireless receiving functionality built directly into the LEDs. No additional receiver module required. Optional: add more LED lights (CD54 / CD43) to create richer and more immersive miniature scenes.",
+  "ar": "تتضمن وظيفة الاستقبال اللاسلكي مدمجة مباشرة في مصابيح LED. لا حاجة إلى وحدة استقبال إضافية. اختياري: أضف المزيد من أضواء LED (CD54 / CD43) لإنشاء مشاهد مصغّرة أغنى وأكثر انغماسًا.",
+  "ckb": "گڵۆپەکانی LED خۆیان تایبەتمەندیی وەرگرتنی بێتەلیان تێدا دانراوە. پێویستی بە مۆدیولی وەرگری زیادە نییە. ئارەزوومەندانە: گڵۆپی زیاتری LED (CD54 / CD43) زیاد بکە بۆ دروستکردنی دیمەنی مینیاتۆریی دەوڵەمەندتر و سەرنجڕاکێشتر.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "77cb9c71425afdba1c86806eba737b11d0fdadaf64f3a86d972719b3bf04276e",
+  "en": "COB light strips do not contain built-in wireless receiving functionality. A receiver module is required for operation.",
+  "ar": "لا تحتوي شرائط إضاءة COB على وظيفة استقبال لاسلكي مدمجة. ويلزم وجود وحدة استقبال لتشغيلها.",
+  "ckb": "شریتەکانی ڕووناکیی COB تایبەتمەندیی وەرگرتنی بێتەلی ناوخۆییان نییە. بۆ کارکردنیان مۆدیولی وەرگر پێویستە.",
+  "kind": "block_cell"
+ },
+ {
+  "h": "bfb3f541276a675a4bfdd96ca4c88b27547e7a60855b773eddfd61de85798ed1",
+  "en": "Receiver Modules for Different Installation Needs",
+  "ar": "وحدات استقبال لاحتياجات تركيب مختلفة",
+  "ckb": "مۆدیولی وەرگر بۆ پێداویستییە جیاوازەکانی دامەزراندن",
+  "kind": "block_line"
+ },
+ {
+  "h": "9764db59ae395be1eb11c47a09968be227f519c965ada0e22c8302d9b9bd3d7a",
+  "en": "For COB Light Strip Setup. Choose between compact or high-output receiver modules depending on the size and brightness requirements of your scene.",
+  "ar": "لإعداد شريط إضاءة COB. اختر بين وحدات استقبال مدمجة أو عالية الخرج حسب متطلبات الحجم والسطوع لمشهدك.",
+  "ckb": "بۆ ڕێکخستنی شریتی ڕووناکیی COB. بە پێی پێداویستییەکانی قەبارە و ڕووناکیی دیمەنەکەت، لە نێوان مۆدیولی وەرگری بچووک یان بە دەرچوونی بەرز هەڵبژێرە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "22fc752d2a80986a90d2f84b7d1a47443a92a19fa34cf1bf91fe8d2a92e43349",
+  "en": "The 15mm receiver is designed for tight miniature spaces, while the 50mm version provides stronger output for larger lighting setups.",
+  "ar": "صُمّم مستقبِل 15mm للمساحات الضيقة في المجسّمات المصغّرة، بينما يوفّر إصدار 50mm خرجًا أقوى لإعدادات الإضاءة الأكبر.",
+  "ckb": "وەرگری 15mm بۆ شوێنە تەسکەکانی مینیاتۆر دیزاین کراوە، لە کاتێکدا وەشانی 50mm دەرچوونێکی بەهێزتر بۆ ڕێکخستنە گەورەترەکانی ڕووناکی دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8e01a861a07bcf6dfe26d3336717ce3a5d4c827d4c512ba7ac3800079803ff47",
+  "en": "Documentations",
+  "ar": "الوثائق",
+  "ckb": "بەڵگەنامەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "7863b9ee9c6e64ceeb9fc2c2e5fbab3c97c20166b317f9fb8aa4b43a7441083e",
+  "en": "Wireless Induction Transmitter Coil",
+  "ar": "ملف الإرسال الحثّي اللاسلكي",
+  "ckb": "کۆیلی ناردنی ئیندەکشنیی بێتەل",
+  "kind": "block_line"
+ },
+ {
+  "h": "2b5f88ba8b52c4471260ff9d6238e245ec57becd0b15f34e0543beff7f9ad78f",
+  "en": "Wireless Induction Control Board",
+  "ar": "لوحة التحكم الحثّية اللاسلكية",
+  "ckb": "بۆردی کۆنترۆڵی ئیندەکشنیی بێتەل",
+  "kind": "block_line"
+ },
+ {
+  "h": "ec9198ec1a2f61a3c2f5541ea9388d6f89d7792f6f18b3a0c9be445fbddce962",
+  "en": "Wireless Inductive Coil LED Lights - CD54",
+  "ar": "أضواء LED بملف حثّي لاسلكي - CD54",
+  "ckb": "گڵۆپەکانی LED بە کۆیلی ئیندەکشنیی بێتەل - CD54",
+  "kind": "block_line"
+ },
+ {
+  "h": "15f4ebf54d72a62b4e752870885abddadf0e4dff67fb68938d92c7d1f295b0c7",
+  "en": "Wireless Inductive Coil LED Lights - CD43",
+  "ar": "أضواء LED بملف حثّي لاسلكي - CD43",
+  "ckb": "گڵۆپەکانی LED بە کۆیلی ئیندەکشنیی بێتەل - CD43",
+  "kind": "block_line"
+ },
+ {
+  "h": "24a5d98c423ff822b87dc7d8f8e72dd708ac33210af6ff648cd7e3a039b9f669",
+  "en": "Wireless Inductive Receiver Coil - 50mm",
+  "ar": "ملف الاستقبال الحثّي اللاسلكي - 50mm",
+  "ckb": "کۆیلی وەرگری ئیندەکشنیی بێتەل - 50mm",
+  "kind": "block_line"
+ },
+ {
+  "h": "29c6d8c7b0a3dda2d213cfe72eba37cc47504f68669d4d9b296fb289b751c10c",
+  "en": "Wireless Inductive Receiver Coil - 15mm",
+  "ar": "ملف الاستقبال الحثّي اللاسلكي - 15mm",
+  "ckb": "کۆیلی وەرگری ئیندەکشنیی بێتەل - 15mm",
+  "kind": "block_line"
+ },
+ {
+  "h": "739a0d1a7250e2eb74e3bb2563a1ce70173965619d8e1ef19f5a7dc45e641b0d",
+  "en": "The Wireless Induction Coil Lights feature built-in receivers for direct use.",
+  "ar": "تأتي أضواء الملف الحثّي اللاسلكي بمستقبِلات مدمجة للاستخدام المباشر.",
+  "ckb": "گڵۆپەکانی کۆیلی ئیندەکشنیی بێتەل وەرگری ناوخۆییان هەیە بۆ بەکارهێنانی ڕاستەوخۆ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "24f6e365ebeb33684beccde4665198d7b379e213cf4218f74c8356b6a176e77f",
+  "en": "The Receiver Coil is not included in the kit and must be purchased separately.",
+  "ar": "ملف الاستقبال غير مرفق في الطقم ويجب شراؤه بشكل منفصل.",
+  "ckb": "کۆیلی وەرگر لەگەڵ کیتەکەدا نییە و پێویستە بە جیا بکڕدرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "533db62c943848d01a21705358d8e912205b767e9ca50e2409b6f78e7f24de86",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Balloon Wind Spinner - LED VAWT . The filaments and AMS shown in the product images are for demonstration purposes only. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Balloon Wind Spinner - LED VAWT يعمل بكامل وظائفه. الفلامنت ووحدة AMS الظاهرة في صور المنتج هي لأغراض العرض فقط. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Balloon Wind Spinner - LED VAWT بە شێوەیەکی تەواو کارا پێویستن. فیلامێنتەکان و یەکەی AMS کە لە وێنەکانی بەرهەمەکەدا دەبینرێن تەنها بۆ نمایشکردنن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d0c81d70de8694f9ab17c88ce2cbff3b08b058402b941054921843064c34703c",
+  "en": "To download the model files please visit the Balloon Wind Spinner - LED VAWT on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Balloon Wind Spinner - LED VAWT على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Balloon Wind Spinner - LED VAWT لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a3ad3c3183209efb077cf2759318e84976a69efb3e40f174ab1d9c6aa64ee20f",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Oil City Memory Pumping unit，surface unit. The filaments and AMS shown in the product images are for demonstration purposes only. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Oil City Memory Pumping unit，surface unit يعمل بكامل وظائفه. الفلامنت ووحدة AMS الظاهرة في صور المنتج هي لأغراض العرض فقط. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Oil City Memory Pumping unit，surface unit بە شێوەیەکی تەواو کارا پێویستن. فیلامێنتەکان و یەکەی AMS کە لە وێنەکانی بەرهەمەکەدا دەبینرێن تەنها بۆ نمایشکردنن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1f5875fa42e06a65b5845dee17f85d4ae8abc50cf7d7611df45fdcac52eb3192",
+  "en": "To download the model files please visit the Oil City Memory Pumping unit，surface unit on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Oil City Memory Pumping unit，surface unit على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Oil City Memory Pumping unit，surface unit لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c0e7619914b2fd4952cc3e406c79cf546015ffb01d8fd7235150d66dd0e8bba9",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional OMMO Dartboard ring for Autodarts. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع OMMO Dartboard ring for Autodarts يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی OMMO Dartboard ring for Autodarts بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9bb743dce83327897bace8bbcd77cd8517b17c6aca53376e532e65270182c8b8",
+  "en": "To download the model files please visit the OMMO Dartboard ring for Autodarts on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة OMMO Dartboard ring for Autodarts على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی OMMO Dartboard ring for Autodarts لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2bad3e991a87058eb8944e059195d6e36c79a5677e4f674819c680f9d9eed91f",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Mount New 4-in-1 PTFE Adapter II H2C H2D H2S. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Mount New 4-in-1 PTFE Adapter II H2C H2D H2S يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Mount New 4-in-1 PTFE Adapter II H2C H2D H2S بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "72066bdf6494bd4be0b92d78b604ce39d59c0352a8fe2bcbe890c89cc6b84c68",
+  "en": "To download the model files please visit the Mount New 4-in-1 PTFE Adapter II H2C H2D H2S on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Mount New 4-in-1 PTFE Adapter II H2C H2D H2S على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Mount New 4-in-1 PTFE Adapter II H2C H2D H2S لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4fb4c6f38a7c723a79f35a986cf0a977a125d95b4a5a2f66de6b81d2555b5ba3",
+  "en": "Plates",
+  "ar": "صفيحة طباعة",
+  "ckb": "پلێتی چاپ",
+  "kind": "block_line"
+ },
+ {
+  "h": "49581d7c49196c862a43c2c3bf9d1ad9f2c1357c06ed1e5c2dbd63b16c8b102a",
+  "en": "Dynamic Movement & Unlocking",
+  "ar": "حركة ديناميكية وفتح للأقفال",
+  "ckb": "جووڵەی داینامیکی و کردنەوەی قفڵەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "bbb810098af31a4cdc49a84422e400ad4733e9a8faa52d67c7593f67b5b17acd",
+  "en": "Engage with the puzzle's moving parts. Rotate segments, slide hidden panels, and manipulate the ancient mechanisms. Every action brings you closer to the sword, eventually unlocking a hidden drawer — a special compartment where you can place a personal gift, message, or reward, turning the puzzle into a unique and memorable experience for friends and family.",
+  "ar": "تفاعل مع الأجزاء المتحركة في اللغز. أدِر الأجزاء، وحرّك الألواح المخفية، وتحكّم في الآليات القديمة. كل خطوة تقرّبك من السيف، حتى تفتح في النهاية درجًا مخفيًا — حجيرة خاصة يمكنك أن تضع فيها هدية شخصية أو رسالة أو مكافأة، لتحوّل اللغز إلى تجربة فريدة لا تُنسى للأصدقاء والعائلة.",
+  "ckb": "لەگەڵ پارچە جووڵاوەکانی مەتەڵەکە کارلێک بکە. بەشەکان بسووڕێنە، پانێڵە شاراوەکان بخزێنە و میکانیزمە کۆنەکان بجووڵێنە. هەر کردارێک نزیکترت دەکاتەوە لە شمشێرەکە، تا لە کۆتاییدا چەکمەجەیەکی شاراوە دەکەیتەوە — بەشێکی تایبەت کە دەتوانیت دیارییەکی کەسی، پەیامێک یان خەڵاتێکی تێدا دابنێیت، و مەتەڵەکە دەکاتە ئەزموونێکی بێهاوتا و لەبیرنەکراو بۆ هاوڕێیان و خێزان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "71c79418a6747746b5ebc7a06f17d71df15a24dd305d947426ec48565e9d266a",
+  "en": "Exquisite Appearance & Lighting Design",
+  "ar": "مظهر رائع وتصميم إضاءة متقن",
+  "ckb": "ڕواڵەتێکی نایاب و دیزاینی ڕووناکی",
+  "kind": "block_title"
+ },
+ {
+  "h": "fb4444dc92f062285f9e37d72492e14228adfce7e9b2e34f771b66067e61f40d",
+  "en": "Observe the weathered stone texture and subtle green moss details that give the puzzle an aged, mystical appearance. The central rock housing Excalibur glows with an inner light, highlighting the detailed runic carvings around its base.",
+  "ar": "تأمّل ملمس الحجر المتآكل بفعل الزمن وتفاصيل الطحالب الخضراء الدقيقة التي تمنح اللغز مظهرًا عتيقًا وغامضًا. وتتوهّج الصخرة المركزية التي تحتضن Excalibur بضوء داخلي يُبرز النقوش الرونية المفصّلة حول قاعدتها.",
+  "ckb": "سەیری هەستی ڕووکاری بەردە کۆن و داخوراوەکە و وردەکارییە ناسکەکانی قەوزی سەوز بکە کە ڕواڵەتێکی کۆن و ئەفسووناوی بە مەتەڵەکە دەبەخشن. بەردە ناوەندییەکە کە شمشێری Excalibur لە خۆ دەگرێت بە ڕووناکییەکی ناوەکی دەدرەوشێتەوە، و هەڵکۆڵینە وردەکانی پیتی ڕونی لە دەوروبەری بنکەکەی دەردەخات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ccaf64fd408289f148affc39ad605fe9b6e75a6e6d7bef0b5e4731113df30978",
+  "en": "Easy Start, Satisfying Finish",
+  "ar": "بداية سهلة ونهاية مُرضية",
+  "ckb": "دەستپێکی ئاسان، کۆتاییەکی دڵخۆشکەر",
+  "kind": "block_title"
+ },
+ {
+  "h": "4233dfda6111e576cbeeca96eeb2c76bec4cd9f701dc1a69101bbe8bab2af686",
+  "en": "The puzzle uses simple plug-and-play electronics, with no programming or soldering required. There is also a solution guide to help you through the full puzzle experience.",
+  "ar": "يعتمد اللغز على إلكترونيات بسيطة بنظام التوصيل والتشغيل المباشر (plug-and-play)، من دون الحاجة إلى برمجة أو لحام. كما يرافقه دليل للحلّ يساعدك طوال تجربة اللغز كاملة.",
+  "ckb": "مەتەڵەکە ئەلیکترۆنیاتی سادەی بەستن و دەستبەجێ کارکردن (plug-and-play) بەکاردەهێنێت، بەبێ پێویستی بە پرۆگرامکردن یان لەحیمکردن. هەروەها ڕێبەرێکی چارەسەری لەگەڵە بۆ یارمەتیدانت لە سەرتاسەری ئەزموونی مەتەڵەکەدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d9ef3ef89323f2841dc81ac0fb908dd431989a104da79df6d572f1a20b662d72",
+  "en": "*The guide is designed to support you whenever you get stuck. You can use it as a full walkthrough, or simply check individual sections when you need a hint.",
+  "ar": "*صُمّم الدليل لمساعدتك كلما تعثّرت. يمكنك استخدامه شرحًا كاملًا خطوة بخطوة، أو الاطلاع على أقسام منفردة فقط عندما تحتاج إلى تلميح.",
+  "ckb": "*ڕێبەرەکە دیزاین کراوە بۆ ئەوەی هەر کاتێک گیرت خوارد یارمەتیت بدات. دەتوانیت وەک ڕێنمایییەکی تەواوی هەنگاو بە هەنگاو بەکاری بهێنیت، یان تەنها کاتێک پێویستت بە ئاماژەیەک بوو سەیری بەشە جیاکان بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2c373b1ec458ef59746d75acbc0a4b7e02d470a16be3d1e9cb58dcbdf14c8064",
+  "en": "Rules & Guides",
+  "ar": "القواعد والأدلّة",
+  "ckb": "یاساکان و ڕێبەرەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "f484532f8a317ba827e59b63e1d8114d6b46d94bcda702656c8bca1b095f2415",
+  "en": "Enjoy the fun while unlocking!",
+  "ar": "استمتع بالمرح وأنت تفتح الأقفال!",
+  "ckb": "لە کاتی کردنەوەی قفڵەکاندا چێژ لە خۆشییەکە وەربگرە!",
+  "kind": "block_line"
+ },
+ {
+  "h": "99b01d36d09e6b4a8e805993dfb56ed328c74b9fa05904bf2301a93bc53871dc",
+  "en": "Regularly add some lubricant/grease to the gearbox to improve its lifespan and reduce noise.",
+  "ar": "أضف بانتظام قليلًا من مادة التشحيم/الشحم إلى علبة التروس لإطالة عمرها الافتراضي وتقليل الضجيج.",
+  "ckb": "بە شێوەیەکی بەردەوام کەمێک ماددەی چەورکردن/گریس بۆ گێربۆکسەکە زیاد بکە بۆ درێژکردنەوەی تەمەنی بەکارهێنانی و کەمکردنەوەی دەنگەدەنگ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e6f240eab4abefb70a99c8b3eb8b82dd68535b374302f09e884a6e540ac4e46",
+  "en": "*The product does not include the 3D printed parts as shown in the main image.",
+  "ar": "*لا يتضمن المنتج القطع المطبوعة بطابعة 3D الظاهرة في الصورة الرئيسية.",
+  "ckb": "*بەرهەمەکە ئەو پارچە چاپکراوانەی 3D لەخۆ ناگرێت کە لە وێنە سەرەکییەکەدا دیارن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f149360a32f9d10bb39f77d5d4f575ede27c419fcc1083138fb5c136313f076d",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Orbitails Egg Vending Machine. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Orbitails Egg Vending Machine يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Orbitails Egg Vending Machine بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fd95db1378cdde98a570be79e76fc052b8bc1d073e030de181d4888d0a2ff3f1",
+  "en": "To download the model files please visit the Orbitails Egg Vending Machine on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Orbitails Egg Vending Machine على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Orbitails Egg Vending Machine لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "17100df7e1ad831d8f348091b1a6d1433eaf06ff3a694e6277de6407b206783f",
+  "en": "This kit is all you need to assemble every split-up Orbitails Egg Vending Machine in the MakerWorld collection.",
+  "ar": "هذا الطقم هو كل ما تحتاجه لتجميع كل نسخة مقسّمة من Orbitails Egg Vending Machine ضمن مجموعة MakerWorld.",
+  "ckb": "ئەم کیتە هەموو ئەو شتەیە کە پێویستتە بۆ پێکەوەنانی هەموو وەشانە دابەشکراوەکانی Orbitails Egg Vending Machine لە کۆمەڵەی MakerWorld.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f018f2db09513d1563adb27515e91b1bf13fae9930946762280a808305c30474",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Mechanical Phone Holder Desk Mounted Stand Arm. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Mechanical Phone Holder Desk Mounted Stand Arm يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Mechanical Phone Holder Desk Mounted Stand Arm بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7631c2f8877c33d69f364e83d12d40ec55a69e699c264db332383b23bcf9bd8e",
+  "en": "To download the model files please visit the Mechanical Phone Holder Desk Mounted Stand Arm on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Mechanical Phone Holder Desk Mounted Stand Arm على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Mechanical Phone Holder Desk Mounted Stand Arm لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "76353b70f497ea8c88a6ce335838926d83a82b9fb0aa52ad6e66ce9415ebad4a",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Spool roller, filament holder, spool holder. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Spool roller, filament holder, spool holder يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Spool roller, filament holder, spool holder بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1fa065240ab975c87aaf6dda6737704f83b577cc51f037e83cce982c90c8966e",
+  "en": "To download the model files please visit the Spool roller, filament holder, spool holder on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Spool roller, filament holder, spool holder على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Spool roller, filament holder, spool holder لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2929379b59877394f4cbd9e24930a0c9cb9c2fe0b8d96d8c928d7ac47fa0b857",
+  "en": "Meet CUBY: Your Customizable Cyber-Companion",
+  "ar": "تعرّف على CUBY: رفيقك الإلكتروني القابل للتخصيص",
+  "ckb": "ئاشنا بە بە CUBY: هاوەڵە سایبەرییە تایبەتکراوەکەت",
+  "kind": "block_title"
+ },
+ {
+  "h": "d6f1cd2728c94ad2094ff4c6aa2f016847086288bec30037b6b407a84fe1471b",
+  "en": "CUBY brings a playful, customizable robot buddy to life with a unique brick-built design. Assemble its modular parts to create a desk companion or a dynamic character for imaginative play. Its expressive face and articulated limbs invite interaction, making it a perfect project for builders of all ages. Get ready to build, personalize, and enjoy your new cyber-friend.",
+  "ar": "يقدّم CUBY رفيقًا روبوتيًا مرحًا وقابلًا للتخصيص بتصميم فريد مبني من القطع. جمّع أجزاءه المعيارية لتصنع رفيقًا لمكتبك أو شخصية حيوية للّعب الخيالي. يدعو وجهه المعبّر وأطرافه المفصلية إلى التفاعل، ما يجعله مشروعًا مثاليًا للبنّائين من جميع الأعمار. استعدّ للبناء والتخصيص والاستمتاع بصديقك الإلكتروني الجديد.",
+  "ckb": "ڕۆبۆتی CUBY هاوڕێیەکی ڕۆبۆتیی یاریئامێز و تایبەتکراو بە دیزاینێکی بێهاوتای پێکهاتوو لە خشتەکان زیندوو دەکاتەوە. پارچە مۆدیوڵارییەکانی پێکەوە بنێ بۆ دروستکردنی هاوەڵێکی سەرمێز یان کارەکتەرێکی چالاک بۆ یاریی خەیاڵی. ڕووخسارە دەربڕەکەی و ئەندامە جومگەدارەکانی بانگهێشتی کارلێک دەکەن، و دەیکەنە پڕۆژەیەکی تەواو بۆ دروستکەران لە هەموو تەمەنێک. ئامادە بە بۆ دروستکردن، تایبەتکردن و چێژوەرگرتن لە هاوڕێ سایبەرییە نوێیەکەت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1031a0ebfe6e5130da579560dcca84324831fc6bf59ab13b6e9f3df7fc69694b",
+  "en": "(not included for remote control)",
+  "ar": "(لا يشمل جهاز التحكم عن بُعد)",
+  "ckb": "(ڕیمۆت کۆنترۆڵ ناگرێتەوە)",
+  "kind": "block_line"
+ },
+ {
+  "h": "d375ae02d537c75a4f9d850901b13b7a744c3385d7aba376e6ced2945889fa71",
+  "en": "Small Bot, Big Emotions",
+  "ar": "روبوت صغير ومشاعر كبيرة",
+  "ckb": "ڕۆبۆتێکی بچووک، هەستێکی گەورە",
+  "kind": "block_title"
+ },
+ {
+  "h": "55f997ec0ea1c77af5f1a67e31622e44837bdb7be35f3a059bbe5549349dd39d",
+  "en": "Bring your CUBY to life with movement and lights. The floating irises make it look like CUBY is always following you with its eyes. The unique illuminated 3D eyes are not only cute but express emotions with different colors and patterns that can be personalized with the CyberBrick app.",
+  "ar": "أضفِ الحياة على CUBY بالحركة والأضواء. تجعل القزحيتان العائمتان CUBY يبدو وكأنه يتابعك بعينيه دائمًا. وعيناه المضيئتان الفريدتان بتقنية 3D ليستا لطيفتين فحسب، بل تعبّران عن المشاعر بألوان وأنماط مختلفة يمكن تخصيصها عبر تطبيق CyberBrick.",
+  "ckb": "ژیان بە CUBY ببەخشە لە ڕێگەی جووڵە و ڕووناکییەوە. گلێنە هەڵواسراوەکان وا دەکەن وا دەربکەوێت کە CUBY هەمیشە بە چاوەکانی بەدواتدا دێت. چاوە ڕووناکە بێهاوتاکانی 3D نەک تەنها جوانن، بەڵکو بە ڕەنگ و نەخشی جیاواز هەست دەردەبڕن کە دەتوانرێت بە ئەپی CyberBrick تایبەت بکرێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "34ca8a4540f5238f274f4bea7038463d9e3cf241eea55b1e76a8c027d9303b35",
+  "en": "Make it yours",
+  "ar": "اجعله خاصًا بك",
+  "ckb": "بیکە هی خۆت",
+  "kind": "block_title"
+ },
+ {
+  "h": "28ecf9de7bd434e39f6420dd06e8b94298640e5f4826d738a5758abe261c17c1",
+  "en": "Bring character to your CUBY with different accessories. Print your style from the expanding library of accessories in MakerWorld or remix and design your own.",
+  "ar": "امنح CUBY شخصيته الخاصة بإكسسوارات مختلفة. اطبع أسلوبك من مكتبة الإكسسوارات المتنامية على MakerWorld، أو عدّل التصاميم (remix) وصمّم إكسسواراتك بنفسك.",
+  "ckb": "بە پێداویستیی جیاواز کەسایەتی بە CUBY ببەخشە. شێوازی خۆت لە کتێبخانە فراوانبووەکەی پێداویستییەکان لە MakerWorld چاپ بکە، یان دیزاینەکان بگۆڕە (remix) و هی خۆت دیزاین بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2a718a936cedcf1a14c490df1785e6ed2fce0f29df199f4f5103bdf72652fa68",
+  "en": "Precision movement",
+  "ar": "حركة دقيقة",
+  "ckb": "جووڵەی ورد",
+  "kind": "block_title"
+ },
+ {
+  "h": "5e954c7b3a7cc8332d3c9177cb60b6314c15953fc17a8ed493a1348cd723f516",
+  "en": "CUBY features a great range of movement for such a small robot. Direct control to each of its four servo motors gives you full power over its movement. Can you master the one-legged turn?",
+  "ar": "يتمتّع CUBY بمدى حركة واسع بالنسبة لروبوت بهذا الحجم الصغير. ويمنحك التحكم المباشر في كل محرك من محركات السيرفو الأربعة سيطرة كاملة على حركته. هل تستطيع إتقان الدوران على ساق واحدة؟",
+  "ckb": "ڕۆبۆتی CUBY مەودایەکی فراوانی جووڵەی هەیە بە بەراورد بە ڕۆبۆتێکی ئەوەندە بچووک. کۆنترۆڵی ڕاستەوخۆی هەر یەک لە چوار بزوێنەرە سێرڤۆکەی دەسەڵاتی تەواوت بەسەر جووڵەکەیدا دەداتێ. دەتوانیت فێری سووڕانەوە لەسەر یەک قاچ ببیت؟",
+  "kind": "block_line"
+ },
+ {
+  "h": "23062035aee1b5048bf1b19feac0e45a6abd1a07de79dea223c66f81bf944baa",
+  "en": "Full directional control",
+  "ar": "تحكّم كامل في الاتجاهات",
+  "ckb": "کۆنترۆڵی تەواوی ئاراستەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "c0e5de3d16cf357220830c8592ac2e90b20ba96970b1f29ef22588e372bb25f5",
+  "en": "Mastering CUBY is like learning to walk again - literally. Walking, turning, dancing and jumping all take practice. The reward is seeing your CUBY come to life with every step … and fall.",
+  "ar": "إتقان CUBY أشبه بتعلّم المشي من جديد - حرفيًا. فالمشي والدوران والرقص والقفز كلها تحتاج إلى تمرين. والمكافأة أن ترى CUBY ينبض بالحياة مع كل خطوة … وكل سقطة.",
+  "ckb": "فێربوونی CUBY وەک دووبارە فێربوونی ڕۆیشتن وایە - بە واتای ڕاستەقینە. ڕۆیشتن، سووڕانەوە، سەماکردن و بازدان هەموویان ڕاهێنانیان پێویستە. پاداشتەکەی ئەوەیە ببینیت CUBY لەگەڵ هەر هەنگاوێک … و هەر کەوتنێک زیندوو دەبێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bd5d59a94c78277a5d62cfa166c68866d469a3826638577f5e137be3dbb7aa66",
+  "en": "Quick access Core",
+  "ar": "وصول سريع إلى وحدة Core",
+  "ckb": "دەستگەیشتنی خێرا بە Core",
+  "kind": "block_title"
+ },
+ {
+  "h": "1132e97287a3ee8d1cbe44609d11f6e65e077cbf3a5e93fa4e52f949fcbb6144",
+  "en": "At the heart of CUBY is the CyberBrick Core and the battery that powers it. Both are easily accessible for swapping by squeezing and lifting the head open.",
+  "ar": "في قلب CUBY توجد وحدة CyberBrick Core والبطارية التي تشغّلها. ويسهل الوصول إليهما لتبديلهما بالضغط على الرأس ورفعه لفتحه.",
+  "ckb": "دڵی ڕۆبۆتی CUBY بریتییە لە CyberBrick Core و ئەو باترییەی وزەی پێدەدات. هەردووکیان بە ئاسانی دەستیان پێدەگات بۆ گۆڕین، بە گوشین و بەرزکردنەوەی سەرەکە بۆ کردنەوەی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2c907bb976ff34fc2770fb705d3093271f5cee11c62a3d795e6dad58b49f3b83",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Cyberpunk Dice Tower - High Detail Illuminated Model. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Cyberpunk Dice Tower - High Detail Illuminated Model يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Cyberpunk Dice Tower - High Detail Illuminated Model بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f4a2f8e9a96d4895887cb21626886952b3d1d6392697c045fa61d7ccda3b6510",
+  "en": "To download the model files please visit the Cyberpunk Dice Tower - High Detail Illuminated Model on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Cyberpunk Dice Tower - High Detail Illuminated Model على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Cyberpunk Dice Tower - High Detail Illuminated Model لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a96510ce15c8fc19a87c512d808d9c4d029d6ed842f3f071828ca2f4079c7490",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional H2D / H2S / H2C / A2L Cutting Module Box . To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع H2D / H2S / H2C / A2L Cutting Module Box يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی H2D / H2S / H2C / A2L Cutting Module Box بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "49eb45287839338ee17c22577633c704a0725aacc0daf257d2f16a63eaf33e99",
+  "en": "To download the model files please visit the H2D / H2S / H2C / A2L Cutting Module Box on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة H2D / H2S / H2C / A2L Cutting Module Box على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی H2D / H2S / H2C / A2L Cutting Module Box لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e0eda91cca195c9d4c638ccd28f1e876afb9798b8f780f7ff24117a8c078dcaa",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Coffee Dispenser. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Coffee Dispenser يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Coffee Dispenser بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bbf0ec8e32ed5b0203120b03e0e3ba0f7d19454bfa3436c0ed0af3df8a660834",
+  "en": "To download the model files please visit the Coffee Dispenser on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Coffee Dispenser على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Coffee Dispenser لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ed7753fac402eb9fd36d91177f8fc73f7d470793312ea11bdbb0ba532f28cf37",
+  "en": "Cyberbrick Truck Series - Build Your Fleet",
+  "ar": "سلسلة شاحنات Cyberbrick - ابنِ أسطولك",
+  "ckb": "زنجیرەی بارهەڵگرەکانی Cyberbrick - کۆمەڵە ئۆتۆمبێلەکەت دروست بکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "b4923adc6efc3cce79fa99799c733e00ef6abd55029543e39ff70b9122c03f8f",
+  "en": "Start your ultimate Cyberbrick fleet with these rugged, versatile trucks. Each model prints easily, snaps together, and is ready for heavy-duty play or display. Build a convoy of customizable vehicles, perfect for any adventure you can imagine. These aren't just models; they're the foundation for endless creative missions.",
+  "ar": "ابدأ أسطول Cyberbrick المثالي الخاص بك مع هذه الشاحنات المتينة ومتعددة الاستخدامات. يُطبع كل نموذج بسهولة، ويُركّب بالتعشيق، ويكون جاهزًا للّعب الشاق أو للعرض. ابنِ قافلة من المركبات القابلة للتخصيص، مثالية لأي مغامرة تتخيّلها. هذه ليست مجرد نماذج، بل هي الأساس لمهام إبداعية لا تنتهي.",
+  "ckb": "بەم بارهەڵگرە بەهێز و فرەبەکارهێنانانە، دەست بە دروستکردنی باشترین کۆمەڵە ئۆتۆمبێلت لە Cyberbrick بکە. هەر مۆدێلێک بە ئاسانی چاپ دەکرێت، بە کلیک پێکەوە دەلکێت، و ئامادەیە بۆ یاریی قورس یان پیشاندان. کاروانێک لە ئۆتۆمبێلی تایبەتکراو دروست بکە، کە گونجاون بۆ هەر سەرکێشییەک کە بیهێنیتە خەیاڵت. ئەمانە تەنها مۆدێل نین؛ بەڵکو بنەمای ئەرکی داهێنەرانەی بێکۆتان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "216664fb31aaec259abbfe415ac69b6ff14c6c7a4e7c65aa6da39e8c05989996",
+  "en": "Whether you are a 3D-printing enthusiast or an RC hobbyist, the CyberBrick Truck Series delivers an unmatched combination of mechanical depth, creative freedom, and expandable play value.",
+  "ar": "سواء كنت من عشّاق الطباعة (3D-printing) أو من هواة RC، تقدّم سلسلة شاحنات CyberBrick مزيجًا لا يُضاهى من العمق الميكانيكي والحرية الإبداعية وقيمة اللعب القابلة للتوسّع.",
+  "ckb": "جا دڵداری چاپی (3D-printing) بیت یان خولیاوەندی RC بیت، زنجیرەی بارهەڵگرەکانی CyberBrick تێکەڵەیەکی بێوێنە لە قووڵیی میکانیکی، ئازادیی داهێنان و بەهای یاریی شیاوی فراوانکردن پێشکەش دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5c34b53a316e212756f3ca41937c9257cbdb100e91f7c962fc4a4cdf3ff8164d",
+  "en": "Per Vehicle",
+  "ar": "لكل مركبة",
+  "ckb": "بۆ هەر ئۆتۆمبێلێک",
+  "kind": "block_line"
+ },
+ {
+  "h": "f52aa2776fca6c9a20c63925e7fc4123b0ae778f6079c2fdd598c85a1e2854e4",
+  "en": "Build Your Fleet",
+  "ar": "ابنِ أسطولك",
+  "ckb": "کۆمەڵە ئۆتۆمبێلەکەت دروست بکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "276a0a000f63f495233610d25b8cbe2a74133dff1b7872bbbbb277e05d1ce9f6",
+  "en": "Each RC trucks engineered for a unique role.",
+  "ar": "كل شاحنة RC مصمّمة هندسيًا لدور فريد.",
+  "ckb": "هەر بارهەڵگرێکی RC بۆ ڕۆڵێکی تایبەت ئەندازیاری کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "839c3b3ea2c3538186381b8cd730931813af25eff3e742d9a6f57d36dea5c7f0",
+  "en": "CyberHauler",
+  "ar": "CyberHauler",
+  "ckb": "CyberHauler",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "da2a6c80aa89409966f5d94f1ed5070ec2542b9f8ca84037efe50fa1bdfdc811",
+  "en": "Heavy-Duty Cargo Hauler",
+  "ar": "ناقلة بضائع للمهام الشاقة",
+  "ckb": "بارهەڵگری قورسی گواستنەوەی کاڵا",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e5dc3179566df683c7abafb81398672b78f37c9220312ecf0f833ad90ff7d6a",
+  "en": "The CyberHauler Built with clean lines, realistic proportions, and a focus on functionality, this truck is made to handle everything from heavy transport to specialized attachments.",
+  "ar": "شاحنة CyberHauler: بُنيت بخطوط نظيفة ونِسب واقعية وتركيز على الأداء الوظيفي، وصُنعت هذه الشاحنة لتتولّى كل شيء من النقل الثقيل إلى الملحقات المتخصّصة.",
+  "ckb": "بارهەڵگری CyberHauler: بە هێڵی پاک، ڕێژەی ڕاستەقینە و سەرنجدان لە کارایی دروست کراوە، و ئەم بارهەڵگرە بۆ مامەڵەکردن لەگەڵ هەموو شتێک دروست کراوە، لە گواستنەوەی قورسەوە تا پاشکۆی تایبەت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9119331331adebe50624b8e17da6ee5b2f3fd4969333c397ea2ddd2a855feefd",
+  "en": "Powerful single or dual N20 motor drive",
+  "ar": "دفع قوي بمحرك N20 واحد أو مزدوج",
+  "ckb": "هێزی بەهێزی جووڵاندن بە یەک یان دوو بزوێنەری N20",
+  "kind": "block_line"
+ },
+ {
+  "h": "027f22f953fad0c1d9a38990b7231e9b1f7b1da1ce95ea533f2d7cd60a811e15",
+  "en": "Future trailer expansions planned",
+  "ar": "توسعات مخطّط لها مستقبلًا بإضافة مقطورات",
+  "ckb": "فراوانکردنی داهاتوو بە تریلەر پلانی بۆ داڕێژراوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "b4bcfbe732e6c7f44ebd617868bd9aff4e48976dd7d8841b72c95d6488fb4089",
+  "en": "Reinforced frame geometry",
+  "ar": "هيكل بتصميم هندسي مقوّى",
+  "ckb": "ئەندازەی چوارچێوەی بەهێزکراو",
+  "kind": "block_line"
+ },
+ {
+  "h": "171bfc274aabc158f9d2654570d447dd4c4d7b06ceeb9c7ae429577649905e9b",
+  "en": "CyberPlow",
+  "ar": "CyberPlow",
+  "ckb": "CyberPlow",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "0248dce9a86c74ac99dacdd24b837cb7722feb8a9eadcd72999a66cf087d5859",
+  "en": "Winter Service Vehicle",
+  "ar": "مركبة خدمات شتوية",
+  "ckb": "ئۆتۆمبێلی خزمەتگوزاریی زستانە",
+  "kind": "block_line"
+ },
+ {
+  "h": "86f28974468668419937fe8602beafa9bccc4b940897d554b4d313f6381af91e",
+  "en": "The ultimate winter service vehicle. A fully functional snowplow and rear spreader system bring realistic road-clearing action to your CyberBrick fleet.",
+  "ar": "مركبة الخدمات الشتوية المثالية. تضيف كاسحة ثلوج تعمل بكامل وظائفها ونظام نثر خلفي حركة واقعية لتنظيف الطرق إلى أسطول CyberBrick الخاص بك.",
+  "ckb": "باشترین ئۆتۆمبێلی خزمەتگوزاریی زستانە. بەفرماڵێکی تەواو کارا و سیستەمێکی پەخشکەرەوەی دواوە کاری ڕاستەقینەی پاککردنەوەی ڕێگا بۆ کۆمەڵە ئۆتۆمبێلەکانت لە CyberBrick دەهێنن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "acc57d789675556ce4406a8735fd646c40fb90bf79057ee743836c0663f50d57",
+  "en": "Raise and lower snow plow",
+  "ar": "رفع كاسحة الثلوج وخفضها",
+  "ckb": "بەرزکردنەوە و نزمکردنەوەی بەفرماڵ",
+  "kind": "block_line"
+ },
+ {
+  "h": "0bef11a32f05ac401af4b35b994d7c9e72f8de5ec578978e0da819a208c6f19a",
+  "en": "Functional rear spreader",
+  "ar": "ناثرة خلفية عاملة",
+  "ckb": "پەخشکەرەوەی دواوەی کارا",
+  "kind": "block_line"
+ },
+ {
+  "h": "5063ddde4b9d3f142ff42daed830cf5a8342ae92aebd5e3c5f7e13ce90cd3516",
+  "en": "Rotating spreader spindle",
+  "ar": "محور ناثرة دوّار",
+  "ckb": "میلی سووڕاوەی پەخشکەرەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "dd476e95b71042d560995080ad65632c50039a952a1c229b188bc3ae627907c3",
+  "en": "CyberTipper",
+  "ar": "CyberTipper",
+  "ckb": "CyberTipper",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "becde0a436d659fc42e846244368baa7493db683f595d1b001bb7013347df866",
+  "en": "Construction Dump Truck",
+  "ar": "شاحنة قلّابة للإنشاءات",
+  "ckb": "قەلابەی بیناسازی",
+  "kind": "block_line"
+ },
+ {
+  "h": "9bcbce13961a9e721b542e8efa9144a49d0acad3562a26306465f92a991a69ae",
+  "en": "A rugged, functional RC tipper built from scratch for the CyberBrick system. Engineered for smooth motorized lifting, strong mechanics, and reliable performance across multiple terrains.",
+  "ar": "قلّابة RC متينة وعاملة صُمّمت من الصفر لنظام CyberBrick. هُندست لرفع سلس بالمحرك، وميكانيكا قوية، وأداء موثوق على تضاريس متعددة.",
+  "ckb": "قەلابەیەکی بەهێز و کارای RC کە لە سفرەوە بۆ سیستەمی CyberBrick دروست کراوە. بۆ بەرزکردنەوەی نەرم بە بزوێنەر، میکانیکی بەهێز و کارکردنی متمانەپێکراو لەسەر چەندین جۆری زەوی ئەندازیاری کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9b90a60fae928bae6c7bf9ca877a67d2b8a57e6d351237c22bd3ee8e145b2fa6",
+  "en": "Motorized tipping bed",
+  "ar": "صندوق قلّاب يعمل بالمحرك",
+  "ckb": "سندوقی قەلابەی بزوێنەردار",
+  "kind": "block_line"
+ },
+ {
+  "h": "13df38d8bab6a8eee279a5bada771fa3d48900c0c44cff0fa15367655105e29d",
+  "en": "High dumping angle",
+  "ar": "زاوية تفريغ عالية",
+  "ckb": "گۆشەی بەتاڵکردنەوەی بەرز",
+  "kind": "block_line"
+ },
+ {
+  "h": "6d01a2763b4e46c445ec148cb1daa2e7cc5023449aee5d21484fed3c16906ef0",
+  "en": "Realistic construction truck design",
+  "ar": "تصميم واقعي لشاحنة إنشاءات",
+  "ckb": "دیزاینی ڕاستەقینەی بارهەڵگری بیناسازی",
+  "kind": "block_line"
+ },
+ {
+  "h": "3878385688ab80005212aecb71edbac059fea530e256d05a0c8c8e69ce1e112a",
+  "en": "CyberFreight",
+  "ar": "CyberFreight",
+  "ckb": "CyberFreight",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "5efb4c1fc61af75e34e2e525d4a7794d8a18eb070be46c573d2af6ad7a0d636e",
+  "en": "Logistics Freight Truck",
+  "ar": "شاحنة نقل بضائع لوجستية",
+  "ckb": "بارهەڵگری گواستنەوەی لۆجیستی",
+  "kind": "block_line"
+ },
+ {
+  "h": "a8daf8ed39d3392d3edd4fe92515fa8ea031d7a892f796c1baf25ba76a427c7f",
+  "en": "A fully enclosed freight carrier built for long-haul logistics simulation. Its large cargo body, clean lines, and smooth RC handling make it the most versatile truck in the series.",
+  "ar": "ناقلة بضائع مغلقة بالكامل صُمّمت لمحاكاة الخدمات اللوجستية لمسافات طويلة. ويجعلها صندوق الحمولة الكبير والخطوط النظيفة والتحكم السلس عبر RC الشاحنة الأكثر تنوّعًا في الاستخدام ضمن السلسلة.",
+  "ckb": "بارهەڵگرێکی تەواو داخراوی کاڵا کە بۆ لاسایکردنەوەی لۆجیستیکی مەودا درێژ دروست کراوە. سندوقە گەورەکەی بار، هێڵە پاکەکانی و مامەڵەکردنی نەرمی RC وای لێدەکەن فرەبەکارترین بارهەڵگری زنجیرەکە بێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "da209068cccccfd4357c938b6ea4d8fca1840be2da14e9d2c5cc59d215702be3",
+  "en": "Enclosed cargo body",
+  "ar": "صندوق حمولة مغلق",
+  "ckb": "لاشەی داخراوی بار",
+  "kind": "block_line"
+ },
+ {
+  "h": "a9dfd53fd2ce56e09fe01b9b9ba3f968b13db912e28c9b275f5b5e273094357c",
+  "en": "Large storage capacity",
+  "ar": "سعة تخزين كبيرة",
+  "ckb": "توانای هەڵگرتنی گەورە",
+  "kind": "block_line"
+ },
+ {
+  "h": "1b2a727e3f3e9bd7f7749f71627742f713efd95f83e41ce8c5465d7b95d94c5d",
+  "en": "Logistics truck design",
+  "ar": "تصميم شاحنة لوجستية",
+  "ckb": "دیزاینی بارهەڵگری لۆجیستی",
+  "kind": "block_line"
+ },
+ {
+  "h": "966095f4ab55a4edbc5b4c88c24562d8995d9b420d7de08b78708020843872c6",
+  "en": "Specialized Roles, Endless Play",
+  "ar": "أدوار متخصّصة ولعب بلا حدود",
+  "ckb": "ڕۆڵی تایبەت، یاریی بێکۆتا",
+  "kind": "block_title"
+ },
+ {
+  "h": "348d3364cd3e214d478a0289adcd7bccf21ec828b3077b2aa60eca7925ddbe40",
+  "en": "Every truck in your Cyberbrick fleet brings its own distinct capability to the mission. Whether you're hauling, lifting, or clearing, each vehicle is engineered for a specific job, expanding your play scenarios and problem-solving possibilities.",
+  "ar": "تضيف كل شاحنة في أسطول Cyberbrick الخاص بك قدرتها المميّزة إلى المهمة. وسواء كنت تنقل أو ترفع أو تزيل العوائق، فكل مركبة مصمّمة هندسيًا لمهمة محدّدة، ما يوسّع سيناريوهات اللعب وإمكانيات حلّ المشكلات لديك.",
+  "ckb": "هەر بارهەڵگرێک لە کۆمەڵە ئۆتۆمبێلەکانت لە Cyberbrick توانای جیاوازی خۆی دەهێنێتە ناو ئەرکەکە. جا بار بگوازیتەوە، بەرز بکەیتەوە یان ڕێگا پاک بکەیتەوە، هەر ئۆتۆمبێلێک بۆ کارێکی دیاریکراو ئەندازیاری کراوە، و سیناریۆکانی یاری و ئەگەرەکانی چارەسەرکردنی کێشە فراوانتر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "29d82393ec57f4ab606386ff8374144768a4df4f4647d7b7dc32a12a7e380709",
+  "en": "Dual-Axle Power, Any Terrain",
+  "ar": "قوة ثنائية المحور على أي تضاريس",
+  "ckb": "هێزی دوو تەوەرە، بۆ هەر زەوییەک",
+  "kind": "block_title"
+ },
+ {
+  "h": "5fef99674636da9de42d1257f5b98d6dca8d4f6919caf7e3c30a2e217e9fe494",
+  "en": "Each truck is driven by dual N20 400 RPM motors, delivering dual-axle drive, lots of torque, and smooth control across multiple terrains. This mechanical foundation allows every variant to feel powerful, responsive, and genuinely fun to operate.",
+  "ar": "تعمل كل شاحنة بمحركين N20 بسرعة 400 RPM، ما يوفّر دفعًا ثنائي المحور وعزم دوران كبيرًا وتحكمًا سلسًا على تضاريس متعددة. ويمنح هذا الأساس الميكانيكي كل نسخة إحساسًا بالقوة وسرعة الاستجابة ومتعة حقيقية في التشغيل.",
+  "ckb": "هەر بارهەڵگرێک بە دوو بزوێنەری N20 بە خێرایی 400 RPM دەجووڵێت، کە جووڵاندنی دوو تەوەرە، تۆرکی زۆر و کۆنترۆڵی نەرم لەسەر چەندین جۆری زەوی دابین دەکات. ئەم بنەما میکانیکییە وا دەکات هەموو جۆرەکان بەهێز، وەڵامدەرەوە و بەڕاستی خۆش بن بۆ کارپێکردن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ce6ae3053854d8448b05b1b5b05d927a46dd15d6006451d4d4414f7b53bc8b98",
+  "en": "Expand Your Fleet, Seamlessly",
+  "ar": "وسّع أسطولك بسلاسة",
+  "ckb": "کۆمەڵە ئۆتۆمبێلەکەت بە ئاسانی فراوان بکە",
+  "kind": "block_title"
+ },
+ {
+  "h": "522c030f9f3b183caed15748ab78859c0aaad55fa155d2af4b6c44eec60afe38",
+  "en": "Start with essential Cyberbrick trucks, then add specialized vehicles as your operations grow. Every new addition integrates perfectly, ready for immediate deployment. As the series expands, more unique vehicles join your collection, building a truly custom fleet.",
+  "ar": "ابدأ بشاحنات Cyberbrick الأساسية، ثم أضف مركبات متخصّصة مع توسّع عملياتك. تندمج كل إضافة جديدة بشكل مثالي وتكون جاهزة للانطلاق فورًا. ومع توسّع السلسلة، تنضم مركبات فريدة أكثر إلى مجموعتك، لتبني أسطولًا مخصّصًا بحق.",
+  "ckb": "بە بارهەڵگرە سەرەکییەکانی Cyberbrick دەست پێبکە، پاشان ئۆتۆمبێلی تایبەت زیاد بکە لەگەڵ گەشەکردنی کارەکانت. هەر زیادکراوێکی نوێ بە تەواوی یەکدەگرێتەوە و ئامادەیە بۆ بەکارهێنانی دەستبەجێ. لەگەڵ فراوانبوونی زنجیرەکە، ئۆتۆمبێلی بێهاوتای زیاتر دێنە ناو کۆمەڵەکەت، و کۆمەڵە ئۆتۆمبێلێکی بەڕاستی تایبەت بە خۆت دروست دەکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8a2358be0d855e16962852cb53da798bdd2fe90c3e3c9ed7dbfe132fd059b07b",
+  "en": "*The products listed under this link do not include remote controls. To purchase one, please visit CyberBrick Remote Control Kit - ZK007.",
+  "ar": "*لا تتضمن المنتجات المدرجة تحت هذا الرابط أجهزة تحكم عن بُعد. لشراء واحد، يرجى زيارة صفحة CyberBrick Remote Control Kit - ZK007.",
+  "ckb": "*ئەو بەرهەمانەی لە ژێر ئەم بەستەرەدا ڕیزکراون ڕیمۆت کۆنترۆڵیان لەگەڵدا نییە. بۆ کڕینی یەکێک، تکایە سەردانی پەڕەی CyberBrick Remote Control Kit - ZK007 بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9d7369dd985d69e3519e610157b91314e23bfeeded579b836831ac2ecb9ca47a",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional P2S / X2D Door hinge 180/270° - Adjustable v3.0. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع P2S / X2D Door hinge 180/270° - Adjustable v3.0 يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی P2S / X2D Door hinge 180/270° - Adjustable v3.0 بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4a10447172debaff3d1cf37f787a0cb81468f3441118c23cb203b8246899768d",
+  "en": "To download the model files please visit the P2S / X2D Door hinge 180/270° - Adjustable v3.0 on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة P2S / X2D Door hinge 180/270° - Adjustable v3.0 على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی P2S / X2D Door hinge 180/270° - Adjustable v3.0 لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6c17cedcd680ab2b4d4a0a57ba19359faa9ffcd30ce1804450c6257d02d975df",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Motorized USB Solder Dispenser. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Motorized USB Solder Dispenser يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Motorized USB Solder Dispenser بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "abcc8f6160206adfd7f2e578b1d75663770ee3295da8eb12436e87c7b5aefa29",
+  "en": "To download the model files please visit the Motorized USB Solder Dispenser on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Motorized USB Solder Dispenser على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Motorized USB Solder Dispenser لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a50d9063b7ba75dcb8d31f594f586fdfcbb8f0adc7a9f349b07a09bf312bbf87",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Sunflower Windmill - 608 Bearing Mod. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Sunflower Windmill - 608 Bearing Mod يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Sunflower Windmill - 608 Bearing Mod بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "62b930164bed12e6df253901aae3c1efc237fe0542264ae02c296bbc4c4f7e56",
+  "en": "To download the model files please visit the Sunflower Windmill - 608 Bearing Mod on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Sunflower Windmill - 608 Bearing Mod على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Sunflower Windmill - 608 Bearing Mod لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "db3142e6f3f20dfeac7fb106af6c163983e30ca8bf420f4cc5097a7cb7e37b93",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional USB Motorized Butterfly Figurine. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع USB Motorized Butterfly Figurine يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی USB Motorized Butterfly Figurine بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "18bf42cb1fdf4da281d842ed9f7049a67ff7225df8dda049e4d6113f78601e5a",
+  "en": "To download the model files please visit the USB Motorized Butterfly Figurine on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة USB Motorized Butterfly Figurine على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی USB Motorized Butterfly Figurine لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e86022f69f95b5daca731cdc8f587c4573d28b4ebe1c4909304b0883b7cfb67e",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Wind-powered Pumping Station - Wind Pump. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Wind-powered Pumping Station - Wind Pump يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Wind-powered Pumping Station - Wind Pump بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "43bd931cd7df28d0c1e6c77cd5e25105e1ee688bfa346fd0b07e3baeaf0f204b",
+  "en": "To download the model files please visit the Wind-powered Pumping Station - Wind Pump on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Wind-powered Pumping Station - Wind Pump على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Wind-powered Pumping Station - Wind Pump لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ccf38660f576eee0d2f8b08cde5e01b15d9c0b280e67fc9599cfcea9ed5e2148",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Press-to-Spin Squishy Ball. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Press-to-Spin Squishy Ball يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Press-to-Spin Squishy Ball بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9f7de1743bb38c3a8ec1b340365eec4ca179058a3c354c47c82f68fa9f598977",
+  "en": "To download the model files please visit the HelixCore – Press-to-Spin Squishy Ball on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة HelixCore – Press-to-Spin Squishy Ball على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی HelixCore – Press-to-Spin Squishy Ball لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d802f2a19e2788da8e58849acef3f88bfcaf42dbd4bf146c0552da0a013e11ca",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Vega 30. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Vega 30 يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Vega 30 بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "091bc0908e6a9bbbf52b0fcb922ee2d63422a8b73fbf2f4c4e214feab58da3a6",
+  "en": "To download the model files please visit the Vega 30 on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Vega 30 على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Vega 30 لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5c0eab2c5984eabefdf04b4a784fd7862953b0d7b7abb5b1c6cd66a83e2a4252",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Budgie Shower Spa – Mini Bird Bath Fountain. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Budgie Shower Spa – Mini Bird Bath Fountain يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Budgie Shower Spa – Mini Bird Bath Fountain بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c8405c5fbbd1058bd787ac27017ac5dd1f14fe33de23324b052e9101a8fee199",
+  "en": "To download the model files please visit the Budgie Shower Spa – Mini Bird Bath Fountain on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Budgie Shower Spa – Mini Bird Bath Fountain على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Budgie Shower Spa – Mini Bird Bath Fountain لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e053005ada2c08955a4766d49420c22a39843155bec9515d52054e2887ae7efa",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional 360° Rotating Lamp. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع 360° Rotating Lamp يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی 360° Rotating Lamp بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "67fdd2390819a07542480f92dfc9519d1b54474901aa9129ab80d2e06896bcf5",
+  "en": "To download the model files please visit the 360° Rotating Lamp on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة 360° Rotating Lamp على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی 360° Rotating Lamp لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b48024b063453bbca5e6bed3528c79de9b5447a2d0716a976efb07e6daa24f4f",
+  "en": "MEC-1: a omnidirectional forklift",
+  "ar": "رافعة MEC-1: رافعة شوكية متعددة الاتجاهات",
+  "ckb": "فۆرکلیفتی MEC-1: فۆرکلیفتێکی هەمەئاراستە",
+  "kind": "block_title"
+ },
+ {
+  "h": "daedd18f01dfef705548b9aab9cf73f8bb183208c08a8bddd0702a289a0edd22",
+  "en": "Meet the MEC-1 — a heavy-duty omnidirectional forklift built on the CyberBrick RC platform. With silicone-molded Mecanum wheels for superior grip, it delivers smooth omnidirectional movement, pivot steering, and three-speed control. Compatible with standard forklift pallets and featuring adaptive lighting effects, it's the ultimate desktop warehouse machine ready to impress.",
+  "ar": "تعرّف على MEC-1 — رافعة شوكية متعددة الاتجاهات للمهام الشاقة مبنية على منصة CyberBrick RC. بفضل عجلات Mecanum المصبوبة من السيليكون لتماسك فائق، توفّر حركة سلسة في جميع الاتجاهات، وتوجيهًا بالدوران حول محور، وتحكمًا بثلاث سرعات. وهي متوافقة مع منصات الرافعات الشوكية القياسية، وتتميّز بتأثيرات إضاءة متكيّفة، لتكون آلة المستودع المكتبية المثالية الجاهزة لإبهارك.",
+  "ckb": "ئاشنا بە بە MEC-1 — فۆرکلیفتێکی هەمەئاراستەی کاری قورس کە لەسەر پلاتفۆرمی CyberBrick RC دروست کراوە. بە تایەکانی Mecanum کە لە سیلیکۆن قاڵب کراون بۆ گرتنی بەهێزتر، جووڵەی نەرم بە هەموو ئاراستەکان، سووڕانەوە بە دەوری تەوەر و کۆنترۆڵی سێ خێرایی پێشکەش دەکات. لەگەڵ پالێتە ستانداردەکانی فۆرکلیفت دەگونجێت و کاریگەریی ڕووناکیی خۆگونجێنی هەیە، و باشترین ئامێری ئەمباری سەرمێزە کە ئامادەیە سەرسامت بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1982115eefb281e687849680e9446129c5dd7a3c3f30b101ce93923aad0e21d0",
+  "en": "Omnidirectional Movement",
+  "ar": "حركة في جميع الاتجاهات",
+  "ckb": "جووڵەی هەمەئاراستە",
+  "kind": "block_title"
+ },
+ {
+  "h": "765815d1dacd72631258154dbd940181e135b04275496c7d0730464f31e3c2a2",
+  "en": "Move freely in any direction without changing the vehicle’s heading, making the model feel more flexible and responsive.",
+  "ar": "تحرّك بحرية في أي اتجاه دون تغيير وجهة المركبة، ما يمنح النموذج إحساسًا بمرونة وسرعة استجابة أكبر.",
+  "ckb": "بە ئازادی بە هەر ئاراستەیەک بجووڵێ بەبێ گۆڕینی ڕووی ئۆتۆمبێلەکە، کە وا دەکات مۆدێلەکە نەرمونیانتر و وەڵامدەرەوەتر هەست پێبکرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "adf240dc68d63e1993e70e3de9ef42b6792698f498a027f29580ba9bf84a514a",
+  "en": "Advanced Maneuverability",
+  "ar": "قدرة متقدمة على المناورة",
+  "ckb": "توانای پێشکەوتووی مانۆڕکردن",
+  "kind": "block_title"
+ },
+ {
+  "h": "aa02d199470eaac34a664d7c614c4584c3206aed93f649e0ed4dbd4dbb8a04e2",
+  "en": "Control the vehicle with tank-style differential steering for smooth, low-speed maneuvering, enhanced by offset pivot movement that lets you rotate around custom points rather than just spinning in place.",
+  "ar": "تحكّم في المركبة بتوجيه تفاضلي على طريقة الدبابات لمناورة سلسة بسرعة منخفضة، معزّز بحركة دوران حول محور مُزاح تتيح لك الدوران حول نقاط تحددها بدلًا من الدوران في المكان فقط.",
+  "ckb": "ئۆتۆمبێلەکە بە ئاراستەکردنی جیاکاریی شێوە تانک کۆنترۆڵ بکە بۆ مانۆڕکردنی نەرم بە خێرایی کەم، کە بە جووڵەی سووڕانەوە بە دەوری تەوەرێکی لاداو بەهێزتر کراوە و ڕێگەت پێدەدات بە دەوری خاڵی دیاریکراوی خۆتدا بسووڕێیتەوە نەک تەنها لە شوێنی خۆیدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d8cf04a1aa1847938b738d3802f374a5ff21ee0ac6ebeef899d9f1c79cfb49ce",
+  "en": "Forklift Lift Control",
+  "ar": "التحكم في رفع الرافعة الشوكية",
+  "ckb": "کۆنترۆڵی بەرزکردنەوەی فۆرکلیفت",
+  "kind": "block_title"
+ },
+ {
+  "h": "f2422c6f330a6fa0b0fc635bd08a3ebabd4ca141e9bab68990921a9e5efaab6e",
+  "en": "Raise and lower the fork with precise control, adding more interactive play value and making the model feel like a real working vehicle.",
+  "ar": "ارفع الشوكة واخفضها بتحكم دقيق، ما يضيف قيمة لعب تفاعلية أكبر ويجعل النموذج يبدو كمركبة عمل حقيقية.",
+  "ckb": "چەتاڵەکە بە کۆنترۆڵێکی ورد بەرز و نزم بکەرەوە، کە بەهای یاریی کارلێککەرانەی زیاتر زیاد دەکات و وا دەکات مۆدێلەکە وەک ئۆتۆمبێلێکی کاری ڕاستەقینە هەست پێبکرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6c9b89c4ed0cc125fd90ce1173dcf76f3ce9b90962d2f50dc178c9dfb4925369",
+  "en": "CyberBrick Mk20 & 1A4 brings one of the smallest German weapon carrier to life in a highly detailed 1/16 scale RC build. The compact hull, functional tracks, working lights, and articulated main gun give it the right mix between scale-model realism and hands-on movement. Two distinct variants show its early life form the 1980’s to its recent combat readiness in the 2000’s. Its small footprint and big character make it a fascinating build for young and old with enough mechanical detail to make the build as rewarding as possible.",
+  "ar": "يُعيد نموذج CyberBrick Mk20 & 1A4 إلى الحياة واحدة من أصغر حاملات الأسلحة الألمانية في مجسّم RC عالي التفاصيل بمقياس 1/16. ويمنحه الهيكل المدمج والجنازير العاملة والأضواء الشغّالة والمدفع الرئيسي المفصلي المزيج المناسب بين واقعية المجسّمات وحركة التحكم العملية. ويُظهر إصداران مميّزان مسيرته من بداياته في حقبة 1980 إلى جاهزيته القتالية الحديثة في حقبة 2000. وبحجمه الصغير وشخصيته الكبيرة، يُعد مشروع بناء رائعًا للصغار والكبار، مع تفاصيل ميكانيكية كافية تجعل البناء مُجزيًا قدر الإمكان.",
+  "ckb": "مۆدێلی CyberBrick Mk20 & 1A4 یەکێک لە بچووکترین هەڵگرەکانی چەکی ئەڵمانی لە دروستکراوێکی پڕ وردەکاریی RC بە پێوەری 1/16 زیندوو دەکاتەوە. لاشە بچووکەکەی، زنجیرە کاراکانی، گڵۆپە کارکەرەکانی و تۆپە سەرەکییە جومگەدارەکەی تێکەڵەی گونجاوی ڕاستەقینەیی مۆدێلی پێوەرکراو و جووڵەی کرداری پێدەبەخشن. دوو وەشانی جیاواز ژیانی سەرەتای لە سەردەمی 1980 تا ئامادەیی جەنگیی نوێی لە سەردەمی 2000 پیشان دەدەن. بە شوێنپێی بچووک و کەسایەتیی گەورەی، دروستکردنێکی سەرنجڕاکێشە بۆ گەنج و پیر، بە وردەکاریی میکانیکیی پێویست بۆ ئەوەی دروستکردنەکە تا دەکرێت بەسوود و دڵخۆشکەر بێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fa51c4ff88f96cb2718d90f40cafcb0457db7c183036627d45de0780a7fe7ebc",
+  "en": "Build for Historical Accuracy",
+  "ar": "مصمّم للدقة التاريخية",
+  "ckb": "دروستکراو بۆ وردیی مێژوویی",
+  "kind": "block_title"
+ },
+ {
+  "h": "6233948ca16fa5f4e3ead48ddb6769382372efad166630ba1fdb295e3f9bd060",
+  "en": "Designed for the ultimate display of historical accuracy, the 1/16 scale model was built upon extensive 3D scans and reference photography form the \"Deutsches Panzermuseum Munster\", setting new standards for accuracy and scale fidelity.",
+  "ar": "صُمّم المجسّم بمقياس 1/16 ليقدّم أعلى درجات الدقة التاريخية، وبُني استنادًا إلى مسوحات 3D مكثّفة وصور مرجعية من \"Deutsches Panzermuseum Munster\"، ليضع معايير جديدة للدقة والأمانة في المقياس.",
+  "ckb": "مۆدێلەکە بە پێوەری 1/16 بۆ بەرزترین پیشاندانی وردیی مێژوویی دیزاین کراوە، و لەسەر بنەمای سکانی فراوانی 3D و وێنەگرتنی سەرچاوەیی لە \"Deutsches Panzermuseum Munster\" دروست کراوە، و ستانداردی نوێ بۆ وردی و دڵسۆزی بە پێوەر دادەنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6faad8fc97ff771d07aead266b93c61bfa862d204aefa1ca0f64c955d65a3601",
+  "en": "Tiny Size, Big Impact",
+  "ar": "حجم صغير وتأثير كبير",
+  "ckb": "قەبارەی بچووک، کاریگەریی گەورە",
+  "kind": "block_title"
+ },
+ {
+  "h": "ff84274a536246c35ef00661f018642dde0eb2a5e06d27c99b759b1e80ee6128",
+  "en": "The small Waffenträger looks almost impossibly small parked between the running gear of a Leopard main battle tank. However, the extensive details make it look like a proper airborne warrior instead of a generic mini tank.",
+  "ar": "تبدو مركبة Waffenträger الصغيرة صغيرة على نحو يكاد لا يُصدَّق وهي متوقفة بين جنازير دبابة القتال الرئيسية Leopard. ومع ذلك، تجعلها تفاصيلها الغنية تبدو محاربًا حقيقيًا محمولًا جوًا بدلًا من دبابة صغيرة عادية.",
+  "ckb": "کاتێک لە نێوان چەرخ و زنجیرەکانی تانکێکی جەنگیی سەرەکیی جۆری Leopard وەستاوە، ئۆتۆمبێلە بچووکەکەی Waffenträger بە شێوەیەکی نزیک لە باوەڕنەکراو بچووک دەردەکەوێت. لەگەڵ ئەوەشدا، وردەکارییە فراوانەکانی وای لێدەکەن وەک جەنگاوەرێکی ڕاستەقینەی هەوابرد دەربکەوێت نەک تانکێکی بچووکی ئاسایی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6d5953601f09206e6a389a8f946ba57b74075c1a3df1bb3674be6dab8c865961",
+  "en": "Multiple Variants",
+  "ar": "إصدارات متعددة",
+  "ckb": "چەندین وەشان",
+  "kind": "block_title"
+ },
+ {
+  "h": "420f88dbc3c13162e26fb825490dfb290d89734a816427f0b6de474ef077dad6",
+  "en": "Available in two iconic variants:",
+  "ar": "يأتي بإصدارين أيقونيين:",
+  "ckb": "بە دوو وەشانی ناسراو دێت:",
+  "kind": "block_line"
+ },
+ {
+  "h": "b9b706a5f84351472d079089c4d5d61c94639c8419388f1519c934eab7adea8a",
+  "en": "The original Mk20 entered production late in the Cold War；",
+  "ar": "دخل Mk20 الأصلي مرحلة الإنتاج في أواخر الحرب الباردة؛",
+  "ckb": "وەشانی ڕەسەنی Mk20 لە کۆتاییەکانی جەنگی سارددا چووە قۆناغی بەرهەمهێنانەوە؛",
+  "kind": "block_line"
+ },
+ {
+  "h": "e1689524836b6f796c643cd42d6bc6417eb4e96b0c695f1e1b809c8769c53519",
+  "en": "The upgraded 1A4, Introduced in the early 2000s",
+  "ar": "النسخة المطوّرة 1A4، التي قُدّمت في مطلع سنوات 2000",
+  "ckb": "وەشانی نوێکراوەی 1A4، کە لە سەرەتای ساڵانی 2000 ناسێنرا",
+  "kind": "block_line"
+ },
+ {
+  "h": "ef094d4b66579c2da2324a3094626e436fd81bb77bddaa781394da1c9119564c",
+  "en": "Small but Feature Rich",
+  "ar": "صغيرة لكنها غنية بالمزايا",
+  "ckb": "بچووک بەڵام پڕ لە تایبەتمەندی",
+  "kind": "block_title"
+ },
+ {
+  "h": "a447123d1c44e6af861c7b08631d978c29e4dd086ad22d25877623dfeb3a2e1d",
+  "en": "Even with the small size of the tanks the detail doesn’t suffer. The sloped armor, exposed running gear, bright LEDs, black tracks links and raised weapon station bring the model to life giving it a convincing field- ready look even at close range.",
+  "ar": "حتى مع صغر حجم الدبابات، لا تتأثر التفاصيل. فالدروع المائلة، ومنظومة العجلات والجنازير المكشوفة، ومصابيح LED الساطعة، ووصلات الجنازير السوداء، ومحطة السلاح المرتفعة، تبثّ الحياة في النموذج وتمنحه مظهرًا مقنعًا جاهزًا للميدان حتى عن قرب.",
+  "ckb": "تەنانەت لەگەڵ قەبارە بچووکی تانکەکانیش، وردەکارییەکان کەم نابنەوە. زرێی لار، چەرخ و زنجیرەی ئاشکرا، گڵۆپە درەوشاوەکانی LED، ئەڵقەکانی زنجیرەی ڕەش و وێستگەی چەکی بەرزکراوە مۆدێلەکە زیندوو دەکەنەوە و ڕواڵەتێکی قایلکەری ئامادە بۆ مەیدانی پێدەبەخشن تەنانەت لە نزیکەوەش.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c006d7be48b9d5031586dad530e9a35d692040e1f8a0ac6f6084ede36c77db8a",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional The Machine Core - Mechanical Puzzle Box. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع The Machine Core - Mechanical Puzzle Box يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی The Machine Core - Mechanical Puzzle Box بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "067c30b7b813963268b8e42f31d1b5499ca6800ffe7ea96962d5ad155e5a26c5",
+  "en": "To download the model files please visit the The Machine Core - Mechanical Puzzle Box on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة The Machine Core - Mechanical Puzzle Box على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی The Machine Core - Mechanical Puzzle Box لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2493d0fd0c61ca96ae4f88b3e9ca75d4441796d6c212a9fa6c8f5d34793004c0",
+  "en": "Add the Lubricant Grease to use during model assembly for smoother operation.",
+  "ar": "أضف Lubricant Grease لاستخدامه أثناء تجميع النموذج للحصول على تشغيل أكثر سلاسة.",
+  "ckb": "بۆ کارکردنی نەرمتر، Lubricant Grease زیاد بکە تا لە کاتی پێکەوەنانی مۆدێلەکەدا بەکاری بهێنیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d109ae657d3b61b9d10699702e3075f6378e6c0fa789437c915e9c17fed7144c",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Filament Respooler Winder. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Filament Respooler Winder يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Filament Respooler Winder بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0adde054a06fc02151e65b83f8d445bfe7589f3f9c6f2788370ce56feda9a49c",
+  "en": "To download the model files please visit the Filament Respooler Winder on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Filament Respooler Winder على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Filament Respooler Winder لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3c056f6b84666ffff485298304c2c650fba40594bdb91266f505d819103ee52e",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Exploding Tower with Light-Up Dice. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Exploding Tower with Light-Up Dice يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Exploding Tower with Light-Up Dice بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "26778339dd1361d37c1e7a106b467763ded5d9872c0c0a280b3760bd0bf1f049",
+  "en": "To download the model files please visit the Exploding Tower with Light-Up Dice on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Exploding Tower with Light-Up Dice على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Exploding Tower with Light-Up Dice لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "04c8111d3ffb43fc50cb9c495df107a44e63b602d3c5c133dc5f89c669d63bde",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional DIY Framework for AMS Lite. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع DIY Framework for AMS Lite يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی DIY Framework for AMS Lite بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ab310bf0341e5f8514bc4bac9bfa8ba3ae80870d584cc01e8b19458c9659b569",
+  "en": "To download the model files please visit the DIY Framework for AMS Lite on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة DIY Framework for AMS Lite على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی DIY Framework for AMS Lite لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "59e69d0e75254fd1347a91799300a7ce3067725d971d74537e3218a0d6abdde0",
+  "en": "Please note that top mounting and RFID recognition are supported across all versions of this model.",
+  "ar": "يرجى ملاحظة أن التركيب العلوي والتعرّف عبر RFID مدعومان في جميع إصدارات هذا النموذج.",
+  "ckb": "تکایە ئاگاداربە کە دامەزراندنی سەرەوە و ناسینەوە بە RFID لە هەموو وەشانەکانی ئەم مۆدێلەدا پشتگیری دەکرێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "19c7aeed04e06d2506e440d5018ea87d31333213873628e794871f29fc81f82e",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Chewing Gum Dispenser. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Chewing Gum Dispenser يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Chewing Gum Dispenser بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "178813a34e1932c8ef1678f194466250911cc128622f3f79dd40fecce39a34c4",
+  "en": "To download the model files please visit the Chewing Gum Spiral Dispenser on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Chewing Gum Spiral Dispenser على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Chewing Gum Spiral Dispenser لە MakerWorld بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4898b480374076deae502e34069e0f9d54f43501916d4913eeb79e05e6e3b8af",
+  "en": "The product contains all the non-3D printed parts for assembling an entirely functional Electric Train. The filaments and AMS shown in the product images are for demonstration purposes only. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+  "ar": "يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع Electric Train يعمل بكامل وظائفه. الفلامنت ووحدة AMS الظاهرة في صور المنتج هي لأغراض العرض فقط. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی Electric Train بە شێوەیەکی تەواو کارا پێویستن. فیلامێنتەکان و یەکەی AMS کە لە وێنەکانی بەرهەمەکەدا دەبینرێن تەنها بۆ نمایشکردنن. بۆ تەواوکردنی کارەکە، پێویستە فایلەکانی مۆدێل دابگریت و پارچەکانی تر بە 3D چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "db1dd0465e0bd26e25b3b795dc7a1dbff56642e323638f25a9ee52f8d998b78d",
+  "en": "To download the model files please visit the Electric Train on MakerWorld.",
+  "ar": "لتنزيل ملفات النموذج، يرجى زيارة صفحة Electric Train على MakerWorld.",
+  "ckb": "بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Electric Train لە MakerWorld بکە.",
+  "kind": "block_line"
+ }
+]

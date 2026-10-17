@@ -1,0 +1,3472 @@
+{
+ "batch": 27,
+ "surface": "api",
+ "handles": [
+  "screws-kit-x1-series-p1-series-and-ams",
+  "base-housing-a1-mini",
+  "baseplate-a1-mini",
+  "a1-mini-x-axis-motor-cover",
+  "y-axis-tensioner-a1-mini",
+  "x-y-axis-pulley-a1-mini",
+  "extruder-motor-a1-series",
+  "toolhead-block-a1-series",
+  "ams-lite-mainboard",
+  "ams-lite-feeder-support",
+  "ams-lite-feeder-cap",
+  "ams-lite-feeder-motor",
+  "ams-lite-stand",
+  "filament-sensor-base-a1-series",
+  "display-rear-housing-with-hinge-x1-series",
+  "motor-drive-pulley-x1-series-and-p1-series",
+  "toolhead-front-carriage-x1-series-and-p1-series",
+  "z-axis-tensioner-x1-series-and-p1-series",
+  "spool-holder-x1-series-and-p1-series",
+  "ap-board-p1s",
+  "ap-board-x1-series",
+  "chamber-camera-p1-series",
+  "printer-cable-pack-7-in-1",
+  "part-cooling-fan-air-duct",
+  "th-board-h2-series",
+  "purge-wiper-h2-series",
+  "usb-c-cable-h2-series",
+  "toolhead-to-mc-board-cable-h2d-h2c",
+  "anti-vibration-feet-h2-series",
+  "cooling-fan-for-hotend-h2",
+  "xy-motor-h2-series",
+  "hotend-cooling-fan-air-duct",
+  "nozzle-blocker-magnet-bracket-h2d-h2c",
+  "z-motor-h2-series",
+  "nozzle-camera",
+  "xy-belt-tensioner-h2-series",
+  "toolhead-camera-h2-series",
+  "dual-extruder-unit-h2d-h2c",
+  "x-axis-idler-pulley-h2-series",
+  "dual-extruder-filament-guide",
+  "quick-change-tool-interface-h2d-h2c",
+  "dual-extruder-idlers-and-filament-sensor",
+  "regular-idler-pulley",
+  "dual-extruder-gears",
+  "h2-ptfe-tube-coupler",
+  "xy-belt-h2-series",
+  "z-belt-h2-series",
+  "x-axis-assembly-h2-series",
+  "front-glass-door-h2-series",
+  "front-door-mounting-kit-h2-series",
+  "glass-cover-plate-h2-series",
+  "rear-panel-h2-series",
+  "part-cooling-fan-h2-series",
+  "automatic-top-vent-kit",
+  "front-cover-h2-series",
+  "enclosure-plastic-bottom-ring",
+  "chamber-exhuast-fan",
+  "extruder-hall-sensor-board-h2d-h2c",
+  "activated-carbon-air-filter-cover-h2-series",
+  "3513-extruder-servo-motor",
+  "active-chamber-exhaust",
+  "mc-board-h2-series",
+  "purge-chute-h2-series",
+  "4pin-interface-board",
+  "power-safety-key-unit",
+  "hall-effect-sensor",
+  "flow-blocker-h2d-h2c",
+  "nozzle-lifting-rail",
+  "usb-port-board",
+  "switching-power-supply",
+  "touchscreen-h2-series",
+  "toolhead-front-cover-h2-series",
+  "extruder-connection-board-h2d",
+  "th-board-fpc-cable-h2d-h2c",
+  "start-pause-button",
+  "birds-eye-camera",
+  "top-chamber-led-cover",
+  "ap-board-cover-h2-series",
+  "ac-board-cover-h2-series",
+  "live-view-camera-h2-series",
+  "z-axis-tensioner-h2-series",
+  "h2-safety-key",
+  "mc-ap-cable-pack-2-in-1-h2d-h2c",
+  "power-socket",
+  "emergency-stop-button",
+  "tube-organizer",
+  "mc-board-fan-h2-series",
+  "auxiliary-part-cooling-fan-h2-series",
+  "cable-chain-h2-series",
+  "wifi-antenna-h2-series",
+  "h2-status-indicator",
+  "enclosure-top-fame-h2-series",
+  "laser-air-assist-tube-connector",
+  "chamber-heat-circulation-fan",
+  "nozzle-offset-calibration-sensor",
+  "hotend-heating-assembly-h2d-and-h2c",
+  "filament-buffer-h2-series",
+  "spool-holder-and-its-bracket",
+  "air-pump-filter",
+  "filament-cutter-lever-h2d-h2c",
+  "weeding-tool",
+  "pen-holder",
+  "ap-board-h2-series",
+  "ac-board-h2-series",
+  "extruder-switch-cam",
+  "blade-holder",
+  "top-chamber-led",
+  "laser-air-assist-tube-coupler",
+  "filament-cutter-stopper",
+  "10-w-laser-air-assist-nozzle-and-laser-lens",
+  "brush",
+  "laser-slats-pack",
+  "heatbed-unit-h2-series",
+  "laser-platform-homing-area-marker",
+  "side-glass",
+  "quick-release-lever-unit",
+  "inner-lining-upper-cover-right",
+  "laser-status-indicator",
+  "inner-lining-left",
+  "nozzle-eddy-sensor",
+  "side-panel-with-glass-window",
+  "chamber-heater-unit-h2-series",
+  "laser-safety-window",
+  "cutting-platform",
+  "laser-base",
+  "toolhead-with-x-axis-assembly-h2-series",
+  "smoke-ventilation-pipe-2m",
+  "smoke-ventilation-pipe-adapter",
+  "ams-2-pro-top-lid",
+  "ams-2-pro-bottom-cover-unit",
+  "ams-2-pro-main-frame",
+  "ams-2-pro-driven-support-shaft-assembly",
+  "ams-2-pro-active-support-shaft-assembly",
+  "ams-2-pro-mainboard",
+  "ams-2-pro-power-board",
+  "ams-2-pro-internal-hub-unit",
+  "3520-ams-internal-assist-motor",
+  "ams-2-pro-heating-unit-slot-1-and-2",
+  "ams-2-pro-heating-unit-slot-3-and-4",
+  "ams-2-pro-air-inlet-unit",
+  "ams-ht-top-lid",
+  "ams-ht-bottom-cover-unit",
+  "ams-ht-main-frame",
+  "ams-ht-heating-unit",
+  "ams-ht-mainboard",
+  "ams-ht-feeder-hall-sensor-assembly",
+  "ams-ht-ac-power-cord",
+  "ams-ht-feeder-unit",
+  "ams-ht-filament-retraction-assembly",
+  "ams-ht-air-inlet-unit",
+  "ams-ht-power-socket",
+  "ams-ht-power-board",
+  "ams-ht-screen",
+  "ams-ht-rfid-coil",
+  "ams-ht-driven-support-shaft-assembly",
+  "ams-ht-active-support-shaft-assembly",
+  "ams-ht-lid-status-hall-sensor",
+  "bambu-bus-cable-6pin-for-ams-2-pro-and-ams-ht",
+  "cutting-essentials-refill-pack",
+  "filament-cutter-stopper-h2s",
+  "side-panel-h2s",
+  "extruder-filament-sensor-h2s",
+  "filament-cutter-lever-h2s",
+  "toolhead-rear-cover-h2s",
+  "extruder-unit-h2s",
+  "extruder-unit-front-cover-h2s",
+  "extruder-gear-assembly-h2s",
+  "hotend-heating-assembly-h2s",
+  "extruder-motor-h2s",
+  "eddy-sensor-h2s",
+  "extruder-gear-assembly-p2s",
+  "xy-belt-tensioner-p2s",
+  "x-axis-assembly-p2s",
+  "filament-cutter-lever-p2s",
+  "purge-wiper-p2s",
+  "right-side-panel-p2s",
+  "chamber-temperature-sensor-p2s",
+  "eddy-sensor-p2s",
+  "screen-rear-housing-with-hinge-p2s",
+  "usb-port-assembly-p2s",
+  "extruder-filament-sensor-p2s",
+  "ap-board-cover-p2s",
+  "left-side-panel-p2s",
+  "toolhead-carriage-p2s",
+  "air-filter-p2s",
+  "front-glass-door-p2s",
+  "heatbed-lv-p2s",
+  "led-light-p2s",
+  "z-motor-p2s",
+  "door-sensor-p2s",
+  "xy-motor-p2s",
+  "3508-extruder-servo-motor-p2s",
+  "toolhead-middle-housing-p2s",
+  "toolhead-rear-cover-p2s",
+  "adaptive-airflow-switching-unit-p2s",
+  "cable-chain-p2s",
+  "ptfe-tube-bracket-p2s",
+  "screen-p2s",
+  "live-view-camera-p2s",
+  "spool-holder-p2s-x2d",
+  "ptfe-tube-connector-for-spool-holder-p2s",
+  "front-door-mounting-kit-p2s",
+  "hotend-heating-assembly-p2s",
+  "extruder-unit-front-cover-assembly-p2s",
+  "nozzle-wiping-pad-p2s-x2d",
+  "idler-pulley-p2s",
+  "ap-board-lv-p2s",
+  "xy-belt-p2s",
+  "mc-board-p2s",
+  "cooling-fan-for-hotend-p2s",
+  "front-cover-p2s",
+  "filament-buffer-p2s",
+  "power-switch-assembly-p2s",
+  "screen-fpc-cable-p2s"
+ ],
+ "strings": [
+  {
+   "h": "2f0b844fdeac0c0a11dcaa2d0cbe374c8752c3f20a74947ce19aa3efaf8c42c5",
+   "en": "The Screws Kit for X1 Series/P1 Series and AMS offers the screws most commonly used based on user feedback.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ebfa37a92d592da8cb3c492189d557ec57bed318eb96fe0ef9f1a15df78b0dfc",
+   "en": "Rear Panel and the Front Cover (Front)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[2].cell[3]",
+    "near": "Item Number | Item Name | QTY | Location"
+   },
+   "dict": null
+  },
+  {
+   "h": "3cb2d85d77d6c08fd36f800155b945d2b56ec394e128a47c1607458daed278f8",
+   "en": "P1S panels and the Z-axis Timing Pulley",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[3].cell[3]",
+    "near": "1 | ST3-4.5 | 10 | Rear Panel and the Front Cover (Front)"
+   },
+   "dict": null
+  },
+  {
+   "h": "f655a04732e3eb0a99595c451e9561c8a87002deb5f9f8a247520744dd499217",
+   "en": "XY/Z Motor and the X1 AP Board",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[4].cell[3]",
+    "near": "2 | BT3-6 | 20 | P1S panels and the Z-axis Timing Pulley"
+   },
+   "dict": null
+  },
+  {
+   "h": "433e88ce123c6762840051a4865e087970f52e0cbc26e0f91b01cb66c37974b4",
+   "en": "AMS first stage feeder, the MC board, and the Excess chute",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[5].cell[3]",
+    "near": "3 | M3-6 | 20 | XY/Z Motor and the X1 AP Board"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a62e09b724f8431be5c0688d3d7832bbda264f3b992d1e9f161cd4ed28bc8fe",
+   "en": "Heatbed Unit and the AMS Main Frame",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[6].cell[3]",
+    "near": "4 | BT2-8 | 10 | AMS first stage feeder, the MC board, and the Excess chute"
+   },
+   "dict": null
+  },
+  {
+   "h": "513c5a43ffa09cc4bc72a910eadd5a78ec9cba3a8263f8969c3e81a0a707df08",
+   "en": "Cutter lever",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[7].cell[3]",
+    "near": "5 | BT3-8 | 10 | Heatbed Unit and the AMS Main Frame"
+   },
+   "dict": null
+  },
+  {
+   "h": "17c5625f7d73c400114523b4fa111eac4988b8e5c67637c344f72b1de277bcd4",
+   "en": "Cutter lever Drive gear of the Extruder Unit",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[8].cell[3]",
+    "near": "6 | MG2.5-13 | 10 | Cutter lever"
+   },
+   "dict": null
+  },
+  {
+   "h": "68f520302fb815fd4bcc6c37005982b17e074c761f791616a8815b6428cf6697",
+   "en": "Hotend Cooling Fans",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[10].cell[3]",
+    "near": "8 | MG3-14 | 5 | Hotend"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d89c6d42a1ebc6108689da51520ff9e7e644d264e551058231e280f4a269fbf",
+   "en": "P1S Panels (Upper)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[11].cell[3]",
+    "near": "9 | MG2.5-15 | 5 | Hotend Cooling Fans"
+   },
+   "dict": null
+  },
+  {
+   "h": "9772b3edebf1d9408a0fa3f7e745f2964a0cecbe87ae9db4fc4ff4af22d7cdf7",
+   "en": "X1C Panels",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[12].cell[3]",
+    "near": "10 | ST2-3.5 | 10 | P1S Panels (Upper)"
+   },
+   "dict": null
+  },
+  {
+   "h": "5305d18932be50c9de095d3d103f538d1bba4127b81000d49c04e64da0df1b66",
+   "en": "Rear Panel and the Front Cover (Rear)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[13].cell[3]",
+    "near": "11 | M3-4.5 | 10 | X1C Panels"
+   },
+   "dict": null
+  },
+  {
+   "h": "a20082278e62c081cae0f63c05a2a90127b96caf8599ce94af80c344a0cff84a",
+   "en": "PTFE tube bracket",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[14].cell[3]",
+    "near": "12 | BT3-5 | 20 | Rear Panel and the Front Cover (Rear)"
+   },
+   "dict": null
+  },
+  {
+   "h": "e68b345b8572d348c8e6777dfdc94443a3df29920c60e27b02e2ad2d11e0697a",
+   "en": "TH Board FPC Cable of X1C toolhead PCBs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[15].cell[3]",
+    "near": "13 | BTG2-6 | 10 | PTFE tube bracket"
+   },
+   "dict": null
+  },
+  {
+   "h": "62dc4cf6bc2077e9a4aab52ef0052d1a2c2bcf50108bbc7e9b9cf0465520254a",
+   "en": "Toolhead housing and PCBs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[16].cell[3]",
+    "near": "14 | M1.6-4 | 10 | TH Board FPC Cable of X1C toolhead PCBs"
+   },
+   "dict": null
+  },
+  {
+   "h": "6a53968345a400b297149ef4f3ba6c55fe5200d479e65ad4f809ed40e9b01b46",
+   "en": "The pressing plate",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-x1-series-p1-series-and-ams",
+    "title": "Screws Kit - X1 Series/P1 Series and AMS",
+    "field": "blocks[1].line[17].cell[1]",
+    "near": "15 | BT2-5 | 20 | Toolhead housing and PCBs"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c327f19ec0aaebe25f2c0474daf9c7acfc2d47d06d230e39452b7f58a2f3c88",
+   "en": "The white plastic upper cover of the A1 mini.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "base-housing-a1-mini",
+    "title": "Base Housing - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "882901bd432613511bdaf5819d73d5e1919fdf1ebb486473d90e9ebcc3f83586",
+   "en": "A gray plastic bottom cover of A1 mini.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "baseplate-a1-mini",
+    "title": "Baseplate - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea04489a8b3348e68460407bb24bc304f5ff000414329a681743b6d28c3b90f9",
+   "en": "A white closed box used to cover the X motor, including a front cover, a back cover and a middle frame.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini-x-axis-motor-cover",
+    "title": "X-Axis Motor Cover - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "18e16025a856531498736969bd582365ef0e316ea8657f8184b6c119c83bec8a",
+   "en": "A component for tensioning the Y-axis belt of the A1 mini.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-tensioner-a1-mini",
+    "title": "Y-Axis Tensioner - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa6facd8f4584022b92c5a26b6c64aa16c013ad29fbfb0d6e7953438f2c0006c",
+   "en": "The idler pulley installed on the left side of the X-axis is used to change the direction of movement of the X belt.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "x-y-axis-pulley-a1-mini",
+    "title": "XY-Axis Pulley - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "13ce03b3b9f2080e644d93b40cc5cff60f81c22c8dc78ff04c57b99f674dfe85",
+   "en": "The extruder motor is installed on the tool head and used to drive the extruder to move.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-motor-a1-series",
+    "title": "Extruder Motor - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "eeb442cc679f81668e2c44c38a91f9cdd80ed2afa449f88f0dc3c6a14c0ebb0a",
+   "en": "The toolhead holder for A1 series printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-block-a1-series",
+    "title": "Toolhead Block - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c628705782eb3754363c575967b3b4f2281db47cfc1e2bd5ab8f54cd3c5d2b83",
+   "en": "The AMS lite Mainboard is a circuit board that installs inside the AMS lite. After connecting to the printer, it can control AMS lite to complete the automatic material change function.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-mainboard",
+    "title": "AMS lite Mainboard",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2095979b59a4fd74f8b90e11179ff47ea6c13272d76e0ce688eabd56ac07a0c4",
+   "en": "A plastic connector that connects the two AMS lite Feeder Units together, and fix them to the AMS lite body.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-support",
+    "title": "AMS lite Feeder Support",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e1713aa060b57593805d1e194033c19716b68f4301126a109f80028fecf91884",
+   "en": "The top cover for the AMS lite Feeder Unit, and is marked with numbers.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-cap",
+    "title": "AMS lite Feeder Cap",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "93df94fdc5d88f15c2e395c14352aafc070b12e9c20a96eebf6943038c9dab45",
+   "en": "The motor installed inside the AMS lite Feeder Unit, and it is used to drive the feeder to send out the filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-motor",
+    "title": "AMS lite Feeder Motor",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "414c9367df831d4ddacfa84c92fd5d324e7e3c3a934a441ec786f9badb879a3f",
+   "en": "A bracket that support the AMS lite body.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-stand",
+    "title": "AMS lite Stand",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a7d935c2be706afef8023fd4bff6c0c6d1b42f988ed22148e29b632aa2d2cfcb",
+   "en": "The Filament Sensor Base is installed on the top of the extruder unit of the tool head and is used as a fixed base for mounting the filament sensor (Hall Board) on its side. It also serves as the base for the filament hub of A1 series printers.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-base-a1-series",
+    "title": "Filament Sensor Base - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4c8c9dd713bccb552776a144940fa06132143c585f40f175b8314549b8fda6b",
+   "en": "The Display Rear Housing with Hinge for X1 Series is a robust component that securely attaches the display to the main body of the printer, allowing smooth opening and closing while providing structural support",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "display-rear-housing-with-hinge-x1-series",
+    "title": "Display Rear Housing with Hinge - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "cea175bf8e53006fe78c9c45c7eddcbeb1ff4800ba6bba663bcd60f5cf0609e2",
+   "en": "Common issues of the hinge are:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "display-rear-housing-with-hinge-x1-series",
+    "title": "Display Rear Housing with Hinge - X1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The Display Rear Housing with Hinge for X1 Series is a robust component that securely attaches the display to the main body of the printer, allowing smooth open"
+   },
+   "dict": null
+  },
+  {
+   "h": "4924dd9cb95609f92c2213cfee88f702c6b5d3fe441e870a330b4de6e2d3604b",
+   "en": "The plastic clips of the screen are broken",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "display-rear-housing-with-hinge-x1-series",
+    "title": "Display Rear Housing with Hinge - X1 Series",
+    "field": "blocks[0].line[3]",
+    "near": "Common issues of the hinge are:"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6ca58bc0161d93aacad9a50439c7c90dc4d9e238c3ba90d6244efabdd6378a8",
+   "en": "The screen wobbles due to the hinge being damaged",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "display-rear-housing-with-hinge-x1-series",
+    "title": "Display Rear Housing with Hinge - X1 Series",
+    "field": "blocks[0].line[4]",
+    "near": "• The plastic clips of the screen are broken"
+   },
+   "dict": null
+  },
+  {
+   "h": "37389a6fd85b091438d6b33a00b4faa2f3a59a033cb5c46cdbae5dc2e6650b54",
+   "en": "Recommended by Bambu Lab Customer Support",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "display-rear-housing-with-hinge-x1-series",
+    "title": "Display Rear Housing with Hinge - X1 Series",
+    "field": "blocks[0].line[5]",
+    "near": "• The screen wobbles due to the hinge being damaged"
+   },
+   "dict": null
+  },
+  {
+   "h": "fc35203b4f9fd2a6ccb1deed1b3f73ab8a738d5b7b811920b4d6922efd027525",
+   "en": "The Motor Drive Pulley is installed on a motor to drive the belt.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motor-drive-pulley-x1-series-and-p1-series",
+    "title": "Motor Drive Pulley - X1 Series and P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a58ee6b7f44883b0b12838e6c6f78a0a586fcc2cd77da3df70060f24a11bcfb",
+   "en": "The Toolhead Front Carriage is used to fix the extruder and cutter arm in place.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-front-carriage-x1-series-and-p1-series",
+    "title": "Toolhead Front Carriage - X1 Series and P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e25d34fa67261e2d5c197805ca3208eab62ccaa4b63ee075caa438396f3344e6",
+   "en": "The Z tensioner is a part that mounts on the bottom of the printer and is used to tension the Z timing belt.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-tensioner-x1-series-and-p1-series",
+    "title": "Z-Axis Tensioner - X1/P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "682596943fb1ad7222662cff695c648fe61532a1a91b2463d15829e9553df358",
+   "en": "The Spool Holder is installed on the back of the printer, fixed with 2 screws.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-x1-series-and-p1-series",
+    "title": "Spool Holder - X1 Series and P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0f3feda4334df7798ef995ed9c288323b0fb61be871db53f3f49f5a60ecfd856",
+   "en": "1. The AP boards for P1S and P1P have the same appearance and installation method, but these two boards are not compatible. In other words, P1P can only use the AP board specifically designed for P1P, while P1S can only use the AP board specifically designed for P1S.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-p1s",
+    "title": "AP Board - P1S",
+    "field": "blocks[1].line[1]",
+    "near": "Precautions"
+   },
+   "dict": null
+  },
+  {
+   "h": "81cb4befdca1ea8fcdff9d129186ef3a1d08a47fbb1036fee15f320d4f80aea8",
+   "en": "2. When replacing the AP board, be sure to skip the step of binding the machine when turning it on for the first time.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ap-board-p1s",
+    "title": "AP Board - P1S",
+    "field": "blocks[1].line[2]",
+    "near": "1. The AP boards for P1S and P1P have the same appearance and installation method, but these two boards are not compatible. In other words, P1P can only use the"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7ae6c0c0cbf697125200e3abdff59f5d2cec2c65d4d62116b3553cd5a601c65",
+   "en": "3. After confirming that the replacement is completed, it is necessary to update the SN. To do this, please contact the service team and provide the new and old SN to complete the SN replacement process.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ap-board-p1s",
+    "title": "AP Board - P1S",
+    "field": "blocks[1].line[3]",
+    "near": "2. When replacing the AP board, be sure to skip the step of binding the machine when turning it on for the first time."
+   },
+   "dict": null
+  },
+  {
+   "h": "0a004545b5a841579ab17ebe765bf1485a0cd1cf9361fb65089224fafcee2989",
+   "en": "4. Changing a new AP board does not remove the region lock.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ap-board-p1s",
+    "title": "AP Board - P1S",
+    "field": "blocks[1].line[4]",
+    "near": "3. After confirming that the replacement is completed, it is necessary to update the SN. To do this, please contact the service team and provide the new and old"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e3e52df2bfa550f0da3d74490d9892587e080577ee38c3a547da5943491ab29",
+   "en": "AP Board refers to the Application board, it is a circuit board that controls the interaction of information within the unit. It provides a self-contained operating environment that delivers all system capabilities needed to support the printer's applications, including memory management, system firmware, graphics processing and multimedia decoding.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-x1-series",
+    "title": "AP Board - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8328bdf3fc8adccf3f9acc2ce863c2873cc92bd8f6c4d5a630111d109e41113a",
+   "en": "1. The AP board might need replacement in cases of abnormal voltages, components abnormally hot, burnt out, unrecoverable system failure, or firmware upgrade failure. Some of these can be detected through the log file which is sent to customer support.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-x1-series",
+    "title": "AP Board - X1C",
+    "field": "blocks[1].line[1]",
+    "near": "Precautions"
+   },
+   "dict": null
+  },
+  {
+   "h": "371deaf216e01aebf05089a190d99021c1517bd5867c368bb3f02bb00269c9e5",
+   "en": "The chamber camera has two functions, which are Remote Livestreams and Time-lapses respectively. This camera is used as a replacement part. It does not upgrade the camera quality or FPS for the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-camera-p1-series",
+    "title": "Chamber Camera - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ebdbe124655065fef5ac54d72a6a3cd4425c2742074d64f90260375244a41e9",
+   "en": "This cable pack includes: MC-AC Cable, Emergency Stop Button Detection Hall Board Cable, Left Side Panel Hall Sensor Cable, Right Side Panel Hall Sensor Cable, MC Board Power Cable, 4-Pin Interface Board Cable, Buffer Cable.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "printer-cable-pack-7-in-1",
+    "title": "Printer Cable Pack (7-in-1)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "034d4eebf65c3cc95c3f9281429db50ac5843ad98194eeee06ba4befbcf05e5e",
+   "en": "The Part Cooling Fan Air Duct, positioned at the toolhead's base, works in tandem with the Part Cooling Fan to quickly cool extruded filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "part-cooling-fan-air-duct",
+    "title": "Part Cooling Fan Air Duct",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f95f7690e30873316cfc64901d5c4cc061efb8da9d3eb76e3ba46565cce23534",
+   "en": "The Toolhead (TH) Board is the main electronic component of the Toolhead ensuring seamless operation of the toolhead's parts like the hotend, extruder, cooling fan, and filament cutter.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-h2-series",
+    "title": "TH Board - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "28da65095928dd4feb4cf6df76eff4c68a61c18709ae5c446267b7afea97704f",
+   "en": "The Purge Wiper, positioned above the left inner liner, is used to clean the nozzle and for removing waste filament during printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-h2-series",
+    "title": "Purge Wiper - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "267c48990e112c3f75bedde9eb4ccf21e9d0a771124ea8e66c9245fe601b3c1b",
+   "en": "The USB-C Cable is used to connect the TH board and the AP board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "usb-c-cable-h2-series",
+    "title": "USB-C Cable - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "228a4a493c8757ad05b4e8f4f4e9d35ca2e54a61497f89ea53f0de3d24733643",
+   "en": "The Toolhead to MC Board Cable connects to the MC board and extends to the buffer area, where it links with the built-in cable on the TH board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-to-mc-board-cable-h2d-h2c",
+    "title": "Toolhead to MC Board Cable - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "11c14e1764d1df2a091f7ba720bf439ee6df766186fe46267756b3237b947538",
+   "en": "The Anti-Vibration Feet are used to reduce printer vibrations during the printing process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "anti-vibration-feet-h2-series",
+    "title": "Anti-Vibration Feet - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "17eb104663e4e4e247d828d75e1a13348f6d862d62ce3539e4f6e283f8bb76a3",
+   "en": "The Cooling Fan for Hotend, situated between the TH board and extruder, cools the hotend to avoid premature filament softening and clogs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cooling-fan-for-hotend-h2",
+    "title": "Cooling Fan for Hotend - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a105a61a86f3148b43406682888f1f10b2ae6aa5782d0deaa6095dd4d3e4ce61",
+   "en": "The XY Motor is a stepper motor installed at the back of the printer, responsible for driving the toolhead's movement in the X and Y directions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xy-motor-h2-series",
+    "title": "XY Motor - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d03f07d0c28172e51fa9dab0e6930a3d96d5ac85016f3a5b52f0cb1a22ad702f",
+   "en": "The Hotend Cooling Fan Air Duct, positioned between the TH board and extruder, cools the hotend to prevent premature filament softening and clogs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-cooling-fan-air-duct",
+    "title": "Hotend Cooling Fan Air Duct",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "bbfd2478984f445ca0a212bd76dd778de3b4faeb6d56c82599361c43efa2533b",
+   "en": "The Nozzle Blocker Magnet Bracket is installed at the bottom of the toolhead and holds three magnets that secure the Nozzle Blocker in place.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-blocker-magnet-bracket-h2d-h2c",
+    "title": "Nozzle Blocker Magnet Bracket - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f7c300e56a01e998bd0c5a9c148a73c6f3f3b5be5edce538b729feb6a648f278",
+   "en": "The Z motor is installed at the back of the printer and is responsible for driving the heatbed's movement in the Z direction.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-motor-h2-series",
+    "title": "Z Motor - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c59740cfffeaaa306155702532f29029825b33cd2c40aefe91e25cec44ee1ad",
+   "en": "The Nozzle Camera, mounted at the toolhead's rear, supports 1080p at 10fps (up to 30fps) for detecting hotend wrapping, air printing, spaghetti issues, and Chute positioning.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-camera",
+    "title": "Nozzle Camera",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4bb4a7bc8b92f85717445636eda3d799388d26e1e440c796afa708abcfc30bb0",
+   "en": "The XY Belt Tensioner is installed behind the X/Y motor and is used to tension the belt.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-h2-series",
+    "title": "XY Belt Tensioner - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "45ea428e2e146ed67f3cb2f78649570cd14e36d5bc19ad39979b6b89e0f16cd3",
+   "en": "The toolhead camera (1080p, 30fps), mounted on the right side, enables motion accuracy calibration, precise nozzle offset adjustment, and code recognition for the build plate and laser pad.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-camera-h2-series",
+    "title": "Toolhead Camera - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e34d3a64e6e47f87018fd148ebaedf09600c1e5904756a6cf970d23a0cac29b0",
+   "en": "The Extruder Unit features dual gears to drive filament into the hotend, boosting extrusion force, minimizing slippage, and enhancing wear resistance. Paired with a robust extruder motor, it ensures reliable extrusion power.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-unit-h2d-h2c",
+    "title": "Dual Extruder Unit - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "169f9ce894ad09347bf90d593f7dd83dcfd2970ce1f0755262306890806e583a",
+   "en": "The X-Axis Idler Pulley is used to guide the belt and facilitate movement along the X/Y axes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-idler-pulley-h2-series",
+    "title": "X-Axis Idler Pulley - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fede8884290d898f832fb36fca1fb56eae82c400a154b6caaa46cda2592834a9",
+   "en": "The Dual Extruder Filament Guide primarily serves to direct the filament from the extruder gears to the nozzle.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-filament-guide",
+    "title": "Dual Extruder Filament Guide",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0867224937dfe5236b84951f65d771d20e62305d8c6867a6e8027d23d2d5a32a",
+   "en": "The Quick Change Tool Interface links the FPC cable and indicator lights for both extruders while offering a seamless attachment point for the laser and cutting modules.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "quick-change-tool-interface-h2d-h2c",
+    "title": "Quick Change Tool Interface - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b815238df0311565e9ade23bd69b81fad759c2449d2a46cb85538be6c9a66e9",
+   "en": "The Dual Extruder Idlers and Filament Sensor works together with the drive gear to grip and feed the filament, ensuring stable extrusion. In a dual extrusion system, it switches between different filament paths to support multi-color or multi-material printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-idlers-and-filament-sensor",
+    "title": "Dual Extruder Idlers and Filament Sensor",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "745f780750cc2e40442734ec16d164cbeeae13c6ef133a9dae9486ee7c106fb1",
+   "en": "The Regular Idler Pulley is used to guide the belt and facilitate movement along the X/Y axes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "regular-idler-pulley",
+    "title": "Regular Idler Pulley",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "83e53e5e37b554d7ae4d0ada699feee2198ae51ca9d4819f1a3daebd133b6ded",
+   "en": "The Dual Extruder Gears are responsible for precisely advancing and controlling the movement of the filament, ensuring a smooth printing process, and switching to different filaments when needed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dual-extruder-gears",
+    "title": "Dual Extruder Gears",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "eade28df1ef147bbc8e290582bf55c063c7bfeb63f533c7437d96e8d6f7b857e",
+   "en": "The PTFE Tube Coupler is used to secure the PTFE tube and connect the PTFE tube between the buffer and the tool head.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2-ptfe-tube-coupler",
+    "title": "H2 PTFE Tube Coupler",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "562fe52044880bade949600bf5f6f164444da038d264bbd5723beae3de94e1a7",
+   "en": "The XY Belt connects the XY Motor and the toolhead, driving the toolhead's movement in the X/Y directions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-h2-series",
+    "title": "XY Belt - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "88c99a5e64f21664cb011aadb2fc57de543e22e68a49b6df8b530c320318d5de",
+   "en": "The Z belt is a closed-loop belt with a length of 1142mm, installed at the bottom of the printer. It connects the Z-axis motor and the Z-axis synchronizer wheel, driving the heated bed's movement along the Z-axis.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt-h2-series",
+    "title": "Z Belt - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca6d3772224ea2b26b45e1716cfa081d0e744f0a6a1d68ad4857c11ea08788fe",
+   "en": "The X-Axis Assembly consists of the linear rail, lifting bracket, and the toolhead middle frame, and it controls the toolhead's movement along the X-axis.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-assembly-h2-series",
+    "title": "X-Axis Assembly - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2ccdc610d96594adf78f2418246461e6076ddfd180043cc00894910fcaf7f96",
+   "en": "Front Glass Door/Front Laser Safety Window is installed in front of the printer. The color of the front glass door is black, and the color of the front laser safety window is green. Therefore, there are 2 types of front door spare parts for H2 Series. You can choose the corresponding spare parts according to your needs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-glass-door-h2-series",
+    "title": "Front Glass Door - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c308576b4b0ba57a190ac469cb7cf0e29ab2e27cff124372c5d83056c1b0c71e",
+   "en": "The Front Door Mounting Kit is a set of accessories used to secure the printer's Front Glass Door to the device.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-door-mounting-kit-h2-series",
+    "title": "Front Door Mounting Kit - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "217eaf821148dc2720185e51d8e2d4730f2a15f031121048df8135842fb5fe8b",
+   "en": "The Glass Cover Plate is used as a top cover of the H2 Series",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "glass-cover-plate-h2-series",
+    "title": "Glass Cover Plate - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b6f8963ec7ac1f4d820110c366469916696aa11309e544a7eed7f1c31c15d608",
+   "en": "The Rear Panel is a metallic panel installed at the back of the printer to cover the electronics.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rear-panel-h2-series",
+    "title": "Rear Panel - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b185a352011862f4b663ef49038dd57c22673272b067f23636a8dbb6c3050696",
+   "en": "The Part Cooling Fan, located at the toolhead's base, works in tandem with the Air Duct to swiftly cool extruded filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "part-cooling-fan-h2-series",
+    "title": "Part Cooling Fan - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e081313af0fd32f5fe9adc60fb8bfb392f199656531064e7138379e1eef24b4",
+   "en": "The Automatic Top Vent Kit is installed at the top of the printer's frame and is controlled by a motor to open and close the vent for airflow management",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "automatic-top-vent-kit",
+    "title": "Automatic Top Vent Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7ad6bec961442fea6d630204c413bed76fcef21a863cd8296f670b8da67ad193",
+   "en": "The Front Cover is a plastic component installed at the top front section of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-cover-h2-series",
+    "title": "Front Cover - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "567c1c9cf862493166f6c954590522542b7f9351d53ce9f2809b89dbe0c877e0",
+   "en": "The Enclosure Plastic Bottom Ring provides structural support and serves as the mounting base for the printer's feet.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "enclosure-plastic-bottom-ring",
+    "title": "Enclosure Plastic Bottom Ring",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c5ffabf6f7b79cf5d761c430be167d1cf05587d90eb8329d40710df4e5d6923",
+   "en": "The Chamber Exhaust Fan, mounted on the right inner liner behind the activated carbon filter, vents air from the printer's interior.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-exhuast-fan",
+    "title": "Chamber Exhaust Fan",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c9bb37b1a35aa022d527c732d4b96824fee5383d380c7db885a6c9f52e15a944",
+   "en": "The Extruder Hall Sensor Board is used to connect the Hall Effect Sensor on both sides of the Extruder Idlers and the front cover Hall board to the TH board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-hall-sensor-board-h2d-h2c",
+    "title": "Extruder Hall Sensor Board - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a2e828e5fae18d1e0c7fa31bfa4c3510a5a0125578557fdf35b05b7e2521e51",
+   "en": "The Activated Carbon Air Filter Cover contains Air Filter, primarily used to filter the air inside the printer chamber.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "activated-carbon-air-filter-cover-h2-series",
+    "title": "Activated Carbon Air Filter Cover - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "aba55a93d67ede7e07f9cf4b8a18c1b1803d0dc92e05f07c219a31305f3b1143",
+   "en": "The Extruder Servo Motor is installed on the back of the extruder and drives it to feed the filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3513-extruder-servo-motor",
+    "title": "3513 Extruder Servo Motor",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b33b6345aa28e87df3649776e6709d3272263f4e6cb9f56b8c2fe746bc88adeb",
+   "en": "The Active Chamber Exhaust is installed on the right inner liner of the printer, with the Chamber Exhaust Fan mounted on its inner side. It works with the Chamber Exhaust Fan to expel air when open and seal the chamber when closed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "active-chamber-exhaust",
+    "title": "Active Chamber Exhaust",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9fb3d4fee7a5f6f5cbf7a579023deb6c02cf1ff26a6a192cbf3a8ad031a38018",
+   "en": "The MC Board, installed in the printer's electronics section, governs precise movements and control over the printer's operation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mc-board-h2-series",
+    "title": "MC Board - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b85c817c438c42bb024ca875c8536ac31a008e96a31b1b402ea2d928b2f5b0a9",
+   "en": "The purge chute, positioned beneath the purge wiper, directs waste from the wiper out of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "purge-chute-h2-series",
+    "title": "Purge Chute - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c57ddf745eb1136484740753a691c21cdb0a0ce989f56da4086fba1488bdc78",
+   "en": "The 4-pin Interface Board features two 4pin ports for connecting an External Air Pump and an Extension Board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "4pin-interface-board",
+    "title": "4pin Interface Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c66bfd60133c810359523b040d26c09a28ed63555b0a7392871e54a56fc47db0",
+   "en": "The H2 Series printer is designed with built-in safety features to ensure compliance with safety regulations.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "power-safety-key-unit",
+    "title": "Power Safety Key Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f96133d7b815e7ef7d5367457cc9f47b13cae4f2e15ee858d2a5b5af7675cfa7",
+   "en": "It includes a safety key socket, which prevents the printer from being powered on unless the safety key is inserted.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "power-safety-key-unit",
+    "title": "Power Safety Key Unit",
+    "field": "blocks[0].line[2]",
+    "near": "The H2 Series printer is designed with built-in safety features to ensure compliance with safety regulations."
+   },
+   "dict": null
+  },
+  {
+   "h": "9c213026a2478f0b5f918d1b4c0423a23b86ef4208cce2c6288acb64ae39f69d",
+   "en": "Additionally, an emergency stop button with an integrated safety key provides an extra layer of protection, allowing you to quickly and securely deactivate the printer if needed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "power-safety-key-unit",
+    "title": "Power Safety Key Unit",
+    "field": "blocks[0].line[3]",
+    "near": "It includes a safety key socket, which prevents the printer from being powered on unless the safety key is inserted."
+   },
+   "dict": null
+  },
+  {
+   "h": "01a5cd311938032644d8635dcc3076d80da900e130269a49d7df032f82c452ab",
+   "en": "There are two types of Hall Effect Sensor: Digital Hall Effect Sensor and Analog Hall Effect Sensor.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hall-effect-sensor",
+    "title": "Hall Effect Sensor",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "57584c9538f97e667bc49f05beb753df2f77a4c0b2a16fbaf163cc3d82f0de62",
+   "en": "The Digital Hall Effect Sensor is primarily used to detect the position changes of various internal components of the printer, ensuring the printer operates normally and assisting in controlling the motion system.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hall-effect-sensor",
+    "title": "Hall Effect Sensor",
+    "field": "blocks[0].line[2]",
+    "near": "There are two types of Hall Effect Sensor: Digital Hall Effect Sensor and Analog Hall Effect Sensor."
+   },
+   "dict": null
+  },
+  {
+   "h": "81e386d6cc4ab7078d6aef1a03120d4a3cb60d267579ce0ffb29ad83503d40d5",
+   "en": "The Analog Hall Effect Sensor is mainly used to monitor the speed and rotation direction of the printer's rotating parts, helping to adjust the printer's speed and precision, ensuring print quality.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hall-effect-sensor",
+    "title": "Hall Effect Sensor",
+    "field": "blocks[0].line[3]",
+    "near": "The Digital Hall Effect Sensor is primarily used to detect the position changes of various internal components of the printer, ensuring the printer operates nor"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e0b60f600af25400e0965b1c8c38e5ef2acf6ecd540c9ede955cf4c8087f44b",
+   "en": "The Flow Blocker is located beneath the nozzle and is used to block the nozzle in a non-operating state to prevent filament leakage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "flow-blocker-h2d-h2c",
+    "title": "Flow Blocker - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "df2ac84ff657f125db2bc55fd51ebb52d1dfc096b8b73801b15dab5ee0797046",
+   "en": "The Nozzle Lifting Rail is installed on the back of the Hotend Heating Assembly - Left. It consists of a lifting rail and a lifting slider, primarily enabling the vertical movement of the hotend.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-lifting-rail",
+    "title": "Nozzle Lifting Rail",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "75b77b8edcc0794eb6e04009a498109fcf66706b6b1585fb8448f46e259a7b05",
+   "en": "The USB-A interface, compatible with USB 2.0, enables offline printing and timelapse video storage via a USB flash drive.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "usb-port-board",
+    "title": "USB Port Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7764e64f1ccc471c20abc2395d6ab72ed211a1f54d92acf07782447bb8ad710e",
+   "en": "The Switching Power Supply is used to provide power to the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "switching-power-supply",
+    "title": "Switching Power Supply",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4386a7f32f59e0d6082d86e6a0117ef95e195ec98892daf58ebfbbcb6424efa5",
+   "en": "The 5-inch touchscreen, with a 1280x720 resolution, is used to provide touch control for the printer features.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "touchscreen-h2-series",
+    "title": "Touchscreen - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f12d74557814a931a4ffc2ae982966d496491c781b564e3211af44bdaa513b8e",
+   "en": "Protects the front components of the toolhead from dust and debris.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "toolhead-front-cover-h2-series",
+    "title": "Toolhead Front Cover - H2D/H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "adf9e5d22fdff01ae2c5a70a13a658e2edd91399dcdc652401e8aca5c43686f2",
+   "en": "The Extruder Connection Board is installed on the back of the toolhead and primarily serves to connect and manage the electrical signals and power supply for the extruder. It acts as an interface between the extruder components and the main control system, ensuring stable operation of sensors, heating elements, and motors.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-connection-board-h2d",
+    "title": "Extruder Connection Board - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f064ab5577d11cec384dd1c18d071e1a52fa7824c75754f77fb10b4570173662",
+   "en": "The TH Board FPC Cable is used to connect the TH Board and the Extruder Connection Board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-fpc-cable-h2d-h2c",
+    "title": "TH Board FPC Cable - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c8e39fc6e9bd155be28a13ef47caa3cb890311be4b112e66a39130993d3fae3",
+   "en": "The Start/Pause Button is installed on the top of the printer and is used to start or pause the printing process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "start-pause-button",
+    "title": "Start/Pause Button",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "765704bdd29dfa35fcbcc49937366d799e93e74f7d5fd9f1faa42007339856bc",
+   "en": "The Birds Eye Camera is installed on the inner side of the top frame.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "birds-eye-camera",
+    "title": "Birds Eye Camera",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e0ca9b1bb598d31dee13d4a8244c7d96ee6fc5fa07283597046fba7a87f702a1",
+   "en": "2. If you have purchased the Laser Upgrade Kit, the Birds Eye Camera is included.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "birds-eye-camera",
+    "title": "Birds Eye Camera",
+    "field": "blocks[1].line[2]",
+    "near": "• Important Notice Before Purchase"
+   },
+   "dict": null
+  },
+  {
+   "h": "91e2ce5ec1da6c385b70d42024eb97072ee556daa87dcbd393bfdd426596a988",
+   "en": "Covers and protects the LED light in the top chamber.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "top-chamber-led-cover",
+    "title": "Top Chamber LED Cover",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0df929912f40cd7e8b536cd3fdc43e1304b69c50ede157a8027f9ed4f9774d32",
+   "en": "Covers and protects the AP board from dust and damage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-cover-h2-series",
+    "title": "AP Board Cover - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a3bacd6f95659cd68e4eca2f9ba737d290ca5f8781cbf7fc7b30d837a76d27d",
+   "en": "Covers and protects the AC board for safe operation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ac-board-cover-h2-series",
+    "title": "AC Board Cover - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a63843acf919854b558c3642ce834a34a6164d98eb8daa90bb239aa28b94a0ab",
+   "en": "The Live View Camera provides remote livestreaming, spaghetti detection, and additional features.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-h2-series",
+    "title": "Live View Camera - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a52ac58f75e0dd44fabd3877264cfe3ef61a20be518b4b4fd425356bcc6a573a",
+   "en": "The Z tensioner is used to tension the Z timing belt.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-tensioner-h2-series",
+    "title": "Z-Axis Tensioner - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "89049ef6ca6842e05c34bc2e00000a2d984e7d6ed5e36814ac136b712b9a90fc",
+   "en": "The Safety Key is installed in the Safety Key Socket which prevents the printer from being powered on unless the safety key is inserted.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2-safety-key",
+    "title": "H2 Safety Key",
+    "field": "blocks[0].line[2]",
+    "near": "The H2 Series printer is designed with built-in safety features to ensure compliance with safety regulations."
+   },
+   "dict": null
+  },
+  {
+   "h": "367e6ba44f43171e72709b5eb354f5f3685f50f86cf99b0f7d092b60aadced80",
+   "en": "The MC AP Cable Pack (2-in-1) connects the MC board and the AP board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mc-ap-cable-pack-2-in-1-h2d-h2c",
+    "title": "MC AP Cable Pack (2-in-1) - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e065e3e0b24df0d49e168b1bdc73d7fb55e737a4c8729dd104f50f4b5d857593",
+   "en": "The Power Socket is located at the lower left corner, in the back of the H2 printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "power-socket",
+    "title": "Power Socket",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3cfb748d3d872f09732b14eb5e2ec2523dec30560d550cd9a5b50857d4fe60bb",
+   "en": "The Emergency Stop Button is used to immediately halt all printer operations in case of an emergency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "emergency-stop-button",
+    "title": "Emergency Stop Button",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb4f02175f0f774e4d9f5ae64ed25a3a16f70cf2d7154148bf56085e2cda813c",
+   "en": "The Tube Organizer is installed on the cable chain.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tube-organizer",
+    "title": "Tube Organizer",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "db6299011155df1ef5f3d198eb2fd2b22abe43bb5d55586d483018512e7da548",
+   "en": "The MC Board Fan is used to regulate the temperature and dissipate heat for the MC board.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "mc-board-fan-h2-series",
+    "title": "MC Board Fan - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d93859ccbe1fea3df9f64075a48b43a296de9ce4b414b67d56673523752c6fec",
+   "en": "The Auxiliary Part Cooling Fan is a powerful 12W cooling fan installed on the left side of the printer chamber, providing better cooling conditions for high-speed printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auxiliary-part-cooling-fan-h2-series",
+    "title": "Auxiliary Part Cooling Fan - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8ace78f0c4d6e2396422c3d9fb4524d8c2e6691d7825cc5246e1a6f07dea41a3",
+   "en": "The Cable Chain assembly links the toolhead to the printer's rear, housing the PTFE tube, USB-C cable, and Toolhead-to-MC Board cable/power cable.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cable-chain-h2-series",
+    "title": "Cable Chain - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5bfe3c3dbce49e3237d02edcd13d5a5acae6a4c54d2b47f78706f349ec73b001",
+   "en": "The WiFi Antenna is used to enhance the wireless network signal.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wifi-antenna-h2-series",
+    "title": "WiFi Antenna - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e13c282c81d2791cb1d1bc7cb0bbd11e364eac81639ec6e32af08d8cc0f75035",
+   "en": "The H2 Status Indicator is installed at the front of the heated bed and is used to display the status of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2-status-indicator",
+    "title": "H2 Status Indicator",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "07440870d4e8dba53deabd10accec5bdfd04ab2358db8db525f5e06f8bbd7d7a",
+   "en": "The Enclosure Top Fame is designed for the top cover of the H2 Series.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "enclosure-top-fame-h2-series",
+    "title": "Enclosure Top Frame - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "90f282603662a4d508b1b495a82e331fa242827d595e9dc44df74aa1bd93560e",
+   "en": "The Laser Air Assist Tube Connector consists of two parts: one is installed on the inside of the top cover, next to the material tube bracket, and the long tube connects the built-in air pump to the base.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-air-assist-tube-connector",
+    "title": "Laser Air Assist Tube Connector",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b6ca4fad39f5cab649175297c4cafcaff5c269b79f201898421f5784bfe6eda6",
+   "en": "The Chamber Heat Circulation Fan is installed in the right inner lining of the printer. Its primary function is to maintain an even temperature throughout the chamber by circulating heated air, which helps ensure stable printing conditions and prevents temperature fluctuations during the printing process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-heat-circulation-fan",
+    "title": "Chamber Heat Circulation Fan",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec40351401408aa9c1730b497d8ee7de7c9b7f21e39ac8d878967fb20942afa6",
+   "en": "The Nozzle Offset Calibration Sensor is installed at the back of the heatbed and is used for calibrating the nozzle's position.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "nozzle-offset-calibration-sensor",
+    "title": "Nozzle Offset Calibration Sensor",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "13a22d1a2a8d880af490b528c00813c84df74cecbf5b452ab6d9e2fa699ee41c",
+   "en": "The Hotend Heating Assembly is designed to heat the hotend and enable quick hotend replacement. The heating assembly secures the hotend with a clamping mechanism, allowing easy removal for maintenance or replacement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-heating-assembly-h2d-and-h2c",
+    "title": "Hotend Heating Assembly - H2D and H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca18965383ed5cef873e2c632f32f7cbd0edadc60166b095bcf48012a1e37d69",
+   "en": "The Filament Buffer is used to regulate the filament movement, ensuring an appropriate and stable supply of filament to the hotend.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-buffer-h2-series",
+    "title": "Filament Buffer - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2932ef11ff760f7069a023f9b6d13824f812a81bb3bf0d62b32b119ddd1718af",
+   "en": "The Spool Holder and its Bracket are used to hold and support the external filament spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-and-its-bracket",
+    "title": "Spool Holder and its Bracket",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a2b37304c1139cdef362ec0667fbc86849a67e6c63016e6686fc6f429f6e1e2c",
+   "en": "Filters the air entering the air pump to prevent dust and debris from affecting its performance or cause damage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "air-pump-filter",
+    "title": "Air Pump Filter",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b2f781275ab1f739e765705b2067260da8bb0a800a6679816e721cf6b2547c47",
+   "en": "The Filament Cutter Lever holds the cutter blade and drives it to slice filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-lever-h2d-h2c",
+    "title": "Filament Cutter Lever - H2D/H2C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2ef379c74e3fe5d5cd617db62c9b0e05223092070676cddcca8a9c76cac6e56",
+   "en": "The Weeding Tool helps users pick out fine details.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "weeding-tool",
+    "title": "Weeding Tool",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "70b8a189bb353d1f1e628546b46294a026b8084d501e2be7603cd21d32442f1c",
+   "en": "The Pen Holder is used for holding pens.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pen-holder",
+    "title": "Pen Holder",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c9aa2ed00d3951466a1bcdda2d11004f7300477cc8d39e3c7a45ae9af103b0f0",
+   "en": "The AP board manages information exchange within the printer, providing an independent operating environment and supporting key functions like memory management, firmware, graphics processing, and multimedia decoding.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-h2-series",
+    "title": "AP Board - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "adac3d434b97a388b0d96a4f8daa783f15a2fa7095113c234ed5b1b5ba6e1975",
+   "en": "The AC Board, installed in the printer’s electronics section, functions as a circuit board delivering power to the heated bed and chamber heating module.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ac-board-h2-series",
+    "title": "AC Board - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "62350d5a0a1785f71bed059fd50ce12f63548ab821586ba7c289261f09748e9f",
+   "en": "The extruder switching system operates through a switching motor and transmission mechanism that drives the Extruder Switch Cam. This action causes the left and right driven wheel linkages (driven rods) to swing. A tension spring, attached to the driven rod, ensures that one driven wheel is pressed firmly against the drive wheel, enabling filament extrusion as the drive wheel rotates. Simultaneously, the opposite driven wheel remains disengaged, preventing unwanted filament movement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-switch-cam",
+    "title": "Extruder Switch Cam",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f44ebcbcca2e6adf403331778402a2d4121521f4e38529c3f08bcdb78de00fc",
+   "en": "By reversing the drive wheel's rotation, the extruder motor can selectively engage either driven wheel, enabling seamless dual extrusion using a single drive wheel.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-switch-cam",
+    "title": "Extruder Switch Cam",
+    "field": "blocks[0].line[2]",
+    "near": "The extruder switching system operates through a switching motor and transmission mechanism that drives the Extruder Switch Cam. This action causes the left and"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4fba9bf691cb0831c2351d99305b170894bc988cb4462ec3e494b8828a475ac",
+   "en": "The Blade Holder is used to install the cutting blade required for the cutting module.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "blade-holder",
+    "title": "Blade Holder",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ee3572d4d393ff4076c57e0bfa7a901a92fb819253e97d78aa9998446adebba9",
+   "en": "The Top Chamber LED is used to enhance chamber lighting.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "top-chamber-led",
+    "title": "Top Chamber LED",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "af5fd8c043a92f6fdc00ac56a5d4a8e1d92f8b8570ec910fe9ad05c905fd8469",
+   "en": "The Laser Air Assist Tube Coupler is used to connect the PU tube.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-air-assist-tube-coupler",
+    "title": "Laser Air Assist Tube Coupler",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ff8ce8fa52b07db75ec332218c5cff46510f381393aae0139c84814b718585e",
+   "en": "The Filament Cutter Stopper assembly is used to hold the cutter in place, enabling it to cut the filament during filament changing and unloading.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-stopper",
+    "title": "Filament Cutter Stopper",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f51a67f80f29b07f7a308f5cd1a4fea26ca4d32b4c1b14617ead2eed3c3edf08",
+   "en": "The Laser Lens, mounted on the laser head, serves as a protective barrier for internal optical components while optimizing laser transmission efficiency. It minimizes energy loss, ensures fast and precise laser performance, and prevents dust and debris from entering the laser module, enhancing both durability and reliability.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "10-w-laser-air-assist-nozzle-and-laser-lens",
+    "title": "10 W Laser Air Assist Nozzle and Laser Lens",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2b738f6b03bc9dbf1b47064e0b7d34e12f41eade737208410cc9480a270bba9",
+   "en": "The Brush is used to clean debris from the laser base.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "brush",
+    "title": "Brush",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "adcf5f2c6776ac18f1180452ec249e8d6eccf2b019e9d3322f23e08b289b04d1",
+   "en": "The Laser Slats Pack is placed on the laser base to support printing materials. For processing small objects, additional Laser Slats are needed to make the working area denser.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-slats-pack",
+    "title": "Laser Slats Pack",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8913400227212eef07b6722779783cc806ed3be02d6a18025ba7dacd62e53227",
+   "en": "The Heatbed Unit is installed inside the printer's chamber, capable of moving up and down along the Z-axis and heating according to the user's set temperature. Setting the appropriate heated bed temperature can effectively enhance the adhesion between the model and the print bed, and prevent warping of the model.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-h2-series",
+    "title": "Heatbed Unit - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "543d116e9b0bc64624464201d35b5baa656f405119fe8a346bb3d24745d73f0b",
+   "en": "The Laser Platform Homing Area Marker is a positioning label designed to assist the laser head in precise homing. The toolhead camera detects and recognizes this marker, ensuring accurate alignment and positioning during operation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-platform-homing-area-marker",
+    "title": "Laser Platform Homing Area Marker",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9d5470ae5d7ae3d0e2ad4abcf34c4710132354237ee125b1e71513b08915acf",
+   "en": "The Side Glass - Left is installed on the left side of the printer. It features a glass window, and a Hall Effect Sensor to detect whether the glass window is closed. The Side Glass - Right is installed on the right side of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "side-glass",
+    "title": "Side Glass",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd15ee528f231eb52f122e03782d9deda1b9d787df1cf42dc0c85aec3a7dffa5",
+   "en": "The Quick-release Lever Unit is used to secure the cutting module and laser module and detect whether they are properly locked.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "quick-release-lever-unit",
+    "title": "Quick-release Lever Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2365b05fa222c5a5a689ecbd6a2e30d69c11e18f01291c9011ebd2d9d08b6ef8",
+   "en": "The Inner Lining Upper Cover - Right is a plastic attachment equipped with a Purge Chute, MC board, and AC board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "inner-lining-upper-cover-right",
+    "title": "Inner Lining Upper Cover - Right",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ce8d3e23e61c75822747408094364aaff3dcbcdf31b473585d81a473d8b20f0",
+   "en": "The Laser Status Indicator is a light used to display the working status of the laser module.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-status-indicator",
+    "title": "Laser Status Indicator",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d297d81d6f21d93712a6a90748895150aa4c19f4c028312a66dec217a808a40",
+   "en": "The MC board, AC board, Purge Wiper, and Purge Chute are all installed on the Inner Lining - Left. Additionally, there is a 4-pin connector on the Inner Lining - Left.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "inner-lining-left",
+    "title": "Inner Lining - Left",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "21f03c437078ad7846636468670afe1550574a27e9b3b1a3c96395677c9dd3b3",
+   "en": "The Nozzle Eddy Sensor is used to detect whether the nozzle is wrapped by molten filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-eddy-sensor",
+    "title": "Nozzle Eddy Sensor",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9a3a486acfd2d44190ef3946cb04a22e955f35cd56e2838c7322cb3e2560ebc",
+   "en": "Left Side Panel with Glass Window is installed on the left side of the printer (when facing the printer). It features a glass window. The Right Side Panel with Glass Window is installed on the right side of the printer (when facing the printer). It features a glass window.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "side-panel-with-glass-window",
+    "title": "Side Panel with Glass Window",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9ab1ad6294d9338f698e5b315d93a9dac3ce35eafe3d48d78deac984fccf99d",
+   "en": "The Chamber Heater Unit is responsible for heating the printer's chamber to maintain a consistent temperature. This helps create a stable environment for printing, preventing issues like warping or poor adhesion of materials, especially when using temperature-sensitive filaments. It ensures the optimal temperature for high-quality prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-heater-unit-h2-series",
+    "title": "Chamber Heater Unit - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "295551ad0aacec2535813e0ae21491255529219e28b99ac4b48e1d4fcfdd0cf1",
+   "en": "The Left Side Panel with Laser Safety Window is installed on the left side of the printer. It features a laser protection window, and a Hall Effect Sensor to detect whether the laser protection window is closed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-safety-window",
+    "title": "Laser Safety Window",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9b078bb5a39b9fe2edab4cd1802c620bb21b5c636037b803db42b4193714ae4e",
+   "en": "The Right Side Panel with Laser Safety Window is installed on the right side of the printer. It features a laser protection window.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-safety-window",
+    "title": "Laser Safety Window",
+    "field": "blocks[0].line[2]",
+    "near": "The Left Side Panel with Laser Safety Window is installed on the left side of the printer. It features a laser protection window, and a Hall Effect Sensor to de"
+   },
+   "dict": null
+  },
+  {
+   "h": "5b11db48a8f440a8a791b8e3fab4dfbbd5f8024ca71b05ccc3d3d8094a89933b",
+   "en": "The Top Laser Protection Plate is installed on the top of the printer and provides laser shielding to ensure safety during laser operations.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-safety-window",
+    "title": "Laser Safety Window",
+    "field": "blocks[0].line[3]",
+    "near": "The Right Side Panel with Laser Safety Window is installed on the right side of the printer. It features a laser protection window."
+   },
+   "dict": null
+  },
+  {
+   "h": "7be1ef6f18352b1c6be815edbd73f89dd99cb8251c3e54127e5dfb011fa4f8be",
+   "en": "The Front Laser Safety Window is installed on the front of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-safety-window",
+    "title": "Laser Safety Window",
+    "field": "blocks[0].line[4]",
+    "near": "The Top Laser Protection Plate is installed on the top of the printer and provides laser shielding to ensure safety during laser operations."
+   },
+   "dict": null
+  },
+  {
+   "h": "a4fdb6b4720740dcc2a60bbe537380623231cf07c832f66c3504d1e5264d34df",
+   "en": "The Cutting Platform is a steel plate with StrongGrip Cutting Mat and LightGrip Cutting Mat attached, used to secure materials and provide a stable cutting surface.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-platform",
+    "title": "Cutting Platform",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e50469d81870b2cdae5df27a7c0579c389f49fd75c60f751864004f9f556b13e",
+   "en": "The Laser Base serves as the working platform for laser engraving/cutting. It works with support strips to hold engraving/cutting materials, limit flames and smoke generated during the process, and collect debris produced during operation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "laser-base",
+    "title": "Laser Base",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "553021683d13531e12d90856b34ce09f25cb848c19435da411ab79e9144e9989",
+   "en": "The X-axis in a 3D printer is responsible for moving left and right, allowing the tool head to be precisely positioned along the horizontal direction. The Tool Head Assembly is responsible for performing specific processing tasks.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-with-x-axis-assembly-h2-series",
+    "title": "Toolhead with X-Axis Assembly - H2 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b80d449a61ae3620824558922a21fe1f89d620a08f7ff88f0f802d773be0af1",
+   "en": "The Smoke Ventilation Pipe (2m) is designed to safely expel harmful gases produced during the machine's operation, particularly during laser processing. It helps maintain a cleaner and safer working environment by effectively directing fumes away from the machine.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-ventilation-pipe-2m",
+    "title": "Smoke Ventilation Pipe 2m",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "bf6f78f52a638716531e87080a17e2afae62bd7e454e929f41af21100a32aec4",
+   "en": "The Smoke Ventilation Pipe Adapter is a connector that securely attaches the printer to the ventilation pipe, ensuring efficient and safe exhaust of fumes and gases.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-ventilation-pipe-adapter",
+    "title": "Smoke Ventilation Pipe Adapter",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "cf9e4e85cb8a374e42624cafe8b63baf23492aed2406181c2ebf67cd69cd2510",
+   "en": "The transparent top lid of the AMS 2 Pro.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-top-lid",
+    "title": "AMS 2 Pro Top Lid",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e6d91ebf72d140b13f1e805f5df95506be2e96ccba073ec8576588c824bf8e1b",
+   "en": "The AMS 2 Pro Bottom Cover Unit is the bottom shell of the AMS 2 Pro with all sealings pre-installed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-bottom-cover-unit",
+    "title": "AMS 2 Pro Bottom Cover Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8ad1d17fdca10092ae9c452a45d406ef09a5de64fa1d431425a59985e1b7a8bc",
+   "en": "A casted tray for assembled parts of the AMS 2 Pro.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-main-frame",
+    "title": "AMS 2 Pro Main Frame",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "be54e20cabd49b7dc5afe4356df49485d1633b264310ccf970527d079adde1db",
+   "en": "The AMS 2 Pro Driven Support Shaft Assembly is a roller for supporting the filament spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-driven-support-shaft-assembly",
+    "title": "AMS 2 Pro Driven Support Shaft Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c92e35c04eecd590a6fb43ab2ab1693ba9d0cb37cd1d54e4e9a27fd2992a705",
+   "en": "The AMS 2 Pro Active Support Shaft Assembly is a roller for supporting the filament spool and also for actively driving the spool to roll.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-active-support-shaft-assembly",
+    "title": "AMS 2 Pro Active Support Shaft Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ea5f744f38ad081ab00f746ba465f4558546c35fa47d4d09c989c60e61940b6",
+   "en": "The AMS 2 Pro Mainboard is the core circuit board of the AMS 2 Pro. It includes a series of connectors through which various functional components are connected by cables.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-mainboard",
+    "title": "AMS 2 Pro Mainboard",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "679607334a640a41a0dd3b87be2e4e36980d72d5e575515a13253824d4ae361b",
+   "en": "The AMS 2 Pro power board is a circuit board installed at the rear of the AMS 2 Pro. It is responsible for receiving DC power from the printer and transmitting it to the AMS 2 Pro mainboard. Additionally, it facilitates certain communication bridging functions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-power-board",
+    "title": "AMS 2 Pro Power Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b2617007ec74dbc94c7ef3cb79cb572d82f9507ba3c8ddbe6f8eede09573c36b",
+   "en": "The AMS 2 Pro Internal Hub Unit is specially designed for Bambu AMS 2 Pro, which is located at the rear of AMS 2 Pro and consists of four Hall sensors, a magnetic rotary encoder, and a motor. It merges four filament slots into one and is used to select particular filaments in AMS 2 Pro and convey filaments from AMS 2 Pro to the printer. The Hall sensor detects when the filament reaches a specific position and activates the brushless motor to provide an additional driving force for feeding the filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-internal-hub-unit",
+    "title": "AMS 2 Pro Internal Hub Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1892256750146af6c882c36677b22cd61edda8b39c01a927c6e8af03a6567f36",
+   "en": "The 3520 AMS Internal Assist Motor is used to provide driving force for the operation of the AMS 2 Pro internal hub unit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3520-ams-internal-assist-motor",
+    "title": "3520 AMS Internal Assist Motor",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5afe91875d25409449ece511f015983a931a223d064774f147f4dc3303e98d11",
+   "en": "The AMS 2 Pro has two drying modules, consisting of heaters, fans, and temperature sensors, with a maximum drying temperature of 65 °C. The AMS 2 Pro Heating Unit (Slot 1 and 2) is an internal component designed for filament drying function within the AMS 2 Pro for the Slot 1 and 2 .It can greatly enhance drying efficiency and maintain optimal filament conditions for extended periods.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-heating-unit-slot-1-and-2",
+    "title": "AMS 2 Pro Heating Unit (Slot 1 and 2)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9982483e0e01a65db6677cbaa2729df073b092922a193a0af120e3bc09f1009f",
+   "en": "The AMS 2 Pro has two drying modules, consisting of heaters, fans, and temperature sensors, with a maximum drying temperature of 65 °C. The AMS 2 Pro Heating Unit (Slot 3 and 4) is an internal component designed for filament drying function within the AMS 2 Pro for the Slot 3 and 4 .It can greatly enhance drying efficiency and maintain optimal filament conditions for extended periods.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-heating-unit-slot-3-and-4",
+    "title": "AMS 2 Pro Heating Unit (Slot 3 and 4)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "753ebd5088962991298f03cd9e9b43d57f86cbceea43cc820fdf7f4b792a1242",
+   "en": "The AMS 2 Pro has two active inlet and outlet air vent, with the bottom one as the outlet and the rear one as the intlet. The dampers in the Outlet (bottom) Unit and Inlet (side wall) Unit assemblies are identical, differing only in cable length.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-air-inlet-unit",
+    "title": "AMS 2 Pro Air Inlet Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "25636763fa6969ad8c063ed14acb81e3fe4b93566ff9a9cf419a03284c2fcf4c",
+   "en": "When drying the filament, AMS 2 Pro will discharge moisture from the inside through external circulation. When performing external circulation, the air inlet and outlet will be opened. Please ensure that they are not obstructed by other debris to achieve the best drying performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-2-pro-air-inlet-unit",
+    "title": "AMS 2 Pro Air Inlet Unit",
+    "field": "blocks[0].line[2]",
+    "near": "The AMS 2 Pro has two active inlet and outlet air vent, with the bottom one as the outlet and the rear one as the intlet. The dampers in the Outlet (bottom) Uni"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa3418002af587ceb7fd52f4d149298f85f731cd01a5c8348d58c5de49b7abc6",
+   "en": "The transparent top lid of the AMS HT.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-top-lid",
+    "title": "AMS HT Top Lid",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c5315ec18f66fc3575e395964d5a99e22b7e843c67fee8a5fb05aa5cf8bc25a6",
+   "en": "The AMS HT Bottom Cover Unit is the bottom shell of the AMS HT with all sealings pre-installed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-bottom-cover-unit",
+    "title": "AMS HT Bottom Cover Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "dce46063dc9dffaa348adc603075b369d3d0933a76c5f97020bc3a0b7d1b2d10",
+   "en": "A casted tray for assembled parts of the AMS HT.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-main-frame",
+    "title": "AMS HT Main Frame",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f500bacd2587fec10eb6250f1c9b9386d96df3f7f12d71ca3fe7c98273bf789c",
+   "en": "The AMS HT Heating Unit consists of a heating element, a fan, and an NTC temperature sensor, with a maximum drying temperature of 85°C.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-heating-unit",
+    "title": "AMS HT Heating Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1413e260a16c53a208998f9fa07a0bc37760150d9ceec59fb765904609986718",
+   "en": "The AMS HT Mainboard is the core circuit board of the AMS HT. It includes a series of connectors through which various functional components are connected by cables.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-mainboard",
+    "title": "AMS HT Mainboard",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4eb07efee1a0bc4e609275cd382d05b975a487147837f263896bf1a22bea3284",
+   "en": "At the rear of the AMS HT, near the filament outlet, there is an AMS HT Feeder Hall Sensor Assembly. This module detects whether the filament has been successfully fed out of the AMS. In cases of filament breakage, jams, or other anomalies, the Feeder Hall Sensor Assembly helps determine the exact position of the filament, allowing users to troubleshoot issues quickly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-feeder-hall-sensor-assembly",
+    "title": "AMS HT Feeder Hall Sensor Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4bab78bd9aa29db7607d42a654c03117c5eaa7b367a220368d18a79dafa19a4e",
+   "en": "Due to the high power consumption of the AMS HT drying function, it cannot be powered directly by the printer. Therefore, the AMS HT comes with a standard AMS HT AC Power Cord, which must be connected when using the drying function. For connection instructions, please refer to the wiki.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-ac-power-cord",
+    "title": "AMS HT AC Power Cord",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "21a6be28302a30981079b7a9aa0cf3364aef17ff4bce7725826792ba4ef347e6",
+   "en": "The AMS HT Feeder Unit includes a filament detection sensor and a filament odometry wheel. The Hall sensor detects whether the filament is inserted, while the odometry wheel calculates the feeding length.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-feeder-unit",
+    "title": "AMS HT Feeder Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "539e95816d4ca519068b18ced081ddd1e1316d4f5f3e20da2561ddfcb20720b4",
+   "en": "The AMS HT Filament Retraction Assembly includes a motor and a rocker gear. During filament retraction, it drives the main shaft to rotate, pulling the filament back onto the spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-filament-retraction-assembly",
+    "title": "AMS HT Filament Retraction Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4cd9377729bddc9f450ca3adf23749068251420736041eb4dfe16a00485e503",
+   "en": "The AMS HT has two active inlet and outlet air vent, with the bottom one as the inlet and the rear one as the outlet. The dampers in the Inlet (side wall) Unit and Outlet (bottom) Unit assemblies are identical, differing only in cable length.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-air-inlet-unit",
+    "title": "AMS HT Air Inlet Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "302419bf906a098dd175e95bf5344d47ba865cb96100541ddc270ce64fbc099e",
+   "en": "When drying the filament, AMS HT will discharge moisture from the inside through external circulation. When performing external circulation, the air inlet and outlet will be opened. Please ensure that they are not obstructed by other debris to achieve the best drying performance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-air-inlet-unit",
+    "title": "AMS HT Air Inlet Unit",
+    "field": "blocks[0].line[2]",
+    "near": "The AMS HT has two active inlet and outlet air vent, with the bottom one as the inlet and the rear one as the outlet. The dampers in the Inlet (side wall) Unit "
+   },
+   "dict": null
+  },
+  {
+   "h": "89d403077daa8c3d5bd22f20db6fe8d31fb419205285fe142bba6bd4991b0e36",
+   "en": "The socket for the AC power cord to connect to the heater.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-power-socket",
+    "title": "AMS HT Power Socket",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "065b94010bf8795518f65f1930a45b977ddd17ce2428edf2c6ed0ae14166c96d",
+   "en": "The AMS HT power board is a circuit board installed at the rear of the AMS HT. It is responsible for receiving DC power from the printer and transmitting it to the AMS HT mainboard. Additionally, it facilitates certain communication bridging functions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-power-board",
+    "title": "AMS HT Power Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "33f28f25f29a7c7e29b5225d83d4490a4c5c4ee02e0d026dfbb87302712bd40e",
+   "en": "The AMS HT front display that shows real-time humidity, real-time temperature, and the remaining drying time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-screen",
+    "title": "AMS HT Screen",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4f2ddf87bbb2521c02c5e75da864aff6df415778ae79302d813e01db632cebb0",
+   "en": "The AMS HT RFID coil to recognize the RFID tags on Bambu Lab official filaments, enabling functions such as filament remaining estimation and automatic refilling.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-rfid-coil",
+    "title": "AMS HT RFID Coil",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a799f8b03f88096aed73b2741db76a5ecd21d8382102082b0e2e5b2ab24d5c88",
+   "en": "The AMS HT Driven Support Shaft Assembly is a roller for supporting the filament spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-driven-support-shaft-assembly",
+    "title": "AMS HT Driven Support Shaft Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b94e65e00b886fe394ef7739e54dc5cbad2793d8e3ecfc5680f13a7f3d5a8fa5",
+   "en": "The AMS HT Active Support Shaft Assembly is a roller for supporting the filament spool and also for actively driving the spool to roll.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-active-support-shaft-assembly",
+    "title": "AMS HT Active Support Shaft Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a156970693d06289f0975505dc3f50a73a3b3a19c93e86bf2b5781f0c05f1363",
+   "en": "The AMS HT is equipped with a lid-open sensor, consisting of a magnet and the AMS HT Lid Status Hall Sensor. If the lid is opened during the drying process, the printer will issue a reminder. The magnet is located on the lid handle assembly, while the AMS HT Lid Status Hall Sensor is positioned on the main frame.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht-lid-status-hall-sensor",
+    "title": "AMS HT Lid Status Hall Sensor",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b73288c5cb9ab1a175b591df236441bdcdafc5a2505d308960e8154d98ad9d11",
+   "en": "The printer can be directly connected to the AMS 2 Pro or AMS HT using Bambu Bus Cable - 6pin.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-bus-cable-6pin-for-ams-2-pro-and-ams-ht",
+    "title": "Bambu Bus Cable - 6pin for AMS 2 Pro and AMS HT",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2a327bc36020aacd181bb89c7d0bd5df7ae71e55f91f179bc1bf0a82b6802769",
+   "en": "Keep your cutting workflow smooth and uninterrupted with the Cutting Essentials Refill Pack!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-essentials-refill-pack",
+    "title": "Cutting Essentials Refill Pack",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7d7b8d00c4429d8129fbdd832f337bb31ccb683519804282644ad71c7568183",
+   "en": "This pack includes high-wear consumables that need regular replacement, ensuring your work stays in peak condition.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-essentials-refill-pack",
+    "title": "Cutting Essentials Refill Pack",
+    "field": "blocks[0].line[2]",
+    "near": "Keep your cutting workflow smooth and uninterrupted with the Cutting Essentials Refill Pack!"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4431b45a10f34a19c7a82ef9eee996aba63ee8375efa4469436af34dc4a7a07",
+   "en": "Fine Point Blade: Used for performing precise cutting tasks with the cutting module.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cutting-essentials-refill-pack",
+    "title": "Cutting Essentials Refill Pack",
+    "field": "blocks[0].line[5]",
+    "near": "LightGrip Cutting Mat: Ideal for lighter materials such as regular cardstock and paper. Provides gentle adhesion for easy removal."
+   },
+   "dict": null
+  },
+  {
+   "h": "1ff2a6f80f9b13b5de986c25b683420789c87ddee379ac70ee7f40cf17a8c7a3",
+   "en": "The Filament Cutter Stopper is located inside the printer chamber. It supports the cutter during operation, enabling it to cut the filament for tasks such as material changes and unloading.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-stopper-h2s",
+    "title": "Filament Cutter Stopper - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb6afc27cb1a3f2c8544308ade821e70add066657f20d7d9d3713b0b7f757167",
+   "en": "The Left Side Panel is mounted on the left side of the printer when facing the front, and the Right Side Panel is mounted on the right side when facing the front.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "side-panel-h2s",
+    "title": "Side Panel - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "96b98d8a94fc6f60b1c9427968669f4f46fd9408e563363c2dbc0d024da3be34",
+   "en": "The Extruder Filament Sensor is located in the extruder and detects both the presence of filament and the position of the filament cutter lever.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-filament-sensor-h2s",
+    "title": "Extruder Filament Sensor - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2fdcbbe084f74d553b8c26a5a2ec28be088b35518f4c9476b8c607da23884cae",
+   "en": "The Filament Cutter Lever holds the cutter blade and actuates it to slice the filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-lever-h2s",
+    "title": "Filament Cutter Lever - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "bd6b343396d2346ebd916b136f709448bb99f1e68f18c077b6657a99cf230caf",
+   "en": "The Toolhead Rear Cover shields the rear components of the toolhead from dust and debris.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-rear-cover-h2s",
+    "title": "Toolhead Rear Cover - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "83aae0c5b390e7d6eb68eb3d1f3c1a2a3f45fd5907c823212c5f7d492c3d1f1d",
+   "en": "The Extruder Unit drives filament into the hotend, boosting extrusion force, minimizing slippage, and enhancing wear resistance. Paired with a robust extruder motor, it ensures reliable extrusion power.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-unit-h2s",
+    "title": "Extruder Unit - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "da958537269bdc8ae547b8aa2396f3095b6cd057261759945b10e8f554b010a9",
+   "en": "The Extruder Unit Front Cover protects internal components from dust and debris, aids in filament alignment, and adds to the structural integrity of the extrusion system.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-unit-front-cover-h2s",
+    "title": "Extruder Unit Front Cover - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "adafb3c25e331d30a2c317b09cabf051599c8a94b255c27ad0682ada5804ec88",
+   "en": "The Extruder Gear Assembly precisely advances and controls filament movement, ensuring smooth printing and enabling filament changes when required.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-gear-assembly-h2s",
+    "title": "Extruder Gear Assembly - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d541f8f6b7fa0e544d4f8691fb92d81c56578d3a912a7060f2f075d133291738",
+   "en": "The Hotend Heating Assembly heats the hotend and uses a clamping mechanism to secure it, enabling quick removal for maintenance or replacement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-heating-assembly-h2s",
+    "title": "Hotend Heating Assembly - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a481232bf4767be75e9d17386ae74c646e17ad68f37ca7c64ea003f59b4685bd",
+   "en": "The Extruder Motor is mounted on the toolhead and drives the extruder to feed filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-motor-h2s",
+    "title": "Extruder Motor - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0bf335c40479114ab0f346869de94b2ff32c892e3c48be2eee5d28e567f9aa34",
+   "en": "The Eddy Sensor detects whether the nozzle is covered with melted filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eddy-sensor-h2s",
+    "title": "Eddy Sensor - H2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "612c0d5f26447a09cbd8568e536bfb7ae9d501776903b8d158b56a4a2b85f71a",
+   "en": "Installed inside the extruder, it is driven by the extrusion motor to transport filament to the hot end or retract it from the extruder.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-gear-assembly-p2s",
+    "title": "Extruder Gear Assembly - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3cbede9b92b99c3ff96008178bd35997b3b5fad0b409de85da712315e976a1ac",
+   "en": "The XY-axis belt tensioner with pulleys comprises idler pulleys and brackets, enabling adjustment of the belt's travel distance under spring tension.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-p2s",
+    "title": "XY Belt Tensioner - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "65afb97689b927530cc3c256ccae4e2743c60e4c675cce91b2209bd33e0f45e7",
+   "en": "The X-axis controls the tool head's left-right movement. Unlike the X1/P1 series' carbon rod system , the P2S adopts a smooth rod and belt structure . The hollow steel smooth rod delivers carbon rod-level performance while its smooth surface allows easier cleaning and more convenient maintenance . X-direction motion is driven by the A and B stepper motors .",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "x-axis-assembly-p2s",
+    "title": "X-Axis Assembly - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "da7a93b47e4c49f19a5646c85d9c7e0e3f0e997d5be288942904116574550c0c",
+   "en": "The filament cutter lever on the toolhead cuts filament just above the hotend to retract old and load new filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-cutter-lever-p2s",
+    "title": "Filament Cutter Lever - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "13355416115b9f7594a602ae121ffe5e7c059fa17f4cf6645a5c6a6f149b43e7",
+   "en": "The material discharge assembly is mounted above the printer liner to expel waste generated during filament swapping.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-p2s",
+    "title": "Purge Wiper - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5548ea7f7fcd862043d89be29c3e76e5beccf3e114f91e1e6f4d1071f045da7",
+   "en": "When facing the printer's front door, the right side cover is referred to as the right side panel.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "right-side-panel-p2s",
+    "title": "Right Side Panel -P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "17d6791d645757e9b453f132bc376a72d5966d0bee27f6923a02c24adf8fe690",
+   "en": "The chamber temperature sensor is an NTC with a fixed bracket, installed on the inside of the printer's front beam, and is used to detect the temperature inside the printer chamber.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-temperature-sensor-p2s",
+    "title": "Chamber Temperature Sensor - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ca44fd832008c3e5987f1757a5bba3a43afa3f9332f17372fc2af9648ebbf12",
+   "en": "The eddy current coil , installed between the extruder and the hotend, is an accessory for active calibration of filament flow.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eddy-sensor-p2s",
+    "title": "Eddy Sensor - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "847eb2c66002c1268debe65a7920fe28dce7507e70301fb6bb85f13987afdca2",
+   "en": "The screen rear housing is a component installed on the back of the screen. It has clips that secure the screen to the printer.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "screen-rear-housing-with-hinge-p2s",
+    "title": "Screen Rear Housing with Hinge - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "12c05418e0fc14b76a3543555bcd90ef01d891204467590dca4d77398f9df71f",
+   "en": "The USB port module is mounted on the printer's top for USB drive connection.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "usb-port-assembly-p2s",
+    "title": "USB Port Assembly - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "731f3d8f00e2affd7708413692e2fdcf73bb664dc51ba2a68fe9319cffbc34c7",
+   "en": "Installed on the upper part of the extruder, it functions as a sensor for detecting filaments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-filament-sensor-p2s",
+    "title": "Extruder Filament Sensor - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f7f930bfb276a40c47b9a708366fdadfc063f2b33f3fa2cb2fc8d84b8cf1119",
+   "en": "A plastic cover installed on the left side of the printer to protect the AP board cover and its connecting cables.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-cover-p2s",
+    "title": "AP Board Cover - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fff55654a254c4624aa48894a4ee6b526d87e9e276e7e293e697f571b569911b",
+   "en": "When facing the printer's front door, the left side cover is referred to as the left side panel.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "left-side-panel-p2s",
+    "title": "Left Side Panel - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c5fcf3a1abb645e1823a0ff09565108cc7028c22a57e9683138a84a21df1f8c1",
+   "en": "The toolhead carriage assembly consists of front and rear shells fixed on an aluminum sleeve, enabling X-axis movement via XY belt traction.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "toolhead-carriage-p2s",
+    "title": "Toolhead Carriage - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e9a6e9852ef7016de5b20ba37faf41667b04503af8e0d39c5b5eafab9545ff3",
+   "en": "A replaceable activated-carbon filter inside the right chamber liner. It removes VOCs produced during printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "air-filter-p2s",
+    "title": "Air Filter - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "6dd46a02bd730558eaee9899520d84a7df57ccab49ebda740a1723ae34308eb6",
+   "en": "The front glass door, made of dark gray glass, is installed on the front of the printer, offering clear visibility of it's operation and providing protection. The P2S front glass door includes a film for enhanced security.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-glass-door-p2s",
+    "title": "Front Glass Door - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d3c6d4a1589d1950f78e1a744654eeb56b84fb9a6cd718af01346423ceb52627",
+   "en": "The heatbed of a printer is a platform installed inside the printer chamber. It moves up and down along the Z-axis and is heated to a set temperature. Setting the appropriate heatbed temperature can effectively improve adhesion between the model and the build plate while helping to prevent warping.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-lv-p2s",
+    "title": "Heatbed - LV - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fab2795366a8496e7bd4d03e297f9f0c61e1d0ce5c9a46b30113c36819965459",
+   "en": "The left LED light strip is mounted on the AP board cover to illuminate the printer chamber. The front LED light is installed inside the front cover and provides supplementary lighting for the printer chamber.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-p2s",
+    "title": "LED Light - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "928f4acd56cca8805185924474a7d305658c66981b8f7d18a693ec9beb40a13f",
+   "en": "The Z-axis stepper motor drives the heatbed along the Z-axis via a synchronous belt, and comes with a motor cable and drive pulley.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-motor-p2s",
+    "title": "Z Motor - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "40f1bbc927dd2fc8ea342e1ab880ac11da6910b40b8cf285e875b7d6d004e50c",
+   "en": "The front door sensor is a small circuit board mounted on the inside of the front column of the printer to sense the opened or closed status of the glass front door of the P2S",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "door-sensor-p2s",
+    "title": "Door Sensor - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b1a587b2f84bcc5fd4a8912e0bae292dc955f35538303e2f3ae57a766b633d60",
+   "en": "The XY stepper motors are mounted at the back of the printer, driving the toolhead for XY-axis movement. There is one on each side (left/right), designated as the A motor and B motor for positional differentiation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xy-motor-p2s",
+    "title": "XY Motor - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9fa7a0bb72cacac6bacde6b978e63a5afe0321c845cac762407c7d5e7b489064",
+   "en": "The 3508 extruder servo motor used in the P2S is a high-precision servo motor developed by Bambu Lab. It accurately controls filament feeding, stopping, and retraction, making it a key component for ensuring print quality and success.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "3508-extruder-servo-motor-p2s",
+    "title": "3508 Extruder Servo Motor - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b56a216120a0037b8c34115efd006174e0a27836ea67e162742f8a1f0c64480",
+   "en": "A central plastic housing with magnets for front cover attachment.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-middle-housing-p2s",
+    "title": "Toolhead Middle Housing - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d60106b792e1a657e69f1844587c0f099665a0448cdff4223935b6e88ea08951",
+   "en": "A plastic enclosure designed to seal the rear part of the toolhead.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "toolhead-rear-cover-p2s",
+    "title": "Toolhead Rear Cover - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac9db68061f0ae9c8bd94ec4c83fdc1eba65639b1ee8cbb237157088882eec61",
+   "en": "A component installed on the right side of the printer chamber that switches the air circulation mode and helps cool the components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "adaptive-airflow-switching-unit-p2s",
+    "title": "Adaptive Airflow Switching Unit - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c0819ff79b8e60f310c271016500709370929e8f027961b4b90581a58a3d6c4",
+   "en": "The drag chain is a mechanical device mounted between the tool head and the rear of the printer, designed to manage and protect the tool head cables and material tubes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cable-chain-p2s",
+    "title": "Cable Chain - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "98694e92a229bd37d8004b1c5762d48cce8d558b1596ee238cf4f3776030417d",
+   "en": "The PTFE tube bracket is mounted on the back of the P2S to provide secure attachment of the PTFE tube (also known as a Bowden tube) which provides a low friction path for filament into the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-bracket-p2s",
+    "title": "PTFE Tube Bracket - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7bd786daccb065b67cf27467ab261746c5935ccf51db449cad9b41934342c31f",
+   "en": "The P2S printer features a 5-inch touchscreen for controlling the printer and monitoring its status.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "screen-p2s",
+    "title": "Screen - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e07aab634556ffe356484ba6e269ea9a8fff2b06e85cc43041d9017d2de03d9f",
+   "en": "The live camera , installed inside the printer, enables real-time monitoring of the printing process via Bambu Studio and Bambu Handy . It also provides intelligent detection features such as stringing detection , foreign object detection , print bed detection , and hotend type recognition .",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-p2s",
+    "title": "Live View Camera - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "51dcfc0fb827905be18e98cbbb44e1d4db4077a170904f16c444cd4f16cdd3f6",
+   "en": "A plastic bracket mounted on the back of the printer to hold an external filament spool",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-p2s-x2d",
+    "title": "Spool Holder - P2S/X2D",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "58daef263cb44e036d9d227b7d4a906364cc82206223e76a534da9442385f38a",
+   "en": "PTFE Tube Connector: A connector used to connect the PTFE tube to the filament spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-connector-for-spool-holder-p2s",
+    "title": "PTFE Tube Connector for Spool Holder - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "83f0da74b94a872a9c9314cce1c1c738b1ea3acc98a3c7a90dc7faa16ae24dd8",
+   "en": "The glass front door of the P2S swings on a top and a bottom hinge, and is mounted to each via two screws. The hinges themselves are also removable from the P2S frame.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-door-mounting-kit-p2s",
+    "title": "Front Door Mounting Kit - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c16bbf4c74ba7f47b0906b95980652e48a33eb016360c9b638c33619dd587967",
+   "en": "An accessory installed on the toolhead, responsible for heating the printing materials to a molten state.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-heating-assembly-p2s",
+    "title": "Hotend Heating Assembly - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2a9a02492894f75b3348c945ab7b47d463d6c3c04014d55dc0c123cb79c721b3",
+   "en": "The outer shell of the extruder",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-unit-front-cover-assembly-p2s",
+    "title": "Extruder Unit Front Cover Assembly - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e235d62023699c357e6ca44cde13d09f63310ffcc6bd05c75d0d603fea3daf24",
+   "en": "The nozzle wiping pad is installed on the nozzle wiper part of the purge wiper and is used to remove residual waste on the nozzle. It is made of soft silicone material to ensure good contact with the hotend during wiping. Replace the nozzle wiping pad if it is damaged or detached.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "nozzle-wiping-pad-p2s-x2d",
+    "title": "Nozzle Wiping Pad - P2S/X2D",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "619ffe022c5affe7dc03a86486e868278b61738ef288c600b83c54d14bdf9134",
+   "en": "An idler pulley or idler is a smooth or toothed free-spinning pulley mounted on a bearing that redirects or tensions the timing belts driving the core-XY motion system of the P2S.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "idler-pulley-p2s",
+    "title": "Idler Pulley - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "16b7b51456602b4f0e9e3debb0e81948fa2a6b0788c143c30bd128c9145cf545",
+   "en": "The Application Processor Main Board, or AP Board for short, is the circuit board that manages all internal communication and system-level processing for the printer. It provides an independent operating environment—handling things like memory management, firmware operations, graphics processing, multimedia decoding, Wi-Fi, camera signals, LEDs, and the user interface.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ap-board-lv-p2s",
+    "title": "AP Board - LV - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "22cf07ffd83465e142830c2197f847aa64e4b3f63b53adc52496587802d69911",
+   "en": "The P2S uses two XY belts, each 1444 mm in length and 7 mm wide. They connect the XY motors to the toolhead and drive its movement along the XY plane.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-p2s",
+    "title": "XY Belt - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "24ff50333d15d1c672108ec4bc4bae86d63bd8753b9aac0b7241451d4edcba03",
+   "en": "The MC board, or Main Control Board, is a printed circuit board with integrated microprocessors, various driver chips, connectors and circuits used to operate the various aspects of the P2S.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mc-board-p2s",
+    "title": "MC Board - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8886fa6a5dd9b675a2b415b06a154c79a184db5f415fabc0b8b1ae14505b349",
+   "en": "Cools the upper part of the hotend to prevent the filament from softening prematurely and causing blockages.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cooling-fan-for-hotend-p2s",
+    "title": "Cooling Fan for Hotend - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9b22a0658a78029c9576fdb34758dc13f95eb8710848965943538fab4f05bad",
+   "en": "The front cover of the P2S printer is a dark grey panel installed on the front of the printer, with the model number \"P2S\" printed on it.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-cover-p2s",
+    "title": "Front Cover - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "32292d11643fb52866da676712725afc64cc0288f3e82bc125a76ea9d91efe38",
+   "en": "The filament buffer is a special component installed on the back of the printer to reduce tension fluctuations during the feeding process and ensure smooth filament feeding.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-buffer-p2s",
+    "title": "Filament Buffer - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "175924ae1ba6ebe7ef9aa0fb63c1a8e5ab987338caaa150ce97bcbe8ba28bbd5",
+   "en": "The power switch assembly, located on the back of the printer, consists of a power cord socket, a switch that controls the printer’s power, and cables that connect the printer's power supply, AC power board, and ground wire.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "power-switch-assembly-p2s",
+    "title": "Power Switch Assembly - P2S",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c7fcbd08455c6d4fdf2e378fd9b3376ad4dc68f903a0fb3e354afcc8ad84a9c",
+   "en": "The 5-inch touch screen is connected to the AP board via a Flexible Printed Circuit (FPC) ribbon cable.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "screen-fpc-cable-p2s",
+    "title": "Screen FPC Cable - P2S/X2D",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  }
+ ]
+}

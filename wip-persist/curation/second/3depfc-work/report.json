@@ -1,0 +1,40 @@
+{
+ "productType": "accessory",
+ "format": "legacy_html",
+ "counts": {
+  "groups": 2,
+  "values": 3,
+  "variants": 2,
+  "images": 3,
+  "distinct_images": 1,
+  "swatches": 0,
+  "content_blocks": 15,
+  "content_images": 8,
+  "content_images_omitted": 0,
+  "box_items": 0,
+  "box_images": 0,
+  "specs": 1,
+  "documents": 1,
+  "relations": 9,
+  "external_ids": 3,
+  "notes": 5
+ },
+ "specsByStatus": {
+  "unverified": 1
+ },
+ "specsByRegion": {},
+ "relationsByState": {
+  "pending": 9
+ },
+ "sentenceCounts": {
+  "money": 0,
+  "promotion": 0,
+  "shipping_policy": 0,
+  "warranty": 0,
+  "region": 0
+ },
+ "errors": [],
+ "hold": "",
+ "unknownLabels": [],
+ "soldOutCount": 0
+}

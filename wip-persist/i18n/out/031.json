@@ -1,0 +1,1740 @@
+[
+ {
+  "h": "42b0c9bbede244f45b487fcd1a23b66af529cf069c61148aaf9379ae5df52e9d",
+  "en": "M (mm) Nominal Diameter",
+  "ar": "القطر الاسمي M (mm)",
+  "ckb": "تیرەی ناوزەد M (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "18c8329a93ff7d2d40fb79b74146e3d18456bfaa6b34fca8766e6d9b5ae10f14",
+  "en": "P (mm) Thread Pitch",
+  "ar": "خطوة السنّ P (mm)",
+  "ckb": "هەنگاوی پێچ P (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "28312b073c696dfad03de1d51fe05359ce0f629edb6ef2ffd2c5ea9ee485f19c",
+  "en": "L (mm) Bolt Length",
+  "ar": "طول البرغي L (mm)",
+  "ckb": "درێژیی بۆڵت L (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "82357d5beff133130492639d5528abbfe160b107cc75d79089cbb35bc539b282",
+  "en": "D (mm) Head Diameter",
+  "ar": "قطر الرأس D (mm)",
+  "ckb": "تیرەی سەر D (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0b33fac506b5eb249083d2e5403a1e479450b27c6d5bc025f187712655a8cfa9",
+  "en": "H (mm) Head Thickness",
+  "ar": "سماكة الرأس H (mm)",
+  "ckb": "ئەستووریی سەر H (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "31edfe7674e18ab4650e41c2cfe1a4450f5c6fe19adc555a47a8f9651a1cf7e7",
+  "en": "k (mm) Hexagon Across Flats",
+  "ar": "المسافة بين الوجهين المتقابلين للشكل السداسي k (mm)",
+  "ckb": "پانیی نێوان دوو ڕووی تەختی شەشپاڵوو k (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "282e4a73dd14abdc052fad962e2693dcdde04c409f33938e48d339ac8d6e1b90",
+  "en": "t (mm) Groove Depth",
+  "ar": "عمق المجرى t (mm)",
+  "ckb": "قووڵایی شیار t (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e6502f0f12a538196ff73d61e35ebdacf4ffdcb96eaa609125c82f83d00f38a0",
+  "en": "Screwdriver Bit Size",
+  "ar": "مقاس رأس المفكّ",
+  "ckb": "قەبارەی سەری دەرنەفیس",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2673ac3ff97819b18eb8ec0ff6eae47e47af9227b364ce2d8438f666ab317c26",
+  "en": "Compliant with the requirements of GB/T 70.2-2015 standard [Equivalent standards: ISO 4762, ASME/ANSI B 18.3.1M - 1986 (R1993), DIN EN ISO 12474]",
+  "ar": "متوافق مع متطلبات معيار GB/T 70.2-2015 [المعايير المكافئة: ISO 4762، ASME/ANSI B 18.3.1M - 1986 (R1993)، DIN EN ISO 12474]",
+  "ckb": "گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB/T 70.2-2015 [ستانداردە هاوتاکان: ISO 4762، ASME/ANSI B 18.3.1M - 1986 (R1993)، DIN EN ISO 12474]",
+  "kind": "block_line"
+ },
+ {
+  "h": "3f79cc81707d7ebc9f1d99d123fc02f58af3a0f65f776eddd1b037e90c691f41",
+  "en": "Forgot the screw specs? Just tap the Screw Gauge for sorting help.",
+  "ar": "نسيت مواصفات البراغي؟ ما عليك سوى النقر على نموذج Screw Gauge للمساعدة في فرزها.",
+  "ckb": "تایبەتمەندییەکانی بورغییەکەت لەبیر چووە؟ تەنها لەسەر مۆدێلی Screw Gauge کلیک بکە بۆ یارمەتی لە جیاکردنەوەیاندا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cb80be25177a08a2c78977d0e4b1c01d3d9221c7cbf539ef2f986147d7bf4e33",
+  "en": "Product Feature",
+  "ar": "مزايا المنتج",
+  "ckb": "تایبەتمەندییەکانی بەرهەم",
+  "kind": "block_title"
+ },
+ {
+  "h": "4e882728fdf8ac6c252e6ee66e7efe0941bd9bce640ab100141ffbfb338e7c33",
+  "en": "Stainless Steel Socket Head Cap Machine Screws (SHCS)",
+  "ar": "براغٍ ميكانيكية برأس أسطواني وتجويف سداسي من الفولاذ المقاوم للصدأ (SHCS)",
+  "ckb": "بورغیی ئامێری سەرلوولەیی بە کونی شەشپاڵوو لە پۆڵای زەنگنەگر (SHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "f5ddc0f35671a171f59126e3c62b282cd114b69cd5874205ec134dd5eec3a8dc",
+  "en": "Nominal thread: M2.5~M5",
+  "ar": "السنّ الاسمي: M2.5~M5",
+  "ckb": "پێچی ناوزەد: M2.5~M5",
+  "kind": "block_line"
+ },
+ {
+  "h": "5b3f234a44b447c1e1b219d5308442e5e6500e35897fa5cee78ec3184fcdb018",
+  "en": "Strength grade: 4.8",
+  "ar": "درجة المتانة: 4.8",
+  "ckb": "پلەی بەهێزی: 4.8",
+  "kind": "block_line"
+ },
+ {
+  "h": "887adb9a566711993dcdcc2e223922337fb375744ec66df2a519138007fbff21",
+  "en": "Full thread series (except M3*23)",
+  "ar": "سلسلة السنّ الكامل (باستثناء M3*23)",
+  "ckb": "زنجیرەی پێچی تەواو (جگە لە M3*23)",
+  "kind": "block_line"
+ },
+ {
+  "h": "9cc6607bcb899aa4eee4fa953815b8c4a09ab6bf3cf4bbe43e3e4f4e7f05c7ad",
+  "en": "Type of thread: Metric coarse thread (currently all screws are metric coarse thread)",
+  "ar": "نوع السنّ: سنّ متري خشن (جميع البراغي حاليًا ذات سنّ متري خشن)",
+  "ckb": "جۆری پێچ: پێچی مەتری زبر (ئێستا هەموو بورغییەکان پێچی مەتری زبریان هەیە)",
+  "kind": "block_line"
+ },
+ {
+  "h": "44d79a384a356b93290c81616e8dfc7a13939e77605ca85c49d20dea7834da96",
+  "en": "2D Drawing 3D Document",
+  "ar": "رسم 2D، مستند 3D",
+  "ckb": "نەخشەی 2D، بەڵگەنامەی 3D",
+  "kind": "block_line"
+ },
+ {
+  "h": "458917880e1cc7ac537be5d110ce079913c73f7fe046a3fe59673fdbd3498298",
+  "en": "Self-Tapping Screws for 3D Printing",
+  "ar": "براغٍ ذاتية اللولبة للطباعة 3D",
+  "ckb": "بورغیی خۆپێچ بۆ چاپی 3D",
+  "kind": "block_title"
+ },
+ {
+  "h": "60b7fcc51721118529d904dda3b7d0ad68691fbc2a862559c06af3e57ff80243",
+  "en": "For 3D printed parts, which often have gaps between layers and varying hole sizes, we recommend using BT self-tapping screws. These screws provide moderate torque for insertion, prevent loosening, and can be installed and removed multiple times. Using these screws and matching them with the recommended hole size ensures easy and secure connections for your printed parts, eliminating the need for nuts and avoiding issues like screw loosening or hole shrinkage.",
+  "ar": "للقطع المطبوعة بطابعة 3D، التي غالبًا ما تحتوي على فراغات بين الطبقات وتتفاوت مقاسات ثقوبها، نوصي باستخدام براغي BT ذاتية اللولبة. توفّر هذه البراغي عزم دوران معتدلًا عند الإدخال، وتمنع الارتخاء، ويمكن تركيبها وفكّها عدة مرات. إن استخدام هذه البراغي مع مقاس الثقب الموصى به يضمن وصلات سهلة ومحكمة لقطعك المطبوعة، ويغني عن الصواميل، ويجنّبك مشكلات مثل ارتخاء البراغي أو انكماش الثقوب.",
+  "ckb": "بۆ پارچە چاپکراوەکانی 3D، کە زۆرجار بۆشایی لە نێوان چینەکانیاندا هەیە و قەبارەی کونەکانیان جیاوازە، پێشنیاری بەکارهێنانی بورغیی خۆپێچی BT دەکەین. ئەم بورغییانە تۆرکێکی مامناوەند بۆ تێخستن دابین دەکەن، ڕێگری لە شلبوونەوە دەکەن، و دەتوانرێت چەندین جار دابمەزرێنرێن و لابرێن. بەکارهێنانی ئەم بورغییانە و گونجاندنیان لەگەڵ قەبارەی کونی پێشنیارکراو، پەیوەستکردنێکی ئاسان و قایم بۆ پارچە چاپکراوەکانت مسۆگەر دەکات، پێویستی بە سامۆڵە نامێنێت و ڕێگری لە کێشەی وەک شلبوونەوەی بورغی یان کرژبوونەوەی کون دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "62876a21ebe9b7f3de03a81dc0ade6840e537e3052abab856399c5fa3d8beb23",
+  "en": "We have included the relevant data for the twisting torque and loosening torque experiments of PLA and PETG material specimens, as well as the recommended hole sizes for design. The model files for testing are available for download at the end of the details page. All test holes are printed perpendicularly to the platform. When designing a bolt bottom hole on the side of the part, it is recommended to use a size one size larger than the recommended size for lying flat to prevent interlayer compression cracking.",
+  "ar": "أدرجنا البيانات ذات الصلة بتجارب عزم الربط وعزم الفك لعيّنات من مادتي PLA وPETG، إضافةً إلى مقاسات الثقوب الموصى بها للتصميم. ملفات النموذج الخاصة بالاختبار متاحة للتنزيل في نهاية صفحة التفاصيل. جميع ثقوب الاختبار مطبوعة عموديًا على صفيحة الطباعة. عند تصميم ثقب قاعدة لبرغي على جانب القطعة، يوصى باستخدام مقاس أكبر بدرجة واحدة من المقاس الموصى به للوضع المسطّح، لتجنّب التشقق الناتج عن الانضغاط بين الطبقات.",
+  "ckb": "داتا پەیوەندیدارەکانی تاقیکردنەوەکانی تۆرکی بادان و تۆرکی شلبوونەوەمان بۆ نموونەکانی کەرەستەی PLA و PETG داناوە، هەروەها قەبارەی کونە پێشنیارکراوەکان بۆ دیزاین. فایلەکانی مۆدێل بۆ تاقیکردنەوە لە کۆتایی پەڕەی وردەکارییەکاندا بۆ داگرتن بەردەستن. هەموو کونەکانی تاقیکردنەوە بە ستوونی بەسەر پلێتی چاپەوە چاپ کراون. کاتێک کونی بنەوەی بۆڵت لە لای پارچەکە دیزاین دەکەیت، پێشنیار دەکرێت قەبارەیەک گەورەتر لە قەبارەی پێشنیارکراو بۆ دۆخی پاڵکەوتوو بەکاربهێنیت، بۆ ڕێگریکردن لە درزبردنی نێوان چینەکان بەهۆی پەستانەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a444e3a135186c1a886af96944ed48869cf670aad8f35eeb3f0814662cd46c57",
+  "en": "Test Data for Self-Tapping Screws 3D Document for Screws Test",
+  "ar": "بيانات اختبار البراغي ذاتية اللولبة، مستند 3D لاختبار البراغي",
+  "ckb": "داتای تاقیکردنەوەی بورغیی خۆپێچ، بەڵگەنامەی 3D بۆ تاقیکردنەوەی بورغی",
+  "kind": "block_line"
+ },
+ {
+  "h": "ae1eeee80295248173c25d56a72cbaaf609152630ffbcfef48eb0d7b413a0896",
+  "en": "Carbon steel Socket Head Cap Self Tapping Screw (SHCS)",
+  "ar": "برغي ذاتي اللولبة برأس أسطواني وتجويف سداسي من الفولاذ الكربوني (SHCS)",
+  "ckb": "بورغیی خۆپێچی سەرلوولەیی بە کونی شەشپاڵوو لە پۆڵای کاربۆنی (SHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "5eef5af7181b354921c5f7fcb3f014ce7e22fcc81b64b639f2c7f747b353ddd2",
+  "en": "Specification 3D Document",
+  "ar": "المواصفات، مستند 3D",
+  "ckb": "تایبەتمەندییەکان، بەڵگەنامەی 3D",
+  "kind": "block_line"
+ },
+ {
+  "h": "18cb5fd6aff834e95ecd70661fd4b37f6a16861add2c9869dd2aa0fb731eeecb",
+  "en": "S (mm) Thread length",
+  "ar": "طول السنّ S (mm)",
+  "ckb": "درێژیی پێچ S (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "bd4f8a35c053a61eee0fc7a19fc71fe1f184955c3c5a233741dbd9e23f66f0b9",
+  "en": "d (mm) Shoulder Diameter",
+  "ar": "قطر الكتف d (mm)",
+  "ckb": "تیرەی شان d (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "b45e55d8a044fc2c42f9bc02f42908d86f0388e1c6a477ce8a994f1de3de4c22",
+  "en": "Carbon steel Socket Head Cap Machine Screws (SHCS)",
+  "ar": "براغٍ ميكانيكية برأس أسطواني وتجويف سداسي من الفولاذ الكربوني (SHCS)",
+  "ckb": "بورغیی ئامێری سەرلوولەیی بە کونی شەشپاڵوو لە پۆڵای کاربۆنی (SHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "e7e60892b7d17cb8aacdb0d2f6575afd7d73f24ce20ba00b6c76e111d84c3411",
+  "en": "*Compliant with the requirements of GB/T 70.1-2008 standard [Equivalent standards: ISO 4762, ASME/ANSI B 18.3.1M - 1986 (R1993), DIN EN ISO 12474]",
+  "ar": "*متوافق مع متطلبات معيار GB/T 70.1-2008 [المعايير المكافئة: ISO 4762، ASME/ANSI B 18.3.1M - 1986 (R1993)، DIN EN ISO 12474]",
+  "ckb": "*گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB/T 70.1-2008 [ستانداردە هاوتاکان: ISO 4762، ASME/ANSI B 18.3.1M - 1986 (R1993)، DIN EN ISO 12474]",
+  "kind": "block_line"
+ },
+ {
+  "h": "dd9af825eba58176162b90826f6fc89521163d47ba47cfe8f3920d096e31acc9",
+  "en": "Forgot the screw specs? Just print the Screw Gauge model from MakerWorld to help with sorting.",
+  "ar": "نسيت مواصفات البراغي؟ ما عليك سوى طباعة نموذج Screw Gauge من MakerWorld للمساعدة في فرزها.",
+  "ckb": "تایبەتمەندییەکانی بورغییەکەت لەبیر چووە؟ تەنها مۆدێلی Screw Gauge لە MakerWorld چاپ بکە بۆ یارمەتی لە جیاکردنەوەیاندا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "71fcf0336c5d9bd6bdfd039443eb7fda53fe22f1e766a63754f28a373c8a10a4",
+  "en": "Carbon steel Socket Flat Head Socket Cap Machine Screw (FHCS)",
+  "ar": "برغي ميكانيكي برأس مسطّح غاطس وتجويف سداسي من الفولاذ الكربوني (FHCS)",
+  "ckb": "بورغیی ئامێری سەرتەختی نقووم بە کونی شەشپاڵوو لە پۆڵای کاربۆنی (FHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "8821ebeba0141c690d8474a86cb60094b6ddaa9711ce456ef1813e06a2124e86",
+  "en": "Compliant with the requirements of GB/T 70.2-2015 standard [Equivalent standards: ISO 7380-1, DIN EN ISO 7380 (-1) - 2011]",
+  "ar": "متوافق مع متطلبات معيار GB/T 70.2-2015 [المعايير المكافئة: ISO 7380-1، DIN EN ISO 7380 (-1) - 2011]",
+  "ckb": "گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB/T 70.2-2015 [ستانداردە هاوتاکان: ISO 7380-1، DIN EN ISO 7380 (-1) - 2011]",
+  "kind": "block_line"
+ },
+ {
+  "h": "d257e947eba486bc35956137a124a10036153220269e6d0d5ac650358ca9be68",
+  "en": "Stainless Steel Button Head Cap Machine Screws (BHCS)",
+  "ar": "براغٍ ميكانيكية برأس دائري من الفولاذ المقاوم للصدأ (BHCS)",
+  "ckb": "بورغیی ئامێری سەرخڕ لە پۆڵای زەنگنەگر (BHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "fea670de5661773a4bfe836050fbf038c6d886bb46e83cc7c028d3500020d80f",
+  "en": "Specification 3D Model",
+  "ar": "المواصفات، نموذج 3D",
+  "ckb": "تایبەتمەندییەکان، مۆدێلی 3D",
+  "kind": "block_line"
+ },
+ {
+  "h": "25b9c008436ac49af68b7d5d19e2bbd222014ddba082c91b2725ffc9f269d262",
+  "en": "Compliant with the requirements of GB/T 70.2-2015 standard [Equivalent standards: ISO 7380-1, DIN EN ISO(-1)]",
+  "ar": "متوافق مع متطلبات معيار GB/T 70.2-2015 [المعايير المكافئة: ISO 7380-1، DIN EN ISO(-1)]",
+  "ckb": "گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB/T 70.2-2015 [ستانداردە هاوتاکان: ISO 7380-1، DIN EN ISO(-1)]",
+  "kind": "block_line"
+ },
+ {
+  "h": "dedc96af3cbdefabc5b21a3695669a3ae9c9cfe0fa388cc76d5ac6af787de199",
+  "en": "Stainless Steel Flat Head Cap Machine Screws (FHCS)",
+  "ar": "براغٍ ميكانيكية برأس مسطّح غاطس من الفولاذ المقاوم للصدأ (FHCS)",
+  "ckb": "بورغیی ئامێری سەرتەختی نقووم لە پۆڵای زەنگنەگر (FHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "2a3927af463c41974e11aae6bd1c58d5ac2e96a69674258dfc0cee78e888b707",
+  "en": "H (mm) Wrench Size",
+  "ar": "مقاس مفتاح الربط H (mm)",
+  "ckb": "قەبارەی ئاچار H (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "862bf07eabc7bed4fff0f6c1e8dd9543449151dbbe9c2c6c6aa71dae28ca1d01",
+  "en": "k (mm) Thickness",
+  "ar": "السماكة k (mm)",
+  "ckb": "ئەستووری k (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "fa2dfa4a1ad9267646fa7e9256ff8f9288e00936abfe4b051e2a62b3065bc1bf",
+  "en": "e (mm) Across Corners",
+  "ar": "المسافة بين الزاويتين المتقابلتين e (mm)",
+  "ckb": "پانیی نێوان دوو گۆشەی بەرامبەر e (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "b149b6da48955aac5b4fc16076b3e253cc3c219688560a0ac575345eb9cf7340",
+  "en": "Compliant with the requirements of GB /T 6170 - 2015 standard [Equivalent standards: ISO 4032 - 2012, ASME/ANSI B 18.2.4.1M - 2007, DIN EN ISO 4032 - 2013]",
+  "ar": "متوافق مع متطلبات معيار GB /T 6170 - 2015 [المعايير المكافئة: ISO 4032 - 2012، ASME/ANSI B 18.2.4.1M - 2007، DIN EN ISO 4032 - 2013]",
+  "ckb": "گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB /T 6170 - 2015 [ستانداردە هاوتاکان: ISO 4032 - 2012، ASME/ANSI B 18.2.4.1M - 2007، DIN EN ISO 4032 - 2013]",
+  "kind": "block_line"
+ },
+ {
+  "h": "262576219ee860fea9725d735216bb454121260db9dc037f026c930c39043330",
+  "en": "M (mm) Inner Diameter",
+  "ar": "القطر الداخلي M (mm)",
+  "ckb": "تیرەی ناوەوە M (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ffcf4541d3740f34c636b9347df255243b05e423b5eeb7c58b0dc1444f426cbc",
+  "en": "D (mm) Outer Diameter",
+  "ar": "القطر الخارجي D (mm)",
+  "ckb": "تیرەی دەرەوە D (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "7cfc67b4043aa3c829c9848c730ff83749ccc3234e041c034718970d0bfcad84",
+  "en": "H (mm) Thickness",
+  "ar": "السماكة H (mm)",
+  "ckb": "ئەستووری H (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "c5b49d7e1a92ed7ab413adcf37aa221063b66aba15e3a88d7205172850b5ac5c",
+  "en": "Compliant with the requirements of GB /T 848 - 2002 standard [Equivalent standards: ISO 7092 - 2000, DIN EN ISO 7092 - 2000]",
+  "ar": "متوافق مع متطلبات معيار GB /T 848 - 2002 [المعايير المكافئة: ISO 7092 - 2000، DIN EN ISO 7092 - 2000]",
+  "ckb": "گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB /T 848 - 2002 [ستانداردە هاوتاکان: ISO 7092 - 2000، DIN EN ISO 7092 - 2000]",
+  "kind": "block_line"
+ },
+ {
+  "h": "2fe34c3db79374a6f7adef6dfc6ffb0fb94b5d82d9061fe650eded6f9cc6c226",
+  "en": "L (mm) Free Length",
+  "ar": "الطول الحر L (mm)",
+  "ckb": "درێژیی ئازاد L (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "a5f112a2e9f6afb788337851219263a73b6b429c50127acb000b53feab634419",
+  "en": "dk (mm) Wire Diameter",
+  "ar": "قطر السلك dk (mm)",
+  "ckb": "تیرەی وایەر dk (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "a131db80649a9e0220169317deb566c8ffc927d40dda323eee40e36912cc9a80",
+  "en": "f (mm) Permissible Length",
+  "ar": "الطول المسموح به f (mm)",
+  "ckb": "درێژیی ڕێگەپێدراو f (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "16ba9f9b2588dbc95c315ad9da958fff3d6988d60f9cb860f1dfdd0809c987e6",
+  "en": "Solid Height (mm)",
+  "ar": "الارتفاع عند الانضغاط الكامل (mm)",
+  "ckb": "بەرزی لە کاتی پەستانی تەواودا (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2b48010bebdb5da487781a2bacd775756f9d9005f2c4dda0a6ffd1ed9f33ab6e",
+  "en": "Max Load (Nmax)",
+  "ar": "أقصى حمل (Nmax)",
+  "ckb": "زۆرترین بار (Nmax)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "8c7f72dc7b559429bc162debdd61aad41ab8a0a09b62ca22d0878808a5b73c4f",
+  "en": "Rate g/mm（±10%）",
+  "ar": "ثابت النابض g/mm (±10%)",
+  "ckb": "ڕێژەی ڕەقیی فەنەر g/mm (±10%)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "56d219feb9d9fa592cbcae221228a325a6460ca4bd2a6a0cad3b2c0635ef9c88",
+  "en": "Total coils",
+  "ar": "إجمالي عدد اللفات",
+  "ckb": "کۆی ژمارەی ئەڵقەکان",
+  "kind": "block_cell"
+ },
+ {
+  "h": "7d4590ebe52cac92c9f31fb304c70626ca46f9964b5125f2cbe64985feafd468",
+  "en": "SWP-B",
+  "ar": "SWP-B",
+  "ckb": "SWP-B",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "5ad6dea727a2665587ab8b541dc048f3409b61be2d8c722beafe36d139f4f64f",
+  "en": "Temperature Range: Stainless Steel: -10°C to 100°C",
+  "ar": "نطاق درجة الحرارة: الفولاذ المقاوم للصدأ: من -10°C إلى 100°C",
+  "ckb": "مەودای پلەی گەرمی: پۆڵای زەنگنەگر: لە -10°C تا 100°C",
+  "kind": "block_line"
+ },
+ {
+  "h": "85f315bbf25a3c7759f539986d04077733bb44986d7cb2692da752cce5619cfc",
+  "en": "- If used under conditions exceeding the above temperature range, the load value may decrease due to usage conditions.",
+  "ar": "- إذا استُخدم في ظروف تتجاوز نطاق درجة الحرارة المذكور أعلاه، فقد تنخفض قيمة الحمل بسبب ظروف الاستخدام.",
+  "ckb": "- ئەگەر لە بارودۆخێکدا بەکاربهێنرێت کە لە مەودای پلەی گەرمیی سەرەوە تێپەڕێت، لەوانەیە بەهای بار بەهۆی بارودۆخی بەکارهێنانەوە کەم ببێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e6c0819db1490f8387a2b11839d1d89f9b49952561aec2bcd06a50d688f81e3a",
+  "en": "- When used in environments with high and low temperature differences and humidity, such as outdoors, stainless steel products are recommended.",
+  "ar": "- عند الاستخدام في بيئات ذات فروق كبيرة بين درجات الحرارة المرتفعة والمنخفضة ورطوبة، مثل الأماكن الخارجية، يوصى باستخدام منتجات الفولاذ المقاوم للصدأ.",
+  "ckb": "- کاتێک لە ژینگەیەکدا بەکاردێت کە جیاوازیی پلەی گەرمیی بەرز و نزم و شێی تێدایە، وەک دەرەوەی ماڵ، بەرهەمەکانی پۆڵای زەنگنەگر پێشنیار دەکرێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "09a363e2636afabd2513d087ef518d35f03fcc7f531f9a54eae1816c92ad41a9",
+  "en": "*Stainless steel springs also possess magnetism.",
+  "ar": "*نوابض الفولاذ المقاوم للصدأ لها خاصية مغناطيسية أيضًا.",
+  "ckb": "*فەنەرەکانی پۆڵای زەنگنەگر خاسیەتی موگناتیسیشیان هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "530e7e9c9c8ba0dd4936226a4cc2a588371075c085a737944d7ec1276ac964b9",
+  "en": "n (mm) Total Coil",
+  "ar": "إجمالي عدد اللفات n (mm)",
+  "ckb": "کۆی ژمارەی ئەڵقەکان n (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f7e388036df070da0c4181f70c95732fdf20e9941d7bab7f473b6dc24d990d38",
+  "en": "L (mm) Leg Length",
+  "ar": "طول الساق L (mm)",
+  "ckb": "درێژیی قاچ L (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f7b80ce11cf7037023ce5634198d6236f8edd5f90c33a0a78d6a66c053439dd9",
+  "en": "α (°） Leg Angle",
+  "ar": "زاوية الساق α (°)",
+  "ckb": "گۆشەی قاچ α (°)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5142cd0b1eaf37e68b1a8dcf4624751a320b198acb8e936a970546a8feb20009",
+  "en": "Rate (g.mm/deg)",
+  "ar": "ثابت النابض (g.mm/deg)",
+  "ckb": "ڕێژەی ڕەقیی فەنەر (g.mm/deg)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "867afa0633995ae5eb4b9c1d363b180c9b090e975c59f816a99711d67772be67",
+  "en": "θ (°) Max Deflection",
+  "ar": "أقصى انحراف θ (°)",
+  "ckb": "زۆرترین لادان θ (°)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0d2ce3cbaf4a8568aaf9f58e34e5a9f1dd31af9d46ce9f7cceada69b8217c4f1",
+  "en": "Exceeding the maximum allowable deflection can lead to torsional spring fatigue. As the spring rate increases due to higher loads, the load curve rises accordingly, resulting in high stresses that can cause spring fractures.",
+  "ar": "قد يؤدي تجاوز أقصى انحراف مسموح به إلى إجهاد النابض الالتوائي. ومع زيادة ثابت النابض بسبب الأحمال الأعلى، يرتفع منحنى الحمل تبعًا لذلك، ما ينتج عنه إجهادات عالية قد تسبب انكسار النابض.",
+  "ckb": "تێپەڕاندنی زۆرترین لادانی ڕێگەپێدراو دەکرێت ببێتە هۆی ماندووبوونی فەنەری بادان. کاتێک ڕێژەی ڕەقیی فەنەر بەهۆی باری زیاترەوە زیاد دەکات، هێڵی بار بە هەمان شێوە بەرز دەبێتەوە، و فشاری زۆر دروست دەکات کە دەکرێت ببێتە هۆی شکانی فەنەرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6d28f56314e780a2f93bac382e8502a1d869723b4646e3afc8bc240db4e30f28",
+  "en": "In applications without pre-torsion, gaps may cause the spring to vibrate vertically, leading to spring twisting. With pre-torsion, the spring tends to be more stable.",
+  "ar": "في الاستخدامات التي لا يوجد فيها التواء مسبق، قد تتسبب الفراغات في اهتزاز النابض عموديًا، ما يؤدي إلى التوائه. أما مع الالتواء المسبق، فيميل النابض إلى أن يكون أكثر ثباتًا.",
+  "ckb": "لەو بەکارهێنانانەی کە بادانی پێشوەختەیان تێدا نییە، لەوانەیە بۆشاییەکان ببنە هۆی لەرینەوەی ستوونیی فەنەرەکە، کە دەبێتە هۆی بادرانی فەنەرەکە. لەگەڵ بادانی پێشوەختەدا، فەنەرەکە زیاتر بەرەو جێگیربوون دەچێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "949ba4ef8222079d3b75322a9c0e684ea55f457dc5934f6c6336e9289f4ffea3",
+  "en": "When springs are used in a transverse orientation, it may cause wear and fracture of the guide pin and the spring.",
+  "ar": "عند استخدام النوابض في وضع عرضي، قد يؤدي ذلك إلى تآكل وانكسار مسمار التوجيه والنابض.",
+  "ckb": "کاتێک فەنەرەکان بە ئاراستەی پانی بەکاردەهێنرێن، لەوانەیە ببێتە هۆی سووان و شکانی بزماری ڕێنمایی و فەنەرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e2dc1a9657da0897453687b9afd01ca5afb18eb60b30ec893a66021e667692fc",
+  "en": "D (mm) Diameter (0,-0.1)",
+  "ar": "القطر D (mm) (0,-0.1)",
+  "ckb": "تیرە D (mm) (0,-0.1)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "75f812b6f1ccf1e192d77b626a15093d8ac75e430d4baac21509f0b68bc7c213",
+  "en": "H (mm) Thickness (0,-0.1)",
+  "ar": "السماكة H (mm) (0,-0.1)",
+  "ckb": "ئەستووری H (mm) (0,-0.1)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ab5580942bd896f87dde77995e3e7baa0a1d98dc27f31e27f989226e0b4ea642",
+  "en": "Magnet Grade",
+  "ar": "درجة المغناطيس",
+  "ckb": "پلەی موگناتیس",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5d4c1f03364d57c79569e710f1a23f80473bf2175db2495cb2707325804dbc06",
+  "en": "This product is intended for ages 14 and up and is not suitable for use in any children's products, toys, or household items intended for children.",
+  "ar": "هذا المنتج مخصّص للأعمار من 14 عامًا فما فوق، وغير مناسب للاستخدام في أي منتجات للأطفال أو ألعاب أو أغراض منزلية مخصّصة للأطفال.",
+  "ckb": "ئەم بەرهەمە بۆ تەمەنی 14 ساڵ و سەرووترە و گونجاو نییە بۆ بەکارهێنان لە هیچ بەرهەمێکی منداڵان، یاری، یان کەلوپەلێکی ماڵ کە بۆ منداڵان دانرابێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a14ac6925f1c4c0ecf692361b487f1fc0b4b7ab4b8dd7ea6517df6128f934fbe",
+  "en": "This product contains small parts and poses a choking hazard. Do not ingest. If accidentally swallowed, seek immediate medical attention. Keep out of reach of children.",
+  "ar": "يحتوي هذا المنتج على قطع صغيرة ويشكّل خطر الاختناق. لا تبتلعه. في حال ابتلاعه عن طريق الخطأ، اطلب الرعاية الطبية فورًا. يُحفظ بعيدًا عن متناول الأطفال.",
+  "ckb": "ئەم بەرهەمە پارچەی بچووکی تێدایە و مەترسیی خنکانی هەیە. قووتی مەدە. ئەگەر بە هەڵە قووت درا، دەستبەجێ سەردانی پزیشک بکە. لە دەستڕەسی منداڵان دووری بخەرەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "da0df03e55814f136bd8453069e96ef97aa15a31ea87ddde456605254886536e",
+  "en": "M (mm) Diameter",
+  "ar": "القطر M (mm)",
+  "ckb": "تیرە M (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9fa63b358b1bdf2d96c303e20900f5f6041ab7b27f2c01a29b5ba1bbb96309f9",
+  "en": "L (mm) Length",
+  "ar": "الطول L (mm)",
+  "ckb": "درێژی L (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e1bb96beab11baed213440c5271a29875fe65d4ee1b1e4d563f47667800f2f72",
+  "en": "d (mm) Inside Diameter",
+  "ar": "القطر الداخلي d (mm)",
+  "ckb": "تیرەی ناوەوە d (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9449f8bb5a00ef25631216eb97e4cc58db5a40d6ead738ec6284dcd7c99cf414",
+  "en": "H (mm) Width",
+  "ar": "العرض H (mm)",
+  "ckb": "پانی H (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5f931f970a56954fa715d1071c7f7e29510024beb47a51841d30b0fd2df31ed6",
+  "en": "Dynamic Load (N)",
+  "ar": "الحمل الديناميكي (N)",
+  "ckb": "بەرگەی باری داینامیکی (N)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "561315feec29dc6949f82803a41d3ef42dbaaacf7142919315226e99b3fd63cb",
+  "en": "Static Load (N)",
+  "ar": "الحمل الساكن (N)",
+  "ckb": "بەرگەی باری ستاتیکی (N)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ccb1f14562228012edf236b7c637842f512e6acc6a0facf8877e55fdf107f8d7",
+  "en": "Bearing Clearance (μm)",
+  "ar": "خلوص المحمل (μm)",
+  "ckb": "بۆشایی بێرینگ (μm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0d64bfb1affe138bb2d32aaaac02c77c95b1ca8286d9779c712a4abb0d236954",
+  "en": "Max Speed (rpm)",
+  "ar": "أقصى سرعة (rpm)",
+  "ckb": "زۆرترین خێرایی (rpm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "32f5316981bdacb54061aaebb16119326ce0fd9c825614f93d1c549fb8987435",
+  "en": "Bearing Seal Type",
+  "ar": "نوع إحكام المحمل",
+  "ckb": "جۆری داخەری بێرینگ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ed077f3d8125d60dca1979c7133601bd187d47c73ed9975028f677e49e709942",
+  "en": "Open",
+  "ar": "مفتوح",
+  "ckb": "کراوە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "269b046b64262cd3a0cf9fb78e79ca39c70614c2584ff65ffdfb74158cba0c3b",
+  "en": "Comparison of Bearing Materials",
+  "ar": "مقارنة مواد المحامل",
+  "ckb": "بەراوردکردنی کەرەستەکانی بێرینگ",
+  "kind": "block_title"
+ },
+ {
+  "h": "0374024a28933c9f08b47b3e173b4c0969aa830370b2e543215abbe613446d76",
+  "en": "Rotational Resistance",
+  "ar": "مقاومة الدوران",
+  "ckb": "بەرگەی سووڕانەوە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0e0ad62a98703965e141eeacde670911c968b99c84609c748da686cf20d1b5c7",
+  "en": "Rotational Noise",
+  "ar": "ضجيج الدوران",
+  "ckb": "دەنگەدەنگی سووڕانەوە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f05a9541d5080a974e3013663f0780de06342b6b803fa52d57ad772aa1ce46f2",
+  "en": "Durability",
+  "ar": "المتانة",
+  "ckb": "بەرگەگری",
+  "kind": "block_cell"
+ },
+ {
+  "h": "92bccbfa0191745b927d865298d99aaa097c774cc76f5d95f3063dc7a84a25bf",
+  "en": "Self-lubricity",
+  "ar": "التزييت الذاتي",
+  "ckb": "خۆچەورکردن",
+  "kind": "block_cell"
+ },
+ {
+  "h": "875670ae70fa7306d17c9d2b7dc1943d2d90aff73792d9c5eb5c4cfe07af1380",
+  "en": "Resistance to Humid Environments",
+  "ar": "مقاومة البيئات الرطبة",
+  "ckb": "بەرگەی ژینگەی شێدار",
+  "kind": "block_cell"
+ },
+ {
+  "h": "d916515d826cf07e09085057ba1c998b0500a754c38701829b587101ab80ffed",
+  "en": "Bronze",
+  "ar": "برونز",
+  "ckb": "برۆنز",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5c42afc7a23018d32dcff346792b575bcdf63be118b98a61084b1afac32b93e9",
+  "en": "Moderate",
+  "ar": "متوسط",
+  "ckb": "مامناوەند",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f793de205ead5ac302c4a1627829dea41f176b1068b993a32373fc869918374b",
+  "en": "Low",
+  "ar": "منخفض",
+  "ckb": "نزم",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5263293fc202649bdc8135573ac9cd3b0bcea4355e0d8f0a59f1ddeea8eefc15",
+  "en": "Small",
+  "ar": "صغير",
+  "ckb": "بچووک",
+  "kind": "block_cell"
+ },
+ {
+  "h": "88dc4d2b38a3c792de11dcc5bd1910afb3f3b07e0a263ac078d26c6751cbb494",
+  "en": "Short lifespan",
+  "ar": "عمر افتراضي قصير",
+  "ckb": "تەمەنی بەکارهێنانی کورت",
+  "kind": "block_cell"
+ },
+ {
+  "h": "8e588cd187741f1cd76f5fab77b7208782a8c21d764ce7d7a4cf3ac4e0968873",
+  "en": "Medium",
+  "ar": "متوسط",
+  "ckb": "ناوەند",
+  "kind": "block_cell"
+ },
+ {
+  "h": "95a135ac4951bad41780eb8292e389f3fa27f1f6cd13d3bd2ce58bc0786e49ef",
+  "en": "Bearing Steel",
+  "ar": "فولاذ المحامل",
+  "ckb": "پۆڵای بێرینگ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "b8f9082427845c8210f4f42f7a04a1ac910a703744d4cb55a583827f7a4c16b1",
+  "en": "Moderate lifespan",
+  "ar": "عمر افتراضي متوسط",
+  "ckb": "تەمەنی بەکارهێنانی مامناوەند",
+  "kind": "block_cell"
+ },
+ {
+  "h": "caaba84670559b5bd406e01cb8f8c69eb1306b258197ceed0dd88ba7988dfeb4",
+  "en": "Heavy",
+  "ar": "ثقيل",
+  "ckb": "قورس",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2076cfb188f0313fa5cb0c2139e6fe7226930fbdfe4c84d82e5c5967b745eb89",
+  "en": "Not ideal",
+  "ar": "غير مثالي",
+  "ckb": "زۆر گونجاو نییە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "3090c619f6f728d4a6e6abecc5640089d00466bd777f948408cd918c45e29d5c",
+  "en": "Very low",
+  "ar": "منخفض جدًا",
+  "ckb": "زۆر نزم",
+  "kind": "block_cell"
+ },
+ {
+  "h": "a20a4d56c1ed2e950167353afa32bf5f6bfb3a156755322f4827ee1ce079e89a",
+  "en": "Long lifespan",
+  "ar": "عمر افتراضي طويل",
+  "ckb": "تەمەنی بەکارهێنانی درێژ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9418752bb43b8ba4075d626a64a006f4028d9ec07400437ef019e1ac25500974",
+  "en": "Very light",
+  "ar": "خفيف جدًا",
+  "ckb": "زۆر سووک",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2fd860ebd8f5581d5c27e084399be08427f5bb397b4ea0af2b9ad3f2d86e2ec6",
+  "en": "Ceramic Ball",
+  "ar": "كرات سيراميكية",
+  "ckb": "تۆپەڵەی سیرامیکی",
+  "kind": "block_cell"
+ },
+ {
+  "h": "eac074976819ee24ee0e66914a3ab7844ac02c805c3553ae64841da40c9d5a25",
+  "en": "Plastic Bearings",
+  "ar": "المحامل البلاستيكية",
+  "ckb": "بێرینگی پلاستیکی",
+  "kind": "block_line"
+ },
+ {
+  "h": "4df9f2a4ee9964b8aed1b7e66379e4fa355000a6a5b13b2be7a7d081ff01e480",
+  "en": "No need to add lubricant",
+  "ar": "لا حاجة إلى إضافة مادة تشحيم",
+  "ckb": "پێویست بە زیادکردنی ماددەی چەورکردن ناکات",
+  "kind": "block_line"
+ },
+ {
+  "h": "264623f1c42e78415297aeb48c6a4f760f98a54e2a04d5f21c1f80f341ceb50a",
+  "en": "Light weight",
+  "ar": "وزن خفيف",
+  "ckb": "کێشی سووک",
+  "kind": "block_line"
+ },
+ {
+  "h": "b2c3009d1636342b2bdc8904331b575afecae496ed24b51be753ac4183fe18f3",
+  "en": "Low rotational noise",
+  "ar": "ضجيج دوران منخفض",
+  "ckb": "دەنگەدەنگی سووڕانەوەی نزم",
+  "kind": "block_line"
+ },
+ {
+  "h": "0510372d674766b2d5d9d86fa1feda5f7fe9ebc97da0b5266555ecc7d97255c7",
+  "en": "Ideal Applications for plastic bearings",
+  "ar": "الاستخدامات المثالية للمحامل البلاستيكية",
+  "ckb": "گونجاوترین بەکارهێنانەکانی بێرینگی پلاستیکی",
+  "kind": "block_line"
+ },
+ {
+  "h": "7200e003f5ad4e902222797234dc2156f5b34c7cde437711ddf761e6d4916556",
+  "en": "When contact with food or the avoidance of mineral lubricating oils is required",
+  "ar": "عند الحاجة إلى ملامسة الطعام أو تجنّب زيوت التشحيم المعدنية",
+  "ckb": "کاتێک پێویست بە بەرکەوتنی خۆراک یان دوورکەوتنەوە لە ڕۆنی چەورکردنی مەعدەنی هەیە",
+  "kind": "block_line"
+ },
+ {
+  "h": "c79cb2650ba1d8cd5618e5607ce9b8251a02be5fe2290f05195941a55af733a2",
+  "en": "Light load and mass reduction is desired",
+  "ar": "عندما يكون الحمل خفيفًا ويُرغب في تقليل الكتلة",
+  "ckb": "کاتێک بار سووکە و کەمکردنەوەی کێش مەبەستە",
+  "kind": "block_line"
+ },
+ {
+  "h": "d8d45f3e28829848046a2e5fb9d9dc33bb7349231e7ada37b3deef03e2ca7e56",
+  "en": "Desire to minimize rotational noise",
+  "ar": "الرغبة في تقليل ضجيج الدوران إلى أدنى حد",
+  "ckb": "ویستی کەمکردنەوەی دەنگەدەنگی سووڕانەوە بۆ کەمترین ئاست",
+  "kind": "block_line"
+ },
+ {
+  "h": "044dd1f423439be8bcebe80214fafb8a0c8142c13f8d7af9b1e68af1dfe61b8c",
+  "en": "Exposure to factors that accelerate steel corrosion, such as water",
+  "ar": "التعرّض لعوامل تسرّع تآكل الفولاذ، مثل الماء",
+  "ckb": "ڕووبەڕووبوونەوەی ئەو هۆکارانەی کە داخورانی پۆڵا خێرا دەکەن، وەک ئاو",
+  "kind": "block_line"
+ },
+ {
+  "h": "afb8c555ea90d25eaef964870437f902ff770df9e8eed4e2c8d1f25bb99244ad",
+  "en": "SD/mm Diameter",
+  "ar": "القطر SD/mm",
+  "ckb": "تیرە SD/mm",
+  "kind": "block_cell"
+ },
+ {
+  "h": "be3a4478ccd4565470e4bb3e401e5479ca6aa1cf77a323ee33b6c7625c4f6393",
+  "en": "Tolerance (mm)",
+  "ar": "التفاوت (mm)",
+  "ckb": "تۆڵێرانس (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2ecf0b716d0b8e739ec44b6e6c9ac30711deee305b9fbfcc667a631920363bdb",
+  "en": "SD (mm) Diameter",
+  "ar": "القطر SD (mm)",
+  "ckb": "تیرە SD (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "337b7f15b38acf94d57f7a8a14834f9d1ccf7b04a8e8ebddc253b52ae9ab9ba7",
+  "en": "PDF 3D Model",
+  "ar": "ملف PDF، نموذج 3D",
+  "ckb": "فایلی PDF، مۆدێلی 3D",
+  "kind": "block_line"
+ },
+ {
+  "h": "60693c0d55ada787d130222dd2eb3f31896e1f6665d8dc3a2dddf0854d46ecbe",
+  "en": "Need Other Accessories",
+  "ar": "يحتاج إلى ملحقات أخرى",
+  "ckb": "پێویستی بە پێداویستیی تر هەیە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "d3d12bee8e33ea8ed48b00443d1f51657742897e91b29dd3dc634cadd7ca0daf",
+  "en": "Christmas Santa's Snowcat 009",
+  "ar": "Christmas Santa's Snowcat 009",
+  "ckb": "Christmas Santa's Snowcat 009",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "f9171164593756e56fb197327b529a4955590566560dbe62d586bff41be9d297",
+  "en": "YES",
+  "ar": "نعم",
+  "ckb": "بەڵێ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e62032999533e9d145541b04ba5ce92a56e6cb7c54ebe3aae449a2b626738f6d",
+  "en": "Kinetic Christmas Carousel 2.0",
+  "ar": "Kinetic Christmas Carousel 2.0",
+  "ckb": "Kinetic Christmas Carousel 2.0",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "757766ebad81efa7f610c23913c2272d96883f6bec19cf5e1ec58e94a6a4efd9",
+  "en": "Motorized version",
+  "ar": "نسخة بمحرك",
+  "ckb": "وەشانی بزوێنەردار",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5929788bec64791af9d0979ee68345af716bf5d01a3ab8e45c08361f7a38f54f",
+  "en": "Specification 3D Model Application Instruction",
+  "ar": "المواصفات، نموذج 3D، تعليمات الاستخدام",
+  "ckb": "تایبەتمەندییەکان، مۆدێلی 3D، ڕێنماییەکانی بەکارهێنان",
+  "kind": "block_line"
+ },
+ {
+  "h": "1a218f95e03cf29b8868f9aa7d391aed8b4a7cf4f1d5825af3e6b33a6efae25c",
+  "en": "Please use a power supply within the working voltage range.",
+  "ar": "يرجى استخدام مزوّد طاقة ضمن نطاق جهد التشغيل.",
+  "ckb": "تکایە دابینکەرێکی وزە بەکاربهێنە کە لە ناو مەودای ڤۆڵتیەی کارکردندا بێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ad8d559e9cf67b25e4f19e378046564ffbc97460318cca1c5c13afcf36d366b8",
+  "en": "Avoid immersing the motor in water or getting the motor wet.",
+  "ar": "تجنّب غمر المحرك في الماء أو تعريضه للبلل.",
+  "ckb": "خۆت بپارێزە لە نوقمکردنی بزوێنەرەکە لە ئاودا یان تەڕکردنی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ff759a76b286b819630d113141ad78e0c91ebd58da43c7dd4cc9df8f8edf7c19",
+  "en": "Use screws of the appropriate length to secure the gearbox to prevent thread slippage or damage to the gearbox from screws touching the gears.",
+  "ar": "استخدم براغي بطول مناسب لتثبيت علبة التروس، لمنع انزلاق السنّ أو تلف علبة التروس بسبب ملامسة البراغي للتروس.",
+  "ckb": "بورغیی درێژیی گونجاو بەکاربهێنە بۆ جێگیرکردنی گێربۆکسەکە، بۆ ڕێگریکردن لە خلیسکانی پێچ یان زیانگەیاندن بە گێربۆکسەکە بەهۆی بەرکەوتنی بورغییەکان بە چەرخە ددانەدارەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ae69f931d7aa912105c96e36ad936efeee69558f2c4a637f88483bc00be376a6",
+  "en": "When using glue/adhesive to fix the motor, to prevent damage, do not let the glue/adhesive seep into the gearbox, shaft, or motor interior.",
+  "ar": "عند استخدام الغراء/المادة اللاصقة لتثبيت المحرك، ولتجنّب التلف، لا تدع الغراء/المادة اللاصقة يتسرّب إلى علبة التروس أو العمود أو داخل المحرك.",
+  "ckb": "کاتێک چەسپ/ماددەی لکێنەر بەکاردەهێنیت بۆ جێگیرکردنی بزوێنەرەکە، بۆ ڕێگریکردن لە زیان، مەهێڵە چەسپ/ماددەی لکێنەرەکە بچێتە ناو گێربۆکس، میل یان ناوەوەی بزوێنەرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f01359144d4543d1eb2c2c17069d59dc5595cde124e6619a4e7af3abf30ed0a7",
+  "en": "Regularly add a small amount of lubricant/grease to the gearbox to improve its lifespan and reduce noise.",
+  "ar": "أضف بانتظام كمية صغيرة من مادة التشحيم/الشحم إلى علبة التروس لإطالة عمرها الافتراضي وتقليل الضجيج.",
+  "ckb": "بە شێوەیەکی بەردەوام بڕێکی کەم ماددەی چەورکردن/گریس بۆ گێربۆکسەکە زیاد بکە بۆ درێژکردنەوەی تەمەنی بەکارهێنانی و کەمکردنەوەی دەنگەدەنگ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "55e7a6c1199f247eb90ebcc3f91925d5290eafe962230e6acc85e9a1b6dbbd10",
+  "en": "Soft-start function",
+  "ar": "وظيفة البدء السلس",
+  "ckb": "ئەرکی دەستپێکردنی نەرم",
+  "kind": "block_line"
+ },
+ {
+  "h": "0c23097a68a6fa957baad27ca1fd5b3118ce2a37178fa244759996ba5406d5b6",
+  "en": "CNC voltage regulation",
+  "ar": "تنظيم الجهد بالتحكم الرقمي (CNC)",
+  "ckb": "ڕێکخستنی ڤۆڵتیە بە کۆنترۆڵی ژمارەیی (CNC)",
+  "kind": "block_line"
+ },
+ {
+  "h": "a481c0d2bc3dcf0b339319171c391a26145c167610fa7c69b656b0a554d53f74",
+  "en": "Automatic shutdown function",
+  "ar": "وظيفة الإيقاف التلقائي",
+  "ckb": "ئەرکی کوژاندنەوەی خۆکار",
+  "kind": "block_line"
+ },
+ {
+  "h": "68e4c32f2076646d8c9fb3c7b69f743ef468fb0b55b2b9b5254820c24ef41864",
+  "en": "Double-click to turn off digital display screen",
+  "ar": "انقر نقرًا مزدوجًا لإطفاء الشاشة الرقمية",
+  "ckb": "دوو جار کلیک بکە بۆ کوژاندنەوەی شاشە دیجیتاڵییەکە",
+  "kind": "block_line"
+ },
+ {
+  "h": "246a99e9441ce6f9040a0efb9e8d1999941e6c81dd129fab00aaf3372a6a181d",
+  "en": "Timing Setting",
+  "ar": "ضبط المؤقّت",
+  "ckb": "ڕێکخستنی تایمەر",
+  "kind": "block_title"
+ },
+ {
+  "h": "f42e3edcd2a6fbc589b7f0c9c6e8a8e44e0c93941f227c3756816fec371972c6",
+  "en": "Long press the thumbwheel for 3 seconds to enter the time setting interface. The \"---\" display represents timer OFF, and the number displayed represents timer ON.",
+  "ar": "اضغط مطوّلًا على عجلة الإبهام لمدة 3 ثوانٍ للدخول إلى واجهة ضبط الوقت. يشير عرض «---» إلى أن المؤقّت متوقف (OFF)، ويشير الرقم المعروض إلى أن المؤقّت يعمل (ON).",
+  "ckb": "چەرخی پەنجە بۆ ماوەی 3 چرکە دابگرە بۆ چوونە ناو ڕووکاری ڕێکخستنی کات. پیشاندانی «---» واتە تایمەر کوژاوەتەوە (OFF)، و ژمارەی پیشاندراو واتە تایمەر هەڵکراوە (ON).",
+  "kind": "block_line"
+ },
+ {
+  "h": "833add145e9302202a63ea41f872db4fa575b720a2048d3084af6f90929bdacc",
+  "en": "In the setting interface, click the thumbwheel once to switch timer function ON/OFF.",
+  "ar": "في واجهة الضبط، انقر على عجلة الإبهام مرة واحدة لتشغيل وظيفة المؤقّت أو إيقافها (ON/OFF).",
+  "ckb": "لە ڕووکاری ڕێکخستندا، یەک جار کلیک لە چەرخی پەنجە بکە بۆ هەڵکردن یان کوژاندنەوەی ئەرکی تایمەر (ON/OFF).",
+  "kind": "block_line"
+ },
+ {
+  "h": "45f36121ee5edce9b82c7b4df2ce5fe218534a501062057cfa164cae7ff96cc8",
+  "en": "In the setting interface, turn the thumbwheel to the left side to increase the timer. Turn it to the right to decrease the timer.",
+  "ar": "في واجهة الضبط، أدِر عجلة الإبهام إلى جهة اليسار لزيادة المؤقّت. وأدِرها إلى اليمين لتقليل المؤقّت.",
+  "ckb": "لە ڕووکاری ڕێکخستندا، چەرخی پەنجە بەرەو لای چەپ بسووڕێنە بۆ زیادکردنی تایمەر. بەرەو لای ڕاست بیسووڕێنە بۆ کەمکردنەوەی تایمەر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "629aadce1e49b0bdc5955cb3e13ab985ed58ac115ba07ff399a32587c1f9cd20",
+  "en": "Long press the thumbwheel for 3 seconds to exit the interface and countdown starts.",
+  "ar": "اضغط مطوّلًا على عجلة الإبهام لمدة 3 ثوانٍ للخروج من الواجهة، فيبدأ العدّ التنازلي.",
+  "ckb": "چەرخی پەنجە بۆ ماوەی 3 چرکە دابگرە بۆ دەرچوون لە ڕووکارەکە، و ژماردنی پێچەوانە دەست پێدەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "76c27e94957acc81492c1ace1a3dbe067bc3b2e111f80b390aab3f2b14678ea0",
+  "en": "Three/Four AA/AAA batteries are connected in series.",
+  "ar": "تُوصَل ثلاث/أربع بطاريات AA/AAA على التوالي.",
+  "ckb": "سێ/چوار باتریی AA/AAA بە شێوەی زنجیرەیی پێکەوە دەبەسترێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "60d933ed0a417e4809818b1f7c3cbf3da8127aa7112d381a5a11148ce7ab4268",
+  "en": "External power supply / battery box with a PH2.0/XH2.54 connector.",
+  "ar": "مزوّد طاقة خارجي / علبة بطاريات بموصل PH2.0/XH2.54.",
+  "ckb": "دابینکەری وزەی دەرەکی / سندوقی باتری بە گەیەنەری PH2.0/XH2.54.",
+  "kind": "block_line"
+ },
+ {
+  "h": "31dc401cff87e8f192c1ff0ee0377bf4d7489ce34a538ce9b027df85192323bb",
+  "en": "Includes battery holder case box with cover and ON / OFF switch and connector (Batteries are not included).",
+  "ar": "يتضمن علبة حامل البطاريات مع غطاء ومفتاح تشغيل/إيقاف (ON / OFF) وموصل (البطاريات غير مرفقة).",
+  "ckb": "سندوقی هەڵگری باتری لەگەڵ قەپاغ و کلیلی هەڵکردن/کوژاندنەوە (ON / OFF) و گەیەنەر لەخۆدەگرێت (باترییەکان لەگەڵدا نین).",
+  "kind": "block_line"
+ },
+ {
+  "h": "c5966d45e95d91668f59c7e61e87baecc2605ee00bc11f650b15e3d41073424b",
+  "en": "Please confirm the correct connector model (e.g., PH2.0 or XH2.54) before purchasing to ensure compatibility with your model or project.",
+  "ar": "يرجى التأكّد من طراز الموصل الصحيح (مثل PH2.0 أو XH2.54) قبل الشراء لضمان توافقه مع نموذجك أو مشروعك.",
+  "ckb": "تکایە پێش کڕین دڵنیابە لە مۆدێلی دروستی گەیەنەرەکە (بۆ نموونە PH2.0 یان XH2.54) بۆ ئەوەی دڵنیابیت لە گونجاوی لەگەڵ مۆدێل یان پڕۆژەکەت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b7f817bff9851ef50f62e6776a29261244104cb17ef99d9bd81d6b474f476ebd",
+  "en": "Please hold the connector when plugging and unplugging, and do not forcefully twist the connectors to avoid wires loosening or detaching.",
+  "ar": "يرجى الإمساك بالموصل عند التوصيل والفصل، وعدم لَيّ الموصلات بالقوة لتجنّب ارتخاء الأسلاك أو انفصالها.",
+  "ckb": "تکایە لە کاتی بەستن و لابردندا گەیەنەرەکە بگرە، و گەیەنەرەکان بە زۆر مەپێچەوە بۆ ئەوەی وایەرەکان شل نەبنەوە یان جیا نەبنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "05f9d5e97fc837b72fad6c23188c3c3e061388c3b6bb36436be00a7b1d01a412",
+  "en": "Servo Ports Pin Definition",
+  "ar": "تعريف أطراف منافذ السيرفو",
+  "ckb": "پێناسەی پینەکانی دەرچەکانی سێرڤۆ",
+  "kind": "block_title"
+ },
+ {
+  "h": "df51e6057792654fc93214b37d3a2c5acd0194b4d423774d76aa0c1121f10893",
+  "en": "Please strictly follow the wire sequence below to avoid damaging the components.",
+  "ar": "يرجى الالتزام الصارم بترتيب الأسلاك أدناه لتجنّب إتلاف المكوّنات.",
+  "ckb": "تکایە بە وردی پەیڕەوی ڕیزبەندیی وایەرەکانی خوارەوە بکە بۆ ئەوەی زیان بە پێکهاتەکان نەگات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6dcf54c759d03ede1e5b83bd6d2193ad5ce9ec57bed377f4f541a986357b083b",
+  "en": "The 9G Servo Motor with Clutch Protection is a high-performance servo product, designed for mechanical control.",
+  "ar": "يُعد محرك السيرفو (9G Servo Motor with Clutch Protection) منتج سيرفو عالي الأداء، مصمّمًا للتحكم الميكانيكي.",
+  "ckb": "بزوێنەری سێرڤۆ (9G Servo Motor with Clutch Protection) بەرهەمێکی سێرڤۆی کارایی بەرزە، بۆ کۆنترۆڵی میکانیکی دیزاین کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "98db1cecbf9ef79d1f6821a7961dca9b23c5d9e6f1b8fdf9d51b4ef4497783e0",
+  "en": "High Precision Motion Control: Equipped with advanced digital control technology, the 9G Servo Motor with Clutch Protection can provide precise motion control, ensuring stable and accurate actions for models or mechanical devices.",
+  "ar": "تحكم عالي الدقة في الحركة: بفضل تقنية التحكم الرقمي المتقدمة، يوفّر محرك السيرفو (9G Servo Motor with Clutch Protection) تحكمًا دقيقًا في الحركة، ما يضمن حركات مستقرة ودقيقة للنماذج أو الأجهزة الميكانيكية.",
+  "ckb": "کۆنترۆڵی جووڵە بە وردیی بەرز: بە تەکنەلۆژیای پێشکەوتووی کۆنترۆڵی دیجیتاڵ، بزوێنەری سێرڤۆ (9G Servo Motor with Clutch Protection) کۆنترۆڵێکی وردی جووڵە دابین دەکات، کە جووڵەی جێگیر و ورد بۆ مۆدێل یان ئامێرە میکانیکییەکان مسۆگەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "258da74c4c4749c6999b010d4438ae8521c9f13b48d268b6460ba1baad078dbe",
+  "en": "Clutch Function: Unlike traditional servos, this servo has a clutch function to prevent overload damage.",
+  "ar": "وظيفة القابض: على عكس محركات السيرفو التقليدية، يتميّز هذا السيرفو بوظيفة قابض تمنع التلف الناتج عن الحمل الزائد.",
+  "ckb": "ئەرکی کلەچ: بە پێچەوانەی سێرڤۆ ئاساییەکان، ئەم سێرڤۆیە ئەرکی کلەچی هەیە بۆ ڕێگریکردن لە زیانی بارگرانی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "19062ff37b2f74bd94f0975e0b8b6c975f3307799fa7f2c4eafc871c4c5c10a5",
+  "en": "(Note: When external forces change the angle of the servo during normal operation, the servo can protect itself from damage through the integrated clutch mechanism. This function automatically resets and restores the servo to prevent any potential hazards)",
+  "ar": "(ملاحظة: عندما تغيّر قوى خارجية زاوية السيرفو أثناء التشغيل العادي، يستطيع السيرفو حماية نفسه من التلف عبر آلية القابض المدمجة. تُعيد هذه الوظيفة ضبط السيرفو واستعادته تلقائيًا لمنع أي مخاطر محتملة)",
+  "ckb": "(تێبینی: کاتێک هێزی دەرەکی لە کاتی کارکردنی ئاساییدا گۆشەی سێرڤۆکە دەگۆڕێت، سێرڤۆکە دەتوانێت لە ڕێگەی میکانیزمی کلەچی ناوخۆییەوە خۆی لە زیان بپارێزێت. ئەم ئەرکە بە شێوەی خۆکار سێرڤۆکە ڕێکدەخاتەوە و دەیگەڕێنێتەوە دۆخی خۆی بۆ ڕێگریکردن لە هەر مەترسییەکی ئەگەری)",
+  "kind": "block_line"
+ },
+ {
+  "h": "58950e42f3fecec5187f5d2f06836bb3b4689dd74e3f53bca66ef0392b60be69",
+  "en": "Powerful Torque Output: Despite its compact size, the servo has excellent torque output capability. It can drive larger loads making it suitable for various applications requiring strong driving force.",
+  "ar": "عزم دوران قوي: رغم حجمه الصغير، يتمتع السيرفو بقدرة ممتازة على إخراج عزم الدوران. ويمكنه تحريك أحمال أكبر، ما يجعله مناسبًا لتطبيقات متنوعة تتطلب قوة دفع كبيرة.",
+  "ckb": "تۆرکی بەهێز: سەرەڕای قەبارە بچووکەکەی، سێرڤۆکە توانایەکی نایابی دەرچوونی تۆرکی هەیە. دەتوانێت باری گەورەتر بجووڵێنێت، بۆیە گونجاوە بۆ بەکارهێنانە جۆراوجۆرەکان کە پێویستیان بە هێزی جووڵاندنی بەهێز هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e2a11474d1667db6d63e511ce7750dae6b98d307c42fe5af1d6b1dd37b7878c1",
+  "en": "Fast Response: With a quick response speed, it can rapidly respond to control signals, achieving fast and precise actions, enhancing the response speed and performance of models or devices.",
+  "ar": "استجابة سريعة: بفضل سرعة استجابته العالية، يستجيب بسرعة لإشارات التحكم، فينفّذ حركات سريعة ودقيقة، ويعزّز سرعة استجابة النماذج أو الأجهزة وأداءها.",
+  "ckb": "وەڵامدانەوەی خێرا: بە خێرایی وەڵامدانەوەی بەرز، دەتوانێت بە خێرایی وەڵامی سیگناڵەکانی کۆنترۆڵ بداتەوە، جووڵەی خێرا و ورد ئەنجام دەدات، و خێرایی وەڵامدانەوە و کارایی مۆدێل یان ئامێرەکان باشتر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "87378d74ad8144ff6b52a492aae176f7cdffadf2e41b5e652d615aae5e2419d7",
+  "en": "Digital Control: Utilizing digital control, it offers stability and reliability, allowing for fine-tuning through programming to meet the needs of different application scenarios.",
+  "ar": "التحكم الرقمي: بفضل اعتماده على التحكم الرقمي، يوفّر الثبات والموثوقية، ويتيح الضبط الدقيق عبر البرمجة لتلبية احتياجات سيناريوهات الاستخدام المختلفة.",
+  "ckb": "کۆنترۆڵی دیجیتاڵ: بە بەکارهێنانی کۆنترۆڵی دیجیتاڵ، جێگیری و متمانەپێکراوی پێشکەش دەکات، و ڕێگە بە ڕێکخستنی ورد لە ڕێگەی پرۆگرامکردنەوە دەدات بۆ پڕکردنەوەی پێداویستییەکانی بوارە جیاوازەکانی بەکارهێنان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "80465b47b45c6a108b7a6b253fe217fff75b94a86d0e94c9119a7f4ac10f066e",
+  "en": "Wide Applicability: Suitable for various fields such as models, robots, remote-controlled vehicles, and aeromodelling, providing reliable power support for various creative and application needs.",
+  "ar": "قابلية استخدام واسعة: مناسب لمجالات متنوعة مثل النماذج والروبوتات والمركبات المتحكَّم بها عن بُعد ونماذج الطيران، ويوفّر دعمًا موثوقًا للقوة المحرّكة لمختلف الاحتياجات الإبداعية والتطبيقية.",
+  "ckb": "بەکارهێنانی فراوان: گونجاوە بۆ بوارە جۆراوجۆرەکان وەک مۆدێلەکان، ڕۆبۆتەکان، ئۆتۆمبێلە کۆنترۆڵکراوەکان لە دوورەوە و مۆدێلی فڕۆکە، و پشتگیرییەکی متمانەپێکراوی هێزی جووڵاندن بۆ پێداویستییە جۆراوجۆرە داهێنەرانە و بەکارهێنانییەکان دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "289c5cccf6640bb423ade9c727a2f9d0db24e07bab55d962059852890f2fa6c9",
+  "en": "When installing the servo, ensure that it is correctly matched with the mechanical structure of the model or device to avoid excessive stress or unstable installation.",
+  "ar": "عند تركيب السيرفو، تأكّد من مطابقته بشكل صحيح مع البنية الميكانيكية للنموذج أو الجهاز لتجنّب الإجهاد الزائد أو التركيب غير المستقر.",
+  "ckb": "لە کاتی دامەزراندنی سێرڤۆکەدا، دڵنیابە کە بە دروستی لەگەڵ پێکهاتەی میکانیکیی مۆدێل یان ئامێرەکە گونجێنراوە بۆ ئەوەی فشاری زیادە یان دامەزراندنی ناجێگیر ڕوو نەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3175e5bfecfacf0b98a38d6a247cd3357e32531453c2c08bb5d6d63b4103e8ab",
+  "en": "Use a power supply that meets the specifications to avoid damage to the servo due to excessive or insufficient voltage.",
+  "ar": "استخدم مزوّد طاقة مطابقًا للمواصفات لتجنّب تلف السيرفو بسبب الجهد الزائد أو غير الكافي.",
+  "ckb": "دابینکەرێکی وزە بەکاربهێنە کە لەگەڵ تایبەتمەندییەکاندا بگونجێت بۆ ئەوەی سێرڤۆکە بەهۆی ڤۆڵتیەی زیاد یان کەمەوە زیانی پێنەگات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ab1499991f3766d3c4968cdb41c7d1e2141ff7b8da207bbf7d42834e4c278273",
+  "en": "Avoid overloading the servo to prevent damage to internal components or the motor.",
+  "ar": "تجنّب تحميل السيرفو فوق طاقته لمنع تلف المكوّنات الداخلية أو المحرك.",
+  "ckb": "خۆت بپارێزە لە بارگرانکردنی سێرڤۆکە بۆ ڕێگریکردن لە زیانگەیاندن بە پێکهاتە ناوخۆییەکان یان بزوێنەرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "73d9a41ec2d2e289e02394bcea819525bf7c119562031ca2e003950d71c482a9",
+  "en": "When using the clutch function, operate gently to avoid excessive force and protect the internal mechanical structure and circuitry of the servo.",
+  "ar": "عند استخدام وظيفة القابض، تعامل معه بلطف لتجنّب القوة المفرطة وحماية البنية الميكانيكية الداخلية ودوائر السيرفو.",
+  "ckb": "لە کاتی بەکارهێنانی ئەرکی کلەچدا، بە نەرمی کاری پێبکە بۆ ئەوەی هێزی زیادە بەکارنەهێنرێت و پێکهاتەی میکانیکیی ناوخۆیی و بازنە کارەباییەکانی سێرڤۆکە بپارێزرێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2882a53c5ce56a000c671cdbcd87b76c2f2f04859b65451a2319100530bb69e2",
+  "en": "When manually operating the clutch function, avoid excessive rotation of the servo to prevent damage to internal components or mechanical structures.",
+  "ar": "عند تشغيل وظيفة القابض يدويًا، تجنّب تدوير السيرفو بشكل مفرط لمنع تلف المكوّنات الداخلية أو البنى الميكانيكية.",
+  "ckb": "لە کاتی بەکارهێنانی دەستیی ئەرکی کلەچدا، خۆت بپارێزە لە سووڕاندنی زیادەی سێرڤۆکە بۆ ڕێگریکردن لە زیانگەیاندن بە پێکهاتە ناوخۆییەکان یان پێکهاتە میکانیکییەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "49289ff1603fb7c7e269b910bb819bafd0c0ae0b969abe5d4494f6210b70b59f",
+  "en": "Please hold the connector when plugging and unplugging, and avoid pulling the wires forcefully to avoid the wires being detached from the connector.",
+  "ar": "يرجى الإمساك بالموصل عند التوصيل والفصل، وتجنّب سحب الأسلاك بقوة لتجنّب انفصالها عن الموصل.",
+  "ckb": "تکایە لە کاتی بەستن و لابردندا گەیەنەرەکە بگرە، و خۆت بپارێزە لە ڕاکێشانی وایەرەکان بە زۆر بۆ ئەوەی وایەرەکان لە گەیەنەرەکە جیا نەبنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "60ca3f27c9effdf31beaaad4cbfd65bba00cb470b6c205ebdca6e7131f8104cd",
+  "en": "Provides bright and uniform lighting.",
+  "ar": "يوفّر إضاءة ساطعة ومتجانسة.",
+  "ckb": "ڕووناکیی گەش و یەکسان دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "af19d1b7b7847439e4dc869554e7f636f67499151ea450d296f52c2dbf9a1314",
+  "en": "Easy to install.",
+  "ar": "سهل التركيب.",
+  "ckb": "دامەزراندنی ئاسانە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3f05f1a5f76acee1062be60f1b13059c46c50b8b61ea2e529440bc729feaeab7",
+  "en": "Suitable for various models and creative projects, adding visual appeal to artwork.",
+  "ar": "مناسب لمختلف النماذج والمشاريع الإبداعية، ويضيف جاذبية بصرية إلى الأعمال الفنية.",
+  "ckb": "گونجاوە بۆ مۆدێلە جۆراوجۆرەکان و پڕۆژە داهێنەرانەکان، و سەرنجڕاکێشیی بینراو بە کارە هونەرییەکان دەبەخشێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b188727b7893d10f24e6988963b77da0ea9a60e6c2fa5099d1f1ad6a0d092a86",
+  "en": "The following models all require the use of a Self-Locking Button Switch. To complete the assembly of a full model, users need to download the model files and 3D print the remaining parts.",
+  "ar": "تتطلب جميع النماذج التالية استخدام مفتاح الزر ذاتي القفل (Self-Locking Button Switch). ولإكمال تجميع نموذج كامل، يحتاج المستخدمون إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "هەموو ئەم مۆدێلانەی خوارەوە پێویستیان بە بەکارهێنانی کلیلی دوگمەی خۆقفڵکەر (Self-Locking Button Switch) هەیە. بۆ تەواوکردنی پێکەوەنانی مۆدێلێکی تەواو، بەکارهێنەران پێویستە فایلەکانی مۆدێل دابگرن و پارچە ماوەکان بە چاپکەری 3D چاپ بکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f865e0bf08395bd7fcf912bf2e570775aa82f43fa5dcf3976444f13425d6c379",
+  "en": "Models Using This Part",
+  "ar": "النماذج التي تستخدم هذه القطعة",
+  "ckb": "ئەو مۆدێلانەی ئەم پارچەیە بەکاردەهێنن",
+  "kind": "block_cell"
+ },
+ {
+  "h": "a8555a31935f05bf9ba2175bc95ae9159c3b8325418b04df62ced7bfce32bce5",
+  "en": "Endless Loop Express",
+  "ar": "Endless Loop Express",
+  "ckb": "Endless Loop Express",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "f39635a233838dc4264a3e9368ff846aeee8a96e107fc2663c96e1d9d889c841",
+  "en": "IMD_Q.",
+  "ar": "IMD_Q.",
+  "ckb": "IMD_Q.",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "6afc7e0c16e53455da9cc3a07f93662113c5c142bd32464a45b83aa258769c3a",
+  "en": "Amao Chan",
+  "ar": "Amao Chan",
+  "ckb": "Amao Chan",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "a8eb1aac0d7e17e18802baa50e62a38d8ff43d9032d65e420f55837b04baa985",
+  "en": "Kit Crafters",
+  "ar": "Kit Crafters",
+  "ckb": "Kit Crafters",
+  "kind": "block_cell",
+  "keep": true
+ },
+ {
+  "h": "44f9725bb78e019327786eb3d35d4709824b838baf7a1181e6c530469361bbfc",
+  "en": "Electronics System",
+  "ar": "النظام الإلكتروني",
+  "ckb": "سیستەمی ئەلیکترۆنی",
+  "kind": "block_title"
+ },
+ {
+  "h": "b42f619511e96cbad4a64cb2fba661a573d75c2775c98407c0ad58ed66a73919",
+  "en": "The components of this circuit set can be divided into five categories: Power Distribution Board (PDB) - 4 Channels, power-type devices, power supply devices, switch devices, and wires. The Power Distribution Board has channels for connecting power supply devices, switch devices, and electric devices. Please refer to the figure below for the devices supported by each connector. The IN is used to connect various power supply devices, such as AA Battery Case and USB-A Power Cable; the CH1-4 are used to connect various electric devices, such as N20 Reduction Gear Motor (150rpm) and 4 White 3030-LED Board, and supports up to 4 connections; the SW0~4 is used to connect various switch devices, such as Self-locking Button Switch, Potentiometer Board, and Jumper Cable. Please do not connect electric devices to the SW0~4, and likewise, do not connect switches to the CH1~4. The OUT is used to connect to the next Power Distribution Board to achieve connector expansion. To learn more about this case, please refer to theApplication Instruction.",
+  "ar": "يمكن تقسيم مكوّنات مجموعة الدوائر هذه إلى خمس فئات: لوحة توزيع الطاقة (PDB) - 4 قنوات، والأجهزة المستهلكة للطاقة، وأجهزة تزويد الطاقة، وأجهزة المفاتيح، والأسلاك. تحتوي لوحة توزيع الطاقة على قنوات لتوصيل أجهزة تزويد الطاقة وأجهزة المفاتيح والأجهزة الكهربائية. يرجى الرجوع إلى الشكل أدناه لمعرفة الأجهزة التي يدعمها كل موصل. يُستخدم منفذ IN لتوصيل مختلف أجهزة تزويد الطاقة، مثل علبة البطاريات AA Battery Case وكابل الطاقة USB-A Power Cable؛ وتُستخدم المنافذ CH1-4 لتوصيل مختلف الأجهزة الكهربائية، مثل المحرك N20 Reduction Gear Motor (150rpm) ولوحة الإضاءة 4 White 3030-LED Board، وتدعم ما يصل إلى 4 توصيلات؛ وتُستخدم المنافذ SW0~4 لتوصيل مختلف أجهزة المفاتيح، مثل المفتاح Self-locking Button Switch واللوحة Potentiometer Board والكابل Jumper Cable. يرجى عدم توصيل الأجهزة الكهربائية بالمنافذ SW0~4، وكذلك عدم توصيل المفاتيح بالمنافذ CH1~4. يُستخدم منفذ OUT للتوصيل بلوحة توزيع الطاقة التالية لتوسيع عدد الموصلات. لمعرفة المزيد عن هذا المثال، يرجى الرجوع إلى تعليمات الاستخدام (Application Instruction).",
+  "ckb": "پێکهاتەکانی ئەم کۆمەڵە بازنە کارەباییە دەکرێن بە پێنج پۆل: بۆردی دابەشکردنی وزە (PDB) - 4 کەناڵ، ئامێرە وزەبەکاربەرەکان، ئامێرەکانی دابینکردنی وزە، ئامێرەکانی کلیل، و وایەرەکان. بۆردی دابەشکردنی وزە کەناڵی هەیە بۆ بەستنی ئامێرەکانی دابینکردنی وزە، ئامێرەکانی کلیل و ئامێرە کارەباییەکان. تکایە بۆ زانینی ئەو ئامێرانەی هەر گەیەنەرێک پشتگیرییان دەکات سەیری وێنەی خوارەوە بکە. دەرچەی IN بۆ بەستنی ئامێرە جۆراوجۆرەکانی دابینکردنی وزە بەکاردێت، وەک سندوقی باتریی AA Battery Case و کێبڵی وزەی USB-A Power Cable؛ دەرچەکانی CH1-4 بۆ بەستنی ئامێرە کارەباییە جۆراوجۆرەکان بەکاردێن، وەک بزوێنەری N20 Reduction Gear Motor (150rpm) و بۆردی ڕووناکیی 4 White 3030-LED Board، و پشتگیری تا 4 پەیوەندی دەکەن؛ دەرچەکانی SW0~4 بۆ بەستنی ئامێرە جۆراوجۆرەکانی کلیل بەکاردێن، وەک کلیلی Self-locking Button Switch، بۆردی Potentiometer Board و کێبڵی Jumper Cable. تکایە ئامێرە کارەباییەکان بە دەرچەکانی SW0~4 مەبەستە، و بە هەمان شێوە کلیلەکان بە دەرچەکانی CH1~4 مەبەستە. دەرچەی OUT بۆ بەستن بە بۆردی دابەشکردنی وزەی دواتر بەکاردێت بۆ زیادکردنی ژمارەی گەیەنەرەکان. بۆ زانیاریی زیاتر دەربارەی ئەم نموونەیە، تکایە سەیری ڕێنماییەکانی بەکارهێنان (Application Instruction) بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9043adaac44cd6a593c5ab85a5f1955356033897c28a4b7d81ff37535ec22fda",
+  "en": "Please do not forcefully twist the connectors to avoid wires loosening or detaching.",
+  "ar": "يرجى عدم لَيّ الموصلات بالقوة لتجنّب ارتخاء الأسلاك أو انفصالها.",
+  "ckb": "تکایە گەیەنەرەکان بە زۆر مەپێچەوە بۆ ئەوەی وایەرەکان شل نەبنەوە یان جیا نەبنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "521ab970fd53e94fbb7ddf1861fa8942fb1a1fc6edeeae7211f06bf6fc6566ed",
+  "en": "Used with a Power Distribution Board (PDB) - 4 Channels, it is used to adjust the voltage of the corresponding channel, thereby achieving the function of adjusting the speed or brightness of the corresponding device.",
+  "ar": "يُستخدم مع لوحة توزيع الطاقة (PDB) - 4 قنوات لضبط جهد القناة المقابلة، وبذلك يحقق وظيفة ضبط سرعة الجهاز المقابل أو سطوعه.",
+  "ckb": "لەگەڵ بۆردی دابەشکردنی وزە (PDB) - 4 کەناڵ بەکاردێت بۆ ڕێکخستنی ڤۆڵتیەی کەناڵی هاوتا، بەم شێوەیە ئەرکی ڕێکخستنی خێرایی یان ڕووناکیی ئامێری هاوتا بەدی دەهێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "098147e95b442af54dfe69eb20e169eb090f97c9c40caaef7d71579c38d8bc66",
+  "en": "The Potentiometer Board with SH1.0 Connector is used for voltage regulation. It requires a Wire Pair with SH1.0 to connect to the SW0~4 channels on the Power Distribution Board (PDB) - 4 Channels. When the knob is turned counterclockwise, the output voltage of the corresponding channel decreases. When the knob is turned clockwise, the output voltage of the corresponding channel increases.",
+  "ar": "تُستخدم لوحة مقياس الجهد Potentiometer Board with SH1.0 Connector لتنظيم الجهد. وتتطلب زوج الأسلاك Wire Pair with SH1.0 للتوصيل بقنوات SW0~4 في لوحة توزيع الطاقة (PDB) - 4 قنوات. عند تدوير المقبض عكس اتجاه عقارب الساعة، ينخفض جهد الخرج للقناة المقابلة. وعند تدويره مع اتجاه عقارب الساعة، يرتفع جهد الخرج للقناة المقابلة.",
+  "ckb": "بۆردی پۆتانشیۆمیتەر Potentiometer Board with SH1.0 Connector بۆ ڕێکخستنی ڤۆڵتیە بەکاردێت. پێویستی بە جووتە وایەری Wire Pair with SH1.0 هەیە بۆ بەستن بە کەناڵەکانی SW0~4 لەسەر بۆردی دابەشکردنی وزە (PDB) - 4 کەناڵ. کاتێک دوگمە سووڕاوەکە بە پێچەوانەی ئاراستەی میلی کاتژمێر دەسووڕێنرێت، ڤۆڵتیەی دەرچوونی کەناڵی هاوتا کەم دەبێتەوە. کاتێک بە ئاراستەی میلی کاتژمێر دەسووڕێنرێت، ڤۆڵتیەی دەرچوونی کەناڵی هاوتا زیاد دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "11f0a1096f1e4dc2ba5391f60a8d1629b6458bfef9f188dcb514ee713fe325d1",
+  "en": "If the Potentiometer Board is connected to any of the SW1~SW4 channels, ensure that the maximum current of the corresponding channel's device does not exceed 0.4A, and the battery voltage does not exceed 6V.",
+  "ar": "إذا وُصلت لوحة مقياس الجهد (Potentiometer Board) بأي من القنوات SW1~SW4، فتأكّد من ألا يتجاوز أقصى تيار لجهاز القناة المقابلة 0.4A، وألا يتجاوز جهد البطارية 6V.",
+  "ckb": "ئەگەر بۆردی پۆتانشیۆمیتەر (Potentiometer Board) بە یەکێک لە کەناڵەکانی SW1~SW4 ببەسترێت، دڵنیابە کە زۆرترین تەزووی ئامێری کەناڵی هاوتا لە 0.4A تێناپەڕێت، و ڤۆڵتیەی باتری لە 6V تێناپەڕێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9e1ea5f4878e7fea2ebe5c4dffe1acd758a8484070d08a44ca5a6c676ea477f2",
+  "en": "If the Potentiometer Board is connected to the SW0 master switch, ensure that the combined maximum current of all channels SW1~SW4 does not exceed 0.4A, and the battery voltage does not exceed 6V.",
+  "ar": "إذا وُصلت لوحة مقياس الجهد (Potentiometer Board) بالمفتاح الرئيسي SW0، فتأكّد من ألا يتجاوز مجموع أقصى تيار لجميع القنوات SW1~SW4 قيمة 0.4A، وألا يتجاوز جهد البطارية 6V.",
+  "ckb": "ئەگەر بۆردی پۆتانشیۆمیتەر (Potentiometer Board) بە کلیلی سەرەکیی SW0 ببەسترێت، دڵنیابە کە کۆی زۆرترین تەزووی هەموو کەناڵەکانی SW1~SW4 لە 0.4A تێناپەڕێت، و ڤۆڵتیەی باتری لە 6V تێناپەڕێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d4a20ff70af699385bccf15a5be1309875a775b0d70c3da1a08b7a672b5848e1",
+  "en": "It is normal for the triode on the Potentiometer Board to heat up. When installing it on a model, please leave space for heat dissipation and avoid direct contact, which would cause the model material to heat up and soften.",
+  "ar": "من الطبيعي أن يسخن الترانزستور الموجود على لوحة مقياس الجهد (Potentiometer Board). عند تركيبها على نموذج، يرجى ترك مساحة لتبديد الحرارة وتجنّب التلامس المباشر، لأنه قد يؤدي إلى سخونة مادة النموذج وليونتها.",
+  "ckb": "ئاساییە ترانزیستۆرەکەی سەر بۆردی پۆتانشیۆمیتەر (Potentiometer Board) گەرم ببێت. کاتێک لەسەر مۆدێلێک دایدەمەزرێنیت، تکایە شوێن بۆ دەرچوونی گەرمی بهێڵەرەوە و خۆت لە بەرکەوتنی ڕاستەوخۆ بپارێزە، چونکە دەبێتە هۆی گەرمبوون و نەرمبوونی کەرەستەی مۆدێلەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "24bce3aa2411f4561c167d659ad8a06a3446e36591faaeca4a1ffe7009b20fbd",
+  "en": "The components of this circuit set can be divided into five categories: Power Distribution Board (PDB) - 4 Channels, power-type devices, power supply devices, switch devices, and wires. The Power Distribution Board has channels for connecting power supply devices, switch devices, and electric devices. Please refer to the figure below for the devices supported by each connector. The IN is used to connect various power supply devices, such as AA Battery Case and USB-A Power Cable; the CH1-4 are used to connect various electric devices, such as N20 Reduction Gear Motor (150rpm) and 4 White 3030-LED Board, and supports up to 4 connections; the SW0~4 is used to connect various switch devices, such as Self-locking Button Switch, Potentiometer Board, and Jumper Cable. Please do not connect electric devices to the SW0~4, and likewise, do not connect switches to the CH1~4. The OUT is used to connect to the next Power Distribution Board to achieve connector expansion. To learn more about case, please refer to the Application Instruction.",
+  "ar": "يمكن تقسيم مكوّنات مجموعة الدوائر هذه إلى خمس فئات: لوحة توزيع الطاقة (PDB) - 4 قنوات، والأجهزة المستهلكة للطاقة، وأجهزة تزويد الطاقة، وأجهزة المفاتيح، والأسلاك. تحتوي لوحة توزيع الطاقة على قنوات لتوصيل أجهزة تزويد الطاقة وأجهزة المفاتيح والأجهزة الكهربائية. يرجى الرجوع إلى الشكل أدناه لمعرفة الأجهزة التي يدعمها كل موصل. يُستخدم منفذ IN لتوصيل مختلف أجهزة تزويد الطاقة، مثل علبة البطاريات AA Battery Case وكابل الطاقة USB-A Power Cable؛ وتُستخدم المنافذ CH1-4 لتوصيل مختلف الأجهزة الكهربائية، مثل المحرك N20 Reduction Gear Motor (150rpm) ولوحة الإضاءة 4 White 3030-LED Board، وتدعم ما يصل إلى 4 توصيلات؛ وتُستخدم المنافذ SW0~4 لتوصيل مختلف أجهزة المفاتيح، مثل المفتاح Self-locking Button Switch واللوحة Potentiometer Board والكابل Jumper Cable. يرجى عدم توصيل الأجهزة الكهربائية بالمنافذ SW0~4، وكذلك عدم توصيل المفاتيح بالمنافذ CH1~4. يُستخدم منفذ OUT للتوصيل بلوحة توزيع الطاقة التالية لتوسيع عدد الموصلات. لمعرفة المزيد عن هذا المثال، يرجى الرجوع إلى تعليمات الاستخدام (Application Instruction).",
+  "ckb": "پێکهاتەکانی ئەم کۆمەڵە بازنە کارەباییە دەکرێن بە پێنج پۆل: بۆردی دابەشکردنی وزە (PDB) - 4 کەناڵ، ئامێرە وزەبەکاربەرەکان، ئامێرەکانی دابینکردنی وزە، ئامێرەکانی کلیل، و وایەرەکان. بۆردی دابەشکردنی وزە کەناڵی هەیە بۆ بەستنی ئامێرەکانی دابینکردنی وزە، ئامێرەکانی کلیل و ئامێرە کارەباییەکان. تکایە بۆ زانینی ئەو ئامێرانەی هەر گەیەنەرێک پشتگیرییان دەکات سەیری وێنەی خوارەوە بکە. دەرچەی IN بۆ بەستنی ئامێرە جۆراوجۆرەکانی دابینکردنی وزە بەکاردێت، وەک سندوقی باتریی AA Battery Case و کێبڵی وزەی USB-A Power Cable؛ دەرچەکانی CH1-4 بۆ بەستنی ئامێرە کارەباییە جۆراوجۆرەکان بەکاردێن، وەک بزوێنەری N20 Reduction Gear Motor (150rpm) و بۆردی ڕووناکیی 4 White 3030-LED Board، و پشتگیری تا 4 پەیوەندی دەکەن؛ دەرچەکانی SW0~4 بۆ بەستنی ئامێرە جۆراوجۆرەکانی کلیل بەکاردێن، وەک کلیلی Self-locking Button Switch، بۆردی Potentiometer Board و کێبڵی Jumper Cable. تکایە ئامێرە کارەباییەکان بە دەرچەکانی SW0~4 مەبەستە، و بە هەمان شێوە کلیلەکان بە دەرچەکانی CH1~4 مەبەستە. دەرچەی OUT بۆ بەستن بە بۆردی دابەشکردنی وزەی دواتر بەکاردێت بۆ زیادکردنی ژمارەی گەیەنەرەکان. بۆ زانیاریی زیاتر دەربارەی ئەم نموونەیە، تکایە سەیری ڕێنماییەکانی بەکارهێنان (Application Instruction) بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2ac4348a9e89eab85c5fa063adba0bf15184a494df727c377b6df8351a2ba1fc",
+  "en": "The following models all require the use of a Power Distribution Board - 4 Channels. To complete the assembly of a full model, users need to download the model files and 3D print the remaining parts.",
+  "ar": "تتطلب جميع النماذج التالية استخدام لوحة توزيع الطاقة (Power Distribution Board - 4 Channels). ولإكمال تجميع نموذج كامل، يحتاج المستخدمون إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.",
+  "ckb": "هەموو ئەم مۆدێلانەی خوارەوە پێویستیان بە بەکارهێنانی بۆردی دابەشکردنی وزە (Power Distribution Board - 4 Channels) هەیە. بۆ تەواوکردنی پێکەوەنانی مۆدێلێکی تەواو، بەکارهێنەران پێویستە فایلەکانی مۆدێل دابگرن و پارچە ماوەکان بە چاپکەری 3D چاپ بکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "133d444b9b04370cbe15d25b08ff2cef171ea96378d51a2afb5e6ea654d1aa77",
+  "en": "The components of this circuit set can be divided into five categories: Power Distribution Board (PDB) - 4 Channels, power-type devices, power supply devices, switch devices, and wires. The Power Distribution Board has channels for connecting power supply devices, switch devices, and electric devices. Please refer to the figure below for the devices supported by each connector. The IN is used to connect various power supply devices, such as AA Battery Case and USB-A Power Cable; the CH1-4 are used to connect various electrical devices, such as N20 Reduction Gear Motor (150rpm) and 4 White 3030-LED Board, and supports up to 4 connections; the SW0~4 is used to connect various switch devices, such as Self-locking Button Switch, Potentiometer Board, and Jumper Cable. Please do not connect electric devices to the SW0~4, and likewise, do not connect switches to the CH1~4. The OUT is used to connect to the next Power Distribution Board to achieve connector expansion. To learn more about the case, please refer to the Application Instruction.",
+  "ar": "يمكن تقسيم مكوّنات مجموعة الدوائر هذه إلى خمس فئات: لوحة توزيع الطاقة (PDB) - 4 قنوات، والأجهزة المستهلكة للطاقة، وأجهزة تزويد الطاقة، وأجهزة المفاتيح، والأسلاك. تحتوي لوحة توزيع الطاقة على قنوات لتوصيل أجهزة تزويد الطاقة وأجهزة المفاتيح والأجهزة الكهربائية. يرجى الرجوع إلى الشكل أدناه لمعرفة الأجهزة التي يدعمها كل موصل. يُستخدم منفذ IN لتوصيل مختلف أجهزة تزويد الطاقة، مثل علبة البطاريات AA Battery Case وكابل الطاقة USB-A Power Cable؛ وتُستخدم المنافذ CH1-4 لتوصيل مختلف الأجهزة الكهربائية، مثل المحرك N20 Reduction Gear Motor (150rpm) ولوحة الإضاءة 4 White 3030-LED Board، وتدعم ما يصل إلى 4 توصيلات؛ وتُستخدم المنافذ SW0~4 لتوصيل مختلف أجهزة المفاتيح، مثل المفتاح Self-locking Button Switch واللوحة Potentiometer Board والكابل Jumper Cable. يرجى عدم توصيل الأجهزة الكهربائية بالمنافذ SW0~4، وكذلك عدم توصيل المفاتيح بالمنافذ CH1~4. يُستخدم منفذ OUT للتوصيل بلوحة توزيع الطاقة التالية لتوسيع عدد الموصلات. لمعرفة المزيد عن هذا المثال، يرجى الرجوع إلى تعليمات الاستخدام (Application Instruction).",
+  "ckb": "پێکهاتەکانی ئەم کۆمەڵە بازنە کارەباییە دەکرێن بە پێنج پۆل: بۆردی دابەشکردنی وزە (PDB) - 4 کەناڵ، ئامێرە وزەبەکاربەرەکان، ئامێرەکانی دابینکردنی وزە، ئامێرەکانی کلیل، و وایەرەکان. بۆردی دابەشکردنی وزە کەناڵی هەیە بۆ بەستنی ئامێرەکانی دابینکردنی وزە، ئامێرەکانی کلیل و ئامێرە کارەباییەکان. تکایە بۆ زانینی ئەو ئامێرانەی هەر گەیەنەرێک پشتگیرییان دەکات سەیری وێنەی خوارەوە بکە. دەرچەی IN بۆ بەستنی ئامێرە جۆراوجۆرەکانی دابینکردنی وزە بەکاردێت، وەک سندوقی باتریی AA Battery Case و کێبڵی وزەی USB-A Power Cable؛ دەرچەکانی CH1-4 بۆ بەستنی ئامێرە کارەباییە جۆراوجۆرەکان بەکاردێن، وەک بزوێنەری N20 Reduction Gear Motor (150rpm) و بۆردی ڕووناکیی 4 White 3030-LED Board، و پشتگیری تا 4 پەیوەندی دەکەن؛ دەرچەکانی SW0~4 بۆ بەستنی ئامێرە جۆراوجۆرەکانی کلیل بەکاردێن، وەک کلیلی Self-locking Button Switch، بۆردی Potentiometer Board و کێبڵی Jumper Cable. تکایە ئامێرە کارەباییەکان بە دەرچەکانی SW0~4 مەبەستە، و بە هەمان شێوە کلیلەکان بە دەرچەکانی CH1~4 مەبەستە. دەرچەی OUT بۆ بەستن بە بۆردی دابەشکردنی وزەی دواتر بەکاردێت بۆ زیادکردنی ژمارەی گەیەنەرەکان. بۆ زانیاریی زیاتر دەربارەی ئەم نموونەیە، تکایە سەیری ڕێنماییەکانی بەکارهێنان (Application Instruction) بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b2439bcb8dee14b685f137f294b0e0cb62f5aadf45143ce01d79777d435a93b4",
+  "en": "Output",
+  "ar": "الخرج",
+  "ckb": "دەرچوون",
+  "kind": "block_cell"
+ },
+ {
+  "h": "7bf6fdb6d2286db63f0f6f18676f09efcbd785f0fd1e06781bf8da93c828ce8d",
+  "en": "The N20 Reduction Gear Motor is a low-power reduction motor with a D-shaped output shaft, suitable for applications requiring continuous rotation of objects. The motor can be connected to the Power Distribution Board (PDB) with 4 Channels using the Wire Pair with SH1.0-2PIN-5CM/10CM/20CM.",
+  "ar": "محرك N20 Reduction Gear Motor هو محرك تخفيض منخفض القدرة بعمود خرج على شكل حرف D، مناسب للاستخدامات التي تتطلب دورانًا مستمرًا للأجسام. يمكن توصيل المحرك بلوحة توزيع الطاقة (PDB) ذات 4 قنوات باستخدام زوج الأسلاك Wire Pair with SH1.0-2PIN-5CM/10CM/20CM.",
+  "ckb": "بزوێنەری N20 Reduction Gear Motor بزوێنەرێکی کەمکەرەوەی خێراییە بە وزەی کەم و میلی دەرچوونی بە شێوەی پیتی D، گونجاوە بۆ ئەو بەکارهێنانانەی پێویستیان بە سووڕانەوەی بەردەوامی تەنەکان هەیە. دەتوانرێت بزوێنەرەکە بە بۆردی دابەشکردنی وزەی 4 کەناڵی (PDB) ببەسترێت بە بەکارهێنانی جووتە وایەری Wire Pair with SH1.0-2PIN-5CM/10CM/20CM.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e59b393c3a8cbf974dad0af3cd71a446d3a6dbb7eb05f5174abfd139648b7e00",
+  "en": "The package includes the negative and positive spring plates only. You will need to print your own battery box and purchase the batteries yourself.",
+  "ar": "تتضمن العبوة صفيحتي النابض السالبة والموجبة فقط. ستحتاج إلى طباعة علبة البطاريات بنفسك وشراء البطاريات بنفسك.",
+  "ckb": "پاکەتەکە تەنها پلێتە فەنەرییە نێگەتیڤ و پۆزەتیڤەکان لەخۆدەگرێت. پێویستە سندوقی باترییەکە خۆت چاپ بکەیت و باترییەکان خۆت بکڕیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "51955649c570430265c9972b292686d11a3e5901a6aff048b21cc057bc4589c9",
+  "en": "Ensure correct installation of the positive and negative spring contact plates of the battery to avoid reverse installation leading to short circuits or damage to the device.",
+  "ar": "تأكّد من التركيب الصحيح لصفيحتي التلامس النابضيتين الموجبة والسالبة للبطارية، لتجنّب التركيب المعكوس الذي قد يؤدي إلى دائرة قصر أو تلف الجهاز.",
+  "ckb": "دڵنیابە لە دامەزراندنی دروستی پلێتە فەنەرییەکانی پەیوەندیی پۆزەتیڤ و نێگەتیڤی باترییەکە، بۆ ئەوەی دامەزراندنی پێچەوانە نەبێتە هۆی کورتە بازنە یان زیانگەیاندن بە ئامێرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "60710db1ce63ff5129c1a9f8ae130845ae20e195ab9e7c86998a43e200e3b788",
+  "en": "This kit is ideal for experienced makers",
+  "ar": "هذا الطقم مثالي للصنّاع ذوي الخبرة",
+  "ckb": "ئەم کیتە گونجاوە بۆ دروستکەرە بەئەزموونەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "502a1bf1848447af77ca77c87565769dcc2f573dabfe8ffe0e6598e8495532aa",
+  "en": "1. It consists of commonly used hardware parts and electronic components designed to help creators unleash their creativity.",
+  "ar": "1. يتكوّن من قطع عتاد ومكوّنات إلكترونية شائعة الاستخدام، صُمّمت لمساعدة المصمّمين على إطلاق العنان لإبداعهم.",
+  "ckb": "1. لە پارچەی ڕەقەکاڵا و پێکهاتەی ئەلیکترۆنیی باو پێکهاتووە کە دیزاین کراون بۆ یارمەتیدانی دروستکەران تا داهێنانەکانیان بخەنە ڕوو.",
+  "kind": "block_line"
+ },
+ {
+  "h": "32ce4d80f57d62b903d24e1a39919393095d4107e5f683879c8146c73e29b181",
+  "en": "2. These components allow for the creation of more interesting models, not limited to specific ones.",
+  "ar": "2. تتيح هذه المكوّنات إنشاء نماذج أكثر إثارة للاهتمام، دون الاقتصار على نماذج محدّدة.",
+  "ckb": "2. ئەم پێکهاتانە ڕێگە دەدەن مۆدێلی سەرنجڕاکێشتر دروست بکرێن، بێ ئەوەی تەنها بە مۆدێلی دیاریکراو سنووردار بن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e46859ecdbe779b71fee0de81b09449f8129e4d832b1c2d386984cdd41a744b2",
+  "en": "3. Each item in this kit can also be purchased separately. After creators finish their creations, creators can upload their BOM (Bill of Materials) for customers to purchase with one click.",
+  "ar": "3. يمكن أيضًا شراء كل قطعة في هذا الطقم بشكل منفصل. وبعد أن ينهي المصمّمون إبداعاتهم، يمكنهم رفع قائمة المواد BOM (Bill of Materials) الخاصة بهم ليتمكّن العملاء من شرائها بنقرة واحدة.",
+  "ckb": "3. هەر بڕگەیەکی ئەم کیتە دەتوانرێت بە جیاش بکڕدرێت. دوای ئەوەی دروستکەران کارەکانیان تەواو دەکەن، دەتوانن لیستی کەرەستەکانیان BOM (Bill of Materials) باربکەن بۆ ئەوەی کڕیاران بە یەک کلیک بیکڕن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4da4614d715958e8ccce03936b821fd21304e63676c05c7ba3a76e701e077668",
+  "en": "4. This kit saves creators time and accelerates the creation process.",
+  "ar": "4. يوفّر هذا الطقم وقت المصمّمين ويسرّع عملية الإبداع.",
+  "ckb": "4. ئەم کیتە کاتی دروستکەران دەپارێزێت و پرۆسەی دروستکردن خێراتر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5792fa7bf8a0e780657fc7629cf38d9f6ab1f2d2bf3802932babdd81d7b2d2f3",
+  "en": "Before use, please make sure the supply voltage meets the use of the product range and the voltage is stable. Line-powered load exceeds the maximum power consumption of this product 120%.",
+  "ar": "قبل الاستخدام، يرجى التأكّد من أن جهد التغذية ضمن نطاق استخدام المنتج وأن الجهد مستقر. يجب أن تتجاوز قدرة التحميل لخط التغذية 120% من أقصى استهلاك للطاقة لهذا المنتج.",
+  "ckb": "پێش بەکارهێنان، تکایە دڵنیابە کە ڤۆڵتیەی دابینکردن لە ناو مەودای بەکارهێنانی بەرهەمەکەدایە و ڤۆڵتیەکە جێگیرە. پێویستە توانای بارهەڵگرتنی هێڵی دابینکردن زیاتر بێت لە 120% ی زۆرترین خەرجکردنی وزەی ئەم بەرهەمە.",
+  "kind": "block_line",
+  "needs_review": true
+ },
+ {
+  "h": "e01c03c1415166bac2a088c1106a19b3c3015bb71018f6382e80c9a62da39ef2",
+  "en": "During operation, avoid blocking the blades of the fan.",
+  "ar": "أثناء التشغيل، تجنّب إعاقة شفرات المروحة.",
+  "ckb": "لە کاتی کارکردندا، خۆت بپارێزە لە گیرکردنی پەڕەکانی پانکەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f737abe89dda2cb83d03b5941d47cbeb4b3359cc660abe612c62394f87e3cdaf",
+  "en": "Avoid carrying the fan by holding the lead wires. The bearings and the lead wires may become damaged. Additionally, static electricity may damage the internal circuits of the fan.",
+  "ar": "تجنّب حمل المروحة بالإمساك بأسلاك التوصيل. فقد تتلف المحامل وأسلاك التوصيل. إضافةً إلى ذلك، قد تُتلف الكهرباء الساكنة الدوائر الداخلية للمروحة.",
+  "ckb": "خۆت بپارێزە لە هەڵگرتنی پانکەکە بە گرتنی وایەرەکانی. لەوانەیە بێرینگەکان و وایەرەکان زیانیان پێبگات. هەروەها، لەوانەیە کارەبای ستاتیکی زیان بە بازنە ناوخۆییەکانی پانکەکە بگەیەنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "14c22e509222334251f51496a5187c8f0c600577cc842da88f2d4dc452f66823",
+  "en": "Avoid using the fan in environments of corrosive gas or liquid.",
+  "ar": "تجنّب استخدام المروحة في بيئات تحتوي على غازات أو سوائل أكّالة.",
+  "ckb": "خۆت بپارێزە لە بەکارهێنانی پانکەکە لە ژینگەیەکدا کە گاز یان شلەی داخورێنەری تێدایە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3e79d979200dd6cebb11e00720fbc11af318c76e9f796eb1bdee5f86f4782b41",
+  "en": "Do not store the fan in environments with high humidity.",
+  "ar": "لا تخزّن المروحة في بيئات عالية الرطوبة.",
+  "ckb": "پانکەکە لە ژینگەی شێداری زۆردا هەڵمەگرە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e9c79f59c6b41656ebc9f497606145ad63b3955faaa0644f16698ee0b17fa00c",
+  "en": "Avoid storing the fan for over 6 months. For long term storage, please connect power to the fan shortly every 6 months even though the fan is stored at room temperature.",
+  "ar": "تجنّب تخزين المروحة لأكثر من 6 أشهر. في حال التخزين الطويل، يرجى توصيل المروحة بالطاقة لفترة قصيرة كل 6 أشهر حتى لو كانت مخزّنة في درجة حرارة الغرفة.",
+  "ckb": "خۆت بپارێزە لە هەڵگرتنی پانکەکە بۆ زیاتر لە 6 مانگ. بۆ هەڵگرتنی درێژخایەن، تکایە هەر 6 مانگ جارێک بۆ ماوەیەکی کورت کارەبا بە پانکەکە بگەیەنە، تەنانەت ئەگەر لە پلەی گەرمیی ژووریشدا هەڵگیرابێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3928633ee0f02863fd1bdadf4b693358eb9722a1b3cbbc9c8f57d395cb3f053b",
+  "en": "*Compliant with the requirements of GB/T 70.2-2015 standard [Equivalent standards: ISO 7380-1 - 2011, DIN EN ISO 7380 (-1) - 2011]",
+  "ar": "*متوافق مع متطلبات معيار GB/T 70.2-2015 [المعايير المكافئة: ISO 7380-1 - 2011، DIN EN ISO 7380 (-1) - 2011]",
+  "ckb": "*گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB/T 70.2-2015 [ستانداردە هاوتاکان: ISO 7380-1 - 2011، DIN EN ISO 7380 (-1) - 2011]",
+  "kind": "block_line"
+ },
+ {
+  "h": "0ae9324fc0d85368622947f823cca79921b3de99fe2fd90a57949d2180002787",
+  "en": "Carbon Steel Button Head Cap Machine Screws (BHCS)",
+  "ar": "براغٍ ميكانيكية برأس دائري من الفولاذ الكربوني (BHCS)",
+  "ckb": "بورغیی ئامێری سەرخڕ لە پۆڵای کاربۆنی (BHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "e0c547cbdf9b7597154df78e8eca959ad2edb4457d7742faf528627eea3a4f4c",
+  "en": "Nominal thread: M2~M4",
+  "ar": "السنّ الاسمي: M2~M4",
+  "ckb": "پێچی ناوزەد: M2~M4",
+  "kind": "block_line"
+ },
+ {
+  "h": "e589f0970d6f8995301759c0518ffc582bdfe3fa99bd21dc47cd82d0b9c1ded5",
+  "en": "Full thread series",
+  "ar": "سلسلة السنّ الكامل",
+  "ckb": "زنجیرەی پێچی تەواو",
+  "kind": "block_line"
+ },
+ {
+  "h": "d14f052617ccfa80a0bcf14c28fd9c5f0e4b4bd05aa1f89af73d2f5aa4d3e8f3",
+  "en": "Type of thread: Metric coarse thread",
+  "ar": "نوع السنّ: سنّ متري خشن",
+  "ckb": "جۆری پێچ: پێچی مەتری زبر",
+  "kind": "block_line"
+ },
+ {
+  "h": "f1ce9a0afd5c137756cceff0ae4a1130ced1912112482de5b57d69775e7e0f5f",
+  "en": "Carbon Steel Socket Head Cap Machine Screws (SHCS)",
+  "ar": "براغٍ ميكانيكية برأس أسطواني وتجويف سداسي من الفولاذ الكربوني (SHCS)",
+  "ckb": "بورغیی ئامێری سەرلوولەیی بە کونی شەشپاڵوو لە پۆڵای کاربۆنی (SHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "2421b87214873cd82cb0f538ae8e606aabba98ed26e7bc931ccdc7cdfe48b1d0",
+  "en": "Nominal thread: M1.6~M5",
+  "ar": "السنّ الاسمي: M1.6~M5",
+  "ckb": "پێچی ناوزەد: M1.6~M5",
+  "kind": "block_line"
+ },
+ {
+  "h": "74ed3aadf31983105cfafaf56b5ff36bc95711d2d2a990d4cdc2bd0252ce4c7f",
+  "en": "Forgot the screw specs? Just print the Screw Gauge model from MakerWorld for sorting help.",
+  "ar": "نسيت مواصفات البراغي؟ ما عليك سوى طباعة نموذج Screw Gauge من MakerWorld للمساعدة في الفرز.",
+  "ckb": "تایبەتمەندییەکانی بورغییەکەت لەبیر چووە؟ تەنها مۆدێلی Screw Gauge لە MakerWorld چاپ بکە بۆ یارمەتی لە جیاکردنەوەدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0bdcab93fbdada6b9f36460787ff922989f661cf1030e69501f24db4134b59e8",
+  "en": "M (mm) Thread Size",
+  "ar": "مقاس السنّ M (mm)",
+  "ckb": "قەبارەی پێچ M (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "65dc8d91dd56c70a521731a1ab4ca599a302849ab40ef4625086a2b87920404e",
+  "en": "Minimum Thread Depth(mm)",
+  "ar": "أدنى عمق للسنّ (mm)",
+  "ckb": "کەمترین قووڵایی پێچ (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "b928132891c1177a11dab814f541710f7bf3758513482bb5035dea91e84f8539",
+  "en": "Double-pass Knurled Brass Stud",
+  "ar": "عمود تباعد نحاسي بتحزيز مزدوج",
+  "ckb": "ستوونی جیاکەرەوەی برنج بە خەتکردنی دووانە",
+  "kind": "block_line"
+ },
+ {
+  "h": "6d8e63c16592acb4397b3b022aeb72aac96181347c55c5867b9de25c942b0edd",
+  "en": "Exceptional Strength and Stability",
+  "ar": "متانة وثبات استثنائيان",
+  "ckb": "بەهێزی و جێگیریی نایاب",
+  "kind": "block_line"
+ },
+ {
+  "h": "42afdfab8980d8e1ed12f2b98eaece513ebaf54d8a3dc2da341b28f8474dcead",
+  "en": "Smaller Diameter, Lighter Weight",
+  "ar": "قطر أصغر ووزن أخف",
+  "ckb": "تیرەی بچووکتر، کێشی سووکتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "e5d80d00a78483cdee864ff8aa20d7d96ab2a2a9bbe437fe92da3f485c66f545",
+  "en": "Knurled for Easy Clamping",
+  "ar": "سطح محزّز لسهولة الإمساك والتثبيت",
+  "ckb": "خەتدارە بۆ گرتن و جێگیرکردنی ئاسان",
+  "kind": "block_line"
+ },
+ {
+  "h": "0056aaafd36b2cf2f4b2cd9267116fc4a3bfd2cefed29a608587c33b6e061c11",
+  "en": "*Compliant with the requirements of GB/T 70.3-2008 standard [Equivalent standards: ISO 10642-2019, DIN EN ISO 10642-2013]",
+  "ar": "*متوافق مع متطلبات معيار GB/T 70.3-2008 [المعايير المكافئة: ISO 10642-2019، DIN EN ISO 10642-2013]",
+  "ckb": "*گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB/T 70.3-2008 [ستانداردە هاوتاکان: ISO 10642-2019، DIN EN ISO 10642-2013]",
+  "kind": "block_line"
+ },
+ {
+  "h": "cd6a7a39077aaa24d1f4f3c9f754fd5333d1cf2865f3f714c4ae926644c49a5f",
+  "en": "Carbon Steel M2 Flat Head Cap Machine Screws (FHCS)",
+  "ar": "براغٍ ميكانيكية برأس مسطّح M2 Flat Head Cap Machine Screws (FHCS) من الفولاذ الكربوني",
+  "ckb": "بورغیی ئامێری سەرتەخت M2 Flat Head Cap Machine Screws (FHCS) لە پۆڵای کاربۆنی",
+  "kind": "block_line"
+ },
+ {
+  "h": "c27e964e521c1ef0d482a78c5b342873c725bab15162509406a106283670d4f7",
+  "en": "Nominal thread: M2~M3",
+  "ar": "السنّ الاسمي: M2~M3",
+  "ckb": "پێچی ناوزەد: M2~M3",
+  "kind": "block_line"
+ },
+ {
+  "h": "9222e8072acd432623c3637623c25cfa028b3919a33ef3eb586cd7026efea431",
+  "en": "Compliant with the requirements of GB /T 848 - 2002 / GB /T 95 - 2002 standard [Equivalent standards: ISO 7092 - 2000, DIN EN ISO 7092 - 2000]",
+  "ar": "متوافق مع متطلبات معيار GB /T 848 - 2002 / GB /T 95 - 2002 [المعايير المكافئة: ISO 7092 - 2000، DIN EN ISO 7092 - 2000]",
+  "ckb": "گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB /T 848 - 2002 / GB /T 95 - 2002 [ستانداردە هاوتاکان: ISO 7092 - 2000، DIN EN ISO 7092 - 2000]",
+  "kind": "block_line"
+ },
+ {
+  "h": "fb9e7410bb0a8ef3a73ef471693ae34786b59562a385b654607eefa7330647b6",
+  "en": "We have included the relevant data for the twisting torque and loosening torque experiments of PLA and PETG material specimens, as well as the recommended hole sizes for design. The model files for testing are available for download at the end of the details page. All test holes are printed perpendicularly to the platform. When designing a bolt bottom hole on the side of the part, it is recommended to use one size larger than the recommended size for lying flat to prevent interlayer compression cracking.",
+  "ar": "أدرجنا البيانات ذات الصلة بتجارب عزم الربط وعزم الفك لعيّنات من مادتي PLA وPETG، إضافةً إلى مقاسات الثقوب الموصى بها للتصميم. ملفات النموذج الخاصة بالاختبار متاحة للتنزيل في نهاية صفحة التفاصيل. جميع ثقوب الاختبار مطبوعة عموديًا على صفيحة الطباعة. عند تصميم ثقب قاعدة لبرغي على جانب القطعة، يوصى باستخدام مقاس أكبر بدرجة واحدة من المقاس الموصى به للوضع المسطّح، لتجنّب التشقق الناتج عن الانضغاط بين الطبقات.",
+  "ckb": "داتا پەیوەندیدارەکانی تاقیکردنەوەکانی تۆرکی بادان و تۆرکی شلبوونەوەمان بۆ نموونەکانی کەرەستەی PLA و PETG داناوە، هەروەها قەبارەی کونە پێشنیارکراوەکان بۆ دیزاین. فایلەکانی مۆدێل بۆ تاقیکردنەوە لە کۆتایی پەڕەی وردەکارییەکاندا بۆ داگرتن بەردەستن. هەموو کونەکانی تاقیکردنەوە بە ستوونی بەسەر پلێتی چاپەوە چاپ کراون. کاتێک کونی بنەوەی بۆڵت لە لای پارچەکە دیزاین دەکەیت، پێشنیار دەکرێت قەبارەیەک گەورەتر لە قەبارەی پێشنیارکراو بۆ دۆخی پاڵکەوتوو بەکاربهێنیت، بۆ ڕێگریکردن لە درزبردنی نێوان چینەکان بەهۆی پەستانەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c36b727c4212136b5df9fee98fd2ce02c9cf20ac41db735131a0a5260bd7aa3c",
+  "en": "Carbon Steel Socket Head Cap Self Tapping Screw (SHCS)",
+  "ar": "برغي ذاتي اللولبة برأس أسطواني وتجويف سداسي من الفولاذ الكربوني (SHCS)",
+  "ckb": "بورغیی خۆپێچی سەرلوولەیی بە کونی شەشپاڵوو لە پۆڵای کاربۆنی (SHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "28f185589be02c32581f07da4c7c84a077554dc29365489704dfddd54abc6bcc",
+  "en": "Nominal thread: BT1.6~BT3",
+  "ar": "السنّ الاسمي: BT1.6~BT3",
+  "ckb": "پێچی ناوزەد: BT1.6~BT3",
+  "kind": "block_line"
+ },
+ {
+  "h": "e9615ddc4e03f8e793c9d6fefde82dc505ba4531c2b60e3f9ec492008766ba86",
+  "en": "Carbon Steel Button Head Cap Self Tapping Screw (BHCS)",
+  "ar": "برغي ذاتي اللولبة برأس دائري من الفولاذ الكربوني (BHCS)",
+  "ckb": "بورغیی خۆپێچی سەرخڕ لە پۆڵای کاربۆنی (BHCS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "dc9745356c56bb7d33c7b014623b97191b697eb08c82ed431b94f6136743ae46",
+  "en": "Nominal thread: BT2~BT3",
+  "ar": "السنّ الاسمي: BT2~BT3",
+  "ckb": "پێچی ناوزەد: BT2~BT3",
+  "kind": "block_line"
+ },
+ {
+  "h": "600a415cc62058080cb4a09349fa443f369b2a91b248523a1d35c8e654ba378b",
+  "en": "L (mm) Shoulder Length",
+  "ar": "طول الكتف L (mm)",
+  "ckb": "درێژیی شان L (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "8b7e7370bda25d13c346f1156a8c739bd009b5004ec178dadf6590f3f4914881",
+  "en": "S (mm) Thread Length",
+  "ar": "طول السنّ S (mm)",
+  "ckb": "درێژیی پێچ S (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "772b4ccef1655f23e9cf681622849f1644c04b74723334e98f46eff781593f85",
+  "en": "*Compliant with the requirements of GB 5281 - 1985 standard [Equivalent standards: ISO 7379 - 1983]",
+  "ar": "*متوافق مع متطلبات معيار GB 5281 - 1985 [المعايير المكافئة: ISO 7379 - 1983]",
+  "ckb": "*گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB 5281 - 1985 [ستانداردە هاوتاکان: ISO 7379 - 1983]",
+  "kind": "block_line"
+ },
+ {
+  "h": "d46ca07f87df673c5076632296fe445094b36464aba4894b82ecfc3cdcb0b387",
+  "en": "Carbon Steel Socket Head Shoulder Machine Screws (SHSS)",
+  "ar": "براغٍ كتفية ميكانيكية برأس أسطواني من الفولاذ الكربوني (SHSS)",
+  "ckb": "بورغیی ئامێری شانەداری سەرلوولەیی لە پۆڵای کاربۆنی (SHSS)",
+  "kind": "block_line"
+ },
+ {
+  "h": "8c22539a009ee90e76fb7edcca42fa59d706248ae1b684eb95641b326b429081",
+  "en": "Half thread series",
+  "ar": "سلسلة نصف السنّ",
+  "ckb": "زنجیرەی نیوە پێچ",
+  "kind": "block_line"
+ },
+ {
+  "h": "5e264b1befb4ce7d301b8278664ddf7ff42131947cee918a6a99eb8ea4e61d64",
+  "en": "Using a shoulder section as a bare shaft for easy mounting of bearings or other components",
+  "ar": "يُستخدم جزء الكتف كعمود أملس لتسهيل تركيب المحامل أو المكوّنات الأخرى",
+  "ckb": "بەشی شانەکە وەک میلێکی ڕووت بەکاردێت بۆ دامەزراندنی ئاسانی بێرینگ یان پێکهاتەکانی تر",
+  "kind": "block_line"
+ },
+ {
+  "h": "605a5fa00cbdb1f9ef296c46e540db13fed20b3930e05e82f77ccf2b636458c6",
+  "en": "D (mm) Diameter",
+  "ar": "القطر D (mm)",
+  "ckb": "تیرە D (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "693bf7a36ed1f34959ac08ee7520d67b8af1d7a56406dacb54595394cf1bab47",
+  "en": "Compliant with the requirements of GB /T 889.1 - 2015 standard [Equivalent standards: ISO 7040 - 2012, ASME/ANSI B 18.2.4.1M - 2007, DIN EN ISO 4032 - 2013]",
+  "ar": "متوافق مع متطلبات معيار GB /T 889.1 - 2015 [المعايير المكافئة: ISO 7040 - 2012، ASME/ANSI B 18.2.4.1M - 2007، DIN EN ISO 4032 - 2013]",
+  "ckb": "گونجاوە لەگەڵ پێداویستییەکانی ستانداردی GB /T 889.1 - 2015 [ستانداردە هاوتاکان: ISO 7040 - 2012، ASME/ANSI B 18.2.4.1M - 2007، DIN EN ISO 4032 - 2013]",
+  "kind": "block_line"
+ },
+ {
+  "h": "698ee7d0b9a0b6c5e30ef5383d3dc04af27379e6e20c5b7a5bc878c33674adbe",
+  "en": "Carbon Steel Self Locking Hex Nut",
+  "ar": "صامولة سداسية ذاتية القفل من الفولاذ الكربوني",
+  "ckb": "سامۆڵەی شەشپاڵووی خۆقفڵکەری پۆڵای کاربۆنی",
+  "kind": "block_line"
+ },
+ {
+  "h": "6085f58feed356c6c5ad3841d2e472d5edda1826c32a31419131d802f6d79a02",
+  "en": "Prevents screws from loosening under vibration",
+  "ar": "تمنع ارتخاء البراغي تحت الاهتزاز",
+  "ckb": "ڕێگری لە شلبوونەوەی بورغی دەکات لە کاتی لەرینەوەدا",
+  "kind": "block_line"
+ },
+ {
+  "h": "ee0eb667a6dcd126ab5e22b424441b5990bc95bcb67bf671e2fa5b41f2e79e42",
+  "en": "Round Threaded Brass Heat-Insert Nut with Double Twill Knurling",
+  "ar": "صامولة الإدخال الحراري النحاسية الملولبة الدائرية (Round Threaded Brass Heat-Insert Nut) بتحزيز قطري مزدوج",
+  "ckb": "سامۆڵەی ئینسێرتی گەرمیی برنجی خڕی پێچدار (Round Threaded Brass Heat-Insert Nut) بە خەتکردنی لاری دووانە",
+  "kind": "block_line"
+ },
+ {
+  "h": "704230df564dc9785bd3b63bea8a704c7ebd3d8cde8a2e454d141ca38fa4c5a7",
+  "en": "Stronger pull-out resistance than Diamnod Knurling or Straight Knurling",
+  "ar": "مقاومة أقوى للاقتلاع مقارنةً بالتحزيز الماسي أو التحزيز المستقيم",
+  "ckb": "بەرگەی بەهێزتر بەرامبەر هەڵکێشان بە بەراورد لەگەڵ خەتکردنی ئەڵماسی یان خەتکردنی ڕاست",
+  "kind": "block_line"
+ },
+ {
+  "h": "9a3061d96cf87aaa1cb413bd124ccc8268b9312f9d9f085a8031e30e30b1b30c",
+  "en": "Better attachment to the plastic part compared to Diamond Knurling",
+  "ar": "تثبيت أفضل في القطعة البلاستيكية مقارنةً بالتحزيز الماسي",
+  "ckb": "لکانی باشتر بە پارچە پلاستیکییەکەوە بە بەراورد لەگەڵ خەتکردنی ئەڵماسی",
+  "kind": "block_line"
+ },
+ {
+  "h": "e06b3be1f5ec239b9c4f01518835aa69ab5204933fe1e2735600cf72803ed9e7",
+  "en": "Easy to install in 3D printed parts with a heated soldering iron",
+  "ar": "سهلة التركيب في القطع المطبوعة بطابعة 3D باستخدام كاوية لحام ساخنة",
+  "ckb": "بە ئاسانی لە ناو پارچەی چاپکراوی 3D دادەمەزرێت بە ئامێری لەحیمکردنی گەرمکراو",
+  "kind": "block_line"
+ },
+ {
+  "h": "d9462cfc11a258b2bbbff9e3765bc4ad70f85575923614a2b402bec4af85fbc3",
+  "en": "H(mm) Width",
+  "ar": "العرض H (mm)",
+  "ckb": "پانی H (mm)",
+  "kind": "block_cell"
+ },
+ {
+  "h": "47a013ad697f7b017ead52ef54faf65d57176b162f0956731ac33d5433020646",
+  "en": "Inserting parts from the side to hide",
+  "ar": "تُدخَل في القطع من الجانب لإخفائها",
+  "ckb": "لە لاتەنیشتەوە دەخرێتە ناو پارچەکانەوە بۆ شاردنەوەی",
+  "kind": "block_line"
+ },
+ {
+  "h": "7cbfdb151b42dc8b382abf8035b487430067851d7633f00e3c5085672cb29496",
+  "en": "Metal Shielded",
+  "ar": "مغطّى بدرع معدني",
+  "ckb": "پارێزراو بە کانزا",
+  "kind": "block_cell"
+ },
+ {
+  "h": "dc27adbc09407f835f8f921e7528d13cbe6a62cdbaf5413ab203d5714008ea20",
+  "en": "608 Open Hybrid Ceramic",
+  "ar": "محمل 608 مفتوح، سيراميك هجين",
+  "ckb": "بێرینگی 608 کراوە، سیرامیکی هایبرید",
+  "kind": "block_cell"
+ },
+ {
+  "h": "581c1c679d12632d06fa7bd65e07af7566b3085089ac1b12419b2883d6371d56",
+  "en": "R188 Open Hybrid Ceramic",
+  "ar": "محمل R188 مفتوح، سيراميك هجين",
+  "ckb": "بێرینگی R188 کراوە، سیرامیکی هایبرید",
+  "kind": "block_cell"
+ },
+ {
+  "h": "7a30ec61cc47920585553600b48807fec423ac85c7a05329e06f79e6509b0db3",
+  "en": "Ceramic Ball Bearings",
+  "ar": "محامل الكرات السيراميكية",
+  "ckb": "بێرینگی تۆپەڵەی سیرامیکی",
+  "kind": "block_line"
+ },
+ {
+  "h": "3b4650138718ff823f66672fe1448c1f8b0fddbb013b6876d86f14df24044c8d",
+  "en": "Extremely Low Rolling Resistance",
+  "ar": "مقاومة دحرجة منخفضة للغاية",
+  "ckb": "بەرگەی گلۆربوونەوەی زۆر نزم",
+  "kind": "block_line"
+ },
+ {
+  "h": "70595d445006b2b7aac97d2979e69246e329faa0c660640edd81f48e452aceed",
+  "en": "Crisp Rolling Sound",
+  "ar": "صوت دوران نقي وواضح",
+  "ckb": "دەنگی سووڕانەوەی ڕوون و پاک",
+  "kind": "block_line"
+ },
+ {
+  "h": "4b10b4031cd33d760a4e96e6b19f81b212f1b05b61ef4bb4ca970bf6e7bcfe2b",
+  "en": "Longer Service Life",
+  "ar": "عمر خدمة أطول",
+  "ckb": "تەمەنی بەکارهێنانی درێژتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "26aa317ec6bd4611917651b6a3a55ca65311e219f4c594fea312ebeca9029dd9",
+  "en": "Ideal Applications for Ceramic Ball Bearings",
+  "ar": "الاستخدامات المثالية لمحامل الكرات السيراميكية",
+  "ckb": "گونجاوترین بەکارهێنانەکانی بێرینگی تۆپەڵەی سیرامیکی",
+  "kind": "block_line"
+ },
+ {
+  "h": "0801cebcaa8cab8ff5cc85f4bf20ba48d762329da5181cae16f417dccea76622",
+  "en": "Scenarios Requiring Ultra-Sensitive Rolling Resistance, Such as Fidget Spinners",
+  "ar": "الحالات التي تتطلب مقاومة دحرجة فائقة الحساسية، مثل دوّامات الأصابع (سبينر)",
+  "ckb": "ئەو حاڵەتانەی پێویستیان بە بەرگەی گلۆربوونەوەی زۆر هەستیار هەیە، وەک سپینەری پەنجە",
+  "kind": "block_line"
+ },
+ {
+  "h": "e79a74bc873f5a72f2890908c5be239dae5bc70467184cffb1adba2d2559af30",
+  "en": "High-Speed, Heavy-Load Rotations",
+  "ar": "الدوران بسرعات عالية وأحمال ثقيلة",
+  "ckb": "سووڕانەوە بە خێرایی بەرز و باری قورس",
+  "kind": "block_line"
+ },
+ {
+  "h": "4cbecb9186412bfd237bc98f936af33c6da8492b1d859f282b555500d8677f92",
+  "en": "Situations Demanding Extended Service Life",
+  "ar": "الحالات التي تتطلب عمر خدمة أطول",
+  "ckb": "ئەو حاڵەتانەی پێویستیان بە تەمەنی بەکارهێنانی درێژتر هەیە",
+  "kind": "block_line"
+ },
+ {
+  "h": "bf707cb0aa108793d8430be779b360d0b120f84e42c9c00706754066d056b7d4",
+  "en": "Bearing Steel Bearings",
+  "ar": "محامل من فولاذ المحامل",
+  "ckb": "بێرینگی پۆڵای بێرینگ",
+  "kind": "block_line"
+ },
+ {
+  "h": "a32231872529b47e28e3fb6e36434cde87719c0d2d6731d43db8f5189fa2a4bc",
+  "en": "Excellent overall performance",
+  "ar": "أداء عام ممتاز",
+  "ckb": "کاراییەکی گشتیی نایاب",
+  "kind": "block_line"
+ },
+ {
+  "h": "055b4a58901f9565006dfbd42fffb1019b112eb0836e4973749d6b526460e6b4",
+  "en": "Ideal Applications for Bearing Steel Bearings",
+  "ar": "الاستخدامات المثالية لمحامل فولاذ المحامل",
+  "ckb": "گونجاوترین بەکارهێنانەکانی بێرینگی پۆڵای بێرینگ",
+  "kind": "block_line"
+ },
+ {
+  "h": "1e97fa85897e452223068f0a700ac176364db899aa55780733d036149132d51c",
+  "en": "Applicable to most applications",
+  "ar": "مناسبة لمعظم الاستخدامات",
+  "ckb": "گونجاوە بۆ زۆربەی بەکارهێنانەکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "259cb837741d40ae34777e84b7833d10d81bf08038379c928667d70cf9043b0c",
+  "en": "Attention to rust prevention",
+  "ar": "يجب الانتباه إلى الوقاية من الصدأ",
+  "ckb": "پێویستە ئاگاداری ڕێگریکردن لە ژەنگ بیت",
+  "kind": "block_line"
+ },
+ {
+  "h": "c9d39f90b5108feb13120f973a095712c1ca781fac3ba529c6cb7a8b8eec8e5f",
+  "en": "Commonly used high-performance deep groove ball bearings",
+  "ar": "محامل كروية عالية الأداء ذات مجرى عميق شائعة الاستخدام",
+  "ckb": "بێرینگی تۆپەڵەیی شیارقووڵی کارایی بەرز کە زۆر بەکاردێن",
+  "kind": "block_line"
+ },
+ {
+  "h": "c5582cf4ae3a68233eea7b92b4d3aa7008df49dfc6533d05f2714e5d7b3d2ecf",
+  "en": "Higher precision for stable, durable rotation and higher load capacity",
+  "ar": "دقة أعلى لدوران مستقر ومتين وقدرة أعلى على تحمّل الأحمال",
+  "ckb": "وردیی بەرزتر بۆ سووڕانەوەی جێگیر و بەرگەگر و توانای هەڵگرتنی باری زیاتر",
+  "kind": "block_line"
+ },
+ {
+  "h": "4b90d22929ed063f5340c0022cc1fc8a05ce18fa44b8d109fc394bc4504eb5a0",
+  "en": "Bearing Steel Bearings:",
+  "ar": "محامل من فولاذ المحامل:",
+  "ckb": "بێرینگی پۆڵای بێرینگ:",
+  "kind": "block_line"
+ },
+ {
+  "h": "22dfd5b9cb57c6c5af0cd2ce4e6a5d78fa677f381be47a5cc411165cd9dcdbbf",
+  "en": "Solid weight",
+  "ar": "وزن متين",
+  "ckb": "کێشی قایم",
+  "kind": "block_line",
+  "needs_review": true
+ },
+ {
+  "h": "50bc18d1026dda0edd70a909e13239e526b52979e66da2237d24bec7d1bf7852",
+  "en": "Ideal Applications for Bearing Steel Bearings:",
+  "ar": "الاستخدامات المثالية لمحامل فولاذ المحامل:",
+  "ckb": "گونجاوترین بەکارهێنانەکانی بێرینگی پۆڵای بێرینگ:",
+  "kind": "block_line"
+ },
+ {
+  "h": "52792f24905e11c683240e65b33de726952a24050b11078659508870f86a10b1",
+  "en": "Applicable to most scenes",
+  "ar": "مناسبة لمعظم الحالات",
+  "ckb": "گونجاوە بۆ زۆربەی حاڵەتەکان",
+  "kind": "block_line"
+ }
+]

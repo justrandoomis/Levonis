@@ -1,0 +1,995 @@
+{
+  "handle": "asa-cf",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T17:08:15Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "extrusion.supported_nozzle_diameters",
+        "motion.max_flow",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer, page by page): Basic Info, Specifications and Recommended Printing Settings (p.1); Physical and Mechanical Properties and the start of Other Physical and Chemical Properties (p.2); the rest of that table and the Specimen Test (p.3); test charts (p.4, images only) and the Disclaimer (pp.4-5). No filament length, no hardness, no diameter tolerance; Glass Transition Temperature and Crystallization Temperature are given as \"/\"."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/49cbb7bc9b7047fbb1c34a43fb209871/SDS20260701B51_Bambu_ASA_CF.pdf",
+      "title": "Bambu ASA CF Safety Data Sheet SDS20260701B51 (Jul. 01. 2026)",
+      "retrieved_at": "2026-10-16T08:24:58Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 20 pages read. Section 1 (p.2) product name and model; section 2 (pp.3-4) \"Not classified\"; section 3 (p.4) composition; section 8 (pp.8-9) carbon-fibre handling; section 9 (pp.9-10) \"No data available\" for every physical value including melting point and density; section 14 (pp.13-14) not hazardous goods; section 15 (p.16) SVHC not listed."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "Read in full. No ASA-CF row in the nozzle, AMS, bed-temperature or storage tables (only generic \"ASA\"); ASA-CF is named in the glue bullet (\"Use Bambu Lab Glue Stick for ASA-CF …\") and covered by the printer row for \"ABS, ASA, PC, PA, and their CF/GF reinforced materials\" and the carbon/glass-fibre nozzle guidelines."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "motion.max_flow",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "Read in full: 1.2 Core Features property table (ASA-CF column), 1.3 Hardware Compatibility (row ASA CF), 2.1 drying table (row ASA-CF), 5.1 speed / flow table (row ASA-CF). Its own TDS / MSDS links (/filament-acc/asacf-pahtcf/…) were not cached and not read."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Read in full; Appendix I row \"ASA-CF, ABS-GF\"."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/asa-cf",
+      "title": "Bambu Lab US store product page: ASA-CF",
+      "retrieved_at": "2026-10-16T07:03:33Z",
+      "keys": [
+        "material.diameter",
+        "material.diameter_tolerance",
+        "material.net_weight"
+      ],
+      "note": "The corpus copy parsed with the package (extractPage + buildImportPayload with the manifest row), as the runner does: Product Features, Cautions for Use, page-builder sections and FAQ. Used for the consistency check and as corroborating relation evidence."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "ASA-CF",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, title and Basic Info",
+      "quote": "ASA-CF • Basic Info Bambu ASA-CF - Engineered for harsh outdoor conditions … retaining the advantages of ASA while adding carbon fiber",
+      "test_method": "",
+      "test_condition": "Material designation (TDS title and Basic Info; no test method)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "TDS p.2 Other Physical and Chemical Properties › Composition: \"acrylonitrile - styrene - acrylate\". SDS section 3 (p.4): Acrylonitrile-styrene-acrylate (ASA) 78-89 % by wt (CAS 71512-90-8), Carbon Fiber 5-10 % (CAS 7440-44-0), Additive 6-12 %. SDS section 1 (p.2): product name \"Bambu ASA CF\", model \"B51-xx\"."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS Specifications; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\", 1.75 mm). The ± 0.03 mm tolerance is the store page's own row; the TDS gives none."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681813141516292",
+        "value_text": "1 kg",
+        "group": "Size"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Net filament weight (TDS Specifications)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Scoped to the only Size value \"1 kg\"; agrees with the store page's option row (option Size › 1 kg = 1000 g, official_variant)."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681813141516291",
+        "value_text": "Filament with spool",
+        "group": "Type"
+      },
+      "value": "PC+ABS (Temperature resistance 90 °C)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Specifications › Spool Material",
+      "quote": "Spool Material PC+ABS (Temperature resistance 90 °C)",
+      "test_method": "",
+      "test_condition": "Spool material (TDS Specifications row \"Spool Material\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "The registry's spool key (label \"Spool\") holds the TDS spool-material row; scoped to the only Type value \"Filament with spool\". The TDS spool size (\"Diameter: 200 mm; Height: 67 mm\") has no registry key and is not stored."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.02,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.02 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS Physical Properties)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Store page: not stated (its deterministic row is not_found). SDS section 9 (p.9) says \"Density : No data available.\"; the TDS value stands."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 210,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 210 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS Physical Properties)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "SDS section 9 (p.9): \"Melting Point : No data available.\""
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 108,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 108 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (TDS Physical Properties; the TDS spells it \"Vicar\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": ""
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 110,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (0.45 MPa row)",
+      "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 110 °C",
+      "test_method": "ISO 75",
+      "test_condition": "0.45 MPa load, typical value (TDS Physical Properties); the TDS also gives 102 °C at 1.8 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "The TDS has two HDT rows: \"ISO 75 1.8 MPa 102 °C\" and \"ISO 75 0.45 MPa 110 °C\"; one key per scope, so the 0.45 MPa value is kept. The ASA-CF wiki (1.2 Core Features table, \"Heat Resistance（HDT，0.45 MPaLoad）\") agrees: 110 ℃."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 34,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 34 ± 3 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimen, X-Y direction; specimens printed at nozzle 275 °C, bed 90 °C, 200 mm/s, 100% infill, then annealed and dried at 80 °C for 12 h before testing (TDS p.3 note)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Printed-specimen result (± 3 MPa). Z: \"Tensile Strength (Z) ISO 527, GB/T 1040 30 ± 4 MPa\" (not stored: one key per scope)."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 9.6,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 9.6 ± 1.4 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimen, X-Y direction; specimens printed at nozzle 275 °C, bed 90 °C, 200 mm/s, 100% infill, then annealed and dried at 80 °C for 12 h before testing (TDS p.3 note)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Printed-specimen result (± 1.4 %). Z: 4.4 ± 0.8 % (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 3740,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 3740 ± 130 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimen, X-Y direction; specimens printed at nozzle 275 °C, bed 90 °C, 200 mm/s, 100% infill, then annealed and dried at 80 °C for 12 h before testing (TDS p.3 note)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Printed-specimen result (± 130 MPa). Z: 1350 ± 120 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 72,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 72 ± 5 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimen, X-Y direction; specimens printed at nozzle 275 °C, bed 90 °C, 200 mm/s, 100% infill, then annealed and dried at 80 °C for 12 h before testing (TDS p.3 note)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Printed-specimen result (± 5 MPa). Z: 33 ± 3 MPa (not stored). The ASA-CF wiki (1.2 Core Features table, \"Strength （Flexural Strength - XY）\") agrees: 72 Mpa."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 14.0,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 14.0 ± 2.2 kJ/m²； 6.2 ± 1.4 kJ/m²（notched）",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimen, X-Y direction; specimens printed at nozzle 275 °C, bed 90 °C, 200 mm/s, 100% infill, then annealed and dried at 80 °C for 12 h before testing (TDS p.3 note); the same row gives 6.2 ± 1.4 kJ/m² notched",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Printed-specimen result (± 2.2 kJ/m²); the notched X-Y value (6.2 ± 1.4) and Z (9.4 ± 0.6 kJ/m²) are not stored. The ASA-CF wiki (1.2 Core Features table) agrees: Impact Strength - XY 14 KJ/m², Z 9.4 KJ/m²."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 250,
+        "max": 280
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 250 - 280 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Store page: not stated (its deterministic row is not_found). The material-table wiki (2. Nozzle) has no ASA-CF row; its generic \"ASA\" row (240 - 280, ±10 °C) is another material and is not a conflict."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 80,
+        "max": 100
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 100°C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (bed types: Textured PEI Plate / Smooth PEI Plate)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "The material-table wiki gives 90 - 100 °C for generic \"ASA\" (glue stick / liquid glue table, and the build-plate table); no ASA-CF row. The store FAQ (4.Warping Prevention Tips) says \"Set lower printing speed and higher heatbed temperature\" without a number."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 250 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 250 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "An upper bound with no lower bound, so it is kept as text, not as a range with an invented minimum. The ASA-CF wiki (5.1, table) agrees: \"ASA-CF | ＜250 mm/s\"; the same section's general advice for high-temperature filaments (outer-wall speed \"should not exceed 100 mm/s\" for surface quality) is not product-specific."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": ""
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate",
+        "Smooth PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Textured PEI Plate / Smooth PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "The ASA-CF wiki (1.3 Hardware Compatibility, Build Plate Compatibility) adds \"Glue-assisted printing required; not compatible with low-temperature engineering plate\" (see relations)."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C，8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven (forced-air), before printing; the TDS also gives X1 Series printer heatbed 90 - 100 °C, 12 h",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "The drying wiki (Appendix I, row \"ASA-CF, ABS-GF\": forced-air oven 80 °C, 8 h; bed 90-100 °C, 12 h) and the ASA-CF wiki (2.1, row ASA-CF: convection oven 80 °C, 8h; heated bed 90 - 100 °C, 12h) agree. AMS drying: see notes."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C，8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven (forced-air) at 80 °C, before printing; the TDS also gives X1 Series printer heatbed 90 - 100 °C, 12 h",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "Agrees with both wiki drying tables for the oven method (8 h)."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "The ASA-CF wiki (1.3) adds: hardened steel nozzle only; 0.6 mm recommended; not compatible with 0.2 mm; 0.4 mm high-flow nozzle not recommended. The store page (Cautions for Use) says \"0.2 mm Nozzle NOT Compatible\" and \"Hardened Steel Nozzle Mandatory\"."
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 45,
+        "max": 60
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "locator": "p.1, Recommended Printing Settings › Chamber Temperature",
+      "quote": "Chamber Temperature 45 - 60 °C",
+      "test_method": "",
+      "test_condition": "Recommended chamber temperature while printing (a filament print setting, not a printer capability)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "note": "The TDS label matches the registry synonym \"Chamber Temperature\" (key applies to every type). The registry types this key as a number; the TDS gives a range, kept as min/max. Reviewer: drop this row if the key is to stay printer-only."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 18,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "locator": "5.1 Improving Surface Quality › table › row ASA-CF",
+      "quote": "Filament | Recommended Printing Speed | Suggested Maximum Volumetric Flow Rate … ASA-CF | ＜250 mm/s | 18 mm³/s",
+      "test_method": "",
+      "test_condition": "Suggested maximum volumetric flow rate (wiki table)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "note": "Registry synonym \"Maximum Volumetric Speed\"; the key applies to every type. Not on the TDS or the store page."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Accessory Compatibility",
+      "quote": "Printing with an external spool holder is recommended. AMS lite is not compatible, and AMS / AMS 2 Pro / AMS HT have limited compatibility with ASA CF.",
+      "note": "Agrees with the store page (Cautions for Use: \"AMS lite NOT Compatible\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Accessory Compatibility",
+      "quote": "Printing with an external spool holder is recommended. AMS lite is not compatible, and AMS / AMS 2 Pro / AMS HT have limited compatibility with ASA CF.",
+      "note": "Limited compatibility only; an external spool holder is recommended. Agrees with the store page (\"External Spool Holder Recommended & Limited Compatibility with AMS, AMS 2 Pro, and AMS HT\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Accessory Compatibility",
+      "quote": "Printing with an external spool holder is recommended. AMS lite is not compatible, and AMS / AMS 2 Pro / AMS HT have limited compatibility with ASA CF.",
+      "note": "Limited compatibility only (feeding). For drying, the drying wiki (Appendix I, row \"ASA-CF, ABS-GF\") lists AMS 2 Pro as \"Not compatible\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Accessory Compatibility",
+      "quote": "Printing with an external spool holder is recommended. AMS lite is not compatible, and AMS / AMS 2 Pro / AMS HT have limited compatibility with ASA CF.",
+      "note": "Limited compatibility only; an external spool holder is recommended."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "Enclosed printer",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Printer Compatibility",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 series",
+      "note": "A printer class, not a product: unresolvable. The store page (Cautions for Use) agrees: \"Enclosure Printers Required\"; the material-table wiki recommends an enclosed printer for ASA and its CF/GF reinforced materials."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "P1P",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Printer Compatibility",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 series",
+      "note": "compat-targets.json resolves \"P1P\" to an existing Levonis model (step-2 snapshot).",
+      "target_levonis_model": "P1P"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "target_source_handle": "",
+      "target_family": "a1_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Printer Compatibility",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 series",
+      "note": "Source words \"A1 series\" (A1 and A1 mini, both open-frame)."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hardened steel nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Nozzle Compatibility",
+      "quote": "Hardened steel nozzle only; 0.6 mm nozzle recommended; not compatible with 0.2 mm nozzle; use of 0.4 mm high-flow nozzle is not recommended",
+      "note": "A component concept, not one product: unresolvable. The store page agrees (Cautions for Use: \"Hardened Steel Nozzle Mandatory\")."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2 mm nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Nozzle Compatibility",
+      "quote": "Hardened steel nozzle only; 0.6 mm nozzle recommended; not compatible with 0.2 mm nozzle; use of 0.4 mm high-flow nozzle is not recommended",
+      "note": "compat-targets.json reviews \"0.2 mm Nozzle\" as a component concept, not a product (unresolvable). The store page agrees (\"0.2 mm Nozzle NOT Compatible\"; FAQ: \"Hotend with Stainless Steel Nozzle 0.2 mm\")."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Glue Stick",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Build Plate Settings › 1. Recommended Bed Temperatures for Different Filament & Glue Combinations › bullet 1",
+      "quote": "Use Bambu Lab Glue Stick for ASA-CF, PA6-GF/CF, PPA-CF, PPS-CF, PET-CF, and PAHT-CF printing.",
+      "note": "The ASA-CF wiki (1.3, Build Plate Compatibility) says \"Glue-assisted printing required\" and (2.2) \"It is recommended to use Bambu Lab Glue Stick for Build Plate\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Liquid Glue",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/asa-cf",
+      "source_title": "Bambu Lab US store product page: ASA-CF",
+      "retrieved_at": "2026-10-16T07:03:33Z",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, and Bambu Liquid Glue.",
+      "note": "Store page FAQ. The material-table wiki's glue table lists liquid glue for generic \"ASA\" (90 - 100 °C), not for ASA-CF, and directs ASA-CF to the glue stick: no conflict."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/asa-cf",
+      "source_title": "Bambu Lab US store product page: ASA-CF",
+      "retrieved_at": "2026-10-16T07:03:33Z",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, and Bambu Liquid Glue.",
+      "note": "Store page FAQ. The material-table wiki rates the Cool Plate \"Not recommended\" for generic ASA."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Low-temperature engineering plate",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "locator": "1.3 Hardware Compatibility › row ASA CF › Build Plate Compatibility",
+      "quote": "Glue-assisted printing required; not compatible with low-temperature engineering plate",
+      "note": "Unresolvable: the source does not say whether this is the current Bambu Engineering Plate (the material-table wiki says every engineering plate now sold is the new version), so no target handle is set."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "target_family": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Textured PEI Plate / Smooth PEI Plate",
+      "note": ""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "target_family": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Textured PEI Plate / Smooth PEI Plate",
+      "note": ""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_source_handle": "",
+      "target_family": "h2_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › row 1 › Recommended Printer",
+      "quote": "ABS, ASA, PC, PA, and their CF/GF reinforced materials (e.g., ABS-GF, PC-CF, PA-CF/GF, …) | … | Enclosed printer (Bambu H2 Series, X2D, P2S, X1, X1C, P1S, etc.)",
+      "note": "Named as a recommended enclosed printer for ASA and its CF/GF reinforced materials (class row; ASA-CF is not named on its own)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "target_source_handle": "x2d",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › row 1 › Recommended Printer",
+      "quote": "ABS, ASA, PC, PA, and their CF/GF reinforced materials (e.g., ABS-GF, PC-CF, PA-CF/GF, …) | … | Enclosed printer (Bambu H2 Series, X2D, P2S, X1, X1C, P1S, etc.)",
+      "note": "Named as a recommended enclosed printer for ASA and its CF/GF reinforced materials (class row; ASA-CF is not named on its own)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_source_handle": "",
+      "target_family": "model_p2s",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › row 1 › Recommended Printer",
+      "quote": "ABS, ASA, PC, PA, and their CF/GF reinforced materials (e.g., ABS-GF, PC-CF, PA-CF/GF, …) | … | Enclosed printer (Bambu H2 Series, X2D, P2S, X1, X1C, P1S, etc.)",
+      "note": "Named as a recommended enclosed printer for ASA and its CF/GF reinforced materials (class row; ASA-CF is not named on its own)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "X1",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › row 1 › Recommended Printer",
+      "quote": "ABS, ASA, PC, PA, and their CF/GF reinforced materials (e.g., ABS-GF, PC-CF, PA-CF/GF, …) | … | Enclosed printer (Bambu H2 Series, X2D, P2S, X1, X1C, P1S, etc.)",
+      "note": "Named as a recommended enclosed printer for ASA and its CF/GF reinforced materials (class row; ASA-CF is not named on its own).",
+      "target_levonis_model": "X1"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "X1C",
+      "target_source_handle": "",
+      "target_family": "model_x1c",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › row 1 › Recommended Printer",
+      "quote": "ABS, ASA, PC, PA, and their CF/GF reinforced materials (e.g., ABS-GF, PC-CF, PA-CF/GF, …) | … | Enclosed printer (Bambu H2 Series, X2D, P2S, X1, X1C, P1S, etc.)",
+      "note": "Named as a recommended enclosed printer for ASA and its CF/GF reinforced materials (class row; ASA-CF is not named on its own)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "P1S",
+      "target_source_handle": "",
+      "target_family": "model_p1s",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › row 1 › Recommended Printer",
+      "quote": "ABS, ASA, PC, PA, and their CF/GF reinforced materials (e.g., ABS-GF, PC-CF, PA-CF/GF, …) | … | Enclosed printer (Bambu H2 Series, X2D, P2S, X1, X1C, P1S, etc.)",
+      "note": "Named as a recommended enclosed printer for ASA and its CF/GF reinforced materials (class row; ASA-CF is not named on its own)."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/44b0a48ab1d84e819647c980eb179ae9/Bambus_ASA-CF_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: ASA-CF",
+      "retrieved_at": "2026-10-16T08:24:56Z",
+      "sha256": "d244e24b49638f08317eb93b941b9b55d8232f5bc957b296a4a9678c6dd03b2a"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/49cbb7bc9b7047fbb1c34a43fb209871/SDS20260701B51_Bambu_ASA_CF.pdf",
+      "title": "Bambu ASA CF Safety Data Sheet SDS20260701B51 (Jul. 01. 2026)",
+      "retrieved_at": "2026-10-16T08:24:58Z",
+      "sha256": "bea7fb8ceebe74ab0eefe89c1a95010340530759df43c1704b7487b8c3ca5610"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "title": "ASA CF / PAHT CF Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "sha256": "b245cb78937252aa4cc803a867433b53ba8375667d2505bcd1987bc305353a46"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness",
+    "thermal.glass_transition"
+  ],
+  "notes": [
+    "Independent second extraction (agent-2). No other curated file for this product was read.",
+    "Mechanical keys hold the TDS X-Y printed-specimen values (Mechanical Properties, p.2; specimens printed at 275 °C / 90 °C / 200 mm/s / 100% infill and annealed and dried at 80 °C for 12 h before testing, p.3 note). The registry has one key per scope and no *.printed / *.material split, so the Z values are named in each row's note and not stored. Density, melting, Vicat and HDT come from the TDS Physical Properties table and sit under material.* / thermal.*.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 4200 ± 270 MPa, Z 2290 ± 260 MPa), melt index (1.74 ± 0.3 g/10 min at 210 °C, 2.16 kg), crystallization temperature (\"/\"), HDT 102 °C at 1.8 MPa (the 0.45 MPa value is stored), saturated water absorption rate (0.33% at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed, with desiccant), retraction length (0.8 - 1.4 mm) and speed (20 - 40 mm/s), max overhang angle (~ 70°), max bridging length (~ 40 mm), spool size (diameter 200 mm, height 67 mm), the X1 Series heatbed drying alternative (90 - 100 °C, 12 h), annealing advice, and the odor, composition, skin hazard, chemical stability, solubility, acid / alkali / solvent / oil resistance, flammability and combustion-product rows.",
+    "TDS internal inconsistency (p.3): the Specimen Printing Conditions table says nozzle 220 °C and bed 35 °C, while the footnote under it says the specimens were printed at nozzle 275 °C and bed 90 °C. 220 °C is below the TDS's own recommended nozzle range (250 - 280 °C), so the test_condition cites the footnote. The footnote also gives annealing advice for \"Bambu ASA\" (80 to 90 °C, 6 to 12 hours), not ASA-CF.",
+    "AMS drying, sources disagree: the drying wiki (Appendix I, row \"ASA-CF, ABS-GF\") gives AMS HT 80 °C for 8 h and AMS 2 Pro \"Not compatible\"; the ASA-CF wiki (2.1) gives AMS HT 85 °C, 12h. Neither is stored (one drying key pair, holding the TDS oven value).",
+    "SDS facts with no registry key are not stored: CLP \"Not classified\", no hazard pictogram or signal word, physical state \"Thread\", the section 8 carbon-fibre handling warning (gloves when loading/unloading, cutting or sanding; its text says \"carbon fiber-reinforced filament （Glass fiber-reinforced filament)\", a wording slip), conditions to avoid (fire, elevated temperatures, direct sunlight), and \"Not hazardous goods\" for IMDG, DOT, ADR/RID and ICAO-TI / IATA transport. Its section 9 \"No data available\" does not override the TDS values.",
+    "Wiki values that agree with the TDS are recorded as corroboration in the row notes, not as separate rows: flexural strength 72 MPa, impact 14 / 9.4 kJ/m², HDT 110 ℃ at 0.45 MPa, print speed < 250 mm/s, oven drying 80 °C 8 h, heatbed drying 90 - 100 °C 12 h. The ASA-CF wiki comparison table's ASA / PAHT-CF / PPS-CF columns are other products.",
+    "Printer guidance: the ASA-CF wiki says \"Requires an enclosed printer; not compatible with P1P / A1 series\"; the material-table wiki lists enclosed printers (H2 Series, X2D, P2S, X1, X1C, P1S, etc.) for ASA and its CF/GF reinforced materials; the store page says \"Enclosure Printers Required\". The ASA-CF wiki (2.3) adds that the H2 series and X1E have active chamber heating and that X1C / P1S can preheat the bed for 15 minutes.",
+    "Nozzle guidance (ASA-CF wiki 1.3): \"0.6 mm nozzle recommended\" and \"use of 0.4 mm high-flow nozzle is not recommended\" are recommendations, not compatibility facts, so they are not written as relations.",
+    "Marketing prose proves no number: \"67% more stiffness compared to standard ASA\", \"Superior Outdoor Durability\", \"Optimized for Large Models\" and the page's specimen-size line (\"Model size (L*W*H): 220*100*90 mm³\") are not stored as values.",
+    "No hex: the store page links no hex-code document for this filament and none is cached, so its only colour value \"Black (46101)\" has no published hex.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/s7/default/a7676855216f4ea2b41e625c8b5a8cac/Bambu_ASA-CF_RoHS.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 5); the TDS gives no tolerance, so it is not restated and not marked not_published.",
+    "Safety and handling (store FAQ 6-7, ASA-CF wiki ⚠️ Important): not food-contact grade, may carry hard microscopic barbs (wear puncture- and cut-resistant gloves and safety goggles), releases styrene at printing temperatures (enclosed printer, ventilation, activated-carbon mask for long jobs), dry before use, avoid excessive bending (more brittle than ASA). No registry key holds these."
+  ]
+}

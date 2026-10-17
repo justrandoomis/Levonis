@@ -1,0 +1,819 @@
+{
+  "handle": "pla-wood",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T13:40:17Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer page by page; pages 1 and 4 also as images): Basic Info, Specifications, Recommended Printing Settings, Physical, Mechanical and Other Physical and Chemical Properties, Specimen Test, test specimen drawings, Disclaimer."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/d6c961ed06964581815e31ec1816e254/SDS20250723SA16_Bambu_PLA_Wood.pdf",
+      "title": "Bambu PLA Wood Safety Data Sheet SDS20250723A16",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 19 pages read (text layer; the cover page, which has no text layer, as an image). Section 3 gives the composition; section 9 says \"No data available\" for melting point, density and the other physical data; section 14 classifies it as not hazardous goods."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/312a35d5cdce4fc5a76692955b493a82/PLA_Wood_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Wood",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "keys": [],
+      "note": "One page, 6 colours (text layer and the page as an image): read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Nozzle table row \"PLA Wood\", the AMS & AMS lite prose and table row \"PLA Metal / Wood / Marble\", the build plate table row and the storage table row \"PLA Metal / Wood / Marble\"; used as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Important box (PLA Wood drying), hardware compatibility table row \"PLA Galaxy / Wood / Marble / Sparkle\", drying table row \"PLA Silk / Silk+ / Wood / Aero\", section 3.2 \"PLA Wood\", and the HDT remark for PLA in general."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PLA Wood\" and Appendix II storage humidity. The store page links this page from its FAQ (2.Drying Recommendations)."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-wood",
+      "title": "Bambu Lab US store product page: PLA Wood",
+      "retrieved_at": "2026-10-16T07:03:55Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections, FAQ, Download block."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PLA",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Basic Info",
+      "quote": "Bambu PLA Wood - a mix of our high-quality PLA with fine wood powder",
+      "test_method": "",
+      "test_condition": "Base polymer as named by the TDS Basic Info (no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "The TDS composition row (p.3, Other Physical and Chemical Properties › Composition) reads \"Polylactic acid\"; the SDS (p.4, section 3) gives PLA 70-85 % by wt (CAS 26100-51-6), wood powder 10-18 % by wt and additive 5-12 % by wt."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 ± 0.03 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\")."
+    },
+    {
+      "key": "material.diameter_tolerance",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.03,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 ± 0.03 mm",
+      "test_method": "",
+      "test_condition": "Tolerance on the 1.75 mm nominal diameter (TDS \"Specifications\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\")."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681957794672647",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "Scoped to the store page's only Net weight value \"1 kg\"; agrees with the store page row (option Net weight › 1 kg)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.21,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.21 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 156,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 156 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 54,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 54 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 64,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 64 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (the TDS row reads \"Vicar Softening Temperature\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 57,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 57 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value. The next row gives 60 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "The PLA wiki (4.1) says \"a heat deflection temperature of only 57°C\" for PLA in general (no load stated); it is not a PLA Wood value. The product TDS value is kept."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 26,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 26 ± 5 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing, p.3: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 15.3,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 15.3 ± 3.1 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing, p.3: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z"
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2780,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2780 ± 120 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing, p.3: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z"
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 55 ± 4 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing, p.3: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z"
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 15.7,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 15.7 ± 3.7 kJ/m²; 6.3 ± 2.2 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing, p.3: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing). First value of the cell (unnotched); the same cell gives 6.3 ± 2.2 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z"
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 190,
+        "max": 240
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 190 - 240 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "The material-table wiki (2. Nozzle, row \"PLA Wood\") agrees: 190 - 240 under the heading \"Nozzle temperature /℃ ( ±10 °C)\"."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Textured PEI Plate / Smooth PEI Plate, bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "Source disagreement left to review: the material-table wiki (Build Plate Settings › 3, row \"PLA Metal / Wood / Marble\") gives 35 - 45 ℃ on the Cool Plate / PLA Plate but 45 - 65 ℃ on the Smooth PEI / High-Temperature and Textured PEI plates, the two bed types this TDS names. The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 250 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 250 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate",
+        "Smooth PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Textured PEI Plate / Smooth PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "The TDS names only these two plates. The material-table wiki (Build Plate Settings › 3, row \"PLA Metal / Wood / Marble\") also gives the Cool Plate / PLA Plate (35 - 45 ℃) and the Engineering Plate (45 - 65 ℃, glue required); those are kept as relations, not added here."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C, 8 h X1 Series Printer Heatbed: 65 - 75 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 Series printer heatbed: 65 - 75 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "The material-table wiki (Storage and Material Specifications, row \"PLA Metal / Wood / Marble\") agrees: blast drying oven 55 ℃ for 8 h (AMS 2 Pro and AMS HT: 45 ℃ for 12 h). The drying wiki (Appendix I, row \"PLA Wood\") gives a forced-air oven range of 55-65 °C for 8 h, printer bed 70-75 °C for 12 h, AMS 2 Pro / AMS HT 45 °C for 12 h; the PLA wiki (2.1) gives convection oven 55℃ 8 h, hot bed 70℃ 12 h, AMS HT/AMS 2 Pro 55℃ 8 h. The TDS oven value is kept; see notes."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C, 8 h X1 Series Printer Heatbed: 65 - 75 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 55 °C. The same row gives 12 h on an X1 Series printer heatbed at 65 - 75 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "note": "The material-table wiki row \"PLA Metal / Wood / Marble\", the drying wiki row \"PLA Wood\" (forced-air oven) and the PLA wiki (convection oven) all agree on 8 h in an oven."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Basic Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/pla-wood",
+      "source_title": "Bambu Lab US store product page: PLA Wood",
+      "locator": "Product Features › bullet 4",
+      "quote": "Comes with Basic Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:03:55Z",
+      "note": "Unverified: an unlabelled store-page bullet. The store page's only Spool value is \"Filament with spool\"; the TDS (p.1, Specifications) gives the spool as \"ABS (Temperature resistance 70 °C)\", 200 mm diameter, 67 mm height."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Black Walnut (13107)",
+      "source_value_id": "564681957794672640",
+      "hex": "#4F3F24",
+      "source_url": "https://store.bblcdn.com/s7/default/312a35d5cdce4fc5a76692955b493a82/PLA_Wood_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Wood",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Black Walnut Hex:#4F3F24",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "value_text": "Rosewood (13204)",
+      "source_value_id": "564681957794672641",
+      "hex": "#4C241C",
+      "source_url": "https://store.bblcdn.com/s7/default/312a35d5cdce4fc5a76692955b493a82/PLA_Wood_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Wood",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Rosewood Hex:#4C241C",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "value_text": "Clay Brown (13801)",
+      "source_value_id": "564681957794672642",
+      "hex": "#995F11",
+      "source_url": "https://store.bblcdn.com/s7/default/312a35d5cdce4fc5a76692955b493a82/PLA_Wood_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Wood",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Clay Brown Hex:#995F11",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "conflict": "The printed label reads \"Hex:#995F11\" (a dark brown), but the colour block it labels is rendered as about #F4A925 (an orange-yellow; sampled from the page rendered at 80 dpi). The other five blocks match their labels. The printed hex is kept; left to review."
+    },
+    {
+      "value_text": "Classic Birch (13505)",
+      "source_value_id": "564681957794672643",
+      "hex": "#918669",
+      "source_url": "https://store.bblcdn.com/s7/default/312a35d5cdce4fc5a76692955b493a82/PLA_Wood_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Wood",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Classic Birch Hex:#918669",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "value_text": "White Oak (13106)",
+      "source_value_id": "564681957794672644",
+      "hex": "#D6CCA3",
+      "source_url": "https://store.bblcdn.com/s7/default/312a35d5cdce4fc5a76692955b493a82/PLA_Wood_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Wood",
+      "locator": "p.1, row 1, column 1",
+      "quote": "White Oak Hex:#D6CCA3",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    },
+    {
+      "value_text": "Ochre Yellow (13403)",
+      "source_value_id": "564681957794672645",
+      "hex": "#C98935",
+      "source_url": "https://store.bblcdn.com/s7/default/312a35d5cdce4fc5a76692955b493a82/PLA_Wood_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Wood",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Ochre Yellow Hex:#C98935",
+      "retrieved_at": "2026-10-16T08:25:06Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "AMS series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA Galaxy / Wood / Marble / Sparkle\" › Component Compatibility",
+      "quote": "PLA Galaxy / Wood / Marble / Sparkle | All standard nozzles are acceptable (excluding 0.2 mm nozzle) | All printers compatible | Fully compatible with the AMS series",
+      "note": "The store page says the same (Product Features › Cautions for Use › bullet 1: \"All AMS Series Compatible\"); the material-table wiki (3. AMS & AMS lite, row \"PLA Metal / Wood / Marble\") gives \"Compatible\" in its \"AMS / AMS lite Compatibility\" column.",
+      "conflict": "The material-table wiki prose above the same table says \"PLA Wood filaments are compatible with the AMS but not recommended for the AMS lite\" and lists PLA Wood as \"Too brittle\" (can break inside the AMS / AMS lite channel). The product-specific store bullet and both wiki tables say compatible; the AMS lite caution is left to review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "all_bambu_printers",
+      "target_label": "Open-frame or enclosed printer",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table › row \"PLA Metal / Wood / Marble\"",
+      "quote": "PLA Metal / Wood / Marble | Compatible | Compatible | Compatible",
+      "note": "Columns: Open-frame printer (A Series, P1P, etc.), Enclosed printer (H2 Series, X2D, P2S, X1 Series, P1S, etc.), AMS / AMS lite Compatibility. The PLA wiki row \"PLA Galaxy / Wood / Marble / Sparkle\" says \"All printers compatible\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-wood",
+      "source_title": "Bambu Lab US store product page: PLA Wood",
+      "retrieved_at": "2026-10-16T07:03:55Z",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "0.2 mm Nozzle Not Compatible",
+      "note": "Agreed by every source read: the store FAQ (1.Accessory Compatibility) \"Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm.\"; the material-table wiki row \"PLA Wood\" gives \"Not Compatible\" for the 0.2 mm nozzle; the PLA wiki (3.2, PLA Wood) \"It is not recommended to use a 0.2 mm stainless steel nozzle\"; the TDS Nozzle Size row lists only 0.4, 0.6, 0.8 mm. compat-targets.json reviews \"0.2 mm Nozzle\" as unresolvable, so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "note": "The material-table wiki row \"PLA Wood\" gives \"Compatible\" for the 0.4, 0.6 and 0.8 mm nozzles and says hardened steel is \"Not Required\"; the PLA wiki says \"All standard nozzles are acceptable (excluding 0.2 mm nozzle)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High-flow nozzles (0.4, 0.6, 0.8 mm)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"PLA Wood\"",
+      "quote": "PLA Wood | Not Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 240 |",
+      "note": "Columns: 0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm nozzle, 0.4 mm, 0.6 mm, 0.8 mm high flow nozzle, hardened steel necessary?, nozzle temperature. The TDS Nozzle Size row does not mention high-flow nozzles."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Textured PEI Plate / Smooth PEI Plate",
+      "note": "The material-table wiki row \"PLA Metal / Wood / Marble\" gives 45 - 65 ℃ on the Bambu Textured PEI Plate (the TDS bed temperature is 35 - 45 °C)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Textured PEI Plate / Smooth PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (PLA Metal / Wood / Marble 45 - 65 ℃)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › table › row \"PLA Metal / Wood / Marble\" › Bambu Cool Plate / PLA Plate",
+      "quote": "PLA Metal / Wood / Marble | 35 - 45 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃ | 45 - 65 ℃ | If bed > 45 ℃, Recommended",
+      "note": "Columns: Cool Plate / PLA Plate, Engineering Plate, Smooth PEI / High-Temperature Plate, Textured PEI Plate, upper glass cover removal. The TDS Bed Type row does not list the Cool Plate. No store product is the plain Bambu Cool Plate (bambu-cool-plate-supertack is a different plate), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › table › row \"PLA Metal / Wood / Marble\" › Bambu Engineering Plate",
+      "quote": "PLA Metal / Wood / Marble | 35 - 45 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃ | 45 - 65 ℃ | If bed > 45 ℃, Recommended",
+      "note": "On the Engineering Plate glue is required (45 - 65 ℃); the TDS Bed Type row does not list the Engineering Plate."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s4/default/6fda0ae88e5a4e66bb5d58f2968eee42/Bambus_PLA_Wood_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PLA Wood",
+      "retrieved_at": "2026-10-16T08:25:03Z",
+      "sha256": "0d4a7db697bb84866f7852860a81035d5329a645008844ba0f39a03d80bddf52"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/d6c961ed06964581815e31ec1816e254/SDS20250723SA16_Bambu_PLA_Wood.pdf",
+      "title": "Bambu PLA Wood Safety Data Sheet SDS20250723A16",
+      "retrieved_at": "2026-10-16T08:25:05Z",
+      "sha256": "ce01164246ba600473c2a0ee9099bf2fdfb1693846870f2390ea544475e30e06"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/312a35d5cdce4fc5a76692955b493a82/PLA_Wood_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Wood",
+      "retrieved_at": "2026-10-16T08:25:06Z",
+      "sha256": "0e6cdf4d2b8023894a97310f2659b2c6bc87bd489d57da5558e9f743dd7ad908"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 15 ± 4 MPa, elongation 4.5 ± 1.7 %, bending modulus 1975 ± 140 MPa, bending strength 28 ± 4 MPa, impact 5.6 ± 1.2 kJ/m²) are not stored. Density, melting, glass transition, Vicat and HDT are raw-material properties (ISO 1183, DSC, ISO 306, ISO 75) and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 2360 ± 190 MPa, Z 1770 ± 150 MPa), melt index (29.4 ± 1.7 g/10 min at 210 °C, 2.16 kg), crystallization temperature (\"/\"), heat deflection temperature 60 °C at 0.45 MPa, saturated water absorption rate (1.25% at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed, with desiccant), bed surface preparation (glue), retraction length (0.6 - 1.0 mm) and speed (20 - 40 mm/s), chamber temperature (25 - 45 °C), max overhang angle (~ 55°), max bridging length (~ 30 mm), support material (Support for PLA), spool material (ABS, temperature resistance 70 °C) and spool size (diameter 200 mm, height 67 mm), suggested annealing (50 to 60 °C, 6 to 12 h), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows.",
+    "The TDS recommended chamber temperature (25 - 45 °C) is not written to thermal.chamber_temp: that key is a printer capability, not a filament print setting.",
+    "The TDS \"Bed Surface Preparation Glue\" is a recommended setting, not a stated requirement, so no \"requires\" relation is written; the material-table wiki's \"Glue Required\" applies to the Engineering Plate only and is kept in that relation's quote.",
+    "The TDS \"Support Material: Support for PLA\" names a support filament; no store product is exactly \"Support for PLA\" (support-for-pla-petg is \"Support for PLA/PETG\"), so no relation is written.",
+    "SDS facts with no registry key are not stored: model \"A16-xx\", CLP \"Not classified\", and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO/IATA) transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values. The SDS number is printed \"SDS20250723A16\" inside the sheet; the file name reads \"SDS20250723SA16\".",
+    "Source disagreement left to review: bed temperature on the TDS's own bed types (TDS 35 - 45 °C on Textured PEI / Smooth PEI vs material-table wiki 45 - 65 ℃ on those plates for \"PLA Metal / Wood / Marble\"). The product TDS value is kept.",
+    "Source disagreement left to review (drying, other than the oven value stored): printer heatbed drying is 65 - 75 °C, 12 h (TDS, X1 Series), 70-75 °C, 12 h (drying wiki, H/X/P2S/P1S) and 70℃, 12 h (PLA wiki); AMS 2 Pro / AMS HT drying is 45 °C, 12 h (material-table wiki and drying wiki) vs 55℃, 8 h (PLA wiki). The drying wiki's forced-air oven range is 55-65 °C (TDS and material-table: 55 °C).",
+    "AMS lite caution left to review: the material-table wiki prose says PLA Wood is \"compatible with the AMS but not recommended for the AMS lite\" and is \"Too brittle\", while its own table row, the PLA wiki and the store page (\"All AMS Series Compatible\") say compatible. Recorded as a conflict on the AMS series relation.",
+    "Odor disagreement (no registry key): the TDS gives \"Odor Odorless\", while the store FAQ (4.Wood-like Smell) and the PLA wiki say PLA Wood emits a mild, natural wood scent during printing (non-irritating, non-toxic).",
+    "Marketing prose proves no number: \"Feels Like Real Wood\", \"Matte Finish, Fine Texture\", \"Integrates Perfectly with Other PLA\" and the RFID section (store page) are not stored as values or relations.",
+    "Hex: all six store colours have exactly one hex cell, matched by the colour name without the code in parentheses (the hex table text layer titles the product \"PLA wood\"; the rendered page reads \"PLA Wood\"). The Clay Brown cell's printed hex (#995F11) does not match its rendered colour block (about #F4A925); the printed hex is kept with a conflict note.",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/s5/default/413722048c504e38854120a0a89b14c2.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store FAQ (5.Safety Tips) says the filament \"is not food-grade\"; the drying wiki (Appendix I) marks drying before use and desiccant protection during use as \"Required\" for PLA Wood. No registry key holds either."
+  ]
+}

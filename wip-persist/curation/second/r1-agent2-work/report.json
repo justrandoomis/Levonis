@@ -1,0 +1,36 @@
+{
+ "productType": "laser_machine",
+ "format": "page_builder",
+ "counts": {
+  "groups": 1,
+  "values": 3,
+  "variants": 3,
+  "images": 14,
+  "distinct_images": 11,
+  "swatches": 0,
+  "content_blocks": 73,
+  "content_images": 35,
+  "content_images_omitted": 0,
+  "box_items": 0,
+  "box_images": 0,
+  "specs": 0,
+  "documents": 0,
+  "relations": 0,
+  "external_ids": 4,
+  "notes": 0
+ },
+ "specsByStatus": {},
+ "specsByRegion": {},
+ "relationsByState": {},
+ "sentenceCounts": {
+  "money": 2,
+  "promotion": 0,
+  "shipping_policy": 0,
+  "warranty": 0,
+  "region": 0
+ },
+ "errors": [],
+ "hold": "",
+ "unknownLabels": [],
+ "soldOutCount": 1
+}

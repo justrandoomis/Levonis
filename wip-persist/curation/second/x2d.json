@@ -1,0 +1,2283 @@
+{
+  "handle": "x2d",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T20:25:00Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "title": "X2D Spec Sheet",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "safety.*",
+        "product.*",
+        "package.*",
+        "shipment.*"
+      ],
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "3 pages, every row read (pdftotext -layout per page and -raw). No layer height, auto-levelling, nozzle or BirdsEye camera, hotend type, rated/standby power, current, Bluetooth, noise, NPU figure, package size, package or gross weight, or certification rows."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/x2d/manual/acc-in-the-box",
+      "title": "Packaging List for X2D",
+      "keys": [
+        "package.contents"
+      ],
+      "retrieved_at": "2026-10-16T08:23:56Z",
+      "note": "Packing List table (X2D Combo and X2D columns) and Accessories Overview."
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.technology",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Fused Deposition Modeling",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Printing Technology",
+      "quote": "Printing Technology Fused Deposition Modeling",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "256 × 256 × 260 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Body › Build Volume (W*D*H)",
+      "quote": "Main Nozzle Printing: 256*256*260 mm³ Auxiliary Nozzle Printing: 235.5*256*256 mm³ Dual Nozzle Printing: 235.5*256*256 mm³ Total Volume for Two Nozzles: 256*256*260 mm³",
+      "test_method": "",
+      "test_condition": "Main nozzle printing (also the total volume for two nozzles); auxiliary-nozzle and dual-nozzle printing: 235.5 × 256 × 256 mm",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Object key written as text W × D × H (mergeCurated has no object form; the text is the package typeValue form). The cell has four sub-values; the main-nozzle / total figure is the value, the 235.5 × 256 × 256 mm auxiliary and dual-nozzle volumes are kept in test_condition. Agrees with the store feature bullet \"256 × 256 × 260 mm³ Print Volume\" and the store table."
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Plastic and Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Body › Chassis",
+      "quote": "Chassis Plastic and Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "physical.outer_frame",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Plastic, Glass, and Metal",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Body › Outer Frame",
+      "quote": "Outer Frame Plastic, Glass, and Metal",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 392,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Dimensions and Weight › Physical Dimensions",
+      "quote": "Physical Dimensions 392*406*478 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Order as published (no axis labels in the cell), mapped first → length, second → width, third → height as the package parser maps it. Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 406,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Dimensions and Weight › Physical Dimensions",
+      "quote": "Physical Dimensions 392*406*478 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Order as published (no axis labels in the cell), mapped first → length, second → width, third → height as the package parser maps it. Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 478,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Dimensions and Weight › Physical Dimensions",
+      "quote": "Physical Dimensions 392*406*478 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Order as published (no axis labels in the cell), mapped first → length, second → width, third → height as the package parser maps it. Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 16250,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Dimensions and Weight › Net Weight",
+      "quote": "Net Weight 16.25 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The printer net weight (16.25 kg as published; the merge weight rule stores grams and keeps the text «16.25 kg»). Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "extrusion.main_extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Gear",
+      "quote": "Extruder Gear Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The sheet labels the toolhead row \"Extruder Gear\" (section Toolhead, beside a separate Auxiliary Extruder section); the store table labels the same row \"Main Extruder Gear\". Keyed as the main extruder."
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Toolhead › Nozzle",
+      "quote": "Nozzle Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Toolhead › Max Nozzle Temperature",
+      "quote": "Max Nozzle Temperature 300 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Toolhead › Included Nozzle Diameter",
+      "quote": "Included Nozzle Diameter 0.4 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Toolhead › Supported Nozzle Diameter",
+      "quote": "Supported Nozzle Diameter 0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "printing.filament_cutter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Cutter",
+      "quote": "Filament Cutter Built-in",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Diameter",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "extrusion.main_extruder_motor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Motor",
+      "quote": "Extruder Motor Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Toolhead row \"Extruder Motor\"; the store table labels it \"Main Extruder Motor\". The store footnote 5 says the PMSM servo motor is on the main extruder only."
+    },
+    {
+      "key": "extrusion.aux_extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Auxiliary Extruder › Extruder Gear",
+      "quote": "Extruder Gear Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "extrusion.aux_extruder_motor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Stepper Motor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Auxiliary Extruder › Extruder Motor",
+      "quote": "Extruder Motor Stepper Motor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "printing.build_plate_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Flexible Steel Plate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Heatbed › Build Plate Material",
+      "quote": "Build Plate Material Flexible Steel Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Not in the store table (it has no Build Plate Material row)."
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Heatbed › Included Build Plate Type",
+      "quote": "Included Build Plate Type Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Not in the store table. The wiki accessories overview also names the pre-installed plate \"Bambu Textured PEI Plate\"; the store in-the-box table says \"Textured PEI Build Plate\"."
+    },
+    {
+      "key": "printing.build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate",
+        "Smooth PEI Plate",
+        "Cool Plate SuperTack",
+        "Engineering Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI Plate, Smooth PEI Plate, Cool Plate SuperTack, Engineering Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 120,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Heatbed › Max Heatbed Temperature",
+      "quote": "Max Heatbed Temperature 120 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store table (\"120 ℃\")."
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Speed › Max Speed of Toolhead",
+      "quote": "Max Speed of Toolhead 1000 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block). The store FAQ (Q2) gives the same figure \"When printing with the main nozzle\"."
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Speed › Max Acceleration of Toolhead",
+      "quote": "Max Acceleration of Toolhead 20,000 mm/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block). The store FAQ (Q2) gives the same figure \"When printing with the main nozzle\"."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Speed › Max Flow for Hotend",
+      "quote": "Max Flow for Hotend 40 mm³/s (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 °C printing temperature)",
+      "test_method": "",
+      "test_condition": "250 mm round model with a single outer wall; Bambu Lab ABS; 280 °C printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The store table labels the row \"Max Flow for Hotend (Standard Flow Hotend)\" with the same figure and test parameters."
+    },
+    {
+      "key": "thermal.chamber_heating",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Chamber Temperature Control › Active Chamber Heating",
+      "quote": "Active Chamber Heating Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Boolean key written as the published wording (the sense is true); the store table has the same text. Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Chamber Temperature Control › Max Temperature",
+      "quote": "Max Temperature 65 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The maximum actively heated chamber temperature. Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "safety.prefilter_grade",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "G3",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Air Purification › Pre-filter Grade",
+      "quote": "Pre-filter Grade G3",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "safety.hepa_grade",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H12",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Air Purification › HEPA Filter Grade",
+      "quote": "HEPA Filter Grade H12",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "safety.carbon_filter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Granulated Coconut Shell",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Air Purification › Activated Carbon Filter Type",
+      "quote": "Activated Carbon Filter Type Granulated Coconut Shell",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "safety.voc_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Air Purification › VOC Filtration",
+      "quote": "VOC Filtration Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "safety.particulate_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Air Purification › Particulate Matter Filtration",
+      "quote": "Particulate Matter Filtration Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "thermal.part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Cooling › Part Cooling Fan",
+      "quote": "Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "thermal.hotend_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Cooling › Hotend Cooling Fan",
+      "quote": "Hotend Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The store table labels the row \"Cooling Fan for Hotend\", same value."
+    },
+    {
+      "key": "thermal.control_board_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Cooling › Main Control Board Fan",
+      "quote": "Main Control Board Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "thermal.chamber_circulation_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Cooling › Chamber Heat Circulation Fan",
+      "quote": "Chamber Heat Circulation Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "thermal.aux_part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Cooling › Auxiliary Part Cooling Fan",
+      "quote": "Auxiliary Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "thermal.chamber_exhaust_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Cooling › External Exhaust Fan",
+      "quote": "External Exhaust Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The sheet says \"External Exhaust Fan\"; the store table says \"Chamber Exhaust Fan\" (same value), and the wiki says \"The external exhaust fan exhausts hot air from the chamber\"."
+    },
+    {
+      "key": "printing.filament_main_hotend",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "ABS",
+        "ASA",
+        "TPU",
+        "Support for PLA",
+        "Support for PLA/PETG",
+        "Support for ABS",
+        "PET",
+        "PA",
+        "PC",
+        "PVA",
+        "Carbon/Glass Fiber Reinforced PLA",
+        "Carbon/Glass Fiber Reinforced PETG",
+        "Carbon/Glass Fiber Reinforced ABS",
+        "Carbon/Glass Fiber Reinforced ASA",
+        "Carbon/Glass Fiber Reinforced PA6",
+        "Carbon/Glass Fiber Reinforced PAHT",
+        "Carbon/Glass Fiber Reinforced PPA",
+        "Carbon/Glass Fiber Reinforced PET"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Filament Supported (Main Hotend)",
+      "quote": "(Main Hotend) PLA, PETG, ABS, ASA, TPU, Support for PLA, Support for PLA/PETG, Support for ABS, PET, PA, PC, PVA; Carbon/Glass Fiber Reinforced PLA, PETG, ABS, ASA, PA6, PAHT, PPA, PET",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "conflict": "The store page table lists \"Support for PA/PET\" for the main hotend as well (between \"Support for ABS\" and \"PET\"); the spec sheet does not. The spec sheet (official document) is kept.",
+      "note": "The published group \"Carbon/Glass Fiber Reinforced PLA, PETG, ABS, ASA, PA6, PAHT, PPA, PET\" is written as one item per base material."
+    },
+    {
+      "key": "printing.filament_aux_hotend",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA (excluding PLA Aero)",
+        "PETG",
+        "ABS",
+        "ASA",
+        "TPU for AMS",
+        "Support for PLA",
+        "Support for PLA/PETG",
+        "Support for ABS",
+        "Support for PA/PET",
+        "PET",
+        "PA",
+        "PC",
+        "PVA",
+        "Carbon/Glass Fiber Reinforced PLA",
+        "Carbon/Glass Fiber Reinforced PETG",
+        "Carbon/Glass Fiber Reinforced ABS",
+        "Carbon/Glass Fiber Reinforced ASA",
+        "Carbon/Glass Fiber Reinforced PA6",
+        "Carbon/Glass Fiber Reinforced PAHT",
+        "Carbon/Glass Fiber Reinforced PET"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Filament Supported (Auxiliary Hotend) › Type",
+      "quote": "PLA (excluding PLA Aero), PETG, ABS, ASA, TPU for AMS, Support for PLA, … Support for PA/PET, PET, PA, PC, PVA; Carbon/Glass Fiber Reinforced PLA, PETG, ABS, ASA, PA6, PAHT, PET",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The published group \"Carbon/Glass Fiber Reinforced …\" is written as one item per base material (no PPA on the auxiliary hotend). Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block). The store footnote 1 says auxiliary-nozzle print quality is slightly lower than the main nozzle."
+    },
+    {
+      "key": "printing.filament_aux_hotend_caution",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA Silk",
+        "PETG-CF",
+        "ASA-CF",
+        "PA6-CF",
+        "TPU for AMS",
+        "Support for PA/PET"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Filament Supported (Auxiliary Hotend) › Print with Caution¹",
+      "quote": "Print with Caution¹ PLA Silk, PETG-CF, ASA-CF, PA6-CF, TPU for AMS, Support for PA/PET",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Footnote 1 (p.3): \"For optimal print quality, please use the main hotend to print these filaments.\" Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "printing.camera",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Sensor › Live View Camera",
+      "quote": "Live View Camera Built-in; 1920*1080",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "printing.camera_toolhead",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1600*1200",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Sensor › Toolhead Camera",
+      "quote": "Toolhead Camera Built-in; 1600*1200",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "printing.door_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Sensor › Door Sensor",
+      "quote": "Door Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Boolean key written as the published wording (the sense is true), equal to the store table text."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Sensor › Filament Run Out Sensor",
+      "quote": "Filament Run Out Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Boolean key written as the published wording (the sense is true), equal to the store table text."
+    },
+    {
+      "key": "printing.filament_tangle_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Sensor › Filament Tangle Sensor",
+      "quote": "Filament Tangle Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Boolean key written as the published wording (the sense is true), equal to the store table text."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported with AMS",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Sensor › Filament Odometry",
+      "quote": "Filament Odometry Supported with AMS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Boolean key written as the published wording; the qualifier \"with AMS\" matters. Equal to the store table text."
+    },
+    {
+      "key": "printing.power_loss_recovery",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Sensor › Power Loss Recovery",
+      "quote": "Power Loss Recovery Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Boolean key written as the published wording (the sense is true), equal to the store table text."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200-240 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electrical Requirements² › Voltage",
+      "quote": "Voltage High-voltage version: 200-240 VAC, 50/60 Hz Low-voltage version: 100-120 VAC , 50/60 Hz",
+      "test_method": "",
+      "test_condition": "High-voltage version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The 220 V (high-voltage) half of the row (§C.6). The page messages bundle carries no X2D 220 V table, so the official spec sheet is the 220 V source. The store page shows only the US half. Footnote 2 (p.3): \"The printer’s voltage specifications vary by sales region. Before use, please check the label next to the power socket on the printer to ensure the supplied voltage matches the indicated voltage.\""
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-120 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electrical Requirements² › Voltage",
+      "quote": "Voltage High-voltage version: 200-240 VAC, 50/60 Hz Low-voltage version: 100-120 VAC , 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "conflict": "The parsed store page has its us_110v voltage row from the feature bullet \"Voltage Range: 100 – 120 V\" (text \"100 – 120 V\"); same range, different wording, so the merge will record a text difference.",
+      "note": "The low-voltage half of the row; us_110v rows are unverified by rule. Same range as the store table (\"100-120 VAC , 50/60 Hz\")."
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electrical Requirements² › Voltage",
+      "quote": "Voltage High-voltage version: 200-240 VAC, 50/60 Hz Low-voltage version: 100-120 VAC , 50/60 Hz",
+      "test_method": "",
+      "test_condition": "High-voltage version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The frequency written inside the voltage cell of the high-voltage version."
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electrical Requirements² › Voltage",
+      "quote": "Voltage High-voltage version: 200-240 VAC, 50/60 Hz Low-voltage version: 100-120 VAC , 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The frequency written inside the voltage cell of the low-voltage version; same in the store table."
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1600,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electrical Requirements² › Max Power³",
+      "quote": "Max Power³ High-voltage version: 1600 W@220 V Low-voltage version: 1100 W@110 V",
+      "test_method": "",
+      "test_condition": "@220 V",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Footnote 3 (p.3): \"To ensure the heatbed quickly reaches the needed temperature, the printer will maintain maximum power for about 3-5 minutes.\""
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1100,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electrical Requirements² › Max Power³",
+      "quote": "Max Power³ High-voltage version: 1600 W@220 V Low-voltage version: 1100 W@110 V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The 110 V figure of the same row; same as the store table (\"1100 W@110 V\"). Footnote 3 (p.3): \"To ensure the heatbed quickly reaches the needed temperature, the printer will maintain maximum power for about 3-5 minutes.\""
+    },
+    {
+      "key": "electrical.steady_state_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PLA (25 °C): 250 W@220 V; PC (25 °C): 550 W@220 V",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electrical Requirements² › Steady-State Power",
+      "quote": "High-voltage version: PLA (25 °C): 250 W@220 V PC (25 °C): 550 W@220 V",
+      "test_method": "",
+      "test_condition": "@220 V; PLA and PC printing at 25 °C ambient",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "String key; the high-voltage half of the row in the sheet's own words."
+    },
+    {
+      "key": "electrical.steady_state_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PLA (25 °C): 250 W@110 V; PC (25 °C): 550 W@110 V",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electrical Requirements² › Steady-State Power",
+      "quote": "Low-voltage version: PLA (25 °C): 250 W@110 V PC (25 °C): 550 W@110 V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The low-voltage half; same as the store table."
+    },
+    {
+      "key": "physical.operating_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "10 °C-30 °C",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Environment Requirements › Operating Temperature",
+      "quote": "Operating Temperature 10 °C-30 °C",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "The store table labels the row \"Working Temperature\", same value."
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "5-inch 1280*720 Touchscreen",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electronics › Touchscreen",
+      "quote": "Touchscreen 5-inch 1280*720 Touchscreen",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block). The wiki accessories overview says \"5-inch 1280*720 full-color touchscreen\"."
+    },
+    {
+      "key": "connectivity.storage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in 8 GB EMMC and USB Port",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electronics › Storage",
+      "quote": "Storage Built-in 8 GB EMMC and USB Port",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "connectivity.control_interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Touchscreen",
+        "mobile App",
+        "PC App"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electronics › Control Interface",
+      "quote": "Control Interface Touchscreen, mobile App, PC App",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "connectivity.motion_controller",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-core Cortex-M4 and Single-core Cortex-M7",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electronics › Motion Controller",
+      "quote": "Motion Controller Dual-core Cortex-M4 and Single-core Cortex-M7",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "connectivity.application_processor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Quad-core ARM with dedicated NPU",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Electronics › Application Processor",
+      "quote": "Application Processor Quad-core ARM with dedicated NPU",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Studio / Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Software › Slicer",
+      "quote": "Slicer Bambu Studio Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Two lines in the cell, joined with \" / \" as the package joins cell lines. Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "MacOS",
+        "Windows",
+        "Linux"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.2, Software › Supported Operating System",
+      "quote": "Supported Operating System MacOS, Windows, Linux",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "connectivity.ethernet",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.3, Network Control › Ethernet",
+      "quote": "Ethernet Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "connectivity.wireless_network",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-Band Wi-Fi",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.3, Network Control › Wireless Network",
+      "quote": "Wireless Network Dual-Band Wi-Fi",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "connectivity.network_kill_switch",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.3, Network Control › Network Kill Switch",
+      "quote": "Network Kill Switch Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Boolean key written as the published wording (the sense is false), equal to the store table text."
+    },
+    {
+      "key": "connectivity.removable_network_module",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.3, Network Control › Removable Network Module",
+      "quote": "Removable Network Module Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Boolean key written as the published wording (the sense is false), equal to the store table text."
+    },
+    {
+      "key": "connectivity.network_access_control",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.3, Network Control › 802.1X Network Access Control",
+      "quote": "802.1X Network Access Control Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Boolean key written as the published wording (the sense is false), equal to the store table text."
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Operating Frequency — 2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE) 2400 - 2483.5 MHz, 5150 - 5850 MHz (SRRC)\nWi-Fi Transmitter Power (EIRP) — 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) 5 GHz Band1/2: <23 dBm (FCC/CE/SRRC/MIC) 5 GHz Band3: <30 dBm (CE); <24 dBm (FCC) 5 GHz Band4: <23 dBm (FCC/SRRC); <14 dBm (CE)\nWi-Fi Protocol — IEEE 802.11 a/b/g/n",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.3, Wi-Fi › Operating Frequency; Wi-Fi Transmitter Power (EIRP); Wi-Fi Protocol",
+      "quote": "2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE) … 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) … Wi-Fi Protocol IEEE 802.11 a/b/g/n",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "note": "Three rows of the Wi-Fi group in one string, \"label — value\" joined by new lines as the package writes a matrix group; the quote is elided to fit 200 characters. Agrees with the store page Technical Specifications table (featureConfig.richText of the Specs block)."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720069852747550723",
+        "value_text": "X2D AMS Combo"
+      },
+      "value": [
+        "X2D Printer",
+        "Build plate (pre-installed on the heatbed)",
+        "Anti-vibration feet (pre-installed on the printer)",
+        "Filament buffer (pre-installed on the printer)",
+        "AMS 2 Pro",
+        "Spool Holder",
+        "Touchscreen",
+        "Power Cord",
+        "Auxiliary Extruder",
+        "Bambu Bus Cable 6-pin",
+        "Spare hotend",
+        "Hotend silicone sock",
+        "Left filament cutter",
+        "Right filament cutter",
+        "Unclogging pin",
+        "Nozzle wiping pad",
+        "Scraper blade",
+        "Screws (for scraper)",
+        "PTFE tube locking nut (for auxiliary extruder)",
+        "Allen keys (H1.5 and H2.0)",
+        "Open-end wrench",
+        "Flow blocker",
+        "Lubricant oil",
+        "Lubricant grease",
+        "External exhaust fan bundle (external exhaust fan + Bambu Bus Cable 6-pin)",
+        "AMS desiccant",
+        "PTFE Tube ×2",
+        "Quick Start Guide",
+        "Disclaimer and Safety Guidelines"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/x2d/manual/acc-in-the-box",
+      "source_title": "Packaging List for X2D",
+      "locator": "¶ Packing List › table column \"X2D Combo\"",
+      "quote": "X2D Combo … AMS 2 Pro … Accessory Box - Spool Holder - Touchscreen - Power Cord - Auxiliary Extruder - Bambu Bus Cable 6-pin … Inside AMS 2 Pro … PTFE Tube *2 … Quick Start Guide Warranty Leaflet",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:56Z",
+      "note": "The official packing list of the combo version (wiki column \"X2D Combo\" = store value \"X2D AMS Combo\"; it is the column that includes the AMS 2 Pro). Warranty Leaflet withheld from the customer list (L-19). The store page In-the-box table (featureConfig.richText, not read by the package parse) lists X2D, Textured PEI Build Plate, External Exhaust Fan Bundle, Accessory Box and Spool holder for both versions, plus \"AMS 2 Pro (combo version)\" for the AMS Combo: consistent with the wiki list."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720069852747550722",
+        "value_text": "X2D"
+      },
+      "value": [
+        "X2D Printer",
+        "Build plate (pre-installed on the heatbed)",
+        "Anti-vibration feet (pre-installed on the printer)",
+        "Filament buffer (pre-installed on the printer)",
+        "Spool holder ×2",
+        "Touchscreen",
+        "Power cord",
+        "Auxiliary extruder",
+        "External exhaust fan bundle (external exhaust fan + Bambu Bus Cable 6-pin)",
+        "Spare hotend",
+        "Hotend silicone sock",
+        "Left filament cutter",
+        "Right filament cutter",
+        "Unclogging pin",
+        "Nozzle wiping pad",
+        "Scraper blade",
+        "Screws (for scraper)",
+        "PTFE tube locking nut (for auxiliary extruder)",
+        "Allen keys (H1.5 and H2.0)",
+        "Open-end wrench",
+        "Flow blocker",
+        "Lubricant oil",
+        "Lubricant grease",
+        "PTFE Tube ×2",
+        "Quick Start Guide",
+        "Disclaimer and Safety Guidelines"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/x2d/manual/acc-in-the-box",
+      "source_title": "Packaging List for X2D",
+      "locator": "¶ Packing List › table column \"X2D\"",
+      "quote": "X2D Printer … Top Cardboard - Spool holder *2 - Touchscreen - Power cord - Auxiliary extruder - External exhaust fan bundle … Toolbox … PTFE Tube *2 … Quick Start Guide Warranty Leaflet",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:56Z",
+      "note": "The official packing list of the standalone X2D (no AMS 2 Pro, no desiccant). Warranty Leaflet withheld from the customer list (L-19). The store page In-the-box table (featureConfig.richText, not read by the package parse) lists X2D, Textured PEI Build Plate, External Exhaust Fan Bundle, Accessory Box and Spool holder for both versions, plus \"AMS 2 Pro (combo version)\" for the AMS Combo: consistent with the wiki list."
+    },
+    {
+      "key": "motion.max_flow_high_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "Specs block \"Bambu Lab X2D - Technical Specifications\" (featureConfig.richText) › Speed › Max Flow for Hotend (Optional High Flow Hotend)",
+      "quote": "Max Flow for Hotend (Optional High Flow Hotend) 65 mm³/s (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 °C printing temperature)",
+      "test_method": "",
+      "test_condition": "Optional High Flow Hotend; 250 mm round model with a single outer wall; Bambu Lab ABS; 280 °C printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:40Z",
+      "note": "Official store page table row; the spec sheet has no high-flow row. The package parse does not read this table (problem reported)."
+    },
+    {
+      "key": "physical.recommended_space",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "500 × 700 × 850 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "Specs block \"Bambu Lab X2D - Technical Specifications\" (featureConfig.richText) › Dimensions and Weight › Physical Dimensions › line 2",
+      "quote": "Recommended printer space：500×700×850mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:40Z",
+      "note": "Object key written as text W × D × H (package typeValue form). Official store page table; not on the spec sheet."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720069852747550722",
+        "value_text": "X2D"
+      },
+      "value": 20200,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "Specs block \"Bambu Lab X2D - Technical Specifications\" (featureConfig.richText) › Dimensions and Weight › Net Weight › line 2",
+      "quote": "(Gross Weight: X2D 20.2 kg, X2D AMS Combo 22.2kg)",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:55:40Z",
+      "note": "The store table is a US table (100-120 VAC, 1100 W@110 V, \"Please purchase the version corresponding to your region's voltage\"), so the printer gross weight is us_110v and unverified (§C.6). Not on the spec sheet; no 220 V gross weight is published."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720069852747550723",
+        "value_text": "X2D AMS Combo"
+      },
+      "value": 22200,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "Specs block \"Bambu Lab X2D - Technical Specifications\" (featureConfig.richText) › Dimensions and Weight › Net Weight › line 2",
+      "quote": "(Gross Weight: X2D 20.2 kg, X2D AMS Combo 22.2kg)",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:55:40Z",
+      "note": "As the X2D row: us_110v and unverified (§C.6); scoped to the X2D AMS Combo version."
+    },
+    {
+      "key": "physical.noise",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Below 50 dB under typical conditions",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "Description › \"All the must-haves for everyday use\" › \"Quiet enough for overnight prints\"",
+      "quote": "Active Motor Noise Canceling and a noise-optimized air duct keep X2D below 50 dB under typical conditions. Quiet enough for overnight printing⁷.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:40Z",
+      "note": "Marketing prose, so unverified (§6: prose never proves a number); the spec sheet has no noise row. Page footnote 7: \"Suitable for overnight printing when the printer is placed in a separate room from the sleeping area.\""
+    },
+    {
+      "key": "printing.multi_color",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Up to 25-color printing (dual hotends, with the maximum AMS configuration)",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "FAQ › Q5 \"What is the maximum number of AMS units the X2D can connect to?\"",
+      "quote": "Dual hotends: Enables up to 25-color printing when combined with the maximum AMS configuration.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:40Z",
+      "note": "Official store FAQ prose, so unverified; the spec sheet has no multi-colour row."
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "UL 2904 (indoor air quality, printing Bambu PLA Basic and PETG Basic)",
+        "EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020 (cybersecurity)"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "Description › \"Safe for your living room\"; Product Features › footnote",
+      "quote": "The X2D is UL 2904 certified for indoor air quality when printing with Bambu PLA Basic and PETG Basic. … Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:40Z",
+      "note": "Store page prose (a marketing item and the feature-list footnote), so unverified; the spec sheet lists no certifications. No certificate document was searched."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI Plate, Smooth PEI Plate, Cool Plate SuperTack, Engineering Plate",
+      "retrieved_at": "2026-10-16T08:21:35Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI Plate, Smooth PEI Plate, Cool Plate SuperTack, Engineering Plate",
+      "retrieved_at": "2026-10-16T08:21:35Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "spec_row",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI Plate, Smooth PEI Plate, Cool Plate SuperTack, Engineering Plate",
+      "retrieved_at": "2026-10-16T08:21:35Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "source_title": "X2D Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI Plate, Smooth PEI Plate, Cool Plate SuperTack, Engineering Plate",
+      "retrieved_at": "2026-10-16T08:21:35Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/x2d/manual/acc-in-the-box",
+      "source_title": "Packaging List for X2D",
+      "locator": "¶ Accessories Overview › Bambu Bus Cable 6-pin",
+      "quote": "Bambu Bus Cable 6-pin | Connects the AMS 2 Pro to the printer.",
+      "retrieved_at": "2026-10-16T08:23:56Z",
+      "note": "The X2D Combo packing list includes an AMS 2 Pro; the store FAQ Q5 says a single hotend supports up to 4 AMS 2 Pro units."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "FAQ › Q5",
+      "quote": "Single hotend: Supports up to 4 AMS 2 Pro and 8 AMS HT units (12 units total, 24 slots).",
+      "retrieved_at": "2026-10-16T06:55:40Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "FAQ › Q6",
+      "quote": "No. The two ports serve different purposes: One is for connecting AMS/AMS 2 Pro/AMS HT. The other is for connecting the chamber exhaust fan.",
+      "retrieved_at": "2026-10-16T06:55:40Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "hub",
+      "target_label": "AMS Hub",
+      "target_source_handle": "ams-hub",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "FAQ › Q7 \"Can X2D use the AMS hub?\"",
+      "quote": "Incompatible. The interface types are different.",
+      "retrieved_at": "2026-10-16T06:55:40Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter (FAZ013-N)",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "Product Features › bullet 8",
+      "quote": "To connect more than two AMS (including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed",
+      "retrieved_at": "2026-10-16T06:55:40Z",
+      "condition": "Only to connect more than two AMS units"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Flow Hotend",
+      "target_source_handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/x2d",
+      "source_title": "Bambu Lab X2D (store page)",
+      "locator": "FAQ › Q9 \"Does the X2D support high-flow nozzles?\"",
+      "quote": "Yes. High-flow hotends maintain print quality while significantly increasing print speed, reducing print time by up to 30% compared with standard nozzles.",
+      "retrieved_at": "2026-10-16T06:55:40Z",
+      "note": "The store table also has \"Max Flow for Hotend (Optional High Flow Hotend) 65 mm³/s\". Target handle from the corpus (the hotend product named for H2/P2S/X2D)."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720069852747550723",
+        "value_text": "X2D AMS Combo"
+      },
+      "section": "X2D Combo",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/x2d/manual/acc-in-the-box",
+      "source_title": "Packaging List for X2D",
+      "locator": "¶ Packing List › table column \"X2D Combo\"",
+      "retrieved_at": "2026-10-16T08:23:56Z",
+      "items": [
+        {
+          "text": "X2D Printer",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Build plate (pre-installed on the heatbed)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Anti-vibration feet (pre-installed on the printer)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Filament buffer (pre-installed on the printer)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Spool Holder",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Touchscreen",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Auxiliary Extruder",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Bambu Bus Cable 6-pin",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Spare hotend",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Hotend silicone sock",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Left filament cutter",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Right filament cutter",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Unclogging pin",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Nozzle wiping pad",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Scraper blade",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Screws (for scraper)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "PTFE tube locking nut (for auxiliary extruder)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Allen keys (H1.5 and H2.0)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Open-end wrench",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Flow blocker",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant oil",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant grease",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "External exhaust fan bundle (external exhaust fan + Bambu Bus Cable 6-pin)",
+          "qty": null,
+          "section": "Inside AMS 2 Pro"
+        },
+        {
+          "text": "AMS desiccant",
+          "qty": null,
+          "section": "Inside AMS 2 Pro"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": 2,
+          "section": "Loose"
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": "Documents"
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": "Documents"
+        }
+      ],
+      "withheld": [
+        "Warranty Leaflet"
+      ],
+      "note": "Wiki column \"X2D Combo\" is the store value \"X2D AMS Combo\". No official list exists for \"X2D Print More Bundle (2 AMS 2 Pro included)\" or \"X2D Combo Print with Care Bundle\", so neither gets one."
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "720069852747550722",
+        "value_text": "X2D"
+      },
+      "section": "X2D",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/x2d/manual/acc-in-the-box",
+      "source_title": "Packaging List for X2D",
+      "locator": "¶ Packing List › table column \"X2D\"",
+      "retrieved_at": "2026-10-16T08:23:56Z",
+      "items": [
+        {
+          "text": "X2D Printer",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Build plate (pre-installed on the heatbed)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Anti-vibration feet (pre-installed on the printer)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Filament buffer (pre-installed on the printer)",
+          "qty": null,
+          "section": "Main"
+        },
+        {
+          "text": "Spool holder",
+          "qty": 2,
+          "section": "Top Cardboard"
+        },
+        {
+          "text": "Touchscreen",
+          "qty": null,
+          "section": "Top Cardboard"
+        },
+        {
+          "text": "Power cord",
+          "qty": null,
+          "section": "Top Cardboard"
+        },
+        {
+          "text": "Auxiliary extruder",
+          "qty": null,
+          "section": "Top Cardboard"
+        },
+        {
+          "text": "External exhaust fan bundle (external exhaust fan + Bambu Bus Cable 6-pin)",
+          "qty": null,
+          "section": "Top Cardboard"
+        },
+        {
+          "text": "Spare hotend",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Hotend silicone sock",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Left filament cutter",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Right filament cutter",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Unclogging pin",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Nozzle wiping pad",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Scraper blade",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Screws (for scraper)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "PTFE tube locking nut (for auxiliary extruder)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Allen keys (H1.5 and H2.0)",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Open-end wrench",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Flow blocker",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant oil",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "Lubricant grease",
+          "qty": null,
+          "section": "Toolbox"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": 2,
+          "section": "Loose"
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": "Documents"
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null,
+          "section": "Documents"
+        }
+      ],
+      "withheld": [
+        "Warranty Leaflet"
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/s7/default/9e5a2e55561347cba2838a0c98c15ace/X2D_spec.pdf",
+      "title": "X2D Spec Sheet",
+      "language": "en",
+      "retrieved_at": "2026-10-16T08:21:35Z",
+      "sha256": "a1c78c54f97d47e34a391aa4a2477e7863cd494695f227a21455ee0f2b64d701",
+      "pages": 3,
+      "note": "Linked from the store page Specs block \"Download PDF\" button (featureConfig.downloadButton.downloadUrl), which the package parse does not read, so the deterministic layer has no document row for it."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/x2d/manual/acc-in-the-box",
+      "title": "Packaging List for X2D",
+      "language": "en",
+      "retrieved_at": "2026-10-16T08:23:56Z",
+      "sha256": "b524a5c2cce496ce3ee2d49c06230f4cf3409818028c481eb78a43c479344b5d",
+      "updated_on": "2026-05-20"
+    }
+  ],
+  "not_published": [
+    "printing.layer_height",
+    "printing.unsupported_filament",
+    "printing.auto_leveling",
+    "printing.camera_nozzle",
+    "printing.camera_birdseye",
+    "extrusion.hotend",
+    "electrical.rated_power",
+    "electrical.current",
+    "electrical.standby_power",
+    "connectivity.bluetooth",
+    "connectivity.npu",
+    "package.length",
+    "package.width",
+    "package.height",
+    "package.weight"
+  ],
+  "notes": [
+    "Store page read from the P0 corpus (us.store.bambulab.com/products/x2d, 2026-10-16T06:55:40Z) and parsed with the package (extractPage + buildImportPayload with the manifest row): the parse yields one us_110v electrical.voltage row (feature bullet \"Voltage Range: 100 – 120 V\"), not_found rows for the expected printer keys and one variant note. Its page-builder Specs block keeps the full technical table in featureConfig.richText (RSC row $1b2) and the In-the-box table in featureConfig.richText ($1b1); the package read list drops richText, so neither is parsed. Every curated value was compared with that raw table; differences carry a conflict note.",
+    "Store page values used here (source_kind store_page) are only rows the spec sheet does not carry: high-flow max flow, recommended space, US gross weights, and three unverified prose facts (noise, multi-colour, certifications). The store page is not listed in searched because searched URLs become customer-visible checked_sources and a store_page ref is owner-only.",
+    "printing.supported_filament is not written and not listed as not_published: the sheet publishes per-hotend lists (printing.filament_main_hotend, printing.filament_aux_hotend, printing.filament_aux_hotend_caution) instead of one list. extrusion.extruder_gear / extrusion.extruder_motor are covered by the main_ and aux_ keys.",
+    "Option values (manifest value_labels and sku_codes are empty): X2D 720069852747550722, X2D AMS Combo 720069852747550723, X2D Print More Bundle (2 AMS 2 Pro included) 753859494895067136, X2D Combo Print with Care Bundle 776210262356197377."
+  ]
+}

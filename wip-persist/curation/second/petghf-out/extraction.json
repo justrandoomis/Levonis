@@ -1,0 +1,1300 @@
+{
+ "sourceProductId": "8280001544328",
+ "handle": "petg-hf",
+ "canonicalUrl": "https://us.store.bambulab.com/products/petg-hf",
+ "title": "PETG HF",
+ "seoMetaDescription": "PETG HF is a fully optimized PETG filament designed specifically for high-speed printing. With a default printing speed that is twice as fast as standard PETG filaments, PETG HF takes your printing efficiency to new heights. It effectively addresses common issues such as oozing and clumping associated with regular PETG, ensuring smoother and more reliable prints. The new matte finish not only enhances the aesthetic by smoothing out uneven gloss during speed transitions but also provides a consistently uniform look. Offering greater durability and toughness than PLA, PETG HF is the ideal choice for creating long-lasting items with an improved finish and faster production times.",
+ "route": "552709755819347968>552709756440104960>552709756469465088",
+ "isFilament": true,
+ "groups": [
+  {
+   "propertyKeyId": "10935428120712",
+   "propertyKey": "Color",
+   "type": 1,
+   "title": "",
+   "position": 1,
+   "values": [
+    {
+     "id": "564681894469070866",
+     "value": "Black (33102)",
+     "selectedDefault": true,
+     "colorUrl": "https://store.bblcdn.com/s7/default/6c735633c22748908ff584f9f5e1de89/0cf39d0e4c6c43b38fef498561894508.png"
+    },
+    {
+     "id": "564681894469070867",
+     "value": "White (33100)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/4a7f9361225f4f69b388615e247f3b62/d0124e2bbb174c8ba1bad0675d35e37a.png"
+    },
+    {
+     "id": "564681894469070864",
+     "value": "Red (33200)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/709cf02acaca4145952913934f200a53/6f6460b12d9348e99b5070a8284c0409.png"
+    },
+    {
+     "id": "564681894469070868",
+     "value": "Gray (33101)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/5582df632ed74f38a00384ddb2c2064e/9a7dade47ad44a37a39325b7363a0370.png"
+    },
+    {
+     "id": "564681894469070874",
+     "value": "Dark Gray (33103)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/c5498dad6adb4a4eaadde859a7f997ea/1607ecea09a94ff7b3d985685aa31d54.png"
+    },
+    {
+     "id": "564681894469070875",
+     "value": "Cream (33401)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/13884494e0354d6f952db38ca365f3e0/61202de96c7c49ccab34f0cc001157ee.png"
+    },
+    {
+     "id": "564681894469070869",
+     "value": "Yellow (33400)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/58af1b6933954bd5af530072c5e9c5b1/884a185a0d6e4b58a9c055dcfabe7174.png"
+    },
+    {
+     "id": "564681894469070870",
+     "value": "Orange (33300)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/5c5e4de6b8424bb8b84793e8dcc9802e/bfa461028ea3467aa362bbe369a84500.png"
+    },
+    {
+     "id": "564681894469070873",
+     "value": "Peanut Brown (33801)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/365fda6e85eb4d8896228f46a1d544b0/99c7222bb9d644df8f46109bb1a099da.png"
+    },
+    {
+     "id": "564681894469070876",
+     "value": "Lime Green (33501)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/153b1266f7334a3f8cce41e99924e32a/38812377e81940668994d607c5af121f.png"
+    },
+    {
+     "id": "564681894469070871",
+     "value": "Green (33500)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/f2b2a518b63248339b48fa4da8ed5c3e/aee675e95734414ca1e9b6f83ba6e7cf.png"
+    },
+    {
+     "id": "564681894469070872",
+     "value": "Forest Green (33502)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/8620e8a63e7d46d2a488d7282c2b97fb/616eb09aec544622963c5f1a9fb6424a.png"
+    },
+    {
+     "id": "564681894469070877",
+     "value": "Lake Blue (33601)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/9d372967762642129819a39527033e1b/26cf49afc41b4a8eb01f53084a0aba3c.png"
+    },
+    {
+     "id": "564681894469070865",
+     "value": "Blue (33600)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/945e8fad01b048b6b79c3c15859265b8/a3478612f8b24e47b12a3d86116de7a6.png"
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "10935428153480",
+   "propertyKey": "Type",
+   "type": 1,
+   "title": "",
+   "position": 2,
+   "values": [
+    {
+     "id": "564681894469070878",
+     "value": "Refill",
+     "selectedDefault": true,
+     "colorUrl": ""
+    },
+    {
+     "id": "564681894469070879",
+     "value": "Filament with spool",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "10935428186248",
+   "propertyKey": "Size",
+   "type": 1,
+   "title": "",
+   "position": 3,
+   "values": [
+    {
+     "id": "564681894469070880",
+     "value": "1 kg",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  }
+ ],
+ "skus": [
+  {
+   "id": "42735939420296",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Blue (33600)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "37257776889992",
+    "url": "https://store.bblcdn.com/s7/default/74a83c3b90a94a438ba1012d99405751/PETGHF_5.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "42735939551368",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Red (33200)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "37288264302728",
+    "url": "https://store.bblcdn.com/s7/default/2167472e11724b8bb44afcc2e365a703/5_86b594d6-b4dd-498d-8adc-51ca350410e3.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "42735939682440",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Black (33102)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "37257776824456",
+    "url": "https://store.bblcdn.com/s7/default/834a8ad1816747b290e1d6c0ea018942/PETGHF_6.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "42735939715208",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Black (33102)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Refill"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "37257776824456",
+    "url": "https://store.bblcdn.com/s7/default/834a8ad1816747b290e1d6c0ea018942/PETGHF_6.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "42735939747976",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Gray (33101)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "37257776988296",
+    "url": "https://store.bblcdn.com/s7/default/b63d30f16c0746abba10d7ea131b3227/PETGHF_1.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "42735939813512",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "White (33100)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "37257776922760",
+    "url": "https://store.bblcdn.com/s7/default/7c949a22d4fb484da7aefd5d2abed7b0/PETGHF_7.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "654207405072093185",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Dark Gray (33103)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "38993861574792",
+    "url": "https://store.bblcdn.com/s7/default/d7a3410895784371a81c014019dd5c63/PETGHFNEWCOLOR_3.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "654207405072093191",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Cream (33401)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "38993866096776",
+    "url": "https://store.bblcdn.com/s7/default/dafd5b1c76024c6d8ee05be7f56886b7/PETGHFNEWCOLOR_5.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "654207405072093197",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Orange (33300)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "37257776955528",
+    "url": "https://store.bblcdn.com/s7/default/d8d6f7ca45704fc09849fca8dc510c75/PETGHF_4.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "654207405072093203",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Green (33500)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "37257776791688",
+    "url": "https://store.bblcdn.com/s7/default/f6fd695db6484056b39eec780eaec2f2/PETGHF_3.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "654943233990885377",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Yellow (33400)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "37257776857224",
+    "url": "https://store.bblcdn.com/s7/default/e6e2585de3cf45bdafcdc906b5c30e78/PETGHF_2.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "654943233990885383",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Lime Green (33501)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "38993873174664",
+    "url": "https://store.bblcdn.com/s7/default/f61a217d0fbf4926b7c7ee89db2d9e97/PETGHFNEWCOLOR_4.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "654943233990885389",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Forest Green (33502)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "38993845125256",
+    "url": "https://store.bblcdn.com/s7/default/6bebbfff173047e591f6cb045d259283/PETGHFNEWCOLOR_6.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "654943233990885395",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Lake Blue (33601)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "38993877500040",
+    "url": "https://store.bblcdn.com/s7/default/9e720394f3014a2784fd7992d6c49ec1/PETGHFNEWCOLOR_2.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "659540022699311104",
+   "props": [
+    {
+     "propertyKeyId": "10935428120712",
+     "propertyKey": "Color",
+     "value": "Peanut Brown (33801)"
+    },
+    {
+     "propertyKeyId": "10935428153480",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "10935428186248",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "38993857020040",
+    "url": "https://store.bblcdn.com/s7/default/8462f8d707ff46b697da7361c2cdb6e7/PETGHFNEWCOLOR_1.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  }
+ ],
+ "gallery": [
+  {
+   "resourceFileId": "37257776824456",
+   "url": "https://store.bblcdn.com/s7/default/834a8ad1816747b290e1d6c0ea018942/PETGHF_6.jpg"
+  },
+  {
+   "resourceFileId": "37343406555272",
+   "url": "https://store.bblcdn.com/s7/default/74641acf3ac041bb8a93319a534f2096/PETG_HF_pic.jpg"
+  },
+  {
+   "resourceFileId": "762170226073677824",
+   "url": "https://store.bblcdn.com/s7/default/d9169957dc2f414dbbf555a00afa7ac8/In_the_Box_3.jpg"
+  },
+  {
+   "resourceFileId": "37257776922760",
+   "url": "https://store.bblcdn.com/s7/default/7c949a22d4fb484da7aefd5d2abed7b0/PETGHF_7.jpg"
+  },
+  {
+   "resourceFileId": "37288264302728",
+   "url": "https://store.bblcdn.com/s7/default/2167472e11724b8bb44afcc2e365a703/5_86b594d6-b4dd-498d-8adc-51ca350410e3.jpg"
+  },
+  {
+   "resourceFileId": "37257776988296",
+   "url": "https://store.bblcdn.com/s7/default/b63d30f16c0746abba10d7ea131b3227/PETGHF_1.jpg"
+  },
+  {
+   "resourceFileId": "38993861574792",
+   "url": "https://store.bblcdn.com/s7/default/d7a3410895784371a81c014019dd5c63/PETGHFNEWCOLOR_3.jpg"
+  },
+  {
+   "resourceFileId": "38993866096776",
+   "url": "https://store.bblcdn.com/s7/default/dafd5b1c76024c6d8ee05be7f56886b7/PETGHFNEWCOLOR_5.jpg"
+  },
+  {
+   "resourceFileId": "37257776857224",
+   "url": "https://store.bblcdn.com/s7/default/e6e2585de3cf45bdafcdc906b5c30e78/PETGHF_2.jpg"
+  },
+  {
+   "resourceFileId": "37332045267080",
+   "url": "https://store.bblcdn.com/s7/default/39ba5147066448eaaf9bc997a25371c6/PETG_HF_Model_4_94e94a3a-9205-479e-8a88-330ee5dcb937.png"
+  },
+  {
+   "resourceFileId": "37257776955528",
+   "url": "https://store.bblcdn.com/s7/default/d8d6f7ca45704fc09849fca8dc510c75/PETGHF_4.jpg"
+  },
+  {
+   "resourceFileId": "38993857020040",
+   "url": "https://store.bblcdn.com/s7/default/8462f8d707ff46b697da7361c2cdb6e7/PETGHFNEWCOLOR_1.jpg"
+  },
+  {
+   "resourceFileId": "38993873174664",
+   "url": "https://store.bblcdn.com/s7/default/f61a217d0fbf4926b7c7ee89db2d9e97/PETGHFNEWCOLOR_4.jpg"
+  },
+  {
+   "resourceFileId": "37257776791688",
+   "url": "https://store.bblcdn.com/s7/default/f6fd695db6484056b39eec780eaec2f2/PETGHF_3.jpg"
+  },
+  {
+   "resourceFileId": "38993845125256",
+   "url": "https://store.bblcdn.com/s7/default/6bebbfff173047e591f6cb045d259283/PETGHFNEWCOLOR_6.jpg"
+  },
+  {
+   "resourceFileId": "38993877500040",
+   "url": "https://store.bblcdn.com/s7/default/9e720394f3014a2784fd7992d6c49ec1/PETGHFNEWCOLOR_2.jpg"
+  },
+  {
+   "resourceFileId": "37257776889992",
+   "url": "https://store.bblcdn.com/s7/default/74a83c3b90a94a438ba1012d99405751/PETGHF_5.jpg"
+  }
+ ],
+ "featuresTitle": "Product Features",
+ "features": [
+  {
+   "title": "Product Features",
+   "html": "<div style=\"text-align: left; box-sizing: border-box;\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul style=\"margin: 0px; padding: 0px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">Designed for Speed</li>\n<li style=\"box-sizing: border-box;\">Print Flawlessly with Minimal Tuning</li>\n<li style=\"box-sizing: border-box;\">Smooth, Soft Texture</li>\n<li style=\"box-sizing: border-box;\">Ready for Outdoor Use</li>\n<li style=\"box-sizing: border-box;\">Diameter: 1.75mm +/- 0.03mm</li>\n</ul>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<div class=\"bbl-title-4 text-bbl-grey-13 font-bold\">Cautions for Use</div>\n<ul style=\"margin: 0px; padding: 0px; margin-top: 8px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">All AMS Series Compatible</li>\n<li style=\"box-sizing: border-box;\">Dry Out Before Use</li>\n</ul>\n<p style=\"margin-top: 0px; font-size: inherit; font-weight: inherit; margin-bottom: 0px; color: red; box-sizing: border-box;\">&nbsp;</p>\n<p><strong><span style=\"color: red;\">Note:</span></strong></p>\n<ul>\n<li style=\"font-size: inherit; font-weight: inherit; color: red; box-sizing: border-box;\">PETG HF must be dried before use to achieve optimal print quality.</li>\n<li style=\"font-size: inherit; font-weight: inherit; color: red; box-sizing: border-box;\">PETG HF is discontinued and will not be restocked once sold out. A new and improved PETG is available now!<span style=\"text-decoration: underline;\"> <span style=\"color: #00ae42; text-decoration: underline;\"><a style=\"color: #00ae42; text-decoration: underline;\" href=\"../../../products/petg-basic\">Buy Now &gt;</a></span></span></li>\n</ul>"
+  }
+ ],
+ "videos": [],
+ "description": {
+  "kind": "page_builder",
+  "config": {
+   "schemaVersion": "1.0",
+   "templateId": "tpl-1776935009448",
+   "components": [
+    {
+     "id": "banner_1776859885795_imdr8wmzy",
+     "type": "banner",
+     "variant": "banner_1",
+     "name": "Banner",
+     "anchor": {
+      "enabled": true,
+      "name": "Overview",
+      "id": "banner_1776859885795_imdr8wmzy"
+     },
+     "modules": {
+      "media": {
+       "pc": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/4c18b95251724464b92cc6ecd7726448/Banner_Media-1-tuya.jpg",
+        "naturalWidth": 5120,
+        "naturalHeight": 1280
+       },
+       "mo": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/a7dedb34649349fbba9cc1580437834b/BannerChapter_Media_Assets_x_5-tuya.jpg",
+        "naturalWidth": 1536,
+        "naturalHeight": 960
+       }
+      },
+      "typeStyles": {
+       "content": {
+        "title": "PETG HF",
+        "description": "The PETG that prints as effortlessly as PLA"
+       }
+      }
+     }
+    },
+    {
+     "id": "chapter_1776860120943_tabnn7pvy",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "卖点",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-9",
+      "id": "chapter_1776860120943_tabnn7pvy"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "",
+        "description": ""
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1776860161046_c2ynsoh65",
+       "type": "content_block",
+       "variant": "content-block-6",
+       "name": "卖点 1",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1776860161046_c2ynsoh65"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Designed for Speed",
+          "description": "Twice as fast as standard PETG*, PETG HF significantly boosts your productivity without compromising the quality of your prints.\n\n* The speed of PETG HF can be twice as fast compared to regular PETG, but achieving this speed is highly dependent on model size and geometry."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/default/1133582e78174e16a56fa1ca8e829542/2026.mp4",
+             "naturalWidth": 1200,
+             "naturalHeight": 540
+            },
+            "mo": {
+             "type": "video",
+             "src": "https://store.bblcdn.com/s7/default/f88960d3f50a4135ab83cf9ec57a4f92/20260708-153552.mp4",
+             "naturalWidth": 672,
+             "naturalHeight": 1550
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_iertnhmd8"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860162526_2x88208di",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 2",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1776860162526_2x88208di"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Print Flawlessly with Minimal Tuning",
+          "description": "PETG HF excels in printability among PETG filaments with its higher adaptability for printers and printing settings, achieving ideal print results without fine-tuning parameters. Thanks to advanced formula optimization, PETG HF bids farewell to oozing and clumping, ensuring smoother prints with crisp details."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/0f85e6ed86cb4f66bb2ab6eeccc8d8fe/Frame_1123864805-3-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/0a9e0f2e44684d5d843311812226c8d2/Frame_1123867128-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_0gf68kumj"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/437775ecb1da460a8f9f47b64062192a/PC-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/4479b61f077f496d8ee83e2587cfedaa/MO-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_632wk41xw"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/36488f8a3fbf4d8fbeb81947b4a17ce0/Frame_1123864805-4-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/f65196e68356408c8d1f65cf308cb91b/Frame_1123867129-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_tuosnubld"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/189c7009f0914ca9a434ecf205d1afd6/Frame_1123864806-4-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/eb61ab1374164d92a8dc3774a50707eb/Frame_1123867130-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_9mpg7y55b"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860163846_rda8jgx7m",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 3",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-3",
+        "id": "content_block_1776860163846_rda8jgx7m"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Smooth, Soft Texture",
+          "description": "PETG HF provides a smooth texture and consistent gloss at any printing speed, ensuring uniformity and sharp details in every print."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/19192cb00cff45748e1d92185d9776a0/Content_Block_Media-8-tuya.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/81cd48614c2a40c69f8406c6d8072738/Frame_1123867134-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_8i35jl8yu"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/6b10c879e9f049b4ac6165288150b2e5/Frame_1123864805-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/8921c4cab8864461b6a9dbbb682fc630/Frame_1123864908-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_aws9dd2q5"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/3a67559013bb4061ab336ea675a025ec/Frame_1123864806-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/cb81d6c088b64b1c9c8cefa7f6f4f2c9/Frame_1123864909-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_xyftqdome"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1779354958528_rekg6lipk",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点4",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-4",
+        "id": "content_block_1779354958528_rekg6lipk"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Ready for Outdoor Use",
+          "description": "PETG HF maintains the inherent strengths of regular PETG, providing superior resistance to water, UV, and temperatures. Tougher and more durable than PLA, with higher temperature resistance, it's the perfect choice for printing outdoor items such as planter pots, bird cages, watering cans, and automotive parts. Additionally, it's ideal for outdoor toys that require long-term exposure and the ability to withstand impacts, collisions, and falls."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/aec925a6b8b240e18ee22f72c606f729/Frame_1123864805-1-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/1de374bdce3042ddb5622178b6cfcced/Frame_1123867131-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_rrdt8fxgb"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/ddfa5396ed5e4ff4a7d92e7db368de59/Frame_1123864806-1-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/298e25436cb042e0a8e2cf3585ca11dd/Frame_1123867132-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_i1n3lgftp"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/d9a38f92c1b94de88d222d607b2e47a8/Frame_1123864805-2-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/d67d880590e24ed88193eabf6f6e03be/Frame_1123867133-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {
+            "type": "link",
+            "text": ""
+           },
+           "id": "comp_1790040601598_oqk2p4xzt"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/79541ac6ec0448df899f728cc266e6b8/Frame_1123864806-2-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/466f87ff5dca440088c91c65db694150/Frame_1123864910-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1790040601598_7by47f9im"
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "content_block_1776744592796_vv35dwp6b",
+     "type": "content_block",
+     "variant": "content-block-1",
+     "name": "RFID",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-6",
+      "id": "content_block_1776744592796_vv35dwp6b"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "RFID for Intelligent Printing",
+        "description": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+       }
+      },
+      "featureConfig": {
+       "tabs": [
+        {
+         "name": "Tab 1",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7582b13ce2604750968dafbc244de91a/RFID_for_Intelligent_Printing-compressed.jpg",
+           "naturalWidth": 2400,
+           "naturalHeight": 918
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/06c6251453c340aeab1c0117f97fec75/RFID_for_Intelligent_PrintingMO-compressed.jpg",
+           "naturalWidth": 1344,
+           "naturalHeight": 840
+          }
+         },
+         "id": "comp_1790040601598_shz63dne7"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744650085_nu31krt23",
+     "type": "content_block",
+     "variant": "content-block-17",
+     "name": "Download",
+     "anchor": {
+      "enabled": true,
+      "name": "Download",
+      "id": "content_block_1776744650085_nu31krt23"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Download"
+       }
+      },
+      "featureConfig": {
+       "items": [
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/44b88c2274b2430397da892f1de79f70/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament TDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a2896066b2f4308b780cb9d101040a9/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7abf592a7bc44468bb2d86e22fde3d24/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+         "id": "comp_1790040601598_n691df0al"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/5575e961df094c9591a7faa849ca9b77/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament MSDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/531bad4351164f0a9c0391e0a33f2190/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/9b45266304a64648b14fcbecc220d043/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/859e223a3eeb4aea96dab858e497152b/SDS20250724G02_Bambu_PETG_HF.pdf",
+         "id": "comp_1790040601598_vqpwxf8oy"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/bf5dbaee598d46e9bd8170e43facfa96/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament RoHS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a31a894dab64da9bf1df9f1f2b620db/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/f1d23869da8f41bab3454ccb28728347/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/8171d8bdd1ef402bb81196229fc40eaa.pdf",
+         "id": "comp_1790040601598_d7giiykk3"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/fdec58d7e8cd4820bb93af5ef7582247/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Hex Code",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/ce375e36d3db48b19db9ff0603549fc9/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/d8e728852e1d44b58088c7892cc9be49/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/f9b2b5ac54aa4aabaf2d725e6a830045/PETG_HF_Hex_Code_Table.pdf",
+         "id": "comp_1790040601598_c6l7cyhc9"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744740718_dwoqb1p7t",
+     "type": "content_block",
+     "variant": "content-block-21-pro",
+     "name": "FAQ",
+     "anchor": {
+      "enabled": true,
+      "name": "Printing Tips",
+      "id": "content_block_1776744740718_dwoqb1p7t"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Printing Tips"
+       }
+      },
+      "featureConfig": {
+       "faqs": [
+        {
+         "question": "1.Accessory Compatibility",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Compatible with all printers, AMS, build plate, and nozzles.</div>",
+           "id": "comp_1790040601598_01ta8jc0m"
+          }
+         ],
+         "id": "comp_1790040601598_0j17amdiv"
+        },
+        {
+         "question": "2.Drying Recommendations",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Dry before use to ensure the best print quality and consistent finish. PETG HF must be dried before use and remain moisture-free during the printing process, especially for longer print times (over 6 hours). For more details, please refer to: <a href=\"https://wiki.bambulab.com/en/filament-acc/filament/dry-filament\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">Filament drying instructions</span></span></a> on WIKI.</div>",
+           "id": "comp_1790040601598_jzjoh7jix"
+          },
+          {
+           "type": "media",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/57217f5458864281baf1d48afdd3ce86/CA_Price-tuya.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/fa4521171dbd4b9b854bbd13f3fd34b0/Frame_1123864807-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "id": "comp_1790040601598_b40pvn0p3"
+          }
+         ],
+         "id": "comp_1790040601598_mcrc9j0ds"
+        },
+        {
+         "question": "3.Refill Guidelines",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>The refill filament needs to be used with a spool. For detailed instructions on how to swap in the new filament using the Bambu Reusable Spool, please refer to the <a href=\"https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">guide</span></span></a> on WIKI.</div>",
+           "id": "comp_1790040601598_svkn1w53l"
+          }
+         ],
+         "id": "comp_1790040601598_a2eh4xkbl"
+        },
+        {
+         "question": "4.Safety Tips",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>\n<ul>\n<li>Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.</li>\n<li>Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.</li>\n<li>For opened filament, we recommend drying before use according to the wiki&rsquo;s recommended temperature and time settings.</li>\n<li>Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.</li>\n<li>As this filament is not food-grade, please avoid using finished prints for food storage or contact.&nbsp;</li>\n<li>As this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing.</li>\n</ul>\n</div>",
+           "id": "comp_1790040601598_5qrv6cofj"
+          }
+         ],
+         "id": "comp_1790040601598_j985p4ryj"
+        }
+       ]
+      }
+     }
+    }
+   ]
+  }
+ },
+ "jsonld": {
+  "productGroupId": "8280001544328",
+  "variantSkus": [
+   "42735939420296",
+   "42735939551368",
+   "42735939682440",
+   "42735939715208",
+   "42735939747976",
+   "42735939813512",
+   "654207405072093185",
+   "654207405072093191",
+   "654207405072093197",
+   "654207405072093203",
+   "654943233990885377",
+   "654943233990885383",
+   "654943233990885389",
+   "654943233990885395",
+   "659540022699311104"
+  ],
+  "brand": "Bambu Lab"
+ }
+}

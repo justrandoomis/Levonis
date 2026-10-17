@@ -1,0 +1,1699 @@
+{
+ "protocol": 2,
+ "source": "bambu_us",
+ "source_product_id": "593999615810912256",
+ "handle": "pla-translucent",
+ "route": "552709755819347968>552709755857096704>594000098526253056",
+ "write_mode": "create",
+ "product_id": "p_d13aab0e0990e1dda5babf6f",
+ "curated_sha256": "",
+ "extraction_sha256": "186fac9689d75500907630f0d703177e48036b1156fd9a9bd563fca2bb71852d",
+ "product": {
+  "title_en": "PLA Translucent",
+  "short_description_en": "",
+  "variant_mode": "VARIANT_COMBINATION",
+  "usage_steps": [],
+  "usage_official_url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament"
+ },
+ "groups": [
+  {
+   "id": "og_c77f2bf145c0d3f6b7fb45ed",
+   "source_id": "593999615827689472",
+   "sort": 1,
+   "name_en": "Colour",
+   "name_ar": "اللون",
+   "name_ckb": "ڕەنگ",
+   "kind": "color",
+   "source_label": "Color",
+   "default_value_id": "ov_9aa5158dbce9d8fce2bf0d83",
+   "values": [
+    {
+     "id": "ov_9aa5158dbce9d8fce2bf0d83",
+     "source_id": "593999615827689473",
+     "name_en": "Teal (13612)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-7a02e867ac3ecf7d104a4446",
+     "variant_label": "Teal (13612)",
+     "sort": 0,
+     "colour_code": "13612"
+    },
+    {
+     "id": "ov_faa1ccaf9c1230de00d86572",
+     "source_id": "593999615827689474",
+     "name_en": "Blue (13611)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-a3eccd3b3a4af337cd9ecc50",
+     "variant_label": "Blue (13611)",
+     "sort": 1,
+     "colour_code": "13611"
+    },
+    {
+     "id": "ov_8c0ac65b6eea2834cfccf1d4",
+     "source_id": "593999615827689476",
+     "name_en": "Orange (13301)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-88507bb1f3f354314e7120a7",
+     "variant_label": "Orange (13301)",
+     "sort": 2,
+     "colour_code": "13301"
+    },
+    {
+     "id": "ov_e73443e31f059700c9d8b49f",
+     "source_id": "593999615827689475",
+     "name_en": "Purple (13710)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-c2a99d4e74e5ba5e6865dadb",
+     "variant_label": "Purple (13710)",
+     "sort": 3,
+     "colour_code": "13710"
+    },
+    {
+     "id": "ov_47efaf3a614f42d0eff8d3d5",
+     "source_id": "593999615827689477",
+     "name_en": "Red (13210)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-8dc25695cbd84ae61c1fb093",
+     "variant_label": "Red (13210)",
+     "sort": 4,
+     "colour_code": "13210"
+    },
+    {
+     "id": "ov_472b1afefe5b1e726f2c201f",
+     "source_id": "593999615827689478",
+     "name_en": "Light Jade (13510)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-9fa8a3bd9d38d2877b822404",
+     "variant_label": "Light Jade (13510)",
+     "sort": 5,
+     "colour_code": "13510"
+    },
+    {
+     "id": "ov_13b3956720507a2972c33bc8",
+     "source_id": "593999615827689479",
+     "name_en": "Mellow Yellow (13410)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-dae21177a10d5c5c3dc2b865",
+     "variant_label": "Mellow Yellow (13410)",
+     "sort": 6,
+     "colour_code": "13410"
+    },
+    {
+     "id": "ov_bba019b92d65605f84cb04b2",
+     "source_id": "593999615827689480",
+     "name_en": "Cherry Pink (13211)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-ac592856fb42696611f41792",
+     "variant_label": "Cherry Pink (13211)",
+     "sort": 7,
+     "colour_code": "13211"
+    },
+    {
+     "id": "ov_0a5f36d96bed96be8da748f6",
+     "source_id": "593999615827689481",
+     "name_en": "Ice Blue (13610)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-ac278fd8235a6e7a82b16a3e",
+     "variant_label": "Ice Blue (13610)",
+     "sort": 8,
+     "colour_code": "13610"
+    },
+    {
+     "id": "ov_4d61cdd46648e3c774af851b",
+     "source_id": "593999615827689482",
+     "name_en": "Lavender (13711)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-2b5273704cde54358ae7d3c3",
+     "variant_label": "Lavender (13711)",
+     "sort": 9,
+     "colour_code": "13711"
+    }
+   ]
+  },
+  {
+   "id": "og_45d98fa68d737c849fb90f77",
+   "source_id": "593999615827689483",
+   "sort": 2,
+   "name_en": "Spool",
+   "name_ar": "البكرة",
+   "name_ckb": "ماسوورە",
+   "kind": "spool",
+   "source_label": "Type ",
+   "default_value_id": "ov_68daf27e94cb4c219446eafb",
+   "values": [
+    {
+     "id": "ov_68daf27e94cb4c219446eafb",
+     "source_id": "593999615827689484",
+     "name_en": "Filament with spool",
+     "name_ar": "مع بكرة",
+     "name_ckb": "لەگەڵ ماسوورە",
+     "variant_key": "bv-d925b161bc0bd8e0fabe8c1e",
+     "variant_label": "Filament with spool",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  },
+  {
+   "id": "og_b9a7b7e57a1842fce8e26228",
+   "source_id": "593999615827689485",
+   "sort": 3,
+   "name_en": "Net weight",
+   "name_ar": "الوزن الصافي",
+   "name_ckb": "کێشی پوخت",
+   "kind": "pack",
+   "source_label": "Size",
+   "default_value_id": "ov_6694abbff085f41908c13a9b",
+   "values": [
+    {
+     "id": "ov_6694abbff085f41908c13a9b",
+     "source_id": "593999615827689486",
+     "name_en": "1 kg",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-8d2584dcca86007f1e5dbacc",
+     "variant_label": "1 kg",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  }
+ ],
+ "variants": [
+  {
+   "id": "pv_a0de4b1429370b3728799e21",
+   "source_id": "593999615827689487",
+   "combo_key": "o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb|o:ov_9aa5158dbce9d8fce2bf0d83",
+   "value_ids": [
+    "ov_9aa5158dbce9d8fce2bf0d83",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  },
+  {
+   "id": "pv_b2e1335c38c42cee836302dd",
+   "source_id": "593999615827689493",
+   "combo_key": "o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb|o:ov_faa1ccaf9c1230de00d86572",
+   "value_ids": [
+    "ov_faa1ccaf9c1230de00d86572",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  },
+  {
+   "id": "pv_727894eef208deb8ab518434",
+   "source_id": "593999615827689499",
+   "combo_key": "o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb|o:ov_e73443e31f059700c9d8b49f",
+   "value_ids": [
+    "ov_e73443e31f059700c9d8b49f",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  },
+  {
+   "id": "pv_2e38642820176fc4a530ae69",
+   "source_id": "593999615827689505",
+   "combo_key": "o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb|o:ov_8c0ac65b6eea2834cfccf1d4",
+   "value_ids": [
+    "ov_8c0ac65b6eea2834cfccf1d4",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  },
+  {
+   "id": "pv_d092c19996c379554ec57ed0",
+   "source_id": "593999615827689511",
+   "combo_key": "o:ov_47efaf3a614f42d0eff8d3d5|o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb",
+   "value_ids": [
+    "ov_47efaf3a614f42d0eff8d3d5",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  },
+  {
+   "id": "pv_1fd1c1f065a85ca9d30250c3",
+   "source_id": "593999615827689517",
+   "combo_key": "o:ov_472b1afefe5b1e726f2c201f|o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb",
+   "value_ids": [
+    "ov_472b1afefe5b1e726f2c201f",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  },
+  {
+   "id": "pv_3cb76f8f2f15635459db9798",
+   "source_id": "593999615827689523",
+   "combo_key": "o:ov_13b3956720507a2972c33bc8|o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb",
+   "value_ids": [
+    "ov_13b3956720507a2972c33bc8",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  },
+  {
+   "id": "pv_d4659269059d6297c01a9748",
+   "source_id": "593999615827689529",
+   "combo_key": "o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb|o:ov_bba019b92d65605f84cb04b2",
+   "value_ids": [
+    "ov_bba019b92d65605f84cb04b2",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  },
+  {
+   "id": "pv_cd94e686265e0b95cc01e4f0",
+   "source_id": "593999615827689535",
+   "combo_key": "o:ov_0a5f36d96bed96be8da748f6|o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb",
+   "value_ids": [
+    "ov_0a5f36d96bed96be8da748f6",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  },
+  {
+   "id": "pv_2d1175525282ccf33d22a166",
+   "source_id": "593999615827689541",
+   "combo_key": "o:ov_4d61cdd46648e3c774af851b|o:ov_6694abbff085f41908c13a9b|o:ov_68daf27e94cb4c219446eafb",
+   "value_ids": [
+    "ov_4d61cdd46648e3c774af851b",
+    "ov_68daf27e94cb4c219446eafb",
+    "ov_6694abbff085f41908c13a9b"
+   ]
+  }
+ ],
+ "images": [
+  {
+   "id": "pi_ef12024ec7469a4d3fa61e33",
+   "source_media_id": "594003813261496320",
+   "source_url": "https://store.bblcdn.com/s7/default/7a274c60cf77465295cb0ebbd5597668/teal.jpg",
+   "sort_order": 0,
+   "is_primary": true,
+   "option_value_id": null,
+   "variant_id": "pv_a0de4b1429370b3728799e21",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Teal (13612) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Teal (13612) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Teal (13612) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_f02d906db4f5e27bc31582a6",
+   "source_media_id": "594003813261496320",
+   "source_url": "https://store.bblcdn.com/s7/default/7a274c60cf77465295cb0ebbd5597668/teal.jpg",
+   "sort_order": 1,
+   "is_primary": false,
+   "option_value_id": "ov_9aa5158dbce9d8fce2bf0d83",
+   "variant_id": null,
+   "via_variant_id": "pv_a0de4b1429370b3728799e21",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Teal (13612)",
+   "alt_ar": "صورة PLA Translucent — Teal (13612)",
+   "alt_ckb": "وێنەی PLA Translucent — Teal (13612)"
+  },
+  {
+   "id": "pi_24d0f29054ae4c64936c449d",
+   "source_media_id": "594006910516195328",
+   "source_url": "https://store.bblcdn.com/s7/default/1ca67c64e814468d9b7c820388e8a20b/PLA_Translucent_interaction.png",
+   "sort_order": 2,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "general",
+   "alt_en": "PLA Translucent",
+   "alt_ar": "صورة PLA Translucent",
+   "alt_ckb": "وێنەی PLA Translucent"
+  },
+  {
+   "id": "pi_a355125e7bf555aecd91f0cc",
+   "source_media_id": "594004126590427136",
+   "source_url": "https://store.bblcdn.com/s7/default/38803a9888d047619ec6fec250f8fa99/blue.jpg",
+   "sort_order": 3,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_b2e1335c38c42cee836302dd",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Blue (13611) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Blue (13611) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Blue (13611) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_dd60952aa8e09d7154592229",
+   "source_media_id": "594004126590427136",
+   "source_url": "https://store.bblcdn.com/s7/default/38803a9888d047619ec6fec250f8fa99/blue.jpg",
+   "sort_order": 4,
+   "is_primary": false,
+   "option_value_id": "ov_faa1ccaf9c1230de00d86572",
+   "variant_id": null,
+   "via_variant_id": "pv_b2e1335c38c42cee836302dd",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Blue (13611)",
+   "alt_ar": "صورة PLA Translucent — Blue (13611)",
+   "alt_ckb": "وێنەی PLA Translucent — Blue (13611)"
+  },
+  {
+   "id": "pi_fa1f9a1506159676670b5afe",
+   "source_media_id": "594004126413516800",
+   "source_url": "https://store.bblcdn.com/s7/default/89199c1d16cf434d8a60cd3d3c376ead/orange.jpg",
+   "sort_order": 5,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_2e38642820176fc4a530ae69",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Orange (13301) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Orange (13301) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Orange (13301) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_848d5c2223295bbce00982da",
+   "source_media_id": "594004126413516800",
+   "source_url": "https://store.bblcdn.com/s7/default/89199c1d16cf434d8a60cd3d3c376ead/orange.jpg",
+   "sort_order": 6,
+   "is_primary": false,
+   "option_value_id": "ov_8c0ac65b6eea2834cfccf1d4",
+   "variant_id": null,
+   "via_variant_id": "pv_2e38642820176fc4a530ae69",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Orange (13301)",
+   "alt_ar": "صورة PLA Translucent — Orange (13301)",
+   "alt_ckb": "وێنەی PLA Translucent — Orange (13301)"
+  },
+  {
+   "id": "pi_01dcad746b0248e13d1b0bd3",
+   "source_media_id": "594004126836322304",
+   "source_url": "https://store.bblcdn.com/s7/default/5b62331f74db41698e6159b071c635cc/purple.jpg",
+   "sort_order": 7,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_727894eef208deb8ab518434",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Purple (13710) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Purple (13710) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Purple (13710) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_65a34c1a47bd4c212b6700cd",
+   "source_media_id": "594004126836322304",
+   "source_url": "https://store.bblcdn.com/s7/default/5b62331f74db41698e6159b071c635cc/purple.jpg",
+   "sort_order": 8,
+   "is_primary": false,
+   "option_value_id": "ov_e73443e31f059700c9d8b49f",
+   "variant_id": null,
+   "via_variant_id": "pv_727894eef208deb8ab518434",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Purple (13710)",
+   "alt_ar": "صورة PLA Translucent — Purple (13710)",
+   "alt_ckb": "وێنەی PLA Translucent — Purple (13710)"
+  },
+  {
+   "id": "pi_424fbc229cec4c9ab5e49464",
+   "source_media_id": "594004126606454784",
+   "source_url": "https://store.bblcdn.com/s7/default/fc112bd633b34efcaf106b5832801acf/red.jpg",
+   "sort_order": 9,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_d092c19996c379554ec57ed0",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Red (13210) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Red (13210) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Red (13210) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_223d88438a8542c2e282e08a",
+   "source_media_id": "594004126606454784",
+   "source_url": "https://store.bblcdn.com/s7/default/fc112bd633b34efcaf106b5832801acf/red.jpg",
+   "sort_order": 10,
+   "is_primary": false,
+   "option_value_id": "ov_47efaf3a614f42d0eff8d3d5",
+   "variant_id": null,
+   "via_variant_id": "pv_d092c19996c379554ec57ed0",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Red (13210)",
+   "alt_ar": "صورة PLA Translucent — Red (13210)",
+   "alt_ckb": "وێنەی PLA Translucent — Red (13210)"
+  },
+  {
+   "id": "pi_12b279baf9be7b21c3b16982",
+   "source_media_id": "594004126533496832",
+   "source_url": "https://store.bblcdn.com/s7/default/b25d0ca092ee4784a22ece2eccbeed06/Jade_green.jpg",
+   "sort_order": 11,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_1fd1c1f065a85ca9d30250c3",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Light Jade (13510) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Light Jade (13510) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Light Jade (13510) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_8f7c680bbfbcf19c1575ac7f",
+   "source_media_id": "594004126533496832",
+   "source_url": "https://store.bblcdn.com/s7/default/b25d0ca092ee4784a22ece2eccbeed06/Jade_green.jpg",
+   "sort_order": 12,
+   "is_primary": false,
+   "option_value_id": "ov_472b1afefe5b1e726f2c201f",
+   "variant_id": null,
+   "via_variant_id": "pv_1fd1c1f065a85ca9d30250c3",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Light Jade (13510)",
+   "alt_ar": "صورة PLA Translucent — Light Jade (13510)",
+   "alt_ckb": "وێنەی PLA Translucent — Light Jade (13510)"
+  },
+  {
+   "id": "pi_cda796cb58a9fd3f6ea9cdfe",
+   "source_media_id": "594004126873444352",
+   "source_url": "https://store.bblcdn.com/s7/default/5e6eb876f811436791130e24a3bab789/mellow_yellow.jpg",
+   "sort_order": 13,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_3cb76f8f2f15635459db9798",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Mellow Yellow (13410) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Mellow Yellow (13410) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Mellow Yellow (13410) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_9325507ed7a2a5657c79e66c",
+   "source_media_id": "594004126873444352",
+   "source_url": "https://store.bblcdn.com/s7/default/5e6eb876f811436791130e24a3bab789/mellow_yellow.jpg",
+   "sort_order": 14,
+   "is_primary": false,
+   "option_value_id": "ov_13b3956720507a2972c33bc8",
+   "variant_id": null,
+   "via_variant_id": "pv_3cb76f8f2f15635459db9798",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Mellow Yellow (13410)",
+   "alt_ar": "صورة PLA Translucent — Mellow Yellow (13410)",
+   "alt_ckb": "وێنەی PLA Translucent — Mellow Yellow (13410)"
+  },
+  {
+   "id": "pi_8df4287e03b879dfeed1600c",
+   "source_media_id": "594004126894772224",
+   "source_url": "https://store.bblcdn.com/s7/default/f3214824ddf848ffb74689918501980d/pink.jpg",
+   "sort_order": 15,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_d4659269059d6297c01a9748",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Cherry Pink (13211) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Cherry Pink (13211) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Cherry Pink (13211) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_526991bedf89f1499ba5077d",
+   "source_media_id": "594004126894772224",
+   "source_url": "https://store.bblcdn.com/s7/default/f3214824ddf848ffb74689918501980d/pink.jpg",
+   "sort_order": 16,
+   "is_primary": false,
+   "option_value_id": "ov_bba019b92d65605f84cb04b2",
+   "variant_id": null,
+   "via_variant_id": "pv_d4659269059d6297c01a9748",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Cherry Pink (13211)",
+   "alt_ar": "صورة PLA Translucent — Cherry Pink (13211)",
+   "alt_ckb": "وێنەی PLA Translucent — Cherry Pink (13211)"
+  },
+  {
+   "id": "pi_ea0fabfd7f99c594b9c0d3e3",
+   "source_media_id": "594004126902149120",
+   "source_url": "https://store.bblcdn.com/s7/default/6378eaa8eb0040eaaf0c467d5d8e283f/light_blue.jpg",
+   "sort_order": 17,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_cd94e686265e0b95cc01e4f0",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Ice Blue (13610) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Ice Blue (13610) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Ice Blue (13610) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_d670517998588e48094390b8",
+   "source_media_id": "594004126902149120",
+   "source_url": "https://store.bblcdn.com/s7/default/6378eaa8eb0040eaaf0c467d5d8e283f/light_blue.jpg",
+   "sort_order": 18,
+   "is_primary": false,
+   "option_value_id": "ov_0a5f36d96bed96be8da748f6",
+   "variant_id": null,
+   "via_variant_id": "pv_cd94e686265e0b95cc01e4f0",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Ice Blue (13610)",
+   "alt_ar": "صورة PLA Translucent — Ice Blue (13610)",
+   "alt_ckb": "وێنەی PLA Translucent — Ice Blue (13610)"
+  },
+  {
+   "id": "pi_55f42941f723ae6f5cc4102c",
+   "source_media_id": "594004126621577216",
+   "source_url": "https://store.bblcdn.com/s7/default/abe58fb0b2544300b78ca426ef95d5c2/lavender.jpg",
+   "sort_order": 19,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_2d1175525282ccf33d22a166",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Translucent — Lavender (13711) / Filament with spool / 1 kg",
+   "alt_ar": "صورة PLA Translucent — Lavender (13711) / مع بكرة / 1 kg",
+   "alt_ckb": "وێنەی PLA Translucent — Lavender (13711) / لەگەڵ ماسوورە / 1 kg"
+  },
+  {
+   "id": "pi_d31247d3deed050a8a5c1c33",
+   "source_media_id": "594004126621577216",
+   "source_url": "https://store.bblcdn.com/s7/default/abe58fb0b2544300b78ca426ef95d5c2/lavender.jpg",
+   "sort_order": 20,
+   "is_primary": false,
+   "option_value_id": "ov_4d61cdd46648e3c774af851b",
+   "variant_id": null,
+   "via_variant_id": "pv_2d1175525282ccf33d22a166",
+   "binding_rule": "representative",
+   "alt_en": "PLA Translucent — Lavender (13711)",
+   "alt_ar": "صورة PLA Translucent — Lavender (13711)",
+   "alt_ckb": "وێنەی PLA Translucent — Lavender (13711)"
+  }
+ ],
+ "swatches": [
+  {
+   "value_id": "ov_9aa5158dbce9d8fce2bf0d83",
+   "source_media_id": "swatch:593999615827689473",
+   "source_url": "https://store.bblcdn.com/s7/default/de621108b9954ddcaf2be76a22a7ac3c/Rectangle_4549.png"
+  },
+  {
+   "value_id": "ov_faa1ccaf9c1230de00d86572",
+   "source_media_id": "swatch:593999615827689474",
+   "source_url": "https://store.bblcdn.com/s7/default/b3b4f16ef3494bc18ab4205e2dc91a80/Rectangle_4550.png"
+  },
+  {
+   "value_id": "ov_8c0ac65b6eea2834cfccf1d4",
+   "source_media_id": "swatch:593999615827689476",
+   "source_url": "https://store.bblcdn.com/s7/default/82f66860820f409ea224a4aa9f472821/Rectangle_4552.png"
+  },
+  {
+   "value_id": "ov_e73443e31f059700c9d8b49f",
+   "source_media_id": "swatch:593999615827689475",
+   "source_url": "https://store.bblcdn.com/s7/default/c8e6f924466e4d819da1670edb2f5300/Rectangle_4551.png"
+  },
+  {
+   "value_id": "ov_47efaf3a614f42d0eff8d3d5",
+   "source_media_id": "swatch:593999615827689477",
+   "source_url": "https://store.bblcdn.com/s7/default/028d8f0bac3948f89639f3ffcb35113f/Rectangle_4553.png"
+  },
+  {
+   "value_id": "ov_472b1afefe5b1e726f2c201f",
+   "source_media_id": "swatch:593999615827689478",
+   "source_url": "https://store.bblcdn.com/s7/default/f4a6d331ab47473c8ea08189959aafb9/Rectangle_4554.png"
+  },
+  {
+   "value_id": "ov_13b3956720507a2972c33bc8",
+   "source_media_id": "swatch:593999615827689479",
+   "source_url": "https://store.bblcdn.com/s7/default/04f1bffd8b094dd8b92358029d8143d6/Rectangle_4555.png"
+  },
+  {
+   "value_id": "ov_bba019b92d65605f84cb04b2",
+   "source_media_id": "swatch:593999615827689480",
+   "source_url": "https://store.bblcdn.com/s7/default/54b3f5ff98934b8a86f5326961f72684/Rectangle_4556.png"
+  },
+  {
+   "value_id": "ov_0a5f36d96bed96be8da748f6",
+   "source_media_id": "swatch:593999615827689481",
+   "source_url": "https://store.bblcdn.com/s7/default/8bca6cc749bf4010b10cd6b92a53a3b2/Rectangle_4557.png"
+  },
+  {
+   "value_id": "ov_4d61cdd46648e3c774af851b",
+   "source_media_id": "swatch:593999615827689482",
+   "source_url": "https://store.bblcdn.com/s7/default/7306088e92224c1e9ac166616b72423e/Rectangle_4558.png"
+  }
+ ],
+ "content_blocks": [
+  {
+   "id": "cb_87075d6ff9b112fb9b46a26f",
+   "order": 0,
+   "title_en": "PLA Translucent",
+   "body_en": "Print the Shape of Light",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_ed1616fc67b7c5ba75df2c60",
+   "order": 1,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:17853fe7be94afd708283c27",
+   "source_url": "https://store.bblcdn.com/s7/default/14acecc74135453d998172faba4f4938/Bambu_PLA_Translucent01-compressed.jpg",
+   "alt_en": "PLA Translucent",
+   "alt_ar": "صورة PLA Translucent",
+   "alt_ckb": "وێنەی PLA Translucent",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_aaa66861a850ad80d4986821",
+   "order": 2,
+   "title_en": "Bambu PLA Translucent",
+   "body_en": "Bambu PLA Translucent, available in 10 vibrant colors, is perfect for crafting lightshades and decorative lanterns. Its frosted finish diffuses light beautifully. With enhanced durability, it’s ideal for long-term indoor lighting and décor. Customize the shape of light with Bambu PLA Translucent!",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_bec172fa6cc4370323005da5",
+   "order": 3,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:fa557d03ac731c9a7c7e8015",
+   "source_url": "https://store.bblcdn.com/s7/default/373a8f81c7354506bb8b75764007ea16/Bambu_PLA_Translucent02-compressed.jpg",
+   "alt_en": "PLA Translucent",
+   "alt_ar": "صورة PLA Translucent",
+   "alt_ckb": "وێنەی PLA Translucent",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_6b3e5e861b59043952905205",
+   "order": 4,
+   "title_en": "Diffuse Light in a Splash of Colors",
+   "body_en": "From soft pastels to vibrant candy hues, Bambu PLA Translucent offers a stunning range of frosted tones that add both subtle elegance and bold vibrancy to your prints. Its unique matte finish mimics the look of hand-blown frosted glass, making it ideal for crafting light shades, vases, and stained glass decor. PLA Translucent seamlessly bonds with any PLA filament, making adding a translucent accent to your prints as effortless as swapping colors mid‑print.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_be9f4c2ddfa2bc0d5c119e1e",
+   "order": 5,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:177e321dab7add17dc819af6",
+   "source_url": "https://store.bblcdn.com/s7/default/45d36f85f8bc471dbbf0967c8457147c/20260511-170416.jpg",
+   "alt_en": "PLA Translucent",
+   "alt_ar": "صورة PLA Translucent",
+   "alt_ckb": "وێنەی PLA Translucent",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_b533bd4a0656a248dc1aa133",
+   "order": 6,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:9cf1f7ab6f5f3797f52c9357",
+   "source_url": "https://store.bblcdn.com/s7/default/61acdf4e818e42249014408a28343ca6/Frame_1123864805-1-compressed.jpg",
+   "alt_en": "PLA Translucent",
+   "alt_ar": "صورة PLA Translucent",
+   "alt_ckb": "وێنەی PLA Translucent",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_81fa2c80e30dd9d0f3e174db",
+   "order": 7,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:ccbaf17b5a79a33d1dab76d6",
+   "source_url": "https://store.bblcdn.com/s7/default/183ece81b12940d483f882507b60d070/Frame_1123864806-compressed.jpg",
+   "alt_en": "PLA Translucent",
+   "alt_ar": "صورة PLA Translucent",
+   "alt_ckb": "وێنەی PLA Translucent",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 1"
+  },
+  {
+   "id": "cb_87c79b00439961076a94354d",
+   "order": 8,
+   "title_en": "Craft Stained Glass Art That Endures",
+   "body_en": "Bambu PLA Translucent strikes the perfect balance between visual translucency and everyday durability. It offers greater impact and aging resistance compared to generic translucent PLA, ensuring your prints last longer and perform better over time.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_27845214f935285530e193dc",
+   "order": 9,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:d11ddc8b8166e10ec2e9b5fb",
+   "source_url": "https://store.bblcdn.com/s7/default/13940847ac6f4d55adcfdaa9a453b172/Frame_1123864805-compressed.jpg",
+   "alt_en": "PLA Translucent",
+   "alt_ar": "صورة PLA Translucent",
+   "alt_ckb": "وێنەی PLA Translucent",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_940396b320ce696a2a8e65d9",
+   "order": 10,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:681f751dab54c31da133f3f9",
+   "source_url": "https://store.bblcdn.com/s7/default/ce7a6c063418400db934f4ec146f9380/Content_Block_Media-8-compressed.jpg",
+   "alt_en": "PLA Translucent",
+   "alt_ar": "صورة PLA Translucent",
+   "alt_ckb": "وێنەی PLA Translucent",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 2"
+  },
+  {
+   "id": "cb_34458e36af17393f3853b10e",
+   "order": 11,
+   "title_en": "RFID for Intelligent Printing",
+   "body_en": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System).",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_d2ba630fa597ec0e563be790",
+   "order": 12,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:d8edc4cf97639fcb125a1e60",
+   "source_url": "https://store.bblcdn.com/s7/default/488456bb882744c892a36df11c4b152e/RFID_for_Intelligent_Printing-compressed.jpg",
+   "alt_en": "PLA Translucent",
+   "alt_ar": "صورة PLA Translucent",
+   "alt_ckb": "وێنەی PLA Translucent",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_a2929b5f8bd6b04e5982d792",
+   "order": 13,
+   "title_en": "FAQ",
+   "body_en": "1.Accessory Compatibility\nNot compatible with Hotend with Stainless Steel Nozzle 0.2 mm.\n\n2.Drying Recommendations\nDry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: Filament drying instructions on WIKI.\n\n3.Appearance Change\nPlease note that the transparency of prints may vary depending on factors such as size, thickness, structure, and printing parameters (including speed, nozzle temperature, and infill density). To enhance translucency, please refer to the printing tips on WIKI.\nPLA Translucent has a frosted glass texture that diffuses light well, while PETG Translucent is more see-through with a crystal-clear finish.\n\n4.Printability\nPLA Translucent is more beginner-friendly than PETG Translucent.\n\n5.Safety Tips\nPlease store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.\nPlease keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.\nFor opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings.\nPlease print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.\nAs this filament is not food-grade, please avoid using finished prints for food storage or contact.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "faq",
+   "section_path": "components[4]"
+  },
+  {
+   "id": "cb_011e2e4c36832fe212cd390c",
+   "order": 14,
+   "title_en": "Highlights",
+   "body_en": "• Translucent Appearance That Diffuses Light\n• Bonds with All PLA Filaments\n• Durable for Long-Term Use\n• Clean Build Plates Before Printing\n• Cautions for Use",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "P.productFeaturesModuleList"
+  }
+ ],
+ "specs": [
+  {
+   "id": "sv_8bf125c1d5d95fb1a56078ba",
+   "key": "material.diameter",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "1.75 mm",
+   "value_num": 1.75,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 4",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 0
+  },
+  {
+   "id": "sv_5e0c4801b970f9a71f9138fe",
+   "key": "material.diameter_tolerance",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "± 0.03 mm",
+   "value_num": 0.03,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 4",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 1
+  },
+  {
+   "id": "sv_5a36f3079b91c9e876b6f621",
+   "key": "material.net_weight",
+   "group": "material",
+   "scope_kind": "option_value",
+   "scope_id": "ov_6694abbff085f41908c13a9b",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Size",
+   "original_value": "1 kg",
+   "value_text": "1000 g",
+   "value_num": 1000,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g",
+   "status": "verified",
+   "confidence": "official_variant",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "option Size › 1 kg",
+   "source_excerpt": "1 kg",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 2
+  },
+  {
+   "id": "sv_b2e9308c0e62e3465d9075cd",
+   "key": "material.density",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g/cm³",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/pla-translucent",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 3
+  },
+  {
+   "id": "sv_ddb97f8c1c68399d9c0045ec",
+   "key": "print_settings.nozzle_temp",
+   "group": "print_settings",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "range",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "°C",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/pla-translucent",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 4
+  }
+ ],
+ "documents": [
+  {
+   "id": "pd_20b053b18a2814d0dc13fe89",
+   "kind": "tds",
+   "title_en": "Filament TDS",
+   "title_ar": "ورقة البيانات الفنية (TDS) — Filament TDS",
+   "title_ckb": "پەڕەی زانیاری تەکنیکی (TDS) — Filament TDS",
+   "url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 0
+  },
+  {
+   "id": "pd_e4d03b0971ffba5ad80bd376",
+   "kind": "sds",
+   "title_en": "Filament MSDS",
+   "title_ar": "ورقة بيانات السلامة (SDS) — Filament MSDS",
+   "title_ckb": "پەڕەی زانیاری سەلامەتی (SDS) — Filament MSDS",
+   "url": "https://store.bblcdn.com/s7/default/8a9bc9278da74ee4bd5490bae9fb634d/SDS20250928A17_Bambu_PLA_Translucent.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 1
+  },
+  {
+   "id": "pd_cd6fbf34fad3710d745a2fc6",
+   "kind": "certificate",
+   "title_en": "Filament RoHS",
+   "title_ar": "شهادة مطابقة — Filament RoHS",
+   "title_ckb": "بڕوانامەی گونجان — Filament RoHS",
+   "url": "https://store.bblcdn.com/s7/default/369b7d0c17804f9d8a4402a121dd8d1d/Bambu_PLA_Translucent_RoHS.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 2
+  },
+  {
+   "id": "pd_9cf0ac75165a1b11260e6b1e",
+   "kind": "hex_codes",
+   "title_en": "Hex Code",
+   "title_ar": "رموز الألوان — Hex Code",
+   "title_ckb": "کۆدەکانی ڕەنگ — Hex Code",
+   "url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 3
+  },
+  {
+   "id": "pd_8a3d5fdb22e19af59d86a45a",
+   "kind": "wiki",
+   "title_en": "Filament drying instructions",
+   "title_ar": "ويكي Bambu Lab — Filament drying instructions",
+   "title_ckb": "ویکی Bambu Lab — Filament drying instructions",
+   "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+   "host": "wiki.bambulab.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 4
+  },
+  {
+   "id": "pd_ce3cb884a665fdc759f93c87",
+   "kind": "wiki",
+   "title_en": "printing tips",
+   "title_ar": "ويكي Bambu Lab — printing tips",
+   "title_ckb": "ویکی Bambu Lab — printing tips",
+   "url": "https://wiki.bambulab.com/en/knowledge-sharing/transparent-petg",
+   "host": "wiki.bambulab.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 5
+  }
+ ],
+ "relations": [
+  {
+   "id": "pr_c44fc9cc385d7bc57b9778f8",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "ams-multicolor-printing",
+   "target_family": "ams_series",
+   "target_label": "All AMS Series",
+   "state": "pending",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "All AMS Series Compatible"
+  },
+  {
+   "id": "pr_1bd809ed7487273243473326",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "ams-lite",
+   "target_family": "ams_series",
+   "target_label": "All AMS Series",
+   "state": "pending",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "All AMS Series Compatible"
+  },
+  {
+   "id": "pr_c0050553c0058cb01e271519",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "ams-2-pro",
+   "target_family": "ams_series",
+   "target_label": "All AMS Series",
+   "state": "pending",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "All AMS Series Compatible"
+  },
+  {
+   "id": "pr_9019bbd8dc09ad5beb0354fe",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "ams-ht",
+   "target_family": "ams_series",
+   "target_label": "All AMS Series",
+   "state": "pending",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "All AMS Series Compatible"
+  }
+ ],
+ "external_ids": [
+  {
+   "scope_kind": "product",
+   "scope_id": "",
+   "id_type": "bambu_product_id",
+   "value": "593999615810912256",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_a0de4b1429370b3728799e21",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689487",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_b2e1335c38c42cee836302dd",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689493",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_727894eef208deb8ab518434",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689499",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_2e38642820176fc4a530ae69",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689505",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_d092c19996c379554ec57ed0",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689511",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_1fd1c1f065a85ca9d30250c3",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689517",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_3cb76f8f2f15635459db9798",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689523",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_d4659269059d6297c01a9748",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689529",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_cd94e686265e0b95cc01e4f0",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689535",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_2d1175525282ccf33d22a166",
+   "id_type": "bambu_variant_id",
+   "value": "593999615827689541",
+   "searchable": false
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_9aa5158dbce9d8fce2bf0d83",
+   "id_type": "color_code",
+   "value": "13612",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_faa1ccaf9c1230de00d86572",
+   "id_type": "color_code",
+   "value": "13611",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_8c0ac65b6eea2834cfccf1d4",
+   "id_type": "color_code",
+   "value": "13301",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_e73443e31f059700c9d8b49f",
+   "id_type": "color_code",
+   "value": "13710",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_47efaf3a614f42d0eff8d3d5",
+   "id_type": "color_code",
+   "value": "13210",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_472b1afefe5b1e726f2c201f",
+   "id_type": "color_code",
+   "value": "13510",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_13b3956720507a2972c33bc8",
+   "id_type": "color_code",
+   "value": "13410",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_bba019b92d65605f84cb04b2",
+   "id_type": "color_code",
+   "value": "13211",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_0a5f36d96bed96be8da748f6",
+   "id_type": "color_code",
+   "value": "13610",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_4d61cdd46648e3c774af851b",
+   "id_type": "color_code",
+   "value": "13711",
+   "searchable": true
+  }
+ ],
+ "source_refs": [
+  {
+   "kind": "group",
+   "source_id": "593999615827689472",
+   "levonis_id": "og_c77f2bf145c0d3f6b7fb45ed",
+   "source_label": "Color",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689473",
+   "levonis_id": "ov_9aa5158dbce9d8fce2bf0d83",
+   "source_label": "Teal (13612)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689474",
+   "levonis_id": "ov_faa1ccaf9c1230de00d86572",
+   "source_label": "Blue (13611)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689476",
+   "levonis_id": "ov_8c0ac65b6eea2834cfccf1d4",
+   "source_label": "Orange (13301)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689475",
+   "levonis_id": "ov_e73443e31f059700c9d8b49f",
+   "source_label": "Purple (13710)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689477",
+   "levonis_id": "ov_47efaf3a614f42d0eff8d3d5",
+   "source_label": "Red (13210)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689478",
+   "levonis_id": "ov_472b1afefe5b1e726f2c201f",
+   "source_label": "Light Jade (13510)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689479",
+   "levonis_id": "ov_13b3956720507a2972c33bc8",
+   "source_label": "Mellow Yellow (13410)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689480",
+   "levonis_id": "ov_bba019b92d65605f84cb04b2",
+   "source_label": "Cherry Pink (13211)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689481",
+   "levonis_id": "ov_0a5f36d96bed96be8da748f6",
+   "source_label": "Ice Blue (13610)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689482",
+   "levonis_id": "ov_4d61cdd46648e3c774af851b",
+   "source_label": "Lavender (13711)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "593999615827689483",
+   "levonis_id": "og_45d98fa68d737c849fb90f77",
+   "source_label": "Type ",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689484",
+   "levonis_id": "ov_68daf27e94cb4c219446eafb",
+   "source_label": "Filament with spool",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "593999615827689485",
+   "levonis_id": "og_b9a7b7e57a1842fce8e26228",
+   "source_label": "Size",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "593999615827689486",
+   "levonis_id": "ov_6694abbff085f41908c13a9b",
+   "source_label": "1 kg",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689487",
+   "levonis_id": "pv_a0de4b1429370b3728799e21",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689493",
+   "levonis_id": "pv_b2e1335c38c42cee836302dd",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689499",
+   "levonis_id": "pv_727894eef208deb8ab518434",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689505",
+   "levonis_id": "pv_2e38642820176fc4a530ae69",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689511",
+   "levonis_id": "pv_d092c19996c379554ec57ed0",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689517",
+   "levonis_id": "pv_1fd1c1f065a85ca9d30250c3",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689523",
+   "levonis_id": "pv_3cb76f8f2f15635459db9798",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689529",
+   "levonis_id": "pv_d4659269059d6297c01a9748",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689535",
+   "levonis_id": "pv_cd94e686265e0b95cc01e4f0",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "593999615827689541",
+   "levonis_id": "pv_2d1175525282ccf33d22a166",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594003813261496320",
+   "levonis_id": "pi_ef12024ec7469a4d3fa61e33",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594003813261496320",
+   "levonis_id": "pi_f02d906db4f5e27bc31582a6",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_a0de4b1429370b3728799e21"
+  },
+  {
+   "kind": "image",
+   "source_id": "594006910516195328",
+   "levonis_id": "pi_24d0f29054ae4c64936c449d",
+   "source_label": "",
+   "binding_rule": "general",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126590427136",
+   "levonis_id": "pi_a355125e7bf555aecd91f0cc",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126590427136",
+   "levonis_id": "pi_dd60952aa8e09d7154592229",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_b2e1335c38c42cee836302dd"
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126413516800",
+   "levonis_id": "pi_fa1f9a1506159676670b5afe",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126413516800",
+   "levonis_id": "pi_848d5c2223295bbce00982da",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_2e38642820176fc4a530ae69"
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126836322304",
+   "levonis_id": "pi_01dcad746b0248e13d1b0bd3",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126836322304",
+   "levonis_id": "pi_65a34c1a47bd4c212b6700cd",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_727894eef208deb8ab518434"
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126606454784",
+   "levonis_id": "pi_424fbc229cec4c9ab5e49464",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126606454784",
+   "levonis_id": "pi_223d88438a8542c2e282e08a",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_d092c19996c379554ec57ed0"
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126533496832",
+   "levonis_id": "pi_12b279baf9be7b21c3b16982",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126533496832",
+   "levonis_id": "pi_8f7c680bbfbcf19c1575ac7f",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_1fd1c1f065a85ca9d30250c3"
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126873444352",
+   "levonis_id": "pi_cda796cb58a9fd3f6ea9cdfe",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126873444352",
+   "levonis_id": "pi_9325507ed7a2a5657c79e66c",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_3cb76f8f2f15635459db9798"
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126894772224",
+   "levonis_id": "pi_8df4287e03b879dfeed1600c",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126894772224",
+   "levonis_id": "pi_526991bedf89f1499ba5077d",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_d4659269059d6297c01a9748"
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126902149120",
+   "levonis_id": "pi_ea0fabfd7f99c594b9c0d3e3",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126902149120",
+   "levonis_id": "pi_d670517998588e48094390b8",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_cd94e686265e0b95cc01e4f0"
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126621577216",
+   "levonis_id": "pi_55f42941f723ae6f5cc4102c",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "594004126621577216",
+   "levonis_id": "pi_d31247d3deed050a8a5c1c33",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_2d1175525282ccf33d22a166"
+  }
+ ],
+ "notes": []
+}

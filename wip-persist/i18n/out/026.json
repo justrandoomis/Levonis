@@ -1,0 +1,1697 @@
+[
+ {
+  "h": "eb67a78bf0dccf05ad2813e5bd97670482d331512b6dd046427f9251f25dd751",
+  "en": "The P1 series and X1C use the same specification of glass cover plate, which is suitable for both P1P and P1S. It is recommended to use the glass cover plate when installing the side panels to avoid the glass cover plate from slipping.",
+  "ar": "تستخدم طابعات سلسلة P1 وX1C غطاءً زجاجيًا بالمواصفات نفسها، وهو مناسب لكل من P1P وP1S. يُوصى باستخدام الغطاء الزجاجي عند تركيب الألواح الجانبية لتجنّب انزلاقه.",
+  "ckb": "چاپکەرەکانی زنجیرەی P1 و X1C هەمان تایبەتمەندیی قەپاغی شووشەیی بەکاردەهێنن، کە بۆ هەردوو P1P و P1S گونجاوە. پێشنیار دەکرێت لە کاتی دامەزراندنی پانێڵە لاتەنیشتەکاندا قەپاغە شووشەییەکە بەکاربهێنرێت بۆ ئەوەی نەخلیسکێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e7b83e7d70b06ca73cdd3e61691abb73f353df1ab453d78944a90529fb879fd2",
+  "en": "The control board fan is used to cool the control board to prevent the control board from overheating and shutting down. The control board fan cannot be manually controlled, and the printer automatically adjusts the speed.",
+  "ar": "تُستخدم مروحة لوحة التحكم لتبريد لوحة التحكم ومنعها من ارتفاع الحرارة المفرط والتوقف عن العمل. لا يمكن التحكم في مروحة لوحة التحكم يدويًا، إذ تضبط الطابعة سرعتها تلقائيًا.",
+  "ckb": "پانکەی بۆردی کۆنترۆڵ بۆ ساردکردنەوەی بۆردی کۆنترۆڵ بەکاردێت بۆ ڕێگریکردن لە گەرمبوونی زیادە و کوژانەوەی. پانکەی بۆردی کۆنترۆڵ ناتوانرێت بە دەستی کۆنترۆڵ بکرێت، و چاپکەرەکە خۆی بە شێوەی خۆکار خێراییەکەی ڕێک دەخات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e8a2417587e5bf88b25d1b18edbb4d78d98877839391380c086b7c1496dc46e0",
+  "en": "The Chamber Temperature Regulator Fan is responsible for adjusting the temperature within the chamber. The fan operates based on the detected chamber temperature, determining both its on/off status and the speed at which it operates.",
+  "ar": "مروحة تنظيم حرارة حجرة الطباعة (Chamber Temperature Regulator Fan) مسؤولة عن ضبط درجة الحرارة داخل حجرة الطباعة. تعمل المروحة وفقًا لحرارة الحجرة المرصودة، فتحدّد حالة تشغيلها أو إيقافها والسرعة التي تدور بها.",
+  "ckb": "پانکەی ڕێکخەری پلەی گەرمیی ژووری چاپ (Chamber Temperature Regulator Fan) بەرپرسە لە ڕێکخستنی پلەی گەرمی لە ناو ژووری چاپدا. پانکەکە بەپێی پلەی گەرمیی دۆزراوەی ژوورەکە کار دەکات، و هەم داگیرسان یان کوژانەوەی و هەم ئەو خێراییەی پێی کار دەکات دیاری دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e4e7ff16abc8e8bc08bb014bf5ff0d4553383df1a4a60d7eef674c0cd516908",
+  "en": "The Cooling Fan for Hotend is used to cool and reduce the temperature of the ceramic heater.",
+  "ar": "تُستخدم مروحة تبريد رأس الصهر لتبريد السخّان الخزفي وخفض حرارته.",
+  "ckb": "پانکەی ساردکردنەوەی سەری تواندنەوە بۆ ساردکردنەوە و دابەزاندنی پلەی گەرمیی گەرمکەرەوە سیرامیکییەکە بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1f7ea45814add6ec1ecc2eef5e6bfb52fa41a1cad91f93e93b65ee52238b47ee",
+  "en": "The cooling fan for hotend has an auto-shutoff function while being locked at rated voltage for 1-3 seconds. The circuit attempts to restart in 2 to 6 seconds. There is no damage after 72 hours of locking.",
+  "ar": "تتميّز مروحة تبريد رأس الصهر بخاصية الإيقاف التلقائي عند انحباس دورانها عند الجهد المقدّر لمدة 1-3 ثوانٍ. وتحاول الدائرة إعادة التشغيل خلال 2 إلى 6 ثوانٍ. ولا يحدث أي تلف بعد 72 ساعة من الانحباس.",
+  "ckb": "پانکەی ساردکەرەوەی سەری تواندنەوە تایبەتمەندیی کوژانەوەی خۆکاری هەیە کاتێک بۆ ماوەی 1-3 چرکە لە ڤۆڵتیەی دیاریکراودا گیر دەخوات. بازنە کارەباییەکە هەوڵ دەدات لە ماوەی 2 بۆ 6 چرکەدا دووبارە دەست پێبکاتەوە. دوای 72 کاتژمێر گیرخواردن هیچ زیانێک دروست نابێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "aaa1fea95d6d5c515e5bb6859156378f69a3ade137457528c6d5bd520b6f08d1",
+  "en": "The cooling fan is a high-speed rotating part, so do not touch it while it is running.",
+  "ar": "مروحة التبريد قطعة تدور بسرعة عالية، لذا لا تلمسها أثناء تشغيلها.",
+  "ckb": "پانکەی ساردکەرەوە پارچەیەکە بە خێرایی بەرز دەسووڕێتەوە، بۆیە لە کاتی کارکردنیدا دەستی لێ مەدە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "03722edb79fa1779b18e2115c52bbfca0ba642dc875509081969a7fb5ac96b5c",
+  "en": "The thermistor has highly accurate temperature measurement and reliable structural design. It is for use with Bambu Lab complete hotend assembly only.",
+  "ar": "يتميّز الثرمستور بقياس عالي الدقة لدرجة الحرارة وتصميم هيكلي موثوق. وهو مخصّص للاستخدام مع مجموعة رأس الصهر الكاملة من Bambu Lab فقط.",
+  "ckb": "تێرمیستۆرەکە پێوانی زۆر وردی پلەی گەرمی و دیزاینی پێکهاتەیی متمانەپێکراوی هەیە. تەنها لەگەڵ کۆمەڵەی تەواوی سەری تواندنەوەی Bambu Lab بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "82f273281623410a0164d1e40dae711e11dfe86ec35bac224a698c3acaa9a2d0",
+  "en": "The ceramic heater can heat the nozzle up to 300℃, which is for use with Bambu Lab complete hotend assembly only.",
+  "ar": "يمكن للسخّان الخزفي تسخين النوزل حتى 300℃، وهو مخصّص للاستخدام مع مجموعة رأس الصهر الكاملة من Bambu Lab فقط.",
+  "ckb": "گەرمکەرەوە سیرامیکییەکە دەتوانێت نۆزڵ تا 300℃ گەرم بکات، و تەنها لەگەڵ کۆمەڵەی تەواوی سەری تواندنەوەی Bambu Lab بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8dcf3e71dc5cf33804f49972487cdb4acc2d065c5dac6c63ff136008a36e5359",
+  "en": "The Bambu Lab USB-C cable is installed in the towing chain and is only suitable for Bambu Lab X1 series printers.",
+  "ar": "يُركَّب كابل Bambu Lab USB-C داخل سلسلة الكابلات، وهو مناسب لطابعات سلسلة X1 من Bambu Lab فقط.",
+  "ckb": "کێبڵی Bambu Lab USB-C لە ناو زنجیری کێبڵدا دادەمەزرێت و تەنها بۆ چاپکەرەکانی زنجیرەی X1 ی Bambu Lab گونجاوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f4c55928fb4c7903c50a6dfcee7d21365ce6fcffa2ef4f052d5312a5b9f49f78",
+  "en": "To prolong the lifetime of the build plate, use a sharp scraper to release the model from the printing surface. After the plate has cooled down, gently slide the scraper underneath one of the corners of the model. Then, carefully bend the sheet to remove the model.",
+  "ar": "لإطالة عمر صفيحة الطباعة، استخدم مكشطة حادة لتحرير النموذج من سطح الطباعة. بعد أن تبرد الصفيحة، أدخل المكشطة برفق تحت إحدى زوايا النموذج، ثم اثنِ الصفيحة بحذر لإزالة النموذج.",
+  "ckb": "بۆ درێژکردنەوەی تەمەنی پلێتی چاپ، تاشەرێکی تیژ بەکاربهێنە بۆ جیاکردنەوەی مۆدێلەکە لە ڕووی چاپ. دوای ئەوەی پلێتەکە سارد بووەوە، بە هێمنی تاشەرەکە بخزێنە ژێر یەکێک لە گۆشەکانی مۆدێلەکە. پاشان بە وریاییەوە پلێتەکە بچەمێنەوە بۆ لابردنی مۆدێلەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "10af9928ba801e7d223b816e783edf7c6d77d3bf5390ae16616eb6a5a1a195a8",
+  "en": "Guidance",
+  "ar": "إرشادات",
+  "ckb": "ڕێنمایی",
+  "kind": "block_title"
+ },
+ {
+  "h": "ffb900090c237d47bb226200031d85bea5e5c53e438465c1e0789a66339cdcf1",
+  "en": "Please watch the video on how to install the scraper:",
+  "ar": "يرجى مشاهدة الفيديو الذي يشرح طريقة تركيب المكشطة:",
+  "ckb": "تکایە سەیری ڤیدیۆکە بکە دەربارەی چۆنیەتیی دامەزراندنی تاشەرەکە:",
+  "kind": "block_line"
+ },
+ {
+  "h": "6ffc6352e8b3654a9eeca8d654505ff51c8963abb51ee2bca60607de7c5fd52c",
+  "en": "Melt extrusion printers will generate VOCs while printing because the heating temperature of ABS, PC, PA and other materials is relatively high, resulting in more VOCs. Materials such as PLA with lower melting points produce much fewer VOCs during printing. These VOCs are absorbed by our activated carbon air filter.",
+  "ar": "تُطلق طابعات البثق بالصهر مركبات عضوية متطايرة (VOCs) أثناء الطباعة، لأن درجة حرارة تسخين ABS وPC وPA وغيرها من المواد مرتفعة نسبيًا، ما يؤدي إلى انبعاث كمية أكبر من VOCs. أما المواد ذات نقاط الانصهار المنخفضة مثل PLA فتُطلق كميات أقل بكثير من VOCs أثناء الطباعة. ويمتص فلتر الهواء بالكربون المنشّط هذا تلك المركبات.",
+  "ckb": "چاپکەرەکانی پاڵنانی تواوە لە کاتی چاپدا پێکهاتە ئۆرگانییە بەهەڵمبووەکان (VOCs) دروست دەکەن، چونکە پلەی گەرمیی گەرمکردنی ABS، PC، PA و کەرەستەکانی تر بە ڕێژەیی بەرزە، ئەمەش دەبێتە هۆی دروستبوونی بڕێکی زیاتری VOCs. کەرەستەی وەک PLA کە خاڵی توانەوەیان نزمترە، لە کاتی چاپدا بڕێکی زۆر کەمتر VOCs دروست دەکەن. ئەم فلتەری هەوای کاربۆنی چالاککراوە ئەو پێکهاتانە هەڵدەمژێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e52dde4843c7869597fd4776a7dfda1008c02600712bf2737a36028edfeaf54c",
+  "en": "Remote livestream: you can observe print progress anytime, anywhere.",
+  "ar": "البث المباشر عن بُعد: يمكنك متابعة تقدّم الطباعة في أي وقت ومن أي مكان.",
+  "ckb": "پەخشی ڕاستەوخۆ لە دوورەوە: دەتوانیت لە هەر کات و شوێنێکدا چاودێریی پێشکەوتنی چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f2f6080a68a18b4c19e8b137cf32f91b438fc66277fef5f098c0e5a501e25286",
+  "en": "Spaghetti Detection: Spaghetti detection uses AI to detect print failures. If this feature is enabled, once spaghetti is detected, the printer pauses and waits for your input before continuing or stopping the print.",
+  "ar": "كشف التشابك (السباغيتي): تستخدم ميزة كشف السباغيتي الذكاء الاصطناعي (AI) لاكتشاف حالات فشل الطباعة. وعند تفعيل هذه الميزة، ما إن يُكتشف التشابك حتى تتوقف الطابعة مؤقتًا وتنتظر قرارك قبل متابعة الطباعة أو إيقافها.",
+  "ckb": "دۆزینەوەی سپاگێتی: دۆزینەوەی سپاگێتی AI بەکاردەهێنێت بۆ دۆزینەوەی شکستەکانی چاپ. ئەگەر ئەم تایبەتمەندییە چالاک بێت، هەر کە سپاگێتی دۆزرایەوە، چاپکەرەکە ڕادەوەستێت و چاوەڕێی بڕیاری تۆ دەکات پێش ئەوەی چاپەکە بەردەوام بکات یان ڕایبگرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ca42bd8ef0dfbeaef5238248d1cb957b9e5827b8de8f328c43944b19d5336548",
+  "en": "Time-lapses: This feature uses the chamber camera to automatically create a time-lapse video of a print and make an innovative video.",
+  "ar": "التصوير بفاصل زمني: تستخدم هذه الميزة كاميرا حجرة الطباعة لإنشاء فيديو بفاصل زمني للطباعة تلقائيًا وصنع فيديو مبتكر.",
+  "ckb": "وێنەگرتنی کاتی خێراکراو: ئەم تایبەتمەندییە کامێرای ژووری چاپ بەکاردەهێنێت بۆ دروستکردنی خۆکاری ڤیدیۆیەکی کاتی خێراکراو لە چاپەکە و دروستکردنی ڤیدیۆیەکی داهێنەرانە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0fd0df8123998ed1ee13ee2898b01504c88e9bac2ddd6c15cbc2a3657cc7fea7",
+  "en": "The display connect flex cable is used to connect the motherboard and high-resolution screen. Its function is to transmit SD card data and display images between the screen and printer.",
+  "ar": "يُستخدم كابل التوصيل المرن للشاشة لتوصيل اللوحة الأم بالشاشة عالية الدقة. ووظيفته نقل بيانات بطاقة SD وعرض الصور بين الشاشة والطابعة.",
+  "ckb": "کێبڵی نەرمی گەیەنەری شاشە بۆ پەیوەستکردنی بۆردی سەرەکی و شاشە بەرز-ڕوونییەکە بەکاردێت. ئەرکەکەی گواستنەوەی زانیاریی کارتی SD و نیشاندانی وێنەیە لە نێوان شاشە و چاپکەرەکەدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3414f541b668bb6135a375e80f5a673fbe8b8876bba7ab11130a06e36d8d4591",
+  "en": "The hardened steel extruder unit is equipped with double gears made of hardened steel, which provides increased extrusion force, prevents slippage, and enhances abrasion resistance. These gears enable the extruder unit to handle tough engineering filaments such as carbon fiber nylon and glass fiber nylon.",
+  "ar": "وحدة الدافع المصنوعة من الفولاذ المقسّى مزوّدة بترسين مزدوجين من الفولاذ المقسّى، ما يزيد قوة البثق ويمنع الانزلاق ويعزّز مقاومة التآكل بالاحتكاك. وتتيح هذه التروس لوحدة الدافع التعامل مع الفلامنتات الهندسية القاسية مثل النايلون المقوّى بألياف الكربون والنايلون المقوّى بألياف الزجاج.",
+  "ckb": "یەکەی پاڵنەری پۆڵای ڕەقکراو دوو چەرخی ددانەداری لە پۆڵای ڕەقکراو تێدایە، کە هێزی پاڵنان زیاد دەکات، ڕێگری لە خلیسکان دەکات و بەرگەی سووان بەهێز دەکات. ئەم چەرخانە یارمەتی یەکەی پاڵنەر دەدەن بۆ مامەڵەکردن لەگەڵ فیلامێنتە ئەندازیارییە پتەوەکانی وەک نایلۆنی ڕیشاڵی کاربۆن و نایلۆنی ڕیشاڵی شووشە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ba9fc5640990efbc1dd5af528d222429bccd56595f885a94c5ad54d0363e637a",
+  "en": "In addition, the extruder unit includes a sensor that supports filament break detection, which can help prevent print failures and improve overall printing efficiency.",
+  "ar": "بالإضافة إلى ذلك، تتضمن وحدة الدافع حساسًا يدعم كشف انقطاع الفلامنت، ما يساعد على منع فشل الطباعة وتحسين كفاءة الطباعة عمومًا.",
+  "ckb": "جگە لەوەش، یەکەی پاڵنەرەکە هەستەوەرێکی تێدایە کە پشتگیری لە دۆزینەوەی پچڕانی فیلامێنت دەکات، ئەمەش یارمەتی ڕێگریکردن لە شکستی چاپ و باشترکردنی کارایی گشتیی چاپ دەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "69445c5cb4762eceeee0a16fc09881ea27029ccfa828bb59e955b5e89c51f5b6",
+  "en": "The AMS Driven Support Shaft Assembly is a roller for supporting the filament spool.",
+  "ar": "مجموعة AMS Driven Support Shaft Assembly هي أسطوانة دوّارة لحمل بكرة الفلامنت (spool).",
+  "ckb": "کۆمەڵەی AMS Driven Support Shaft Assembly لوولەیەکی سووڕاوەیە بۆ ڕاگرتنی ماسوورەی فیلامێنت (spool).",
+  "kind": "block_line"
+ },
+ {
+  "h": "f2e99543b8ecdb0831b41e24d5010fa0d0586fc2a57239bf3f94b3bc73c7a782",
+  "en": "The AMS Active Support Shaft Assembly is a roller for supporting the filament spool and also for actively driving the spool to roll.",
+  "ar": "مجموعة AMS Active Support Shaft Assembly هي أسطوانة دوّارة لحمل بكرة الفلامنت (spool)، وتعمل أيضًا على تدوير البكرة بشكل فعّال.",
+  "ckb": "کۆمەڵەی AMS Active Support Shaft Assembly لوولەیەکی سووڕاوەیە بۆ ڕاگرتنی ماسوورەی فیلامێنت (spool) و هەروەها بە شێوەی چالاک ماسوورەکە دەسووڕێنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e68070c5154dfec5069c42906b5a6042b4524dc161c61c0eeae6a2be3b32a97",
+  "en": "The AMS Active Extrusion Wheel Assembly is a friction wheel assembly for actively driving the filament forward.",
+  "ar": "مجموعة AMS Active Extrusion Wheel Assembly هي مجموعة عجلة احتكاك تدفع الفلامنت إلى الأمام بشكل فعّال.",
+  "ckb": "کۆمەڵەی AMS Active Extrusion Wheel Assembly کۆمەڵەیەکی تایەی لێکخشانە بۆ پاڵنانی چالاکی فیلامێنت بەرەو پێشەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5306e87c07fd5fa1b100d53b42eb4a1af7e255eec7b9da1879742332a11bf13c",
+  "en": "The purpose of the front glass door is to keep the inside of the printer closed, thus providing protection for the printing process while also insulating the enclosure for high-temperature printing.",
+  "ar": "الغرض من الباب الزجاجي الأمامي هو إبقاء الطابعة مغلقة من الداخل، ما يوفر حماية لعملية الطباعة ويعزل الهيكل المغلق حراريًا للطباعة بدرجات حرارة عالية.",
+  "ckb": "مەبەست لە دەرگای شووشەیی پێشەوە داخستنی ناوەوەی چاپکەرەکەیە، بەم شێوەیە پاراستن بۆ پرۆسەی چاپ دابین دەکات و هەروەها ژووری داخراوەکە بۆ چاپی پلەی گەرمیی بەرز لە ڕووی گەرمییەوە دادەبڕێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "84ec5767b7418cd33a98414843302c8f37ebea8794df3f71c4261da536d0679c",
+  "en": "The XY belt is an open drive belt with a pitch length of 1442mm. Its main function is to transmit the motion of the motor to the tool head with high precision.",
+  "ar": "سير XY هو سير نقل حركة مفتوح بطول خطوة يبلغ 1442mm، ووظيفته الرئيسية نقل حركة المحرك إلى رأس الطباعة بدقة عالية.",
+  "ckb": "قایشی XY قایشێکی گواستنەوەی کراوەیە بە درێژیی هەنگاوی 1442mm. ئەرکی سەرەکیی ئەوەیە جووڵەی بزوێنەرەکە بە وردیی بەرز بگوازێتەوە بۆ سەری چاپ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d1ee5c590134333b5d38eda6decf1d5847c2048133e20282beeb6b841c1cfca4",
+  "en": "Important to know",
+  "ar": "من المهم أن تعرف",
+  "ckb": "گرنگە بزانیت",
+  "kind": "block_title"
+ },
+ {
+  "h": "8911f3c379ee853889a2c638d3f47a9b4029cd76f887acb93d3a7c07baa220e4",
+  "en": "1. The label on the Z belt you received may be labeled as \"XY belt\" due to an improper production operation, the actual product is the Z belt you ordered, which will not affect its functionality.",
+  "ar": "1. قد يحمل ملصق سير Z الذي استلمته اسم «XY belt» بسبب خطأ في عملية الإنتاج، لكن المنتج الفعلي هو سير Z الذي طلبته، ولن يؤثر ذلك على أدائه.",
+  "ckb": "1. لەوانەیە لەیبڵی سەر قایشی Z کە پێت گەیشتووە «XY belt» بێت بەهۆی هەڵەیەک لە پرۆسەی بەرهەمهێناندا؛ بەڵام بەرهەمی ڕاستەقینە بریتییە لە هەمان قایشی Z کە داوات کردووە، و ئەمە کاریگەری لەسەر کارکردنی نابێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b74ed9f28580274764329c0471bc79621c4c6a5ea03367d1709a450130f156ce",
+  "en": "2. We apologize for any confusion this may have caused. Rest assured, we are taking immediate corrective actions to address this issue. Thank you for your understanding.",
+  "ar": "2. نعتذر عن أي لبس قد يكون سبّبه ذلك. وكن مطمئنًا، فنحن نتخذ إجراءات تصحيحية فورية لمعالجة هذه المشكلة. شكرًا لتفهّمك.",
+  "ckb": "2. داوای لێبوردن دەکەین بۆ هەر تێکچوونێک کە لەوانەیە ئەمە دروستی کردبێت. دڵنیابە، ئێمە ڕێوشوێنی ڕاستکردنەوەی دەستبەجێ دەگرینەبەر بۆ چارەسەرکردنی ئەم کێشەیە. سوپاس بۆ تێگەیشتنت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "412479aba4b62a7fb5cbc64965a78ca248c202c55e22365a651b078b390caf7a",
+  "en": "The Z belt is a close drive belt with a pitch length of 1142mm, it is installed at the bottom of the Bambu Lab X1/X1C printer. Its main function is to transmit the motion of the Z motor to the three Z-axis lead screws.",
+  "ar": "سير Z هو سير نقل حركة مغلق بطول خطوة يبلغ 1142mm، ويُركَّب في الجزء السفلي من طابعة Bambu Lab X1/X1C. ووظيفته الرئيسية نقل حركة محرك Z إلى الأعمدة الملولبة الثلاثة للمحور Z.",
+  "ckb": "قایشی Z قایشێکی گواستنەوەی داخراوە بە درێژیی هەنگاوی 1142mm، لە بەشی خوارەوەی چاپکەری Bambu Lab X1/X1C دادەمەزرێت. ئەرکی سەرەکیی ئەوەیە جووڵەی بزوێنەری Z بگوازێتەوە بۆ هەر سێ میلی پێچداری تەوەری Z.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5557df10e6860f3b409e0718ee04d881a5ab2ccf46eef7c8813ed1cb5b268b98",
+  "en": "The AMS Feeder Unit (Hall) is specially designed to support the AMS for printing multiple colors and materials.",
+  "ar": "صُمّمت وحدة التغذية AMS Feeder Unit (Hall) خصيصًا لدعم نظام AMS في الطباعة بألوان ومواد متعددة.",
+  "ckb": "یەکەی پێدانی AMS Feeder Unit (Hall) بە تایبەتی دیزاین کراوە بۆ پشتگیریکردنی سیستەمی AMS لە چاپکردن بە چەند ڕەنگ و کەرەستەیەک.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7de1ca3b7c2b04cdd6a9f89db2c648160352b77a50fd44a51c9b0e6afb56eb06",
+  "en": "Each AMS has 4 feeder units, and each feeder unit has its own motor and gears to actively push the filament forward or wind it back to the spool.",
+  "ar": "تحتوي كل وحدة AMS على 4 وحدات تغذية، ولكل وحدة تغذية محركها وتروسها الخاصة لدفع الفلامنت إلى الأمام بشكل فعّال أو إعادة لفّه على البكرة (spool).",
+  "ckb": "هەر یەکەیەکی AMS 4 یەکەی پێدانی هەیە، و هەر یەکەیەکی پێدان بزوێنەر و چەرخی ددانەداری تایبەتی خۆی هەیە بۆ پاڵنانی چالاکی فیلامێنت بەرەو پێشەوە یان پێچانەوەی بۆ سەر ماسوورەکە (spool).",
+  "kind": "block_line"
+ },
+ {
+  "h": "abd2c5e6548e70381e775057c809079708f80e4e46978b8cbe57de2053a97546",
+  "en": "The feeder unit has a sensor to detect filament. When a filament is inserted, the feeder unit will pull the filament automatically. When a filament needs to be wound back, the feeder unit will drive the AMS driving sleeve to rotate the spool for filament winding.",
+  "ar": "تحتوي وحدة التغذية على حساس لكشف الفلامنت. فعند إدخال الفلامنت تسحبه وحدة التغذية تلقائيًا، وعند الحاجة إلى إعادة لفّه تُدير وحدة التغذية جلبة الدفع في نظام AMS لتدوير البكرة (spool) ولفّ الفلامنت عليها.",
+  "ckb": "یەکەی پێدان هەستەوەرێکی هەیە بۆ دۆزینەوەی فیلامێنت. کاتێک فیلامێنتێک دەخرێتە ناوەوە، یەکەی پێدان بە شێوەی خۆکار فیلامێنتەکە ڕادەکێشێت. کاتێک پێویست بێت فیلامێنتەکە بپێچرێتەوە، یەکەی پێدان بۆریچکەی جووڵێنەری AMS دەجووڵێنێت بۆ سووڕاندنی ماسوورەکە (spool) و پێچانەوەی فیلامێنت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "44f8c48d62af12b02e51d9ffa51df152ae9d7b4120761fa66396fbdeec5fa3cb",
+  "en": "The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating impurities, preventing the filament from soiling the nozzle and affecting print quality.",
+  "ar": "غطاء السيليكون للنوزل غطاء أسود وظيفته الأساسية الحفاظ على ثبات حرارة النوزل وعزل الشوائب، فيمنع الفلامنت من تلطيخ النوزل والتأثير في جودة الطباعة.",
+  "ckb": "بەرگی سیلیکۆنی نۆزڵ قەپاغێکی ڕەشە کە ئەرکی سەرەکیی پاراستنی جێگیریی پلەی گەرمیی نۆزڵ و جیاکردنەوەی پیسییەکانە، و ڕێگری دەکات لەوەی فیلامێنت نۆزڵەکە پیس بکات و کاریگەری لەسەر جۆرایەتیی چاپ هەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bab1131cf1e44aa68bc5a436fc6f1af22613c1000d92b625d1ac0474506e095b",
+  "en": "You should replace the silicone hotend cover if any of the following signs occur:",
+  "ar": "ينبغي استبدال غطاء السيليكون لرأس الصهر إذا ظهرت أيٌّ من العلامات التالية:",
+  "ckb": "پێویستە بەرگی سیلیکۆنی سەری تواندنەوە بگۆڕیت ئەگەر هەر یەکێک لەم نیشانانەی خوارەوە دەرکەوت:",
+  "kind": "block_line"
+ },
+ {
+  "h": "9a66c96f4e701f608521354d377d976dda52468401b2f7ecdc48f3dbe2a29b55",
+  "en": "1. Cracks or Damage",
+  "ar": "1. التشققات أو التلف",
+  "ckb": "1. درزبوون یان زیانلێکەوتن",
+  "kind": "block_line"
+ },
+ {
+  "h": "638528d945dcd4ede6e72b33d356e448f17fc9075927fed41d5f2ba0e8848cbc",
+  "en": "If the silicone cover shows visible cracks or tears, it should be replaced immediately. Any opening can compromise the insulation performance of the hotend, allowing heat to escape and resulting in unstable printing temperatures.",
+  "ar": "إذا ظهرت على غطاء السيليكون تشققات أو تمزقات واضحة، فيجب استبداله فورًا؛ إذ يمكن لأي فتحة أن تُضعف أداء العزل الحراري لرأس الصهر، فتسمح بتسرّب الحرارة وتؤدي إلى عدم استقرار حرارة الطباعة.",
+  "ckb": "ئەگەر درز یان دڕانی بەرچاو لە بەرگە سیلیکۆنییەکەدا دەرکەوت، پێویستە دەستبەجێ بگۆڕدرێت. هەر کونێک دەتوانێت کارایی دابڕینی گەرمیی سەری تواندنەوە لاواز بکات، ڕێگە بە دەرچوونی گەرمی دەدات و دەبێتە هۆی ناجێگیریی پلەی گەرمیی چاپ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "83724566ba759997895f5ab068b6cc034f2c992f78093b22febc986c1343cf5a",
+  "en": "2. Looseness or Detachment",
+  "ar": "2. الارتخاء أو الانفصال",
+  "ckb": "2. شلبوون یان جیابوونەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "ca361924abe16bda01b4cb3179beb5940cf1bb0b6aa740420d69ef5db0772043",
+  "en": "The silicone cover should fit tightly around the hotend. If it becomes loose or easily slips off, it cannot effectively protect the nozzle and heating block. Cold air from the environment may cause temperature fluctuations and could interfere with the printer’s wiping or leveling functions.",
+  "ar": "يجب أن يُحكم غطاء السيليكون الإحاطة برأس الصهر. فإذا ارتخى أو انزلق بسهولة، فلن يتمكن من حماية النوزل وكتلة التسخين بفعالية، وقد يتسبب الهواء البارد من المحيط في تذبذب درجة الحرارة ويتداخل مع وظيفتَي المسح أو التسوية في الطابعة.",
+  "ckb": "بەرگە سیلیکۆنییەکە دەبێت بە توندی لە دەوری سەری تواندنەوە جێگیر بێت. ئەگەر شل بوو یان بە ئاسانی خلیسکا، ناتوانێت بە شێوەیەکی کارا نۆزڵ و بلۆکی گەرمکەرەوە بپارێزێت. هەوای ساردی دەوروبەر لەوانەیە ببێتە هۆی گۆڕانکاریی پلەی گەرمی و دەستێوەردان لە کارەکانی سڕین یان ڕێکخستنی ئاستی چاپکەرەکەدا بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f22dc5b1b7cc7febededfb1624444eadd605a951b4e91d9dbe7eb48f4855c43b",
+  "en": "3. Deformation Due to Prolonged High Temperatures",
+  "ar": "3. التشوّه بسبب التعرّض المطوّل لدرجات حرارة عالية",
+  "ckb": "3. شێوە تێکچوون بەهۆی پلەی گەرمیی بەرزی درێژخایەن",
+  "kind": "block_line"
+ },
+ {
+  "h": "dc38cc034938a06750730ac5a5cc6f462d19059f6ec3ab96e620e93d1575cde2",
+  "en": "Extended exposure to high temperatures can cause the silicone cover to stretch or deform, preventing it from fitting tightly or fully covering the hotend. If deformation is observed, replacement is necessary.",
+  "ar": "قد يؤدي التعرّض المطوّل لدرجات الحرارة العالية إلى تمدّد غطاء السيليكون أو تشوّهه، فيمنعه ذلك من الإحكام حول رأس الصهر أو تغطيته بالكامل. وإذا لاحظت أي تشوّه فيجب استبداله.",
+  "ckb": "مانەوە بۆ ماوەیەکی درێژ لە ژێر پلەی گەرمیی بەرزدا دەتوانێت ببێتە هۆی کشانەوە یان شێوە تێکچوونی بەرگە سیلیکۆنییەکە، و ڕێگری دەکات لەوەی بە توندی جێگیر بێت یان سەری تواندنەوە بە تەواوی دابپۆشێت. ئەگەر شێوە تێکچوون بینرا، گۆڕینی پێویستە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "83a608a56885a79af61ba108bece2cb5128d9f1a1d56e40bfe30dfd6be1582d6",
+  "en": "4. Frequent Filament Build-up on the Heating Block",
+  "ar": "4. تراكم الفلامنت المتكرر على كتلة التسخين",
+  "ckb": "4. کەڵەکەبوونی دووبارەی فیلامێنت لەسەر بلۆکی گەرمکەرەوە",
+  "kind": "block_line"
+ },
+ {
+  "h": "24ef26880cfd3d9b98a1cbecf1492600c888cbd7a8352adad1504212272e6cf3",
+  "en": "If you notice frequent residue or filament build-up around the hotend, it may indicate that the silicone cover has failed. A damaged cover cannot effectively block oozing or retracted filament, which can lead to clogging and other issues.",
+  "ar": "إذا لاحظت تكرار تراكم البقايا أو الفلامنت حول رأس الصهر، فقد يدل ذلك على تلف غطاء السيليكون. فالغطاء التالف لا يستطيع منع الفلامنت المتسرّب أو المسحوب بفعالية، ما قد يؤدي إلى الانسداد ومشكلات أخرى.",
+  "ckb": "ئەگەر تێبینیت کرد پاشماوە یان فیلامێنت بە دووبارە لە دەوری سەری تواندنەوە کەڵەکە دەبێت، لەوانەیە ئاماژە بێت بۆ ئەوەی بەرگە سیلیکۆنییەکە تێکچووە. بەرگێکی زیانلێکەوتوو ناتوانێت بە شێوەیەکی کارا ڕێگری لە فیلامێنتی دزەکردوو یان پاشەکشەکراو بکات، ئەمەش دەتوانێت ببێتە هۆی گیران و کێشەی تر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a2771b67f4872e12223228d9ff802311d0638eeb72d4ecf977f1c902e7345782",
+  "en": "5. Discoloration or Brittleness",
+  "ar": "5. تغيّر اللون أو الهشاشة",
+  "ckb": "5. ڕەنگ گۆڕان یان زوو شکان",
+  "kind": "block_line"
+ },
+ {
+  "h": "1e18a66000692b7476111109800588149134850f57d4563e9ec33f4502720b30",
+  "en": "Prolonged high temperatures can cause the silicone to age, discolor, or become brittle. If any of these signs appear, the cover is nearing failure and should be replaced as soon as possible.",
+  "ar": "قد تؤدي درجات الحرارة العالية لفترات طويلة إلى تقادم السيليكون أو تغيّر لونه أو هشاشته. وإذا ظهرت أيٌّ من هذه العلامات، فهذا يعني أن الغطاء يقترب من التلف ويجب استبداله في أقرب وقت ممكن.",
+  "ckb": "پلەی گەرمیی بەرزی درێژخایەن دەتوانێت ببێتە هۆی کۆنبوون، ڕەنگ گۆڕان یان زوو شکانی سیلیکۆنەکە. ئەگەر هەر یەکێک لەم نیشانانە دەرکەوت، بەرگەکە نزیکە لە تێکچوون و پێویستە بە زووترین کات بگۆڕدرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7bcc8e57319532b30a1487f70f6b4655e6c56e14d1505c982b8234d1f3ac1075",
+  "en": "6. Friction With Moving Parts (e.g, Nozzle Wiper)",
+  "ar": "6. الاحتكاك بالأجزاء المتحركة (مثل ماسحة النوزل)",
+  "ckb": "6. لێکخشان لەگەڵ پارچە جووڵاوەکان (وەک سڕەری نۆزڵ)",
+  "kind": "block_line"
+ },
+ {
+  "h": "913c66479e7e1803f9124983ea835dff03cd505094a54629e0b9cbc504dd1a08",
+  "en": "If the cover comes into contact with the other parts of the 3D printer, it may tear or shift out of place. Repeated friction can cause physical wear or misalignment, exposing the nozzle or heating block and affecting heat retention and distribution. It is recommended to inspect the silicone cover after cleaning.",
+  "ar": "إذا لامس الغطاء أجزاء أخرى من طابعة 3D، فقد يتمزق أو يتزحزح من مكانه. ويمكن أن يسبب الاحتكاك المتكرر تآكلًا فعليًا أو انحرافًا عن الموضع، فيكشف النوزل أو كتلة التسخين ويؤثر في الاحتفاظ بالحرارة وتوزيعها. يُوصى بفحص غطاء السيليكون بعد التنظيف.",
+  "ckb": "ئەگەر بەرگەکە بەر پارچەکانی تری چاپکەری 3D بکەوێت، لەوانەیە بدڕێت یان لە شوێنی خۆی بجووڵێت. لێکخشانی دووبارە دەتوانێت ببێتە هۆی سووانی فیزیکی یان لاچوون لە شوێن، و نۆزڵ یان بلۆکی گەرمکەرەوە ئاشکرا بکات و کاریگەری لەسەر ڕاگرتن و دابەشبوونی گەرمی هەبێت. پێشنیار دەکرێت دوای پاککردنەوە بەرگە سیلیکۆنییەکە بپشکنیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fb499e0fd8833322a208b4b2ccf5b7a6f5a8c60b2e548c04a2971358519b28d1",
+  "en": "The AMS Feeding Funnel is the inner component of the AMS First Stage Feeder, which consists of structural parts and a filament detection sensor board.",
+  "ar": "قمع التغذية AMS Feeding Funnel هو المكوّن الداخلي لوحدة التغذية الأولى في نظام AMS (AMS First Stage Feeder)، ويتكوّن من أجزاء هيكلية ولوحة حساس لكشف الفلامنت.",
+  "ckb": "قیفی پێدانی AMS Feeding Funnel بەشێکی ناوەکییە لە پێدەری قۆناغی یەکەمی AMS (AMS First Stage Feeder)، و لە پارچەی پێکهاتەیی و بۆردێکی هەستەوەری دۆزینەوەی فیلامێنت پێکدێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a42f2245eb7b3d3b656b906b32ddee5a2178ab1b2a61833e1f8ec7353033073a",
+  "en": "When the sensor board detects the insertion of filament, the AMS first stage feeder will pull the filament forward automatically. When the filament insertion is abnormal, the sensor board will also identify it and feed that information back to the 3D printer.",
+  "ar": "عندما تكتشف لوحة الحساس إدخال الفلامنت، تسحب وحدة التغذية الأولى في نظام AMS الفلامنت إلى الأمام تلقائيًا. وإذا كان إدخال الفلامنت غير طبيعي، تتعرّف لوحة الحساس على ذلك أيضًا وترسل هذه المعلومة إلى طابعة 3D.",
+  "ckb": "کاتێک بۆردی هەستەوەر خستنە ناوەوەی فیلامێنت دەدۆزێتەوە، پێدەری قۆناغی یەکەمی AMS بە شێوەی خۆکار فیلامێنتەکە بەرەو پێشەوە ڕادەکێشێت. کاتێک خستنە ناوەوەی فیلامێنت نائاسایی بێت، بۆردی هەستەوەر ئەوەش دەناسێتەوە و ئەو زانیارییە دەنێرێتەوە بۆ چاپکەری 3D.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d84fdd54ce25a34ccc47e7c10af56fc3376cb2de983a459c5e0867dcf16f7148",
+  "en": "The ceramic heater and thermistor for Bambu Lab P1P 3D printer are combined into one module with an integrated terminal connector. With this design, the reliability of the terminal connector under extreme conditions is improved.",
+  "ar": "دُمج السخّان الخزفي والثرمستور الخاصّان بطابعة 3D طراز Bambu Lab P1P في وحدة واحدة مزوّدة بموصل أطراف مدمج. وبفضل هذا التصميم تتحسّن موثوقية موصل الأطراف في الظروف القاسية.",
+  "ckb": "گەرمکەرەوە سیرامیکییەکە و تێرمیستۆری چاپکەری 3D مۆدێلی Bambu Lab P1P لە یەک مۆدیولدا کۆکراونەتەوە کە گەیەنەری تێرمیناڵی یەکگرتووی هەیە. بەم دیزاینە، متمانەپێکراویی گەیەنەری تێرمیناڵ لە بارودۆخی تونددا باشتر دەبێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3fdbc73a464f6a4d1f9337b88ab8a29fca44eeb5b4a8d9de0d91d818c65693e5",
+  "en": "The ceramic heater can heat the nozzle up to 300℃ while the thermistor has highly accurate temperature measurement and reliable structural design.",
+  "ar": "يمكن للسخّان الخزفي تسخين النوزل حتى 300℃، بينما يتميّز الثرمستور بقياس عالي الدقة لدرجة الحرارة وتصميم هيكلي موثوق.",
+  "ckb": "گەرمکەرەوە سیرامیکییەکە دەتوانێت نۆزڵ تا 300℃ گەرم بکات، لە کاتێکدا تێرمیستۆرەکە پێوانی زۆر وردی پلەی گەرمی و دیزاینی پێکهاتەیی متمانەپێکراوی هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "38585859099a42ccda923787a9aad7d0f756df2d971e855b6ca6ca3302944db6",
+  "en": "The hardened steel extruder gear assembly is an internal component of the hardened steel extruder unit. It comprises a driven gear and an active gear that work together to feed filament into the hotend.",
+  "ar": "مجموعة تروس الدافع المصنوعة من الفولاذ المقسّى مكوّن داخلي في وحدة الدافع المصنوعة من الفولاذ المقسّى، وتتألف من ترس تابع وترس محرِّك يعملان معًا لتغذية الفلامنت إلى رأس الصهر.",
+  "ckb": "کۆمەڵەی چەرخی پاڵنەری پۆڵای ڕەقکراو پێکهاتەیەکی ناوەوەی یەکەی پاڵنەری پۆڵای ڕەقکراوە. لە چەرخێکی شوێنکەوتوو و چەرخێکی جووڵێنەر پێکدێت کە پێکەوە کار دەکەن بۆ پێدانی فیلامێنت بۆ ناو سەری تواندنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c25c9923b677aa5db4db72d777c538c53b5e5dad9e185a039eb5497cd21ae756",
+  "en": "Built with heavy-duty materials, the hardened steel extruder gear has a better capability of printing with tough engineering filaments like PAHT-CF and PET-CF for long-lasting performance. If abrasion or clogging occurs due to extended use, users can just replace the extruder gear assembly rather than the whole extruder unit.",
+  "ar": "بفضل تصنيعه من مواد شديدة التحمّل، يتمتع ترس الدافع المصنوع من الفولاذ المقسّى بقدرة أفضل على الطباعة بالفلامنتات الهندسية القاسية مثل PAHT-CF وPET-CF لأداء يدوم طويلًا. وإذا حدث تآكل أو انسداد بسبب الاستخدام المطوّل، يمكن للمستخدمين استبدال مجموعة تروس الدافع فقط بدلًا من وحدة الدافع بأكملها.",
+  "ckb": "چەرخی پاڵنەری پۆڵای ڕەقکراو، کە لە کەرەستەی بەرگەگری قورس دروستکراوە، توانای باشتری هەیە بۆ چاپکردن بە فیلامێنتە ئەندازیارییە پتەوەکانی وەک PAHT-CF و PET-CF بۆ کاراییەکی درێژخایەن. ئەگەر بەهۆی بەکارهێنانی درێژخایەنەوە سووان یان گیران ڕوویدا، بەکارهێنەران دەتوانن تەنها کۆمەڵەی چەرخی پاڵنەر بگۆڕن نەک هەموو یەکەی پاڵنەرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "58c618fc4f7ee6249da99c1d989206993558846e35e799a1f89f5580e50cd786",
+  "en": "*The P1 Series Extruder Unit comes with stainless steel extruder gear. Users can upgrade it to hardened steel extruder gear for better abrasion resistance to engineering filaments.",
+  "ar": "*تأتي وحدة الدافع في P1 Series مزوّدة بترس دافع من الفولاذ المقاوم للصدأ، ويمكن للمستخدمين ترقيته إلى ترس دافع من الفولاذ المقسّى لمقاومة أفضل للتآكل بالاحتكاك عند استخدام الفلامنتات الهندسية.",
+  "ckb": "*یەکەی پاڵنەری P1 Series چەرخی پاڵنەری پۆڵای زەنگنەگری لەگەڵدایە. بەکارهێنەران دەتوانن بیگۆڕن بە چەرخی پاڵنەری پۆڵای ڕەقکراو بۆ بەرگەی سووانی باشتر بەرامبەر بە فیلامێنتە ئەندازیارییەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f3936493496d214d4fdc3f942c4275ff54cc6f02b94143e23abf5e4c3b6d17fd",
+  "en": "The display connector cable for P1P is used to connect the motherboard and high-resolution screen. Its function is to transmit SD card data and display images between the screen and printer.",
+  "ar": "يُستخدم كابل توصيل الشاشة الخاص بطابعة P1P لتوصيل اللوحة الأم بالشاشة عالية الدقة. ووظيفته نقل بيانات بطاقة SD وعرض الصور بين الشاشة والطابعة.",
+  "ckb": "کێبڵی گەیەنەری شاشە بۆ P1P بۆ پەیوەستکردنی بۆردی سەرەکی و شاشە بەرز-ڕوونییەکە بەکاردێت. ئەرکەکەی گواستنەوەی زانیاریی کارتی SD و نیشاندانی وێنەیە لە نێوان شاشە و چاپکەرەکەدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3e6a5d40faa187897314214684502ec24bfb481d3d3aa7832e97a5e554005e3d",
+  "en": "The function of PTFE Tube is to reduce resistance and guide filament. The tube's inner diameter is 2.5mm, and its outer diameter is 4mm.",
+  "ar": "وظيفة أنبوب PTFE تقليل المقاومة وتوجيه الفلامنت. القطر الداخلي للأنبوب 2.5mm وقطره الخارجي 4mm.",
+  "ckb": "ئەرکی بۆریی PTFE کەمکردنەوەی بەرگری و ڕێنماییکردنی فیلامێنتە. بۆرییەکە تیرەی ناوەوەی 2.5mm و تیرەی دەرەوەی 4mm هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0ec2f629f7e878532c8cb69312f7c50d324082b72375211de5f5a7da5ed281fc",
+  "en": "Please note that the PTFE tubes are consumables and are at risk of wear, as they may rub against the filament over time. We recommend that you check the PTFE tubes for wear during your maintenance of the machine.",
+  "ar": "يرجى ملاحظة أن أنابيب PTFE مواد استهلاكية معرّضة للتآكل، لأنها قد تحتك بالفلامنت مع مرور الوقت. نوصي بفحص أنابيب PTFE للتأكد من عدم تآكلها أثناء صيانة الجهاز.",
+  "ckb": "تکایە ئاگاداربە کە بۆرییەکانی PTFE کەرەستەی بەکاربردنن و مەترسیی سووانیان هەیە، چونکە لەوانەیە بە تێپەڕبوونی کات بە فیلامێنتەکەدا بخشێن. پێشنیار دەکەین لە کاتی چاککردنەوەی ئامێرەکەدا بۆرییەکانی PTFE بۆ سووان بپشکنیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "06f19778745867c6af5835f45b6bd4d5d25d7c416ad7e9a7a4865eae81959bb6",
+  "en": "If the tubes are worn and not replaced in time, this may lead to feeding failures, filament accumulation inside the AMS, etc.",
+  "ar": "إذا تآكلت الأنابيب ولم تُستبدل في الوقت المناسب، فقد يؤدي ذلك إلى فشل التغذية وتراكم الفلامنت داخل وحدة AMS وغير ذلك.",
+  "ckb": "ئەگەر بۆرییەکان سووابن و بە کاتی خۆی نەگۆڕدرێن، لەوانەیە ببێتە هۆی شکستی پێدان، کەڵەکەبوونی فیلامێنت لە ناو یەکەی AMS و هتد.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b205029d540e4fed423973a07e992ec4660616a573c75f4cef21bce2f3ef8be0",
+  "en": "The P1 Series Toolhead Cable connects the printer headboard and the motion control mainboard to supply power and data communication.",
+  "ar": "يربط كابل رأس الطباعة P1 Series Toolhead Cable بين لوحة رأس الطباعة واللوحة الأم للتحكم في الحركة لتوفير الطاقة ونقل البيانات.",
+  "ckb": "کێبڵی سەری چاپی P1 Series Toolhead Cable بۆردی سەری چاپ و بۆردی سەرەکیی کۆنترۆڵی جووڵە بە یەکەوە دەبەستێت بۆ دابینکردنی وزە و پەیوەندیی زانیاری.",
+  "kind": "block_line"
+ },
+ {
+  "h": "591ed1e7b0910b3bd8cbe9e0201c7d3f3c53b148d394ee4675cda54e2900fa71",
+  "en": "The P1S version without rubber plug is mainly designed for P1S to adapt the cable chain. It is also compatible with P1P especially when cable chain is added.",
+  "ar": "نسخة P1S الخالية من السدادة المطاطية مصمّمة أساسًا لطابعة P1S لتتلاءم مع سلسلة الكابلات، وهي متوافقة أيضًا مع P1P، خاصة عند إضافة سلسلة الكابلات إليها.",
+  "ckb": "وەشانی P1S کە سەرپۆشی لاستیکیی نییە بە شێوەیەکی سەرەکی بۆ P1S دیزاین کراوە تاکو لەگەڵ زنجیری کێبڵ بگونجێت. هەروەها لەگەڵ P1P گونجاوە، بە تایبەتی کاتێک زنجیری کێبڵی بۆ زیاد دەکرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "83457715e4162f1026e49cce66768cafaf0eb29f4855bf6cab9927152b5b5c2b",
+  "en": "The screen module with LCD screen and physical control buttons can be used to display printing parameters and control the printer.",
+  "ar": "يمكن استخدام وحدة الشاشة المزوّدة بشاشة LCD وأزرار تحكم فعلية لعرض إعدادات الطباعة والتحكم في الطابعة.",
+  "ckb": "مۆدیولی شاشە کە شاشەی LCD و دوگمەی کۆنترۆڵی فیزیکیی هەیە، دەتوانرێت بۆ پیشاندانی ڕێکخستنەکانی چاپ و کۆنترۆڵکردنی چاپکەرەکە بەکاربهێنرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b95a7751764c6cde3558b60e66631db6cfe7ed5d4692a279add879d7aaba9f3e",
+  "en": "The stainless steel extruder unit features double gears made of stainless steel, which increases extrusion force and prevents slippage. It is suitable for commonly used 3D printing filaments such as PLA, PETG, TPU, and more.",
+  "ar": "تتميّز وحدة الدافع المصنوعة من الفولاذ المقاوم للصدأ بترسين مزدوجين من الفولاذ المقاوم للصدأ، ما يزيد قوة البثق ويمنع الانزلاق. وهي مناسبة لفلامنتات الطباعة 3D الشائعة مثل PLA وPETG وTPU وغيرها.",
+  "ckb": "یەکەی پاڵنەری پۆڵای زەنگنەگر دوو چەرخی ددانەداری لە پۆڵای زەنگنەگر هەیە، کە هێزی پاڵنان زیاد دەکات و ڕێگری لە خلیسکان دەکات. گونجاوە بۆ فیلامێنتە باوەکانی چاپی 3D وەک PLA، PETG، TPU و هی تر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "36e61882f9165d0ff1dd25290080c3cdd36250b94c04549293544be8a9af174b",
+  "en": "The extruder unit also includes a sensor that supports filament break detection, helping to prevent print failures and improving overall printing efficiency.",
+  "ar": "تتضمن وحدة الدافع أيضًا حساسًا يدعم كشف انقطاع الفلامنت، ما يساعد على منع فشل الطباعة ويحسّن كفاءة الطباعة عمومًا.",
+  "ckb": "یەکەی پاڵنەرەکە هەروەها هەستەوەرێکی تێدایە کە پشتگیری لە دۆزینەوەی پچڕانی فیلامێنت دەکات، یارمەتی ڕێگریکردن لە شکستی چاپ دەدات و کارایی گشتیی چاپ باشتر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "69362ff557d219ffec9072569e0b5b2a1f037d7969a94c698da1dce2372ac00f",
+  "en": "*Please keep all the screws from your original extruder unit for replacement.",
+  "ar": "*يرجى الاحتفاظ بجميع البراغي من وحدة الدافع الأصلية لاستخدامها عند الاستبدال.",
+  "ckb": "*تکایە هەموو بورغییەکانی یەکەی پاڵنەری ئەسڵیی خۆت هەڵبگرە بۆ کاتی گۆڕین.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c5eaf1cfb88d70b921dc7f2bee63079de906e4365b1a455fa85791b63faae589",
+  "en": "The front door mounting kit is an accessory package for installing the glass front door of X1 and P1 series printers",
+  "ar": "طقم تركيب الباب الأمامي عبوة ملحقات لتركيب الباب الأمامي الزجاجي في طابعات سلسلتَي X1 وP1",
+  "ckb": "کیتی دامەزراندنی دەرگای پێشەوە پاکەتێکی پێداویستییە بۆ دامەزراندنی دەرگای شووشەیی پێشەوەی چاپکەرەکانی زنجیرەکانی X1 و P1",
+  "kind": "block_line"
+ },
+ {
+  "h": "d538c68afe23a7bb9c87624e124f1aaee740fb51ad7ac86496570107cbd3a3a0",
+  "en": "The auxiliary part cooling fan is a powerful 12W cooling fan installed on the left side of the chamber, it provides a better cooling condition for high-speed printing.",
+  "ar": "مروحة التبريد المساعدة للقطعة المطبوعة مروحة تبريد قوية بقدرة 12W تُركَّب على الجانب الأيسر من حجرة الطباعة، وتوفّر ظروف تبريد أفضل للطباعة عالية السرعة.",
+  "ckb": "پانکەی یاریدەدەری ساردکردنەوەی پارچەی چاپکراو پانکەیەکی ساردکەرەوەی بەهێزە بە توانای 12W کە لە لای چەپی ژووری چاپ دادەمەزرێت، و بارودۆخێکی ساردکردنەوەی باشتر بۆ چاپی خێرا دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f83c10ae0bf642bfe93a81c036bf1193344b6f180c60f4eb3e1d845a9b91f2ff",
+  "en": "When using an Auxiliary Part Cooling Fan on an X1 printer (not X1C), you need to set the printer model to X1C in the slicer for the fan to start correctly.",
+  "ar": "عند استخدام مروحة Auxiliary Part Cooling Fan على طابعة X1 (وليس X1C)، يجب ضبط طراز الطابعة على X1C في برنامج التقطيع لكي تعمل المروحة بشكل صحيح.",
+  "ckb": "کاتێک پانکەی Auxiliary Part Cooling Fan لەسەر چاپکەری X1 (نەک X1C) بەکاردەهێنیت، پێویستە لە نەرمەکاڵای سلایسەردا مۆدێلی چاپکەرەکە بکەیت بە X1C تاکو پانکەکە بە دروستی دەست بە کار بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fbd3732ce7e1e99ed0a808269a62026054f21f12baabd485fdd4d0752feeaa62",
+  "en": "With the cable chain assembled, the trajectory of the toolhead cable and feeding tube can be safely confined to the horizontal plane during printing.",
+  "ar": "بعد تركيب سلسلة الكابلات، يمكن حصر مسار كابل رأس الطباعة وأنبوب التغذية بأمان في المستوى الأفقي أثناء الطباعة.",
+  "ckb": "دوای دامەزراندنی زنجیری کێبڵ، ڕێڕەوی کێبڵی سەری چاپ و بۆریی پێدان دەتوانرێت بە سەلامەتی لە کاتی چاپدا لە ڕووی ئاسۆییدا بهێڵرێتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "6128641b77bb3bfa93b4408ea3f301d462783a8682e4d0f43b1a0372d5754eef",
+  "en": "It can also protect the toolhead cable and feeding tube from being damaged during repetitive bending as a result of motion.",
+  "ar": "كما تحمي كابل رأس الطباعة وأنبوب التغذية من التلف الناتج عن الانثناء المتكرر بسبب الحركة.",
+  "ckb": "هەروەها دەتوانێت کێبڵی سەری چاپ و بۆریی پێدان لە زیانی چەمانەوەی دووبارە بەهۆی جووڵەوە بپارێزێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "99daddfdee69292639a91ac17799d55df1ed2f80d9101e41e2b6f006931f06e8",
+  "en": "The heatbed signal cable is a 6pin cable connected to the hotbed Sensor for temperature measurement and leveling.",
+  "ar": "كابل إشارة السرير الساخن هو كابل 6pin يتصل بحساس السرير الساخن لقياس درجة الحرارة والتسوية.",
+  "ckb": "کێبڵی ئاماژەی بێدی گەرم، کێبڵێکی 6pin، بە هەستەوەری بێدی گەرمەوە دەبەسترێت بۆ پێوانەکردنی پلەی گەرمی و ڕێکخستنی ئاستی بێد.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cefd665229744cd945523e0c83aa2e6bce40cb8367c85bd3e68dbd5f76ae1ecf",
+  "en": "Replacement",
+  "ar": "الاستبدال",
+  "ckb": "گۆڕین",
+  "kind": "block_title"
+ },
+ {
+  "h": "c5c0a569c23abbd7853c1e772d648a710ae41934c5f2df54e2b8da22a0a2ae22",
+  "en": "To learn more about replacing the heatbed signal cable",
+  "ar": "لمعرفة المزيد عن استبدال كابل إشارة السرير الساخن",
+  "ckb": "بۆ زانیاریی زیاتر دەربارەی گۆڕینی کێبڵی ئاماژەی بێدی گەرم",
+  "kind": "block_line"
+ },
+ {
+  "h": "c56325acf34b352c8de955dfde4a5a9a7762501507162d5da825a3073ee11e18",
+  "en": "X1 Series: https://wiki.bambulab.com/en/x1/maintenance/Replacing-the-heat-bed-cable.",
+  "ar": "X1 Series: https://wiki.bambulab.com/en/x1/maintenance/Replacing-the-heat-bed-cable.",
+  "ckb": "X1 Series: https://wiki.bambulab.com/en/x1/maintenance/Replacing-the-heat-bed-cable.",
+  "kind": "block_line",
+  "keep": true
+ },
+ {
+  "h": "0ac79b5e02ed135442dbc483e97819bc0918141f61cfa8f1e59e31dbd6ae255f",
+  "en": "The PTFE Tube Coupler is a component used to connect the PTFE tube, which is mounted on the back of the printer and used to connect the PTFE tube between the buffer and the tool head. You may need to replace the pneumatic connector when you encounter the following situations:",
+  "ar": "وصلة PTFE Tube Coupler مكوّن يُستخدم لتوصيل أنبوب PTFE، وتُركَّب في الجهة الخلفية من الطابعة لتوصيل أنبوب PTFE بين الموازن ورأس الطباعة. قد تحتاج إلى استبدال الموصل الهوائي في الحالات التالية:",
+  "ckb": "گەیەنەری PTFE Tube Coupler پێکهاتەیەکە بۆ بەستنی بۆریی PTFE بەکاردێت، لە پشتەوەی چاپکەرەکە دادەمەزرێت و بۆ بەستنی بۆریی PTFE لە نێوان هاوسەنگکەر و سەری چاپدا بەکاردێت. لەوانەیە پێویست بکات گەیەنەرە هەوایییەکە بگۆڕیت کاتێک ڕووبەڕووی ئەم حاڵەتانەی خوارەوە دەبیتەوە:",
+  "kind": "block_line"
+ },
+ {
+  "h": "a04b530aababc2e7d47b0ebc0ba1a614593ed0a4112ec8c980b1941e46d806e4",
+  "en": "1. The PTFE tube can not be secured. For example, the PTFE tube can not be fixed on the extruder.",
+  "ar": "1. تعذّر تثبيت أنبوب PTFE، على سبيل المثال: لا يمكن تثبيت أنبوب PTFE على الدافع.",
+  "ckb": "1. بۆریی PTFE جێگیر ناکرێت. بۆ نموونە، بۆریی PTFE لەسەر پاڵنەرەکە جێگیر نابێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7f780c3bdf604fb4d91bf96727d78bf8342fb51566c65bd6ec8915be53f2067a",
+  "en": "2. The filament cannot pass through the pneumatic connector. For example, the filament cannot pass through the buffer (as shown in the picture below, it may be due to internal damage to the pneumatic connector).",
+  "ar": "2. لا يستطيع الفلامنت المرور عبر الموصل الهوائي، على سبيل المثال: لا يمرّ الفلامنت عبر الموازن (كما هو موضّح في الصورة أدناه، وقد يكون ذلك بسبب تلف داخلي في الموصل الهوائي).",
+  "ckb": "2. فیلامێنت ناتوانێت بە ناو گەیەنەرە هەوایییەکەدا تێپەڕێت. بۆ نموونە، فیلامێنت ناتوانێت بە ناو هاوسەنگکەرەکەدا تێپەڕێت (وەک لە وێنەکەی خوارەوەدا دیارە، لەوانەیە بەهۆی زیانی ناوەکیی گەیەنەرە هەوایییەکەوە بێت).",
+  "kind": "block_line"
+ },
+ {
+  "h": "bdc3de881db09834f1d6f96e8e619dd67e846c7ddb2dd3f126afecf49a6934ce",
+  "en": "The X-axis carbon rods assembly ensures that the X-axis movement of the toolhead remains consistently fixed on the horizontal plane. Its lightweight and high rigidity characteristics enable the toolhead to achieve stable and high-speed movement along the Y-axis, enabling high-speed printing.",
+  "ar": "تضمن مجموعة قضبان الكربون للمحور X بقاء حركة رأس الطباعة على المحور X ثابتة دائمًا في المستوى الأفقي. وبفضل خفة وزنها وصلابتها العالية، تمكّن رأس الطباعة من التحرك بثبات وبسرعة عالية على طول المحور Y، ما يتيح الطباعة عالية السرعة.",
+  "ckb": "کۆمەڵەی میلە کاربۆنییەکانی تەوەری X دڵنیا دەکاتەوە کە جووڵەی سەری چاپ لەسەر تەوەری X بە بەردەوامی لە ڕووی ئاسۆییدا جێگیر دەمێنێتەوە. سووکی و ڕەقیی بەرزی وا لە سەری چاپ دەکات بە جێگیری و خێرایی بەرز بە درێژایی تەوەری Y بجووڵێت، ئەمەش چاپی خێرا ڕێگەپێدەدات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1a7c661a0b78e811ffcb666f798037dc298f3d14f6a65138400c2af9b3cc2bd7",
+  "en": "The toolhead (TH) board is the main board of the toolhead to ensure the smooth functioning of the toolhead parts, including but not limited to the hotend, extruder, cooling fan, filament cutter, etc.",
+  "ar": "لوحة رأس الطباعة (TH) هي اللوحة الرئيسية لرأس الطباعة، وتضمن عمل أجزائه بسلاسة، بما في ذلك على سبيل المثال لا الحصر: رأس الصهر والدافع ومروحة التبريد وقاطع الفلامنت وغيرها.",
+  "ckb": "بۆردی سەری چاپ (TH) بۆردی سەرەکیی سەری چاپە بۆ دڵنیابوون لە کارکردنی بێکێشەی پارچەکانی سەری چاپ، لەوانە بەڵام تەنها ئەمانە نا: سەری تواندنەوە، پاڵنەر، پانکەی ساردکەرەوە، بڕەری فیلامێنت و هتد.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e0549a42d19896401d3d32f071a3c56739386ab89882a30ba0fad147e39601eb",
+  "en": "The TH Board FPC Cable connects the Extruder Connection Board (Interface board in the front) and the TH Board (in the rear) to supply power and data communication.",
+  "ar": "يربط كابل FPC الخاص بـ TH Board بين لوحة توصيل الدافع (لوحة الواجهة في الأمام) وTH Board (في الخلف) لتوفير الطاقة ونقل البيانات.",
+  "ckb": "کێبڵی FPC ی TH Board بۆردی گەیەنەری پاڵنەر (بۆردی ڕووکار لە پێشەوە) و TH Board (لە پشتەوە) بە یەکەوە دەبەستێت بۆ دابینکردنی وزە و پەیوەندیی زانیاری.",
+  "kind": "block_line"
+ },
+ {
+  "h": "133175a3450e11e77b4982d580b1f0bcba1dadd35fa0da3c8f355d78b50641a8",
+  "en": "The front cover of the P1S printer is a black-gray cover that is installed on the front of the printer and printed with P1S.",
+  "ar": "الغطاء الأمامي لطابعة P1S غطاء بلون أسود رمادي يُركَّب في مقدمة الطابعة، ومطبوع عليه P1S.",
+  "ckb": "قەپاغی پێشەوەی چاپکەری P1S قەپاغێکی ڕەش-خۆڵەمێشییە کە لە پێشەوەی چاپکەرەکە دادەمەزرێت و ناوی P1S لەسەری چاپ کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4b3a03e87c2318f47fda3880fbca9a24cd0d2d1c31ebab767404b34b479ae641",
+  "en": "It is the plastic panel that is installed on the right side of the printer when facing the screen of the printer.",
+  "ar": "هو اللوح البلاستيكي الذي يُركَّب على الجانب الأيمن من الطابعة عند النظر إلى شاشتها من الأمام.",
+  "ckb": "ئەمە ئەو پانێڵە پلاستیکییەیە کە لە لای ڕاستی چاپکەرەکە دادەمەزرێت کاتێک ڕووت لە شاشەی چاپکەرەکە بێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0f90e39f9fca742316c45b5ed38d1b5ae2ba390889388b5e230df91bca9b35e6",
+  "en": "Two types of bases for the P1P model",
+  "ar": "نوعان من القواعد لطراز P1P",
+  "ckb": "دوو جۆر بنکە بۆ مۆدێلی P1P",
+  "kind": "block_title"
+ },
+ {
+  "h": "26048c81d4fa6e6cde76d7e1ea537a806c611672468e77321b04f910a0f472d8",
+  "en": "We have two types of bases for the P1P model. One version comes with side panel tab slots, while the other version does not have these slots. It is possible that earlier shipments of the P1P model were of the older version without the tab slots, while recent and future shipments of the P1P will be of the newer version with the tab slots. Please check if your printer base has tab slots or not.",
+  "ar": "لدينا نوعان من القواعد لطراز P1P: نسخة مزوّدة بفتحات لألسنة الألواح الجانبية، ونسخة أخرى بدون هذه الفتحات. ومن المحتمل أن تكون الدفعات السابقة من طراز P1P من النسخة القديمة بدون فتحات الألسنة، بينما ستكون الدفعات الحديثة والمستقبلية من P1P من النسخة الأحدث المزوّدة بفتحات الألسنة. يرجى التحقق مما إذا كانت قاعدة طابعتك تحتوي على فتحات الألسنة أم لا.",
+  "ckb": "دوو جۆر بنکەمان بۆ مۆدێلی P1P هەیە. وەشانێکیان کونی زمانەی پانێڵی لاتەنیشتی هەیە، لە کاتێکدا وەشانەکەی تر ئەم کونانەی نییە. لەوانەیە دەستەکانی پێشووی مۆدێلی P1P لە وەشانە کۆنەکە بووبن کە کونی زمانەی نییە، بەڵام دەستە نوێ و داهاتووەکانی P1P لە وەشانە نوێیەکە دەبن کە کونی زمانەی هەیە. تکایە بپشکنە بزانە بنکەی چاپکەرەکەت کونی زمانەی هەیە یان نا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bcc44fe5f7f14ead05c660443e2232a3e35036c4e543686ab6d9ec4f436f62b5",
+  "en": "Two types of side panel",
+  "ar": "نوعان من الألواح الجانبية",
+  "ckb": "دوو جۆر پانێڵی لاتەنیشت",
+  "kind": "block_title"
+ },
+ {
+  "h": "c12254134640eae56d160a8dab6e6db17126122eb552f02d887e6d8d7fec1dd0",
+  "en": "The side panels we shipped earlier also did not have tabs. Due to a change in production plans, the side panels we will be shipping in the near future and onwards will have tabs.If your printer base does not have tab slots but you received side panels with tabs, please remove the tabs from the side panels.",
+  "ar": "كذلك لم تكن الألواح الجانبية التي أرسلناها سابقًا مزوّدة بألسنة. ونظرًا لتغيير خطط الإنتاج، ستكون الألواح الجانبية التي سنرسلها في المستقبل القريب وما بعده مزوّدة بألسنة. إذا كانت قاعدة طابعتك لا تحتوي على فتحات للألسنة لكنك استلمت ألواحًا جانبية بألسنة، فيرجى إزالة الألسنة من الألواح الجانبية.",
+  "ckb": "ئەو پانێڵە لاتەنیشتانەی پێشتر ناردمان زمانەیان نەبوو. بەهۆی گۆڕانکاری لە پلانەکانی بەرهەمهێناندا، ئەو پانێڵە لاتەنیشتانەی لە داهاتووی نزیک و دواتر دەینێرین زمانەیان دەبێت. ئەگەر بنکەی چاپکەرەکەت کونی زمانەی نییە بەڵام پانێڵی لاتەنیشتی زمانەدارت وەرگرتووە، تکایە زمانەکان لە پانێڵە لاتەنیشتەکان لاببە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0d5f9c0c66a4080534cf35fb726437557ff01a309095a2f42409115707857b92",
+  "en": "It is the plastic panel that is installed on the left side of the printer when facing the screen of the printer.",
+  "ar": "هو اللوح البلاستيكي الذي يُركَّب على الجانب الأيسر من الطابعة عند النظر إلى شاشتها من الأمام.",
+  "ckb": "ئەمە ئەو پانێڵە پلاستیکییەیە کە لە لای چەپی چاپکەرەکە دادەمەزرێت کاتێک ڕووت لە شاشەی چاپکەرەکە بێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3b4b7b8992f088850db64d4f91af24eb35995d7420d2d7709f8590b83b969898",
+  "en": "It is the black metal panel that is installed on the back of the P1S printer (Please use the original screws from the printer for black metal rear pannel installation, as there are no screws included in the package of this spare part).",
+  "ar": "هو اللوح المعدني الأسود الذي يُركَّب في الجهة الخلفية من طابعة P1S (يرجى استخدام البراغي الأصلية للطابعة لتركيب اللوح الخلفي المعدني الأسود، إذ لا تتضمن عبوة قطعة الغيار هذه أي براغٍ).",
+  "ckb": "ئەمە ئەو پانێڵە کانزاییە ڕەشەیە کە لە پشتەوەی چاپکەری P1S دادەمەزرێت (تکایە بۆ دامەزراندنی پانێڵی پشتەوەی کانزایی ڕەش بورغییە ئەسڵییەکانی چاپکەرەکە بەکاربهێنە، چونکە هیچ بورغییەک لە پاکەتی ئەم پارچە یەدەگەدا نییە).",
+  "kind": "block_line"
+ },
+ {
+  "h": "ddcb27aff765c228c12c67b983f78168e2f5ce6b4f33d8cc7e4de84cd8dce661",
+  "en": "Some cables used inside AMS, include 1 RFID board connection cable, 1 power supply connection cable, 1 485 bus connection cable, 1 speed measurement board connection cable, and 1 filament selection board connection cable.",
+  "ar": "بعض الكابلات المستخدمة داخل وحدة AMS، وتشمل: كابل توصيل لوحة RFID عدد 1، وكابل توصيل مزوّد الطاقة عدد 1، وكابل توصيل ناقل 485 عدد 1، وكابل توصيل لوحة قياس السرعة عدد 1، وكابل توصيل لوحة اختيار الفلامنت عدد 1.",
+  "ckb": "هەندێک لەو کێبڵانەی لە ناو AMS بەکاردێن، لەوانە: 1 کێبڵی پەیوەستکردنی بۆردی RFID، 1 کێبڵی پەیوەستکردنی دابینکەری وزە، 1 کێبڵی پەیوەستکردنی باسی 485، 1 کێبڵی پەیوەستکردنی بۆردی پێوانەکردنی خێرایی، و 1 کێبڵی پەیوەستکردنی بۆردی هەڵبژاردنی فیلامێنت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "710a4685d27825cf35e2da48799d98749ca9a080f46f3bc22f3d719582ca80bb",
+  "en": "The Rear Panel refers to the metal panel installed on the back of the P1P printer.",
+  "ar": "اللوح الخلفي هو اللوح المعدني المركَّب في الجهة الخلفية من طابعة P1P.",
+  "ckb": "پانێڵی پشتەوە بریتییە لەو پانێڵە کانزاییەی لە پشتەوەی چاپکەری P1P دامەزراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e4c14273d209c4a3aa868524124f9db37115f59e2d4bee5664a41d4c7ed071bb",
+  "en": "The TH Board FPC Cable V9 connects the TH main board and the interface board.",
+  "ar": "يربط كابل FPC الخاص بـ TH Board من الإصدار V9 بين لوحة TH الرئيسية ولوحة الواجهة.",
+  "ckb": "کێبڵی FPC بۆ TH Board، وەشانی V9، بۆردی سەرەکیی TH و بۆردی ڕووکار بە یەکەوە دەبەستێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1130087092cab7b0ffab2b184d402505ace9139c89b1bcfef305bde490497569",
+  "en": "The rear cover of the printer's toolhead.",
+  "ar": "الغطاء الخلفي لرأس الطباعة في الطابعة.",
+  "ckb": "قەپاغی پشتەوەی سەری چاپی چاپکەرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "66ac699232de74c47a7ea5f70456d19981aa4100045644da5a34e515f296a67e",
+  "en": "The circuit board installed in the rear part of the heatbed with 5 connectors.",
+  "ar": "اللوحة الإلكترونية المركَّبة في الجزء الخلفي من السرير الساخن، وتحتوي على 5 موصلات.",
+  "ckb": "ئەو بۆردە ئەلیکترۆنییەی لە بەشی پشتەوەی بێدی گەرمدا دامەزراوە و 5 گەیەنەری هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "247ce18712c70d386acc9795a7abf03fd5e9ab28118a14d17463a0672d62a67f",
+  "en": "The cable connecting the front housing of the toolhead to the extruder board.",
+  "ar": "الكابل الذي يصل الغلاف الأمامي لرأس الطباعة بلوحة الدافع.",
+  "ckb": "ئەو کێبڵەی بەرگی پێشەوەی سەری چاپ بە بۆردی پاڵنەرەوە دەبەستێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9a8f08d124ee27031e497ea0357638baa26356fed3356a447efaf5fe42b5b116",
+  "en": "Extruder Interface Board V9 is the part of the tool head board where the print head wires are connected. It's also connected to the main TH board V9 and it's only compatible with V9 version of the TH board.",
+  "ar": "لوحة واجهة الدافع V9 هي جزء لوحة رأس الطباعة الذي تُوصَل به أسلاك رأس الطباعة. وهي موصولة أيضًا بلوحة TH الرئيسية V9، ومتوافقة فقط مع الإصدار V9 من لوحة TH.",
+  "ckb": "بۆردی ڕووکاری پاڵنەر V9 ئەو بەشەی بۆردی سەری چاپە کە وایەرەکانی سەری چاپی پێوە دەبەسترێن. هەروەها بە بۆردی سەرەکیی TH وەشانی V9 بەستراوە و تەنها لەگەڵ بۆردی TH وەشانی V9 گونجاوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "72bc3a47257f1eb2fa3c4e541adfe5df067d6572e7e4afcf651876bfcb0eaa8a",
+  "en": "A small circuit board installed underneath the heatbed, which connects the heatbed sensors to the MC board.",
+  "ar": "لوحة إلكترونية صغيرة تُركَّب أسفل السرير الساخن، وتصل حساسات السرير الساخن بلوحة MC.",
+  "ckb": "بۆردێکی ئەلیکترۆنیی بچووکە لە ژێر بێدی گەرم دادەمەزرێت و هەستەوەرەکانی بێدی گەرم دەگەیەنێت بە بۆردی MC.",
+  "kind": "block_line"
+ },
+ {
+  "h": "77304bc3602f1673ee7b6d8fea65d2e0c1b1008b40b420568296d8950e739c40",
+  "en": "The cable connects the MC board to the AP board on the P1 series printers. It supplies power and data.",
+  "ar": "يصل الكابل لوحة MC بلوحة AP في طابعات سلسلة P1، ويوفّر الطاقة والبيانات.",
+  "ckb": "ئەم کێبڵە لە چاپکەرەکانی زنجیرەی P1، بۆردی MC بە بۆردی AP دەگەیەنێت. وزە و زانیاری دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f0bc1438fff14b26598f19dbb1f7e991cc56c7470c8c8713fdb259bf3f197fc8",
+  "en": "The AMS bottom cover unit is the bottom shell of the AMS with all sealings installed.",
+  "ar": "وحدة الغطاء السفلي لنظام AMS هي الغلاف السفلي لوحدة AMS مع جميع موانع التسرّب مركّبة عليه.",
+  "ckb": "یەکەی قەپاغی خوارەوەی AMS بریتییە لە ڕووپۆشی خوارەوەی یەکەی AMS کە هەموو داخەرەکانی لەسەر دامەزراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d947b3e45392b85edfabee0d167db670b071c55da83ded842dc0ca3487d85da7",
+  "en": "The middle cover of the printer's toolhead.",
+  "ar": "الغطاء الأوسط لرأس الطباعة في الطابعة.",
+  "ckb": "قەپاغی ناوەڕاستی سەری چاپی چاپکەرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5d918f72da8f3910e52e4b9963c591d844ff79a32d1caf9f3ac41a3725248442",
+  "en": "The rear panel is the metallic panel installed on the back of the X series printers.",
+  "ar": "اللوح الخلفي هو اللوح المعدني المركَّب في الجهة الخلفية من طابعات سلسلة X.",
+  "ckb": "پانێڵی پشتەوە ئەو پانێڵە کانزاییەیە کە لە پشتەوەی چاپکەرەکانی زنجیرەی X دامەزراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "649dd9b8105ca4cbda7244e666c09187621a64b202fe1ef7d801f993b8c403b0",
+  "en": "The transparent top lid of the AMS.",
+  "ar": "الغطاء العلوي الشفاف لوحدة AMS.",
+  "ckb": "قەپاغە ڕوونەکەی سەرەوەی AMS.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e14be7aba0b57add051cf833a3895b3c67d599a259d0283f79e23ab8ee0b18dc",
+  "en": "The pack comes with 4 cables including the communication cable connecting the AC board and MC cable, the MC board power supply cable, the heat bed power cable for V3 heatbed, and the cable connecting the MC board and the AMS interface board.",
+  "ar": "تحتوي العبوة على 4 كابلات، تشمل: كابل الاتصال الذي يصل لوحة AC بكابل MC، وكابل تغذية الطاقة للوحة MC، وكابل طاقة السرير الساخن الخاص بالسرير الساخن V3، والكابل الذي يصل لوحة MC بلوحة واجهة AMS.",
+  "ckb": "پاکەتەکە 4 کێبڵی تێدایە، لەوانە: کێبڵی پەیوەندی کە بۆردی AC و کێبڵی MC بە یەکەوە دەبەستێت، کێبڵی دابینکردنی وزەی بۆردی MC، کێبڵی وزەی بێدی گەرم بۆ بێدی گەرمی V3، و ئەو کێبڵەی بۆردی MC و بۆردی ڕووکاری AMS بە یەکەوە دەبەستێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "303e9f1e1893f91310712220a28fc6b74fe117e495eba7581d05c965b88898c7",
+  "en": "The 2 cables that connecting the AP board and MC board of the X series printers, supplying the power from MC to AP, and and data interaction between them.",
+  "ar": "عدد 2 من الكابلات التي تصل لوحة AP بلوحة MC في طابعات سلسلة X، لنقل الطاقة من MC إلى AP وتبادل البيانات بينهما.",
+  "ckb": "ئەو 2 کێبڵەی کە لە چاپکەرەکانی زنجیرەی X بۆردی AP و بۆردی MC بە یەکەوە دەبەستن، وزە لە بۆردی MC دەگوازنەوە بۆ بۆردی AP و ئاڵوگۆڕی زانیاری لە نێوانیاندا دەکەن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "98d5dd9d15e0e4ab7fbc136e752781822479d7f5da9f5e7dcc7195820e6ce7dd",
+  "en": "The X-Axis Assembly ensures that the X-axis movement of the toolhead remains consistently fixed on the horizontal plane. The X-axis utilizes linear rail guidance, which provides stability, smooth motion, improved guiding precision, and longevity.",
+  "ar": "تضمن مجموعة المحور X بقاء حركة رأس الطباعة على المحور X ثابتة دائمًا في المستوى الأفقي. ويعتمد المحور X على التوجيه بسكة خطية، ما يوفّر الثبات وسلاسة الحركة ودقة توجيه أعلى وعمرًا أطول.",
+  "ckb": "کۆمەڵەی تەوەری X دڵنیا دەکاتەوە کە جووڵەی سەری چاپ لەسەر تەوەری X بە بەردەوامی لە ڕووی ئاسۆییدا جێگیر دەمێنێتەوە. تەوەری X ڕێنماییکردن بە ڕێڕەوی هێڵی بەکاردەهێنێت، کە جێگیری، جووڵەی نەرم، وردیی ڕێنماییکردنی باشتر و تەمەنی درێژ دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "5f70d159cf28a4da7e1cf6c12a8f867607ad5cf31b9b9f95dcf407c01b7973c8",
+  "en": "The Toolhead Rear Housing is designed to protect the rear part of the print head.",
+  "ar": "صُمّم الغلاف الخلفي لرأس الطباعة (Toolhead Rear Housing) لحماية الجزء الخلفي من رأس الطباعة.",
+  "ckb": "بەرگی پشتەوەی سەری چاپ (Toolhead Rear Housing) بۆ پاراستنی بەشی پشتەوەی سەری چاپ دیزاین کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "aaad2b75106dff0b6818f59dbc059a3a24d861e574f6676b50b8a88c1b3b5a63",
+  "en": "The Hardened Steel Extruder Gear Assembly is an internal component of the Extruder Unit. It comprises a driven gear and an active gear that work together to feed filament into the hotend.",
+  "ar": "مجموعة تروس الدافع من الفولاذ المقسّى (Hardened Steel Extruder Gear Assembly) مكوّن داخلي في وحدة الدافع، وتتألف من ترس تابع وترس محرِّك يعملان معًا لتغذية الفلامنت إلى رأس الصهر.",
+  "ckb": "کۆمەڵەی چەرخی پاڵنەری پۆڵای ڕەقکراو (Hardened Steel Extruder Gear Assembly) پێکهاتەیەکی ناوەوەی یەکەی پاڵنەرە. لە چەرخێکی شوێنکەوتوو و چەرخێکی جووڵێنەر پێکدێت کە پێکەوە کار دەکەن بۆ پێدانی فیلامێنت بۆ ناو سەری تواندنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e7591b42a9403b63242dd171521b61f0336f5892393d37c99269cde9d5417d72",
+  "en": "Built with heavy-duty materials, the extruder gear assembly is designed for long-lasting performance. If abrasion or clogging occurs due to extended use, users can simply replace the extruder gear assembly rather than the whole extruder unit.",
+  "ar": "صُمّمت مجموعة تروس الدافع من مواد شديدة التحمّل لأداء يدوم طويلًا. وإذا حدث تآكل أو انسداد بسبب الاستخدام المطوّل، يمكن للمستخدمين ببساطة استبدال مجموعة تروس الدافع بدلًا من وحدة الدافع بأكملها.",
+  "ckb": "کۆمەڵەی چەرخی پاڵنەر لە کەرەستەی بەرگەگری قورس دروستکراوە و بۆ کاراییەکی درێژخایەن دیزاین کراوە. ئەگەر بەهۆی بەکارهێنانی درێژخایەنەوە سووان یان گیران ڕوویدا، بەکارهێنەران دەتوانن بە ئاسانی تەنها کۆمەڵەی چەرخی پاڵنەر بگۆڕن نەک هەموو یەکەی پاڵنەرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "cfe5ad11ea2cad60f8af9d18511e4c23ae2cbfbd3cd0c274169b81815d2751eb",
+  "en": "The Toolhead Board is the main circuit board of the toolhead which provides connectivity to the toolhead parts, including the hotend heating assembly, extruder unit, hotend cooling fan, filament sensor, etc.",
+  "ar": "لوحة رأس الطباعة هي اللوحة الإلكترونية الرئيسية لرأس الطباعة، وتوفّر الاتصال بأجزائه، بما فيها مجموعة تسخين رأس الصهر ووحدة الدافع ومروحة تبريد رأس الصهر وحساس الفلامنت وغيرها.",
+  "ckb": "بۆردی سەری چاپ بۆردی ئەلیکترۆنیی سەرەکیی سەری چاپە کە پەیوەندی بە پارچەکانی سەری چاپەوە دابین دەکات، لەوانە کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە، یەکەی پاڵنەر، پانکەی ساردکردنەوەی سەری تواندنەوە، هەستەوەری فیلامێنت و هتد.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b9a11e94f65697a7f2d4e14169a3cbd6ce9342a2345be41ba74afe6ce8620cf1",
+  "en": "The Filament Sensor is used to detect the filament feeding status to help prevent print failures and improve overall printing efficiency.",
+  "ar": "يُستخدم حساس الفلامنت لكشف حالة تغذية الفلامنت، ما يساعد على منع فشل الطباعة وتحسين كفاءة الطباعة عمومًا.",
+  "ckb": "هەستەوەری فیلامێنت بۆ دۆزینەوەی باری پێدانی فیلامێنت بەکاردێت بۆ یارمەتیدان لە ڕێگریکردن لە شکستی چاپ و باشترکردنی کارایی گشتیی چاپ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c34438c4bcee55de2cb26614fecbdc24be1187473fdf96d1b3181c3411eb5f2d",
+  "en": "When printing with multiple filaments, the filament sensor can recognize the input and output of filaments and transmit the information to the AMS Lite for filament switching.",
+  "ar": "عند الطباعة بعدة فلامنتات، يستطيع حساس الفلامنت التعرّف على دخول الفلامنتات وخروجها ونقل هذه المعلومات إلى وحدة AMS Lite لتبديل الفلامنت.",
+  "ckb": "لە کاتی چاپکردن بە چەند فیلامێنتێک، هەستەوەری فیلامێنت دەتوانێت چوونەژوورەوە و دەرچوونی فیلامێنتەکان بناسێتەوە و زانیارییەکە بنێرێت بۆ یەکەی AMS Lite بۆ گۆڕینی فیلامێنت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d04456427041d2019aaff65e1c965ba901a4ac099991ad9eed924beb26e94bcc",
+  "en": "It can also detect filament jamming situations and transmit the information to the printer immediately.",
+  "ar": "كما يمكنه كشف حالات انحشار الفلامنت ونقل المعلومات إلى الطابعة فورًا.",
+  "ckb": "هەروەها دەتوانێت حاڵەتەکانی گیرخواردنی فیلامێنت بدۆزێتەوە و دەستبەجێ زانیارییەکە بنێرێت بۆ چاپکەرەکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "995c22b52c6eb5119f9ec22f2a6af87e6a381a741c982d2f2ad416bda2779342",
+  "en": "A set of circuit boards installed on the printer's toolhead.",
+  "ar": "مجموعة من اللوحات الإلكترونية المركّبة على رأس الطباعة في الطابعة.",
+  "ckb": "کۆمەڵێک بۆردی ئەلیکترۆنی کە لەسەر سەری چاپی چاپکەرەکە دامەزراون.",
+  "kind": "block_line"
+ },
+ {
+  "h": "11c674f96b2ca1e0f372d2e1154955f0a9c83c72ba997f450fc08b498f04e486",
+  "en": "Please refer to the Wiki page here to check the version of your X1 Series TH board. There is no difference in functionality between the Dual Red Laser version and the Single Red Laser version.",
+  "ar": "يرجى الرجوع إلى صفحة الويكي هنا للتحقق من إصدار لوحة TH في طابعتك من X1 Series. لا يوجد أي فرق في الوظائف بين نسخة Dual Red Laser ونسخة Single Red Laser.",
+  "ckb": "تکایە سەیری پەڕەی ویکی لێرە بکە بۆ ئەوەی بزانیت بۆردی TH ی چاپکەرەکەت (X1 Series) کام وەشانە. هیچ جیاوازییەک لە کارکردندا نییە لە نێوان وەشانی Dual Red Laser و وەشانی Single Red Laser.",
+  "kind": "block_line"
+ },
+ {
+  "h": "594d4e2032301da78b17a1a331095b3f69df0c4ac98991b266ae38de7f90a311",
+  "en": "The Single Red Laser TH board is discontinued and has been replaced by the Dual Red Laser TH board.",
+  "ar": "تم إيقاف إنتاج لوحة TH بنسخة Single Red Laser، واستُبدلت بلوحة TH بنسخة Dual Red Laser.",
+  "ckb": "بەرهەمهێنانی بۆردی TH وەشانی Single Red Laser ڕاگیراوە و بۆردی TH وەشانی Dual Red Laser جێگەی گرتووەتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "a5a015fa4479e906cd52b268f76c59103c839787823650d88406b2388430270c",
+  "en": "The Dual Red Laser TH board works with the Dual Red Laser LIDAR.",
+  "ar": "تعمل لوحة TH بنسخة Dual Red Laser مع مستشعر LIDAR بنسخة Dual Red Laser.",
+  "ckb": "بۆردی TH وەشانی Dual Red Laser لەگەڵ هەستەوەری LIDAR وەشانی Dual Red Laser کار دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "963f02dabd5f3ffe45674bf60f7ec6fabf808047a25fcfb3deea5b16e455ef95",
+  "en": "To do so, please open a ticket by following this link, and our team will handle your request ASAP.",
+  "ar": "لإجراء ذلك، يرجى فتح تذكرة دعم عبر هذا الرابط، وسيتولى فريقنا معالجة طلبك في أقرب وقت ممكن.",
+  "ckb": "بۆ ئەم مەبەستە، تکایە لە ڕێگەی ئەم بەستەرەوە تیکێتێک بکەرەوە، و تیمەکەمان بە زووترین کات داواکارییەکەت جێبەجێ دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "c1736ddeba1b95e24ed83e4daa97f5a66027ee93fa2819063e1e0bb0acf6c121",
+  "en": "The Print Head Front Cover is designed to protect the front part of the print head. It features a circular window that allows observation of the rotating status of the extruder gear.",
+  "ar": "صُمّم الغطاء الأمامي لرأس الطباعة لحماية الجزء الأمامي من رأس الطباعة، ويتميّز بنافذة دائرية تتيح مراقبة حالة دوران ترس الدافع.",
+  "ckb": "قەپاغی پێشەوەی سەری چاپ بۆ پاراستنی بەشی پێشەوەی سەری چاپ دیزاین کراوە. پەنجەرەیەکی بازنەیی هەیە کە ڕێگە دەدات باری سووڕانەوەی چەرخی پاڵنەر ببینرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7e45feed5d11650a49cc8293cf157351d0a5205149ded605a06e82a74320e0ec",
+  "en": "The Extruder Unit features dual gears made of hardened steel to feed filament into the hotend. The hardened steel gears provide increased extrusion force, prevent slippage, and enhance abrasion resistance. These gears enable the extruder unit to handle tough engineering filaments such as carbon fiber nylon and glass fiber nylon.",
+  "ar": "تتميّز وحدة الدافع بترسين مزدوجين من الفولاذ المقسّى لتغذية الفلامنت إلى رأس الصهر. وتوفّر التروس المصنوعة من الفولاذ المقسّى قوة بثق أكبر وتمنع الانزلاق وتعزّز مقاومة التآكل بالاحتكاك. وتتيح هذه التروس لوحدة الدافع التعامل مع الفلامنتات الهندسية القاسية مثل النايلون المقوّى بألياف الكربون والنايلون المقوّى بألياف الزجاج.",
+  "ckb": "یەکەی پاڵنەر دوو چەرخی ددانەداری لە پۆڵای ڕەقکراو هەیە بۆ پێدانی فیلامێنت بۆ ناو سەری تواندنەوە. چەرخەکانی پۆڵای ڕەقکراو هێزی پاڵنانی زیاتر دابین دەکەن، ڕێگری لە خلیسکان دەکەن و بەرگەی سووان بەهێز دەکەن. ئەم چەرخانە یارمەتی یەکەی پاڵنەر دەدەن بۆ مامەڵەکردن لەگەڵ فیلامێنتە ئەندازیارییە پتەوەکانی وەک نایلۆنی ڕیشاڵی کاربۆن و نایلۆنی ڕیشاڵی شووشە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e3a75d3f90fb91e53ea2c28801a754c8e2158b0fb507bc1561f1c4063300dc1",
+  "en": "The extruder unit is also equipped with a filament cutter for filament unloading or switching, and an extruder motor that supplies the required power for the extrusion process.",
+  "ar": "كما زُوّدت وحدة الدافع بقاطع فلامنت لإخراج الفلامنت أو تبديله، وبمحرك دافع يوفّر القوة اللازمة لعملية البثق.",
+  "ckb": "یەکەی پاڵنەر هەروەها بڕەری فیلامێنتی تێدایە بۆ دەرهێنان یان گۆڕینی فیلامێنت، و بزوێنەری پاڵنەرێک کە هێزی پێویست بۆ پرۆسەی پاڵنان دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fd4982fbd0b03224c92550c8c60b8b3fb7bdb788a47b0d7f5ef4230b8e19cdbd",
+  "en": "The Part Cooling Fan is used to ensure adequate cooling of the printed layers during the printing process. It helps in rapidly cooling the material as it is extruded, allowing each layer to solidify and maintain its shape before the next layer is deposited.",
+  "ar": "تُستخدم مروحة تبريد القطعة المطبوعة لضمان تبريد كافٍ للطبقات المطبوعة أثناء الطباعة، إذ تساعد على تبريد المادة بسرعة لحظة بثقها، ما يسمح لكل طبقة بالتصلّب والحفاظ على شكلها قبل وضع الطبقة التالية.",
+  "ckb": "پانکەی ساردکردنەوەی پارچەی چاپکراو بۆ دڵنیابوون لە ساردبوونەوەی پێویستی چینە چاپکراوەکان لە کاتی چاپدا بەکاردێت. یارمەتی ساردکردنەوەی خێرای کەرەستەکە دەدات لە کاتی پاڵنانیدا، و ڕێگە دەدات هەر چینێک ڕەق ببێتەوە و شێوەی خۆی بپارێزێت پێش ئەوەی چینی دواتر دابنرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "87dfcf3aaabaeb28b90a938fd5c1817ee41b1b4b8892cd9871031eb9e968590b",
+  "en": "The Hotend Cooling Fan is used to cool down both the hotend heating assembly and the hotend.",
+  "ar": "تُستخدم مروحة تبريد رأس الصهر لتبريد كلٍّ من مجموعة تسخين رأس الصهر ورأس الصهر نفسه.",
+  "ckb": "پانکەی ساردکردنەوەی سەری تواندنەوە بۆ ساردکردنەوەی هەم کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە و هەم خودی سەری تواندنەوە بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b049551ea202117faf0d52f38e5cb46f09d7fd7c432b1e28938ea08183300888",
+  "en": "The Hotend Heating Assembly is specially designed to support the quick swap design of the hotend. A quick clamping mechanism is used to secure the heater block and heating base, enabling easy separation of the thermal and electronic components of the hotend.",
+  "ar": "صُمّمت مجموعة تسخين رأس الصهر خصيصًا لدعم تصميم التبديل السريع لرأس الصهر. وتُستخدم آلية تثبيت سريع لتثبيت كتلة السخّان وقاعدة التسخين، ما يتيح فصل المكوّنات الحرارية والإلكترونية لرأس الصهر بسهولة.",
+  "ckb": "کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە بە تایبەتی دیزاین کراوە بۆ پشتگیریکردنی دیزاینی گۆڕینی خێرای سەری تواندنەوە. میکانیزمێکی گیرکردنی خێرا بەکاردێت بۆ جێگیرکردنی بلۆکی گەرمکەرەوە و بنکەی گەرمکردن، کە ڕێگە دەدات پێکهاتە گەرمی و ئەلیکترۆنییەکانی سەری تواندنەوە بە ئاسانی لێک جیا بکرێنەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fb6b1e91cc84633bd0d46c89057ab6607a9d41179f9b28aef1724e64e1a5b1e5",
+  "en": "The hotend heating assembly can heat the hotend up to 300℃ and measure the real-time temperature of the hotend with the included thermistor.",
+  "ar": "يمكن لمجموعة تسخين رأس الصهر تسخين رأس الصهر حتى 300℃، وقياس حرارته في الوقت الفعلي بواسطة الثرمستور المرفق.",
+  "ckb": "کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە دەتوانێت سەری تواندنەوە تا 300℃ گەرم بکات و بە تێرمیستۆرە لەگەڵداکەی پلەی گەرمیی سەری تواندنەوە لە کاتی ڕاستەقینەدا بپێوێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4c4385665732571b81f7f440a9760de340631b138f76366725bb2590f3b4aac4",
+  "en": "When replacing the hotend heating assembly, please make sure to align the gasket with the screw holes and pre-install two screws at first, then secure the heating assembly to the toolhead.",
+  "ar": "عند استبدال مجموعة تسخين رأس الصهر، يرجى التأكد من محاذاة الحشية مع ثقوب البراغي وتركيب برغيين مبدئيًا أولًا، ثم تثبيت مجموعة التسخين على رأس الطباعة.",
+  "ckb": "لە کاتی گۆڕینی کۆمەڵەی گەرمکەرەوەی سەری تواندنەوە، تکایە دڵنیابە لەوەی گاسکێتەکە لەگەڵ کونی بورغییەکان ڕێک دەخەیت و سەرەتا دوو بورغی بە شێوەی کاتی دادەنێیت، پاشان کۆمەڵەی گەرمکەرەوەکە لەسەر سەری چاپ جێگیر بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "db117c47c811c2df9d3405c22926ed0035c698bd6efcb1d8924081ffcb1e99ad",
+  "en": "The AMS lite Filament Hub is a key part of reliable filament switching during multi-color or multi-filament printing. One end of the hub connects to 4 different PTFE tubes (up to 4 filaments), while the other end connects to the top of the extruder to feed filament.",
+  "ar": "موزّع الفلامنت AMS lite Filament Hub جزء أساسي لتبديل الفلامنت بشكل موثوق أثناء الطباعة متعددة الألوان أو متعددة الفلامنتات. يتصل أحد طرفي الموزّع بـ 4 أنابيب PTFE مختلفة (حتى 4 فلامنتات)، بينما يتصل الطرف الآخر بأعلى الدافع لتغذية الفلامنت.",
+  "ckb": "دابەشکەری فیلامێنتی AMS lite Filament Hub بەشێکی سەرەکییە بۆ گۆڕینی متمانەپێکراوی فیلامێنت لە کاتی چاپی فرەڕەنگ یان فرە فیلامێنتدا. سەرێکی دابەشکەرەکە دەبەسترێت بە 4 بۆریی جیاوازی PTFE (تا 4 فیلامێنت)، لە کاتێکدا سەرەکەی تری دەبەسترێت بە سەرەوەی پاڵنەرەکە بۆ پێدانی فیلامێنت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ddb830d053b3785a8234baab8a5dbd895cdbdcd15f5dffdeb1a6e8d262aafa6f",
+  "en": "The AMS lite Housing Assembly is the outer casing of the AMS lite body. It provides protection for the internal structure of the AMS Lite.",
+  "ar": "مجموعة الغلاف AMS lite Housing Assembly هي الغلاف الخارجي لجسم AMS lite، وتوفّر الحماية للبنية الداخلية لوحدة AMS Lite.",
+  "ckb": "کۆمەڵەی بەرگی AMS lite Housing Assembly بریتییە لە ڕووپۆشی دەرەوەی لاشەی AMS lite. پاراستن بۆ پێکهاتەی ناوەوەی یەکەی AMS Lite دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "edae9aa026f7c4246b1476a28ac28a1a307b0a90c5e7d7bb68ea83259a10e656",
+  "en": "The AMS lite Feeder Unit is specially designed to support the AMS lite for printing multiple colors and materials. Due to its unique symmetrical design, the feeder unit is designed in both left and right versions. Both left and right feeder units have their corresponding slots. The left feeder unit corresponds to Slot 1 and Slot 2, while the right feeder unit corresponds to Slot 3 and Slot 4.",
+  "ar": "صُمّمت وحدة التغذية AMS lite Feeder Unit خصيصًا لدعم AMS lite في الطباعة بألوان ومواد متعددة. وبسبب تصميمها المتماثل الفريد، صُمّمت وحدة التغذية بنسختين: يسرى ويمنى، ولكل منهما فتحاتها المقابلة؛ فوحدة التغذية اليسرى تقابل الفتحة 1 والفتحة 2، بينما تقابل وحدة التغذية اليمنى الفتحة 3 والفتحة 4.",
+  "ckb": "یەکەی پێدانی AMS lite Feeder Unit بە تایبەتی دیزاین کراوە بۆ پشتگیریکردنی AMS lite لە چاپکردن بە چەند ڕەنگ و کەرەستەیەک. بەهۆی دیزاینە هاوتا تایبەتەکەیەوە، یەکەی پێدان بە دوو وەشانی چەپ و ڕاست دیزاین کراوە. هەریەک لە یەکەی پێدانی چەپ و ڕاست شوێنی هاوتای خۆیان هەیە. یەکەی پێدانی چەپ بۆ شوێنی 1 و شوێنی 2 بەکاردێت، لە کاتێکدا یەکەی پێدانی ڕاست بۆ شوێنی 3 و شوێنی 4 بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f6de36da7640ae5ccf71cc22b5ac8c14ae4896de0176f843d5ad82ecafc5f56c",
+  "en": "The left and right feeder units have only minor structural differences, while their functionality and purpose remain identical. Please note that both the left and right feeder units can only be installed in their respective positions. Please confirm that you have selected the correct version (left or right) before purchase.",
+  "ar": "لا توجد بين وحدتي التغذية اليسرى واليمنى سوى فروق هيكلية طفيفة، بينما تبقى وظيفتهما والغرض منهما متطابقين. يرجى ملاحظة أن كل وحدة تغذية، يسرى أو يمنى، لا يمكن تركيبها إلا في موضعها المخصّص. يرجى التأكد من اختيار النسخة الصحيحة (اليسرى أو اليمنى) قبل الشراء.",
+  "ckb": "یەکەکانی پێدانی چەپ و ڕاست تەنها جیاوازیی بچووکی پێکهاتەییان هەیە، لە کاتێکدا کارکردن و مەبەستیان وەک یەکە. تکایە ئاگاداربە کە هەریەک لە یەکەی پێدانی چەپ و ڕاست تەنها لە شوێنی تایبەتی خۆیدا دادەمەزرێت. تکایە پێش کڕین دڵنیابە کە وەشانی دروستت (چەپ یان ڕاست) هەڵبژاردووە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "367033a18a68134ef2392f77d11a7e6c9a3dd165f344102dbe6e85344f9dae72",
+  "en": "Each feeder unit has its own motors and gears to actively push the filament forward. When the filament is inserted, the feeder unit will pull the filament automatically and send the filament to the toolhead through the PTFE Tube.",
+  "ar": "لكل وحدة تغذية محركاتها وتروسها الخاصة لدفع الفلامنت إلى الأمام بشكل فعّال. وعند إدخال الفلامنت، تسحبه وحدة التغذية تلقائيًا وترسله إلى رأس الطباعة عبر أنبوب PTFE.",
+  "ckb": "هەر یەکەیەکی پێدان بزوێنەر و چەرخی ددانەداری تایبەتی خۆی هەیە بۆ پاڵنانی چالاکی فیلامێنت بەرەو پێشەوە. کاتێک فیلامێنت دەخرێتە ناوەوە، یەکەی پێدان بە شێوەی خۆکار ڕایدەکێشێت و لە ڕێگەی بۆریی PTFE دەینێرێت بۆ سەری چاپ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "65b88ae5467b2ec8ebdc27f87eb5de10dd46510e8cba537da5e101b1b888ef30",
+  "en": "The AMS lite Filament Funnel Unit is the inner component of the AMS lite Feeder Unit. It consists of structural parts and a filament detection sensor board. In line with the feeder unit, the funnel unit is also designed in both left and right versions.",
+  "ar": "وحدة قمع الفلامنت AMS lite Filament Funnel Unit هي المكوّن الداخلي لوحدة التغذية AMS lite Feeder Unit، وتتكوّن من أجزاء هيكلية ولوحة حساس لكشف الفلامنت. وعلى غرار وحدة التغذية، صُمّمت وحدة القمع أيضًا بنسختين: يسرى ويمنى.",
+  "ckb": "یەکەی قیفی فیلامێنتی AMS lite Filament Funnel Unit بەشێکی ناوەکییە لە یەکەی پێدانی AMS lite Feeder Unit، و لە پارچەی پێکهاتەیی و بۆردێکی هەستەوەری دۆزینەوەی فیلامێنت پێکدێت. وەک یەکەی پێدان، یەکەی قیفیش بە دوو وەشانی چەپ و ڕاست دیزاین کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2e61baaa2792cf9a47773d58f4fdfa3d5cf75ddfe58506a2526be437c20259af",
+  "en": "Please note that both the left and right funnel units can only be installed in their corresponding feeder units. Please confirm that you have selected the correct version (left or right) before purchase.",
+  "ar": "يرجى ملاحظة أن كل وحدة قمع، يسرى أو يمنى، لا يمكن تركيبها إلا في وحدة التغذية المقابلة لها. يرجى التأكد من اختيار النسخة الصحيحة (اليسرى أو اليمنى) قبل الشراء.",
+  "ckb": "تکایە ئاگاداربە کە هەریەک لە یەکەی قیفی چەپ و ڕاست تەنها لە یەکەی پێدانی هاوتای خۆیدا دادەمەزرێت. تکایە پێش کڕین دڵنیابە کە وەشانی دروستت (چەپ یان ڕاست) هەڵبژاردووە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8cd358ea3402c6e17b82f4f1453adf4f41c10f4e86e40a37d669a826899b599e",
+  "en": "When the sensor board detects the insertion of filament, the funnel unit will pull the filament forward automatically. When the filament insertion is abnormal, the sensor board will also identify it and feed that information back to the 3D printer.",
+  "ar": "عندما تكتشف لوحة الحساس إدخال الفلامنت، تسحب وحدة القمع الفلامنت إلى الأمام تلقائيًا. وإذا كان إدخال الفلامنت غير طبيعي، تتعرّف لوحة الحساس على ذلك أيضًا وترسل هذه المعلومة إلى طابعة 3D.",
+  "ckb": "کاتێک بۆردی هەستەوەر خستنە ناوەوەی فیلامێنت دەدۆزێتەوە، یەکەی قیف بە شێوەی خۆکار فیلامێنتەکە بەرەو پێشەوە ڕادەکێشێت. کاتێک خستنە ناوەوەی فیلامێنت نائاسایی بێت، بۆردی هەستەوەر ئەوەش دەناسێتەوە و ئەو زانیارییە دەنێرێتەوە بۆ چاپکەری 3D.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2136b2bf4e910a8169cdcf37f6396881ae05f22bd17ac11b7c6c0f2ca5f5f1ea",
+  "en": "The AMS lite Rotary Spool Holder is designed to support and hold the spool when it's attached to the AMS lite. Each rotary spool holder has 3 spool claws to secure the spool in place. While the feeder unit pulls the filament, the rotary spool holder works in coordination to enable the spool to rotate during the printing process. This ensures continuous filament feeding and smooth operation.",
+  "ar": "صُمّم حامل البكرة الدوّار AMS lite Rotary Spool Holder لدعم البكرة (spool) وحملها عند تركيبها على AMS lite. ويحتوي كل حامل بكرة دوّار على 3 مخالب لتثبيت البكرة في مكانها. وبينما تسحب وحدة التغذية الفلامنت، يعمل حامل البكرة الدوّار بالتنسيق معها ليسمح للبكرة بالدوران أثناء الطباعة، ما يضمن تغذية مستمرة للفلامنت وتشغيلًا سلسًا.",
+  "ckb": "هەڵگری ماسوورەی سووڕاوەی AMS lite Rotary Spool Holder دیزاین کراوە بۆ ڕاگرتن و هەڵگرتنی ماسوورە (spool) کاتێک لەسەر AMS lite دادەنرێت. هەر هەڵگرێکی ماسوورەی سووڕاوە 3 چنگاڵی هەیە بۆ جێگیرکردنی ماسوورەکە لە شوێنی خۆیدا. لە کاتێکدا یەکەی پێدان فیلامێنتەکە ڕادەکێشێت، هەڵگری ماسوورەی سووڕاوە بە هاوئاهەنگی کار دەکات بۆ ئەوەی ماسوورەکە لە کاتی چاپدا بسووڕێتەوە. ئەمەش پێدانی بەردەوامی فیلامێنت و کارکردنی نەرم مسۆگەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4d50eb99e003b3baa7a05400c71f08d45cedd94802f89f60548f0006a9e27b78",
+  "en": "The rotary spool holder is designed in both green and yellow versions to work with the left and right feeder units for filament feeding. For the green version, the two holders are installed on the bottom-right roller and top-left roller, rotating counterclockwise to feed filament to slots 1 and 3. For the yellow version, the two holders are installed on the bottom-left roller and top-right roller, rotating clockwise to feed filament to slots 2 and 4.",
+  "ar": "صُمّم حامل البكرة (spool) الدوّار بنسختين خضراء وصفراء ليعمل مع وحدتي التغذية اليسرى واليمنى في تغذية الفلامنت. في النسخة الخضراء، يُركَّب الحاملان على الأسطوانة السفلية اليمنى والأسطوانة العلوية اليسرى، ويدوران عكس اتجاه عقارب الساعة لتغذية الفلامنت إلى الفتحتين 1 و3. وفي النسخة الصفراء، يُركَّب الحاملان على الأسطوانة السفلية اليسرى والأسطوانة العلوية اليمنى، ويدوران مع اتجاه عقارب الساعة لتغذية الفلامنت إلى الفتحتين 2 و4.",
+  "ckb": "هەڵگری سووڕاوەی ماسوورە (spool) بە دوو وەشانی سەوز و زەرد دیزاین کراوە بۆ کارکردن لەگەڵ یەکەکانی پێدانی چەپ و ڕاست بۆ پێدانی فیلامێنت. لە وەشانی سەوزدا، دوو هەڵگرەکە لەسەر لوولەی خوارەوەی لای ڕاست و لوولەی سەرەوەی لای چەپ دادەمەزرێن و بە پێچەوانەی ئاراستەی میلی کاتژمێر دەسووڕێنەوە بۆ پێدانی فیلامێنت بۆ شوێنی 1 و 3. لە وەشانی زەرددا، دوو هەڵگرەکە لەسەر لوولەی خوارەوەی لای چەپ و لوولەی سەرەوەی لای ڕاست دادەمەزرێن و بە ئاراستەی میلی کاتژمێر دەسووڕێنەوە بۆ پێدانی فیلامێنت بۆ شوێنی 2 و 4.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8e0b32924b9d5ff1471d9e9e6a8b0857e28b422f5ce8300c51bb9c2b4ba6b311",
+  "en": "Please note that the spool holder can only be installed and correctly operated on the roller that matches its color version. Please confirm that you have selected the correct version (green or yellow) before purchase.",
+  "ar": "يرجى ملاحظة أن حامل البكرة (spool) لا يمكن تركيبه وتشغيله بشكل صحيح إلا على الأسطوانة المطابقة لنسخة لونه. يرجى التأكد من اختيار النسخة الصحيحة (الخضراء أو الصفراء) قبل الشراء.",
+  "ckb": "تکایە ئاگاداربە کە هەڵگری ماسوورە (spool) تەنها لەسەر ئەو لوولەیە دادەمەزرێت و بە دروستی کار دەکات کە لەگەڵ وەشانی ڕەنگەکەیدا دەگونجێت. تکایە پێش کڕین دڵنیابە کە وەشانی دروستت (سەوز یان زەرد) هەڵبژاردووە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "edcb6c007a7e622e99346786f7caf37a07e0cea4538f4f74a8f8e4ae01cbc67b",
+  "en": "The AMS lite Spool Claw is assembled on the Rotary Spool Holder and is used to secure the spool in place. The 3 rubber pads on the claws are used to increase the friction between the claws and the spool, preventing the spool from detaching from the spool holder during the printing process.",
+  "ar": "يُركَّب مخلب البكرة AMS lite Spool Claw على حامل البكرة الدوّار، ويُستخدم لتثبيت البكرة (spool) في مكانها. وتعمل 3 وسادات مطاطية على المخالب على زيادة الاحتكاك بين المخالب والبكرة، ما يمنع انفصال البكرة عن حاملها أثناء الطباعة.",
+  "ckb": "چنگاڵی ماسوورەی AMS lite Spool Claw لەسەر هەڵگری ماسوورەی سووڕاوە دادەمەزرێت و بۆ جێگیرکردنی ماسوورەکە (spool) لە شوێنی خۆیدا بەکاردێت. 3 پارچە لاستیکییەکەی سەر چنگاڵەکان بۆ زیادکردنی لێکخشان لە نێوان چنگاڵەکان و ماسوورەکەدا بەکاردێن، و ڕێگری دەکەن لە جیابوونەوەی ماسوورەکە لە هەڵگرەکەی لە کاتی چاپدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "801f28b041bcd899472948cfb98015deec0d462e92e603768f33ac1387163a65",
+  "en": "The X Belt is a crucial transmission component within the X-axis assembly, facilitating the connection between the X motor and the tool head, enabling smooth movement along the X-direction. It is imperative to replace the X Belt promptly in cases of severe wear or breakage to avoid operational disruptions of the printer.",
+  "ar": "يُعدّ سير X مكوّن نقل حركة أساسيًا ضمن مجموعة محور X، إذ يربط بين محرك X ورأس الطباعة ويتيح حركة سلسة على امتداد اتجاه X. ومن الضروري استبدال سير X فورًا في حالات التآكل الشديد أو الانقطاع لتجنّب تعطّل عمل الطابعة.",
+  "ckb": "قایشی X پارچەیەکی گرنگی گواستنەوەی جووڵەیە لە ناو کۆمەڵەی تەوەری X، کە بزوێنەری X و سەری چاپ بە یەکەوە دەبەستێت و جووڵەی نەرم بە درێژایی ئاراستەی X ڕێگەپێدەدات. پێویستە لە کاتی سووانی زۆر یان پچڕاندا قایشی X بە خێرایی بگۆڕدرێت بۆ ئەوەی کارکردنی چاپکەرەکە تێکنەچێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9c0229fb14939653f63fb464d61fb399e669860c0b78e3452c3fe6840fa73968",
+  "en": "Connects the A1 mini hotbed to the Mainboard, which is used to power the hotbed and provide feedback on the temperature of the hotbed.",
+  "ar": "يصل السرير الساخن في A1 mini باللوحة الأم، ويُستخدم لتزويد السرير الساخن بالطاقة وإرسال قراءات درجة حرارته.",
+  "ckb": "بێدی گەرمی A1 mini بە بۆردی سەرەکییەوە دەبەستێت، و بۆ دابینکردنی وزەی بێدی گەرم و ناردنەوەی زانیاریی پلەی گەرمییەکەی بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "155be31eae5fafc70c3fea1c9b8b5a19fc5e56113a9b057b50d009f35d280cdc",
+  "en": "Facilitates the connection between the Mainboard and the TH Extrusion board for MC-TH power supply and serial communication.",
+  "ar": "يؤمّن التوصيل بين اللوحة الأم ولوحة البثق TH لتغذية الطاقة MC-TH والاتصال التسلسلي.",
+  "ckb": "پەیوەندیی نێوان بۆردی سەرەکی و بۆردی پاڵنانی TH ئاسان دەکات بۆ دابینکردنی وزەی MC-TH و پەیوەندیی زنجیرەیی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f6530eb83b104be3a727f9daa1df601ee7f0b6a96d271c773386300e479379f5",
+  "en": "The live view camera is a low-FPS camera included by default in the A1 mini. The chamber camera has two functions, which are Remote Livestreams and Time-lapses respectively. This camera is used as a replacement part. It does not upgrade the camera quality or FPS for the printer.",
+  "ar": "كاميرا المشاهدة المباشرة كاميرا منخفضة معدل الإطارات (FPS) مرفقة افتراضيًا مع A1 mini. ولكاميرا حجرة الطباعة وظيفتان، هما البث المباشر عن بُعد والتصوير بفاصل زمني. تُستخدم هذه الكاميرا كقطعة بديلة، ولا ترفع جودة الكاميرا أو معدل الإطارات (FPS) في الطابعة.",
+  "ckb": "کامێرای بینینی ڕاستەوخۆ کامێرایەکی FPS نزمە کە بە شێوەی بنەڕەتی لەگەڵ A1 mini دێت. کامێرای ژووری چاپ دوو ئەرکی هەیە، کە بە ڕیز بریتین لە پەخشی ڕاستەوخۆ لە دوورەوە و وێنەگرتنی کاتی خێراکراو. ئەم کامێرایە وەک پارچەی گۆڕین بەکاردێت. جۆرایەتیی کامێرای چاپکەرەکە یان ڕێژەی FPS بەرز ناکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "79530157366c285f24ca315af1be5decf518936c9e1c82a1b512eb3eec7aa259",
+  "en": "Remote livestream: You can observe print progress anytime, anywhere.",
+  "ar": "البث المباشر عن بُعد: يمكنك متابعة تقدّم الطباعة في أي وقت ومن أي مكان.",
+  "ckb": "پەخشی ڕاستەوخۆ لە دوورەوە: دەتوانیت لە هەر کات و شوێنێکدا چاودێریی پێشکەوتنی چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "04a9c9bfb0d5fc43e7e3efa09d147fc777da145c13845ea8743fec433369ebf9",
+  "en": "Time-lapses: This feature uses the chamber camera to automatically create time-lapse videos of prints.",
+  "ar": "التصوير بفاصل زمني: تستخدم هذه الميزة كاميرا حجرة الطباعة لإنشاء مقاطع فيديو بفاصل زمني للمطبوعات تلقائيًا.",
+  "ckb": "وێنەگرتنی کاتی خێراکراو: ئەم تایبەتمەندییە کامێرای ژووری چاپ بەکاردەهێنێت بۆ دروستکردنی خۆکاری ڤیدیۆی کاتی خێراکراو لە چاپکراوەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "934c4bf69b2ef8caf3ad9e24475a848fcb4c4b8c3fe6b92569993fd83b8f73b0",
+  "en": "The heatbed nozzle wiper is designed for cleaning the hotend nozzle before starting a print job. The machine's heated bed comes with a built-in nozzle wiping kit, and the cleaning action is automatically performed after initiating each print task without the need for manual intervention.",
+  "ar": "صُمّمت ماسحة النوزل للسرير الساخن لتنظيف نوزل رأس الصهر قبل بدء مهمة الطباعة. يأتي السرير الساخن في الجهاز مزوّدًا بطقم مدمج لمسح النوزل، وتتم عملية التنظيف تلقائيًا بعد بدء كل مهمة طباعة دون الحاجة إلى تدخل يدوي.",
+  "ckb": "سڕەری نۆزڵی بێدی گەرم بۆ پاککردنەوەی نۆزڵی سەری تواندنەوە پێش دەستپێکردنی کاری چاپ دیزاین کراوە. بێدی گەرمی ئامێرەکە کیتێکی ناوخۆیی بۆ سڕینی نۆزڵ لەگەڵدایە، و کرداری پاککردنەوەکە دوای دەستپێکردنی هەر کارێکی چاپ بە شێوەی خۆکار ئەنجام دەدرێت بێ ئەوەی پێویست بە دەستتێوەردانی دەستی بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4b3af664667ba2bc766b0aa24daa5fc3a31135b3363a803b1b1aa390a81469b8",
+  "en": "Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that may indicate the need for replacement of the A1 mini nozzle wipers include:",
+  "ar": "مع مرور الوقت، قد تتلف شعيرات الماسحة السيليكونية، وقد تتآكل الماسحة المعدنية أو تنثني. ومن المشكلات الشائعة التي قد تدل على الحاجة إلى استبدال ماسحات النوزل في A1 mini:",
+  "ckb": "بە تێپەڕبوونی کات، لەوانەیە مووەکانی سڕەرە سیلیکۆنییەکە زیانیان پێبگات، و سڕەرە کانزاییەکە بسوێت یان بچەمێتەوە. ئەو کێشە باوانەی لەوانەیە ئاماژە بن بۆ پێویستیی گۆڕینی سڕەرەکانی نۆزڵی A1 mini بریتین لە:",
+  "kind": "block_line"
+ },
+ {
+  "h": "530faed4edf0cd965242b0bc599229a781d2321ed9a08e29d67a8342d45c1e69",
+  "en": "1. Inadequate cleaning of the nozzle during the pre-print preparation step",
+  "ar": "1. عدم تنظيف النوزل بشكل كافٍ في مرحلة التحضير قبل الطباعة",
+  "ckb": "1. پاککردنەوەی ناتەواوی نۆزڵ لە قۆناغی ئامادەکاریی پێش چاپدا",
+  "kind": "block_line"
+ },
+ {
+  "h": "97b153966675f6ae964905be93990144fca25661b491140bdb9ff8ab7dda3328",
+  "en": "2. Filament adhering to the nozzle tip during bed leveling, resulting in an inconsistent first layer",
+  "ar": "2. التصاق الفلامنت بطرف النوزل أثناء تسوية الصفيحة، ما يؤدي إلى طبقة أولى غير منتظمة",
+  "ckb": "2. لکانی فیلامێنت بە سەری نۆزڵەوە لە کاتی ڕێکخستنی پلێتدا، کە دەبێتە هۆی چینی یەکەمی ناڕێک",
+  "kind": "block_line"
+ },
+ {
+  "h": "fd9c0674f58bbd5d47909181492a73b52c2a094e9ea5bebbddceecc2fec1e9cb",
+  "en": "3. Visible damage or wear on the nozzle wipers.",
+  "ar": "3. تلف أو تآكل ظاهر في ماسحات النوزل.",
+  "ckb": "3. زیان یان سووانی بەرچاو لە سڕەرەکانی نۆزڵدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "51f247f7d1e111509c43da466e58b6b0e0e06a621b8a321120cf6c624233b202",
+  "en": "The Bambu Micro Lidar shell consists of three segments, a top cover, a bottom cover, and a protective lens.",
+  "ar": "يتكوّن غلاف Bambu Micro Lidar من ثلاثة أجزاء: غطاء علوي، وغطاء سفلي، وعدسة حماية.",
+  "ckb": "ڕووپۆشی Bambu Micro Lidar لە سێ بەش پێکدێت: قەپاغی سەرەوە، قەپاغی خوارەوە و لێنزێکی پارێزەر.",
+  "kind": "block_line"
+ },
+ {
+  "h": "98487e54e078c3a1be01b1c7f4e7e05d1fd0b19dbd706efd9bc5bc7b922422c2",
+  "en": "This Purge Wiper is designed to efficiently remove waste filament generated by the printer's hotend. It gathers and dislodges waste filament during different stages, including printer setup, pause and resume operations, and filament changes for multi-color printing. Its purpose is to ensure the proper management and disposal of waste materials for seamless printing processes.",
+  "ar": "صُمّمت ماسحة الطرد هذه لإزالة الفلامنت المهدور الناتج عن رأس الصهر في الطابعة بكفاءة؛ فهي تجمع الفلامنت المهدور وتفصله في مراحل مختلفة، منها تهيئة الطابعة، وعمليات الإيقاف المؤقت والاستئناف، وتبديل الفلامنت في الطباعة متعددة الألوان. والغرض منها ضمان إدارة المواد المهدورة والتخلص منها بالشكل الصحيح لعمليات طباعة سلسة.",
+  "ckb": "ئەم سڕەری فیلامێنتی دەرکراوە دیزاین کراوە بۆ لابردنی کارای ئەو فیلامێنتە بەفیڕۆچووەی سەری تواندنەوەی چاپکەرەکە دروستی دەکات. لە قۆناغە جیاوازەکاندا فیلامێنتی بەفیڕۆچوو کۆدەکاتەوە و جیای دەکاتەوە، لەوانە ئامادەکردنی چاپکەر، کردارەکانی ڕاگرتنی کاتی و دەستپێکردنەوە، و گۆڕینی فیلامێنت بۆ چاپی فرەڕەنگ. ئامانجی دڵنیابوونە لە بەڕێوەبردن و فڕێدانی دروستی کەرەستە بەفیڕۆچووەکان بۆ پرۆسەیەکی چاپی بێ پچڕان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0f6f30f564a7efa92212eeb700bc08a02dacac311407a10472b41d05a319dde5",
+  "en": "Over time, the purge wiper can become damaged, and the metallic flap of the wiper may wear out or become bent. Common issues that may indicate the need for replacement of the A1 purge wiper include:",
+  "ar": "مع مرور الوقت، قد تتلف ماسحة الطرد، وقد تتآكل الشفة المعدنية للماسحة أو تنثني. ومن المشكلات الشائعة التي قد تدل على الحاجة إلى استبدال ماسحة الطرد في A1:",
+  "ckb": "بە تێپەڕبوونی کات، لەوانەیە سڕەری فیلامێنتی دەرکراو زیانی پێبگات، و پەڕە کانزاییەکەی سڕەرەکە بسوێت یان بچەمێتەوە. ئەو کێشە باوانەی لەوانەیە ئاماژە بن بۆ پێویستیی گۆڕینی سڕەری فیلامێنتی دەرکراوی A1 بریتین لە:",
+  "kind": "block_line"
+ },
+ {
+  "h": "eacd594262d865c1500d2d34fdbd711cfd5e6a482184b5cf98f775911c4a6af0",
+  "en": "1. Inadequate cleaning of the nozzle during the pre-print preparation step.",
+  "ar": "1. عدم تنظيف النوزل بشكل كافٍ في مرحلة التحضير قبل الطباعة.",
+  "ckb": "1. پاککردنەوەی ناتەواوی نۆزڵ لە قۆناغی ئامادەکاریی پێش چاپدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ce50f26741d1dff29d99e6dc9de6a4566f8ad0f95184b59369d4bf16b8df209b",
+  "en": "2. Filament adhering to the purge wiper flap.",
+  "ar": "2. التصاق الفلامنت بشفة ماسحة الطرد.",
+  "ckb": "2. لکانی فیلامێنت بە پەڕەی سڕەری فیلامێنتی دەرکراوەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "47af5028528c000ce1186acd6f5c820138b2608bc5bf7a2bd106f39c96fc4dbf",
+  "en": "3. Visible damage or wear on the purge wiper.",
+  "ar": "3. تلف أو تآكل ظاهر في ماسحة الطرد.",
+  "ckb": "3. زیان یان سووانی بەرچاو لە سڕەری فیلامێنتی دەرکراودا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "1f25dad65ac72cf8e0e744db6dce670a5e8b5b1dcd915a352507f0ece118d302",
+  "en": "The Z-axis Coupler is used to connect the Z-axis motor and the Z-axis lead screw. It enables precise transmission of motion and torque while accommodating certain levels of radial, axial, and angular misalignment.",
+  "ar": "تُستخدم وصلة المحور Z لربط محرك المحور Z بالعمود الملولب للمحور Z، وتتيح نقل الحركة وعزم الدوران بدقة مع استيعاب قدر معيّن من عدم المحاذاة الشعاعي والمحوري والزاوي.",
+  "ckb": "گەیەنەری تەوەری Z بۆ بەستنەوەی بزوێنەری تەوەری Z بە میلی پێچداری تەوەری Z بەکاردێت. ڕێگە بە گواستنەوەی وردی جووڵە و تۆرک دەدات، لە هەمان کاتدا ڕێژەیەکی دیاریکراو لە ناڕێکیی تیشکی، تەوەری و گۆشەیی هەڵدەگرێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "32f131a0ab3f14d0ca47cb625671dc08921a969041ba7381aa50f4563ebec449",
+  "en": "The X Motor is utilized to drive the tool head in the back-and-forth motion along the X-axis.",
+  "ar": "يُستخدم محرك المحور X لتحريك رأس الطباعة ذهابًا وإيابًا على طول المحور X.",
+  "ckb": "بزوێنەری تەوەری X بۆ جووڵاندنی سەری چاپ بۆ پێشەوە و دواوە بە درێژایی تەوەری X بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9f08772e8fc636287b780d27da6687e9c8364bdadf0b822f66c519dafb57fc8a",
+  "en": "The Y Motor is used to drive the heated bed in the back-and-forth motion along the Y-axis.",
+  "ar": "يُستخدم محرك المحور Y لتحريك السرير الساخن ذهابًا وإيابًا على طول المحور Y.",
+  "ckb": "بزوێنەری تەوەری Y بۆ جووڵاندنی بێدی گەرم بۆ پێشەوە و دواوە بە درێژایی تەوەری Y بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "3eb47599fdef5c8d9ae79270b501507320b75c833f4b197db072f1535625b3e0",
+  "en": "The heatbed unit of the A1 mini is a printing platform installed on the printer, which can move back and forward along the Y direction and can be heated according to the temperature set by the user. Setting a suitable heat bed temperature can effectively improve adhesion between the model and the build plate and prevent the model from warping. Please follow our recommended heatbed temperatures for each filament to get the best results.",
+  "ar": "وحدة السرير الساخن في A1 mini منصة طباعة مركّبة على الطابعة، يمكنها التحرك ذهابًا وإيابًا في اتجاه Y، ويمكن تسخينها وفق درجة الحرارة التي يحدّدها المستخدم. ويساعد ضبط درجة حرارة مناسبة للسرير الساخن بفعالية على تحسين الالتصاق بين النموذج وصفيحة الطباعة ومنع تقوّس النموذج. يرجى اتباع درجات حرارة السرير الساخن الموصى بها لكل فلامنت للحصول على أفضل النتائج.",
+  "ckb": "یەکەی بێدی گەرمی A1 mini سەکۆیەکی چاپە کە لەسەر چاپکەرەکە دامەزراوە، دەتوانێت بە ئاراستەی Y بۆ پێشەوە و دواوە بجووڵێت و بەپێی ئەو پلەی گەرمییەی بەکارهێنەر دیاری دەکات گەرم بکرێت. دانانی پلەی گەرمیی گونجاو بۆ بێدی گەرم دەتوانێت بە شێوەیەکی کارا لکانی نێوان مۆدێل و پلێتی چاپ باشتر بکات و ڕێگری لە چەمانەوەی لێواری مۆدێلەکە بکات. تکایە پلەکانی گەرمیی پێشنیارکراوی ئێمە بۆ بێدی گەرم بۆ هەر فیلامێنتێک پەیڕەو بکە بۆ بەدەستهێنانی باشترین ئەنجام.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4fd7bb64210cb3116ae2d5d272ccb2cfeda52017efe015f351d0bb0ee511baea",
+  "en": "This sensor is used in the Extruder to detect the presence of the filament, and also detect the Filament Cutter lever.",
+  "ar": "يُستخدم هذا الحساس في الدافع لكشف وجود الفلامنت، وكذلك لكشف ذراع قاطع الفلامنت.",
+  "ckb": "ئەم هەستەوەرە لە پاڵنەردا بەکاردێت بۆ دۆزینەوەی بوونی فیلامێنت، و هەروەها بۆ دۆزینەوەی لیڤەری بڕەری فیلامێنت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "37c690006e9af27ccc6672e17f610537c4f3431419a149deb6316ee033fa3dfa",
+  "en": "This sensor is used in the Extruder to detect the presence of the filament, and also detect the Filament Cutter lever",
+  "ar": "يُستخدم هذا الحساس في الدافع لكشف وجود الفلامنت، وكذلك لكشف ذراع قاطع الفلامنت",
+  "ckb": "ئەم هەستەوەرە لە پاڵنەردا بەکاردێت بۆ دۆزینەوەی بوونی فیلامێنت، و هەروەها بۆ دۆزینەوەی لیڤەری بڕەری فیلامێنت",
+  "kind": "block_line"
+ },
+ {
+  "h": "f69d9c384516688ec7359f83679a3b23040330d7b80fb3d37ef46d95e8b346d3",
+  "en": "The AMS power board is a circuit board that receives power from the printer and supplies it to the AMS.",
+  "ar": "لوحة الطاقة في نظام AMS لوحة إلكترونية تستقبل الطاقة من الطابعة وتزوّد بها وحدة AMS.",
+  "ckb": "بۆردی وزەی AMS بۆردێکی ئەلیکترۆنییە کە وزە لە چاپکەرەکەوە وەردەگرێت و دابینی دەکات بۆ یەکەی AMS.",
+  "kind": "block_line"
+ },
+ {
+  "h": "50b3cbafd20e3e2207743bc9de42fe5899b8962843f39602f242d818977c2342",
+  "en": "The AMS interface board is a circuit board that provides 24V power and also handles communication between the AMS and the printer.",
+  "ar": "لوحة واجهة AMS لوحة إلكترونية توفّر طاقة بجهد 24V، وتتولى أيضًا الاتصال بين وحدة AMS والطابعة.",
+  "ckb": "بۆردی ڕووکاری AMS بۆردێکی ئەلیکترۆنییە کە وزەی 24V دابین دەکات و هەروەها پەیوەندیی نێوان AMS و چاپکەرەکە بەڕێوە دەبات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4e4e5af9fe30abce8ef6d5cb0c390006588aaf934e881d27201df6b2182c5e33",
+  "en": "The XY tensioner idler is an idler mounted on the XY belt tensioner, one on each side (XY), each containing two washers, and an idler.",
+  "ar": "بكرة الشد لمشدّ XY هي بكرة مركّبة على مشدّ سير XY، بواقع واحدة على كل جانب (XY)، ويضم كلٌّ منها حلقتين معدنيتين وبكرة شد.",
+  "ckb": "چەرخی ڕاکێشەری توندکەرەوەی XY چەرخێکە کە لەسەر توندکەرەوەی قایشی XY دامەزراوە، یەکێک لە هەر لایەک (XY)، و هەریەکەیان دوو واشەر و چەرخێکی ڕاکێشەری تێدایە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "38917503357ea33f3d81198d93bcbe1af16284a97382c4d827b03e947d0ab848",
+  "en": "The front cover of the X1C printer is a cover that is installed on the upper front of the printer and printed with its model name.",
+  "ar": "الغطاء الأمامي لطابعة X1C غطاء يُركَّب في الجزء العلوي الأمامي من الطابعة، ومطبوع عليه اسم طرازها.",
+  "ckb": "قەپاغی پێشەوەی چاپکەری X1C قەپاغێکە کە لە بەشی سەرەوەی پێشەوەی چاپکەرەکە دادەمەزرێت و ناوی مۆدێلەکەی لەسەر چاپ کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "dd4d59568687ed4743f6958e4aeee35e22a2ffa4e55951ba005d495767640db0",
+  "en": "MC stands for Machine Controller, which is the unit that controls all the moving parts of the printer.",
+  "ar": "يرمز الاختصار MC إلى Machine Controller (وحدة التحكم في الآلة)، وهي الوحدة التي تتحكم في جميع الأجزاء المتحركة في الطابعة.",
+  "ckb": "کورتکراوەی MC واتە Machine Controller (کۆنترۆڵەری ئامێر)، کە ئەو یەکەیەیە هەموو پارچە جووڵاوەکانی چاپکەرەکە کۆنترۆڵ دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0e8461f23be93a3530f66a3240795b6cebb22529d5a04dfdfd5cdafe7d1741c6",
+  "en": "The Z-Axis Top Cover is designed to protect the top of the Z-axis assembly.",
+  "ar": "صُمّم الغطاء العلوي للمحور Z لحماية الجزء العلوي من مجموعة المحور Z.",
+  "ckb": "قەپاغی سەرەوەی تەوەری Z بۆ پاراستنی بەشی سەرەوەی کۆمەڵەی تەوەری Z دیزاین کراوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "874f914295d523900acc52b3c2be1187919fbc9d67168c7016cedd0d2d794928",
+  "en": "The P1S Heatsink for MC Board serves the purpose of dissipating heat generated by the MC board. The P1S heatsink is horizontal oriented to work with the control board fan for heat dissipation.",
+  "ar": "يؤدي المبدّد الحراري P1S Heatsink for MC Board وظيفة تبديد الحرارة التي تولّدها لوحة MC. ويأتي المبدّد الحراري لطابعة P1S بوضع أفقي ليعمل مع مروحة لوحة التحكم على تبديد الحرارة.",
+  "ckb": "بڵاوکەرەوەی گەرمیی P1S Heatsink for MC Board بۆ بڵاوکردنەوەی ئەو گەرمییە بەکاردێت کە بۆردی MC دروستی دەکات. بڵاوکەرەوەی گەرمیی چاپکەری P1S بە ئاراستەی ئاسۆیی دانراوە بۆ ئەوەی لەگەڵ پانکەی بۆردی کۆنترۆڵ بۆ بڵاوکردنەوەی گەرمی کار بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2333857dcf6b186d745657c12def8413b2172539f243c6651fb67f53e9391d94",
+  "en": "It is also compatible with the P1P 3D Printer and can be used as an upgrade part, if you wish to enclose the printer and add an MC Board fan.",
+  "ar": "وهو متوافق أيضًا مع طابعة 3D طراز P1P، ويمكن استخدامه كقطعة ترقية إذا رغبت في إغلاق الطابعة وإضافة مروحة للوحة MC.",
+  "ckb": "هەروەها لەگەڵ چاپکەری 3D مۆدێلی P1P گونجاوە و دەتوانرێت وەک پارچەی نوێکردنەوە بەکاربهێنرێت، ئەگەر بتەوێت چاپکەرەکە دابخەیت و پانکەیەکی بۆردی MC زیاد بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "0c01fc6cb36c6088f28ac90b0c9ffcba3fd4829d540d95ceb7dcb05c277d5c50",
+  "en": "An assembly that is installed on the back of the printer and it is used to clean the nozzle and slide the excess filament out of the printer.",
+  "ar": "مجموعة تُركَّب في الجهة الخلفية من الطابعة، وتُستخدم لتنظيف النوزل وتمرير الفلامنت الزائد إلى خارج الطابعة.",
+  "ckb": "کۆمەڵەیەکە لە پشتەوەی چاپکەرەکە دادەمەزرێت و بۆ پاککردنەوەی نۆزڵ و خلیسکاندنی فیلامێنتی زیادە بۆ دەرەوەی چاپکەرەکە بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4f26fcdee911253d0d2274810b169be1ea02acfdc5afd829c26003fde28cbafb",
+  "en": "Facilitates the connection between the Mainboard and the TH Extrusion Board for MC-TH power and serial communication.",
+  "ar": "يؤمّن التوصيل بين اللوحة الأم ولوحة البثق TH لنقل الطاقة MC-TH والاتصال التسلسلي.",
+  "ckb": "پەیوەندیی نێوان بۆردی سەرەکی و بۆردی پاڵنانی TH ئاسان دەکات بۆ وزەی MC-TH و پەیوەندیی زنجیرەیی.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b9d5a153f81a0e36c5c329e0cfea335edf9130782cbf3e8ff0627a4d52644d9e",
+  "en": "The Live View camera is a low-FPS camera included by default in the A1. The Live View camera has two functions, which are Remote Livestreams and Time-lapse. This camera is used as a replacement part. It does not upgrade the camera quality or FPS for the printer.",
+  "ar": "كاميرا المشاهدة المباشرة كاميرا منخفضة معدل الإطارات (FPS) مرفقة افتراضيًا مع A1. ولكاميرا المشاهدة المباشرة وظيفتان، هما البث المباشر عن بُعد والتصوير بفاصل زمني. تُستخدم هذه الكاميرا كقطعة بديلة، ولا ترفع جودة الكاميرا أو معدل الإطارات (FPS) في الطابعة.",
+  "ckb": "کامێرای بینینی ڕاستەوخۆ کامێرایەکی FPS نزمە کە بە شێوەی بنەڕەتی لەگەڵ A1 دێت. کامێرای بینینی ڕاستەوخۆ دوو ئەرکی هەیە، کە بریتین لە پەخشی ڕاستەوخۆ لە دوورەوە و وێنەگرتنی کاتی خێراکراو. ئەم کامێرایە وەک پارچەی گۆڕین بەکاردێت. جۆرایەتیی کامێرای چاپکەرەکە یان ڕێژەی FPS بەرز ناکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2869b08e2775da0ba7812e2a1d2de788d9992169ba5b8655b9cce7986b9b06d8",
+  "en": "Remote Livestream: You can observe the printing progress anytime, anywhere.",
+  "ar": "البث المباشر عن بُعد: يمكنك متابعة تقدّم الطباعة في أي وقت ومن أي مكان.",
+  "ckb": "پەخشی ڕاستەوخۆ لە دوورەوە: دەتوانیت لە هەر کات و شوێنێکدا چاودێریی پێشکەوتنی چاپ بکەیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ae2f483b76c4b59a38bfee26c4337e628967dc2e1ca1f858d283077f2959b34a",
+  "en": "Time-lapse: This feature uses the chamber camera to automatically create time-lapse videos of prints.",
+  "ar": "التصوير بفاصل زمني: تستخدم هذه الميزة كاميرا حجرة الطباعة لإنشاء مقاطع فيديو بفاصل زمني للمطبوعات تلقائيًا.",
+  "ckb": "وێنەگرتنی کاتی خێراکراو: ئەم تایبەتمەندییە کامێرای ژووری چاپ بەکاردەهێنێت بۆ دروستکردنی خۆکاری ڤیدیۆی کاتی خێراکراو لە چاپکراوەکان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b375ca2e52ea719467216e979451b59587137da7273c096a27fb2cb94c8339a4",
+  "en": "3.5-inch IPS capacitive touchscreen which connects to the Mainboard which is used to control the printer through the touchscreen interface.",
+  "ar": "شاشة لمس سعوية IPS مقاس 3.5 إنش تتصل باللوحة الأم، وتُستخدم للتحكم في الطابعة من خلال واجهة شاشة اللمس.",
+  "ckb": "شاشەی دەستلێدانی کاپاسیتیڤی IPS بە قەبارەی 3.5 ئینچ کە بە بۆردی سەرەکییەوە دەبەسترێتەوە و بۆ کۆنترۆڵکردنی چاپکەرەکە لە ڕێگەی ڕووکاری شاشەی دەستلێدانەوە بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "b37540e86e1e1423f91c135bada0bcd4fe477aed972ca728b2af89a0215d51b7",
+  "en": "The Y Belt is a crucial transmission component within the Y-axis assembly, facilitating the connection between the Y motor and the heatbed, enabling smooth movement along the Y-direction. It is imperative to replace the Y-Axis Belt promptly in cases of severe wear or breakage to avoid disrupting printer operations.",
+  "ar": "يُعدّ سير Y مكوّن نقل حركة أساسيًا ضمن مجموعة محور Y، إذ يربط بين محرك Y والسرير الساخن ويتيح حركة سلسة على امتداد اتجاه Y. ومن الضروري استبدال سير محور Y فورًا في حالات التآكل الشديد أو الانقطاع لتجنّب تعطّل عمل الطابعة.",
+  "ckb": "قایشی Y پارچەیەکی گرنگی گواستنەوەی جووڵەیە لە ناو کۆمەڵەی تەوەری Y، کە بزوێنەری Y و بێدی گەرم بە یەکەوە دەبەستێت و جووڵەی نەرم بە درێژایی ئاراستەی Y ڕێگەپێدەدات. پێویستە لە کاتی سووانی زۆر یان پچڕاندا قایشی تەوەری Y بە خێرایی بگۆڕدرێت بۆ ئەوەی کارکردنی چاپکەرەکە تێکنەچێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "77a986fe57fd22332eaafb5b07808380c6aee45c74861eff5ed9823d5dbeb084",
+  "en": "Used to drive the Z-axis lead screws for vertical movement of the X-axis, ensuring the consistency in elevation.",
+  "ar": "يُستخدم لتحريك الأعمدة الملولبة للمحور Z من أجل الحركة الرأسية للمحور X، مع ضمان ثبات الارتفاع.",
+  "ckb": "بۆ جووڵاندنی میلە پێچدارەکانی تەوەری Z بەکاردێت بۆ جووڵەی ستوونیی تەوەری X، و یەکسانیی بەرزی مسۆگەر دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "643c0ecf24f6482ae24d7d0e1f7695c75fcf894af514564ccf764add9647b3b4",
+  "en": "Used to mount the filament to the printer when the AMS Lite is not used.",
+  "ar": "يُستخدم لتثبيت الفلامنت على الطابعة عند عدم استخدام AMS Lite.",
+  "ckb": "بۆ بەستنی فیلامێنت بە چاپکەرەکەوە بەکاردێت کاتێک AMS Lite بەکارنایەت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "956e9e46c74007c0a23713e188c5154c37d01473f948449f739c54f05fb134b0",
+  "en": "The AMS lite Top Mount Screws Kit contains all the necessary screws for installing the Top Mount Bracket Set on top of the A1/A2L 3D printer. The screws kit can help to safely mount the AMS lite.",
+  "ar": "يحتوي طقم البراغي AMS lite Top Mount Screws Kit على جميع البراغي اللازمة لتركيب مجموعة الحوامل Top Mount Bracket Set أعلى طابعة 3D طراز A1/A2L. ويساعد طقم البراغي على تثبيت AMS lite بأمان.",
+  "ckb": "کیتی بورغیی AMS lite Top Mount Screws Kit هەموو ئەو بورغییانەی تێدایە کە بۆ دامەزراندنی کۆمەڵەی پایەکانی Top Mount Bracket Set لەسەر چاپکەری 3D مۆدێلی A1/A2L پێویستن. کیتی بورغییەکان یارمەتی دەدات AMS lite بە سەلامەتی دابمەزرێنیت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8c90379daf2f65d7d1f99db2518663ffe5687790bd709ad381aaaaf6e2dbfffa",
+  "en": "Please note that the Top Mount Bracket Set is a set of printable components which is available on MakerWorld for download.",
+  "ar": "يرجى ملاحظة أن Top Mount Bracket Set مجموعة من القطع القابلة للطباعة، ويمكن تنزيلها من منصة MakerWorld.",
+  "ckb": "تکایە ئاگاداربە کە Top Mount Bracket Set کۆمەڵێک پارچەیە کە دەتوانیت چاپیان بکەیت، و لە پلاتفۆرمی MakerWorld بۆ داگرتن بەردەستە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "2308c5b06e59e0426a7fcccdbb9ccd2f39463f2ceae20f1dd51226a6b047a8e0",
+  "en": "The X Belt is a crucial transmission component within the X-Axis assembly, facilitating the connection between the X motor and the tool head, enabling smooth movement along the X-axis. It is imperative to replace the X belt promptly in cases of severe wear or breakage to avoid operational disruptions of the printer.",
+  "ar": "يُعدّ سير X مكوّن نقل حركة أساسيًا ضمن مجموعة محور X، إذ يربط بين محرك X ورأس الطباعة ويتيح حركة سلسة على امتداد محور X. ومن الضروري استبدال سير X فورًا في حالات التآكل الشديد أو الانقطاع لتجنّب تعطّل عمل الطابعة.",
+  "ckb": "قایشی X پارچەیەکی گرنگی گواستنەوەی جووڵەیە لە ناو کۆمەڵەی تەوەری X، کە بزوێنەری X و سەری چاپ بە یەکەوە دەبەستێت و جووڵەی نەرم بە درێژایی تەوەری X ڕێگەپێدەدات. پێویستە لە کاتی سووانی زۆر یان پچڕاندا قایشی X بە خێرایی بگۆڕدرێت بۆ ئەوەی کارکردنی چاپکەرەکە تێکنەچێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d105b6b514ac0f8e2c0d65a052c516dd5b3c8b6ae3a636596ed278e47499950e",
+  "en": "The heatbed nozzle wiper is designed for cleaning the hotend nozzle before starting a print job. The machine's heatbed comes with a built-in nozzle wiping kit, and the cleaning action is automatically performed after initiating each print task without the need for manual intervention.",
+  "ar": "صُمّمت ماسحة النوزل للسرير الساخن لتنظيف نوزل رأس الصهر قبل بدء مهمة الطباعة. يأتي السرير الساخن في الجهاز مزوّدًا بطقم مدمج لمسح النوزل، وتتم عملية التنظيف تلقائيًا بعد بدء كل مهمة طباعة دون الحاجة إلى تدخل يدوي.",
+  "ckb": "سڕەری نۆزڵی بێدی گەرم بۆ پاککردنەوەی نۆزڵی سەری تواندنەوە پێش دەستپێکردنی کاری چاپ دیزاین کراوە. بێدی گەرمی ئامێرەکە کیتێکی ناوخۆیی بۆ سڕینی نۆزڵ لەگەڵدایە، و کرداری پاککردنەوەکە دوای دەستپێکردنی هەر کارێکی چاپ بە شێوەی خۆکار ئەنجام دەدرێت بێ ئەوەی پێویست بە دەستتێوەردانی دەستی بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f2b4c556dedb5ce868ce63b5fb82246dccf90d3272fc4fb3013e63e007bc5c85",
+  "en": "Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that may indicate the need for replacement of the A1/A2L nozzle wiper include:",
+  "ar": "مع مرور الوقت، قد تتلف شعيرات الماسحة السيليكونية، وقد تتآكل الماسحة المعدنية أو تنثني. ومن المشكلات الشائعة التي قد تدل على الحاجة إلى استبدال ماسحة النوزل في A1/A2L:",
+  "ckb": "بە تێپەڕبوونی کات، لەوانەیە مووەکانی سڕەرە سیلیکۆنییەکە زیانیان پێبگات، و سڕەرە کانزاییەکە بسوێت یان بچەمێتەوە. ئەو کێشە باوانەی لەوانەیە ئاماژە بن بۆ پێویستیی گۆڕینی سڕەری نۆزڵی A1/A2L بریتین لە:",
+  "kind": "block_line"
+ },
+ {
+  "h": "6700dffba2e49096c6f331a4a2dede2d5dc379b936fcf9aa80127dead08396c7",
+  "en": "3. Visible damage or wear on the nozzle wiper.",
+  "ar": "3. تلف أو تآكل ظاهر في ماسحة النوزل.",
+  "ckb": "3. زیان یان سووانی بەرچاو لە سڕەری نۆزڵدا.",
+  "kind": "block_line"
+ },
+ {
+  "h": "bdae3726e654d1d680d639684c9ddb61523b06259d2812acf7f7fec79f303d0a",
+  "en": "A casted holder for assembled parts of the AMS.",
+  "ar": "حامل مصبوب يضم الأجزاء المجمّعة لوحدة AMS.",
+  "ckb": "هەڵگرێکی قاڵبڕێژکراوە بۆ پارچە پێکەوەنراوەکانی AMS.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f44ee6056b79fc156ffcce610a178433967e98389fb92c9a08ed94deccd3279c",
+  "en": "The RFID System can automatically identify the RFID tag on the Bambulab filament spools, which can then sync the filament information to the Bambulab slicer (Bambu Studio).",
+  "ar": "يستطيع نظام RFID التعرّف تلقائيًا على شريحة RFID الموجودة على بكرات فلامنت Bambu Lab، ثم مزامنة معلومات الفلامنت مع برنامج التقطيع من Bambu Lab (Bambu Studio).",
+  "ckb": "سیستەمی RFID دەتوانێت بە شێوەی خۆکار تاگی RFID لەسەر ماسوورەکانی فیلامێنتی Bambu Lab بناسێتەوە، و پاشان زانیاریی فیلامێنتەکە لەگەڵ نەرمەکاڵای سلایسەری Bambu Lab (Bambu Studio) هاوکات بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "20551d956a19b004bae5cd65911976d84df15b75579e496d9ebf085aa2e01491",
+  "en": "The filament buffer connection board is located inside the AMS filament buffer and is equipped with a Hall sensor. It monitors the filament loading status by detecting the position changes of the buffer slider.",
+  "ar": "تقع لوحة توصيل موازن الفلامنت داخل موازن الفلامنت الخاص بنظام AMS، وهي مزوّدة بحساس Hall. وتراقب حالة تحميل الفلامنت عبر كشف تغيّرات موضع المنزلق في الموازن.",
+  "ckb": "بۆردی پەیوەستکردنی هاوسەنگکەری فیلامێنت لە ناوەوەی هاوسەنگکەری فیلامێنتی سیستەمی AMS جێگیر کراوە و بە هەستەوەری Hall تەیار کراوە. بە دۆزینەوەی گۆڕانی شوێنی خلیسکێنەری هاوسەنگکەرەکە، چاودێریی باری بارکردنی فیلامێنت دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "89826f051a289c68df03b19f4caf3c01a9d925a5dcb7e2344a4a699b0cf05077",
+  "en": "The AP board is a circuit board that controls the printer and provides the required Wi-Fi connectivity and processing power for the printer.",
+  "ar": "لوحة AP لوحة إلكترونية تتحكم في الطابعة وتوفّر لها اتصال Wi-Fi وقدرة المعالجة اللازمين.",
+  "ckb": "بۆردی AP بۆردێکی ئەلیکترۆنییە کە چاپکەرەکە کۆنترۆڵ دەکات و پەیوەندیی Wi-Fi و توانای پرۆسێسکردنی پێویستی بۆ دابین دەکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f463a0fd89ba7b615adabd86225372ed0a9034bd413485f7f1e7498a3ac8bacd",
+  "en": "Precautions",
+  "ar": "الاحتياطات",
+  "ckb": "وریاییەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "d3df7b10c325d458e51d5b8637d06d4a847cbb4739219bdb4891946f471305ba",
+  "en": "1. When replacing the AP board, be sure to skip the step of binding the machine when turning it on for the first time.",
+  "ar": "1. عند استبدال لوحة AP، احرص على تخطّي خطوة ربط الجهاز عند تشغيله لأول مرة.",
+  "ckb": "1. لە کاتی گۆڕینی بۆردی AP، دڵنیابە لەوەی هەنگاوی بەستنەوەی ئامێرەکە تێدەپەڕێنیت کاتێک بۆ یەکەم جار دەیکەیتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "62f6312f945d6fd6a3910ca4527df1b67488a0eb24560416dc6c4d2c6e4ec09e",
+  "en": "2. After confirming that the replacement is completed, it is necessary to update the SN. To do this, please contact the service team and provide the new and old SN to complete the SN replacement process. (The printer SN of P1P is begins with 01S)",
+  "ar": "2. بعد التأكد من اكتمال الاستبدال، يجب تحديث الرقم التسلسلي (SN). وللقيام بذلك، يرجى التواصل مع فريق الخدمة وتزويده بالرقم التسلسلي الجديد والقديم لإتمام عملية استبدال الرقم التسلسلي. (يبدأ الرقم التسلسلي لطابعة P1P بـ 01S)",
+  "ckb": "2. دوای دڵنیابوون لە تەواوبوونی گۆڕینەکە، پێویستە ژمارەی زنجیرەیی (SN) نوێ بکرێتەوە. بۆ ئەم مەبەستە، تکایە پەیوەندی بە تیمی خزمەتگوزارییەوە بکە و ژمارە زنجیرەییە نوێ و کۆنەکە بدە بۆ تەواوکردنی پرۆسەی گۆڕینی ژمارەی زنجیرەیی. (ژمارەی زنجیرەیی چاپکەری P1P بە 01S دەست پێدەکات)",
+  "kind": "block_line"
+ },
+ {
+  "h": "bd0e4c30a1064cfecaf009e9c062d7c00f7efaea5996a2b86d2430146f6c9835",
+  "en": "3. Changing a new AP board does not remove the region lock.",
+  "ar": "3. لا يؤدي تركيب لوحة AP جديدة إلى إزالة قفل المنطقة.",
+  "ckb": "3. گۆڕینی بۆردی AP بە دانەیەکی نوێ قفڵی ناوچە لانابات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "7ced19c1dfe01b7a24fc3dfaed4d01f06ccdecefa24ff83f86aa83a6c6dd06e7",
+  "en": "The Z Belt Timing Pulley is located on the bottom side of the printer, and used to connect the Z axis leadscrew to the belt of the printer.",
+  "ar": "تقع بكرة السير المسنّنة Z Belt Timing Pulley في الجهة السفلية من الطابعة، وتُستخدم لربط العمود الملولب للمحور Z بسير الطابعة.",
+  "ckb": "چەرخی قایشی ددانەداری Z Belt Timing Pulley لە لای خوارەوەی چاپکەرەکە جێگیرە و بۆ بەستنەوەی میلی پێچداری تەوەری Z بە قایشی چاپکەرەکەوە بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e67c5954d7da200d8fee012fcb94e58a7d4b39d8d51016fcbdf09f0348afe741",
+  "en": "Button Board with Chamber Temperature Sensor is a circuit board installed in the upper right-hand corner of the X1 printer to control the emergency stop button and the sleep (screen off) button. It also contains the chamber's temperature sensor.",
+  "ar": "لوحة الأزرار المزوّدة بحساس حرارة حجرة الطباعة لوحة إلكترونية تُركَّب في الزاوية العلوية اليمنى من طابعة X1، للتحكم في زر الإيقاف الطارئ وزر السكون (إطفاء الشاشة). كما تحتوي على حساس حرارة حجرة الطباعة.",
+  "ckb": "بۆردی دوگمەکان لەگەڵ هەستەوەری پلەی گەرمیی ژووری چاپ بۆردێکی ئەلیکترۆنییە کە لە گۆشەی سەرەوەی لای ڕاستی چاپکەری X1 دادەمەزرێت بۆ کۆنترۆڵکردنی دوگمەی وەستانی خێرا و دوگمەی خەوتن (کوژاندنەوەی شاشە). هەروەها هەستەوەری پلەی گەرمیی ژووری چاپی تێدایە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "49b751bf3a9390caf0065c9dcc436faa7047aa7422c0c7813cc82e86fa67021c",
+  "en": "The Bambu Micro Lidar (Dual Red Laser) is a sensor capable of measuring depth in micrometers. Using this unit, the system can measure the distance, calibrate the flow extruded from the nozzle, and scan the first layer.",
+  "ar": "يُعدّ Bambu Micro Lidar (Dual Red Laser) حساسًا قادرًا على قياس العمق بوحدة الميكرومتر. وباستخدام هذه الوحدة، يستطيع النظام قياس المسافة ومعايرة التدفق الخارج من النوزل وفحص الطبقة الأولى.",
+  "ckb": "هەستەوەری Bambu Micro Lidar (Dual Red Laser) دەتوانێت قووڵایی بە میکرۆمەتر بپێوێت. بە بەکارهێنانی ئەم یەکەیە، سیستەمەکە دەتوانێت دووری بپێوێت، ڕێژەی ڕۆیشتنی کەرەستەی پاڵنراو لە نۆزڵەوە کالیبرە بکات، و چینی یەکەم بپشکنێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "62150de59eadee8dad68ddc992f7f3bd9fb14152f428a8d21b6c443c94863404",
+  "en": "A round handle used to open and close the AMS top lid",
+  "ar": "مقبض دائري يُستخدم لفتح الغطاء العلوي لوحدة AMS وإغلاقه",
+  "ckb": "دەسکێکی خڕە بۆ کردنەوە و داخستنی قەپاغی سەرەوەی AMS بەکاردێت",
+  "kind": "block_line"
+ },
+ {
+  "h": "2ed53fd197b37b3e78b72b1441c6a7214089a1b73a3cd8211b65be19129e7a74",
+  "en": "The XY Belt Tensioner with Pulley is composed of an idler pulley and a bracket, which can change the belt travel distance under the tension of the spring.",
+  "ar": "يتكوّن مشدّ السير XY Belt Tensioner with Pulley من بكرة شد ودعامة تثبيت، ويمكنه تغيير مسافة حركة السير تحت تأثير شدّ النابض.",
+  "ckb": "توندکەرەوەی قایشی XY Belt Tensioner with Pulley لە چەرخێکی ڕاکێشەر و پایەیەکی جێگیرکردن پێکدێت، و دەتوانێت بە هێزی کشانی فەنەرەکە مەودای ڕۆیشتنی قایشەکە بگۆڕێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fde149ea627c83e6ed3953978b613775ab4a1504d8d8ee8e9bc75357ca1e8580",
+  "en": "Used to support the printer and help insulate it from vibrations.",
+  "ar": "يُستخدم لدعم الطابعة والمساعدة على عزلها عن الاهتزازات.",
+  "ckb": "بۆ ڕاگرتنی چاپکەرەکە و یارمەتیدان لە دابڕینی لە لەرینەوەکان بەکاردێت.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d36b859a398171d3d20ba818ad9294ae821dbf33f97ccf81faa142cdf34d44a7",
+  "en": "The A1 PTFE Tube Connector is used to connect filament to the PTFE tube when printing with an external spool.",
+  "ar": "يُستخدم موصل أنبوب PTFE الخاص بطابعة A1 لتوصيل الفلامنت بأنبوب PTFE عند الطباعة من بكرة خارجية (spool).",
+  "ckb": "گەیەنەری بۆریی PTFE بۆ A1 بەکاردێت بۆ گەیاندنی فیلامێنت بە بۆریی PTFE لە کاتی چاپکردن لە ماسوورەیەکی دەرەکی (spool).",
+  "kind": "block_line"
+ },
+ {
+  "h": "617d35e1378be7cfbd2d3645f7751d39e17e62cc5fb97010e3b92bde951fa79e",
+  "en": "AMS Rubber Seal keeps the inside of the AMS dry, reducing the rate at which filaments and desiccants absorb water from the air.",
+  "ar": "يحافظ مانع التسرّب المطاطي AMS Rubber Seal على جفاف الجزء الداخلي من وحدة AMS، ما يقلّل سرعة امتصاص الفلامنتات والمواد المجففة للماء من الهواء.",
+  "ckb": "داخەری لاستیکیی AMS Rubber Seal ناوەوەی AMS وشک دەهێڵێتەوە، و ڕێژەی هەڵمژینی ئاو لە هەواوە لەلایەن فیلامێنتەکان و ماددە وشککەرەوەکانەوە کەم دەکاتەوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "4bc19896592a9163be67cb37275522fa1ed8f9ac5076ecf3d8f5676adf47fb51",
+  "en": "The Screws Kit for A1 Series and AMS lite offers the screws most commonly used based on user feedback.",
+  "ar": "يوفّر طقم Screws Kit for A1 Series and AMS lite البراغي الأكثر استخدامًا استنادًا إلى ملاحظات المستخدمين.",
+  "ckb": "کیتی Screws Kit for A1 Series and AMS lite ئەو بورغییانە دابین دەکات کە بەپێی ڕاوبۆچوونی بەکارهێنەران زۆرترین بەکارهێنانیان هەیە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "f6b8c2060d3bd4df92791e5ea6ef4551eb300333d36de81c95d0e5335fb3577d",
+  "en": "For more detailed information and image guide, please visit the Bambu Lab Wiki.",
+  "ar": "لمزيد من المعلومات التفصيلية ودليل مصوّر، يرجى زيارة ويكي Bambu Lab.",
+  "ckb": "بۆ زانیاریی وردتر و ڕێبەری وێنەدار، تکایە سەردانی ویکی Bambu Lab بکە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ff7c91fa8617f54adb32efa3c5411bb093bbae7eba8611c35906d21c9fa99789",
+  "en": "Screws Information",
+  "ar": "معلومات البراغي",
+  "ckb": "زانیاریی بورغییەکان",
+  "kind": "block_title"
+ },
+ {
+  "h": "f7b4556177d1215c5fcedd1489b625ef61032820d54d774cde66a998f898086f",
+  "en": "Item Number",
+  "ar": "رقم القطعة",
+  "ckb": "ژمارەی پارچە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "06d4918fe3e6838d2d1b1df08325e67f712ecc2361e676995bbbe211747fa28e",
+  "en": "Item Name",
+  "ar": "اسم القطعة",
+  "ckb": "ناوی پارچە",
+  "kind": "block_cell"
+ },
+ {
+  "h": "efd7b769a999d370ca9c1df955f398d35e7c53cb17ae551436880214d005c491",
+  "en": "QTY",
+  "ar": "الكمية",
+  "ckb": "بڕ",
+  "kind": "block_cell"
+ },
+ {
+  "h": "15b61974b2707a7b3d4201385e0f01f4ff5eb1f17c5639d98788ee5add2025cd",
+  "en": "Location",
+  "ar": "الموضع",
+  "ckb": "شوێن",
+  "kind": "block_cell"
+ },
+ {
+  "h": "13e1066f18792ec9709c5280fbaf2c9f7b5c8fe115b50a261fcfa6ff5b08f6ec",
+  "en": "M2x2.5 FHCS (Machine Screw)",
+  "ar": "برغي ميكانيكي M2x2.5 FHCS",
+  "ckb": "بورغیی ئامێری M2x2.5 FHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "3dc4576f886958f5b1dde43836f93d680a59ef7586ed7f89051e005c82f43ed8",
+  "en": "Coil and the Heat Sink of A1 Main Board",
+  "ar": "الملف والمبدّد الحراري للوحة الرئيسية في A1",
+  "ckb": "کۆیل و بڵاوکەرەوەی گەرمیی بۆردی سەرەکیی A1",
+  "kind": "block_cell"
+ },
+ {
+  "h": "8e19c75467843ab035bcd84017b13bfd7b07ddb5c1fefd046045b72b59c91dff",
+  "en": "M2.5x5 FHCS (Machine Screw)",
+  "ar": "برغي ميكانيكي M2.5x5 FHCS",
+  "ckb": "بورغیی ئامێری M2.5x5 FHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "58c73aaeaef7700e01da286ddaa3406b2ac7c044888ac558e51174dc2e370c2a",
+  "en": "A1 mini Heatbed",
+  "ar": "السرير الساخن في A1 mini",
+  "ckb": "بێدی گەرمی A1 mini",
+  "kind": "block_cell"
+ },
+ {
+  "h": "049577c8cd2fc1c62534eb47b8d3ea55f006621bf4dfdbb335bfc341e7e8fbdf",
+  "en": "BT2x5 SHCS (Self Tapping Screw)",
+  "ar": "برغي ذاتي اللولبة BT2x5 SHCS",
+  "ckb": "بورغیی خۆپێچی BT2x5 SHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "4cfbcf0e577bcd3bd5df941ab4223519c5bbfe59fd34d895af376d92aee06980",
+  "en": "Feeder unit and the Filament Sensor",
+  "ar": "وحدة التغذية وحساس الفلامنت",
+  "ckb": "یەکەی پێدان و هەستەوەری فیلامێنت",
+  "kind": "block_cell"
+ },
+ {
+  "h": "d2e51139af132dc12aefac09f1d258522759a9867eecb11f15aa19c7c682016d",
+  "en": "BT2.6x5 SHCS (Self Tapping Screw)",
+  "ar": "برغي ذاتي اللولبة BT2.6x5 SHCS",
+  "ckb": "بورغیی خۆپێچی BT2.6x5 SHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0d5093b6dc4472065b988f25c22a2bc71a9582461278ce467e2a8d6d4f3b9417",
+  "en": "BT2.3x7 SHCS (Self Tapping Screw)",
+  "ar": "برغي ذاتي اللولبة BT2.3x7 SHCS",
+  "ckb": "بورغیی خۆپێچی BT2.3x7 SHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "e0a36d4da2bbb0d1568fbafb4bd87ddd8cc5b70463289b6745c7ac2bc5ffe569",
+  "en": "Extruder Unit and its front cover",
+  "ar": "وحدة الدافع وغطاؤها الأمامي",
+  "ckb": "یەکەی پاڵنەر و قەپاغی پێشەوەکەی",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5fc479767814252642262198f0a0db7dbb521fc13776be02519215bb3c3f461c",
+  "en": "BT2x8 SHCS (Self Tapping Screw)",
+  "ar": "برغي ذاتي اللولبة BT2x8 SHCS",
+  "ckb": "بورغیی خۆپێچی BT2x8 SHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0ebae9e5a96b0a31b24cb5f8edbca42fa1aac8de127f76ffe3418be34158ca8f",
+  "en": "Filament Pressing Block",
+  "ar": "كتلة ضغط الفلامنت",
+  "ckb": "بلۆکی پەستانی فیلامێنت",
+  "kind": "block_cell"
+ },
+ {
+  "h": "fafe443ebe407bd1ca075c6d6950dfefdb733c00968197dea15f5a705ba91955",
+  "en": "BT2.6x14 SHCS (Self Tapping Screw)",
+  "ar": "برغي ذاتي اللولبة BT2.6x14 SHCS",
+  "ckb": "بورغیی خۆپێچی BT2.6x14 SHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ec7e4c313fa141fcdb732f1c5e226e91fd667efd4e37835cff928ca45e45f9ff",
+  "en": "Cutter Lever",
+  "ar": "ذراع القاطع",
+  "ckb": "لیڤەری بڕەر",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5926aa0f06fc2fc65d7fc169ba15377e188287f569aae875cc8cb80ab2416511",
+  "en": "Extruder Gear Assembly",
+  "ar": "مجموعة تروس الدافع",
+  "ckb": "کۆمەڵەی چەرخی پاڵنەر",
+  "kind": "block_cell"
+ },
+ {
+  "h": "eec682a13d168a53d3bbd621a9db9431e1cbc20813a5c1d0410bacf58aece97c",
+  "en": "BT2.6x8 SHCS (Self Tapping Screw)",
+  "ar": "برغي ذاتي اللولبة BT2.6x8 SHCS",
+  "ckb": "بورغیی خۆپێچی BT2.6x8 SHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "ebb6552099a973e31ccaf98f81b1b271ac3933fe0b61b817f0b257596fe0581a",
+  "en": "Scraper",
+  "ar": "المكشطة",
+  "ckb": "تاشەر",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2e528333d0adb7d9d9bf7f0109ee068e3f292a5d1420b0ebf65c0433f1bda642",
+  "en": "BT3x8 SHCS (Self Tapping Screw)",
+  "ar": "برغي ذاتي اللولبة BT3x8 SHCS",
+  "ckb": "بورغیی خۆپێچی BT3x8 SHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2954a367901e8654164827183c1ebfe29d157492db337eb69ebd459ec684fea3",
+  "en": "Bottom Plate of A1& A1 mini",
+  "ar": "اللوح السفلي في A1 وA1 mini",
+  "ckb": "تەختەی ژێرەوەی A1 و A1 mini",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2e90928519909c93dfb1d3b4299ed63da3648a118486d815d2c7a319cc283306",
+  "en": "BT3x12 SHCS (Self Tapping Screw)",
+  "ar": "برغي ذاتي اللولبة BT3x12 SHCS",
+  "ckb": "بورغیی خۆپێچی BT3x12 SHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "fec58940f6560f2f7398f9d2a2b6d9c9ba510bd8286ca943802837005ad36a95",
+  "en": "M3x12 FHCS (Machine Screw)",
+  "ar": "برغي ميكانيكي M3x12 FHCS",
+  "ckb": "بورغیی ئامێری M3x12 FHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "5d160a9a60d5b9ce90cf92c4184e4ff543fd42a555954585928b548531ee7787",
+  "en": "Purge Unit and the A1 mini Z Cover",
+  "ar": "وحدة الطرد وغطاء المحور Z في A1 mini",
+  "ckb": "یەکەی دەرکردنی فیلامێنت و قەپاغی تەوەری Z لە A1 mini",
+  "kind": "block_cell"
+ },
+ {
+  "h": "56c0b4c91c53e262dab13ff7e478898f4d1ac4191cba5b77e47959dd40b620bf",
+  "en": "BT2x13 SHCS (Self Tapping Screw)",
+  "ar": "برغي ذاتي اللولبة BT2x13 SHCS",
+  "ckb": "بورغیی خۆپێچی BT2x13 SHCS",
+  "kind": "block_cell"
+ },
+ {
+  "h": "3472083da12d0ba598beb583fc19a2515054aa956a36d89de8d3f356daa6b685",
+  "en": "Filament Funnel Unit",
+  "ar": "وحدة قمع الفلامنت",
+  "ckb": "یەکەی قیفی فیلامێنت",
+  "kind": "block_cell"
+ },
+ {
+  "h": "d3fbccd9740e75b3f8be70f140dbff038c2ce166cc9fb86edc184cbabea14410",
+  "en": "0.9x11 mm Helical Compression Spring",
+  "ar": "نابض ضغط حلزوني (Helical Compression Spring) مقاس 0.9x11 mm",
+  "ckb": "فەنەری پەستانی پێچاوپێچ (Helical Compression Spring) بە قەبارەی 0.9x11 mm",
+  "kind": "block_cell"
+ },
+ {
+  "h": "f1cb38b5081c19bfba01f7c7d5fc29d47421197ab0c73c09bb4751dd0a2da0d9",
+  "en": "When facing the printer's front door, the right side cover is referred to as the right panel. It is a metal panel.",
+  "ar": "عند مواجهة الباب الأمامي للطابعة، يُسمّى الغطاء الجانبي الأيمن اللوحَ الأيمن، وهو لوح معدني.",
+  "ckb": "کاتێک ڕووت لە دەرگای پێشەوەی چاپکەرەکە بێت، قەپاغی لای ڕاست پێی دەوترێت پانێڵی ڕاست. پانێڵێکی کانزاییە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "ee5cc207d0e7e70aeda4a9bb281f1fe9de6cce7bbd4668bebb1f267b30f0a03c",
+  "en": "When facing the printer's front door, the left side cover is referred to as the left panel. It is a metal panel.",
+  "ar": "عند مواجهة الباب الأمامي للطابعة، يُسمّى الغطاء الجانبي الأيسر اللوحَ الأيسر، وهو لوح معدني.",
+  "ckb": "کاتێک ڕووت لە دەرگای پێشەوەی چاپکەرەکە بێت، قەپاغی لای چەپ پێی دەوترێت پانێڵی چەپ. پانێڵێکی کانزاییە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "98eb94644070f7bcc9f62803f346950bd13eb880acbc39f58f5ff62a25b01427",
+  "en": "The Heatbed Surface Magnet is a magnetized soft rubber adhered to the heatbed aluminum base plate. Its primary purpose is to ensure a strong magnetic connection with the build plate.",
+  "ar": "مغناطيس سطح السرير الساخن طبقة مطاطية لينة ممغنطة مُلصقة على صفيحة القاعدة الألمنيوم للسرير الساخن، وغرضه الأساسي ضمان ارتباط مغناطيسي قوي بصفيحة الطباعة.",
+  "ckb": "موگناتیسی ڕووی بێدی گەرم لاستیکێکی نەرمی موگناتیسکراوە کە بە تەختەی بنکەی ئەلەمنیۆمی بێدی گەرمەوە لکێنراوە. ئامانجی سەرەکیی دڵنیابوونە لە بەستنەوەیەکی موگناتیسیی بەهێز لەگەڵ پلێتی چاپ.",
+  "kind": "block_line"
+ },
+ {
+  "h": "64c6f90f58618dbe46c32873cb64570f49295b19d839e8736ce532f83c3b8865",
+  "en": "The X1 Series printers utilize the version without cutout.",
+  "ar": "تستخدم طابعات X1 Series النسخة بدون فتحة.",
+  "ckb": "چاپکەرەکانی X1 Series وەشانی بێ کەلێن بەکاردەهێنن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9e13d6e310dec527c110dc761a9dac79d32d0507fc567af90292a89dbc6f219a",
+  "en": "The P1 Series printers, there are two versions of the Heatbed Surface Magnet due to structural differences. One version features cutout to accommodate leveling screws, while the other version does not.",
+  "ar": "أما طابعات P1 Series، فهناك نسختان من مغناطيس سطح السرير الساخن بسبب اختلافات هيكلية: نسخة فيها فتحة لاستيعاب براغي التسوية، ونسخة أخرى بدونها.",
+  "ckb": "بۆ چاپکەرەکانی P1 Series، بەهۆی جیاوازیی پێکهاتەییەوە دوو وەشانی موگناتیسی ڕووی بێدی گەرم هەیە. وەشانێکیان کەلێنی هەیە بۆ جێکردنەوەی بورغییەکانی ڕێکخستنی ئاست، لە کاتێکدا وەشانەکەی تر کەلێنی نییە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e45fa86334ae1d097e73557f2fbb55ac539b567492144e72936d237fdcbb7b20",
+  "en": "If your printer requires a replacement for the surface magnet, please ensure that you order the correct version to avoid any errors.",
+  "ar": "إذا كانت طابعتك تحتاج إلى استبدال مغناطيس السطح، فيرجى التأكد من طلب النسخة الصحيحة لتجنّب أي أخطاء.",
+  "ckb": "ئەگەر چاپکەرەکەت پێویستی بە گۆڕینی موگناتیسی ڕووەکە هەیە، تکایە دڵنیابە لەوەی وەشانی دروست داوا دەکەیت بۆ دوورکەوتنەوە لە هەر هەڵەیەک.",
+  "kind": "block_line"
+ },
+ {
+  "h": "e9e669b0f931870663193609ff8441571a35fd88fe893379a9eea8fd53d968c3",
+  "en": "The Heatbed Surface Magnet (with Cutout) is available in this listing.",
+  "ar": "نسخة مغناطيس سطح السرير الساخن (مع فتحة) متاحة ضمن هذه الصفحة.",
+  "ckb": "وەشانی موگناتیسی ڕووی بێدی گەرم (کەلێندار) لەم پەڕەیەدا بەردەستە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "52d133244994b97c027b90088f1e04fb29335e9f022c483f11975db5e5474e79",
+  "en": "The Heatbed Surface Magnet (without Cutout) is available in this listing.",
+  "ar": "نسخة مغناطيس سطح السرير الساخن (بدون فتحة) متاحة ضمن هذه الصفحة.",
+  "ckb": "وەشانی موگناتیسی ڕووی بێدی گەرم (بێ کەلێن) لەم پەڕەیەدا بەردەستە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "d811917e04056d3b43d82a85ffb7263165b07e903919a1086e8185d274ff232a",
+  "en": "The heatbed in the P1 series printer is a platform installed inside the printer chamber. It can move up and down along the Z-axis and can be heated based on the temperature set by the user. Setting an appropriate heat bed temperature can enhance model adhesion to the build plate, preventing warping.",
+  "ar": "السرير الساخن في طابعات سلسلة P1 منصة مركّبة داخل حجرة الطباعة، يمكنها التحرك صعودًا ونزولًا على طول المحور Z، ويمكن تسخينها وفق درجة الحرارة التي يحدّدها المستخدم. ويساعد ضبط درجة حرارة مناسبة للسرير الساخن على تعزيز التصاق النموذج بصفيحة الطباعة ومنع التقوّس.",
+  "ckb": "بێدی گەرم لە چاپکەرەکانی زنجیرەی P1 سەکۆیەکە لە ناو ژووری چاپی چاپکەرەکەدا دامەزراوە. دەتوانێت بە درێژایی تەوەری Z بۆ سەرەوە و خوارەوە بجووڵێت و بەپێی ئەو پلەی گەرمییەی بەکارهێنەر دیاری دەکات گەرم بکرێت. دانانی پلەی گەرمیی گونجاو بۆ بێدی گەرم دەتوانێت لکانی مۆدێل بە پلێتی چاپەوە بەهێزتر بکات و ڕێگری لە چەمانەوەی لێوار بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "fda59b229bfa78dbd80b22ffc6d1732e5026ca07e673befb2df1752ca2dbdd60",
+  "en": "The heatbed in the X1 series printer is a platform installed inside the printer chamber. It can move up and down along the Z-axis and can be heated based on the temperature set by the user. Setting an appropriate heat bed temperature can enhance model adhesion to the build plate, preventing warping.",
+  "ar": "السرير الساخن في طابعات سلسلة X1 منصة مركّبة داخل حجرة الطباعة، يمكنها التحرك صعودًا ونزولًا على طول المحور Z، ويمكن تسخينها وفق درجة الحرارة التي يحدّدها المستخدم. ويساعد ضبط درجة حرارة مناسبة للسرير الساخن على تعزيز التصاق النموذج بصفيحة الطباعة ومنع التقوّس.",
+  "ckb": "بێدی گەرم لە چاپکەرەکانی زنجیرەی X1 سەکۆیەکە لە ناو ژووری چاپی چاپکەرەکەدا دامەزراوە. دەتوانێت بە درێژایی تەوەری Z بۆ سەرەوە و خوارەوە بجووڵێت و بەپێی ئەو پلەی گەرمییەی بەکارهێنەر دیاری دەکات گەرم بکرێت. دانانی پلەی گەرمیی گونجاو بۆ بێدی گەرم دەتوانێت لکانی مۆدێل بە پلێتی چاپەوە بەهێزتر بکات و ڕێگری لە چەمانەوەی لێوار بکات.",
+  "kind": "block_line"
+ },
+ {
+  "h": "40d5b07eeffa9c2c2275e952ce9a2988e4d7f70d1fb68dde045d39c7add4cd39",
+  "en": "Please refer to the Wiki page here to check the version of your X1 Series Heatbed Unit.",
+  "ar": "يرجى الرجوع إلى صفحة الويكي هنا للتحقق من إصدار وحدة السرير الساخن في طابعتك من X1 Series.",
+  "ckb": "تکایە سەیری پەڕەی ویکی لێرە بکە بۆ ئەوەی بزانیت یەکەی بێدی گەرمی چاپکەرەکەت (X1 Series) کام وەشانە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "79ce87ee9c0cad3975139623b29a86804cc4149bf8ec51693b6ad6d896e18fff",
+  "en": "The X1 series printers currently have both Heatbed Unit V3 and V2 heatbed options. All printers will eventually shift to the V3 heatbed.",
+  "ar": "تضم طابعات سلسلة X1 حاليًا نسختين من السرير الساخن: Heatbed Unit V3 وV2. وستنتقل جميع الطابعات في النهاية إلى السرير الساخن V3.",
+  "ckb": "لە ئێستادا دوو بژاردەی بێدی گەرم بۆ چاپکەرەکانی زنجیرەی X1 هەیە: Heatbed Unit V3 و V2. لە کۆتاییدا هەموو چاپکەرەکان دەگوازرێنەوە بۆ بێدی گەرمی V3.",
+  "kind": "block_line"
+ },
+ {
+  "h": "8426fb56a285ac700d9977884049f37013e6cb5b9dddbe6ce89a509e5908b394",
+  "en": "Heatbed Unit V3 is more user-friendly for replacement, while maintaining the same functionality as the Heatbed Unit V2. This change is part of our updated production schedule.",
+  "ar": "تُعدّ Heatbed Unit V3 أسهل في الاستبدال للمستخدم، مع الحفاظ على الوظائف نفسها التي تقدّمها Heatbed Unit V2. وهذا التغيير جزء من جدول الإنتاج المحدَّث لدينا.",
+  "ckb": "گۆڕینی Heatbed Unit V3 بۆ بەکارهێنەر ئاسانترە، لە کاتێکدا هەمان کارکردنی Heatbed Unit V2 دەپارێزێت. ئەم گۆڕانکارییە بەشێکە لە خشتەی نوێکراوەی بەرهەمهێنانمان.",
+  "kind": "block_line"
+ },
+ {
+  "h": "176afe8f4350f33bebc8728a48fceba7f5bdae302fe6317c0f99e61e7688a864",
+  "en": "In addition, please note that different versions of the heatbed must correlate to the relevant version of the AC board.",
+  "ar": "بالإضافة إلى ذلك، يرجى ملاحظة أن كل إصدار من السرير الساخن يجب أن يتوافق مع الإصدار المناسب له من لوحة AC.",
+  "ckb": "جگە لەوەش، تکایە ئاگاداربە کە وەشانە جیاوازەکانی بێدی گەرم دەبێت لەگەڵ وەشانی پەیوەندیداری بۆردی AC بگونجێن.",
+  "kind": "block_line"
+ },
+ {
+  "h": "20fbf18f897e2ccc34ae8117c3eaddd1c53febe6ce4195c075a897bd73d678f5",
+  "en": "If your printer initially had a Heatbed Unit V2 and you intend to upgrade to a Heatbed Unit V3, it's essential to upgrade the original AC board to the version compatible with the Heatbed Unit V3.",
+  "ar": "إذا كانت طابعتك مزوّدة في الأصل بـ Heatbed Unit V2 وتنوي الترقية إلى Heatbed Unit V3، فمن الضروري ترقية لوحة AC الأصلية إلى الإصدار المتوافق مع Heatbed Unit V3.",
+  "ckb": "ئەگەر چاپکەرەکەت لە سەرەتاوە بە Heatbed Unit V2 هاتبوو و دەتەوێت بۆ Heatbed Unit V3 نوێی بکەیتەوە، پێویستە بۆردی ئەسڵیی AC نوێ بکەیتەوە بۆ ئەو وەشانەی لەگەڵ Heatbed Unit V3 گونجاوە.",
+  "kind": "block_line"
+ },
+ {
+  "h": "48e5ab7fd8f9e2299b5b43cb88ba702a90703d7c915b06125331ed5661975fd0",
+  "en": "The AC board is a circuit board providing AC power for the X1 Series and P1 Series heatbed.",
+  "ar": "لوحة AC لوحة إلكترونية توفّر طاقة التيار المتردد (AC) للسرير الساخن في X1 Series and P1 Series.",
+  "ckb": "بۆردی AC بۆردێکی ئەلیکترۆنییە کە وزەی AC بۆ بێدی گەرمی X1 Series and P1 Series دابین دەکات.",
+  "kind": "block_line"
+ }
+]

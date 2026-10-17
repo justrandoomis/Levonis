@@ -1,0 +1,2658 @@
+{
+ "batch": 16,
+ "surface": "api",
+ "handles": [
+  "wireless-charger-kit-k012",
+  "p1s",
+  "a1-mini",
+  "a1",
+  "h2d-pro"
+ ],
+ "strings": [
+  {
+   "h": "119f448a1b9ef6c7c914e95a0fed4816d5e54598f236e97ea4b0b57685105fec",
+   "en": "The Wireless Charger Kit contains all the non-3D printed parts for assembling an entirely functional A1 mini Wireless Charger or an Air Force Command Headquarters Wireless Charger. To complete the work, you need to download the model files and 3D print the parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "660abe375102d856c65ad6faac390362559f47d129e4a0de9a415479130a6fa7",
+   "en": "To download the model files and obtain detailed information, please visit A1 mini Wireless Charger or Air Force Command Headquarters on Makerworld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[1].line[2]",
+    "near": "The Wireless Charger Kit contains all the non-3D printed parts for assembling an entirely functional A1 mini Wireless Charger or an Air Force Command Headquarte"
+   },
+   "dict": null
+  },
+  {
+   "h": "49059224153184fde1636b4a91f4734fdf8301a6c74b66155370f5d4c88ef6cf",
+   "en": "Compatible Models",
+   "kind": "block_cell",
+   "freq": 8,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[1].line[3].cell[0]",
+    "near": "To download the model files and obtain detailed information, please visit A1 mini Wireless Charger or Air Force Command Headquarters on Makerworld."
+   },
+   "dict": null
+  },
+  {
+   "h": "c6b6a71ac899e4f8937b0f0896a11170aa2d3a120fa476ec5048b2bda4eba0bd",
+   "en": "Creators",
+   "kind": "block_cell",
+   "freq": 41,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[1].line[3].cell[1]",
+    "near": "To download the model files and obtain detailed information, please visit A1 mini Wireless Charger or Air Force Command Headquarters on Makerworld."
+   },
+   "dict": null
+  },
+  {
+   "h": "8992f1c87cb89bbad310b78ad3e56d520bf1ea1ce57609fc19894fdf14e7870f",
+   "en": "Model Links",
+   "kind": "block_cell",
+   "freq": 40,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[1].line[3].cell[2]",
+    "near": "To download the model files and obtain detailed information, please visit A1 mini Wireless Charger or Air Force Command Headquarters on Makerworld."
+   },
+   "dict": null
+  },
+  {
+   "h": "9ee6825786996f0b170ebd9b963f0a640369baae7a0d6ad84a0fc812c6f2076c",
+   "en": "30 3D print",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[1].line[5].cell[1]",
+    "near": "A1 mini Wireless Charger | Bambu Lab | A1 mini Wireless Charger"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7b75a1afbcaef1df3e817a382458b96d6e8a930cc9277eb98ef66b1994dcdb5",
+   "en": "A1 mini Wireless Charger is here! We have designed an adorable wireless charger model based on the appearance of our A1 mini 3D Printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[2].line[0]",
+    "near": "• Simply connect a Type-C cable to the wireless charger to power it on. Then place your phone on the wireless charging plate to start the charging process."
+   },
+   "dict": null
+  },
+  {
+   "h": "99ea430322abbdfaa363dfe3f5a65c2555e523a3d5a6af36378a1440eb585d20",
+   "en": "Simply connect a Type-C cable to the wireless charger to power it on. Then place your phone on the wireless charging plate to start the charging process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[2].line[1]",
+    "near": "A1 mini Wireless Charger is here! We have designed an adorable wireless charger model based on the appearance of our A1 mini 3D Printer."
+   },
+   "dict": null
+  },
+  {
+   "h": "ff42375be08392d8221142db5aa2e78b4f84f3dcfd33aed18288a331850d9f24",
+   "en": "Once the charging starts, the Z-axis will simulate the printing process by moving up and down for one cycle. During this time, the LOGO light and indicator light will light up.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[2].line[2]",
+    "near": "• Simply connect a Type-C cable to the wireless charger to power it on. Then place your phone on the wireless charging plate to start the charging process."
+   },
+   "dict": null
+  },
+  {
+   "h": "9927e1d2bd372240c305ad318c28ff48e9c7ed2cf85d81d30103fddd4b1f850c",
+   "en": "You can use the Make My Sign function on Makerworld to customize your own nameplate for your A1 mini wireless charger. To learn more about the nameplate customization, please visit A1 mini Wireless Charger on Makerworld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[2].line[3]",
+    "near": "• Once the charging starts, the Z-axis will simulate the printing process by moving up and down for one cycle. During this time, the LOGO light and indicator li"
+   },
+   "dict": null
+  },
+  {
+   "h": "da87efd3d4f7964fb3cadb5c45222a48f072b0b5b65aa8ae2a8b2f2b65fb560a",
+   "en": "To accommodate different phones and filaments, we have specially designed two power modes (high/low) to avoid phone overheating and heat deflection of printed parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[3].line[0]",
+    "near": "• We have also engineered two different drive modes (mode 1 and mode 2) for the A1 mini wireless charger to adapt to varying levels of friction generated during"
+   },
+   "dict": null
+  },
+  {
+   "h": "02bd4ac5f80e53712211b6eda55e17fc85f042fa742e3240971a8388696933fa",
+   "en": "We have also engineered two different drive modes (mode 1 and mode 2) for the A1 mini wireless charger to adapt to varying levels of friction generated during the Z-axis movement. (This friction is caused by differences in filament materials and printing tolerances)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[3].line[1]",
+    "near": "• To accommodate different phones and filaments, we have specially designed two power modes (high/low) to avoid phone overheating and heat deflection of printed"
+   },
+   "dict": null
+  },
+  {
+   "h": "203d51c5e7d9b2568e5210f092f6b01568d10c02b517c7cca07a783270545032",
+   "en": "Mode 1 (default mode)",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[4].line[0]",
+    "near": "Lights: Highlight for 10s and then stay lit at normal brightness"
+   },
+   "dict": null
+  },
+  {
+   "h": "f013b73694c68a20beab1671db0b1bc6390b3c9334ee74713f4f1da3f59c9043",
+   "en": "Lights: Highlight for 10s and then stay lit at normal brightness",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[4].line[1]",
+    "near": "Mode 1 (default mode)"
+   },
+   "dict": null
+  },
+  {
+   "h": "868001dd79e02014f3adffbd93c1c5d8fbb8a6026bbcd4ff00e2f4c46ba347ae",
+   "en": "Motor: Back-and-forth motion for one cycle",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[4].line[2]",
+    "near": "Lights: Highlight for 10s and then stay lit at normal brightness"
+   },
+   "dict": null
+  },
+  {
+   "h": "1cb324350e6c2ee42ddd2afd0063625b72d6ca51172e3de177a587c81e6a369f",
+   "en": "Compatible Model: A1 mini Wireless Charger",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[4].line[3]",
+    "near": "Motor: Back-and-forth motion for one cycle"
+   },
+   "dict": null
+  },
+  {
+   "h": "2dc711ba48ae77dceb8cca2e9393d52de54d4b20cbe2638511b2afcf52160ad9",
+   "en": "Mode 2",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[5].line[0]",
+    "near": "Lights: Highlight for 10s and then stay lit at normal brightness"
+   },
+   "dict": null
+  },
+  {
+   "h": "8df6575b71377876b9cdd6cb9b7431aaaad05c7bac3ae19c7d3638f7c829bb33",
+   "en": "Motor: Back-and-forth motion for one cycle with greater power (adapt to varying levels of friction generated during the Z-axis movement)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[5].line[2]",
+    "near": "Lights: Highlight for 10s and then stay lit at normal brightness"
+   },
+   "dict": null
+  },
+  {
+   "h": "af4dbf485c6b490cb39e2e3cd2e3f00354327a6b805dafcd8e09964e3f33bc4b",
+   "en": "Mode 3",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[6].line[0]",
+    "near": "Lights: Continuous breathing light"
+   },
+   "dict": null
+  },
+  {
+   "h": "497cadef5cbc663ad97f26e3096242f9f2ab6e54b368cbeb2b25f98f06874fc8",
+   "en": "Lights: Continuous breathing light",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[6].line[1]",
+    "near": "Mode 3"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ca55bcc50213d8d21f513d2fae5531891613298e6591eeff8e0e769486a963a",
+   "en": "Motor: Continuous back-and-forth motion",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[6].line[2]",
+    "near": "Lights: Continuous breathing light"
+   },
+   "dict": null
+  },
+  {
+   "h": "f5a37bf82955fd61face4ea1632558c9c0867accd58bce06a2cb7026d1d75caa",
+   "en": "Compatible Model: Air Force Command Headquarters",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[6].line[3]",
+    "near": "Motor: Continuous back-and-forth motion"
+   },
+   "dict": null
+  },
+  {
+   "h": "4b87f3416c67c6fc04c03d715e03e0239092a20ab837608b609d60a34428e71a",
+   "en": "Mode 4",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[7].line[0]",
+    "near": "Lights: Continuous breathing light"
+   },
+   "dict": null
+  },
+  {
+   "h": "53d6bbf395bd98456dcb74952c5f059cb8642a46cadecc2dccc6a4b15070eb00",
+   "en": "Motor: Continuous one-way motion",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[7].line[2]",
+    "near": "Lights: Continuous breathing light"
+   },
+   "dict": null
+  },
+  {
+   "h": "b108a13d1a5b9d42a163a90486f4beba0fd21c16d47ea0987b4201353e71058c",
+   "en": "Mode 5",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[8].line[0]",
+    "near": "Lights: Breathing light for 10s"
+   },
+   "dict": null
+  },
+  {
+   "h": "680ffc06eda1b6ad2e7a80f67141ea1e3d4664d9250d0781e54de5c4a0741c86",
+   "en": "Lights: Breathing light for 10s",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[8].line[1]",
+    "near": "Mode 5"
+   },
+   "dict": null
+  },
+  {
+   "h": "6c6d497057dea16152908a4b93649bd101d75e3717372fe32e85d670118079b0",
+   "en": "Motor: Back-and-forth motion for 10s",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[8].line[2]",
+    "near": "Lights: Breathing light for 10s"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a5ed9176de25727bfb797a8f92d3e06da1b883666fdb1106ccea1a09ff6ab17",
+   "en": "Mode 6",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[9].line[0]",
+    "near": "Lights: Breathing light for 10s"
+   },
+   "dict": null
+  },
+  {
+   "h": "4d6cf0086451024d9d64d017c4418d3e5f0007eaa050292b4072d6921ef10ab1",
+   "en": "Motor: One-way motion for 10s",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[9].line[2]",
+    "near": "Lights: Breathing light for 10s"
+   },
+   "dict": null
+  },
+  {
+   "h": "864063b1ac676f5feaf4a1c2393adfc308b246504ed54f61534a7be9b9dcf5e7",
+   "en": "Mode 7",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[0]",
+    "near": "Lights: OFF"
+   },
+   "dict": null
+  },
+  {
+   "h": "9589ef333933290d13ffd06fcdc1c544c1de1600253676dab101d06d01509cb1",
+   "en": "Lights: OFF",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[1]",
+    "near": "Mode 7"
+   },
+   "dict": null
+  },
+  {
+   "h": "4cda054edc72e8f997032e4bbc6e80f940232d7fe3421317506fcf0a6c8a5f67",
+   "en": "Motor: OFF",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[2]",
+    "near": "Lights: OFF"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5715e32f83c795f0880fb606f18fb5eb19ff255dbb1acda3ff90d674fd9e01a",
+   "en": "Compatible Model: A1 mini Wireless Charger, Air Force Command Headquarters",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[3]",
+    "near": "Motor: OFF"
+   },
+   "dict": null
+  },
+  {
+   "h": "18786940ec538ef1c78ee325f06b25dd4de63b135f4050ac39319462c2cb49f5",
+   "en": "Lights",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[4].cell[1]",
+    "near": "Compatible Model: A1 mini Wireless Charger, Air Force Command Headquarters"
+   },
+   "dict": null
+  },
+  {
+   "h": "adeb8a5507944ec8649020058f1df568a806b7319324815a243a8e6a4a5af15e",
+   "en": "Compatible Model",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[4].cell[3]",
+    "near": "Compatible Model: A1 mini Wireless Charger, Air Force Command Headquarters"
+   },
+   "dict": null
+  },
+  {
+   "h": "5340502f2b25c379b879583555fcde1a7dc7da62f5760158a4b8d19bbe75cf36",
+   "en": "Mode 1",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[5].cell[0]",
+    "near": "| Lights | Motor | Compatible Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "e929de85f93d967305f959566fbabd766eb183d9f8d47535fbffaeeaf4391064",
+   "en": "Highlight for 10s and then stay lit at normal brightness",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[5].cell[1]",
+    "near": "| Lights | Motor | Compatible Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "03cd8d2157edc0b8242de74ad95d136e8274723c7ede1a8e8a0240b59f3e152b",
+   "en": "Back-and-forth motion for one cycle",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[5].cell[2]",
+    "near": "| Lights | Motor | Compatible Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "1387940397d34913af26eec26c95b8234bc5facef71d8712d2f6ee9752b14b66",
+   "en": "Back-and-forth motion for one cycle with greater power",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[6].cell[2]",
+    "near": "Mode 1 | Highlight for 10s and then stay lit at normal brightness | Back-and-forth motion for one cycle | A1 mini Wireless Charger"
+   },
+   "dict": null
+  },
+  {
+   "h": "87c070d3dfd4fac61d1d2ffc22f16527f7b7ac5f6fe1d1b332fd570a26daeca5",
+   "en": "Continuous breathing light",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[7].cell[1]",
+    "near": "Mode 2 | Highlight for 10s and then stay lit at normal brightness | Back-and-forth motion for one cycle with greater power | A1 mini Wireless Charger"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c1b77aa046ca28789b4eaf29f90d2f08578db25a19906d8f4c697ef3cd99225",
+   "en": "Continuous back-and-forth motion",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[7].cell[2]",
+    "near": "Mode 2 | Highlight for 10s and then stay lit at normal brightness | Back-and-forth motion for one cycle with greater power | A1 mini Wireless Charger"
+   },
+   "dict": null
+  },
+  {
+   "h": "7ea22ae742b151bc0f55631378bd919aee585e26945225192d53d7f521fb3e0c",
+   "en": "Continuous one-way motion",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[8].cell[2]",
+    "near": "Mode 3 | Continuous breathing light | Continuous back-and-forth motion | Air Force Command Headquarters"
+   },
+   "dict": null
+  },
+  {
+   "h": "606de8be2ee211418fdcb8c8d91d8995d1c798b5af8e4625eeb77540a948a7c0",
+   "en": "Breathing light for 10s",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[9].cell[1]",
+    "near": "Mode 4 | Continuous breathing light | Continuous one-way motion | Air Force Command Headquarters"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f7e14cfe103ca42267364f76a3f37a1039c1560153429b5a1d22a2608448dda",
+   "en": "Back-and-forth motion for 10s",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[9].cell[2]",
+    "near": "Mode 4 | Continuous breathing light | Continuous one-way motion | Air Force Command Headquarters"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f9d5bd3852627cfc697b868aa6dbdda38bd33a0d8dd173374bc55686347a81a",
+   "en": "One-way motion for 10s",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[10].cell[2]",
+    "near": "Mode 5 | Breathing light for 10s | Back-and-forth motion for 10s | Air Force Command Headquarters"
+   },
+   "dict": null
+  },
+  {
+   "h": "38cca6bea010af8adaf4be7d270456fa9adef8c0252db91f2767c607d077319b",
+   "en": "OFF",
+   "kind": "block_cell",
+   "freq": 7,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[11].cell[1]",
+    "near": "Mode 6 | Breathing light for 10s | One-way motion for 10s | Air Force Command Headquarters"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4134e092c0868134a55d983e7db42ee81f6672b7e6a305a8c1a1331c9a3e0d1",
+   "en": "A1 mini Wireless Charger Air Force Command Headquarters",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[10].line[11].cell[3]",
+    "near": "Mode 6 | Breathing light for 10s | One-way motion for 10s | Air Force Command Headquarters"
+   },
+   "dict": null
+  },
+  {
+   "h": "5bdda2a86c928085be08e70ad8cea3ef875b0ceee284bb95fb54a429dfdb1442",
+   "en": "Please note that the product does not include the 3D printed parts as shown in the main image.",
+   "kind": "block_line",
+   "freq": 109,
+   "context": {
+    "handle": "wireless-charger-kit-k012",
+    "title": "Wireless Charger Kit-K012",
+    "field": "blocks[11].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "ed7f8d5c2bb6f202fde1df9d4e5d6ca8c6879a08e32f9404b4c7b03c99bec9b6",
+   "en": "All-around performance right out of the box",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[0].line[0]",
+    "near": "It just works right out of the box. You don't have to mess with it, just simply hit print, and the printer will handle all the calibrations (Auto-Bed Leveling, "
+   },
+   "dict": null
+  },
+  {
+   "h": "090590536f00f0adcb3965abe71cc1e102d9c25805154a4e3f582b6a100f7eec",
+   "en": "It just works right out of the box. You don't have to mess with it, just simply hit print, and the printer will handle all the calibrations (Auto-Bed Leveling, Vibration compensation) for you. Enjoy trouble-free printing every time with your P1S.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[0].line[1]",
+    "near": "All-around performance right out of the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "40848a046d7b99c4324ef52b2a9576177b7df5dd5d590a748eb74d2ba510cd78",
+   "en": "Multi-color capability",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[1].line[0]",
+    "near": "Get the AMS combo to unleash Multi-color printing capability. (up to 16-color if you stack up 4 AMS units). Purchase additional AMS units for more colors."
+   },
+   "dict": null
+  },
+  {
+   "h": "6a97b3c3c3540787c91280dc43431afa2a8e81e3f681e7b288a8a37da7d5ae9f",
+   "en": "Get the AMS combo to unleash Multi-color printing capability. (up to 16-color if you stack up 4 AMS units). Purchase additional AMS units for more colors.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[1].line[1]",
+    "near": "Multi-color capability"
+   },
+   "dict": null
+  },
+  {
+   "h": "5335882f9f95c95ea0af7d600645b8fcaa2dd5241fdf73bd2cabf2afb6652358",
+   "en": "Print fast with exceptional quality",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[2].line[0]",
+    "near": "Cutting-edge control algorithm with the help of vibration compensation and pressure advance, bringing you lightning-fast print speed without compromising on qua"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca294f2f9ed53b15f6fef935fb31babbdf7d89483f6903d9052bf06c6631cbab",
+   "en": "Cutting-edge control algorithm with the help of vibration compensation and pressure advance, bringing you lightning-fast print speed without compromising on quality.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[2].line[1]",
+    "near": "Print fast with exceptional quality"
+   },
+   "dict": null
+  },
+  {
+   "h": "5972f90a9a9a16c4c8684383156df411086a36f2ebb7b6ab8bbe98de5a27b910",
+   "en": "15-Minute Rapid Setup: From unboxing to your first print in just 15 minutes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[3].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0b60cb02982deaf8c736029597500df656295e567afbc5a7969e51c982749ad",
+   "en": "Fully Enclosed Design: Print engineering-grade filaments safely and with total consistency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[3].line[2]",
+    "near": "• 15-Minute Rapid Setup: From unboxing to your first print in just 15 minutes."
+   },
+   "dict": null
+  },
+  {
+   "h": "c919fedf1f359576359eab203b61fa869c177cd5d61fab96a7a94a1a9f8ed093",
+   "en": "Multi-Color Versatility: Unlock limitless creativity with AMS-powered multi-material printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[3].line[3]",
+    "near": "• Fully Enclosed Design: Print engineering-grade filaments safely and with total consistency."
+   },
+   "dict": null
+  },
+  {
+   "h": "24d3fdfe14a9245e9d238cb93e6447f78d7713048361a27b2108116647ac916f",
+   "en": "Farm-Grade Reliability: Proven performance and uptime, trusted by professional print farms.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[3].line[4]",
+    "near": "• Multi-Color Versatility: Unlock limitless creativity with AMS-powered multi-material printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "55a9183e5e4213ee2d15a6ee3bb25f52551806acfbe794abafd7ae1f2f40133d",
+   "en": "Full-Scale Volume: A generous 256 × 256 × 256 mm³ build space for your large projects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1s",
+    "title": "Bambu Lab P1S 3D Printer",
+    "field": "blocks[3].line[5]",
+    "near": "• Farm-Grade Reliability: Proven performance and uptime, trusted by professional print farms."
+   },
+   "dict": null
+  },
+  {
+   "h": "a922214816077a06c3a606b1c58bdc46dfd1e10bff875e583b649b3623660266",
+   "en": "Bambu Lab A1 mini Combo",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[0].line[0]",
+    "near": "• Multi-Color Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "0bf7ce37ff8079373fa25441ee41f0312ae40d48100f11ab5a1cc7d643fef22a",
+   "en": "Multi-Color Printing",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[0].line[1]",
+    "near": "Bambu Lab A1 mini Combo"
+   },
+   "dict": {
+    "ar": "طباعة متعددة الألوان",
+    "ckb": "چاپی فرەڕەنگ"
+   }
+  },
+  {
+   "h": "debb61b84b8ee5c434634ebd821a6440c9bcb58625b83c3e079b74a78eb235b5",
+   "en": "Plug-N-Play",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[0].line[2]",
+    "near": "• Multi-Color Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9013b229b52fe95b5999afd02e41ec408d269d4579a13851b37a222696722f3",
+   "en": "Active Flow Rate Compensation",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[0].line[3]",
+    "near": "• Plug-N-Play"
+   },
+   "dict": null
+  },
+  {
+   "h": "2af1e365c8a9ba2d09a4481c2a178fea3e709f0287c6a46be24cf6bf214f35ba",
+   "en": "Full Auto Calibration",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[0].line[4]",
+    "near": "• Active Flow Rate Compensation"
+   },
+   "dict": null
+  },
+  {
+   "h": "12350bb1671965c430c492f4c86aa6e1a4cd470cd3e76ef63142c9a1ed810186",
+   "en": "Active Motor Noise Cancelling",
+   "kind": "block_line",
+   "freq": 6,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[0].line[5]",
+    "near": "• Full Auto Calibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "473118ea303200b0f32edbb11e7ee3af45ee0f39ebabb25163d2cb233c233e95",
+   "en": "High Speed Precision",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[0].line[6]",
+    "near": "• Active Motor Noise Cancelling"
+   },
+   "dict": null
+  },
+  {
+   "h": "f900e1abb5de6c30aa351e5c013d78b700ab48e65b81fbb898ecef80ae9c5414",
+   "en": "The all-new AMS lite is elegant and reliable, making multi-color 3D printing accessible to everyone.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[1].line[1]",
+    "near": "Multi-Color Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "7182bbbea056018a7ca2df96aae6260447e391f1362e28666dc625ffee07de04",
+   "en": "The A1 mini revolutionizes flow control in 3D printing. It utilizes a high-resolution, high-frequency eddy current sensor to measure the pressure in the nozzle. Our algorithm actively compensates the flow rate according to the readings to extrude with accuracy.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[2].line[1]",
+    "near": "Active Flow Rate Compensation"
+   },
+   "dict": null
+  },
+  {
+   "h": "40fd57a6517640f926001149e1c4db81a8b8703e8231b0b7fdbf1b1153359548",
+   "en": "The A1 mini handles various calibrations all by itself. It meticulously calibrates the Z-offset, bed-level, vibration resonance and nozzle pressure for EVERY print job, automatically.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[3].line[1]",
+    "near": "Full Auto Calibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "11be5e7967e665207a3d1450fb848c1b0eb7564e660006bffd34a7cc2ba653c5",
+   "en": "The A1 mini comes to you pre-assembled, pre-squared, and pre-tuned with precision. It only takes about 20 minutes to set up for your first print.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[4].line[1]",
+    "near": "Plug-N-Play"
+   },
+   "dict": null
+  },
+  {
+   "h": "afefd3a8b41d731490eaaf6526a09ac593b6d023b3daaa665c5fd66293e168b3",
+   "en": "The A1 mini can calibrate parameters to match tiny individual differences between each drive motor. This compensates for the unwanted harshness of motor noise.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[5].line[1]",
+    "near": "Active Motor Noise Cancelling"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d8ef62a2434b9fe2bdde6308334812a686524f8595cf61b216382d23a4c3b84",
+   "en": "Bed Slinger, with CoreXY Speed And Quality（High-Speed Precision）",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[6].line[0]",
+    "near": "Full-metal Rails, rigid frame, nozzle pressure sensor, accelerometers, powerful MCU, and above all, an advanced motion control system that utilizes these featur"
+   },
+   "dict": null
+  },
+  {
+   "h": "6282e7c7aa2c9c5814edf22bd094857ba5cc2fd61a7a1b84547b13f81a5bbdcc",
+   "en": "Full-metal Rails, rigid frame, nozzle pressure sensor, accelerometers, powerful MCU, and above all, an advanced motion control system that utilizes these features to print a 14-minute benchy with quality and following all the speed benchy rules straight out of the box without using specialized filaments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[6].line[1]",
+    "near": "Bed Slinger, with CoreXY Speed And Quality（High-Speed Precision）"
+   },
+   "dict": null
+  },
+  {
+   "h": "44c19b4bb503150bf816a7e7bc6cf97035a7104cb5abd38a3d8922f27c818556",
+   "en": "Sync with Bambu Studio and Bambu Handy",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[7].line[0]",
+    "near": "Remote control and monitor your printer on Bambu Studio or Bambu Handy. Through the built-in camera, you can also record timelapse videos."
+   },
+   "dict": null
+  },
+  {
+   "h": "64ac197ecfc62caa2927079e36fc80f7316e3464b5bc258c14c68688d4b7f852",
+   "en": "Remote control and monitor your printer on Bambu Studio or Bambu Handy. Through the built-in camera, you can also record timelapse videos.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[7].line[1]",
+    "near": "Sync with Bambu Studio and Bambu Handy"
+   },
+   "dict": null
+  },
+  {
+   "h": "490595b7c0e0cae5afe11db2473e0f0443204328d6794a60d8e03416f07754ce",
+   "en": "Full-Auto Calibration: Absolutely no manual tuning.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[8].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c8d1c0a5b6a649f129179f54935890041980c980cdee142313432b5b090702f",
+   "en": "Seamless Multi-Color Printing (Combo Version): Experience limitless creativity with AMS-powered material handling.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[8].line[2]",
+    "near": "• Full-Auto Calibration: Absolutely no manual tuning."
+   },
+   "dict": null
+  },
+  {
+   "h": "1ec7e6eda08b0b67125d6ed90f5f6cfcdc2fe2046ce7cbe84f9b2d3b630745e8",
+   "en": "49dB Whisper-Quiet Operation: Print in peace with a noise level as low as a quiet library.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[8].line[3]",
+    "near": "• Seamless Multi-Color Printing (Combo Version): Experience limitless creativity with AMS-powered material handling."
+   },
+   "dict": null
+  },
+  {
+   "h": "23794ac76e74188cde7404d3728176310919b50a9e4d0d1d0c07c89923f6c187",
+   "en": "Best-In-Class Print Quality: Pro-grade precision & surfaces that set the industry standard.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[8].line[4]",
+    "near": "• 49dB Whisper-Quiet Operation: Print in peace with a noise level as low as a quiet library."
+   },
+   "dict": null
+  },
+  {
+   "h": "615eb8c621dabeaedc93ca33fb32c6b4b14af621cab39a3f21badb7b85e4d478",
+   "en": "One-Click MakerWorld Integration: Find your next project and start printing instantly.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[8].line[5]",
+    "near": "• Best-In-Class Print Quality: Pro-grade precision & surfaces that set the industry standard."
+   },
+   "dict": null
+  },
+  {
+   "h": "feaa27d8aa02371d8e785fc109ffbb13d210127a9451f0d95ef2d0aea76319ef",
+   "en": "Compact Footprint: Blends in to your desk setup.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[8].line[6]",
+    "near": "• One-Click MakerWorld Integration: Find your next project and start printing instantly."
+   },
+   "dict": null
+  },
+  {
+   "h": "7f96d29b5470eff47193dbd2cf33fdb7a4eee504edb67d4b4b64d6a00bdcd029",
+   "en": "* To connect the A1 mini printer to the AMS/ AMS 2 Pro/ AMS HT, an AMS HUB (SA013) accessory is needed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "field": "blocks[8].line[7]",
+    "near": "• Compact Footprint: Blends in to your desk setup."
+   },
+   "dict": null
+  },
+  {
+   "h": "9bf6986c9c92f2b00154677e26cc76c79c84754b2a883b17d08d3f9827228a72",
+   "en": "Why Choose Bambu Lab A1",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[0].line[0]",
+    "near": "Multi-color Printing - The most reliable multi-color system"
+   },
+   "dict": null
+  },
+  {
+   "h": "732412aa2dcec0f1a86f0e6701dbf0ab9ab18bd01035f0e13bf934b2a751e58f",
+   "en": "Multi-color Printing - The most reliable multi-color system",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[0].line[1]",
+    "near": "Why Choose Bambu Lab A1"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9288d8e4dffcade636c0c45587e8654f026a07108dcd7e67b51ffb3fcbe2f78",
+   "en": "Full-auto Calibration - You don't have to do ANY manual tuning",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[1].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3d9f39fb6348c6a5799cd0353b4abbcabe70e8806e473c8e3b8a72572cd6a049",
+   "en": "Large Print Volume - Print a helmet in 1-piece",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[2].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4e619668fe5eb8c42fdc54478ce6461e73e946e79dd09ca088757fac5e020441",
+   "en": "1-click to Print - As easy as your copier",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[3].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5cf792cc6d1f9a6c6a3b473e68e9a173630cf685c78f782c135aea912d2f8944",
+   "en": "Reliable High Speed - Finish your project on time, every time",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[4].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4a200f5dc361ee6a7cefe979d0c4c5d7ff80e5152835239f7ec779f92385298e",
+   "en": "Active Flow Control - Smooth surfaces, sharp edges",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[5].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f9a43b3972502405f6244fb84417045118d6f158b5ccdf13144404dd061016e0",
+   "en": "1-click printing with MakerWorld",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[6].line[0]",
+    "near": "Print Like A PRO From Your Very First Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "df0e9e12e9e6b2e0b3a5f289b83fa25e01099aa69fe7dc95ba6c3f82562cec6a",
+   "en": "Print Like A PRO From Your Very First Use",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[6].line[1]",
+    "near": "1-click printing with MakerWorld"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4c570e9860521b288a1ac043cf2517da5e3d25fd73fc2741722e865c571b777",
+   "en": "Start printing with a few clicks on your phone, no need to worry about the tedious settings.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[6].line[2]",
+    "near": "Print Like A PRO From Your Very First Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "d68f988c9579bf9dd769068c26ba899e28edd7367c47f0a1af144596ce3e1b0d",
+   "en": "Browse endless selections of high-quality models tailored to your printers on MakerWorld!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[0]",
+    "near": "Full-auto Calibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9f846005f8c33bb2da7a06886c8a3f09883c53097fb3a289e38a67f4a7e525f",
+   "en": "Absolutely Hassle-free",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[2]",
+    "near": "Full-auto Calibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c70edd29b68e88db6a0a2dcb8ccc4c504ea74a2801643d8fd48ee3755c15b52",
+   "en": "A1 handles various calibrations all by itself. It meticulously calibrates the Z-offset, bed-level, vibration resonance and nozzle pressure for EVERY print job, automatically.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[3]",
+    "near": "Absolutely Hassle-free"
+   },
+   "dict": null
+  },
+  {
+   "h": "a9444f69be2893b90388edb5dbc4eb929152f650b0b0b413c5fe3e43ba681a20",
+   "en": "AMS Multi-color Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[4]",
+    "near": "A1 handles various calibrations all by itself. It meticulously calibrates the Z-offset, bed-level, vibration resonance and nozzle pressure for EVERY print job, "
+   },
+   "dict": {
+    "ar": "طباعة متعددة الألوان AMS",
+    "ckb": "چاپی فرەڕەنگ AMS"
+   }
+  },
+  {
+   "h": "214d7d4deb1fa8387d05b2f5dab47fb35834760742bfdbb679a8f31e3c8e5b4e",
+   "en": "The Most Reliable Multi-color System",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[5]",
+    "near": "AMS Multi-color Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "d19091eee32d103dd34ae29584f3506480a9d4525ff33ac1bdf84f328ad00d3a",
+   "en": "The AMS lite has been recognized as the most reliable multi-color 3D printing solution. It also features RFID-sync to automatically match the best print settings for your Bambu filaments, delivering perfect print quality without manual tuning of the filament profile.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[6]",
+    "near": "The Most Reliable Multi-color System"
+   },
+   "dict": null
+  },
+  {
+   "h": "69b499bd71b2cb452a4c236dbf05655531d062de5b5ffc507bba1b50341f6b78",
+   "en": "High-speed Precision",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[7]",
+    "near": "The AMS lite has been recognized as the most reliable multi-color 3D printing solution. It also features RFID-sync to automatically match the best print setting"
+   },
+   "dict": null
+  },
+  {
+   "h": "cf6b944ecaa766570f6eb3a61f650af425127f0ebd7bfb305119581e09380247",
+   "en": "The High-speed You Can Truly Rely On",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[8]",
+    "near": "High-speed Precision"
+   },
+   "dict": null
+  },
+  {
+   "h": "0a5219933a7c13504783b4c7de0f9c247620c767f91a70d0e390bffc0727a878",
+   "en": "A1 is equipped with low-drag linear rails, a powerful MCU,accelerometers, a nozzle pressure sensor, and an advanced motion control system that maximizes their potential. Its high-speed performance is built on a solid foundation, ensuring consistent reliability with stable and uniform output for every print.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[9]",
+    "near": "The High-speed You Can Truly Rely On"
+   },
+   "dict": null
+  },
+  {
+   "h": "d63c09410d59913835854eedf99b1369882510d5094b2e89df6849d63c8c87d2",
+   "en": "Intelligent Print Monitoring",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[10]",
+    "near": "A1 is equipped with low-drag linear rails, a powerful MCU,accelerometers, a nozzle pressure sensor, and an advanced motion control system that maximizes their p"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d63706566307ca87fec8d9a8456ec9e565990ac7b74751236cca54539ecbfb3",
+   "en": "Put Your Printing On Autopilot",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[11]",
+    "near": "Intelligent Print Monitoring"
+   },
+   "dict": null
+  },
+  {
+   "h": "d51418c557dcbee3c30f0a58b62a410339fd199e345d2026403f8c8a1c11ebfa",
+   "en": "3D printing is a complex task where many things can go wrong. The A1 is equipped with a comprehensive print status monitoring system to help keep the print job in check.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[12]",
+    "near": "Put Your Printing On Autopilot"
+   },
+   "dict": null
+  },
+  {
+   "h": "63d9426df3763123187ff5120cf45d3e3e8058e7f304b307491c31a95945cb37",
+   "en": "Full-size Print Volume",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[13]",
+    "near": "3D printing is a complex task where many things can go wrong. The A1 is equipped with a comprehensive print status monitoring system to help keep the print job "
+   },
+   "dict": null
+  },
+  {
+   "h": "92d1bf106539b25a2a7f685b8f0d9bfb2a6a546cdae851e208c7914f8e4d35cc",
+   "en": "Generous Space for You to Expand Your Fantasy",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[14]",
+    "near": "Full-size Print Volume"
+   },
+   "dict": null
+  },
+  {
+   "h": "ef000a86e424dd62f99772e9e39154f190a0d21b93d402142a3378018535f585",
+   "en": "A1 features 256mm*256mm*256mm build volume, bigger than most of the entry-level printers. Print a helmet in one go, we got you.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[7].line[15]",
+    "near": "Generous Space for You to Expand Your Fantasy"
+   },
+   "dict": null
+  },
+  {
+   "h": "ef2c79421eddc13d1427a7dedc39602148daea387e59c9e430e9d06c9a8e1f75",
+   "en": "Active Motor Noise Canceling",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[8].line[0]",
+    "near": "Print Silently"
+   },
+   "dict": null
+  },
+  {
+   "h": "a9ef5a59bd7c1a86a9a553c5ae009346fca5ac401e45a7d908f2fd060b8135e3",
+   "en": "Print Silently",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[8].line[1]",
+    "near": "Active Motor Noise Canceling"
+   },
+   "dict": null
+  },
+  {
+   "h": "152e8f0e7003591ab93976af8e4125d3fee92148c5039ba9439a1b32ad6f9378",
+   "en": "The A1 can calibrate parameters to match tiny individual differences between each drive motor. This compensates for the unwanted harshness of motor noise.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[8].line[2]",
+    "near": "Print Silently"
+   },
+   "dict": null
+  },
+  {
+   "h": "a019b12983cc31e12ebf51d329cc5c49b1cd9c8f4850b72642cf223bd8d16488",
+   "en": "Connected with Privacy in Mind",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[9].line[0]",
+    "near": "Start & Control on Whatever Device You Prefer"
+   },
+   "dict": null
+  },
+  {
+   "h": "aea2a37e06b164a613383458ffa043d25aa1bd667162118a44aa6be828a4603c",
+   "en": "Start & Control on Whatever Device You Prefer",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[9].line[1]",
+    "near": "Connected with Privacy in Mind"
+   },
+   "dict": null
+  },
+  {
+   "h": "faa952528077150573aec66a682ab9ccecb16ada4b746ae2888cc524fce17fcf",
+   "en": "Not only can you connect your A1 to any device you prefer through Bambu Cloud Service, but you can also do so through LAN-only mode. We offer fully customizable connection options to match your privacy preferences.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[9].line[2]",
+    "near": "Start & Control on Whatever Device You Prefer"
+   },
+   "dict": null
+  },
+  {
+   "h": "2aa9da9039991860640ab5e307c8c19f2a1e37b85faeaa1ff6faba8c76c17b9b",
+   "en": "Explore More About A1",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[10].line[0]",
+    "near": "The NEW Bambu Lab A1!"
+   },
+   "dict": null
+  },
+  {
+   "h": "e318e2fd2ad68a92055a102d803926c1d6087bbadc8d976b151a9280c30f99ad",
+   "en": "The NEW Bambu Lab A1!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[10].line[1]",
+    "near": "Explore More About A1"
+   },
+   "dict": null
+  },
+  {
+   "h": "49aa9ec5b617a57337c4c781983a366c06b7842821c99784c3e10734a68e8920",
+   "en": "Bambu Lab A1 Review - ARE YOU HAPPY about this?!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[11].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cb9dbc43bd191946623507a24908b58bb65bf2b01059f220ec2e1e90ca3417ac",
+   "en": "Bambu Lab A1 detailed test - ‘Just works’ 3D printing for",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[12].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "76ddbf56c053e38e87b80dd2ed4cddbf8c412b461702228ed293f4653c27e85c",
+   "en": "Bambu Lab A1 - First Impressions",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[13].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "88587921d5e3ae897f6637b66362928eb013fdc4f32e3f72c7b659a2ac3bf650",
+   "en": "Diving Into Bambu Labs Newest 3d",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[14].line[0]",
+    "near": "Printer"
+   },
+   "dict": null
+  },
+  {
+   "h": "be6ac15ba6855bb569bc749e90ab32cc111af88ecffaa672f88f4ca6e1b1e4a6",
+   "en": "NEW 👉 Bambu Lab A1 - DETAILED REVIEW (Full Analysis &amp;",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[15].line[0]",
+    "near": "Comparison with A1 Mini)"
+   },
+   "dict": null
+  },
+  {
+   "h": "1ad1458fae890c9e0d41f6bde641d323575756d864e68658ffa6d1ded5c4ecf3",
+   "en": "Comparison with A1 Mini)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[15].line[1]",
+    "near": "NEW 👉 Bambu Lab A1 - DETAILED REVIEW (Full Analysis &amp;"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb1f0bb210bcd55d06d368cdb8d41d9fee20e3dc641e00e8bef142e6148b61f9",
+   "en": "Bambu Lab A1 - First Looks and Amazing 3D Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[16].line[0]",
+    "near": "Results!"
+   },
+   "dict": null
+  },
+  {
+   "h": "385b9d9293a03ae1a882a9f3bc77389278a9e9fb1427c0d1ef3ddce69604c451",
+   "en": "Results!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[16].line[1]",
+    "near": "Bambu Lab A1 - First Looks and Amazing 3D Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "99775e12330bc5d7b5c81565965f459391aba658fde130b2709e7e1402c4737f",
+   "en": "1. Do you have an official unboxing guide?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[1]",
+    "near": "FAQ"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb9084a9dd748c72cf805ff59532be27b0594c8500f7c98250c107e7022cb066",
+   "en": "A: Yes, please refer to this",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[2]",
+    "near": "1. Do you have an official unboxing guide?"
+   },
+   "dict": null
+  },
+  {
+   "h": "320e2365bbb6bcf1f7b968041a2e00b1f95eeddb0c2af4dd591e1de550248d9b",
+   "en": "wiki link",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[3]",
+    "near": "A: Yes, please refer to this"
+   },
+   "dict": null
+  },
+  {
+   "h": "92d1354e1cb28ec86faf48cfd4ed97219d8d056ef0dcd9236d3070cf51f616fd",
+   "en": "for the unboxing video guide.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[4]",
+    "near": "wiki link"
+   },
+   "dict": null
+  },
+  {
+   "h": "35117881d175d10a0e96c2493e5b99027a8bd2745cce207081586da22c46c167",
+   "en": "2. What is the maximum print size of the A1?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[6]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "195be4aaf0fa7d03148cf3fd5b0b4cb97d930ca36212d19a30838fbe11d3cc6c",
+   "en": "A: 256 * 256 *256 mm³. For more details, please check",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[7]",
+    "near": "2. What is the maximum print size of the A1?"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd1d122956efde29d2011224d59be74d13f0c13d18b7c82c66aa0bea294bf720",
+   "en": "here.",
+   "kind": "faq_a",
+   "freq": 7,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[8]",
+    "near": "A: 256 * 256 *256 mm³. For more details, please check"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d56183554a301007a5186bbaa9b3c3f4b1240cf9f772128b73981ce1e0f9fcc",
+   "en": "3. What Filaments can A1 Print?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c19bb921d86e1235e03d626d3ecbcd4d18aa0a850770aec7c16a58850f8c0798",
+   "en": "A: 1. Low-temperature filaments such as PLA, PETG, TPU,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[11]",
+    "near": "3. What Filaments can A1 Print?"
+   },
+   "dict": null
+  },
+  {
+   "h": "56dbe7b14c945d9fa4ad445d241811b04cf5b61dc37882d73a642e514150854a",
+   "en": "and support materials for PLA and PETG (Support for PLA,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[12]",
+    "near": "A: 1. Low-temperature filaments such as PLA, PETG, TPU,"
+   },
+   "dict": null
+  },
+  {
+   "h": "a749fbea48b85156faa50589921c5f6d7efd7fad01d4381a6646243203d08a9b",
+   "en": "PVA, HIPS, etc.).",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[13]",
+    "near": "and support materials for PLA and PETG (Support for PLA,"
+   },
+   "dict": null
+  },
+  {
+   "h": "2a891eead1c5bfdde3f741431a776138b8c4684d31fed5ee61cd1a5418446a44",
+   "en": "2. Conventional high-temperature filaments such as ABS,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[14]",
+    "near": "PVA, HIPS, etc.)."
+   },
+   "dict": null
+  },
+  {
+   "h": "141ca37c7462b74c3f8d0fe273a22a63c856a29cb545143c0dc8f6c489adb2b2",
+   "en": "ASA, PC, PA, PA-CF/GF, PET-CF/GF, PPA-CF/GF, etc.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[15]",
+    "near": "2. Conventional high-temperature filaments such as ABS,"
+   },
+   "dict": null
+  },
+  {
+   "h": "805e8e74140bc4aeb2fcd3c3e1d1d09d03d595433d781bbf43d9cde2e6eeddeb",
+   "en": "Kind Reminder:",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[16]",
+    "near": "ASA, PC, PA, PA-CF/GF, PET-CF/GF, PPA-CF/GF, etc."
+   },
+   "dict": null
+  },
+  {
+   "h": "81017dcae95c70d2760b08178b857b5c7314e291aca9725fb7878686e61b20cc",
+   "en": "The standard nozzle is made of stainless steel. When",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[17]",
+    "near": "Kind Reminder:"
+   },
+   "dict": null
+  },
+  {
+   "h": "1af6f2734ef6f1b70cddb002fe433f76f524dc8c2d0f20b6cbed45843f8776d8",
+   "en": "printing filaments containing hard particles (CF, GF,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[18]",
+    "near": "The standard nozzle is made of stainless steel. When"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e2a7762925641dedbf6dbcfcd6efcd640e3d22ac2dba323f3bb20fc01f5696b",
+   "en": "etc.) such as PLA-CF/GF, PLA Glow-in-the-dark, PETG-CF/GF",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[19]",
+    "near": "printing filaments containing hard particles (CF, GF,"
+   },
+   "dict": null
+  },
+  {
+   "h": "a7ff1cabdb1b6ea509e6b68250f85d725680461504221013bcb02d8a71223d3a",
+   "en": "and PAHT-CF/GF, it is necessary to replace the nozzle with",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[20]",
+    "near": "etc.) such as PLA-CF/GF, PLA Glow-in-the-dark, PETG-CF/GF"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ab699b98170124b59d98c0f72899ccd73c7adfc5f2ca01b800868043f22aa5e",
+   "en": "hardened steel to prevent excessive wear.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[21]",
+    "near": "and PAHT-CF/GF, it is necessary to replace the nozzle with"
+   },
+   "dict": null
+  },
+  {
+   "h": "a821193175b3e367c51a5c3bccc73761da9dd16bcc286e6f8709b9b8244ac29a",
+   "en": "Due to the A1's open-frame design and lower chamber",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[22]",
+    "near": "hardened steel to prevent excessive wear."
+   },
+   "dict": null
+  },
+  {
+   "h": "5e8805f881eed76c2207900c51766adfe69c4d5f6bb178973e1e9d938d02e494",
+   "en": "temperature, there is a risk of reduced interlayer",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[23]",
+    "near": "Due to the A1's open-frame design and lower chamber"
+   },
+   "dict": null
+  },
+  {
+   "h": "38e725799440520af16f19ac0b9e346e2bb1913cd2c31328de78c7f715beb789",
+   "en": "strength and increased warping for large-sized models and",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[24]",
+    "near": "temperature, there is a risk of reduced interlayer"
+   },
+   "dict": null
+  },
+  {
+   "h": "49fb129d7a46681e8b7db2879bc74b01209048a3bd752771688ff4068bb143d7",
+   "en": "models with high filling density when using conventional",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[25]",
+    "near": "strength and increased warping for large-sized models and"
+   },
+   "dict": null
+  },
+  {
+   "h": "f664344ca1b50e95fe0b9029e117359d9911cf5f354b75f229cb47e76c815a0d",
+   "en": "high-temperature filaments such as ABS, ASA, PC, PA,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[26]",
+    "near": "models with high filling density when using conventional"
+   },
+   "dict": null
+  },
+  {
+   "h": "d43dcd0206ba02a92147979cc4084bfc46bc96dddb1f6d89f61476198ee579c3",
+   "en": "PA-CF/GF, PET-CF/GF, PPA-CF/GF, etc. on the A1. However,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[27]",
+    "near": "high-temperature filaments such as ABS, ASA, PC, PA,"
+   },
+   "dict": null
+  },
+  {
+   "h": "ed362123d861f0758d2238712fa5a1ec42314ec5694fbfed67b8499fdeeb4340",
+   "en": "these high-temperature filaments can be used on the A1 to",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[28]",
+    "near": "PA-CF/GF, PET-CF/GF, PPA-CF/GF, etc. on the A1. However,"
+   },
+   "dict": null
+  },
+  {
+   "h": "e79a93d30d6492c92c74e75067b654b19ed6b971edbc33b78b9dbd4918c3c1b8",
+   "en": "print small-sized models with low filling density. The",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[29]",
+    "near": "these high-temperature filaments can be used on the A1 to"
+   },
+   "dict": null
+  },
+  {
+   "h": "69d1e3f963cef83f68a381a82c1a6ea51e95852ce4ff08503530d6d4385ea79b",
+   "en": "printing results may vary depending on the filaments' dry",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[30]",
+    "near": "print small-sized models with low filling density. The"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ef74ff21c06a7adbe3a0f965e2e7e1a930a43362bbf4107c35293f0d5c0748a",
+   "en": "and wet state, the characteristics of the model itself,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[31]",
+    "near": "printing results may vary depending on the filaments' dry"
+   },
+   "dict": null
+  },
+  {
+   "h": "31fbe698d41fd436fbcbe5d0875824df05833bd77f69a4b9d697bc511b28522c",
+   "en": "printing parameters, and the ambient temperature. For more",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[32]",
+    "near": "and wet state, the characteristics of the model itself,"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b9a24fd03dcee84ab5683a63823bcce02de22762a74c544a02830be5eeacf99",
+   "en": "details, please check",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[33]",
+    "near": "printing parameters, and the ambient temperature. For more"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e61c35dd1682df7b7a43546dee886c0321ff25bc980f8c7860b01726bd21771",
+   "en": "4. Is it OK to enclose the A1?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[36]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b4d0257cf5e68bd6b7b886ecd56d58a3dcb2dc74e404ec6ae6cf9bbc7bba2378",
+   "en": "A: We don't recommend enclosing the A1. For more details,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[37]",
+    "near": "4. Is it OK to enclose the A1?"
+   },
+   "dict": null
+  },
+  {
+   "h": "768fc989b4ee038e843205b60568075548b9ace860979b7a48f0168fcbf146c4",
+   "en": "please check",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[38]",
+    "near": "A: We don't recommend enclosing the A1. For more details,"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d15dfbc52b046b7529e4b6abd9e33d97bcf654c8757d889e7da31a045949c8b",
+   "en": "5. Can you use multiple AMS lite units with the A1 for up to 16 color prints?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[41]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "36689df195dd726a5c284c07b1fbeeda39d5d6e3f3ca270fceedca84afc65aca",
+   "en": "A: The A1 can only support one AMS lite, which means it",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[42]",
+    "near": "5. Can you use multiple AMS lite units with the A1 for up to 16 color prints?"
+   },
+   "dict": null
+  },
+  {
+   "h": "131aa29ad7c7791446614f9e9e9ae2e767564b3836bd2c667610516fd3fc232c",
+   "en": "can print with a maximum of 4 colors. For more details,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[43]",
+    "near": "A: The A1 can only support one AMS lite, which means it"
+   },
+   "dict": null
+  },
+  {
+   "h": "801518cdf9b0b02755c759d7584169f984986c41ad49ce53c799a99a483125e9",
+   "en": "6. Can I use the AMS on the A1?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[47]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "faf735a31be2efab1eee58e34b5a5a73c4ef613f4ebe854818c68c304dd3c7c9",
+   "en": "A: Yes. To connect the printer to the AMS, an AMS HUB (SA013) accessory is needed. The AMS hub accessory is specifically designed for A1-series 3D printers, serving as a standardized hub for seamless connectivity and integrated functionality between the AMS, AMS 2 Pro, and AMS HT.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[48]",
+    "near": "6. Can I use the AMS on the A1?"
+   },
+   "dict": null
+  },
+  {
+   "h": "27fe93bda35a4d80c301d0f8dad0ece5d2c463c8ae6f3f716ed18708d07e6c84",
+   "en": "7. Can AMS lite be mounted on the beam of the A1 to reduce space occupation? If so,how should I proceed with the operation?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[50]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f2d254a01952f1f17d361175424a1d4b0f78b95105febd575443cd00974cb5b1",
+   "en": "A: Please visit our",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[51]",
+    "near": "7. Can AMS lite be mounted on the beam of the A1 to reduce space occupation? If so,how should I proceed with the operation?"
+   },
+   "dict": null
+  },
+  {
+   "h": "3863b52758629d361dcb492319acb6a7217bc44f79f91c1e72cc83e57d94e878",
+   "en": "MakerWorld model website,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[52]",
+    "near": "A: Please visit our"
+   },
+   "dict": null
+  },
+  {
+   "h": "db90255283ca68a752658aff422411f05ec9cbb2e652fbedc9fb5250eadbcb68",
+   "en": "where you will be able to find the model supports,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[53]",
+    "near": "MakerWorld model website,"
+   },
+   "dict": null
+  },
+  {
+   "h": "909a19c0fc88467a4f7483544ab79fa8708370cb34b5cdb5eab36f5170b80a9d",
+   "en": "installation tutorial, and purchase links for accessory",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[54]",
+    "near": "where you will be able to find the model supports,"
+   },
+   "dict": null
+  },
+  {
+   "h": "da53ac4ea14b3ea23fe1223b96d6705d0a98dd8de56dda0dcfde2a7b8f54fe29",
+   "en": "screws. Additionally, you can also refer to our",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[55]",
+    "near": "installation tutorial, and purchase links for accessory"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c6449e95f4c25c3d7f05eba2b47674dc2ccd8403e49fc531393a41e0e385851",
+   "en": "wiki page",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[56]",
+    "near": "screws. Additionally, you can also refer to our"
+   },
+   "dict": null
+  },
+  {
+   "h": "273ffacc0cb31fb541027a69482c97b082f4f62d040792ff2c84cf47c76b26c1",
+   "en": "for more related information.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[57]",
+    "near": "wiki page"
+   },
+   "dict": null
+  },
+  {
+   "h": "df5a5e688bd29c396fa75f575617125b5afdb9a2ba944e843792ba233fcfd9ee",
+   "en": "For more details, please check",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[58]",
+    "near": "for more related information."
+   },
+   "dict": null
+  },
+  {
+   "h": "08764022e2b45b03cdacdea7205272cce05bfa16af9ec6c8bf1c94b0160b2914",
+   "en": "8. If I install AMS lite on the beam, will the filament spool slide down, or will it affect the accuracy of vibration compensation?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[61]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "06acb6f225ce93528e04c4c9da66ae4e524e4a40a824c6103587fba348813220",
+   "en": "A: As long as the AMS lite is correctly installed, the",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[62]",
+    "near": "8. If I install AMS lite on the beam, will the filament spool slide down, or will it affect the accuracy of vibration compensation?"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0dced6c434373277457d19025623e2b1b11f5ed952862896f90354f9fa7d0ae",
+   "en": "filament spool should not slide down, even if the previous",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[63]",
+    "near": "A: As long as the AMS lite is correctly installed, the"
+   },
+   "dict": null
+  },
+  {
+   "h": "136452fa8ebb43bb8dff6c27e7e4f2ac692dd15d530ec373cceedb0b5320d502",
+   "en": "two spools have a certain forward tilt angle.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[64]",
+    "near": "filament spool should not slide down, even if the previous"
+   },
+   "dict": null
+  },
+  {
+   "h": "c009d6d27cf5d8db54c844eca47e259747ade99c862e2d8437b53ae87430214d",
+   "en": "Additionally, to avoid affecting the accuracy of vibration",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[65]",
+    "near": "two spools have a certain forward tilt angle."
+   },
+   "dict": null
+  },
+  {
+   "h": "0d33c678dc863d6583a3a7f706b02d6f031ae726dd46ce7b86cdd8ed91b77690",
+   "en": "compensation, you can add reinforcement to the column. For",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[66]",
+    "near": "Additionally, to avoid affecting the accuracy of vibration"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d6c7b4114aaceb51239ac8eccdb7caffb88791f0ec452813d1a37c088a20c90",
+   "en": "more details, please check",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[67]",
+    "near": "compensation, you can add reinforcement to the column. For"
+   },
+   "dict": null
+  },
+  {
+   "h": "ed28a1d94bbe6aa5d6240bd5e20fac49a2913f49fe167845dbbfcca98d16802b",
+   "en": "9. Will you sell official refurbished A1 printers?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[70]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2cfba23656cb239e560ddfa6e1db539ee87c16694407ed0db64ee8e359e07835",
+   "en": "A: Currently, Factory Refurbished A1 units are only",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[71]",
+    "near": "9. Will you sell official refurbished A1 printers?"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e4bb07d50310807f6ddb998f2957a18b2eeaff2baef4543ad545c5a04ae8555",
+   "en": "available for sale within the Chinese domestic market. There",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[72]",
+    "near": "A: Currently, Factory Refurbished A1 units are only"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e4bc6fdeb8be99e3c69e6245eb75096f33ed6b05f77c66dce37a84e51df944a",
+   "en": "are no plans for overseas sales of Factory Refurbished units",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[73]",
+    "near": "available for sale within the Chinese domestic market. There"
+   },
+   "dict": null
+  },
+  {
+   "h": "7091b69cd104a2cf602e0e846af63d890046470134bc1dd1e6e0c18be987c04a",
+   "en": "at this time.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[74]",
+    "near": "are no plans for overseas sales of Factory Refurbished units"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd9c62b8cc1a08e3f2495a47306f2418fded6fd9a0628020ef8418efa0977b7c",
+   "en": "For your reference, all Refurbished units will have an \"R\"",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[75]",
+    "near": "at this time."
+   },
+   "dict": null
+  },
+  {
+   "h": "f33ec40da993eca3f49a3a0c62ece107f9c5354df314e1447ca81b60883eee7f",
+   "en": "mark located on the back of the Base Housing, near the power",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[76]",
+    "near": "For your reference, all Refurbished units will have an \"R\""
+   },
+   "dict": null
+  },
+  {
+   "h": "bb922a20f358d6384db607b79f1252b054a370b26993890e9d6ac36c1523ce41",
+   "en": "cord plug.For more details, please check",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[77]",
+    "near": "mark located on the back of the Base Housing, near the power"
+   },
+   "dict": null
+  },
+  {
+   "h": "39022eb510d46770b3a0cba897585a37580f99b80922ee83b8d133d312285806",
+   "en": "10. Are the A1 3D printers currently available for sale from the same batch that was recalled in January 2024?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[80]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "37cac29a61b9152f93284d1fd2d0e69645e6f42adc13ddf0acb62eb5e421a390",
+   "en": "A: No,they aren't. A1 3D printers sold after January 30,",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[81]",
+    "near": "10. Are the A1 3D printers currently available for sale from the same batch that was recalled in January 2024?"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d79af597dcd8243c0df5f61eaeb99fd0f4bde282fd6a4e95f791566750bc4c7",
+   "en": "2024 are not from the same batch as those recalled",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[82]",
+    "near": "A: No,they aren't. A1 3D printers sold after January 30,"
+   },
+   "dict": null
+  },
+  {
+   "h": "52f78d5695f985a2d118eedfc4c1985339891b999119ed2026f764c4ed03b96f",
+   "en": "before.They already contain all the necessary fixes to",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[83]",
+    "near": "2024 are not from the same batch as those recalled"
+   },
+   "dict": null
+  },
+  {
+   "h": "a394ec9cce1fe370591e10d0554d9e7b98156fbaf60ac1113748fdfd88e80864",
+   "en": "mitigate the heatbed cable issue which caused the recall.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[17].line[84]",
+    "near": "before.They already contain all the necessary fixes to"
+   },
+   "dict": null
+  },
+  {
+   "h": "7ee9453da30b9109d62af5bbce59242620b742f35f2ec279b3d4fc43310e0d7a",
+   "en": "Full-Scale Build Volume: A spacious 256 × 256 × 256 mm³ canvas for your big ideas.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[18].line[6]",
+    "near": "• One-Click MakerWorld Integration: Find your next project and start printing instantly."
+   },
+   "dict": null
+  },
+  {
+   "h": "02b4ae2c30bfbc32af40b557d1b99a06557ff79a85f6f8408433ce869886134c",
+   "en": "The upgraded heatbed cable features Kevlar reinforcement, thicker insulation, softer copper, optimized wire winding interval, Nylon sleeving and an extended strain relief.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[18].line[7]",
+    "near": "• Full-Scale Build Volume: A spacious 256 × 256 × 256 mm³ canvas for your big ideas."
+   },
+   "dict": null
+  },
+  {
+   "h": "c857ad0c1d3fe95db0c20acc1a2e00ef29e8fa20b39b394ed8dcbd6e8effe46a",
+   "en": "* To connect the A1 printer to the AMS/ AMS 2 Pro/ AMS HT, an AMS HUB (SA013) accessory is needed.",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "a1",
+    "title": "Bambu Lab A1 3D Printer",
+    "field": "blocks[18].line[8]",
+    "near": "• The upgraded heatbed cable features Kevlar reinforcement, thicker insulation, softer copper, optimized wire winding interval, Nylon sleeving and an extended s"
+   },
+   "dict": null
+  },
+  {
+   "h": "19d89fabb1e4fba05af7178c3dd1d11c6432175e8c42367bb86910ade6f84066",
+   "en": "350℃ (662°F) High-Temperature Dual Nozzle Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-pro",
+    "title": "Bambu Lab H2D Pro",
+    "field": "blocks[0].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "4a9699795dad50826e40d0e39f9a08a73bca1fbfbde3f2b7022aee0b56f8e470",
+   "en": "Auxiliary Extruder Cooling Fan",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-pro",
+    "title": "Bambu Lab H2D Pro",
+    "field": "blocks[0].line[2]",
+    "near": "• 350℃ (662°F) High-Temperature Dual Nozzle Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a9d83aa665de081904fba2215e70c1d4e2bf12e4e36ef7965637b6c649ef77b",
+   "en": "Tungsten Carbide Super Durable Nozzle",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-pro",
+    "title": "Bambu Lab H2D Pro",
+    "field": "blocks[0].line[3]",
+    "near": "• Auxiliary Extruder Cooling Fan"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b584406caaae4165db73e67ec6381afb5651b8b6e7b2912b891b8321f9b229b",
+   "en": "65℃ (149°F) Active Chamber Heating",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-pro",
+    "title": "Bambu Lab H2D Pro",
+    "field": "blocks[0].line[4]",
+    "near": "• Tungsten Carbide Super Durable Nozzle"
+   },
+   "dict": null
+  },
+  {
+   "h": "9597d9ef176043a1dc37dd44bca7288ba4e1486d6d5d853f6fd6930ad67516bf",
+   "en": "50um Motion Accuracy",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-pro",
+    "title": "Bambu Lab H2D Pro",
+    "field": "blocks[0].line[5]",
+    "near": "• 65℃ (149°F) Active Chamber Heating"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d8af8362c779a37511113b7f132f84bbc8a60d6082c288d3faead0ae1d16977",
+   "en": "Ethernet Connection",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-pro",
+    "title": "Bambu Lab H2D Pro",
+    "field": "blocks[0].line[6]",
+    "near": "• 50um Motion Accuracy"
+   },
+   "dict": null
+  },
+  {
+   "h": "355792e10527a7f029cad9c1d0ab2e1c7c1d67caca492c0e0763d6fdd1e0f282",
+   "en": "Physical Network Killswitch",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-pro",
+    "title": "Bambu Lab H2D Pro",
+    "field": "blocks[0].line[7]",
+    "near": "• Ethernet Connection"
+   },
+   "dict": null
+  },
+  {
+   "h": "9064bd5f42ad38104215e8b372020e92e3b402471a7a818eff0ca7f77da6737c",
+   "en": "WPA2-Enterprise Wi-Fi Authentication",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-pro",
+    "title": "Bambu Lab H2D Pro",
+    "field": "blocks[0].line[8]",
+    "near": "• Physical Network Killswitch"
+   },
+   "dict": null
+  },
+  {
+   "h": "65875fcab80c947c5ddc22175ef47b0a6efa1bee367ae98383eaa82792acdc4a",
+   "en": "Adaptive Air Circulation & HEPA Filtering",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "h2d-pro",
+    "title": "Bambu Lab H2D Pro",
+    "field": "blocks[0].line[9]",
+    "near": "• WPA2-Enterprise Wi-Fi Authentication"
+   },
+   "dict": null
+  }
+ ]
+}

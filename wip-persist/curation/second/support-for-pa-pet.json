@@ -1,0 +1,702 @@
+{
+  "handle": "support-for-pa-pet",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T21:21:02Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "motion.max_flow",
+        "extrusion.supported_nozzle_diameters",
+        "safety.certifications"
+      ]
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/bdb2423e515640f5be007524d58c62a6/SDS20250723S03_Bambu_Support_for_PAPET.pdf",
+      "title": "Bambu Support for PA/PET Safety Data Sheet SDS20250723S03",
+      "retrieved_at": "2026-10-16T08:22:47Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.certifications"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "extrusion.supported_nozzle_diameters",
+        "thermal.heat_deflection_temp",
+        "mechanical.tensile_strength",
+        "mechanical.impact_strength"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "extrusion.supported_nozzle_diameters",
+        "material.type"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ]
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Nylon",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Nylon",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "note": "The SDS (p.4, section 3) gives the composition as \"Nylon 6 and copolymer\" 99 % by wt plus 1 % additive. The store page states no material type."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "store_page": {
+        "value_text": "Diameter: 1.75mm +/- 0.03mm",
+        "locator": "Product Features › bullet 5",
+        "agrees": true
+      }
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681905999212548",
+        "id": "ov_6d58a75d409b3f18a05af274",
+        "value_text": "0.5kg"
+      },
+      "value": 500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 0.5 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "store_page": {
+        "value_text": "0.5kg (500 g)",
+        "locator": "option Size › 0.5kg",
+        "agrees": true
+      },
+      "note": "The TDS names one net weight (0.5 kg); scoped to the store's only Size value '0.5kg', where it agrees with the page row (500 g)."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PC + ABS (Temperature resistance 90 °C)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Specifications › Spool Material",
+      "quote": "Spool Material PC + ABS (Temperature resistance 90 °C)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "note": "Consistent with the store bullet \"Comes with High Temperature Reusable Spool\". The TDS spool size (Diameter: 200 mm; Height: 67 mm) has no registry key and is not stored."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.17,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.2, Properties › Physical Properties › Density",
+      "quote": "Density ISO 1183 1.17 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "typical value; material property tested by Bambu Lab on standard samples",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "store_page": {
+        "value_text": "Density 1.17 g/cm³",
+        "locator": "Physical Properties › Density",
+        "agrees": true
+      },
+      "note": "The SDS (p.9, section 9) says \"Density: No data available\"; the TDS value is kept."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 255,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.2, Properties › Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 255 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "typical value; material property tested by Bambu Lab on standard samples",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "store_page": {
+        "value_text": "Melting Temperature 255 °C",
+        "locator": "Physical Properties › Melting Temperature",
+        "agrees": true
+      },
+      "note": "The SDS (p.9, section 9) says \"Melting Point: No data available\"; the TDS value is kept."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 260,
+        "max": 290
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 260 - 290 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "store_page": {
+        "value_text": "Nozzle Temperature 280 - 300 °C",
+        "locator": "Recommended Printing Settings › Nozzle Temperature; Parameters Comparison › Support for PA/PET › Nozzle Temperature",
+        "agrees": false
+      },
+      "note": "CONFLICT: the store page states 280 - 300 °C (Recommended Printing Settings and Parameters Comparison); the wiki material table gives 260 - 300 °C (±10 °C) for Support for PA/PET. The product TDS value is kept (official_doc)."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 80,
+        "max": 100
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 100 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting; bed surface preparation: PVP Glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "store_page": {
+        "value_text": "Bed Temperature (with Glue) 80 - 110 °C",
+        "locator": "Recommended Printing Settings › Bed Temperature (with Glue)",
+        "agrees": false
+      },
+      "note": "CONFLICT: the store Recommended Printing Settings table states 80 - 110 °C (with glue); the store Parameters Comparison table states 80 - 100 °C, which agrees with the TDS. The TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 100 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 100 mm/s",
+      "test_method": "",
+      "test_condition": "recommended printing setting; an upper bound only, kept as text",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "store_page": {
+        "value_text": "Printing Speed < 100 mm/s",
+        "locator": "Recommended Printing Settings › Printing Speed; Parameters Comparison",
+        "agrees": true
+      }
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0 - 60%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 60%",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "recommended printing setting; bed surface preparation: PVP Glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "note": "The wiki support guide says \"Build Plate Compatibility: Compatible with all build plates.\" (compatibility, not a recommendation)."
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 45,
+        "max": 60
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.2, Recommended Printing Settings › Chamber Temperature",
+      "quote": "Chamber Temperature 45 - 60 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting (chamber temperature while printing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "note": "A recommended range for this filament, not a printer capability; the registry types thermal.chamber_temp as a number."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing 80 °C，8 - 12 h",
+      "test_method": "",
+      "test_condition": "drying before printing; the TDS names no drying equipment",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "store_page": {
+        "value_text": "Drying Settings (Blast Drying Oven) 80 °C，12h",
+        "locator": "Recommended Printing Settings › Drying Settings",
+        "agrees": true
+      },
+      "note": "Store Printing Tips: 80 ℃ for 8 h in a blast drying oven, or 90 ℃ for 10 h on the heat bed. Wiki support guide: convection oven 75 °C, 8 h; heated bed 65 - 75 °C, 12 h; AMS 2 Pro 65 °C, 12 h; AMS HT 80 ℃, 12 h. Wiki drying table: forced-air oven 75-85 °C, 8-12 h; bed 90-100 °C, 12 h; AMS 2 Pro not compatible; AMS HT 80 °C, 12 h."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 8,
+        "max": 12
+      },
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing 80 °C，8 - 12 h",
+      "test_method": "",
+      "test_condition": "drying at 80 °C before printing; the TDS names no drying equipment",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:45Z",
+      "store_page": {
+        "value_text": "Drying Settings (Blast Drying Oven) 80 °C，12h; Printing Tips: 80 ℃ for 8 hours in a blast drying oven",
+        "locator": "Recommended Printing Settings › Drying Settings; Printing Tips › bullet 1",
+        "agrees": false
+      },
+      "note": "CONFLICT (form): the store table gives a single 12 h and the store Printing Tips 8 h at 80 °C; the TDS range 8 - 12 h spans both. The TDS range is kept."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › row Support for PA/PET",
+      "quote": "Support for PA/PET | Not Compatible | Compatible | Recommended | Compatible | Compatible | Compatible | Compatible | Required | 260 - 300 |",
+      "test_method": "",
+      "test_condition": "hardened steel nozzle required; 0.6 mm recommended; 0.2 mm not compatible; 0.4 / 0.6 / 0.8 mm high-flow nozzles compatible",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "store_page": {
+        "value_text": "Nozzle Type 0.4 / 0.6 / 0.8 mm Hardened Steel",
+        "locator": "Parameters Comparison › Support for PA/PET › Nozzle Type",
+        "agrees": true
+      },
+      "note": "Columns in order: 0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm, 0.4 mm HF, 0.6 mm HF, 0.8 mm HF, hardened steel required?, nozzle temperature (±10 °C). The wiki support guide also says \"Not suitable for 0.2 mm nozzles.\""
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "target_label": "AMS 2 Pro",
+      "target_kind": "ams",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS 2 Pro, AMS HT & AMS compatible"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "AMS HT",
+      "target_kind": "ams",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS 2 Pro, AMS HT & AMS compatible"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "AMS",
+      "target_kind": "ams",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS 2 Pro, AMS HT & AMS compatible"
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_label": "AMS lite",
+      "target_kind": "ams",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "AMS lite NOT compatible",
+      "also": {
+        "evidence_kind": "wiki_table",
+        "source_url": "https://wiki.bambulab.com/en/filament/support",
+        "locator": "Hardware Compatibility › Support Filament Compatibility Overview › row Support for PA/PET",
+        "quote": "Accessory Compatibility: AMS Lite not compatible.",
+        "note": "The wiki material table's combined 'AMS / AMS lite Compatibility' column says 'Compatible' for Support for PA/PET; the product-specific store bullet and support guide say AMS lite is not compatible."
+      }
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_label": "A1 series",
+      "target_kind": "family",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "locator": "Hardware Compatibility › Support Filament Compatibility Overview › row Support for PA/PET",
+      "quote": "Printer Compatibility: Not compatible with A1 series or P1P."
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_label": "P1P",
+      "target_kind": "printer",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "locator": "Hardware Compatibility › Support Filament Compatibility Overview › row Support for PA/PET",
+      "quote": "Printer Compatibility: Not compatible with A1 series or P1P."
+    },
+    {
+      "relation": "requires",
+      "target_label": "Enclosure Printers",
+      "target_kind": "other",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Product Features › Cautions for Use › bullet 6",
+      "quote": "Enclosure Printers Required",
+      "also": {
+        "evidence_kind": "wiki_table",
+        "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+        "locator": "3. AMS & AMS lite › row Support for PA/PET (Open-frame printer | Enclosed printer | AMS / AMS lite)",
+        "quote": "Support for PA/PET | Not Recommended | Recommended | Compatible |"
+      }
+    },
+    {
+      "relation": "requires",
+      "target_label": "Hardened steel nozzle",
+      "target_kind": "part",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "2. Nozzle › row Support for PA/PET › Is it necessary to use hardened steel nozzles?",
+      "quote": "Support for PA/PET | Not Compatible | Compatible | Recommended | Compatible | Compatible | Compatible | Compatible | Required | 260 - 300 |",
+      "also": {
+        "evidence_kind": "spec_row",
+        "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+        "locator": "Parameters Comparison › Support for PA/PET › Nozzle Type",
+        "quote": "Nozzle Type 0.4 / 0.6 / 0.8 mm Hardened Steel"
+      }
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_label": "0.2 mm nozzle",
+      "target_kind": "part",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "2. Nozzle › row Support for PA/PET › 0.2 mm Nozzle",
+      "quote": "Support for PA/PET | Not Compatible | Compatible | Recommended | Compatible | Compatible | Compatible | Compatible | Required | 260 - 300 |",
+      "also": {
+        "evidence_kind": "wiki_table",
+        "source_url": "https://wiki.bambulab.com/en/filament/support",
+        "locator": "Hardware Compatibility › Support Filament Compatibility Overview › row Support for PA/PET",
+        "quote": "Nozzle Compatibility:： Not suitable for 0.2 mm nozzles."
+      }
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "PAHT-CF",
+      "target_kind": "material",
+      "evidence_kind": "spec_row",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Parameters Comparison › Support for PA/PET › Filament Compatibility",
+      "quote": "Filament Compatibility PAHT-CF,PA6-CF,PA6-GF, PET-CF",
+      "also": {
+        "evidence_kind": "manual",
+        "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+        "locator": "p.1, Basic Info",
+        "quote": "Bambu Support for PA/PET bonds weakly with PAHT-CF and PET-CF by acting as an interface"
+      }
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "PA6-CF",
+      "target_kind": "material",
+      "evidence_kind": "spec_row",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Parameters Comparison › Support for PA/PET › Filament Compatibility",
+      "quote": "Filament Compatibility PAHT-CF,PA6-CF,PA6-GF, PET-CF",
+      "also": {
+        "evidence_kind": "feature_bullet",
+        "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+        "locator": "Product Features › bullet 3",
+        "quote": "Recommended for PAHT-CF, PA6-CF, PET-CF, PA-GF, etc."
+      }
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "PA6-GF",
+      "target_kind": "material",
+      "evidence_kind": "spec_row",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Parameters Comparison › Support for PA/PET › Filament Compatibility",
+      "quote": "Filament Compatibility PAHT-CF,PA6-CF,PA6-GF, PET-CF"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "PET-CF",
+      "target_kind": "material",
+      "evidence_kind": "spec_row",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Parameters Comparison › Support for PA/PET › Filament Compatibility",
+      "quote": "Filament Compatibility PAHT-CF,PA6-CF,PA6-GF, PET-CF",
+      "also": {
+        "evidence_kind": "manual",
+        "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+        "locator": "p.1, Basic Info",
+        "quote": "Bambu Support for PA/PET bonds weakly with PAHT-CF and PET-CF by acting as an interface"
+      }
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "PA-GF",
+      "target_kind": "material",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "Product Features › bullet 3",
+      "quote": "Recommended for PAHT-CF, PA6-CF, PET-CF, PA-GF, etc."
+    },
+    {
+      "relation": "recommended_with",
+      "target_label": "PVP Glue",
+      "target_kind": "part",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Surface Preparation",
+      "quote": "Bed Surface Preparation PVP Glue",
+      "also": {
+        "evidence_kind": "description_text",
+        "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+        "locator": "Recommended Printing Settings › Bed Temperature (with Glue)",
+        "quote": "Bed Temperature (with Glue) 80 - 110 °C"
+      }
+    }
+  ],
+  "in_the_box": [
+    {
+      "text": "Filament with Spool",
+      "qty": 1,
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "What's in the Box › item 1",
+      "quote": "Filament with Spool*1 & Desiccant*1"
+    },
+    {
+      "text": "Desiccant",
+      "qty": 1,
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "What's in the Box › item 1",
+      "quote": "Filament with Spool*1 & Desiccant*1"
+    },
+    {
+      "text": "Package",
+      "qty": 1,
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pa-pet",
+      "locator": "What's in the Box › item 2",
+      "quote": "Package*1"
+    }
+  ],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/7e83189be1eb4a3dab8ce9b9a7b2065a.pdf",
+      "title": "Filament TDS",
+      "source_title": "Bambu Support for PA/PET Technical Data Sheet V1.0"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/bdb2423e515640f5be007524d58c62a6/SDS20250723S03_Bambu_Support_for_PAPET.pdf",
+      "title": "Filament MSDS",
+      "source_title": "Bambu Support for PA/PET Safety Data Sheet SDS20250723S03"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters"
+    }
+  ],
+  "not_published": [
+    "mechanical.tensile_strength",
+    "mechanical.elongation_at_break",
+    "mechanical.flexural_strength",
+    "mechanical.flexural_modulus",
+    "mechanical.impact_strength",
+    "mechanical.hardness",
+    "thermal.heat_deflection_temp",
+    "thermal.vicat_softening",
+    "thermal.glass_transition",
+    "material.length",
+    "motion.max_flow"
+  ]
+}

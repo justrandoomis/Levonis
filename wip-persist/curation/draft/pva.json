@@ -1,0 +1,713 @@
+{
+  "handle": "pva",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T12:54:40Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 3 pages read (text layer, per page): Basic Info, Specifications, Recommended Printing Settings, Physical Properties (glass transition, crystallization, Vicat and both heat deflection rows \"N/A\"), Mechanical Properties (every X-Y and Z row \"N/A\"), Other Physical and Chemical Properties, Disclaimer."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/69b4bf7b69f844f3a26062752279763b/SDS20251127S04_Bambu_PVA.pdf",
+      "title": "Bambu PVA Safety Data Sheet SDS20251127S04",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read (text layer). Section 3 gives the composition (Polyvinyl alcohol 95-99.9 %, additive 0.1-5 %); section 9 says \"No data available\" for melting point, density and every other physical datum; section 2 \"Not classified\"; section 14 \"Not hazardous goods\" (IMDG, DOT, ADR/RID, ICAO-TI/IATA)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Nozzle and AMS tables (row \"PVA, BVOH (Dry)\"), build-plate table (row \"PVA\"), chamber note (PVA among filaments \"with a softening temperature below 60 ℃\", no value), storage table (row \"PVA\": drying and star ratings only, no numbers for heat deflection, impact or tensile strength)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Filament Overview (row \"PVA\"), Hardware Compatibility (row \"(Water-Soluble Support)\"), 2.1 drying table (row \"PVA\"), 2.2 PVA printing notes, 3.3 PVA support settings, 4.1.2 dissolution, 4.2 storage, 5.1 clogging. No material, mechanical or thermal number for PVA."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PVA\": printer bed 90-100 °C 12 h, forced-air oven 75-85 °C 8-12 h, AMS 2 Pro not compatible, AMS HT 85 °C 18 h; 1.2 (AMS HT may not fully dry PVA); 1.3 (static drying mode unsuitable for PVA)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/pva-printing-guide",
+      "title": "PVA Printing Guide",
+      "retrieved_at": "2026-10-16T08:26:15Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "compat.*"
+      ],
+      "note": "Text read in full. Its drying-parameter table and its speed/support settings are images (table-en.png and two setting screenshots) that were not cached and not read; the text gives storage below 20% RH, AMS HT drying at about 80 °C, loading at 240 - 250 ℃, the PETG exclusion and dissolution in water (at most 50 °C for PLA models)."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pva",
+      "title": "Bambu Lab US store product page: PVA",
+      "retrieved_at": "2026-10-16T07:01:54Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features and Cautions for Use, overview banner, page-builder sections (an empty \"Support Filament Comparison\" block), RFID, Downloads, Printing Tips FAQ, Highlights. No spec table (format C), no What's in the Box section."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Polyvinyl alcohol",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polyvinyl alcohol",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "The SDS (p.4, section 3) gives the composition as Polyvinyl alcohol 95-99.9 % by wt (CAS 9002-89-5, EC 209-183-3) and additive 0.1-5 %. The store title and identity.model are \"PVA\"."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\"); the tolerance comes from the store page only."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681920628944900",
+        "value_text": "0.5 kg"
+      },
+      "value": 500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 0.5 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "Scoped to the store page's only Size value \"0.5 kg\"; agrees with the store page row (option Size › 0.5 kg, 500 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.27,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.27 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\", tested by Bambu Lab on standard samples)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "Raw-material property (TDS \"Physical Properties\"), not a printed-specimen result. The store page states no density. The SDS (p.9, section 9) says \"Density: No data available\"."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 202,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 202 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\", tested by Bambu Lab on standard samples)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "Raw-material property. The SDS (p.9, section 9) says \"Melting Point: No data available\"."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 220,
+        "max": 250
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 220 - 250 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "The store page states no nozzle temperature.",
+      "conflict": "The material-table wiki (2. Nozzle, row \"PVA, BVOH (Dry)\") gives 190 - 240 °C (±10 °C); the PVA printing guide (Suggested printing process) and the support wiki (2.2.1, Step 3) give 240 - 250 °C as the correct temperature when loading. The TDS value is kept."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45°C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Cool Plate, High Temperature Plate or Textured PEI Plate; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "conflict": "The material-table wiki (Build Plate Settings › 3, row \"PVA\") gives 35 - 45 ℃ on the Cool Plate / PLA Plate but 45 - 65 ℃ on the Engineering Plate (glue required), the Smooth PEI / High-Temperature Plate and the Textured PEI Plate. The TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 200 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 200 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "Kept as text: the TDS gives only an upper bound."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "The support wiki (Hardware Compatibility, row \"(Water-Soluble Support)\") says \"Build Plate Compatibility: Compatible with all build plates.\"; the material-table wiki also lists the Engineering Plate (45 - 65 ℃, glue required)."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 - 12 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 - 12 h. The same row gives X1 Series printer heatbed: 90 - 100 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "The support wiki (2.1, row \"PVA\": convection oven 80℃, 8 - 12h; heated bed 90 - 100 °C, 12h) agrees; the drying wiki (Appendix I, row \"PVA\") gives forced-air oven 75-85 °C, 8-12 h and printer bed 90-100 °C, 12 h. AMS HT: 85 °C, 18 h (drying wiki, material-table wiki, support wiki). AMS 2 Pro: \"Not compatible\" (drying wiki), \"Not recommended\" (material-table wiki), \"AMS 2Pro: 65°, 18h\" (support wiki).",
+      "conflict": "The material-table wiki (Storage and Material Specifications, row \"PVA\") gives \"55 ℃ for 8 h\" in a blast drying oven. The TDS value, which the support wiki repeats, is kept."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 8,
+        "max": 12
+      },
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 - 12 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 80 °C. The same row gives 12 h on an X1 Series printer heatbed at 90 - 100 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "A range, written the way the package types a \"number\" key that carries a range (value_num 8, value_num_max 12). The support wiki (2.1, convection oven 80℃, 8 - 12h) and the drying wiki (Appendix I, forced-air oven 8-12 h) agree; the material-table wiki gives 8 h (at 55 ℃)."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681920628944899",
+        "value_text": "Filament with spool"
+      },
+      "value": "High Temperature Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/pva",
+      "source_title": "Bambu Lab US store product page: PVA",
+      "locator": "Product Features › bullet 4",
+      "quote": "Comes with High Temperature Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:01:54Z",
+      "note": "Unverified: an unlabelled store-page bullet. Scoped to the only Type value \"Filament with spool\". The TDS (p.1, Specifications) gives \"Spool Material PC+ABS (Temperature resistance 90 °C)\" and \"Spool Size Diameter: 200 mm; Height: 67 mm\"."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_source_handle": "ams-multicolor-printing",
+      "target_family": "ams_series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pva",
+      "source_title": "Bambu Lab US store product page: PVA",
+      "retrieved_at": "2026-10-16T07:01:54Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "All AMS Series Compatible",
+      "condition": "Filament in a dry state",
+      "note": "The store FAQ (3.Pre-Printing & Storage) says \"PVA is suitable for use with AMS and AMS lite in a dry state.\"; the material-table wiki (3. AMS & AMS lite, row \"PVA, BVOH (Dry)\") gives \"Compatible\" for AMS / AMS lite and lists \"damp PVA or BVOH\" among filaments too soft for the AMS / AMS lite channel."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_source_handle": "ams-lite",
+      "target_family": "ams_series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pva",
+      "source_title": "Bambu Lab US store product page: PVA",
+      "retrieved_at": "2026-10-16T07:01:54Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "All AMS Series Compatible",
+      "condition": "Filament in a dry state",
+      "note": "The store FAQ (3.Pre-Printing & Storage) says \"PVA is suitable for use with AMS and AMS lite in a dry state.\"; the material-table wiki (3. AMS & AMS lite, row \"PVA, BVOH (Dry)\") gives \"Compatible\" for AMS / AMS lite and lists \"damp PVA or BVOH\" among filaments too soft for the AMS / AMS lite channel.",
+      "conflict": "The support wiki (Hardware Compatibility, row \"(Water-Soluble Support)\") says \"Accessory Compatibility: AMS Lite not recommended.\" and \"It is not recommended to print PVA filament using the A series with AMS lite.\" (2.2.2: with AMS Lite, ideally print within 1 hour). The store statement is kept; the wiki caveat is for review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_source_handle": "ams-2-pro",
+      "target_family": "ams_series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pva",
+      "source_title": "Bambu Lab US store product page: PVA",
+      "retrieved_at": "2026-10-16T07:01:54Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "All AMS Series Compatible",
+      "condition": "Filament in a dry state",
+      "note": "The store FAQ (3.Pre-Printing & Storage) says \"PVA is suitable for use with AMS and AMS lite in a dry state.\"; the material-table wiki (3. AMS & AMS lite, row \"PVA, BVOH (Dry)\") gives \"Compatible\" for AMS / AMS lite and lists \"damp PVA or BVOH\" among filaments too soft for the AMS / AMS lite channel. For drying, the drying wiki (Appendix I, row \"PVA\") gives \"Not compatible\" in the AMS 2 Pro columns, the material-table wiki \"Not recommended\", and the support wiki \"AMS 2Pro: 65°, 18h\" with the remark that AMS 2 Pro \"cannot completely dry the filament\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_source_handle": "ams-ht",
+      "target_family": "ams_series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pva",
+      "source_title": "Bambu Lab US store product page: PVA",
+      "retrieved_at": "2026-10-16T07:01:54Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "All AMS Series Compatible",
+      "condition": "Filament in a dry state",
+      "note": "The store FAQ (3.Pre-Printing & Storage) says \"PVA is suitable for use with AMS and AMS lite in a dry state.\"; the material-table wiki (3. AMS & AMS lite, row \"PVA, BVOH (Dry)\") gives \"Compatible\" for AMS / AMS lite and lists \"damp PVA or BVOH\" among filaments too soft for the AMS / AMS lite channel. The PVA printing guide: the AMS HT can serve as a dry box with drying mode on (about 80 °C) and \"Rotate Spool When Drying\" off, without automatic loading/unloading; the drying wiki gives AMS HT drying at 85 °C, 18 h and says PVA \"may still not be fully dried\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "All printers",
+      "target_family": "all_bambu_printers",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "Hardware Compatibility › Support Filament Compatibility Overview › row \"(Water-Soluble Support)\" › Printer Compatibility",
+      "quote": "Printer Compatibility: Compatible with all printers, but not recommended for A series. Dual-extrusion with left and right hotends is not supported on H2 series.",
+      "condition": "Not recommended for A series; on H2 series, dual extrusion with the left and right hotends is not supported",
+      "note": "The row is labelled \"(Water-Soluble Support)\"; PVA is the only water-soluble support filament in the guide (Filament Overview). The material-table wiki (3. AMS & AMS lite, row \"PVA, BVOH (Dry)\") gives \"Compatible\" for both open-frame (A Series, P1P, etc.) and enclosed printers.",
+      "conflict": "The material-table wiki rates open-frame printers (A Series) \"Compatible\" while the support wiki says \"not recommended for A series\"; both are kept as text, no not_compatible_with row is written."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pva",
+      "source_title": "Bambu Lab US store product page: PVA",
+      "retrieved_at": "2026-10-16T07:01:54Z",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "0.2 mm Nozzle NOT Compatible",
+      "note": "The store FAQ (1.Accessory Compatibility) says \"Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm.\"; the material-table wiki (2. Nozzle, row \"PVA, BVOH (Dry)\") gives \"Not Compatible\" for the 0.2 mm nozzle; the support wiki says \"0.2 mm nozzles not recommended\". compat-targets.json lists \"0.2 mm Nozzle\" as reviewed-unresolvable, so no target handle is named.",
+      "conflict": "The TDS (p.1, Recommended Printing Settings) lists \"Nozzle Size 0.2, 0.4, 0.6, 0.8 mm\". The store page, its FAQ and the material-table wiki all exclude 0.2 mm; the exclusion is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4, 0.6, 0.8 mm nozzles (standard and high flow)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"PVA, BVOH (Dry)\"",
+      "quote": "PVA, BVOH （Dry） | Not Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 240 |",
+      "note": "Columns: 0.2 mm Not Compatible; 0.4 / 0.6 / 0.8 mm Compatible; 0.4 / 0.6 / 0.8 mm high flow Compatible; hardened steel nozzle \"Not Required\". The TDS lists Nozzle Size \"0.2, 0.4, 0.6, 0.8 mm\". Nozzles are option values of several hotend products, so no single target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "Bed surface preparation: glue (TDS p.1). The material-table wiki gives PVA 35 - 45 ℃ on the \"Bambu Cool Plate / PLA Plate\". No store product is the plain Bambu Cool Plate (bambu-cool-plate-supertack is a different plate), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (PVA 45 - 65 ℃), which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki gives PVA 45 - 65 ℃ on the Bambu Textured PEI Plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control … › table › row \"PVA\" › column \"Bambu Engineering Plate\"",
+      "quote": "PVA | 35 - 45 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃ | 45 - 65 ℃ | If bed > 45 ℃, Recommended |",
+      "condition": "Glue required; bed 45 - 65 ℃",
+      "note": "Not listed in the TDS Bed Type row. The support wiki says \"Build Plate Compatibility: Compatible with all build plates.\" The last column means removing the upper glass cover plate is recommended when the bed is above 45 ℃."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Glue",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Surface Preparation",
+      "quote": "Bed Surface Preparation Glue",
+      "note": "Two store products fit (glue-stick-for-build-plate, liquid-glue-for-build-plate), so no single target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pva",
+      "source_title": "Bambu Lab US store product page: PVA",
+      "retrieved_at": "2026-10-16T07:01:54Z",
+      "locator": "Product Features › bullet 3",
+      "quote": "Recommended for all PLA",
+      "condition": "As the support material for a model printed in this filament",
+      "note": "The support wiki (Filament Overview, row \"PVA\") gives \"Compatible Model Filament: PLA & PLA-CF/GF\". \"All PLA\" covers several store products, so no single target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF/GF",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "1. Basic Information › Filament Overview › table › row \"PVA\"",
+      "quote": "PVA | PLA & PLA-CF/GF | Extremely moisture-sensitive; must be sealed and dried. Water-soluble, suitable for models where manual support removal is difficult. |",
+      "condition": "As the support material for a model printed in this filament",
+      "note": "The label names two materials; the store product PLA-CF is pla-cf. No single target handle is named."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/filament/pva-printing-guide",
+      "source_title": "PVA Printing Guide",
+      "retrieved_at": "2026-10-16T08:26:15Z",
+      "locator": "Parameter settings › Download 3mf parameter file with PVA support › warning",
+      "quote": "PVA is not compatible as support filament for PETG filament printing.",
+      "condition": "As the support material for a model printed in this filament",
+      "note": "The support wiki says the same twice (1. Important Reminder 2; 2.2 PVA Printing Notes). PETG covers several store products (petg-basic, petg-hf, petg-matte, petg-translucent, petg-cf), so no single target handle is named."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/868930e5a44944258586caa250cc8143/Bambu_PVA_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PVA",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "sha256": "7ca185263fec71442794b3f34409233557bd30995613b759e810532616fe955b"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/69b4bf7b69f844f3a26062752279763b/SDS20251127S04_Bambu_PVA.pdf",
+      "title": "Bambu PVA Safety Data Sheet SDS20251127S04",
+      "retrieved_at": "2026-10-16T08:24:26Z",
+      "sha256": "cefd761016b44129271ab5f9523a38a3fc461d9d2a840e766c1f8e1ff77331bf"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "sha256": "279858daaace7d8123091b076c9031bb93306f439696bee26e56b53a7dcf5362"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/pva-printing-guide",
+      "title": "PVA Printing Guide",
+      "retrieved_at": "2026-10-16T08:26:15Z",
+      "sha256": "ca7f07dd914aa461f6de2842558e0a098522a5d0a94ed4573cb8d3b0af74436e"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.tensile_strength",
+    "mechanical.elongation_at_break",
+    "mechanical.flexural_strength",
+    "mechanical.flexural_modulus",
+    "mechanical.impact_strength",
+    "mechanical.hardness",
+    "thermal.heat_deflection_temp",
+    "thermal.vicat_softening",
+    "thermal.glass_transition"
+  ],
+  "notes": [
+    "No hex: the store page links no hex-code document for this filament and none is cached, so its only colour value \"Clear (66400)\" has no published hex.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "not_published: the TDS states \"N/A\" for the glass transition, crystallization and Vicat softening temperatures, both heat deflection rows (1.8 and 0.45 MPa) and every mechanical row (Young's modulus, tensile strength, breaking elongation, bending modulus, bending strength, impact strength; X-Y and Z). Filament length and hardness are stated in none of the documents searched. The material-table wiki only groups PVA among filaments \"with a softening temperature below 60 ℃\" (no value, no method), which proves no Vicat value.",
+    "Density and melting temperature are raw-material properties from the TDS \"Physical Properties\" table; no printed-specimen (mechanical) value exists for this filament.",
+    "TDS facts with no registry key are not stored: melt index 7.2 ± 1.1 g/10 min (210 °C, 2.16 kg), saturated water absorption rate 6.25% (25 °C, 55% RH), crystallization temperature N/A, spool material PC+ABS (temperature resistance 90 °C), spool size 200 × 67 mm, printing and storage humidity < 20% RH (sealed, with desiccant), nozzle size 0.2, 0.4, 0.6, 0.8 mm, bed surface preparation glue, retraction length 0.6 - 1.0 mm, retraction speed 20 - 40 mm/s, chamber temperature 25 - 45 °C (thermal.chamber_temp is the printer chamber key), max overhang angle 55°, max bridging length ~ 30 mm, X1 Series heatbed drying 90 - 100 °C 12 h, odor, skin hazards, chemical stability, solubility (soluble in water), chemical resistance, flammability and combustion products.",
+    "SDS facts with no registry key are not stored: product name \"Bambu PVA\", model \"S04-xx\", CLP \"Not classified\", conditions to avoid (\"Avoid fire, elevated temperatures. direct sunlight.\") and \"Not hazardous goods\" for sea, road and air transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Source disagreements kept for review: nozzle temperature (TDS 220 - 250 °C vs material-table wiki 190 - 240 °C ±10 °C, loading at 240 - 250 °C in the PVA guide); bed temperature on the non-Cool plates (TDS 35 - 45 °C vs material-table wiki 45 - 65 ℃); blast-oven drying (TDS and support wiki 80 °C, 8 - 12 h vs material-table wiki 55 ℃, 8 h); the 0.2 mm nozzle (TDS Nozzle Size lists it, the store page, store FAQ and material-table wiki exclude it); AMS lite (store \"All AMS Series Compatible\" vs support wiki \"not recommended\"); A series (material-table wiki \"Compatible\" vs support wiki \"not recommended\"). The product TDS values are kept for specs.",
+    "Marketing prose proves no number and is not stored: the overview and feature sections (\"Soak and Dissolve\", \"Seamless Support Interface Surface\", \"Thorough and Clean Dissolution\", \"zero top interface spacing\") and the Highlights (\"ONLY used for support\", \"Not to be used for standalone models\", \"Dry Out Before Use\").",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 5); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/s7/default/5a9005351ca8426b8fa2b1b61c8ef4fc/RoHS_report_Bambu_PVA.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published. The store page also links the wiki \"Reduce the risk of prints leakage guide\" (https://wiki.bambulab.com/en/filament/reduce-vase-leaking-guide), not cached and not read (post-processing, no spec key).",
+    "The store has no Refill value for PVA (Type group: \"Filament with spool\" only), so no spool requirement is recorded. The store FAQ (7.Safety Tips) says the filament \"is not food-grade\"; the same list also says it \"contains highly hygroscopic wood fibers\", which contradicts the TDS and SDS composition (polyvinyl alcohol) and reads as a copied sentence. No registry key holds either, and neither is stored."
+  ]
+}

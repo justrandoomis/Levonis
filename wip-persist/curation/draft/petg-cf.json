@@ -1,0 +1,855 @@
+{
+  "handle": "petg-cf",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T12:03:06Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer, page by page): Basic Info, Specifications, Recommended Printing Settings, Physical, Mechanical and Other Physical and Chemical Properties, Specimen Test, Disclaimer. No filament length and no hardness value is given."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/b8ed09c39c5545b19882c05c37b19c96/SDS20260701G50_Bambu_PETG_CF.pdf",
+      "title": "Bambu PETG CF Safety Data Sheet SDS20260701G50",
+      "retrieved_at": "2026-10-16T08:23:33Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 19 pages read. Section 3 gives the composition; section 8 the carbon-fibre handling warning; section 9 says \"No data available\" for melting point, density and the other physical data; section 14 classifies it as not hazardous goods."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/2b5c536e5f824b6d80484c3bcfdfbb17/PETG-CF_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PETG-CF",
+      "retrieved_at": "2026-10-16T08:23:35Z",
+      "keys": [],
+      "note": "One page, 6 colours: read (text and word positions) for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, build plate, glue and storage tables; rows \"PETG-CF\", \"PETG / PETG-CF / …\" and \"… PETG-CF/GF …\" name this material. Used as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petg",
+      "title": "PETG Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:03Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility table (row \"PETG CF\"), drying table (row \"PETG Basic / PETG HF / PETG CF / PETG Translucent\"), PETG-CF safety notes, default flow ratio."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PETG, PETG-CF\"."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/petg-cf",
+      "title": "Bambu Lab US store product page: PETG-CF",
+      "retrieved_at": "2026-10-16T06:59:42Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections, Printing Tips FAQ, Download block."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PETG, carbon fiber",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition PETG, carbon fiber",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The SDS (p.4, section 3) gives PETG 90-95 % by wt (CAS 25640-14-6) and Carbon Fiber 5-10 % by wt (CAS 7440-44-0)."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\"); the tolerance is the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681928757506066",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "Scoped to the store page's only Size value \"1 kg\"; agrees with the store page row (option Size › 1 kg, 1000 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.25,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.25 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept. The store page states no density (its row is not_found)."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 225,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 225 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 68,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 68 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 85,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 85 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (the TDS row reads \"Vicar Softening Temperature\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 68,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 68 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value. The next row gives 74 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z"
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 35,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 35 ± 5 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "Printed-specimen result (± 5 MPa). The Z row gives 29 ± 4 MPa (not stored: one key per scope)."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 10.4,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 10.4 ± 0.6 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The Z row gives 4.7 ± 0.4 % (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2910,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2910 ± 260 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The Z row gives 1560 ± 180 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 70,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 70 ± 5 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The Z row gives 48 ± 4 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 41.2,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 41.2 ± 2.6 kJ/m²; 15.7 ±1.6 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing). First value of the cell (unnotched); the same cell gives 15.7 ± 1.6 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The Z row gives 10.7 ± 1.6 kJ/m² (not stored)."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 240,
+        "max": 270
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 240 - 270 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The material-table wiki (2. Nozzle, row \"PETG-CF\") agrees: 240 - 270 ℃ (±10 °C). The store page states no nozzle temperature (its row is not_found)."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 65,
+        "max": 75
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 65 - 75 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate Engineering Plate, High Temperature Plate or Textured PEI Plate, surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "conflict": "The material-table wiki gives 60 - 80 ℃ for PETG-CF on the Engineering, Smooth PEI / High-Temperature and Textured PEI plates (Build Plate Settings › 3, row \"PETG-CF\") and 60 - 80 °C with glue stick or liquid glue (Build Plate Settings › 1). Its range contains the TDS range; the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 200 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 200 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented. The store page states no print speed for this product."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0 - 60%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 60%",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The store FAQ (6.Z-Axis Strength) adds: \"refrain from setting the cooling fan speed too high, as overcooling can weaken layer bonding.\""
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The material-table wiki (Build Plate Settings › 3, row \"PETG-CF\") agrees on these three plates and gives \"Not recommended\" for the Bambu Cool Plate / PLA Plate."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 65 °C, 8 h X1 Series Printer Heatbed: 75 - 85 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 Series printer heatbed: 75 - 85 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "The drying wiki (Appendix I, row \"PETG, PETG-CF\") gives a forced-air oven range of 60-65 °C, 8 h, and the PETG wiki (Dry the Filament, row \"PETG Basic / PETG HF / PETG CF / PETG Translucent\") a convection oven range of 60 - 65 °C, 8 h; both contain 65 °C.",
+      "conflict": "The material-table wiki (Storage and Material Specifications, row \"PETG-CF\") gives 70 ℃ for 8 h in a blast drying oven (AMS 2 Pro and AMS HT 65 ℃ for 12 h). The product TDS value is kept."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 65 °C, 8 h X1 Series Printer Heatbed: 75 - 85 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 65 °C. The same row gives 12 h on an X1 Series printer heatbed at 75 - 85 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "note": "Every cached source agrees on 8 h in an oven: the material-table wiki (70 ℃ for 8 h), the drying wiki (Appendix I, row \"PETG, PETG-CF\": 60-65 °C, 8 h) and the PETG wiki (60 - 65 °C, 8 h)."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681928757506064",
+        "value_text": "Filament with spool"
+      },
+      "value": "Basic Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/petg-cf",
+      "source_title": "Bambu Lab US store product page: PETG-CF",
+      "locator": "Product Features › bullet 4",
+      "quote": "Comes with Basic Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:59:42Z",
+      "note": "Unverified: an unlabelled store-page bullet. Scoped to the Type value \"Filament with spool\" (the Refill value has no spool). The TDS (p.1, Specifications) gives the spool as \"ABS (Temperature resistance 70 °C)\", diameter 200 mm, height 67 mm."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Brick Red (31200)",
+      "source_value_id": "564681928757506061",
+      "hex": "#9F332A",
+      "source_url": "https://store.bblcdn.com/s7/default/2b5c536e5f824b6d80484c3bcfdfbb17/PETG-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG-CF",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Brick Red Hex:#9f332a",
+      "retrieved_at": "2026-10-16T08:23:35Z"
+    },
+    {
+      "value_text": "Violet Purple (31700)",
+      "source_value_id": "564681928757506062",
+      "hex": "#583061",
+      "source_url": "https://store.bblcdn.com/s7/default/2b5c536e5f824b6d80484c3bcfdfbb17/PETG-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG-CF",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Violet Purple Hex:#583061",
+      "retrieved_at": "2026-10-16T08:23:35Z"
+    },
+    {
+      "value_text": "Indigo Blue (31600)",
+      "source_value_id": "564681928757506058",
+      "hex": "#324585",
+      "source_url": "https://store.bblcdn.com/s7/default/2b5c536e5f824b6d80484c3bcfdfbb17/PETG-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG-CF",
+      "locator": "p.1, row 1, column 3",
+      "quote": "Indigo Blue Hex:#324585",
+      "retrieved_at": "2026-10-16T08:23:35Z"
+    },
+    {
+      "value_text": "Malachite Green (31500)",
+      "source_value_id": "564681928757506059",
+      "hex": "#16B08E",
+      "source_url": "https://store.bblcdn.com/s7/default/2b5c536e5f824b6d80484c3bcfdfbb17/PETG-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG-CF",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Malachite Green Hex:#16b08e",
+      "retrieved_at": "2026-10-16T08:23:35Z"
+    },
+    {
+      "value_text": "Black (31100)",
+      "source_value_id": "564681928757506063",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s7/default/2b5c536e5f824b6d80484c3bcfdfbb17/PETG-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG-CF",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Black Hex:#000000",
+      "retrieved_at": "2026-10-16T08:23:35Z"
+    },
+    {
+      "value_text": "Titan Gray (31101)",
+      "source_value_id": "564681928757506060",
+      "hex": "#565656",
+      "source_url": "https://store.bblcdn.com/s7/default/2b5c536e5f824b6d80484c3bcfdfbb17/PETG-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG-CF",
+      "locator": "p.1, row 2, column 3",
+      "quote": "Titan Gray Hex:#565656",
+      "retrieved_at": "2026-10-16T08:23:35Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/petg-cf",
+      "source_title": "Bambu Lab US store product page: PETG-CF",
+      "retrieved_at": "2026-10-16T06:59:42Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "The material-table wiki (3. AMS & AMS lite, row \"PETG-CF\") agrees: \"AMS: Compatible\". The same wiki warns that rough, abrasive materials such as carbon fiber filaments can eventually grind down the AMS inner PTFE feed channels."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/petg-cf",
+      "source_title": "Bambu Lab US store product page: PETG-CF",
+      "retrieved_at": "2026-10-16T06:59:42Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "The material-table wiki (3. AMS & AMS lite, row \"PETG-CF\") agrees: \"AMS: Compatible\". The same wiki warns that rough, abrasive materials such as carbon fiber filaments can eventually grind down the AMS inner PTFE feed channels."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/petg-cf",
+      "source_title": "Bambu Lab US store product page: PETG-CF",
+      "retrieved_at": "2026-10-16T06:59:42Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "The material-table wiki (3. AMS & AMS lite, row \"PETG-CF\") agrees: \"AMS: Compatible\". The same wiki warns that rough, abrasive materials such as carbon fiber filaments can eventually grind down the AMS inner PTFE feed channels."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/petg-cf",
+      "source_title": "Bambu Lab US store product page: PETG-CF",
+      "retrieved_at": "2026-10-16T06:59:42Z",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "AMS lite NOT Compatible",
+      "note": "The store FAQ (1.Accessory Compatibility) says \"Not compatible with AMS lite\" and the PETG wiki (Hardware compatibility, row \"PETG CF\") \"AMS lite is not compatible\". The material-table wiki is weaker: \"AMS lite: Not Recommended\" (3. AMS & AMS lite) and \"PETG-CF and PLA Wood filaments are compatible with the AMS but not recommended for the AMS lite.\""
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/petg-cf",
+      "source_title": "Bambu Lab US store product page: PETG-CF",
+      "retrieved_at": "2026-10-16T06:59:42Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "0.2 mm Nozzle NOT Compatible",
+      "note": "Agreed by every source read: the store FAQ (1.Accessory Compatibility) \"Not compatible with … Hotend with Stainless Steel Nozzle 0.2 mm\"; the material-table wiki (2. Nozzle, row \"PETG-CF\") \"Not Compatible\" for 0.2 mm and \"Do not use a 0.2 mm nozzle. The clogging risk is extremely high.\"; the TDS (p.1) lists Nozzle Size \"0.4, 0.6, 0.8 mm\" only. compat-targets.json lists \"0.2 mm Nozzle\" as reviewed-unresolvable (component concept), so no target handle is named."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hardened steel nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"PETG-CF\" › Is it necessary to use hardened steel nozzles?",
+      "quote": "PETG-CF | Not Compatible | Bambu PETG-CF： Recommended | Compatible | Compatible | Not Recommended | Compatible | Compatible | Required | 240 - 270 |",
+      "note": "The store FAQ (5.Nozzle Recommendation) says \"PETG-CF requires a more wear-resistant hardened steel nozzle.\"; the PETG wiki row \"PETG CF\" says \"Compatible with hardened steel nozzles\"; the material-table wiki guidelines say \"Always use a hardened steel nozzle\" and \"Do not use a stainless steel or brass nozzle\". The store bullet is weaker: \"Stainless Steel Nozzle NOT Recommended\". No single store product is \"a hardened steel nozzle\", so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "note": "The nozzle must be hardened steel. The material-table wiki (2. Nozzle, row \"PETG-CF\") gives 0.4 mm \"Bambu PETG-CF： Recommended\", 0.6 and 0.8 mm \"Compatible\", 0.4 mm high flow \"Not Recommended\", 0.6 and 0.8 mm high flow \"Compatible\"; the PETG wiki: \"not recommended for use with 0.4 mm high-flow nozzles\". The store FAQ (5.Nozzle Recommendation) recommends 0.6 mm over 0.4 mm to reduce clogging."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki (Build Plate Settings › 3, row \"PETG-CF\") gives 60 - 80 ℃ on the Bambu Engineering Plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (PETG-CF 60 - 80 ℃), which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "Open-frame or enclosed printer",
+      "target_source_handle": "",
+      "target_family": "all_bambu_printers",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › table › row \"PLA, PETG, TPU …\" › Recommended Printer",
+      "quote": "PLA, PETG, TPU, and their CF/GF reinforced materials (e.g., PLA-CF/GF, PETG-CF/GF, etc.) | Not prone to warping; no mandatory temperature requirements | Open-frame or enclosed printer",
+      "note": "The same page adds \"For PETG and PETG-CF/GF, an enclosed printer is recommended to prevent low ambient temperatures from reducing the model's interlayer strength.\" and its AMS table gives PETG-CF \"Compatible\" on open-frame and \"Recommended\" on enclosed printers. The store FAQ (6.Z-Axis Strength) says \"Avoid using an open-frame printer\" for stronger Z-axis adhesion. The PETG wiki: \"PETG is compatible with the entire Bamboo series of machines.\" Every printer still needs a hardened steel nozzle for this filament (see the requires relation)."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681928757506065",
+        "value_text": "Refill"
+      },
+      "target_kind": "spool",
+      "target_label": "spool",
+      "target_source_handle": "bambu-reusable-spool",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/petg-cf",
+      "source_title": "Bambu Lab US store product page: PETG-CF",
+      "retrieved_at": "2026-10-16T06:59:42Z",
+      "locator": "Printing Tips (FAQ) › 3.Refill Guidelines",
+      "quote": "The refill filament needs to be used with a spool.",
+      "note": "Scoped to the Refill value: the \"Filament with spool\" value comes on a spool. The same FAQ points to the wiki guide on swapping the new filament with the Bambu Reusable Spool."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+      "title": "Bambu Filament Technical Data Sheet V3.0: PETG-CF",
+      "retrieved_at": "2026-10-16T08:23:30Z",
+      "sha256": "18ca4ea88470343cd76173c44e5d9e71e6d7e538a6287816a62d80660329bba6"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/b8ed09c39c5545b19882c05c37b19c96/SDS20260701G50_Bambu_PETG_CF.pdf",
+      "title": "Bambu PETG CF Safety Data Sheet SDS20260701G50",
+      "retrieved_at": "2026-10-16T08:23:33Z",
+      "sha256": "6702775e288efd54d09277b7d5abbdd8c3789883ccc70b57e88fca1255e871ce"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/2b5c536e5f824b6d80484c3bcfdfbb17/PETG-CF_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PETG-CF",
+      "retrieved_at": "2026-10-16T08:23:35Z",
+      "sha256": "d97450d2cdca51b4a582696a22faa2fbc86717ec8ac91b97ebbff0532d8159da"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petg",
+      "title": "PETG Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:03Z",
+      "sha256": "7b70055c892826fe371741327adc2121e43d7487f57e519e92f713eb3f610279"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 29 ± 4 MPa, elongation 4.7 ± 0.4 %, bending modulus 1560 ± 180 MPa, bending strength 48 ± 4 MPa, impact 10.7 ± 1.6 kJ/m²) are not stored. Density, melting, glass transition, Vicat and HDT are raw-material properties (ISO 1183, DSC, ISO 306, ISO 75) and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 2460 ± 230 MPa, Z 1340 ± 150 MPa), melt index (19.3 ± 2.4 g/10 min at 250 °C, 2.16 kg), crystallization temperature (N/A), heat deflection temperature 74 °C at 0.45 MPa, saturated water absorption rate (0.30% at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed with desiccant), bed surface preparation (glue), retraction length (0.8 - 1.4 mm) and speed (30 - 60 mm/s), chamber temperature (35 - 50 °C), max overhang angle (~ 70°), max bridging length (~ 30 mm), support (Turn on), spool material (ABS, temperature resistance 70 °C) and spool size (diameter 200 mm, height 67 mm), suggested annealing of prints (55 to 60 °C, 65 to 70 hours, as printed), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows.",
+    "The TDS recommended chamber temperature (35 - 50 °C) is not written to thermal.chamber_temp: that key is a printer capability (number, template field chamber_temp_max), not a filament print setting.",
+    "SDS facts with no registry key are not stored: product name \"Bambu PETG CF\", model \"G50-xx\", CLP \"Not classified\", the section 8 carbon-fibre handling warning (gloves when loading/unloading, cutting or sanding), and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO/IATA) transport. Its section 8 also reads \"carbon fiber-reinforced filament （Glass fiber-reinforced filament)\", a wording slip in the SDS. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Source disagreements kept for review: bed temperature (TDS 65 - 75 °C vs material-table wiki 60 - 80 ℃ on the Engineering, Smooth PEI and Textured PEI plates and 60 - 80 °C in its glue table); oven drying temperature (TDS 65 °C, drying wiki and PETG wiki 60 - 65 °C, material-table wiki 70 ℃). The product TDS values are kept.",
+    "Nozzle guidance: the store page says \"Stainless Steel Nozzle NOT Recommended\"; the store FAQ, the PETG wiki and the material-table wiki say a hardened steel nozzle is required. Which size comes first differs: the material-table wiki recommends the 0.4 mm hardened steel nozzle first for Bambu PETG-CF, the store FAQ (5.Nozzle Recommendation) recommends 0.6 mm to reduce clogging. The 0.4 mm high-flow nozzle is \"Not Recommended\"; \"not recommended\" is not \"not compatible\", so no relation is written for it.",
+    "Printer guidance: the material-table wiki allows an open-frame or enclosed printer and recommends an enclosed one for PETG-CF; the store FAQ says to avoid an open-frame printer for Z-axis strength. Only the compatible_with family relation is written; \"recommended\" has no relation among compatible_with / not_compatible_with / requires.",
+    "Build plate guidance: the TDS lists glue as the surface preparation and the material-table wiki recommends glue stick or liquid glue; this is a recommendation, not a stated requirement, so no requires relation is written. The Bambu Cool Plate / PLA Plate is \"Not recommended\" for PETG-CF (material-table wiki), not \"not compatible\", so no relation is written for it either.",
+    "Marketing prose proves no number: \"Enhanced Strength and Stiffness\", \"Ready for Outdoor Use\" (\"enhanced resistance to heat and moisture\"), \"Improved Mechanical Properties & High Flexibility\" and \"surface finish is glossier than that of PLA-CF\" are not stored as values.",
+    "Hex: all 6 store colours have exactly one hex cell, matched by the colour name without the code in parentheses. The table prints two codes with lower-case letters (#9f332a, #16b08e); they are stored upper-case for the published_hex CHECK, and each quote keeps the table's own spelling (the other four codes are digits only). The raw store value is \"Titan Gray  (31101)\" with two spaces; the package normalises it to \"Titan Gray (31101)\", which is the value_text used here.",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/87dee4bc82c64829b94c0a8d6e55e23c.pdf) that was not cached and not read (skipped as a certificate), so safety.certifications is neither curated nor marked not_published.",
+    "The store page also links the wiki guide https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool, which was not cached and not read.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 5); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store FAQ (4.Safety Tips) and the PETG wiki say the filament is not food-grade / not food-contact grade and warn of fine fibre debris; no registry key holds these. The PETG wiki gives a default flow ratio of 0.95 for Bambu PETG-CF; no registry key holds it."
+  ]
+}

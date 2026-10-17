@@ -1,0 +1,2055 @@
+{
+ "extraction": {
+  "sourceProductId": "7689010839688",
+  "handle": "pla-glow",
+  "canonicalUrl": "https://us.store.bambulab.com/products/pla-glow",
+  "title": "PLA Glow",
+  "seoMetaDescription": "PLA Glow stands out due to its incorporation of a unique additive: luminous powder. This variant retains the familiar qualities of traditional PLA, including easy printing, high quality, and exceptional overall mechanical properties. What sets PLA Glow apart is its distinctive feature—it glows in the dark. This makes it the optimal selection for crafting luminous nameplates, logos, jewelry, and various models that require a captivating glow effect.",
+  "route": "552709755819347968>552709755857096704>552709756201029632",
+  "isFilament": true,
+  "groups": [
+   {
+    "propertyKeyId": "10114084372616",
+    "propertyKey": "Color",
+    "type": 1,
+    "title": "",
+    "position": 1,
+    "values": [
+     {
+      "id": "564681970243366918",
+      "value": "Glow Green (15500)",
+      "selectedDefault": false,
+      "colorUrl": "https://store.bblcdn.com/s7/default/5218f88774e34104a0359c400a99dcbd/0592e39f21c74879a6cd329646c157d5.media"
+     },
+     {
+      "id": "564681970243366919",
+      "value": "Glow Pink (15200)",
+      "selectedDefault": false,
+      "colorUrl": "https://store.bblcdn.com/s7/default/8ec0b7bd61e843dd931e5d845d0a5a5c/5b9adaddb9114bea9758d6353c61b4bd.media"
+     },
+     {
+      "id": "564681970243366920",
+      "value": "Glow Orange (15300)",
+      "selectedDefault": false,
+      "colorUrl": "https://store.bblcdn.com/s7/default/456821e9d47a451f89ba65f6e4eb984c/a07dd6ee6ba740ebaf06dbbc66b9066d.media"
+     },
+     {
+      "id": "564681970243366921",
+      "value": "Glow Yellow (15400)",
+      "selectedDefault": false,
+      "colorUrl": "https://store.bblcdn.com/s7/default/712d0d530fc5493291be2b7b8bbd87d7/c2f53cafa52442cdb4e4a2ebf10443a4.media"
+     },
+     {
+      "id": "564681970243366922",
+      "value": "Glow Blue (15600)",
+      "selectedDefault": false,
+      "colorUrl": "https://store.bblcdn.com/s7/default/9afa41827d634ef9b106b93f9c19e5d0/b5e3453464cc482e918e6b61391394c7.media"
+     }
+    ]
+   },
+   {
+    "propertyKeyId": "10114073395336",
+    "propertyKey": "Type",
+    "type": 1,
+    "title": "",
+    "position": 2,
+    "values": [
+     {
+      "id": "564681970243366923",
+      "value": "Filament with spool",
+      "selectedDefault": false,
+      "colorUrl": ""
+     }
+    ]
+   },
+   {
+    "propertyKeyId": "10114084339848",
+    "propertyKey": "Size",
+    "type": 1,
+    "title": "",
+    "position": 3,
+    "values": [
+     {
+      "id": "564681970243366924",
+      "value": "1 kg",
+      "selectedDefault": false,
+      "colorUrl": ""
+     }
+    ]
+   }
+  ],
+  "skus": [
+   {
+    "id": "41558487793800",
+    "props": [
+     {
+      "propertyKeyId": "10114084372616",
+      "propertyKey": "Color",
+      "value": "Glow Orange (15300)"
+     },
+     {
+      "propertyKeyId": "10114073395336",
+      "propertyKey": "Type",
+      "value": "Filament with spool"
+     },
+     {
+      "propertyKeyId": "10114084339848",
+      "propertyKey": "Size",
+      "value": "1 kg"
+     }
+    ],
+    "hero": {
+     "resourceFileId": "42679712120968",
+     "url": "https://store.bblcdn.com/s7/default/b852ee64945540208e55b588ee6e8e26/e40cbbf6e7fed96557d8e2be99e4b9cf_874f9392-3fe3-4c65-87cc-91b158674eb3.png"
+    },
+    "description": "",
+    "soldOut": false
+   },
+   {
+    "id": "41558487826568",
+    "props": [
+     {
+      "propertyKeyId": "10114084372616",
+      "propertyKey": "Color",
+      "value": "Glow Blue (15600)"
+     },
+     {
+      "propertyKeyId": "10114073395336",
+      "propertyKey": "Type",
+      "value": "Filament with spool"
+     },
+     {
+      "propertyKeyId": "10114084339848",
+      "propertyKey": "Size",
+      "value": "1 kg"
+     }
+    ],
+    "hero": {
+     "resourceFileId": "33160581316744",
+     "url": "https://store.bblcdn.com/s7/default/62abf450b2a743a88c4108f520d44a23/697ef5c2066bf49f4df46a227b1a93c1_f2cca2e1-43ba-4d4d-b20c-832cfa099659.png"
+    },
+    "description": "",
+    "soldOut": false
+   },
+   {
+    "id": "41558487859336",
+    "props": [
+     {
+      "propertyKeyId": "10114084372616",
+      "propertyKey": "Color",
+      "value": "Glow Green (15500)"
+     },
+     {
+      "propertyKeyId": "10114073395336",
+      "propertyKey": "Type",
+      "value": "Filament with spool"
+     },
+     {
+      "propertyKeyId": "10114084339848",
+      "propertyKey": "Size",
+      "value": "1 kg"
+     }
+    ],
+    "hero": {
+     "resourceFileId": "715708339390660608",
+     "url": "https://store.bblcdn.com/s7/default/3ae3b1c1bd254058bf08b79f3ee815b3/PLA_Glow.jpg"
+    },
+    "description": "",
+    "soldOut": false
+   },
+   {
+    "id": "41558487892104",
+    "props": [
+     {
+      "propertyKeyId": "10114084372616",
+      "propertyKey": "Color",
+      "value": "Glow Pink (15200)"
+     },
+     {
+      "propertyKeyId": "10114073395336",
+      "propertyKey": "Type",
+      "value": "Filament with spool"
+     },
+     {
+      "propertyKeyId": "10114084339848",
+      "propertyKey": "Size",
+      "value": "1 kg"
+     }
+    ],
+    "hero": {
+     "resourceFileId": "33160694759560",
+     "url": "https://store.bblcdn.com/s7/default/8ea96321809b43e18d06d1b13dba3371/5d4ad98b7e6fd7642323ef49163d8697_dc0d9844-1668-4026-b430-b3be661988d3.png"
+    },
+    "description": "",
+    "soldOut": false
+   },
+   {
+    "id": "41558487924872",
+    "props": [
+     {
+      "propertyKeyId": "10114084372616",
+      "propertyKey": "Color",
+      "value": "Glow Yellow (15400)"
+     },
+     {
+      "propertyKeyId": "10114073395336",
+      "propertyKey": "Type",
+      "value": "Filament with spool"
+     },
+     {
+      "propertyKeyId": "10114084339848",
+      "propertyKey": "Size",
+      "value": "1 kg"
+     }
+    ],
+    "hero": {
+     "resourceFileId": "33160581382280",
+     "url": "https://store.bblcdn.com/s7/default/712a995a9cf94a76b1ec22d5c06378fb/6fdaecdc33b9371fb7c326d4bd52932b.png"
+    },
+    "description": "",
+    "soldOut": false
+   }
+  ],
+  "gallery": [
+   {
+    "resourceFileId": "715708339390660608",
+    "url": "https://store.bblcdn.com/s7/default/3ae3b1c1bd254058bf08b79f3ee815b3/PLA_Glow.jpg"
+   },
+   {
+    "resourceFileId": "35963332100232",
+    "url": "https://store.bblcdn.com/s7/default/d9a59b6344414b648da6c7e2fbf72d7c/PLAGlow.jpg"
+   },
+   {
+    "resourceFileId": "33160694759560",
+    "url": "https://store.bblcdn.com/s7/default/8ea96321809b43e18d06d1b13dba3371/5d4ad98b7e6fd7642323ef49163d8697_dc0d9844-1668-4026-b430-b3be661988d3.png"
+   },
+   {
+    "resourceFileId": "42679712120968",
+    "url": "https://store.bblcdn.com/s7/default/b852ee64945540208e55b588ee6e8e26/e40cbbf6e7fed96557d8e2be99e4b9cf_874f9392-3fe3-4c65-87cc-91b158674eb3.png"
+   },
+   {
+    "resourceFileId": "33160581382280",
+    "url": "https://store.bblcdn.com/s7/default/712a995a9cf94a76b1ec22d5c06378fb/6fdaecdc33b9371fb7c326d4bd52932b.png"
+   },
+   {
+    "resourceFileId": "33160581316744",
+    "url": "https://store.bblcdn.com/s7/default/62abf450b2a743a88c4108f520d44a23/697ef5c2066bf49f4df46a227b1a93c1_f2cca2e1-43ba-4d4d-b20c-832cfa099659.png"
+   }
+  ],
+  "featuresTitle": "Product Features",
+  "features": [
+   {
+    "title": "Product Features",
+    "html": "<div style=\"text-align: left; box-sizing: border-box;\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul style=\"margin: 0px; padding: 0px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">Unique Glow in Low Light Conditions</li>\n<li style=\"box-sizing: border-box;\">Comes with Basic Reusable Spool</li>\n<li style=\"box-sizing: border-box;\">Diameter: 1.75mm +/- 0.03mm</li>\n</ul>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<div class=\"bbl-title-4 text-bbl-grey-13 font-bold\">Cautions for Use</div>\n<ul style=\"margin: 0px; padding: 0px; margin-top: 8px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">A Hardened Steel Nozzle is required when printing</li>\n<li style=\"box-sizing: border-box;\">Stainless Steel Nozzles <strong>NOT </strong>Compatible</li>\n<li style=\"box-sizing: border-box;\">0.2 mm nozzles <strong>NOT </strong>Compatible</li>\n<li style=\"box-sizing: border-box;\">AMS 2 Pro, AMS HT &amp; AMS Compatible, but can lead to faster wear</li>\n<li style=\"box-sizing: border-box;\">AMS lite <strong>NOT </strong>Compatible</li>\n</ul>"
+   }
+  ],
+  "videos": [],
+  "description": {
+   "kind": "page_builder",
+   "config": {
+    "schemaVersion": "1.0",
+    "templateId": "tpl-1778231690944",
+    "components": [
+     {
+      "id": "banner_1776859885795_imdr8wmzy",
+      "type": "banner",
+      "variant": "banner_1",
+      "name": "Banner",
+      "anchor": {
+       "enabled": true,
+       "name": "Overview",
+       "id": "banner_1776859885795_imdr8wmzy"
+      },
+      "modules": {
+       "media": {
+        "pc": {
+         "type": "image",
+         "src": "https://store.bblcdn.com/s7/default/ba1527067a6942a680e3f70186c31ffe/Bambu_PLA_Glow01-compressed.jpg",
+         "naturalWidth": 5120,
+         "naturalHeight": 1280
+        },
+        "mo": {
+         "type": "image",
+         "src": "https://store.bblcdn.com/s7/default/98454b4123574637a0b9237f66d8a2af/Bambu_PLA_Glow_MO01-compressed.jpg",
+         "naturalWidth": 2048,
+         "naturalHeight": 960
+        }
+       },
+       "typeStyles": {
+        "content": {
+         "title": "PLA Glow",
+         "description": "Unique Glow in Low Light Conditions"
+        }
+       }
+      }
+     },
+     {
+      "id": "chapter_1776860120943_tabnn7pvy",
+      "type": "chapter",
+      "variant": "chapter_1",
+      "name": "卖点",
+      "anchor": {
+       "enabled": false,
+       "name": "Chapter-9",
+       "id": "chapter_1776860120943_tabnn7pvy"
+      },
+      "modules": {
+       "typeStyles": {
+        "content": {
+         "title": "",
+         "description": ""
+        }
+       }
+      },
+      "children": [
+       {
+        "id": "content_block_1776860161046_c2ynsoh65",
+        "type": "content_block",
+        "variant": "content-block-6",
+        "name": "卖点 1",
+        "anchor": {
+         "enabled": true,
+         "name": "Content Block-1",
+         "id": "content_block_1776860161046_c2ynsoh65"
+        },
+        "modules": {
+         "typeStyles": {
+          "content": {
+           "title": "Unique Glow in Low Light Conditions",
+           "description": "Bambu PLA Glow incorporates a distinct additive: luminous powder, which imparts a special property to printed objects, causing them to emit a captivating glow in the dark.",
+           "button": {
+            "type": "link",
+            "text": ""
+           }
+          }
+         },
+         "featureConfig": {
+          "cards": [
+           {
+            "title": "",
+            "subtitle": "",
+            "description": "",
+            "media": {
+             "pc": {
+              "type": "image",
+              "src": "https://store.bblcdn.com/s7/default/530de98277a44885b7baf675655c12fe/Bambu_PLA_Glow04-compressed.jpg",
+              "naturalWidth": 2400,
+              "naturalHeight": 1080
+             },
+             "mo": {
+              "type": "image",
+              "src": "https://store.bblcdn.com/s7/default/68970544070048fba1801cf557fbb104/Bambu_PLA_Glow_MO04-compressed.jpg",
+              "naturalWidth": 1344,
+              "naturalHeight": 700
+             }
+            },
+            "linkButton": {},
+            "button": {},
+            "id": "comp_1789713229552_v6h4xzmc0"
+           },
+           {
+            "title": "",
+            "subtitle": "",
+            "description": "",
+            "media": {
+             "pc": {
+              "type": "image",
+              "src": "https://store.bblcdn.com/s7/default/fae7b9eebae74b1aa82c9f630d34fc21/Bambu_PLA_Glow02-compressed.jpg",
+              "naturalWidth": 1176,
+              "naturalHeight": 1036
+             },
+             "mo": {
+              "type": "image",
+              "src": "https://store.bblcdn.com/s7/default/aa27fa7997e642e6b50d7c15565ddb1c/Bambu_PLA_Glow_MO02-compressed.jpg",
+              "naturalWidth": 1344,
+              "naturalHeight": 700
+             }
+            },
+            "linkButton": {},
+            "button": {},
+            "id": "comp_1789713229552_zp7ri5k1y"
+           },
+           {
+            "title": "",
+            "subtitle": "",
+            "description": "",
+            "media": {
+             "pc": {
+              "type": "image",
+              "src": "https://store.bblcdn.com/s7/default/361efcea41984bb2bc76e98d1afa4bc2/Bambu_PLA_Glow03-compressed.jpg",
+              "naturalWidth": 1176,
+              "naturalHeight": 1036
+             },
+             "mo": {
+              "type": "image",
+              "src": "https://store.bblcdn.com/s7/default/1e670c9a94394a1dada1ee8fbe90d82f/Bambu_PLA_Glow_MO03-compressed.jpg",
+              "naturalWidth": 1344,
+              "naturalHeight": 700
+             }
+            },
+            "linkButton": {},
+            "button": {},
+            "id": "comp_1789713229552_5xas68v0x"
+           }
+          ]
+         }
+        }
+       }
+      ]
+     },
+     {
+      "id": "content_block_1776744592796_vv35dwp6b",
+      "type": "content_block",
+      "variant": "content-block-1",
+      "name": "RFID",
+      "anchor": {
+       "enabled": false,
+       "name": "Content Block-6",
+       "id": "content_block_1776744592796_vv35dwp6b"
+      },
+      "modules": {
+       "typeStyles": {
+        "content": {
+         "title": "RFID for Intelligent Printing",
+         "description": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+        }
+       },
+       "featureConfig": {
+        "tabs": [
+         {
+          "name": "Tab 1",
+          "media": {
+           "pc": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/1e320250ec064be78d572ba40db1d52c/RFID_for_Intelligent_Printing-compressed.jpg",
+            "naturalWidth": 2400,
+            "naturalHeight": 918
+           },
+           "mo": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/542f05ec483a4499b579e46db4bf6fd1/RFID_for_Intelligent_PrintingMO-compressed.jpg",
+            "naturalWidth": 1344,
+            "naturalHeight": 840
+           }
+          },
+          "id": "comp_1789713229552_i73rdj758"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "id": "content_block_1776744650085_nu31krt23",
+      "type": "content_block",
+      "variant": "content-block-17",
+      "name": "Download",
+      "anchor": {
+       "enabled": true,
+       "name": "Download",
+       "id": "content_block_1776744650085_nu31krt23"
+      },
+      "modules": {
+       "typeStyles": {
+        "content": {
+         "title": "Download"
+        }
+       },
+       "featureConfig": {
+        "items": [
+         {
+          "image": {
+           "type": "image",
+           "src": "https://store-test.bblcdn.com/s7/default/44b88c2274b2430397da892f1de79f70/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "description": "Filament TDS",
+          "media": {
+           "pc": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/1b12620627104bae9da9b5ed5706b6fb/Downloads-compressed.jpg",
+            "naturalWidth": 564,
+            "naturalHeight": 240
+           },
+           "mo": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/7e3f57e1be794d09aa62df69dfb93c93/Download_mo.jpg",
+            "naturalWidth": 312,
+            "naturalHeight": 178
+           }
+          },
+          "link": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+          "id": "comp_1789713229552_ej6xmti3g"
+         },
+         {
+          "image": {
+           "type": "image",
+           "src": "https://store-test.bblcdn.com/s7/default/5575e961df094c9591a7faa849ca9b77/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "description": "Filament MSDS",
+          "media": {
+           "pc": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/893f5fb475a5453db202d0c7a5a7fe7c/Downloads-compressed.jpg",
+            "naturalWidth": 564,
+            "naturalHeight": 240
+           },
+           "mo": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/7977a027d60b466ea6cce4176ffd9a0e/Download_mo.jpg",
+            "naturalWidth": 312,
+            "naturalHeight": 178
+           }
+          },
+          "link": "https://store.bblcdn.com/s7/default/4a35986db81f466fa7ff4f84344ef57a/SDS20251127A12_Bambu_PLA_Glow.pdf",
+          "id": "comp_1789713229552_vqqf7huxi"
+         },
+         {
+          "image": {
+           "type": "image",
+           "src": "https://store-test.bblcdn.com/s7/default/bf5dbaee598d46e9bd8170e43facfa96/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "description": "Filament RoHS",
+          "media": {
+           "pc": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/14dfe37f111845718e59742b7162dd27/Downloads-compressed.jpg",
+            "naturalWidth": 564,
+            "naturalHeight": 240
+           },
+           "mo": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/709c41dc79b64f20bd803a34394af5c2/Download_mo.jpg",
+            "naturalWidth": 312,
+            "naturalHeight": 178
+           }
+          },
+          "link": "https://store.bblcdn.com/2c7b9c30a9014c65bb4aeacd9c70e6af.pdf",
+          "id": "comp_1789713229552_vjhxfmj7e"
+         },
+         {
+          "image": {
+           "type": "image",
+           "src": "https://store-test.bblcdn.com/s7/default/fdec58d7e8cd4820bb93af5ef7582247/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "description": "Hex Code",
+          "media": {
+           "pc": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/a913defa7f7d41e78dc88dfe206d5419/Downloads-compressed.jpg",
+            "naturalWidth": 564,
+            "naturalHeight": 240
+           },
+           "mo": {
+            "type": "image",
+            "src": "https://store.bblcdn.com/s7/default/fdc7e2d0b4414ab294c317e384cc59fe/Download_mo.jpg",
+            "naturalWidth": 312,
+            "naturalHeight": 178
+           }
+          },
+          "link": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+          "id": "comp_1789713229552_sdeo23fmi"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "id": "content_block_1776744740718_dwoqb1p7t",
+      "type": "content_block",
+      "variant": "content-block-21-pro",
+      "name": "FAQ",
+      "anchor": {
+       "enabled": true,
+       "name": "Printing Tips",
+       "id": "content_block_1776744740718_dwoqb1p7t"
+      },
+      "modules": {
+       "typeStyles": {
+        "content": {
+         "title": "Printing Tips"
+        }
+       },
+       "featureConfig": {
+        "faqs": [
+         {
+          "question": "1.Accessory Compatibility",
+          "answerBlocks": [
+           {
+            "type": "rich-text",
+            "content": "<ul>\n<li>Not compatible with <strong>Hotend with Stainless Steel Nozzle 0.2mm, and AMS lite</strong>.</li>\n</ul>",
+            "id": "comp_1789713229552_3djgizv95"
+           },
+           {
+            "type": "rich-text",
+            "content": "<ul>\n<li>Utilizing AMS lite may result in high feed resistance and an increased risk of feed failure. Consider alternative methods such as pre-use drying for better outcomes.</li>\n</ul>",
+            "id": "comp_1789713229552_8cq5u0meh"
+           }
+          ],
+          "id": "comp_1789713229552_72957ybu3"
+         },
+         {
+          "question": "2.Drying Recommendations",
+          "answerBlocks": [
+           {
+            "type": "rich-text",
+            "content": "<ul>\n<li>Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: <a href=\"https://wiki.bambulab.com/en/filament-acc/filament/dry-filament\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">Filament drying instructions</span></span></a> on WIKI.</li>\n<li>For opened filament, we recommend drying before use according to the wiki&rsquo;s recommended temperature and time settings.</li>\n</ul>",
+            "id": "comp_1789713229552_0izr2rwxp"
+           }
+          ],
+          "id": "comp_1789713229552_han2ju53e"
+         },
+         {
+          "question": "3. Appearance Change",
+          "answerBlocks": [
+           {
+            "type": "rich-text",
+            "content": "<div>The model's luminous intensity diminishes over time, but exposure to ultraviolet or sunlight for a brief period (approximately 2 hours) can rejuvenate its glow. However, prolonged or frequent irradiation may expedite PLA aging.</div>",
+            "id": "comp_1789713229552_uhaoicxr7"
+           }
+          ],
+          "id": "comp_1789713229552_frul5e7ka"
+         },
+         {
+          "question": "4.Safety Tips",
+          "answerBlocks": [
+           {
+            "type": "rich-text",
+            "content": "<div>\n<div data-page-id=\"UYkSd7IvUoVreQxHLV5cA0mpnBg\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul>\n<li class=\"ace-line ace-line old-record-id-doxcnwYFCemC8F1JknzOfrKazCd\">Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.</li>\n<li class=\"ace-line ace-line old-record-id-doxcnwYFCemC8F1JknzOfrKazCd\">Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.</li>\n<li class=\"ace-line ace-line old-record-id-doxcnwYFCemC8F1JknzOfrKazCd\">Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.</li>\n<li class=\"ace-line ace-line old-record-id-doxcnwYFCemC8F1JknzOfrKazCd\">As this filament is not food-grade, please avoid using finished prints for food storage or contact.</li>\n</ul>\n</div>\n</div>",
+            "id": "comp_1789713229552_74687fsfi"
+           }
+          ],
+          "id": "comp_1789713229552_z81gmn9d6"
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "jsonld": {
+   "productGroupId": "7689010839688",
+   "variantSkus": [
+    "41558487793800",
+    "41558487826568",
+    "41558487859336",
+    "41558487892104",
+    "41558487924872"
+   ],
+   "brand": "Bambu Lab"
+  }
+ },
+ "payload": {
+  "protocol": 2,
+  "source": "bambu_us",
+  "source_product_id": "7689010839688",
+  "handle": "pla-glow",
+  "route": "552709755819347968>552709755857096704>552709756201029632",
+  "write_mode": "create",
+  "product_id": "p_5be29152c3fe7753fbb369ab",
+  "curated_sha256": "",
+  "extraction_sha256": "ad33533d35a2baed6e8f803824a3ec0120f3e0bf643885bdf9316d10ee8e5537",
+  "product": {
+   "title_en": "PLA Glow",
+   "short_description_en": "PLA Glow stands out due to its incorporation of a unique additive: luminous powder. This variant retains the familiar qualities of traditional PLA, including easy printing, high quality, and exceptional overall mechanical properties. What sets PLA Glow apart is its distinctive feature—it glows in the dark. This makes it the optimal selection for crafting luminous nameplates, logos, jewelry, and various models that require a captivating glow effect.",
+   "variant_mode": "VARIANT_COMBINATION",
+   "usage_steps": [],
+   "usage_official_url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament"
+  },
+  "groups": [
+   {
+    "id": "og_95bb8a0bcca0125df88efc6c",
+    "source_id": "10114084372616",
+    "sort": 1,
+    "name_en": "Colour",
+    "name_ar": "اللون",
+    "name_ckb": "ڕەنگ",
+    "kind": "color",
+    "source_label": "Color",
+    "default_value_id": "",
+    "values": [
+     {
+      "id": "ov_4ed44791162c439d2a14c446",
+      "source_id": "564681970243366918",
+      "name_en": "Glow Green (15500)",
+      "name_ar": "",
+      "name_ckb": "",
+      "variant_key": "bv-7b4ff1168aef706cb8bb8cd0",
+      "variant_label": "Glow Green (15500)",
+      "sort": 0,
+      "colour_code": "15500"
+     },
+     {
+      "id": "ov_3b5d954b73506f1a24ad498a",
+      "source_id": "564681970243366919",
+      "name_en": "Glow Pink (15200)",
+      "name_ar": "",
+      "name_ckb": "",
+      "variant_key": "bv-9b07d517745ad1060aaa4ae5",
+      "variant_label": "Glow Pink (15200)",
+      "sort": 1,
+      "colour_code": "15200"
+     },
+     {
+      "id": "ov_d810af93a85107eec89f7798",
+      "source_id": "564681970243366920",
+      "name_en": "Glow Orange (15300)",
+      "name_ar": "",
+      "name_ckb": "",
+      "variant_key": "bv-d1c3d6244807cbc68e7fbc1d",
+      "variant_label": "Glow Orange (15300)",
+      "sort": 2,
+      "colour_code": "15300"
+     },
+     {
+      "id": "ov_593ab009984933a08557d58e",
+      "source_id": "564681970243366921",
+      "name_en": "Glow Yellow (15400)",
+      "name_ar": "",
+      "name_ckb": "",
+      "variant_key": "bv-145b712472f236a4acd377a2",
+      "variant_label": "Glow Yellow (15400)",
+      "sort": 3,
+      "colour_code": "15400"
+     },
+     {
+      "id": "ov_163b3aea356a3b6296d4ead3",
+      "source_id": "564681970243366922",
+      "name_en": "Glow Blue (15600)",
+      "name_ar": "",
+      "name_ckb": "",
+      "variant_key": "bv-60c55f3978b93194bfe2bf91",
+      "variant_label": "Glow Blue (15600)",
+      "sort": 4,
+      "colour_code": "15600"
+     }
+    ]
+   },
+   {
+    "id": "og_cd58fb2ced2b759873d1f964",
+    "source_id": "10114073395336",
+    "sort": 2,
+    "name_en": "Spool",
+    "name_ar": "البكرة",
+    "name_ckb": "ماسوورە",
+    "kind": "spool",
+    "source_label": "Type",
+    "default_value_id": "",
+    "values": [
+     {
+      "id": "ov_e3ce43f2ff3f450d4b56be6c",
+      "source_id": "564681970243366923",
+      "name_en": "Filament with spool",
+      "name_ar": "مع بكرة",
+      "name_ckb": "لەگەڵ ماسوورە",
+      "variant_key": "bv-f288d18b71fcdbc8cebf02fa",
+      "variant_label": "Filament with spool",
+      "sort": 0,
+      "colour_code": ""
+     }
+    ]
+   },
+   {
+    "id": "og_26dabd06181cba8c789a651d",
+    "source_id": "10114084339848",
+    "sort": 3,
+    "name_en": "Net weight",
+    "name_ar": "الوزن الصافي",
+    "name_ckb": "کێشی پوخت",
+    "kind": "pack",
+    "source_label": "Size",
+    "default_value_id": "",
+    "values": [
+     {
+      "id": "ov_074ded351c7d16c6ebc71d7b",
+      "source_id": "564681970243366924",
+      "name_en": "1 kg",
+      "name_ar": "",
+      "name_ckb": "",
+      "variant_key": "bv-e5ff64d2b5b422efcb2140a9",
+      "variant_label": "1 kg",
+      "sort": 0,
+      "colour_code": ""
+     }
+    ]
+   }
+  ],
+  "variants": [
+   {
+    "id": "pv_39fe0751a545bf2f8a528787",
+    "source_id": "41558487793800",
+    "combo_key": "o:ov_074ded351c7d16c6ebc71d7b|o:ov_d810af93a85107eec89f7798|o:ov_e3ce43f2ff3f450d4b56be6c",
+    "value_ids": [
+     "ov_d810af93a85107eec89f7798",
+     "ov_e3ce43f2ff3f450d4b56be6c",
+     "ov_074ded351c7d16c6ebc71d7b"
+    ]
+   },
+   {
+    "id": "pv_0f3782b859c9f198e3af04b1",
+    "source_id": "41558487826568",
+    "combo_key": "o:ov_074ded351c7d16c6ebc71d7b|o:ov_163b3aea356a3b6296d4ead3|o:ov_e3ce43f2ff3f450d4b56be6c",
+    "value_ids": [
+     "ov_163b3aea356a3b6296d4ead3",
+     "ov_e3ce43f2ff3f450d4b56be6c",
+     "ov_074ded351c7d16c6ebc71d7b"
+    ]
+   },
+   {
+    "id": "pv_1ae7d7a6d38aea2e924445fd",
+    "source_id": "41558487859336",
+    "combo_key": "o:ov_074ded351c7d16c6ebc71d7b|o:ov_4ed44791162c439d2a14c446|o:ov_e3ce43f2ff3f450d4b56be6c",
+    "value_ids": [
+     "ov_4ed44791162c439d2a14c446",
+     "ov_e3ce43f2ff3f450d4b56be6c",
+     "ov_074ded351c7d16c6ebc71d7b"
+    ]
+   },
+   {
+    "id": "pv_f576f77640e9e7fa58aac5b5",
+    "source_id": "41558487892104",
+    "combo_key": "o:ov_074ded351c7d16c6ebc71d7b|o:ov_3b5d954b73506f1a24ad498a|o:ov_e3ce43f2ff3f450d4b56be6c",
+    "value_ids": [
+     "ov_3b5d954b73506f1a24ad498a",
+     "ov_e3ce43f2ff3f450d4b56be6c",
+     "ov_074ded351c7d16c6ebc71d7b"
+    ]
+   },
+   {
+    "id": "pv_f444309087252862b1931afa",
+    "source_id": "41558487924872",
+    "combo_key": "o:ov_074ded351c7d16c6ebc71d7b|o:ov_593ab009984933a08557d58e|o:ov_e3ce43f2ff3f450d4b56be6c",
+    "value_ids": [
+     "ov_593ab009984933a08557d58e",
+     "ov_e3ce43f2ff3f450d4b56be6c",
+     "ov_074ded351c7d16c6ebc71d7b"
+    ]
+   }
+  ],
+  "images": [
+   {
+    "id": "pi_98b4f74392e5f80830ecb006",
+    "source_media_id": "715708339390660608",
+    "source_url": "https://store.bblcdn.com/s7/default/3ae3b1c1bd254058bf08b79f3ee815b3/PLA_Glow.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "option_value_id": null,
+    "variant_id": "pv_1ae7d7a6d38aea2e924445fd",
+    "via_variant_id": null,
+    "binding_rule": "variant",
+    "alt_en": "PLA Glow — Glow Green (15500) / Filament with spool / 1 kg",
+    "alt_ar": "صورة PLA Glow — Glow Green (15500) / مع بكرة / 1 kg",
+    "alt_ckb": "وێنەی PLA Glow — Glow Green (15500) / لەگەڵ ماسوورە / 1 kg"
+   },
+   {
+    "id": "pi_64b975543399c12930cdd8c2",
+    "source_media_id": "715708339390660608",
+    "source_url": "https://store.bblcdn.com/s7/default/3ae3b1c1bd254058bf08b79f3ee815b3/PLA_Glow.jpg",
+    "sort_order": 1,
+    "is_primary": false,
+    "option_value_id": "ov_4ed44791162c439d2a14c446",
+    "variant_id": null,
+    "via_variant_id": "pv_1ae7d7a6d38aea2e924445fd",
+    "binding_rule": "representative",
+    "alt_en": "PLA Glow — Glow Green (15500)",
+    "alt_ar": "صورة PLA Glow — Glow Green (15500)",
+    "alt_ckb": "وێنەی PLA Glow — Glow Green (15500)"
+   },
+   {
+    "id": "pi_d8576bce4be47576d33c435c",
+    "source_media_id": "35963332100232",
+    "source_url": "https://store.bblcdn.com/s7/default/d9a59b6344414b648da6c7e2fbf72d7c/PLAGlow.jpg",
+    "sort_order": 2,
+    "is_primary": false,
+    "option_value_id": null,
+    "variant_id": null,
+    "via_variant_id": null,
+    "binding_rule": "general",
+    "alt_en": "PLA Glow",
+    "alt_ar": "صورة PLA Glow",
+    "alt_ckb": "وێنەی PLA Glow"
+   },
+   {
+    "id": "pi_db4b9d1f7d5364c0f166e732",
+    "source_media_id": "33160694759560",
+    "source_url": "https://store.bblcdn.com/s7/default/8ea96321809b43e18d06d1b13dba3371/5d4ad98b7e6fd7642323ef49163d8697_dc0d9844-1668-4026-b430-b3be661988d3.png",
+    "sort_order": 3,
+    "is_primary": false,
+    "option_value_id": null,
+    "variant_id": "pv_f576f77640e9e7fa58aac5b5",
+    "via_variant_id": null,
+    "binding_rule": "variant",
+    "alt_en": "PLA Glow — Glow Pink (15200) / Filament with spool / 1 kg",
+    "alt_ar": "صورة PLA Glow — Glow Pink (15200) / مع بكرة / 1 kg",
+    "alt_ckb": "وێنەی PLA Glow — Glow Pink (15200) / لەگەڵ ماسوورە / 1 kg"
+   },
+   {
+    "id": "pi_22408a36f3f50629d01c6cec",
+    "source_media_id": "33160694759560",
+    "source_url": "https://store.bblcdn.com/s7/default/8ea96321809b43e18d06d1b13dba3371/5d4ad98b7e6fd7642323ef49163d8697_dc0d9844-1668-4026-b430-b3be661988d3.png",
+    "sort_order": 4,
+    "is_primary": false,
+    "option_value_id": "ov_3b5d954b73506f1a24ad498a",
+    "variant_id": null,
+    "via_variant_id": "pv_f576f77640e9e7fa58aac5b5",
+    "binding_rule": "representative",
+    "alt_en": "PLA Glow — Glow Pink (15200)",
+    "alt_ar": "صورة PLA Glow — Glow Pink (15200)",
+    "alt_ckb": "وێنەی PLA Glow — Glow Pink (15200)"
+   },
+   {
+    "id": "pi_28cc1f36047c5235070df7e1",
+    "source_media_id": "42679712120968",
+    "source_url": "https://store.bblcdn.com/s7/default/b852ee64945540208e55b588ee6e8e26/e40cbbf6e7fed96557d8e2be99e4b9cf_874f9392-3fe3-4c65-87cc-91b158674eb3.png",
+    "sort_order": 5,
+    "is_primary": false,
+    "option_value_id": null,
+    "variant_id": "pv_39fe0751a545bf2f8a528787",
+    "via_variant_id": null,
+    "binding_rule": "variant",
+    "alt_en": "PLA Glow — Glow Orange (15300) / Filament with spool / 1 kg",
+    "alt_ar": "صورة PLA Glow — Glow Orange (15300) / مع بكرة / 1 kg",
+    "alt_ckb": "وێنەی PLA Glow — Glow Orange (15300) / لەگەڵ ماسوورە / 1 kg"
+   },
+   {
+    "id": "pi_0418be4e87eb9825cc380030",
+    "source_media_id": "42679712120968",
+    "source_url": "https://store.bblcdn.com/s7/default/b852ee64945540208e55b588ee6e8e26/e40cbbf6e7fed96557d8e2be99e4b9cf_874f9392-3fe3-4c65-87cc-91b158674eb3.png",
+    "sort_order": 6,
+    "is_primary": false,
+    "option_value_id": "ov_d810af93a85107eec89f7798",
+    "variant_id": null,
+    "via_variant_id": "pv_39fe0751a545bf2f8a528787",
+    "binding_rule": "representative",
+    "alt_en": "PLA Glow — Glow Orange (15300)",
+    "alt_ar": "صورة PLA Glow — Glow Orange (15300)",
+    "alt_ckb": "وێنەی PLA Glow — Glow Orange (15300)"
+   },
+   {
+    "id": "pi_24554b06cd1a8b63f27caa31",
+    "source_media_id": "33160581382280",
+    "source_url": "https://store.bblcdn.com/s7/default/712a995a9cf94a76b1ec22d5c06378fb/6fdaecdc33b9371fb7c326d4bd52932b.png",
+    "sort_order": 7,
+    "is_primary": false,
+    "option_value_id": null,
+    "variant_id": "pv_f444309087252862b1931afa",
+    "via_variant_id": null,
+    "binding_rule": "variant",
+    "alt_en": "PLA Glow — Glow Yellow (15400) / Filament with spool / 1 kg",
+    "alt_ar": "صورة PLA Glow — Glow Yellow (15400) / مع بكرة / 1 kg",
+    "alt_ckb": "وێنەی PLA Glow — Glow Yellow (15400) / لەگەڵ ماسوورە / 1 kg"
+   },
+   {
+    "id": "pi_677c90dd3dbbb2d1f896aeb2",
+    "source_media_id": "33160581382280",
+    "source_url": "https://store.bblcdn.com/s7/default/712a995a9cf94a76b1ec22d5c06378fb/6fdaecdc33b9371fb7c326d4bd52932b.png",
+    "sort_order": 8,
+    "is_primary": false,
+    "option_value_id": "ov_593ab009984933a08557d58e",
+    "variant_id": null,
+    "via_variant_id": "pv_f444309087252862b1931afa",
+    "binding_rule": "representative",
+    "alt_en": "PLA Glow — Glow Yellow (15400)",
+    "alt_ar": "صورة PLA Glow — Glow Yellow (15400)",
+    "alt_ckb": "وێنەی PLA Glow — Glow Yellow (15400)"
+   },
+   {
+    "id": "pi_c39629c1dd4d6e79ccab1dbd",
+    "source_media_id": "33160581316744",
+    "source_url": "https://store.bblcdn.com/s7/default/62abf450b2a743a88c4108f520d44a23/697ef5c2066bf49f4df46a227b1a93c1_f2cca2e1-43ba-4d4d-b20c-832cfa099659.png",
+    "sort_order": 9,
+    "is_primary": false,
+    "option_value_id": null,
+    "variant_id": "pv_0f3782b859c9f198e3af04b1",
+    "via_variant_id": null,
+    "binding_rule": "variant",
+    "alt_en": "PLA Glow — Glow Blue (15600) / Filament with spool / 1 kg",
+    "alt_ar": "صورة PLA Glow — Glow Blue (15600) / مع بكرة / 1 kg",
+    "alt_ckb": "وێنەی PLA Glow — Glow Blue (15600) / لەگەڵ ماسوورە / 1 kg"
+   },
+   {
+    "id": "pi_052436c5acce78c2c8a5af80",
+    "source_media_id": "33160581316744",
+    "source_url": "https://store.bblcdn.com/s7/default/62abf450b2a743a88c4108f520d44a23/697ef5c2066bf49f4df46a227b1a93c1_f2cca2e1-43ba-4d4d-b20c-832cfa099659.png",
+    "sort_order": 10,
+    "is_primary": false,
+    "option_value_id": "ov_163b3aea356a3b6296d4ead3",
+    "variant_id": null,
+    "via_variant_id": "pv_0f3782b859c9f198e3af04b1",
+    "binding_rule": "representative",
+    "alt_en": "PLA Glow — Glow Blue (15600)",
+    "alt_ar": "صورة PLA Glow — Glow Blue (15600)",
+    "alt_ckb": "وێنەی PLA Glow — Glow Blue (15600)"
+   }
+  ],
+  "swatches": [
+   {
+    "value_id": "ov_4ed44791162c439d2a14c446",
+    "source_media_id": "swatch:564681970243366918",
+    "source_url": "https://store.bblcdn.com/s7/default/5218f88774e34104a0359c400a99dcbd/0592e39f21c74879a6cd329646c157d5.media"
+   },
+   {
+    "value_id": "ov_3b5d954b73506f1a24ad498a",
+    "source_media_id": "swatch:564681970243366919",
+    "source_url": "https://store.bblcdn.com/s7/default/8ec0b7bd61e843dd931e5d845d0a5a5c/5b9adaddb9114bea9758d6353c61b4bd.media"
+   },
+   {
+    "value_id": "ov_d810af93a85107eec89f7798",
+    "source_media_id": "swatch:564681970243366920",
+    "source_url": "https://store.bblcdn.com/s7/default/456821e9d47a451f89ba65f6e4eb984c/a07dd6ee6ba740ebaf06dbbc66b9066d.media"
+   },
+   {
+    "value_id": "ov_593ab009984933a08557d58e",
+    "source_media_id": "swatch:564681970243366921",
+    "source_url": "https://store.bblcdn.com/s7/default/712d0d530fc5493291be2b7b8bbd87d7/c2f53cafa52442cdb4e4a2ebf10443a4.media"
+   },
+   {
+    "value_id": "ov_163b3aea356a3b6296d4ead3",
+    "source_media_id": "swatch:564681970243366922",
+    "source_url": "https://store.bblcdn.com/s7/default/9afa41827d634ef9b106b93f9c19e5d0/b5e3453464cc482e918e6b61391394c7.media"
+   }
+  ],
+  "content_blocks": [
+   {
+    "id": "cb_dffa6c000a9bd6b0319e96ba",
+    "order": 0,
+    "title_en": "PLA Glow",
+    "body_en": "Unique Glow in Low Light Conditions",
+    "url": "",
+    "source_media_id": "",
+    "source_url": "",
+    "alt_en": "",
+    "alt_ar": "",
+    "alt_ckb": "",
+    "kind": "text",
+    "section_kind": "overview",
+    "section_path": "components[0]"
+   },
+   {
+    "id": "cb_09e3266b237433d98204ea1e",
+    "order": 1,
+    "title_en": "",
+    "body_en": "",
+    "url": "",
+    "source_media_id": "content:f6fc53c4b78a9fbffdfdb77c",
+    "source_url": "https://store.bblcdn.com/s7/default/ba1527067a6942a680e3f70186c31ffe/Bambu_PLA_Glow01-compressed.jpg",
+    "alt_en": "PLA Glow",
+    "alt_ar": "صورة PLA Glow",
+    "alt_ckb": "وێنەی PLA Glow",
+    "kind": "image",
+    "section_kind": "overview",
+    "section_path": "components[0]"
+   },
+   {
+    "id": "cb_82e5eca2b8d35ab8d32db1b8",
+    "order": 2,
+    "title_en": "Unique Glow in Low Light Conditions",
+    "body_en": "Bambu PLA Glow incorporates a distinct additive: luminous powder, which imparts a special property to printed objects, causing them to emit a captivating glow in the dark.",
+    "url": "",
+    "source_media_id": "",
+    "source_url": "",
+    "alt_en": "",
+    "alt_ar": "",
+    "alt_ckb": "",
+    "kind": "text",
+    "section_kind": "features",
+    "section_path": "components[1] › 0"
+   },
+   {
+    "id": "cb_d03fb8a3f24f4ff6a9b764b0",
+    "order": 3,
+    "title_en": "",
+    "body_en": "",
+    "url": "",
+    "source_media_id": "content:bd7ddae56ad30cb52b5832e0",
+    "source_url": "https://store.bblcdn.com/s7/default/530de98277a44885b7baf675655c12fe/Bambu_PLA_Glow04-compressed.jpg",
+    "alt_en": "PLA Glow",
+    "alt_ar": "صورة PLA Glow",
+    "alt_ckb": "وێنەی PLA Glow",
+    "kind": "image",
+    "section_kind": "features",
+    "section_path": "components[1] › 0"
+   },
+   {
+    "id": "cb_f535808088425e4b5e199104",
+    "order": 4,
+    "title_en": "",
+    "body_en": "",
+    "url": "",
+    "source_media_id": "content:762da92ee86335a8b81590fb",
+    "source_url": "https://store.bblcdn.com/s7/default/fae7b9eebae74b1aa82c9f630d34fc21/Bambu_PLA_Glow02-compressed.jpg",
+    "alt_en": "PLA Glow",
+    "alt_ar": "صورة PLA Glow",
+    "alt_ckb": "وێنەی PLA Glow",
+    "kind": "image",
+    "section_kind": "features",
+    "section_path": "components[1] › 0"
+   },
+   {
+    "id": "cb_66755ee6296bea8dd051b145",
+    "order": 5,
+    "title_en": "",
+    "body_en": "",
+    "url": "",
+    "source_media_id": "content:0e1bacf33ef1e99d482d79ac",
+    "source_url": "https://store.bblcdn.com/s7/default/361efcea41984bb2bc76e98d1afa4bc2/Bambu_PLA_Glow03-compressed.jpg",
+    "alt_en": "PLA Glow",
+    "alt_ar": "صورة PLA Glow",
+    "alt_ckb": "وێنەی PLA Glow",
+    "kind": "image",
+    "section_kind": "features",
+    "section_path": "components[1] › 0"
+   },
+   {
+    "id": "cb_d0d8ba6de773c6119cb9b6c0",
+    "order": 6,
+    "title_en": "RFID for Intelligent Printing",
+    "body_en": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System).",
+    "url": "",
+    "source_media_id": "",
+    "source_url": "",
+    "alt_en": "",
+    "alt_ar": "",
+    "alt_ckb": "",
+    "kind": "text",
+    "section_kind": "features",
+    "section_path": "components[2]"
+   },
+   {
+    "id": "cb_3960b2b2ef17507e9d0a5ed4",
+    "order": 7,
+    "title_en": "",
+    "body_en": "",
+    "url": "",
+    "source_media_id": "content:0111c62aef0e4e15315ca60a",
+    "source_url": "https://store.bblcdn.com/s7/default/1e320250ec064be78d572ba40db1d52c/RFID_for_Intelligent_Printing-compressed.jpg",
+    "alt_en": "PLA Glow",
+    "alt_ar": "صورة PLA Glow",
+    "alt_ckb": "وێنەی PLA Glow",
+    "kind": "image",
+    "section_kind": "features",
+    "section_path": "components[2]"
+   },
+   {
+    "id": "cb_0dbac383ef27d867bce351aa",
+    "order": 8,
+    "title_en": "FAQ",
+    "body_en": "1.Accessory Compatibility\nNot compatible with Hotend with Stainless Steel Nozzle 0.2mm, and AMS lite.\nUtilizing AMS lite may result in high feed resistance and an increased risk of feed failure. Consider alternative methods such as pre-use drying for better outcomes.\n\n2.Drying Recommendations\nDry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: Filament drying instructions on WIKI.\nFor opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings.\n\n3. Appearance Change\nThe model's luminous intensity diminishes over time, but exposure to ultraviolet or sunlight for a brief period (approximately 2 hours) can rejuvenate its glow. However, prolonged or frequent irradiation may expedite PLA aging.\n\n4.Safety Tips\nPlease store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.\nPlease keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.\nPlease print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.\nAs this filament is not food-grade, please avoid using finished prints for food storage or contact.",
+    "url": "",
+    "source_media_id": "",
+    "source_url": "",
+    "alt_en": "",
+    "alt_ar": "",
+    "alt_ckb": "",
+    "kind": "text",
+    "section_kind": "faq",
+    "section_path": "components[4]"
+   },
+   {
+    "id": "cb_3579065c77dfa73bc98cfe4d",
+    "order": 9,
+    "title_en": "Highlights",
+    "body_en": "• Unique Glow in Low Light Conditions\n• Comes with Basic Reusable Spool\n• Cautions for Use",
+    "url": "",
+    "source_media_id": "",
+    "source_url": "",
+    "alt_en": "",
+    "alt_ar": "",
+    "alt_ckb": "",
+    "kind": "text",
+    "section_kind": "features",
+    "section_path": "P.productFeaturesModuleList"
+   }
+  ],
+  "specs": [
+   {
+    "id": "sv_3511e53eae518a5d9eb807f6",
+    "key": "material.diameter",
+    "group": "material",
+    "scope_kind": "product",
+    "scope_id": "",
+    "region": "",
+    "data_type": "number",
+    "original_label": "Diameter",
+    "original_value": "1.75mm +/- 0.03mm",
+    "value_text": "1.75 mm",
+    "value_num": 1.75,
+    "value_num_max": null,
+    "value_bool": null,
+    "value_list": [],
+    "unit": "mm",
+    "status": "verified",
+    "confidence": "official_page",
+    "source_kind": "store_page",
+    "source_title": "Bambu Lab US store product page",
+    "source_locator": "Product Features › bullet 3",
+    "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+    "test_method": "",
+    "test_condition": "",
+    "derived_from": "",
+    "missing_reason": "",
+    "checked_sources": [],
+    "visibility": "public",
+    "conflict": "",
+    "sort": 0
+   },
+   {
+    "id": "sv_417a7c5f59aeccde4307eec0",
+    "key": "material.diameter_tolerance",
+    "group": "material",
+    "scope_kind": "product",
+    "scope_id": "",
+    "region": "",
+    "data_type": "number",
+    "original_label": "Diameter",
+    "original_value": "1.75mm +/- 0.03mm",
+    "value_text": "± 0.03 mm",
+    "value_num": 0.03,
+    "value_num_max": null,
+    "value_bool": null,
+    "value_list": [],
+    "unit": "mm",
+    "status": "verified",
+    "confidence": "official_page",
+    "source_kind": "store_page",
+    "source_title": "Bambu Lab US store product page",
+    "source_locator": "Product Features › bullet 3",
+    "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+    "test_method": "",
+    "test_condition": "",
+    "derived_from": "",
+    "missing_reason": "",
+    "checked_sources": [],
+    "visibility": "public",
+    "conflict": "",
+    "sort": 1
+   },
+   {
+    "id": "sv_4b0d6b967dca707412be88f1",
+    "key": "material.net_weight",
+    "group": "material",
+    "scope_kind": "option_value",
+    "scope_id": "ov_074ded351c7d16c6ebc71d7b",
+    "region": "",
+    "data_type": "number",
+    "original_label": "Size",
+    "original_value": "1 kg",
+    "value_text": "1000 g",
+    "value_num": 1000,
+    "value_num_max": null,
+    "value_bool": null,
+    "value_list": [],
+    "unit": "g",
+    "status": "verified",
+    "confidence": "official_variant",
+    "source_kind": "store_page",
+    "source_title": "Bambu Lab US store product page",
+    "source_locator": "option Size › 1 kg",
+    "source_excerpt": "1 kg",
+    "test_method": "",
+    "test_condition": "",
+    "derived_from": "",
+    "missing_reason": "",
+    "checked_sources": [],
+    "visibility": "public",
+    "conflict": "",
+    "sort": 2
+   },
+   {
+    "id": "sv_0026717cbe18bb9123bd2bbc",
+    "key": "material.density",
+    "group": "material",
+    "scope_kind": "product",
+    "scope_id": "",
+    "region": "",
+    "data_type": "number",
+    "original_label": "",
+    "original_value": "",
+    "value_text": "",
+    "value_num": null,
+    "value_num_max": null,
+    "value_bool": null,
+    "value_list": [],
+    "unit": "g/cm³",
+    "status": "not_found",
+    "confidence": "official_page",
+    "source_kind": "store_page",
+    "source_title": "",
+    "source_locator": "",
+    "source_excerpt": "",
+    "test_method": "",
+    "test_condition": "",
+    "derived_from": "",
+    "missing_reason": "not_found_in_checked_sources",
+    "checked_sources": [
+     {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-glow",
+      "title": "Bambu Lab US store product page"
+     }
+    ],
+    "visibility": "public",
+    "conflict": "",
+    "sort": 3
+   },
+   {
+    "id": "sv_dd4da8c6f6b92ebc0ab38361",
+    "key": "print_settings.nozzle_temp",
+    "group": "print_settings",
+    "scope_kind": "product",
+    "scope_id": "",
+    "region": "",
+    "data_type": "range",
+    "original_label": "",
+    "original_value": "",
+    "value_text": "",
+    "value_num": null,
+    "value_num_max": null,
+    "value_bool": null,
+    "value_list": [],
+    "unit": "°C",
+    "status": "not_found",
+    "confidence": "official_page",
+    "source_kind": "store_page",
+    "source_title": "",
+    "source_locator": "",
+    "source_excerpt": "",
+    "test_method": "",
+    "test_condition": "",
+    "derived_from": "",
+    "missing_reason": "not_found_in_checked_sources",
+    "checked_sources": [
+     {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-glow",
+      "title": "Bambu Lab US store product page"
+     }
+    ],
+    "visibility": "public",
+    "conflict": "",
+    "sort": 4
+   },
+   {
+    "id": "sv_aac21c46d6535e5577fc1eff",
+    "key": "identity.model",
+    "group": "identity",
+    "scope_kind": "product",
+    "scope_id": "",
+    "region": "",
+    "data_type": "string",
+    "original_label": "",
+    "original_value": "PLA Glow",
+    "value_text": "PLA Glow",
+    "value_num": null,
+    "value_num_max": null,
+    "value_bool": null,
+    "value_list": [],
+    "unit": "",
+    "status": "verified",
+    "confidence": "official_page",
+    "source_kind": "store_page",
+    "source_title": "Bambu Lab US store product page",
+    "source_locator": "route 552709755819347968>552709755857096704>552709756201029632",
+    "source_excerpt": "",
+    "test_method": "",
+    "test_condition": "",
+    "derived_from": "",
+    "missing_reason": "",
+    "checked_sources": [],
+    "visibility": "public",
+    "conflict": "",
+    "sort": 5
+   },
+   {
+    "id": "sv_025b61028fb8544a64724240",
+    "key": "identity.series",
+    "group": "identity",
+    "scope_kind": "product",
+    "scope_id": "",
+    "region": "",
+    "data_type": "string",
+    "original_label": "",
+    "original_value": "PLA",
+    "value_text": "PLA",
+    "value_num": null,
+    "value_num_max": null,
+    "value_bool": null,
+    "value_list": [],
+    "unit": "",
+    "status": "verified",
+    "confidence": "official_page",
+    "source_kind": "store_page",
+    "source_title": "Bambu Lab US store product page",
+    "source_locator": "route 552709755819347968>552709755857096704>552709756201029632",
+    "source_excerpt": "",
+    "test_method": "",
+    "test_condition": "",
+    "derived_from": "",
+    "missing_reason": "",
+    "checked_sources": [],
+    "visibility": "public",
+    "conflict": "",
+    "sort": 6
+   },
+   {
+    "id": "sv_c42812f1ba36ca4d9f866f00",
+    "key": "identity.family",
+    "group": "identity",
+    "scope_kind": "product",
+    "scope_id": "",
+    "region": "",
+    "data_type": "string",
+    "original_label": "",
+    "original_value": "bambu_filament",
+    "value_text": "bambu_filament",
+    "value_num": null,
+    "value_num_max": null,
+    "value_bool": null,
+    "value_list": [],
+    "unit": "",
+    "status": "verified",
+    "confidence": "official_page",
+    "source_kind": "store_page",
+    "source_title": "Bambu Lab US store product page",
+    "source_locator": "route 552709755819347968>552709755857096704>552709756201029632",
+    "source_excerpt": "",
+    "test_method": "",
+    "test_condition": "",
+    "derived_from": "",
+    "missing_reason": "",
+    "checked_sources": [],
+    "visibility": "public",
+    "conflict": "",
+    "sort": 7
+   }
+  ],
+  "documents": [
+   {
+    "id": "pd_4f413ebd7cd2dd944f929e88",
+    "kind": "tds",
+    "title_en": "Filament TDS",
+    "title_ar": "ورقة البيانات الفنية (TDS) — Filament TDS",
+    "title_ckb": "پەڕەی زانیاری تەکنیکی (TDS) — Filament TDS",
+    "url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+    "host": "store.bblcdn.com",
+    "scope_kind": "product",
+    "scope_id": "",
+    "language": "en",
+    "sort": 0
+   },
+   {
+    "id": "pd_f02edfc373af05977d576db7",
+    "kind": "sds",
+    "title_en": "Filament MSDS",
+    "title_ar": "ورقة بيانات السلامة (SDS) — Filament MSDS",
+    "title_ckb": "پەڕەی زانیاری سەلامەتی (SDS) — Filament MSDS",
+    "url": "https://store.bblcdn.com/s7/default/4a35986db81f466fa7ff4f84344ef57a/SDS20251127A12_Bambu_PLA_Glow.pdf",
+    "host": "store.bblcdn.com",
+    "scope_kind": "product",
+    "scope_id": "",
+    "language": "en",
+    "sort": 1
+   },
+   {
+    "id": "pd_35767f69a0416f2203977467",
+    "kind": "certificate",
+    "title_en": "Filament RoHS",
+    "title_ar": "شهادة مطابقة — Filament RoHS",
+    "title_ckb": "بڕوانامەی گونجان — Filament RoHS",
+    "url": "https://store.bblcdn.com/2c7b9c30a9014c65bb4aeacd9c70e6af.pdf",
+    "host": "store.bblcdn.com",
+    "scope_kind": "product",
+    "scope_id": "",
+    "language": "en",
+    "sort": 2
+   },
+   {
+    "id": "pd_0ec1114c7ebe158162cd6436",
+    "kind": "hex_codes",
+    "title_en": "Hex Code",
+    "title_ar": "رموز الألوان — Hex Code",
+    "title_ckb": "کۆدەکانی ڕەنگ — Hex Code",
+    "url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+    "host": "store.bblcdn.com",
+    "scope_kind": "product",
+    "scope_id": "",
+    "language": "en",
+    "sort": 3
+   },
+   {
+    "id": "pd_5ba1cdadc4fb84d6377184a6",
+    "kind": "wiki",
+    "title_en": "Filament drying instructions",
+    "title_ar": "ويكي Bambu Lab — Filament drying instructions",
+    "title_ckb": "ویکی Bambu Lab — Filament drying instructions",
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "host": "wiki.bambulab.com",
+    "scope_kind": "product",
+    "scope_id": "",
+    "language": "en",
+    "sort": 4
+   }
+  ],
+  "relations": [
+   {
+    "id": "pr_5561fd5b089ff3560cf5047f",
+    "scope_kind": "product",
+    "scope_id": "",
+    "relation": "compatible_with",
+    "target_kind": "ams",
+    "target_product_id": null,
+    "target_source": "bambu_us",
+    "target_source_handle": "ams-2-pro",
+    "target_family": "",
+    "target_label": "AMS 2 Pro",
+    "state": "pending",
+    "evidence_kind": "feature_bullet",
+    "evidence_text": "AMS 2 Pro, AMS HT & AMS Compatible, but can lead to faster wear"
+   },
+   {
+    "id": "pr_634be23ba4fb8c8505fe50ed",
+    "scope_kind": "product",
+    "scope_id": "",
+    "relation": "compatible_with",
+    "target_kind": "ams",
+    "target_product_id": null,
+    "target_source": "bambu_us",
+    "target_source_handle": "ams-ht",
+    "target_family": "",
+    "target_label": "AMS HT",
+    "state": "pending",
+    "evidence_kind": "feature_bullet",
+    "evidence_text": "AMS 2 Pro, AMS HT & AMS Compatible, but can lead to faster wear"
+   },
+   {
+    "id": "pr_33a6c9690cea58015fd2b1c9",
+    "scope_kind": "product",
+    "scope_id": "",
+    "relation": "compatible_with",
+    "target_kind": "ams",
+    "target_product_id": null,
+    "target_source": "bambu_us",
+    "target_source_handle": "ams-multicolor-printing",
+    "target_family": "",
+    "target_label": "AMS",
+    "state": "pending",
+    "evidence_kind": "feature_bullet",
+    "evidence_text": "AMS 2 Pro, AMS HT & AMS Compatible, but can lead to faster wear"
+   },
+   {
+    "id": "pr_15bedb95cbebabb0f0963a76",
+    "scope_kind": "product",
+    "scope_id": "",
+    "relation": "not_compatible_with",
+    "target_kind": "ams",
+    "target_product_id": null,
+    "target_source": "bambu_us",
+    "target_source_handle": "ams-lite",
+    "target_family": "",
+    "target_label": "AMS lite",
+    "state": "pending",
+    "evidence_kind": "feature_bullet",
+    "evidence_text": "AMS lite NOT Compatible"
+   }
+  ],
+  "external_ids": [
+   {
+    "scope_kind": "product",
+    "scope_id": "",
+    "id_type": "bambu_product_id",
+    "value": "7689010839688",
+    "searchable": false
+   },
+   {
+    "scope_kind": "variant",
+    "scope_id": "pv_39fe0751a545bf2f8a528787",
+    "id_type": "bambu_variant_id",
+    "value": "41558487793800",
+    "searchable": false
+   },
+   {
+    "scope_kind": "variant",
+    "scope_id": "pv_0f3782b859c9f198e3af04b1",
+    "id_type": "bambu_variant_id",
+    "value": "41558487826568",
+    "searchable": false
+   },
+   {
+    "scope_kind": "variant",
+    "scope_id": "pv_1ae7d7a6d38aea2e924445fd",
+    "id_type": "bambu_variant_id",
+    "value": "41558487859336",
+    "searchable": false
+   },
+   {
+    "scope_kind": "variant",
+    "scope_id": "pv_f576f77640e9e7fa58aac5b5",
+    "id_type": "bambu_variant_id",
+    "value": "41558487892104",
+    "searchable": false
+   },
+   {
+    "scope_kind": "variant",
+    "scope_id": "pv_f444309087252862b1931afa",
+    "id_type": "bambu_variant_id",
+    "value": "41558487924872",
+    "searchable": false
+   },
+   {
+    "scope_kind": "option_value",
+    "scope_id": "ov_4ed44791162c439d2a14c446",
+    "id_type": "color_code",
+    "value": "15500",
+    "searchable": true
+   },
+   {
+    "scope_kind": "option_value",
+    "scope_id": "ov_3b5d954b73506f1a24ad498a",
+    "id_type": "color_code",
+    "value": "15200",
+    "searchable": true
+   },
+   {
+    "scope_kind": "option_value",
+    "scope_id": "ov_d810af93a85107eec89f7798",
+    "id_type": "color_code",
+    "value": "15300",
+    "searchable": true
+   },
+   {
+    "scope_kind": "option_value",
+    "scope_id": "ov_593ab009984933a08557d58e",
+    "id_type": "color_code",
+    "value": "15400",
+    "searchable": true
+   },
+   {
+    "scope_kind": "option_value",
+    "scope_id": "ov_163b3aea356a3b6296d4ead3",
+    "id_type": "color_code",
+    "value": "15600",
+    "searchable": true
+   }
+  ],
+  "source_refs": [
+   {
+    "kind": "group",
+    "source_id": "10114084372616",
+    "levonis_id": "og_95bb8a0bcca0125df88efc6c",
+    "source_label": "Color",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "value",
+    "source_id": "564681970243366918",
+    "levonis_id": "ov_4ed44791162c439d2a14c446",
+    "source_label": "Glow Green (15500)",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "value",
+    "source_id": "564681970243366919",
+    "levonis_id": "ov_3b5d954b73506f1a24ad498a",
+    "source_label": "Glow Pink (15200)",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "value",
+    "source_id": "564681970243366920",
+    "levonis_id": "ov_d810af93a85107eec89f7798",
+    "source_label": "Glow Orange (15300)",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "value",
+    "source_id": "564681970243366921",
+    "levonis_id": "ov_593ab009984933a08557d58e",
+    "source_label": "Glow Yellow (15400)",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "value",
+    "source_id": "564681970243366922",
+    "levonis_id": "ov_163b3aea356a3b6296d4ead3",
+    "source_label": "Glow Blue (15600)",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "group",
+    "source_id": "10114073395336",
+    "levonis_id": "og_cd58fb2ced2b759873d1f964",
+    "source_label": "Type",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "value",
+    "source_id": "564681970243366923",
+    "levonis_id": "ov_e3ce43f2ff3f450d4b56be6c",
+    "source_label": "Filament with spool",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "group",
+    "source_id": "10114084339848",
+    "levonis_id": "og_26dabd06181cba8c789a651d",
+    "source_label": "Size",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "value",
+    "source_id": "564681970243366924",
+    "levonis_id": "ov_074ded351c7d16c6ebc71d7b",
+    "source_label": "1 kg",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "variant",
+    "source_id": "41558487793800",
+    "levonis_id": "pv_39fe0751a545bf2f8a528787",
+    "source_label": "",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "variant",
+    "source_id": "41558487826568",
+    "levonis_id": "pv_0f3782b859c9f198e3af04b1",
+    "source_label": "",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "variant",
+    "source_id": "41558487859336",
+    "levonis_id": "pv_1ae7d7a6d38aea2e924445fd",
+    "source_label": "",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "variant",
+    "source_id": "41558487892104",
+    "levonis_id": "pv_f576f77640e9e7fa58aac5b5",
+    "source_label": "",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "variant",
+    "source_id": "41558487924872",
+    "levonis_id": "pv_f444309087252862b1931afa",
+    "source_label": "",
+    "binding_rule": "",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "image",
+    "source_id": "715708339390660608",
+    "levonis_id": "pi_98b4f74392e5f80830ecb006",
+    "source_label": "",
+    "binding_rule": "variant",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "image",
+    "source_id": "715708339390660608",
+    "levonis_id": "pi_64b975543399c12930cdd8c2",
+    "source_label": "",
+    "binding_rule": "representative",
+    "via_variant_id": "pv_1ae7d7a6d38aea2e924445fd"
+   },
+   {
+    "kind": "image",
+    "source_id": "35963332100232",
+    "levonis_id": "pi_d8576bce4be47576d33c435c",
+    "source_label": "",
+    "binding_rule": "general",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "image",
+    "source_id": "33160694759560",
+    "levonis_id": "pi_db4b9d1f7d5364c0f166e732",
+    "source_label": "",
+    "binding_rule": "variant",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "image",
+    "source_id": "33160694759560",
+    "levonis_id": "pi_22408a36f3f50629d01c6cec",
+    "source_label": "",
+    "binding_rule": "representative",
+    "via_variant_id": "pv_f576f77640e9e7fa58aac5b5"
+   },
+   {
+    "kind": "image",
+    "source_id": "42679712120968",
+    "levonis_id": "pi_28cc1f36047c5235070df7e1",
+    "source_label": "",
+    "binding_rule": "variant",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "image",
+    "source_id": "42679712120968",
+    "levonis_id": "pi_0418be4e87eb9825cc380030",
+    "source_label": "",
+    "binding_rule": "representative",
+    "via_variant_id": "pv_39fe0751a545bf2f8a528787"
+   },
+   {
+    "kind": "image",
+    "source_id": "33160581382280",
+    "levonis_id": "pi_24554b06cd1a8b63f27caa31",
+    "source_label": "",
+    "binding_rule": "variant",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "image",
+    "source_id": "33160581382280",
+    "levonis_id": "pi_677c90dd3dbbb2d1f896aeb2",
+    "source_label": "",
+    "binding_rule": "representative",
+    "via_variant_id": "pv_f444309087252862b1931afa"
+   },
+   {
+    "kind": "image",
+    "source_id": "33160581316744",
+    "levonis_id": "pi_c39629c1dd4d6e79ccab1dbd",
+    "source_label": "",
+    "binding_rule": "variant",
+    "via_variant_id": ""
+   },
+   {
+    "kind": "image",
+    "source_id": "33160581316744",
+    "levonis_id": "pi_052436c5acce78c2c8a5af80",
+    "source_label": "",
+    "binding_rule": "representative",
+    "via_variant_id": "pv_0f3782b859c9f198e3af04b1"
+   }
+  ],
+  "notes": []
+ },
+ "report": {
+  "productType": "filament",
+  "format": "page_builder",
+  "counts": {
+   "groups": 3,
+   "values": 7,
+   "variants": 5,
+   "images": 11,
+   "distinct_images": 6,
+   "swatches": 5,
+   "content_blocks": 10,
+   "content_images": 5,
+   "content_images_omitted": 0,
+   "box_items": 0,
+   "box_images": 0,
+   "specs": 8,
+   "documents": 5,
+   "relations": 4,
+   "external_ids": 11,
+   "notes": 0
+  },
+  "specsByStatus": {
+   "verified": 6,
+   "not_found": 2
+  },
+  "specsByRegion": {},
+  "relationsByState": {
+   "pending": 4
+  },
+  "sentenceCounts": {
+   "money": 0,
+   "promotion": 0,
+   "shipping_policy": 0,
+   "warranty": 0,
+   "region": 0
+  },
+  "errors": [],
+  "hold": "",
+  "unknownLabels": [],
+  "soldOutCount": 0
+ },
+ "described": {
+  "format": "page_builder",
+  "sections": [
+   {
+    "kind": "overview",
+    "title": "PLA Glow",
+    "path": "components[0]",
+    "blocks": [
+     {
+      "t": "text",
+      "text": "Unique Glow in Low Light Conditions"
+     },
+     {
+      "t": "image",
+      "url": "https://store.bblcdn.com/s7/default/ba1527067a6942a680e3f70186c31ffe/Bambu_PLA_Glow01-compressed.jpg",
+      "alt": ""
+     }
+    ]
+   },
+   {
+    "kind": "features",
+    "title": "Unique Glow in Low Light Conditions",
+    "path": "components[1] › 0",
+    "blocks": [
+     {
+      "t": "text",
+      "text": "Bambu PLA Glow incorporates a distinct additive: luminous powder, which imparts a special property to printed objects, causing them to emit a captivating glow in the dark."
+     },
+     {
+      "t": "image",
+      "url": "https://store.bblcdn.com/s7/default/530de98277a44885b7baf675655c12fe/Bambu_PLA_Glow04-compressed.jpg",
+      "alt": ""
+     },
+     {
+      "t": "image",
+      "url": "https://store.bblcdn.com/s7/default/fae7b9eebae74b1aa82c9f630d34fc21/Bambu_PLA_Glow02-compressed.jpg",
+      "alt": ""
+     },
+     {
+      "t": "image",
+      "url": "https://store.bblcdn.com/s7/default/361efcea41984bb2bc76e98d1afa4bc2/Bambu_PLA_Glow03-compressed.jpg",
+      "alt": ""
+     }
+    ]
+   },
+   {
+    "kind": "features",
+    "title": "RFID for Intelligent Printing",
+    "path": "components[2]",
+    "blocks": [
+     {
+      "t": "text",
+      "text": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+     },
+     {
+      "t": "image",
+      "url": "https://store.bblcdn.com/s7/default/1e320250ec064be78d572ba40db1d52c/RFID_for_Intelligent_Printing-compressed.jpg",
+      "alt": ""
+     }
+    ]
+   },
+   {
+    "kind": "other",
+    "title": "Download",
+    "path": "components[3]",
+    "blocks": [
+     {
+      "t": "link",
+      "url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+      "text": "Filament TDS"
+     },
+     {
+      "t": "link",
+      "url": "https://store.bblcdn.com/s7/default/4a35986db81f466fa7ff4f84344ef57a/SDS20251127A12_Bambu_PLA_Glow.pdf",
+      "text": "Filament MSDS"
+     },
+     {
+      "t": "link",
+      "url": "https://store.bblcdn.com/2c7b9c30a9014c65bb4aeacd9c70e6af.pdf",
+      "text": "Filament RoHS"
+     },
+     {
+      "t": "link",
+      "url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+      "text": "Hex Code"
+     }
+    ]
+   },
+   {
+    "kind": "faq",
+    "title": "Printing Tips",
+    "path": "components[4]",
+    "blocks": [
+     {
+      "t": "faq",
+      "question": "1.Accessory Compatibility",
+      "answer": "Not compatible with Hotend with Stainless Steel Nozzle 0.2mm, and AMS lite.\nUtilizing AMS lite may result in high feed resistance and an increased risk of feed failure. Consider alternative methods such as pre-use drying for better outcomes."
+     },
+     {
+      "t": "faq",
+      "question": "2.Drying Recommendations",
+      "answer": "Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: Filament drying instructions on WIKI.\nFor opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings."
+     },
+     {
+      "t": "link",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "text": "Filament drying instructions"
+     },
+     {
+      "t": "faq",
+      "question": "3. Appearance Change",
+      "answer": "The model's luminous intensity diminishes over time, but exposure to ultraviolet or sunlight for a brief period (approximately 2 hours) can rejuvenate its glow. However, prolonged or frequent irradiation may expedite PLA aging."
+     },
+     {
+      "t": "faq",
+      "question": "4.Safety Tips",
+      "answer": "Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.\nPlease keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.\nPlease print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.\nAs this filament is not food-grade, please avoid using finished prints for food storage or contact."
+     }
+    ]
+   }
+  ],
+  "documents": [
+   {
+    "url": "https://store.bblcdn.com/cd34cf072d14484bbf027290d16abe9b.pdf",
+    "text": "Filament TDS",
+    "section": "other",
+    "via": "a"
+   },
+   {
+    "url": "https://store.bblcdn.com/s7/default/4a35986db81f466fa7ff4f84344ef57a/SDS20251127A12_Bambu_PLA_Glow.pdf",
+    "text": "Filament MSDS",
+    "section": "other",
+    "via": "a"
+   },
+   {
+    "url": "https://store.bblcdn.com/2c7b9c30a9014c65bb4aeacd9c70e6af.pdf",
+    "text": "Filament RoHS",
+    "section": "other",
+    "via": "a"
+   },
+   {
+    "url": "https://store.bblcdn.com/s7/default/bbc0a351ffca4503968910ba98cae27d/PLA_Glow_Hex_Code_Table.pdf",
+    "text": "Hex Code",
+    "section": "other",
+    "via": "a"
+   }
+  ],
+  "wikiLinks": [
+   {
+    "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+    "text": "Filament drying instructions",
+    "section": "faq",
+    "via": "a"
+   }
+  ],
+  "trackerLinks": [],
+  "videos": [],
+  "otherLinks": [],
+  "storeLinks": [],
+  "specPairs": []
+ }
+}

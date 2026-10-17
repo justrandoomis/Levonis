@@ -1,0 +1,3289 @@
+{
+ "batch": 2,
+ "surface": "page",
+ "handles": [
+  "h2s",
+  "p2s",
+  "h2c",
+  "x2d",
+  "a2l",
+  "refurbished-p1s",
+  "refurbished-a1",
+  "refurbished-x1c",
+  "refurbished-bambu-lab-p2s-3d-printer",
+  "ams-multicolor-printing",
+  "ams-lite",
+  "ams-ht",
+  "r1",
+  "support-for-pa-pet",
+  "pc-filament",
+  "abs-filament",
+  "pla-matte",
+  "pla-sparkle",
+  "pla-metal",
+  "pla-marble",
+  "pla-cf",
+  "paht-cf",
+  "petg-cf",
+  "pla-cmyk-lithophane",
+  "pet-cf",
+  "asa-filament",
+  "pla-aero",
+  "pa6-cf",
+  "tpu-95a-hf",
+  "pla-glow",
+  "pla-silk-multi-color",
+  "petg-translucent",
+  "pla-galaxy",
+  "pva",
+  "pa6-gf",
+  "asa-aero",
+  "abs-gf",
+  "support-for-pla-petg",
+  "support-for-abs",
+  "petg-hf",
+  "ppa-cf",
+  "pps-cf",
+  "pc-fr",
+  "tpu-85a-tpu-90a",
+  "pla-pure",
+  "pla-basic-color-trial-set",
+  "petg-matte",
+  "hwb-pumpkinfamily"
+ ],
+ "strings": [
+  {
+   "h": "d840748afe2c6a2a20b10f74ec574dc67229f771f0982dc15ab8fc015ad67dc8",
+   "en": "Biggest build volume 3D printer from the No.1 best-selling brand. 2M+ free models.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0418066432ddb79f2fd7be0fcba1c476113b3267fd88a20302d7088a484ae015",
+   "en": "Equipped on Laser Edition, normal H2S can upgrade through Laser Upgrade Kit",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.laser_safety_windows]",
+    "near": "Body › Laser Safety Windows"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f43948106d1d47fef7b0afa5c60be05f7334dc4fe43a0b77d8716ef6ec22611",
+   "en": "Built-in",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[printing.filament_cutter]",
+    "near": "Filament cutter"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e88817f791b050dd4130420305acd6bf85d0eb727d40f8a6e558602f2dcb3e3",
+   "en": "Superior",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[safety.voc_filtration]",
+    "near": "VOC filtration"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ab86dd8d77c17044797397a33330e784d93ec13915a4a6d87a18bc0b0571893",
+   "en": "BVOH",
+   "kind": "spec_list_item",
+   "freq": 2,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[printing.supported_filament].items[4]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "89147dc06d57cc93f36df9f018029583560562d6b84e21d594c3421e582cf818",
+   "en": "Carbon/Glass Fiber Reinforced PLA",
+   "kind": "spec_list_item",
+   "freq": 2,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[printing.supported_filament].items[11]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e2b23eeed024a866573c5b763e576234cc56841540d9cfa188a4b52fd841f6a",
+   "en": "PPA",
+   "kind": "spec_list_item",
+   "freq": 2,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[printing.supported_filament].items[18]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "185817e5f68f9e92db0ed6329c333848a0551a35cd53a47997dbd3a343f0db54",
+   "en": "PLA, PETG, TPU, PVA, BVOH, ABS, ASA, PC, PA, PET, PPS; / Carbon/Glass Fiber Reinforced PLA, PETG, PA, PET, PC, ABS, ASA, PPA, PPS",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "spec_groups.sg_bambu_official[printing.supported_filament]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "2fe1747e19cc75807bfa84146bdffcd3683a5ad8faec6634775da3828b83d453",
+   "en": "Built-in; 1600*1200",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[printing.camera_toolhead]",
+    "near": "Toolhead camera"
+   },
+   "dict": null
+  },
+  {
+   "h": "58aac2f0067dd3ca7c07435fb54698ee4c648d44b8c5140daa4f0a64ae488138",
+   "en": "Max Power¹ — 1170 W@110 V",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[electrical.requirements]",
+    "near": "Electrical requirements"
+   },
+   "dict": null
+  },
+  {
+   "h": "094adbaf5463dd3c69793de71e60024563beacc00747762fc9e35ed1a8101736",
+   "en": "Bambu Studio Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[connectivity.software]",
+    "near": "Software"
+   },
+   "dict": null
+  },
+  {
+   "h": "4828e60247c1636f57b7446a314e7f599c12b53d40061cc851a1442004354fed",
+   "en": "Linux",
+   "kind": "spec_list_item",
+   "freq": 6,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[connectivity.operating_systems].items[2]",
+    "near": "Supported operating systems"
+   },
+   "dict": null
+  },
+  {
+   "h": "afd88c6e47b36a09a04d0571ef79d5f0a63b336b6cd687efa80bc8d89aab4f0e",
+   "en": "MacOS, Windows, Linux",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "spec_groups.sg_bambu_official[connectivity.operating_systems]",
+    "near": "Supported operating systems"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b0d5d0c3e5d656d1d70c0ee94c78f4cd39fad6eed2040d2d901c0edaa46cdd3",
+   "en": "Operating Frequency — 2412-2472 MHz (CE/FCC), 2400-2483.5 MHz (SRRC), 5150-5850 MHz Wi-Fi Transmitter Power (EIRP) — 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) 5 GHz Band1/2: <23 dBm (FCC/CE/SRRC/MIC) 5 GHz Band3: <30 dBm (CE); <24 dBm (FCC) 5 GHz Band4: <23 dBm (FCC/SRRC); <14 dBm (CE) Wi-Fi Protocol — IEEE 802.11 a/b/g/n",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[connectivity.wifi]",
+    "near": "Wi-Fi"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4936219b5660350ac563df1ed2a6500e3ba2d9f7229600d39ad195cfdf77499",
+   "en": "10W Laser Module › Laser Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.laser_type].label",
+    "near": "Semiconductor Laser"
+   },
+   "dict": null
+  },
+  {
+   "h": "886c7ca87153605ca6eb7052f26dac9c9e79b6a916f20d49aa82fdd54a3854f5",
+   "en": "10W Laser Module › Laser Wavelength",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.laser_wavelength].label",
+    "near": "Engraving Laser: 455 nm ± 5 nm Blue Light / Height Measuring Laser: 850 nm ± 5 nm Infrared Light"
+   },
+   "dict": null
+  },
+  {
+   "h": "72676b84cd9cee7e1ff2864e8b69bd6919d3ca69b7006363d1ad4cd922011ea4",
+   "en": "10W Laser Module › Laser Power",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.laser_power].label",
+    "near": "10 W ± 1 W"
+   },
+   "dict": null
+  },
+  {
+   "h": "153a909fea93984e4e4b2a0659fca83ed012624427db1caec356856451c34f49",
+   "en": "10W Laser Module › Laser Spot Dimension",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.laser_spot_dimension].label",
+    "near": "0.03 * 0.14 mm²"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f84f1fc270e36f1e1d4957e9ec3a951f1f343b4e38872b2c459ebf8afa9614c",
+   "en": "10W Laser Module › Working Temperature",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.10w_laser_module_working_temperature].label",
+    "near": "0 °C–35 °C"
+   },
+   "dict": null
+  },
+  {
+   "h": "fec6fab2bcfbbb1da82808a6c7306e8dce0d5ea1cd5546ecd7fa8016734c428e",
+   "en": "10W Laser Module › Max Engraving Speed",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.max_engraving_speed].label",
+    "near": "400 mm/s"
+   },
+   "dict": null
+  },
+  {
+   "h": "868027fddc6f6b9284e2e1c55342c8509db753e212e4b7ce02d0f1e43b4b01a8",
+   "en": "10W Laser Module › Max Cutting Thickness",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.max_cutting_thickness].label",
+    "near": "5 mm (Basswood Plywood)"
+   },
+   "dict": null
+  },
+  {
+   "h": "467079ce9e43404130354127cb21bb1321f1ba8cdeb308f512ca77ab7e21c757",
+   "en": "5 mm (Basswood Plywood)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.max_cutting_thickness]",
+    "near": "10W Laser Module › Max Cutting Thickness"
+   },
+   "dict": null
+  },
+  {
+   "h": "8718725b8a57830f2b4c4375007f3e5833d6e09b574162674af4fd3a713a442d",
+   "en": "10W Laser Module › Laser Safety Class for Laser Module",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.laser_safety_class_for_laser_module].label",
+    "near": "Class 4"
+   },
+   "dict": null
+  },
+  {
+   "h": "50b972fff08cba6935f0bee45c37f51cb76dd4aa1709789f1c7fd5629668e7cb",
+   "en": "10W Laser Module › Overall Laser Safety Class²",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.overall_laser_safety_class2].label",
+    "near": "Class 1"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d4d63ac8cf52f73d2cb52ce2ba21f44949407d2c583b62da7a162338164d0e0",
+   "en": "10W Laser Module › Engraving Area",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.engraving_area].label",
+    "near": "H2D: 310 * 270 mm² / H2S: 310 * 260 mm²"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad42c6b6927bd31eb5951cbeb68eca9de95d668cd613726dd23ae3237210fd6a",
+   "en": "10W Laser Module › XY Positioning Method",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.xy_positioning_method].label",
+    "near": "Visual Positioning"
+   },
+   "dict": null
+  },
+  {
+   "h": "cffdd8461a805e0f69f0e70ac07499025e63d2adb4c36ed6395f30a0d8b9f5a4",
+   "en": "Visual Positioning",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.xy_positioning_method]",
+    "near": "10W Laser Module › XY Positioning Method"
+   },
+   "dict": null
+  },
+  {
+   "h": "82d43667e5439d14ccf0d4092f7650caa66adf31f4218a464d32db7fa1baaa05",
+   "en": "10W Laser Module › XY Positioning Accuracy",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.xy_positioning_accuracy].label",
+    "near": "< 0.3 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "614ff7f3da595f0950de3fea02030238b9ec49cee92ed8e120a43f91c5eb8883",
+   "en": "10W Laser Module › Z Height Measuring Method",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.z_height_measuring_method].label",
+    "near": "Micro Lidar"
+   },
+   "dict": null
+  },
+  {
+   "h": "e06ed7ff7062d1985d412572899c964ae90542a7a07f3220d734940e464d36ab",
+   "en": "10W Laser Module › Z Height Measuring Accuracy",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.z_height_measuring_accuracy].label",
+    "near": "± 0.1 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "b7bb772c0fd7c002b68df41fdd8a0431500f4ab8211eb5025d4ed3667d83856f",
+   "en": "10W Laser Module › Flame Detection",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.flame_detection].label",
+    "near": "Supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "dced9d796061556e9ee436088817395df40063b28f61c9cf7e697245bb97e6ba",
+   "en": "10W Laser Module › Temperature Detection",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.temperature_detection].label",
+    "near": "Supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "262d8e6490b64b9171b70b022ebb097dd0ae2e5c251061748431a4a9ac1ad14f",
+   "en": "10W Laser Module › Door Sensor",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.10w_laser_module_door_sensor].label",
+    "near": "Supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "63ba0fbf59a56a903a0483f0e9dabb0b8452e510c7992b707ff37727587a54c6",
+   "en": "10W Laser Module › Laser Module Installation Detection",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.laser_module_installation_detection].label",
+    "near": "Supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "25d0073023d165651fca5075ebfc67641501120329fb17753e2dd13a4775ef72",
+   "en": "10W Laser Module › Safety Key",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.safety_key].label",
+    "near": "Included"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4bb3a7ad574d743a0b375067527394bf23368b3da7cb2c15e9fc3e2f70ddb4f",
+   "en": "10W Laser Module › Air Pump",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.air_pump].label",
+    "near": "Built-in; 30 kPa, 30 L/min"
+   },
+   "dict": null
+  },
+  {
+   "h": "13efa206e5a161e62d3ec14ed91877f8b06aeea81ca207b018d3b8082bf1d58c",
+   "en": "Built-in; 30 kPa, 30 L/min",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.air_pump]",
+    "near": "10W Laser Module › Air Pump"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec159339e1781ed32d815467dd10595a19075c737793e91ec1d5c12de428c381",
+   "en": "10W Laser Module › Ventilation Pipe Adapter Outer Diameter",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.ventilation_pipe_adapter_outer_diameter].label",
+    "near": "100 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa5fc9e1c68c750fdae76a33e7c1c339747270600dc81436f9816edf121622c9",
+   "en": "10W Laser Module › Supported Material Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.supported_material_type].label",
+    "near": "Wood, rubber, metal sheet, lether, dark acrylic, stone, and more"
+   },
+   "dict": null
+  },
+  {
+   "h": "27a9fb286b219868e181acef0079384ad7ad8939174fed16e90741215cc6eadd",
+   "en": "Paper, PVC, vinyl, leather, and more",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "specs[x.supported_material_type_2]",
+    "near": "Cutting Module › Supported Material Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6e1fc422f430d6376e6457313a81f8ed0ad7b727864ac1867c43c05f7b07f0d",
+   "en": "Bambu Lab H2S Laser Edition",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ae77995e51630f6c0577301a772e4d0d75d92d9aa0bf7975883d463bb4ef7fce",
+   "en": "Laser and Cutting Materials",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "box[11]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "677ae3aa15b4cc3304a7f0b32ed699a287586bf4baf0f2ddf0b03e29b311f34b",
+   "en": "wiki guide for TPU printing",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "documents[1]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "1ad79ed32de3b3ce392a576bd09d4d8012c05d71ff2e3831a68a058df45c790c",
+   "en": "Laser Safety Document",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2s",
+    "title": "Bambu Lab H2S",
+    "field": "documents[2]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9bff64fe9ac0c3e2d0f6c337d4fd635cf388803d729ab3fba1398a8578eb221",
+   "en": "Multi-filament 3D printer from the No.1 best-selling brand. 2M+ free models.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "aa766c8c933bbc36da242bfdbd5163857564e2d6adc172b6c85059365ec5a941",
+   "en": "Plastic and Steel",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[physical.chassis]",
+    "near": "Chassis & shell"
+   },
+   "dict": null
+  },
+  {
+   "h": "bfa192e6a61e7852af2163a5f9d8dbc31b0b6df29285849f060982c86d35c084",
+   "en": "Plastic and Glass",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[physical.outer_frame]",
+    "near": "Outer frame"
+   },
+   "dict": null
+  },
+  {
+   "h": "4599267a3c613d5a6ea71252d7b68aad5b0d42d541da6bc58b778548928f3f78",
+   "en": "Flexible Steel Plate",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[printing.build_plate_material]",
+    "near": "Build plate material"
+   },
+   "dict": null
+  },
+  {
+   "h": "8663b8544ea928a80d41408c154a55c44806acbfcc0ac4fc4a95250ad6fe963a",
+   "en": "Textured PEI Plate",
+   "kind": "spec_list_item",
+   "freq": 9,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[printing.included_build_plate].items[0]",
+    "near": "Included build plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "99506d9379c29d76bf0223b75ae8ea293d6e29a9d110d02557e9fbc9286ff0bb",
+   "en": "Cool Plate SuperTack",
+   "kind": "spec_list_item",
+   "freq": 4,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[printing.build_plate].items[2]",
+    "near": "Build plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "c25767f49335714681d90621d2e4f9d438177803f646d594fee41e937f782c2a",
+   "en": "Textured PEI plate, Smooth PEI Plate, Cool Plate SuperTack",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "spec_groups.sg_bambu_official[printing.build_plate]",
+    "near": "Build plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "438ea2c25a36555e20006dc6e5b5bd4bc271b309517622727256152747895dff",
+   "en": "40 mm³/s / (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 ℃ printing temperature)",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[motion.max_flow]",
+    "near": "Max volumetric flow"
+   },
+   "dict": null
+  },
+  {
+   "h": "20d0a296dcf8fc97b15f0bd79245be2226851d8f3a85c66f50e97c10d64ae3bd",
+   "en": "Support for PLA",
+   "kind": "spec_list_item",
+   "freq": 4,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[printing.supported_filament].items[5]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "565230a74739d510d8c058ddd0ae9f720ca958280c6256866cc8596015b9d151",
+   "en": "PLA, PETG, ABS, ASA, TPU, Support for PLA, Support for PLA/PETG, Support for ABS, PET, PA, PC, PVA, PLA-CF, PETG-CF, ABS-GF, ASA-CF, PA6-CF, PA6-GF, PAHT-CF, PPA-CF, PET-CF",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "spec_groups.sg_bambu_official[printing.supported_filament]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "cadf8a71bfa4d7b15fdf8d14e930f3211e7a4f76fff529822b46426a2249b8e2",
+   "en": "Built-in; 1920*1080; 30 fps HD",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[printing.camera]",
+    "near": "Monitoring camera"
+   },
+   "dict": null
+  },
+  {
+   "h": "71f8be668dc94d6618c13ac69a8a856421948c297537e50f89ba6ffb4b3e73e6",
+   "en": "200 W@110 V（PLA printing）",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[electrical.steady_state_power]",
+    "near": "Steady-state power"
+   },
+   "dict": null
+  },
+  {
+   "h": "410d4eec40556a37132a57f76a7db41f908d7faf225ee8fc2861ceb3336bf974",
+   "en": "5-inch 854*480 Touchscreen",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[connectivity.display]",
+    "near": "Display"
+   },
+   "dict": null
+  },
+  {
+   "h": "ea6247b88355f8370da1c2055681556dd220c0f1512f669c43dfaac1c2de7a81",
+   "en": "Dual-core Cortex-M4 and Single-core Cortex-M7",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[connectivity.motion_controller]",
+    "near": "Motion controller"
+   },
+   "dict": null
+  },
+  {
+   "h": "ecd011e9d2ec869c240532dc7df2f6f41874d6d8c3fab343e7b9ba6c5fa4b871",
+   "en": "Quad-core 1.5 GHz ARM A7",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[connectivity.application_processor]",
+    "near": "Application processor"
+   },
+   "dict": null
+  },
+  {
+   "h": "373e1989a7b0a894464db9b372e239b9df6721de2f74315db30e9ec9f0880bdb",
+   "en": "Bambu Studio / Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[connectivity.software]",
+    "near": "Software"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ab64517020b392a9fc812ab964a92701d227470faa4b5a000f005f65df742f3",
+   "en": "Not Available",
+   "kind": "spec_value_text",
+   "freq": 16,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[connectivity.ethernet]",
+    "near": "Ethernet"
+   },
+   "dict": null
+  },
+  {
+   "h": "4465b2db038348e0fbc981893cd7a762adc0c04be2c4b50c2ed3d77778258508",
+   "en": "Dual-Band Wi-Fi",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[connectivity.wireless_network]",
+    "near": "Wireless network"
+   },
+   "dict": null
+  },
+  {
+   "h": "204d89ea67b6a5cc70d047dca51caf8ef10b2ea4b1e728e948958d01f58ecc9b",
+   "en": "Operating Frequency — 2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE) 2400 - 2483.5 MHz, 5150 - 5850 MHz (SRRC) Wi-Fi Transmitter Power (EIRP) — 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) 5 GHz Band1/2: <23 dBm (FCC/CE/SRRC/MIC) 5 GHz Band3: <30 dBm (CE); <24 dBm (FCC) 5 GHz Band4: <23 dBm (FCC/SRRC); <14 dBm (CE) Wi-Fi Protocol — IEEE 802.11 a/b/g/n",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[connectivity.wifi]",
+    "near": "Wi-Fi"
+   },
+   "dict": null
+  },
+  {
+   "h": "bda514e7bbcb1866e0855121fdee9a6e58b8e0c24f07fbee70a5d7674b680262",
+   "en": "Unlock limitless creativity with AMS-powered multi-material printing.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[printing.multi_color]",
+    "near": "Multi-colour printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "8cf0947c272163e7389b4415a52c6f22378d672d3d1a587bba150b099945973a",
+   "en": "Note: The standalone P2S (without AMS) does not include a filament buffer. For AMS/AMS 2 Pro owners, to connect P2S you may need to have a Filament Buffer - P2S (SA011) and Bambu Bus Cable (CAB035). Please be aware that the absence of the filament buffer will affect the accuracy of filament tangle detection feature. *To connect more than 2 AMS(including AMS 2 Pro, AMS HT), Filament Buffer - P2S (SA011), a 6pin Bambu Bus Cable (CAB035) ,and a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "b8247b50136ab714ea0d9b743ae18ecf359db24497114eb181b8b17506384597",
+   "en": "AMS 2 Pro (combo version)",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f4808e78fce4692115460d025a85bb26bd2df555824150f4e9d2e6f7a40e467",
+   "en": "Filament Buffer (combo version)",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7408be48ecec99db9ce8c2858c629790941140a0d59b089d251d3c66c5015928",
+   "en": "Buildplate",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "p2s",
+    "title": "Bambu Lab P2S",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "73715fd78a1f98aa6a3dc930e8b1c630501d86b5a4f26e3b5baf26b98722f857",
+   "en": "Vortek multi-material 3D printer from the No.1 best-selling brand. 2M+ free models.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8591012f711ebf99b51380cb2865ce4d1750300d78d27b2e5bee567cd0934cc4",
+   "en": "Aluminum and Steel",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "specs[physical.chassis]",
+    "near": "Chassis & shell"
+   },
+   "dict": null
+  },
+  {
+   "h": "1fca9587b506bdd371f934b8387f8caa03e8848b00ec249074867fa1d61de272",
+   "en": "Engineering Plate",
+   "kind": "spec_list_item",
+   "freq": 3,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "specs[printing.build_plate].items[1]",
+    "near": "Build plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8f28b3db43f3e495129a8d05967731e534e0261143daa2b7ca4bb8a16af0c96",
+   "en": "Textured PEI plate, Engineering Plate",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "spec_groups.sg_bambu_official[printing.build_plate]",
+    "near": "Build plate"
+   },
+   "dict": null
+  },
+  {
+   "h": "4193a2a60f60e3a56c4c398763e33c8702e0200c7b09e02a4af219d238673618",
+   "en": "40 mm³/s / (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 °C printing temperature)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "specs[motion.max_flow]",
+    "near": "Max volumetric flow"
+   },
+   "dict": null
+  },
+  {
+   "h": "4abf980df6b80b13ad71dbcfcf2f7601d1e9b6e3c6421de43b7c1690c4182acb",
+   "en": "Cooling › Toolhead Enhanced Cooling Fan",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "specs[x.toolhead_enhanced_cooling_fan].label",
+    "near": "Closed Loop Control"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c9c25f29af87886c9388217f4ef9ebe3d89f6b6f1a1fc86bfee601baa04c878",
+   "en": "PLA, PETG, TPU, PVA, BVOH, ABS, ASA, PC, PA, PET, PPS;Carbon/Glass Fiber Reinforced PLA, PETG, PA, PET, PC, ABS, ASA, PPA, PPS",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "spec_groups.sg_bambu_official[printing.supported_filament]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b16c7f072b387f1b01b06712752302287c5a71f139ffb3f7a9af6935e2eeaba",
+   "en": "Built-in; 3264*2448 (Equipped with Laser Edition)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "specs[printing.camera_birdseye]",
+    "near": "BirdsEye camera"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8813bf0f7a455eb98cca988021ce80e62a7c5ed695ee41ce1ef97050ae5262d",
+   "en": "200 W@110 V (Single Nozzle Printing PLA)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "specs[electrical.rated_power]",
+    "near": "Rated power"
+   },
+   "dict": null
+  },
+  {
+   "h": "2eefb5707fcd56b2993711409175450d839d1a7342bf367a056a162010c6d5ed",
+   "en": "Quad-core ARM with NPU",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "specs[connectivity.application_processor]",
+    "near": "Application processor"
+   },
+   "dict": null
+  },
+  {
+   "h": "b617226f751b413f481497350811d2c036e4a41738fc5c34b79f0c397a9f82ca",
+   "en": "Please refer to the FAQ for details on how your specific configuration will be delivered.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "bbdd16a9e99345c3b35fd3e74d27ce764dd9f06b0d56ab3ac79a690ffd3b3619",
+   "en": "The bundle includes: (1) H2C 3D Printer *1 (2) AMS 2 Pro *2 (3) Vortek Utility Hotends Bundle includes: 0.4 mm Induction hardened Steel Nozzle (RHS) ×2, 0.2 mm stainless steel nozzle (LHS) ×1, 0.6 mm hardened steel nozzle (LHS) ×1 (4) Filament Track Switch *1",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4bd79cfdb4b43ccf43cbcad5aea160181495e9e464a603febae86956403bbff",
+   "en": "0.4mm Induction Hotend",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f787b737f1436da1dc566d52a775c5782acf1ead4c8c45507d0980133c0974b",
+   "en": "0.2mm Induction Hotend",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f45592947770858cc3c7664942b054dc1379ed54ad738380c2220a1f16eae86",
+   "en": "0.6mm Induction Hotend",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a754729d98ddc19cc5b721fa149ae67ef1159a58660fe9f1519dfd089055772b",
+   "en": "0.4mm Hardened Steel Hotend",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f292d6433f0817710bc0ad2df98cb583a47fb856dc12e1dfad145ca9e8bf0d1",
+   "en": "4-in-1 PTFE Adapter II",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "box[7]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "28fa4160026a12af39812cf29840b2c803674a838f4fac222ac070e3c6d61897",
+   "en": "H2C Laser Edition",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "80952925e66d9e629f353c329da062511d9b1ad37c6e9106c854cf02bd5a1731",
+   "en": "Cutting Module (with Pen holder)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "box[10]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9bc4d22de0c40f32171c8327650944aae8abf7e9c57b8fcdecec472b1989184f",
+   "en": "TPU 85A&90A printing guide",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "h2c",
+    "title": "Bambu Lab H2C",
+    "field": "documents[3]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e0ee7fdf545318c21b961e240fd7cf3f84b79e33ec4793f5f8199c61c234e65",
+   "en": "2M+ free models.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "x2d",
+    "title": "Bambu Lab X2D",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f63cf92ff2fea4886ce112e3fed1ce67ae540172d0072e6270eb08b970ba5ff4",
+   "en": "Provides 8 slots of automatic filament management, allowing you to keep more colors and materials on standby and switch between them effortlessly.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "x2d",
+    "title": "Bambu Lab X2D",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "b89274207ff688d847c959e2da2a5a80691c33d5d25596c099feeea1b6fbb53f",
+   "en": "Large-format 3D printer for beginners. Print-ready, no tuning. 2M+ free models.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "a2l",
+    "title": "Bambu Lab A2L",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1e09b9f377d7f2f806f9b7353789712fe00f01c0707813483c919177bfd6a961",
+   "en": "Include A2L Combo and Cutting Upgrade Kit",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "a2l",
+    "title": "Bambu Lab A2L",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5eff1dbd0154de8292af10fe3c9424573c847dcca5320f9828b637639addd2a",
+   "en": "More details",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "a2l",
+    "title": "Bambu Lab A2L",
+    "field": "documents[0]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "aeba846fb4781d55f32bd50634ccb32f881fbda11629bda50cc18d0a9700d474",
+   "en": "Enclosed high-speed CoreXY for reliable, non-stop printing. Fully rebuilt to factory standards.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-p1s",
+    "title": "[Refurbished] Bambu Lab P1S 3D Printer",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f1907147bd94c1f3a65429bce8f08128e662b5f47882b8d1520500a584258fd2",
+   "en": "Bambu PLA Filament(with a spool) (*This will not be included in P1S AMS 2 Pro Combo)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-p1s",
+    "title": "[Refurbished] Bambu Lab P1S 3D Printer",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d433e42755275a541744c8c35215d23cef7594e60e6931264c3adefed522cca",
+   "en": "Full-size 256mm³ multi-color printer, ready out of the box. Fully rebuilt to factory standards.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-a1",
+    "title": "[Refurbished] Bambu Lab A1 3D Printer",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6aeb30ba8d026358e6a9081ee1f9174eb8f524ada88be1f0f34e81ee21f59726",
+   "en": "Bambu Filament Samples (Random Color)",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "refurbished-a1",
+    "title": "[Refurbished] Bambu Lab A1 3D Printer",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "549da632d485151d6338e5d5bbb3a79c3fe91fad92f762a0e29f012773a4bae9",
+   "en": "Download A1 TDS",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "refurbished-a1",
+    "title": "[Refurbished] Bambu Lab A1 3D Printer",
+    "field": "documents[0]",
+    "near": "tds"
+   },
+   "dict": null
+  },
+  {
+   "h": "10f2923376b1b422cbf54fdc32ab49cea3b20d9daa7c7e0dbd06816a08e7281d",
+   "en": "Fully rebuilt to factory standards.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "65214c333e3197def68a614841eeb60ef8cd4ef8e4a34934182ccd8f0c2fbdec",
+   "en": "0.4 mm Hardened Steel Included",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "specs[extrusion.nozzle_material]",
+    "near": "Nozzle material"
+   },
+   "dict": null
+  },
+  {
+   "h": "8860fb7e739f737cda25751ef2340fccbeb65a39cf0faeff879cfcde55818b56",
+   "en": "Ideal for PA",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "specs[printing.supported_filament].items[7]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "1093b6fadde233b85a8c76a414d6e682c41fd3ade33a8e7e72d7e204b8a54c3c",
+   "en": "Carbon/ Glass Fiber Reinforced Polymer",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "specs[printing.supported_filament].items[9]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "cf98df0f8f74bb8359604c76c6d53782fb89dc51fb191917e526e312fc9f7385",
+   "en": "PLA, PETG, TPU, ABS, ASA, PVA, PET / Ideal for PA, PC, Carbon/ Glass Fiber Reinforced Polymer",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "spec_groups.sg_bambu_official[printing.supported_filament]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "e630057dd92df6aa91626382cde0ff5ea117bde7c36423297814dd0381cabb90",
+   "en": "Build Plate Surface",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "specs[x.build_plate_surface].label",
+    "near": "Bambu Textured PEI Plate(Pre-installed, Random, Both compatible with Micro Lidar)"
+   },
+   "dict": null
+  },
+  {
+   "h": "3afa8bd892c27b8bdeff511e82a06455cd864dc9eb83705e0191ff39e9d8c3f7",
+   "en": "Bambu Textured PEI Plate(Pre-installed, Random, Both compatible with Micro Lidar)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "specs[x.build_plate_surface]",
+    "near": "Build Plate Surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "05919c93e50720ec9eb09a3c0a970764d298c55d48655bda3ed0cfc682894a53",
+   "en": "100-240 VAC, 50/60 H, 1000W@220V, 350W@110V",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "specs[electrical.requirements]",
+    "near": "Electrical requirements"
+   },
+   "dict": null
+  },
+  {
+   "h": "86229d51a143619c339e008e7b59ded37d6a4ad6ab71f193ab0c2a8e14778a20",
+   "en": "Build Plate (Pre-installed)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb5966a3973120fd6944d807f71b3c9b62fe220d91bc4dbd7fa2a59ee500a17f",
+   "en": "Bambu Filament(with a spool)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-x1c",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa9abce427c4df9e9a48bef28bf5e5692b595df1865b5765e1f8737fd5810ddb",
+   "en": "Enclosed high-speed, 300°C hardened steel nozzle for engineering materials. Fully rebuilt to factory standards.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "refurbished-bambu-lab-p2s-3d-printer",
+    "title": "[Refurbished] Bambu Lab P2S 3D Printer",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "037484c9c5d0b7de56ef626e638a375b349caf0adaa67c10e02ec61f37a9850b",
+   "en": "Bambu Lab AMS is an intelligent system that communicates with the toolhead to guarantee smooth feeding and automatic mid-print filament switching. It can detect the tension on filament and actively adjust the feeding pace. With RFID technology, Bambu Lab AMS identifies filament loaded inside and automatically configures the most appropriate print settings.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "840106ecb81b74733bee465d131145d11984e9848e4f7a42d63b4209b9fc3702",
+   "en": "PVA (dry)",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[printing.supported_filament].items[7]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "406f65be6b875d2230e46f88f3162f9e6a222c3d699571339eb97e8c7e6da3ac",
+   "en": "BVOH (dry)",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[printing.supported_filament].items[8]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "cfb9e08ca33f65120377c2f530689fe6828ed5a71ef7c58e6d0e037cb0b3561f",
+   "en": "HIPS and Bambu PLA-CF/ PAHT-CF/ PETG-CF",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[printing.supported_filament].items[11]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "2aee041a66e2081ef44eb57be87fdc58d0da3c8b67f566ca503bd4feb08fd80d",
+   "en": "PLA, PETG, ABS, ASA, PET, PA, PC, PVA (dry), BVOH (dry), PP, POM, HIPS and Bambu PLA-CF/ PAHT-CF/ PETG-CF",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "spec_groups.sg_bambu_official[printing.supported_filament]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "96af5f610eb9be410afccf8f8193b7cf5bcae372f8b4abad227c46afe0e2856a",
+   "en": "PVA (wet)",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[printing.unsupported_filament].items[2]",
+    "near": "Filament not supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "be8958aa024aeeea97420b6b500bafd91a4a58528c84c36ecb30204041c2e0c1",
+   "en": "BVOH (wet)",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[printing.unsupported_filament].items[3]",
+    "near": "Filament not supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "ddf1b83d4cdcfc32b1cc189202d6e82001a2c3cb30f36308224941a2e9f13e7b",
+   "en": "Bambu PET-CF/ TPU 95A and other brand's filaments that contain carbon fiber or glass fiber",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[printing.unsupported_filament].items[4]",
+    "near": "Filament not supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "d3c0223436f2898e437c57830bf2d69b64e881a4bdb31093bd8e3aaf1607ad8b",
+   "en": "TPE, TPU, PVA (wet), BVOH (wet), Bambu PET-CF/ TPU 95A and other brand's filaments that contain carbon fiber or glass fiber",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "spec_groups.sg_bambu_official[printing.unsupported_filament]",
+    "near": "Filament not supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "d801c16fa287324d0b87d8271e14ce86a3180991a636fd3eac1d6c8e373fda6b",
+   "en": "Supported Spool Size",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[x.supported_spool_size].label",
+    "near": "width: 50-68 mm, diameter: 197-202 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "b32c707dfd093db7b38ab08dd7d20e089735e19dccdc1e12a23496d82a80d34f",
+   "en": "width: 50-68 mm, diameter: 197-202 mm",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[x.supported_spool_size]",
+    "near": "Supported Spool Size"
+   },
+   "dict": null
+  },
+  {
+   "h": "e534ed58fa9013d22107835d8d674ce22dfae5beeb01712b10d8e194fab57376",
+   "en": "To connect AMS unit(s) to A1 series printer, an A1 series AMS Hub (SA013) is required. A1 series printer can connect up to 4 AMS units (including AMS HT, AMS, AMS 2 Pro). Note: AMS Lite cannot be used in combination with other AMS units. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "da480220ffaa07912ffa7defca18cced6f65a136b5e3164ba155456f9fbc7732",
+   "en": "To connect a single AMS unit to X1/P1 series printer, a Filament Buffer(SA003), a PTFE Tube Coupler(FAZ006), and a 4-pin Cable(CAB002-N) are required. To connect multiple AMS units, an AMS Hub(SA002-N), a PTFE Tube Coupler(FAZ006), and a 4-pin Cable(CAB002-N) are required. X1/P1 series printer can connect up to 4 AMS units (including AMS HT, AMS, AMS 2 Pro). Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "735301391e0c826bc654e1ecbaeb281650b1760fc4e6c373b3692c6bb6386c5f",
+   "en": "To connect one or two AMS unit(s) to P2S, a P2S Filament Buffer (SA011) is required. To connect more than two AMS units, a P2S Filament Buffer (SA011) and 4-in-1 PTFE Adapter(s) (FAZ013-N) are required. P2S printer can connect up to 4 AMS units (including AMS, AMS 2 Pro) and 4 AMS HT units. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e8dc09de7d26508f11f4d17b9016b9926704b5a7aa307a23a829ccef2ee6593",
+   "en": "To connect more than one AMS units to H2S, 4-in-1 PTFE Adapter(s) (FAZ013-N) are required. To connect a single AMS unit, no extra accessory is required. H2 series printer can connect up to 4 AMS units (including AMS, AMS 2 Pro) and 8 AMS HT units. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "1180b4daacbdce1b6283909809756f6ab5b6e1551a5cdc469c34772653dbc286",
+   "en": "To connect more than two AMS units to H2D/H2C, a 4-in-1 PTFE Adapter(s) (FAZ013-N) are required. For better performance, we recommend 4-in-1 PTFE Adapter II (SA014) for H2C. To connect one or two AMS unit(s), no extra accessory is required. H2 series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro) and 8 AMS HT units . Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "6033861d9b98c2888fcb999a41b5058b50d6a31fdec3f94bc2f4516491939917",
+   "en": "To connect one or two AMS unit(s), no extra accessory is required. X2D series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro) and 8 AMS HT units. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "ed152328799f2190e2f519a33a651ed2ce4f7291866e3cf562635219c923f6da",
+   "en": "To connect 3 or more AMS units, a PTFE Tube Coupler(FAZ006) is required. X2D series printer canconnect up to 4 AMS units(including AMS, AMS 2 Pro) and 8 AMS HT units. X2D series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro) and 8 AMS HT units. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6ce2fce7bdda942c953812e1dc40dfc8d9066b0aa4e6b2b7b28e706e1794d15",
+   "en": "To connect one AMS, no extra accessory is required. A2L series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro and AMS HT) and 1 AMS lite. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "15a5612f7381f86d4f47339db5a0c8c3e65c25aa655f3f2c690d895e4c51b1ac",
+   "en": "To connect more than one AMS units to A2L, 4-in-1 PTFE Adapter(s) (FAZ013-N) are required. A2L series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro and AMS HT) and 1 AMS lite. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "02dd60906ad7f3ffddae4cf0ca0405efbad11623e0456dafcf384743e14e3b97",
+   "en": "Bus Cable - 6pin & Bus Cable - 4pin",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c9500021da480a41d1726023dc575043872f8d6b32baaf1f8e6d117f22e0fc6c",
+   "en": "PTFE Tube Connector",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "63de649fec3c4d57f20c55594938d5de45b8b517d7f4e269a2833f260eafb0e6",
+   "en": "High Temperature Reusable Spool",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "65c81f4056444ea097608e4027302f9def8db58b3facb4d04c7905ee6627aa9a",
+   "en": "AMS feeding system introduction",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "documents[0]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d80b5ea26e2a3211bfde5f4a9ceb1858f96f48dceb400598f1005e3dee05c34",
+   "en": "filament entangled",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "documents[1]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "265ddf222ec282653e9eb24c314fcbe7ed72bf4281058fc3de44acb2db432578",
+   "en": "Non Bambu Lab Filaments need to be manually configured in Bambu Studio or in the printer",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "documents[2]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d6ce4ea6f82f5e1d8fd9d028999cf8e32ce804fdd3052a0f0213c45339e3867",
+   "en": "Filament Guide",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "documents[3]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "0916d5f357accf7b6597372fa04a066b7493b0575d80b212552eb4328d61e3ca",
+   "en": "how AMS works",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-multicolor-printing",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "field": "documents[4]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "5444b9b2a23a367678ece469755741de6d919e88870a6eef916eaea9d8fca9f5",
+   "en": "Bambu Lab AMS lite Multi-Color/Material Capability Automatic Filament Backup Improved Paper Spool Compatibility Easy To Maintain RFID Filament Sync Multi-Color 3D Printing For Everyone AMS lite brings colors to your 3D printed models, opens up a whole new world for your creativity to soar!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dbc3786dc201312220393d82c06f449680482a8d05644f4e18c47fdf68e7cf56",
+   "en": "Easy Maintenance",
+   "kind": "usage_title",
+   "freq": 2,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8291f99e1d9ae7f3d1eda96516d179f7cc146f5b00245cb0d2410375efee3bdc",
+   "en": "The simple and exposed design of the AMS lite makes it super easy to work on. Through the translucent shell, user can easily observe the inner operation structure to troubleshoot.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ec82a962278655f144cbbd4e8e8c27f3af6b895fe889c4a50b222c295c4c930e",
+   "en": "How to Get Started",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "usage[1].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7d78e2bf25695e191eb4eaa5c296d6c5f7e79ad101e82e394b6fd64b1b2e9d21",
+   "en": "Follow the Quick Start Guide or watch the unboxing video below to enjoy out-of-the-box multi-color 3D printing in minutes.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "usage[1].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4a654327d56b7acd0a508f5d19ca5bc3238f05482e2f22d2130c0f6a36ba9b52",
+   "en": "Supported Filament*¹",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "specs[x.supported_filament_1].label",
+    "near": "PLA, PETG,ASA, PET, PA, PC, PVA (dry), BVOH (dry), PP, POM, HIPS / and Bambu PLA-CF"
+   },
+   "dict": null
+  },
+  {
+   "h": "3213fd6f078e9283f2ee4b1e729e07c1e2d1ddef7e6651cf882c4107c0de6ccc",
+   "en": "PLA, PETG,ASA, PET, PA, PC, PVA (dry), BVOH (dry), PP, POM, HIPS / and Bambu PLA-CF",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "specs[x.supported_filament_1]",
+    "near": "Supported Filament*¹"
+   },
+   "dict": null
+  },
+  {
+   "h": "d816ac7480b79688d7508a10aac1d6579e60e1037ff6075cb3fa1a8acfeaea6f",
+   "en": "Not Recommended Filament*²",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "specs[x.not_recommended_filament_2].label",
+    "near": "Bambu PLA Glow, Bambu PETG-CF, and other generic brands of PLA Glow-in-the-dark, etc."
+   },
+   "dict": null
+  },
+  {
+   "h": "bc7fdeb7fcc9fa413144711b7c0fd621ac0ecee408ceac277c4fe2bc67061507",
+   "en": "Bambu PLA Glow, Bambu PETG-CF, and other generic brands of PLA Glow-in-the-dark, etc.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "specs[x.not_recommended_filament_2]",
+    "near": "Not Recommended Filament*²"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b1088771bda296f0fe7814a5c646a7d5d48408fe1f1de902d96c3ef85f81403",
+   "en": "Unsupported Filament*³",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "specs[x.unsupported_filament_3].label",
+    "near": "TPE, TPU, PVA (wet), BVOH (wet), Bambu PET-CF / PA6-CF / TPU 95A / and other brand filament that contains carbon fiber or glass fiber"
+   },
+   "dict": null
+  },
+  {
+   "h": "bf85c0c0a5749e647d83f6c777250d11f2336b0fcebde3a6c7907019724392ee",
+   "en": "TPE, TPU, PVA (wet), BVOH (wet), Bambu PET-CF / PA6-CF / TPU 95A / and other brand filament that contains carbon fiber or glass fiber",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "specs[x.unsupported_filament_3]",
+    "near": "Unsupported Filament*³"
+   },
+   "dict": null
+  },
+  {
+   "h": "25f2301cacc08abae5170f58dde0fde98d1a3b15b5642eecd9be43d925085f6c",
+   "en": "width: 40 - 68 mm, inner diameter: 53 - 58 mm",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "specs[x.supported_spool_size]",
+    "near": "Supported Spool Size"
+   },
+   "dict": null
+  },
+  {
+   "h": "d6db49fd591b6a802a9e24e6befc409e73eb558fab80ec5fb390f1fb948abac3",
+   "en": "Allen Key H2",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6661199e05be24402f5a2bd8809d15dfc34632cadb3185f55b27d5aee9728aa2",
+   "en": "Screw (×5) (For AMS Stand)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ebf5e9048acc63d2e419e817193dd11a141786e9269d0681a2454b5b66cbfb31",
+   "en": "The spring loaded rotary spool holder grips the spool at the center hole, improving spool compatibility especially for those paper spools.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "cc368033581fa41b95a626d4d967b756d08db3e854be511d5d365b3d52aba48d",
+   "en": "how AMS lite works",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "documents[2]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f777202b36bd3d165ac63c660076a1d3860375e99277444869f1568864709dc",
+   "en": "Quick Start Guide",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "field": "documents[3]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8a06d2f820b8a4657b5a133bb78020e147f01ff48031ed81dae3720b2023dd9",
+   "en": "Bambu Lab AMS HT, Engineered to better dry & manage high-performance filament.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "02722ca3609839acb7c63a27a1fd01eebca9379c2c73000785f560aa03ded85a",
+   "en": "Body › Flame Retardant Grade",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[x.flame_retardant_grade].label",
+    "near": "UL 94 V-0"
+   },
+   "dict": null
+  },
+  {
+   "h": "c58f5de99f82b07e74cc601260621e3aa7ff1021062b491d1e59d2163a2be5b7",
+   "en": "and TPU for AMS.<br/>Bypass Filament Outlet: TPE",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[printing.supported_filament].items[13]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "8808d7b01d264262f2e949b3e4c17b4055b98de527a7c48406d846cc15aaf99d",
+   "en": "and other filament that contains carbon fiber or glass fiber.",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[printing.supported_filament].items[16]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "b48efa596bfda9995b310bf8ec13b5c5e6bde97021be2461c0bfb82c2636d996",
+   "en": "PLA, PETG, ABS, ASA, PET, PA, PC, PVA (dried), BVOH (dried), PP, POM, HIPS, Bambu PLA-CF/PAHT-CF/PETG-CF/Support for PLA/PETG, and TPU for AMS.<br/>Bypass Filament Outlet: TPE, generic TPU, Bambu PET-CF/TPU 95A, and other filament that contains carbon fiber or glass fiber.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "spec_groups.sg_bambu_official[printing.supported_filament]",
+    "near": "Supported filament"
+   },
+   "dict": null
+  },
+  {
+   "h": "dee667ab2469aba4c94ae51fe628a3b0e13a832fac7ea0ed6a5acb6813532fe6",
+   "en": "PVA (damp), BVOH (damp)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "spec_groups.sg_bambu_official[printing.unsupported_filament]",
+    "near": "Filament not supported"
+   },
+   "dict": null
+  },
+  {
+   "h": "8ac73765d010fbae4014df702d9d5e8544a1a5b85c5d5ddc0a7f0a5e5cffac53",
+   "en": "Drying › Maximum Temperature",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[x.maximum_temperature].label",
+    "near": "85 °C"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4cde1d941845bdb51923ea97d670ebfd63d6952412825e4d96e03f8519c7d1f",
+   "en": "To connect AMS HT unit(s) to A1 series printer, an A1 series AMS Hub (SA013) is required. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed. A1 series printer can connect up to 4 AMS units(including AMS HT, AMS, AMS 2 Pro). Note: AMS lite cannot be used in combination with other AMS units.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "38ef5d79b4d35306ec7c4d0b7e9b8c480de47fc9966ec7c08e91567e2f4bdb12",
+   "en": "To connect a single AMS HT unit to X1/P1 series printer, a Filament Buffer(SA003) or AMS Hub(SA002-N), a PTFE Tube Coupler(FAZ006), and a 4-pin Cable(CAB002-N) are required. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed. X1/P1 series printer can connect up to 4 AMS units(including AMS HT, AMS, AMS 2 Pro).",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "206e0565c9d07be946eb465261f6f1a3bc1590dda4a769394e468dbaa3337fb8",
+   "en": "To connect multiple AMS HT units, an AMS Hub(SA002-N), a PTFE Tube Coupler(FAZ006), and a 4-pin Cable(CAB002-N) are required. X1/P1 series printer can connect up to 4 AMS units(including AMS HT, AMS, AMS 2 Pro). Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "9659296f2249f7770c323aaca1ca3e35a8321ed98f05877b99ae52ae63afa011",
+   "en": "To connect one or two AMS HT unit(s) to P2S, a P2S Filament Buffer (SA011) is required. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed. P2S printer can connect up to 4 AMS units(including AMS, AMS 2 Pro) and 4 AMS HT units.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6b7d9b6fd2679548d2b6768e0528e42a1c487846fe523ccccac4e90a4267272",
+   "en": "To connect a single AMS HT unit, no extra accessory is required. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed. H2 series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro) and 8 AMS HT units.",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "e937893ade3eaf614b62e6fa5b2b34f055a6196df56a4f8c4cc4c02299243bd5",
+   "en": "To connect one or two AMS HT unit(s), no extra accessory is required. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed. H2 series printer can connect up to 4 AMS units (including AMS, AMS 2 Pro) and 8 AMS HT units.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "d1b67ca7b69936e7e69339e10287b21cb9093dab9888209df7da4fe93b8ec4b5",
+   "en": "To connect 3 or more AMS HT units to H2D/H2C, a 4-in-1 PTFE Adapter(s) (FAZ013-N) are required. For better performance, we recommend 4-in-1 PTFE Adapter II (SA014) for H2C. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed. H2 series printer can connect up to 4 AMS units (including AMS, AMS 2 Pro) and 8 AMS HT units.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "e95ccc6d79496f6be777841fdaf31747ab7d240340f45c2b68a951027686493b",
+   "en": "To connect one or two AMS HT unit(s), no extra accessory is required. X2D series printer can connect up to 4 AMS units (including AMS, AMS 2 Pro) and 8 AMS HT units.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "08216f61d9e2113f1f4e158cabd8653819f71d1cc84fa3cb77c45bbcdbada12a",
+   "en": "To connect 3 or more AMS 2 Pro units, a 4-in-1 PTFE Adapter(s) (FAZ013-N) is required. X2D series printer can connect up to 4 AMS units (including AMS, AMS 2 Pro) and 8 AMS HT units. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb22a34e520a5536d09f2d9c45168edcac52bb9b4dd35c3777601604dffc6ab3",
+   "en": "To connect one AMS HT, no extra accessory is required. A2L series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro and AMS HT) and 1 AMS lite. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "39132781d42cfa3810ae3e86e2a0b598a26b7d905f6df34a4e42fabd70a7812f",
+   "en": "To connect more than one AMS HT units to A2L, 4-in-1 PTFE Adapter(s) (FAZ013-N) are required. A2L series printer can connect up to 4 AMS units(including AMS, AMS 2 Pro and AMS HT) and 1 AMS lite. Please check \"What's in the box\" section below. Some accessories are included, you may purchase extra as needed.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[variant.note]",
+    "near": "Option note"
+   },
+   "dict": null
+  },
+  {
+   "h": "456dfb2879e5663f488c1c1602de4fc9ee86e68e496f32ef9f1aa39ed8625afc",
+   "en": "Bambu AMS HT",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd44e61a805b60968a5c2e23f2ce8a8664ae32312f51f1498b17100fa3ae5f43",
+   "en": "The AMS HT will be compatible with all Bambu Lab products.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "ams-ht",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9bfd06e8766acb3333eae4b0762075a32bc5c4265cd2f78e4a82488b54de4e5",
+   "en": "55W desktop CO2 laser cutter and engraver.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "r1",
+    "title": "Bambu Lab R1",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "23318c632bd668e4e1aa2bf0421c45026bcbaca50013ee15b99997b7a6b34b74",
+   "en": "Tricky setup? Solved.",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "r1",
+    "title": "Bambu Lab R1",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "95ee4df98fb4406a440f0e3e5e9e425bc3a15f87ad658a4b4efc1dc085d0c2f8",
+   "en": "Usually, aligning the optical path meant test shots, manual adjustments, and trial and error — with no telling how long it might take. With R1, that chore comes down to one small sensor. Mount the Laser Alignment Sensor on the toolhead, and it measures the beam, detects the misalignment, and corrects the path automatically, in just one minute.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "r1",
+    "title": "Bambu Lab R1",
+    "field": "usage[0].body.line[0]",
+    "near": "R1 puts a touchscreen right on the machine. Follow every job in real time, watch the optical path calibrate, and check the machine's health status — all without"
+   },
+   "dict": null
+  },
+  {
+   "h": "30c9204893a91072f0371b6cd5c5b6e42102bef8084654ae39fe3f3466bc6de2",
+   "en": "R1 puts a touchscreen right on the machine. Follow every job in real time, watch the optical path calibrate, and check the machine's health status — all without a computer.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "r1",
+    "title": "Bambu Lab R1",
+    "field": "usage[0].body.line[1]",
+    "near": "Usually, aligning the optical path meant test shots, manual adjustments, and trial and error — with no telling how long it might take. With R1, that chore comes"
+   },
+   "dict": null
+  },
+  {
+   "h": "0658dacf0bc83ed4b5741515a6d71c50b641fc18fef4adc33b033f480df1bab8",
+   "en": "R1 recognizes Bambu Lab material automatically and applies the right power and speed, so you can skip test grids and manual parameter setup.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "r1",
+    "title": "Bambu Lab R1",
+    "field": "usage[0].body.line[2]",
+    "near": "R1 puts a touchscreen right on the machine. Follow every job in real time, watch the optical path calibrate, and check the machine's health status — all without"
+   },
+   "dict": null
+  },
+  {
+   "h": "82c268188cd665768bce0f6fd610a7c78d1e3991798c43aa6f1f41a2bf44cf84",
+   "en": "Glass",
+   "kind": "block_line",
+   "freq": 7,
+   "context": {
+    "handle": "r1",
+    "title": "Bambu Lab R1",
+    "field": "blocks[12].line[0]",
+    "near": ""
+   },
+   "dict": {
+    "ar": "زجاج",
+    "ckb": "شووشە"
+   }
+  },
+  {
+   "h": "be91940b79f469101df9a50544b6873aa5509a12f1f93f1cb5e3be3990d344b3",
+   "en": "Support",
+   "kind": "spec_value_text",
+   "freq": 7,
+   "context": {
+    "handle": "support-for-pa-pet",
+    "title": "Support for PA/PET",
+    "field": "specs[identity.series]",
+    "near": "Series"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e8fde6bda1e5d87d8f2584d20820896002b5fc06db43cc2346c6b35b366478b",
+   "en": "Filament with Spool*1 & Desiccant",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pa-pet",
+    "title": "Support for PA/PET",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "59de121db1b8145e4c974543653fd48e1d6667b41160f5a393270c9c0f7852c3",
+   "en": "Package",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pa-pet",
+    "title": "Support for PA/PET",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": {
+    "ar": "العبوة",
+    "ckb": "پاکێت"
+   }
+  },
+  {
+   "h": "8c7299ca1bf870837c521b81abe3368bae0d78dd724bd80a97dc023f26c80643",
+   "en": "Filament drying cover",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pa-pet",
+    "title": "Support for PA/PET",
+    "field": "documents[3]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "a16be519fc46bf0fe4a5b96f440bad5f7279a46c5c45dd185d4628630bd1c1cc",
+   "en": "PC (Polycarbonate) is an extremely tough and durable material for 3D printing, with good temperature and impact resistance. It is highly recommended for high strength 3D printing applications. It's also a naturally transparent thermoplastic. Bambu PC Basic is designed for less shrinkage and better dimensional stability. It's a professional level 3D printing material.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pc-filament",
+    "title": "PC",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9e04b25d926be8e55b74e526f17ee7e37cb7b4c7c804a0a80abc9fff95553977",
+   "en": "Bambu ABS is designed to reduce warping and cracking but maintain outstanding impact resistance. In addition, it's very suitable for high-speed printing because of its good flow behavior.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "abs-filament",
+    "title": "ABS",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "74e58b501b0e2938cd77a2802a9171c9719f9ef66d0131296139c856fe23790e",
+   "en": "Common print quality problems and solutions",
+   "kind": "doc_title",
+   "freq": 4,
+   "context": {
+    "handle": "abs-filament",
+    "title": "ABS",
+    "field": "documents[6]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "7686f8d1e2c1c05164b644c6d43c456262299544f9d00a1438324544007f214b",
+   "en": "Meanwhile, its stiffness and strength can meet most printing needs. It is worth mentioning that it can biodegrade in some artificial composting conditions. Bambu PLA Matte is designed for matte surface, and can be printed in speed up to 250 - 300 mm/s, which is faster than regular PLA. It can also make support removal much easier.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-matte",
+    "title": "PLA Matte",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "42f86067045cd68a5580db5ed1af570d1ced59966f5635ebaf3764e7b5b2e897",
+   "en": "Unleash your creativity with Bambu PLA Sparkle, a shiny, sparkling PLA. Perfect for adding a touch of glamour to your prints, and stand out from the normal PLA prints.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-sparkle",
+    "title": "PLA Sparkle",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "bc6291fd813f504c867dc2dd1e5d6d9b5dc0f4d36b9f84c302e76f0cc701f434",
+   "en": "Bring a metallic finish to your 3D printing projects with Bambu PLA Metal filament. This premium material has a unique metallic look that will give your objects a professional and high-end finish.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-metal",
+    "title": "PLA Metal",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b85f697332b2fb61fe20cf34aef092386a25af4d05371aac925dcb600df6ef96",
+   "en": "Achieve a natural stone finish in your 3D printing projects with Bambu PLA Marble filament. This premium 3D printing material has a unique marble-like finish that will give your objects a natural appearance, making them stand out and look professional.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-marble",
+    "title": "PLA Marble",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c57773ad339e139eb69d5305fb6ae53434a5fbaef7e1afd3ea1ac57e37e935b3",
+   "en": "Bambu PLA-CF is a custom-blended tough PLA with carbon fibers added to improve the hardness and bending modulus while still retaining the easy printing and dimensional stability of normal PLA. The resulting prints have a matte finish with almost invisible layer lines, making them ideal for prototypes of components that have to have a premium non-glossy look.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-cf",
+    "title": "PLA-CF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8b2631ad5d90e04839213e93cbf79409bc4e43711d4e7436902ac767c843e9c0",
+   "en": "Bambu PAHT-CF is a high-temperature engineering-grade carbon-fiber reinforced aromatic nylon that is designed for applications where high strength, stiffness, and temperature resistance are required. It is easy to print, has enhanced Z-bonding, a high-degree of dimensional stability, and has been optimized to retain excellent mechanical properties when wet. Suggested uses are: functional prototypes, machining fixtures, injection molds, jigs, and low-volume production parts.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "paht-cf",
+    "title": "PAHT-CF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5c2004a5f0d85b432979606792007a149ae5e63296da0119fd2ca17cfb32f8d1",
+   "en": "printing tips",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "paht-cf",
+    "title": "PAHT-CF",
+    "field": "documents[4]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "666f1047e3e8def4ed00c53d63d6854203cb858de71798e9832d347b7bc6f8ec",
+   "en": "Bambu PETG-CF is a carbon fiber reinforced PETG that offers improved performance and appearance compared to traditional PETG. The specially formulated blend minimizes the risk of warping and nozzle sticking, while still providing a smooth and consistent print quality. Addition of carbon fiber brings distinctive texture and improved strength to the material, making it ideal for high-stress models requiring premium finish. Whether you're an engineer looking to create functional prototypes, an artist looking to create high-quality models, or simply an enthusiast looking to experiment with the latest materials, Bambu PETG-CF is the ideal choice.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "petg-cf",
+    "title": "PETG-CF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c60d95b3a40e74c7a5d18b1be72f248c1e865aff761e5abad82e83b7b6ee8fa3",
+   "en": "Bambu PLA CMYK Lithophane is a four-color bundle of PLA Basic filaments for lithophane printing including cyan, magenta, yellow, and white. Based on the CMYK color mixing principle, this bundle can create a wide range of colors through the overlaying of the three process colors. With this bundle, you can create vibrant, full-color prints that are perfect for memorizing special moments and creating unique gifts. Whether you're printing photos or creating custom lithophanes, Bambu PLA CMYK Lithophane Bundle will fresh up your experience by coloring your ideas.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-cmyk-lithophane",
+    "title": "PLA CMYK Lithophane Bundle",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b5c1c3f99e393543022478769fd0389c4dacf8126e3db12629b737f62f311560",
+   "en": "CMYK Lithophane Printing Guide",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "pla-cmyk-lithophane",
+    "title": "PLA CMYK Lithophane Bundle",
+    "field": "documents[0]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca1f42bc43c4ca3f39e70d08082912c28b805defcc3e48dc5aa66583522a223f",
+   "en": "Lithophane Maker",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-cmyk-lithophane",
+    "title": "PLA CMYK Lithophane Bundle",
+    "field": "documents[2]",
+    "near": "video"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4e1acf0de57f3c7033a498d262af127c1e38907e584a61b443c405291f5721e",
+   "en": "Bambu Lab CF Reinforced PET Filament: Very low moisture absorption, high dimensional stability, exceptional heat resistance. Ideal for durable parts.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pet-cf",
+    "title": "PET-CF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f0999ec783a1f784b9215857ffea2e17c3d8a6a82ff45f9c55dff1cd288d0485",
+   "en": "Printing tips for Engineering materials",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "pet-cf",
+    "title": "PET-CF",
+    "field": "documents[4]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "2378d30f3ad7d12fe6db2f0564e876da24eaca763254fde07cd392d11fc1f9f5",
+   "en": "Bambu ASA is a highly durable material that offers exceptional UV, weather, mechanical, and thermal resistance. Its unique combination of properties makes it an ideal material for printing outdoor models (plant signs, mailboxes, wind vanes, etc.) and structural parts that require long-term exposure to challenging outdoor conditions.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "89b573e97e7003f28f93417e04e445176f42ff140a6eca375693cc32b1558966",
+   "en": "Bambu PLA Aero achieves low density and light weight by foaming at high temperatures during printing and creating small holes inside the prints. It's the perfect choice for light-weight and energy-saving prints, including unmanned aerial vehicles (UAVs), aerodynamic models, and gliders.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5696d135fe7eb0f05ce06041ec050633b7e8820d0afc490c936e73e5cafb378e",
+   "en": "filament",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "documents[3]",
+    "near": "wiki"
+   },
+   "dict": {
+    "ar": "فلامنت",
+    "ckb": "فیلامێنت"
+   }
+  },
+  {
+   "h": "8d80c9f605223ae97dedf6c9beca36a0a9c7fd43b2d5312ad248303f9997b9b8",
+   "en": "instructions for printing aircraft model with foaming PLA (PLA Aero)",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "documents[4]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5e992382bcafba9deccea65e495109c93dbf35dfca4f6a3bcd0fd1b8ccc672f",
+   "en": "Bambu PA6-CF is a carbon fiber reinforced PA6 (Nylon 6) filament. Carbon fiber reinforcement provides significantly high stiffness and strength properties in dry environments and maintains exceptional heat resistance and impact resistance. Similar to other Bambu CF Filaments, these outstanding mechanical properties combination make it an ideal choice for printing fixtures, clamps, automotive and mechanical components and various structural and engineering parts that used in dry environments.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fd2f4a0b9056c4b8000d23ee8c214525ac88739c37092bfd6863b63aec6170ee",
+   "en": "Bambu TPU 95A HF is an optimized TPU filament designed for high-speed 3D printing. Compared to regular TPU 95A, TPU 95A HF offers an impressive 3x faster printing speed, effectively addressing the common problem of lengthy prints associated with other TPU filaments. TPU 95A HF maintains exceptional interlayer adhesion, impact resistance, flexibility, and cold-temperature resilience, just like traditional TPU filaments. Experience faster TPU printing without any compromises!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b32556484041f49b5486ecfa4fcf616a7450a384cd252f454dafa2ff6f57196f",
+   "en": "PLA Glow stands out due to its incorporation of a unique additive: luminous powder. This variant retains the familiar qualities of traditional PLA, including easy printing, high quality, and exceptional overall mechanical properties. What sets PLA Glow apart is its distinctive feature—it glows in the dark. This makes it the optimal selection for crafting luminous nameplates, logos, jewelry, and various models that require a captivating glow effect.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-glow",
+    "title": "PLA Glow",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8cd74d707d84c5a9a3eec2186d5cc55e01a4b832408ebf0c0104839497f496e5",
+   "en": "Bambu PLA Silk Multi-Color is available in two distinct styles: PLA Silk Dual Color and PLA Silk Gradient. PLA Silk Dual Color is crafted by blending two vibrant silk tones into one filament strand. The color of your prints can be changed by rotating the filament to different orientations. PLA Silk Gradient includes 2 to 4 smooth, flowing color transitions per spool, creating elegant, multitone effects in a single print. Both variants offer a silky texture and high-gloss finish, perfect for making your models visually striking and professional.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3a5a22a5f6d7f1ad65a561bb081c9d59a5766b69c009282a1c6116fe9c4ed9a5",
+   "en": "filament drying instructions",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "documents[4]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f16d96511176ab492a0810f73d71cc5f05f54c358115ba56d9b79c2b86a7c00",
+   "en": "Bambu PETG Translucent stands out with its exceptional printing characteristics, setting it apart from standard PETG materials. This specially tuned filament minimizes common issues like nozzle sticking, leakage, and clumping during the printing process, providing a hassle-free experience compared to ordinary PETG materials. The filament also exhibits water resistance, UV resistance, and resistance to temperature changes, making it an excellent choice for outdoor applications. Create with Light, Shadow and a Wide Range of Colors Bambu PETG Translucent offers 8 vibrant colors for you to choose from. Elevate your prints by seamlessly blending different colors and experimenting with various thicknesses of layers and walls.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4187e94d73e2fdcaeab401fc6123dba9eb924eff3c8e0ab74a93a5ab7a04bcc3",
+   "en": "Printing tips for transparent PETG",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "documents[6]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2774809b19a23044b4ea6c0483140eedaadc39e034c66b9b3fd80a6f511e02a",
+   "en": "PLA Galaxy -- where innovation meets elegance. Experience a new dimension of printing with filament infused with glass microsphere additives. This unique blend creates mesmerizing visual effects, offering dynamic reflections and a glossy, smooth finish. Elevate your prints to new heights as they gleam with unparalleled brilliance from every angle, all while maintaining the ease of printing and exceptional strength and toughness you expect from PLA Basic.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-galaxy",
+    "title": "PLA Galaxy",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9faf9af61b907190a3ea74c504118c8ca5a1eaa360b744f9d4b04bfba9f50d29",
+   "en": "Bambu PVA is a water-dissolvable support material. It provides reliable support for complex designs and overhangs, which can be easily dissolved in water after printing. Compatible with various filaments, it simplifies post-processing and reduces the risk of damaging the printed object during support removal.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9a510441b6e255a7c60877dfdbcdb60aa8660fdaa56d4ff482e5a7c983e0de1d",
+   "en": "PVA Printing Guide",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "documents[4]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "57ac9e078f8025cddab5793d9a7cbcfa172389dc84e7983dea22b6ea9c6c02c8",
+   "en": "Reduce the risk of prints leakage guide",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "documents[5]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "600224ae1bd923d2568513b3df6eefdccc7e5de05692b90e6a0a29de82ef1d90",
+   "en": "Bambu PA6-GF - Glass Fiber Reinforced Nylon Bambu PA6-GF, also known as Nylon 6 with Glass Fiber, stands at the forefront of high-performance engineering plastics. Engineered to deliver exceptional strength, durability, dimensional stability.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c58931cb0f207967c630e7ddc276f6c89b771045779258814d137b211b14ae30",
+   "en": "Work after Printing Finished",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "documents[5]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "998437607a41ac823c52328c3da3ebff698e6e595f472ce9f0d3f90e3426767c",
+   "en": "Bambu ASA Aero is a self-foaming material renowned for its exceptional durability and toughness. Its heat-sensitive foaming allows for controlled model density, resulting in feather-light print models. Additionally, it boasts extraordinary resistance to temperature, water, and UV rays. With these unique properties, it is ideal for printing long-lasting outdoor models and weight-sensitive projects, such as RC planes.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c9589e0c37a654665c506b208c5c40ead5bf251d6709490cf87ead2189ddb280",
+   "en": "ASA Aero Printing Guide",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "documents[5]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "b88e393020ebda59b64774ec6e41a75ab390e510a84d82f5e83087ca39dd72f3",
+   "en": "Bambu ABS-GF is a glass fiber-reinforced ABS filament, enhanced in both mechanical and aesthetic properties. Compared with regular ABS, ABS-GF outperforms in strength, stiffness, temperature resistance and dimentional stability, while being less prone to deformation and warping. Glass fiber imparts a smooth matte finish with micro-spot gloss, blurring layer line. With the inheritance of water resistance, wear resistance, durability and vibrant colors of regular ABS, ABS-GF is ideal for both mechanical parts and decorations.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "83d514c95f36896676da3286196303123b96d67e80c91d50b67e4443dea58458",
+   "en": "Bambu Support for PLA/PETG The ultimate support material, compatible with both PLA and PETG filaments. Effortless, tool-free removal, preserving the pristine surface of your printed object.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b743fb86ef07eb3a33bebb3545230ff0bc409c4e3904db1e3fcff442cefc349a",
+   "en": "Support PLA/PETG is designed for seamless use with both PLA and PETG, eliminating the need to switch support materials. This allows you to save time and simplify your workflow.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "46be0076cd7b866c14b7dcbffb4f7e0b707d49b32869f622c414b7fda68b7e09",
+   "en": "Enhance your ABS printing experience with our innovative support material. Designed for effortless printing and hassle-free removal, this material ensures a flawless support interface every time. Fully compatible with the AMS systems, it streamlines your ABS printing process from start to finish. Say goodbye to tedious support removal and enjoy a smoother, more efficient workflow!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "18b8c383e81c308c8c04a5a4ab8b904dfef0415b859de680a6d95498ed39c122",
+   "en": "PETG HF is a fully optimized PETG filament designed specifically for high-speed printing. With a default printing speed that is twice as fast as standard PETG filaments, PETG HF takes your printing efficiency to new heights. It effectively addresses common issues such as oozing and clumping associated with regular PETG, ensuring smoother and more reliable prints. The new matte finish not only enhances the aesthetic by smoothing out uneven gloss during speed transitions but also provides a consistently uniform look. Offering greater durability and toughness than PLA, PETG HF is the ideal choice for creating long-lasting items with an improved finish and faster production times.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "260537a7b56bdaa694014d680ae3120d82c2e2056e3ff297d6b8a05c27836775",
+   "en": "Work After Printing Finished",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "ppa-cf",
+    "title": "PPA-CF",
+    "field": "documents[5]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "9695a4ccf0f07431e9beaa7dadaab5239b750b99d0abf70608a1339f4b8b76b3",
+   "en": "Bambu Lab CF Reinforced PPS filament: Super heat resistant & flame retardant. Unmatched strength, stiffness, and chemical resistance for industrial use.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "234bd2ed9372265d67f8afde7c690e2e0be1e08207f0d8c59d8b0148808a4843",
+   "en": "UL 94 Test Report",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "documents[3]",
+    "near": "certificate"
+   },
+   "dict": null
+  },
+  {
+   "h": "e479b7795501bfb06f83439f57e8b0968f8e66f57fbe91dc2d227c8b312f910e",
+   "en": "Work After Printing is Finished",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pps-cf",
+    "title": "PPS-CF",
+    "field": "documents[5]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "19e277ecb7870b66e17952ae93c7723354a07b31802803fe4be8f13a73a3ba35",
+   "en": "Filament UL 94 Test Report",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pc-fr",
+    "title": "PC FR",
+    "field": "documents[3]",
+    "near": "certificate"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a6e46fcda734af5ab03b83a558dc0548dd699e47f89e3d0f017d7896ba871c0",
+   "en": "TPU 90A Filament TDS",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "documents[0]",
+    "near": "tds"
+   },
+   "dict": null
+  },
+  {
+   "h": "97c8cfb0d1bfa06ab00b54313cbf1a9d4b385ef2a17f0181457561c458aa4388",
+   "en": "TPU 90A Filament MSDS",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "documents[1]",
+    "near": "sds"
+   },
+   "dict": null
+  },
+  {
+   "h": "f17abab2f2b280862ade29752f1286ff3caafb1b51230409c08092071cbb7672",
+   "en": "TPU 90A Filament RoHS",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "documents[2]",
+    "near": "certificate"
+   },
+   "dict": null
+  },
+  {
+   "h": "11cd4603a3afc81008d0070cbf2e85b96d8fec5d36cf8895d455c5b15cb04874",
+   "en": "TPU 90A Hex Code",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "documents[3]",
+    "near": "hex_codes"
+   },
+   "dict": null
+  },
+  {
+   "h": "bda05db1e47ef6b6ef60d06f46072a7a1b82683c42130785e7ecbcfe39fdd7ee",
+   "en": "TPU 85A Filament TDS",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "documents[4]",
+    "near": "tds"
+   },
+   "dict": null
+  },
+  {
+   "h": "a00b03c990b6c218a35d2ca1c6a03054b63944585c3329b249e14f59ab327919",
+   "en": "TPU 85A Filament MSDS",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "documents[5]",
+    "near": "sds"
+   },
+   "dict": null
+  },
+  {
+   "h": "880d2b7f2f604cf4693d764605e8e638a7bdf617d8a9de74c1247bd0153d54e9",
+   "en": "TPU 85A Filament RoHS",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "documents[6]",
+    "near": "certificate"
+   },
+   "dict": null
+  },
+  {
+   "h": "93e7ae548b6801efe834ffc037ae3837632444770036b3c70f0a6eddd9bfb954",
+   "en": "TPU 85A Hex Code",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "documents[7]",
+    "near": "hex_codes"
+   },
+   "dict": null
+  },
+  {
+   "h": "83bc7275df0b04ae618d7eb87474fb1b33da2b59119a902195ba182d2c92bbaf",
+   "en": "H2D Soft and Hard Filament Multi-Material Printing Guide",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-85a-tpu-90a",
+    "title": "TPU 85A / TPU 90A",
+    "field": "documents[10]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa5d9625b94ca7f1ecd09e6dcf86c832575fcc463fb3578f6ba5c2709aaac253",
+   "en": "PLA Pure is the best PLA filament for safe indoor 3D printing. Ultra-low-emission, toy-safe, and food-contact-grade.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0fc7963e7ad24fa0b7fdf2d2a59bd00e74a87cf30e954dec8dff0915ffd512ea",
+   "en": "EU 10/2011 Food Contact Report",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "documents[4]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "6bb8ee9189a1fefb89e62d62340c52a5600c9a17c36d033a2fefd3f57f79ad2e",
+   "en": "EN 71-3 Toy Safety Report",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-pure",
+    "title": "PLA Pure",
+    "field": "documents[5]",
+    "near": "certificate"
+   },
+   "dict": null
+  },
+  {
+   "h": "2f596c4e138db8225286b18d4f69440d77231cc5e0a99ba031c241af12483ee1",
+   "en": "required adapter",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-basic-color-trial-set",
+    "title": "PLA Basic Color Trial Set",
+    "field": "documents[6]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "dee8671216c6e71908835a6d81dcdb95324bef02cc24a05b76a44b8cb290d1cf",
+   "en": "PETG Usage Guide",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-matte",
+    "title": "PETG Matte",
+    "field": "documents[5]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "b685cbdb0055e6042f7c59a2a570216f1f94b296b4c1e2056e505916547559b1",
+   "en": "Create a glowing Halloween pumpkin display with one Pumpkin Orange PLA filament roll, one Bambu Green PLA filament roll, and twelve warm-white decorative lights. A seasonal bundle for pumpkin lanterns, ornaments, and tabletop scenes.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4496fb137a7f1d6c7a12a4c595c12d889a6cf118ca624eadea99a5997c4b677f",
+   "en": "PLA Basic - Pumpkin Orange (10301)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "specs[x.pla_basic_pumpkin_orange_10301].label",
+    "near": "1"
+   },
+   "dict": null
+  },
+  {
+   "h": "26808a469d3ff366efe9985730bcf7270fabe34649fb50ee9aefc9407c61b732",
+   "en": "PLA Basic - Bambu Green (10501)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "specs[x.pla_basic_bambu_green_10501].label",
+    "near": "1"
+   },
+   "dict": null
+  },
+  {
+   "h": "44a832ac7d74408fb45d170f9f1507aacaf26318574a8f50b83a5c9bc12c3275",
+   "en": "LED Flame Tea Light Candle Set Warm Yellow (12pcs) - KC008",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "specs[x.led_flame_tea_light_candle_set_warm_yellow_12pcs_kc008].label",
+    "near": "1"
+   },
+   "dict": null
+  },
+  {
+   "h": "05012df37251cfc784847ab321bf3dad2b5e767cc73b852ac3fe1ad4fbcb829d",
+   "en": "MakerWorld",
+   "kind": "doc_title",
+   "freq": 94,
+   "context": {
+    "handle": "hwb-pumpkinfamily",
+    "title": "Halloween Special Bundle - Pumpkin Family",
+    "field": "documents[0]",
+    "near": "other"
+   },
+   "dict": null
+  }
+ ]
+}

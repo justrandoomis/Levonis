@@ -1,0 +1,314 @@
+### 0 outside keep=None nr=None
+EN : The product contains all the non-3D printed parts for assembling an entirely functional Magic Night Cat Pumpkin Lantern. To complete the work, you also need to download the model files and 3D print the remaining parts.
+AR1: يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع فانوس Magic Night Cat Pumpkin Lantern يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.
+CK1: بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی فانۆسی Magic Night Cat Pumpkin Lantern بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، هەروەها پێویستە فایلەکانی مۆدێل دابگریت و پارچە ماوەکان بە چاپکەری 3D چاپ بکەیت.
+
+### 1 outside keep=None nr=None
+EN : To download the model files please visit the Magic Night Cat Pumpkin Lantern on MakerWorld.
+AR1: لتنزيل ملفات النموذج، يرجى زيارة صفحة Magic Night Cat Pumpkin Lantern على MakerWorld.
+CK1: بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی Magic Night Cat Pumpkin Lantern لە MakerWorld بکە.
+
+### 2 outside keep=None nr=None
+EN : Magical Changing Expressions
+AR1: تعابير سحرية متغيّرة
+CK1: دەربڕینە سیحراوییە گۆڕاوەکان
+
+### 3 SAMPLE keep=None nr=None
+EN : Its eyes glow with a soft and enchanting light, creating a gentle and magical atmosphere. Simply rotate the top of the hat to switch between different facial expressions and discover a new look every time.
+AR1: تتوهّج عيناه بضوء ناعم وساحر، ما يخلق أجواءً هادئة وسحرية. ما عليك سوى تدوير الجزء العلوي من القبعة للتبديل بين تعابير وجه مختلفة واكتشاف مظهر جديد في كل مرة.
+AR2: تتوهّج عيناه بضوء ناعم وساحر يخلق أجواءً هادئة وسحرية. ما عليك سوى تدوير الجزء العلوي من القبعة للتبديل بين تعابير الوجه المختلفة واكتشاف مظهر جديد في كل مرة.
+CK1: چاوەکانی بە ڕووناکییەکی نەرم و سەرنجڕاکێش دەدرەوشێنەوە و کەشێکی هێمن و سیحراوی دروست دەکەن. تەنها بەشی سەرەوەی کڵاوەکە بسووڕێنە بۆ گۆڕین لە نێوان دەربڕینە جیاوازەکانی ڕوخسار و هەر جارێک شێوەیەکی نوێ بدۆزەرەوە.
+CK2: چاوەکانی بە ڕووناکییەکی نەرم و سەرنجڕاکێش دەدرەوشێنەوە و کەشێکی هێمن و سیحراوی دروست دەکەن. تەنها سەرەوەی کڵاوەکە بسووڕێنە بۆ گۆڕین لە نێوان دەربڕینە جیاوازەکانی ڕووخسار و هەموو جارێک شێوەیەکی نوێ بدۆزەرەوە.
+
+### 4 SAMPLE keep=None nr=None
+EN : Interactive Color-Changing Magic
+AR1: سحر تفاعلي لتغيير الألوان
+AR2: سحر تفاعلي لتغيير الألوان
+CK1: سیحری کارلێککەری گۆڕینی ڕەنگ
+CK2: جادووی کارلێککەری گۆڕینی ڕەنگ
+
+### 5 SAMPLE keep=None nr=None
+EN : Press its head to activate the magic of light. Each press switches to a different light color and produces a soft, satisfying “click” sound, making every interaction feel fun and magical. You can also choose to control it remotely with the included remote control.
+AR1: اضغط على رأسه لتفعيل سحر الضوء. كل ضغطة تنتقل إلى لون إضاءة مختلف وتُصدر صوت «نقرة» ناعمًا ومُرضيًا، ما يجعل كل تفاعل ممتعًا وساحرًا. ويمكنك أيضًا اختيار التحكم به عن بُعد باستخدام جهاز التحكم عن بُعد المرفق.
+AR2: اضغط على رأسه لتفعيل سحر الضوء. كل ضغطة تنقله إلى لون إضاءة مختلف وتُصدر صوت «نقرة» ناعمًا ومُرضيًا، فيصبح كل تفاعل ممتعًا وساحرًا. ويمكنك أيضًا التحكم به عن بُعد باستخدام جهاز التحكم عن بُعد المرفق.
+CK1: فشار بخەرە سەر سەری بۆ چالاککردنی سیحری ڕووناکی. هەر فشارێک دەیگۆڕێت بۆ ڕەنگێکی جیاوازی ڕووناکی و دەنگێکی «کلیک»ی نەرم و دڵخۆشکەر دەردەکات، بەمەش هەموو کارلێکێک خۆش و سیحراوی دەبێت. هەروەها دەتوانیت هەڵبژێریت لە دوورەوە کۆنترۆڵی بکەیت بەو کۆنترۆڵی لە دوورەوەیەی کە لەگەڵیدایە.
+CK2: سەری دابگرە بۆ چالاککردنی جادووی ڕووناکی. هەر داگرتنێک دەیگۆڕێت بۆ ڕەنگێکی جیاوازی ڕووناکی و دەنگێکی «کلیک»ی نەرم و دڵخۆشکەر دەردەکات، بۆیە هەموو کارلێکێک خۆش و سیحراوی دەبێت. هەروەها دەتوانیت بە کۆنترۆڵی لە دوورەوە کە لەگەڵیدایە، لە دوورەوە کۆنترۆڵی بکەیت.
+
+### 6 SAMPLE keep=None nr=None
+EN : Build a compact RC wheel loader that turns 3D printing into hands-on construction play. Designed around the CyberBrick ecosystem, it combines printable parts with modular electronics for driving, steering, lifting, and loading. It's a rewarding project for makers who want a functional machine, not just another static model.
+AR1: ابنِ جرّافة RC بعجلات صغيرة الحجم تحوّل الطباعة 3D إلى لعب عملي بآليات البناء. صُمّمت حول منظومة CyberBrick، وتجمع بين قطع قابلة للطباعة وإلكترونيات معيارية للقيادة والتوجيه والرفع والتحميل. إنها مشروع مُجزٍ للصنّاع الذين يريدون آلة تعمل فعلًا، لا مجرد نموذج ثابت آخر.
+AR2: ابنِ جرّافة تحميل بعجلات RC صغيرة الحجم تحوّل الطباعة 3D إلى لعب عملي بآلات البناء. صُمّمت حول منظومة CyberBrick، وتجمع بين قطع قابلة للطباعة وإلكترونيات معيارية للقيادة والتوجيه والرفع والتحميل. إنها مشروع مُجزٍ للصنّاع الذين يريدون آلة تعمل فعلًا، لا مجرد نموذج ثابت آخر.
+CK1: لۆدەرێکی چەرخداری بچووکی RC دروست بکە کە چاپی 3D دەگۆڕێت بۆ یارییەکی دەستی بە ئامێرەکانی بیناسازی. لەسەر بنەمای سیستەمی CyberBrick دیزاین کراوە، و پارچەی شیاوی چاپ لەگەڵ ئەلیکترۆنیاتی مۆدیولار تێکەڵ دەکات بۆ لێخوڕین، ئاراستەکردن، بەرزکردنەوە و بارکردن. پڕۆژەیەکی بەسوودە بۆ ئەو دروستکەرانەی ئامێرێکی کارایان دەوێت، نەک تەنها مۆدێلێکی جێگیری تر.
+CK2: لۆدەرێکی بچووکی RC بە تایە دروست بکە کە چاپی 3D دەگۆڕێت بۆ یارییەکی کرداریی ئامێری بیناسازی. لە دەوری سیستەمی CyberBrick دیزاین کراوە، و پارچەی شیاوی چاپ لەگەڵ ئەلیکترۆنیاتی مۆدیولار کۆدەکاتەوە بۆ لێخوڕین، ئاراستەکردن، بەرزکردنەوە و بارکردن. پڕۆژەیەکی بەسوودە بۆ ئەو دروستکەرانەی ئامێرێکی کارایان دەوێت، نەک تەنها مۆدێلێکی جێگیری تر.
+
+### 7 SAMPLE keep=None nr=None
+EN : Smooth Lift, Serious Detail
+AR1: رفع سلس وتفاصيل دقيقة
+AR2: رفع سلس وتفاصيل دقيقة
+CK1: بەرزکردنەوەی نەرم و وردەکاریی بەرچاو
+CK2: بەرزکردنەوەی نەرم، وردەکاریی جددی
+
+### 8 SAMPLE keep=None nr=None
+EN : Watch the CyberBrick RC Wheel Loader bring its working front end to life. Its threaded-motor cylinders raise and tilt the bucket with smooth, controlled, hydraulic-style motion—authentic construction-machine action in a compact 1:25 scale build.
+AR1: شاهد جرّافة CyberBrick RC Wheel Loader وهي تُحيي واجهتها الأمامية العاملة. ترفع أسطواناتها التي تعمل بمحركات ملولبة الدلوَ وتُميله بحركة سلسة ومتحكَّم بها تشبه الحركة الهيدروليكية، لتقدّم أداءً حقيقيًا لآليات البناء في نموذج صغير بمقياس 1:25.
+AR2: شاهد CyberBrick RC Wheel Loader وهو يُحيي واجهته الأمامية العاملة. ترفع أسطواناته ذات المحركات اللولبية الدلو وتُميله بحركة سلسة ومتحكَّم بها تحاكي الأنظمة الهيدروليكية، لتمنحك أداءً حقيقيًا لآلات البناء في نموذج مدمج بمقياس 1:25.
+CK1: سەیری لۆدەری CyberBrick RC Wheel Loader بکە کە چۆن بەشی پێشەوەی کاراکەی زیندوو دەکاتەوە. سیلیندەرەکانی کە بە بزوێنەری پێچدار کار دەکەن، سەتڵەکە بەرز دەکەنەوە و لاری دەکەنەوە بە جووڵەیەکی نەرم و کۆنترۆڵکراو لە شێوەی هایدرۆلیکی — کاری ڕاستەقینەی ئامێری بیناسازی لە مۆدێلێکی بچووکدا بە پێوەری 1:25.
+CK2: سەیری CyberBrick RC Wheel Loader بکە کە بەشی پێشەوەی کاراکەی زیندوو دەکاتەوە. سیلیندەرەکانی کە بە بزوێنەری پێچدار کار دەکەن، سەتڵەکە بەرز دەکەنەوە و لار دەکەنەوە بە جووڵەیەکی نەرم و کۆنترۆڵکراو بە شێوازی هایدرۆلیکی؛ کردارێکی ڕاستەقینەی ئامێری بیناسازی لە دروستکراوێکی بچووک بە پێوەری 1:25.
+
+### 9 SAMPLE keep=None nr=None
+EN : Built to Bend, Made to Play
+AR1: صُمّم لينثني، وصُنع للعب
+AR2: صُمّم لينعطف، وصُنع للّعب
+CK1: بۆ چەمانەوە دروستکراوە، بۆ یاری ئامادەکراوە
+CK2: دروستکراوە بۆ چەمانەوە، ئامادەیە بۆ یاری
+
+### 10 SAMPLE keep=None nr=None
+EN : ompact in scale, big on character. This 3D-printed CyberBrick RC Wheel Loader combines articulated steering, detailed engineering, and a rugged working bucket for a model that looks as satisfying in motion as it does on display.
+AR1: صغير الحجم، كبير الحضور. تجمع جرّافة CyberBrick RC Wheel Loader المطبوعة (3D-printed) بين التوجيه المفصلي والهندسة المتقنة التفاصيل ودلوٍ متين يعمل فعلًا، لتحصل على نموذج ممتع للنظر أثناء الحركة بقدر ما هو ممتع على رف العرض.
+AR2: صغير الحجم، كبير الشخصية. يجمع هذا الـ CyberBrick RC Wheel Loader المطبوع (3D-printed) بين التوجيه المفصلي والهندسة الدقيقة ودلو عامل متين، ليقدّم نموذجًا ممتعًا للنظر أثناء الحركة بقدر ما هو ممتع عند عرضه.
+CK1: بچووک لە قەبارەدا، گەورە لە کەسایەتیدا. ئەم لۆدەرە چاپکراوەی (3D-printed) CyberBrick RC Wheel Loader سووکانی جومگەدار، ئەندازیاریی ورد و سەتڵێکی بەهێزی کارا تێکەڵ دەکات بۆ مۆدێلێک کە لە کاتی جووڵەدا هێندەی کاتی نمایشکردن سەرنجڕاکێشە.
+CK2: بچووک لە قەبارەدا، گەورە لە کەسایەتیدا. ئەم لۆدەرە چاپکراوەی (3D-printed) CyberBrick RC Wheel Loader ئاراستەکردنی جومگەدار، ئەندازیاریی ورد و سەتڵێکی کارای بەهێز کۆدەکاتەوە بۆ مۆدێلێک کە لە کاتی جووڵەدا هێندەی کاتی نمایشکردن سەرنجڕاکێشە.
+
+### 11 SAMPLE keep=None nr=None
+EN : The product contains all the non-3D printed parts for assembling an entirely functional The Modular Lantern. To complete the work, you also need to download the model files and 3D print the remaining parts.
+AR1: يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع فانوس The Modular Lantern يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.
+AR2: يحتوي المنتج على جميع القطع غير المطبوعة (non-3D printed) اللازمة لتجميع The Modular Lantern ليعمل بالكامل. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.
+CK1: بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی فانۆسی The Modular Lantern بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، هەروەها پێویستە فایلەکانی مۆدێل دابگریت و پارچە ماوەکان بە چاپکەری 3D چاپ بکەیت.
+CK2: بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D printed) و بۆ پێکەوەنانی The Modular Lantern بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، هەروەها پێویستە فایلەکانی مۆدێل دابگریت و پارچە ماوەکان بە چاپکەری 3D چاپ بکەیت.
+
+### 12 SAMPLE keep=None nr=None
+EN : To download the model files please visit the The Modular Lantern on MakerWorld.
+AR1: لتنزيل ملفات النموذج، يرجى زيارة صفحة The Modular Lantern على MakerWorld.
+AR2: لتنزيل ملفات النموذج، يرجى زيارة صفحة The Modular Lantern على MakerWorld.
+CK1: بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی The Modular Lantern لە MakerWorld بکە.
+CK2: بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی The Modular Lantern لە MakerWorld بکە.
+
+### 13 outside keep=None nr=None
+EN : The product contains all the non-3D printed parts for assembling an entirely functional The Alchemist's Study – A Magical Diorama. To complete the work, you also need to download the model files and 3D print the remaining parts.
+AR1: يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع مجسّم The Alchemist's Study – A Magical Diorama يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.
+CK1: بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی دیۆرامای The Alchemist's Study – A Magical Diorama بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، هەروەها پێویستە فایلەکانی مۆدێل دابگریت و پارچە ماوەکان بە چاپکەری 3D چاپ بکەیت.
+
+### 14 SAMPLE keep=None nr=None
+EN : To download the model files please visit the The Alchemist's Study – A Magical Diorama on MakerWorld.
+AR1: لتنزيل ملفات النموذج، يرجى زيارة صفحة The Alchemist's Study – A Magical Diorama على MakerWorld.
+AR2: لتنزيل ملفات النموذج، يرجى زيارة صفحة The Alchemist's Study – A Magical Diorama على MakerWorld.
+CK1: بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی The Alchemist's Study – A Magical Diorama لە MakerWorld بکە.
+CK2: بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی The Alchemist's Study – A Magical Diorama لە MakerWorld بکە.
+
+### 15 SAMPLE keep=None nr=None
+EN : The product contains all the non-3D printed parts for assembling an entirely functional AMS Drawer for X/P-Series with Printed Slides. To complete the work, you also need to download the model files and 3D print the remaining parts.
+AR1: يتضمن المنتج جميع القطع غير المطبوعة (non-3D) اللازمة لتجميع درج AMS Drawer for X/P-Series with Printed Slides يعمل بكامل وظائفه. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.
+AR2: يحتوي المنتج على جميع القطع غير المطبوعة (non-3D printed) اللازمة لتجميع AMS Drawer for X/P-Series with Printed Slides ليعمل بالكامل. ولإكمال العمل، تحتاج أيضًا إلى تنزيل ملفات النموذج وطباعة القطع المتبقية بطابعة 3D.
+CK1: بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D) و بۆ پێکەوەنانی چەکمەجەی AMS Drawer for X/P-Series with Printed Slides بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، هەروەها پێویستە فایلەکانی مۆدێل دابگریت و پارچە ماوەکان بە چاپکەری 3D چاپ بکەیت.
+CK2: بەرهەمەکە هەموو ئەو پارچانەی تێدایە کە چاپ ناکرێن (non-3D printed) و بۆ پێکەوەنانی AMS Drawer for X/P-Series with Printed Slides بە شێوەیەکی تەواو کارا پێویستن. بۆ تەواوکردنی کارەکە، هەروەها پێویستە فایلەکانی مۆدێل دابگریت و پارچە ماوەکان بە چاپکەری 3D چاپ بکەیت.
+
+### 16 SAMPLE keep=None nr=None
+EN : To download the model files please visit the AMS Drawer for X/P-Series with Printed Slides on MakerWorld.
+AR1: لتنزيل ملفات النموذج، يرجى زيارة صفحة AMS Drawer for X/P-Series with Printed Slides على MakerWorld.
+AR2: لتنزيل ملفات النموذج، يرجى زيارة صفحة AMS Drawer for X/P-Series with Printed Slides على MakerWorld.
+CK1: بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی AMS Drawer for X/P-Series with Printed Slides لە MakerWorld بکە.
+CK2: بۆ داگرتنی فایلەکانی مۆدێل، تکایە سەردانی پەڕەی AMS Drawer for X/P-Series with Printed Slides لە MakerWorld بکە.
+
+### 17 SAMPLE keep=None nr=None
+EN : Turn a 3D print into a moving Halloween prank prop. CyberBrick RC Ghost combines a printable ghost build with remote-control movement, so your decoration can glide through rooms, porches, and party spaces instead of sitting still. Print the parts, install the compatible CyberBrick hardware, and bring a little controlled chaos to Halloween.
+AR1: حوّل طبعة 3D إلى أداة مقالب متحركة للهالوين. يجمع شبح CyberBrick RC Ghost بين مجسّم شبح قابل للطباعة وحركة يُتحكَّم بها عن بُعد، فتنساب زينتك عبر الغرف والشرفات وأماكن الحفلات بدل أن تبقى ثابتة. اطبع القطع، وركّب عتاد CyberBrick المتوافق، وأضف قليلًا من الفوضى المتحكَّم بها إلى الهالوين.
+AR2: حوّل مطبوعة 3D إلى أداة مقالب متحركة للهالوين. يجمع CyberBrick RC Ghost بين مجسّم شبح قابل للطباعة وحركة بالتحكم عن بُعد، لتنساب زينتك عبر الغرف والشرفات وأماكن الحفلات بدلًا من أن تبقى ساكنة. اطبع القطع، وركّب عتاد CyberBrick المتوافق، وأضف قليلًا من الفوضى المتحكَّم بها إلى الهالوين.
+CK1: چاپێکی 3D بگۆڕە بۆ ئامرازێکی گاڵتەجاڕیی جووڵاوی هالۆوین. تارمایی CyberBrick RC Ghost دروستکردنی تارماییەکی شیاوی چاپ لەگەڵ جووڵەی کۆنترۆڵی لە دوورەوە تێکەڵ دەکات، بۆیە ڕازاندنەوەکەت دەتوانێت بە ناو ژوورەکان، بەردەرگاکان و شوێنی ئاهەنگەکاندا بخلیسکێت لە جیاتی ئەوەی بە جێگیری بمێنێتەوە. پارچەکان چاپ بکە، ڕەقەکاڵای گونجاوی CyberBrick دابمەزرێنە، و کەمێک پشێویی کۆنترۆڵکراو بهێنە ناو هالۆوینەوە.
+CK2: چاپێکی 3D بگۆڕە بۆ کەرەستەیەکی جووڵاوی گاڵتەی هالۆوین. CyberBrick RC Ghost دروستکراوێکی تارماییی شیاوی چاپ لەگەڵ جووڵە بە کۆنترۆڵی لە دوورەوە کۆدەکاتەوە، بۆیە ڕازاندنەوەکەت دەتوانێت بە ژوورەکان، بەردەرگاکان و شوێنەکانی ئاهەنگدا بخلیسکێت لە جیاتی ئەوەی جێگیر بمێنێتەوە. پارچەکان چاپ بکە، ڕەقەکاڵا گونجاوەکەی CyberBrick دابمەزرێنە، و کەمێک ئاژاوەی کۆنترۆڵکراو بهێنە ناو هالۆوینەوە.
+
+### 18 SAMPLE keep=None nr=None
+EN : 30min to assemble
+AR1: 30 دقيقة للتجميع
+AR2: 30 دقيقة للتجميع
+CK1: 30 خولەک بۆ پێکەوەنان
+CK2: 30 خولەک بۆ پێکەوەنان
+
+### 19 SAMPLE keep=None nr=None
+EN : Halloween in Motion
+AR1: هالوين متحرّك
+AR2: هالوين يتحرّك
+CK1: هالۆوینی جووڵاو
+CK2: هالۆوینی جووڵاو
+
+### 20 SAMPLE keep=None nr=None
+EN : More than a cute seasonal display, this spooky ghost drives around under remote control for unforgettable RC fun.
+AR1: أكثر من مجرد زينة موسمية لطيفة، فهذا الشبح المخيف يتجوّل بالتحكم عن بُعد ليمنحك متعة RC لا تُنسى.
+AR2: أكثر من مجرد زينة موسمية لطيفة، يتجوّل هذا الشبح المخيف بالتحكم عن بُعد لمتعة RC لا تُنسى.
+CK1: زیاتر لە نمایشێکی وەرزیی جوان، ئەم تارماییە ترسناکە بە کۆنترۆڵی لە دوورەوە بە دەوروبەردا دەگەڕێت بۆ خۆشییەکی RC کە لە بیر ناچێتەوە.
+CK2: زیاتر لە نمایشێکی وەرزیی جوان، ئەم تارماییە ترسناکە بە کۆنترۆڵی لە دوورەوە بە دەوروبەردا دەڕوات بۆ چێژێکی لەبیرنەکراوی یاریی RC.
+
+### 21 SAMPLE keep=None nr=None
+EN : Scare After Dark
+AR1: رعب بعد حلول الظلام
+AR2: رعب بعد حلول الظلام
+CK1: ترساندن لە تاریکیی شەودا
+CK2: ترساندن لە دوای تاریکبوونەوە
+
+### 22 SAMPLE keep=None nr=None
+EN : Lighting effects add atmosphere before the ghost even starts moving. Pair motion with eerie illumination to make dark rooms, entryways, and displays feel instantly more theatrical.
+AR1: تضفي تأثيرات الإضاءة أجواءً خاصة حتى قبل أن يبدأ الشبح بالحركة. اجمع بين الحركة والإضاءة المخيفة لتجعل الغرف المظلمة والمداخل وأماكن العرض تبدو على الفور أشبه بمشهد مسرحي.
+AR2: تضيف تأثيرات الإضاءة أجواءً خاصة حتى قبل أن يبدأ الشبح بالحركة. اجمع بين الحركة والإضاءة المخيفة لتبدو الغرف المظلمة والمداخل وأماكن العرض أكثر مسرحية على الفور.
+CK1: کاریگەرییەکانی ڕووناکی تەنانەت پێش ئەوەی تارماییەکە دەست بە جووڵە بکات کەشێکی تایبەت دروست دەکەن. جووڵە لەگەڵ ڕووناکییەکی ترسناک و نامۆ بەیەکەوە بەکاربهێنە بۆ ئەوەی ژوورە تاریکەکان، دەروازەکان و شوێنەکانی نمایش یەکسەر شانۆییتر دەربکەون.
+CK2: کاریگەرییەکانی ڕووناکی کەشێکی تایبەت زیاد دەکەن تەنانەت پێش ئەوەی تارماییەکە دەست بە جووڵە بکات. جووڵە لەگەڵ ڕووناکییەکی ترسناک تێکەڵ بکە بۆ ئەوەی ژوورە تاریکەکان، دەروازەکان و شوێنەکانی نمایش یەکسەر شانۆییتر دەربکەون.
+
+### 23 SAMPLE keep=None nr=None
+EN : Easy to Build, Easy to Enjoy
+AR1: سهل التجميع، سهل الاستمتاع
+AR2: سهل البناء، سهل الاستمتاع
+CK1: ئاسان بۆ دروستکردن، ئاسان بۆ چێژوەرگرتن
+CK2: دروستکردنی ئاسان، چێژوەرگرتنی ئاسان
+
+### 24 outside keep=None nr=None
+EN : Simple assembly and a practical, accessible design make installation and maintenance hassle-free.
+AR1: بفضل التجميع البسيط والتصميم العملي سهل الوصول، يصبح التركيب والصيانة بلا عناء.
+CK1: پێکەوەنانی سادە و دیزاینێکی کردەیی و دەستڕاگەیشتوو، دامەزراندن و چاککردنەوە بێ گرفت دەکەن.
+
+### 25 SAMPLE keep=None nr=None
+EN : CyberBrick RC Pumpkin turns a Halloween pumpkin into an interactive remote-controlled build for makers who want décor that actually does something. Designed around the CyberBrick ecosystem, it blends 3D printing, motion, and lighting into one seasonal project. Build it once, then bring it back every October as a moving party prop, desk toy, or porch surprise.
+AR1: يحوّل يقطين CyberBrick RC Pumpkin يقطينة الهالوين إلى مشروع تفاعلي يُتحكَّم به عن بُعد للصنّاع الذين يريدون زينةً تؤدي شيئًا فعلًا. صُمّم حول منظومة CyberBrick، ويمزج الطباعة 3D والحركة والإضاءة في مشروع موسمي واحد. ابنِه مرة واحدة، ثم أعِده كل تشرين الأول (أكتوبر) كأداة متحركة للحفلات، أو لعبة مكتب، أو مفاجأة عند المدخل.
+AR2: يحوّل CyberBrick RC Pumpkin يقطين الهالوين إلى مشروع تفاعلي يُتحكَّم به عن بُعد، للصنّاع الذين يريدون زينةً تفعل شيئًا حقًا. صُمّم حول منظومة CyberBrick، ويمزج الطباعة 3D والحركة والإضاءة في مشروع موسمي واحد. ابنِه مرة واحدة، ثم أعِده في تشرين الأول من كل عام كأداة متحركة للحفلات، أو لعبة مكتب، أو مفاجأة عند مدخل البيت.
+CK1: کولەکەی CyberBrick RC Pumpkin کولەکەیەکی هالۆوین دەگۆڕێت بۆ پڕۆژەیەکی کارلێککەر کە بە کۆنترۆڵی لە دوورەوە کار دەکات، بۆ ئەو دروستکەرانەی ڕازاندنەوەیەکیان دەوێت کە بەڕاستی کارێک بکات. لەسەر بنەمای سیستەمی CyberBrick دیزاین کراوە، و چاپی 3D، جووڵە و ڕووناکی لە یەک پڕۆژەی وەرزیدا تێکەڵ دەکات. یەک جار دروستی بکە، پاشان هەموو تشرینی یەکەمێک وەک ئامرازێکی جووڵاوی ئاهەنگ، یاریی سەر مێز یان سەرسوڕمانێکی بەردەرگا بیهێنەرەوە.
+CK2: کولەکەی CyberBrick RC Pumpkin کولەکەیەکی هالۆوین دەگۆڕێت بۆ دروستکراوێکی کارلێککەر کە لە دوورەوە کۆنترۆڵ دەکرێت، بۆ ئەو دروستکەرانەی ڕازاندنەوەیەکیان دەوێت کە بەڕاستی کارێک بکات. لە دەوری سیستەمی CyberBrick دیزاین کراوە، و چاپی 3D، جووڵە و ڕووناکی لە یەک پڕۆژەی وەرزیدا تێکەڵ دەکات. یەک جار دروستی بکە، پاشان هەموو تشرینی یەکەمێک وەک کەرەستەیەکی جووڵاوی ئاهەنگ، یاریی سەر مێز یان سەرسوڕمانێکی بەردەرگا بیهێنەرەوە.
+
+### 26 SAMPLE keep=None nr=None
+EN : Make Halloween Move
+AR1: اجعل الهالوين يتحرّك
+AR2: اجعل الهالوين يتحرّك
+CK1: هالۆوین بخەرە جووڵە
+CK2: هالۆوین بخەرە جووڵە
+
+### 27 SAMPLE keep=None nr=None
+EN : Turn a static Halloween setup into a moving attraction guests can chase, steer, and laugh with. CyberBrick control gives the pumpkin hands-on RC personality, making it a centerpiece instead of background decor.
+AR1: حوّل ديكور الهالوين الثابت إلى عامل جذب متحرك يمكن للضيوف مطاردته وتوجيهه والضحك معه. يمنح تحكّم CyberBrick اليقطينةَ شخصية RC تفاعلية، فتصبح محور الاهتمام بدل أن تكون مجرد زينة في الخلفية.
+AR2: حوّل زينة الهالوين الثابتة إلى عامل جذب متحرّك يمكن للضيوف مطاردته وتوجيهه والضحك معه. يمنح تحكّم CyberBrick اليقطينَ شخصية RC تفاعلية، فيصبح محور الاهتمام بدلًا من أن يكون مجرد زينة في الخلفية.
+CK1: ڕێکخستنێکی جێگیری هالۆوین بگۆڕە بۆ سەرنجڕاکێشێکی جووڵاو کە میوانەکان دەتوانن بەدوایدا بکەون، ئاراستەی بکەن و پێی پێبکەنن. کۆنترۆڵی CyberBrick کەسایەتییەکی دەستیی RC دەداتە کولەکەکە، بەمەش دەبێتە ناوەندی سەرنج لە جیاتی ئەوەی تەنها ڕازاندنەوەیەکی پاشبنەما بێت.
+CK2: ڕێکخستنێکی جێگیری هالۆوین بگۆڕە بۆ سەرنجڕاکێشێکی جووڵاو کە میوانەکان دەتوانن ڕاوی بنێن، ئاراستەی بکەن و پێیەوە پێبکەنن. کۆنترۆڵی CyberBrick کەسایەتییەکی کرداریی RC دەداتە کولەکەکە، و دەیکاتە ناوەندی سەرنج لە جیاتی ڕازاندنەوەیەکی پاشبنەما.
+
+### 28 SAMPLE keep=None nr=None
+EN : Customizable lighting effects
+AR1: تأثيرات إضاءة قابلة للتخصيص
+AR2: تأثيرات إضاءة قابلة للتخصيص
+CK1: کاریگەرییەکانی ڕووناکیی شیاوی تایبەتکردن
+CK2: کاریگەرییەکانی ڕووناکیی شیاوی تایبەتکردن
+
+### 29 SAMPLE keep=None nr=None
+EN : Set the mood with lighting that can shift from spooky glow to party-ready effects. Change the effect to match the scene so the build stays fun beyond one Halloween evening.
+AR1: اضبط الأجواء بإضاءة يمكنها التحوّل من توهّج مخيف إلى تأثيرات تناسب الحفلات. غيّر التأثير ليناسب المشهد، فيبقى المشروع ممتعًا لما بعد أمسية هالوين واحدة.
+AR2: اصنع الأجواء بإضاءة يمكنها التبدّل من توهّج مخيف إلى تأثيرات تناسب الحفلات. غيّر التأثير ليناسب المشهد، فيبقى المشروع ممتعًا لما بعد أمسية هالوين واحدة.
+CK1: کەشەکە ڕێکبخە بە ڕووناکییەک کە دەتوانێت لە درەوشانەوەیەکی ترسناکەوە بگۆڕێت بۆ کاریگەریی گونجاو بۆ ئاهەنگ. کاریگەرییەکە بگۆڕە بۆ ئەوەی لەگەڵ دیمەنەکە بگونجێت، تا پڕۆژەکە لە دوای ئێوارەیەکی هالۆوینیش هەر خۆش بمێنێتەوە.
+CK2: کەشەکە ڕێکبخە بە ڕووناکییەک کە دەتوانێت لە درەوشانەوەیەکی ترسناکەوە بگۆڕێت بۆ کاریگەرییەکانی ئاهەنگ. کاریگەرییەکە بە گوێرەی دیمەنەکە بگۆڕە تا دروستکراوەکە لە دوای یەک ئێوارەی هالۆوینیش هەر خۆش بمێنێتەوە.
+
+### 30 SAMPLE keep=None nr=None
+EN : Kliko Truck Platform is a modular 3D-printable RC truck chassis built for makers who want a functional cargo hauler, not a shelf-only model. Its 1:20 scale balances usable electronics space with parts that remain practical to print at home. Build it in 6x4 or 4x2 form, add working lights, cargo bodies, and control hardware, then keep growing it through the broader CyberBrick ecosystem.
+AR1: منصة Kliko Truck Platform هي هيكل شاحنة RC معياري قابل للطباعة (3D-printable)، صُمّم للصنّاع الذين يريدون شاحنة نقل بضائع تعمل فعلًا، لا نموذجًا للرفّ فقط. يوازن مقياسها 1:20 بين مساحة كافية للإلكترونيات وقطع تبقى عملية للطباعة في المنزل. ابنِها بصيغة 6x4 أو 4x2، وأضف أضواءً تعمل، وصناديق حمولة، وعتاد التحكم، ثم واصل توسيعها عبر منظومة CyberBrick الأوسع.
+AR2: منصة Kliko Truck Platform هي هيكل شاحنة RC معياري قابل للطباعة (3D-printable)، صُمّم للصنّاع الذين يريدون ناقلة بضائع تعمل فعلًا، لا نموذجًا للرفّ فقط. يوازن مقياسها 1:20 بين مساحة كافية للإلكترونيات وقطع تبقى عملية للطباعة في المنزل. ابنِها بتكوين 6x4 أو 4x2، وأضف أضواءً عاملة وصناديق حمولة وعتاد التحكم، ثم واصل توسيعها عبر منظومة CyberBrick الأوسع.
+CK1: پلاتفۆرمی Kliko Truck Platform شاسییەکی مۆدیولاری شیاوی چاپە (3D-printable) بۆ بارهەڵگری RC، کە بۆ ئەو دروستکەرانە دروستکراوە کە بارهەڵگرێکی کارایان دەوێت، نەک مۆدێلێک تەنها بۆ سەر ڕەف. پێوەری 1:20 هاوسەنگی دەکات لە نێوان شوێنی بەکەڵک بۆ ئەلیکترۆنیات و پارچەگەلێک کە چاپکردنیان لە ماڵەوە هەر کردەییە. بە شێوەی 6x4 یان 4x2 دروستی بکە، گڵۆپی کارا، سندوقی بار و ڕەقەکاڵای کۆنترۆڵی بۆ زیاد بکە، پاشان بە یارمەتیی سیستەمی فراوانتری CyberBrick بەردەوام گەشەی پێبدە.
+CK2: پلاتفۆرمی Kliko Truck Platform شاسییەکی مۆدیولارە بۆ بارهەڵگری RC و شیاوی چاپە (3D-printable)، بۆ ئەو دروستکەرانە دروستکراوە کە بارهەڵگرێکی کارایان دەوێت، نەک مۆدێلێک تەنها بۆ سەر ڕەف. پێوەری 1:20 هاوسەنگی لە نێوان شوێنی بەکارهاتوو بۆ ئەلیکترۆنیات و پارچەگەلێک کە بە کرداری لە ماڵەوە چاپ دەکرێن ڕادەگرێت. بە شێوەی 6x4 یان 4x2 دروستی بکە، گڵۆپی کارا، لاشەی بار و ڕەقەکاڵای کۆنترۆڵ زیاد بکە، پاشان لە ڕێگەی سیستەمی فراوانتری CyberBrick بەردەوام گەشەی پێبدە.
+
+### 31 SAMPLE keep=None nr=None
+EN : Real Hauling Play
+AR1: متعة نقل حمولات حقيقية
+AR2: لعب نقل حقيقي
+CK1: یاریی ڕاستەقینەی بارگواستنەوە
+CK2: یاریی ڕاستەقینەی بارگواستنەوە
+
+### 32 SAMPLE keep=None nr=None
+EN : Cargo bodies mount directly to the chassis, so your build becomes a working hauler instead of a static display piece. Printable accessories let you stage loads, create routes, and keep expanding the truck after the base build is finished.
+AR1: تُثبَّت صناديق الحمولة مباشرة على الهيكل، فيصبح مشروعك شاحنة نقل تعمل فعلًا بدل أن يكون قطعة عرض ثابتة. وتتيح لك الملحقات القابلة للطباعة تجهيز الحمولات، وإنشاء المسارات، ومواصلة توسيع الشاحنة بعد الانتهاء من البناء الأساسي.
+AR2: تُثبَّت صناديق الحمولة مباشرة على الهيكل، فيصبح مشروعك شاحنة نقل عاملة بدلًا من قطعة عرض ثابتة. وتتيح لك الملحقات القابلة للطباعة تجهيز الحمولات وإنشاء المسارات ومواصلة توسيع الشاحنة بعد الانتهاء من البناء الأساسي.
+CK1: سندوقەکانی بار ڕاستەوخۆ لەسەر شاسییەکە دادەمەزرێن، بۆیە پڕۆژەکەت دەبێتە بارهەڵگرێکی کارا لە جیاتی پارچەیەکی نمایشیی جێگیر. پێداویستییە شیاوی چاپەکان ڕێگەت پێدەدەن بار ئامادە بکەیت، ڕێگا دروست بکەیت، و دوای تەواوبوونی دروستکردنی بنەڕەتی بەردەوام بارهەڵگرەکە فراوان بکەیت.
+CK2: لاشەکانی بار ڕاستەوخۆ لەسەر شاسییەکە دادەمەزرێن، بۆیە دروستکراوەکەت دەبێتە بارهەڵگرێکی کارا لە جیاتی پارچەیەکی نمایشی جێگیر. پاشکۆ شیاوەکانی چاپ ڕێگەت پێدەدەن بار ئامادە بکەیت، ڕێڕەو دروست بکەیت و دوای تەواوبوونی دروستکردنی بنەڕەتی بەردەوام بارهەڵگرەکە فراوان بکەیت.
+
+### 33 SAMPLE keep=None nr=None
+EN : Customizable lighting
+AR1: إضاءة قابلة للتخصيص
+AR2: إضاءة قابلة للتخصيص
+CK1: ڕووناکیی شیاوی تایبەتکردن
+CK2: ڕووناکیی شیاوی تایبەتکردن
+
+### 34 SAMPLE keep=None nr=None
+EN : The CyberBrick app allows for customizing LED lights, enhancing realism and visual appeal during operation. Integrated lighting support adds practical feedback. It also gives the truck a more complete RC feel without relying on fragile cosmetic add-ons.
+AR1: يتيح تطبيق CyberBrick تخصيص أضواء LED، ما يعزّز الواقعية والجاذبية البصرية أثناء التشغيل. ويضيف دعم الإضاءة المدمجة تغذية راجعة عملية. كما يمنح الشاحنة إحساس RC أكثر اكتمالًا دون الاعتماد على إضافات تجميلية هشّة.
+AR2: يتيح تطبيق CyberBrick تخصيص أضواء LED، ما يعزّز الواقعية والجاذبية البصرية أثناء التشغيل. ويضيف دعم الإضاءة المدمجة إشارات عملية مفيدة. كما يمنح الشاحنة إحساس RC أكثر اكتمالًا دون الاعتماد على إضافات تجميلية هشّة.
+CK1: ئەپی CyberBrick ڕێگە دەدات بە تایبەتکردنی گڵۆپەکانی LED، کە ڕاستەقینەیی و سەرنجڕاکێشیی بینراو لە کاتی کارکردندا زیاتر دەکات. پشتگیریی ڕووناکیی تێهەڵکێشکراو ئاماژەدانی کردەیی زیاد دەکات. هەروەها هەستێکی تەواوتری ئۆتۆمبێلی RC دەداتە بارهەڵگرەکە بەبێ پشتبەستن بە زیادکراوی جوانکاریی ناسک.
+CK2: ئەپی CyberBrick ڕێگە دەدات گڵۆپەکانی LED تایبەت بکرێن، کە ڕاستەقینەیی و سەرنجڕاکێشیی بینراو لە کاتی کارکردندا زیاد دەکات. پاڵپشتیی ڕووناکیی یەکگرتوو ئاماژەی کرداری زیاد دەکات. هەروەها هەستێکی تەواوتری RC دەداتە بارهەڵگرەکە بەبێ پشتبەستن بە پاشکۆی جوانکاریی ناسک.
+
+### 35 outside keep=None nr=None
+EN : Remote Trailer Moves
+AR1: تحريك المقطورة عن بُعد
+CK1: جووڵاندنی تریلە لە دوورەوە
+
+### 36 SAMPLE keep=None nr=None
+EN : A servo-operated coupling turns trailer handling into part of the drive, not a manual reset between runs. Hook up, drop off, and switch tasks from the controller for more realistic yard work.
+AR1: وصلة ربط تعمل بالسيرفو تجعل التعامل مع المقطورة جزءًا من القيادة، لا إعادة ضبط يدوية بين الجولات. اربط المقطورة وافصلها وبدّل المهام من وحدة التحكم لعمل أكثر واقعية في الساحة.
+AR2: تجعل وصلة القطر العاملة بمحرك سيرفو التعاملَ مع المقطورة جزءًا من القيادة، لا إعادة ضبط يدوية بين الجولات. اربط المقطورة وافصلها وبدّل المهام من وحدة التحكم لعمل أكثر واقعية في الساحة.
+CK1: گەیەنەرێک کە بە سێرڤۆ کار دەکات، مامەڵەکردن لەگەڵ تریلەکە دەکاتە بەشێک لە لێخوڕین، نەک ڕێکخستنەوەیەکی دەستی لە نێوان خولەکاندا. تریلەکە ببەستە، دایبگرە و ئەرکەکان لە کۆنترۆڵەرەوە بگۆڕە بۆ کاری حەوشەی ڕاستەقینەتر.
+CK2: پەیوەستکەرێک کە بە سێرڤۆ کار دەکات مامەڵەکردن لەگەڵ تریلەر دەکاتە بەشێک لە لێخوڕین، نەک ڕێکخستنەوەیەکی دەستی لە نێوان گەڕەکاندا. لە کۆنترۆڵەرەکەوە ببەستە، جیای بکەرەوە و ئەرکەکان بگۆڕە بۆ کاری ڕاستەقینەتر لە گۆڕەپان.
+
+### 37 SAMPLE keep=None nr=None
+EN : Drive It Your Way
+AR1: قُدها على طريقتك
+AR2: قُدها على طريقتك
+CK1: بە شێوازی خۆت لێی بخوڕە
+CK2: بە شێوازی خۆت لێی بخوڕە
+
+### 38 SAMPLE keep=None nr=None
+EN : CyberBrick remote compatibility keeps steering, throttle, and functions in one familiar control setup. Builders can focus on tuning the truck and adding modules instead of inventing a control system from scratch.
+AR1: بفضل التوافق مع جهاز التحكم CyberBrick، يبقى التوجيه والتحكم بالسرعة والوظائف ضمن إعداد تحكم واحد مألوف. ويمكن للصنّاع التركيز على ضبط الشاحنة وإضافة الوحدات بدل ابتكار نظام تحكم من الصفر.
+AR2: يُبقي التوافق مع جهاز تحكم CyberBrick التوجيهَ والتحكم بالسرعة والوظائف ضمن إعداد تحكم واحد مألوف. ويمكن للبنّائين التركيز على ضبط الشاحنة وإضافة الوحدات بدلًا من ابتكار نظام تحكم من الصفر.
+CK1: گونجاوی لەگەڵ ڕیمۆتی CyberBrick ئاراستەکردن، گازدان و ئەرکەکان لە یەک ڕێکخستنی کۆنترۆڵی ئاشنادا دەهێڵێتەوە. دروستکەران دەتوانن سەرنج بخەنە سەر ڕێکخستنی بارهەڵگرەکە و زیادکردنی مۆدیولەکان لە جیاتی داهێنانی سیستەمێکی کۆنترۆڵ لە سفرەوە.
+CK2: گونجانی ڕیمۆتی CyberBrick ئاراستەکردن، کۆنترۆڵی خێرایی و فەنکشنەکان لە یەک ڕێکخستنی کۆنترۆڵی ناسراودا دەهێڵێتەوە. دروستکەران دەتوانن سەرنج بخەنە سەر ڕێکخستنی بارهەڵگرەکە و زیادکردنی مۆدیولەکان لە جیاتی داهێنانی سیستەمێکی کۆنترۆڵ لە سفرەوە.
+
+### 39 SAMPLE keep=None nr=None
+EN : CyberBrick 4WD Car turns a 3D print into a fast, hands-on RC build with real mechanical depth. Its double wishbone independent suspension and 4WD platform give makers a more capable drive than a simple display model. A combination lighting system adds separate headlight and indicator functions for a richer driving feel. Support from the Cyberbrick ecosystem make it an ideal choice for experienced model enthusiasts seeking personalized customization.
+AR1: تحوّل سيارة CyberBrick 4WD Car طبعة 3D إلى مشروع RC سريع وعملي بعمق ميكانيكي حقيقي. ويمنح نظام التعليق المستقل ثنائي الأذرع (double wishbone) ومنصة الدفع الرباعي 4WD الصنّاعَ قيادةً أكثر قدرة من نموذج عرض بسيط. ويضيف نظام إضاءة مركّب وظيفتين منفصلتين للمصابيح الأمامية وإشارات الانعطاف لإحساس قيادة أغنى. كما أن دعم منظومة CyberBrick يجعلها خيارًا مثاليًا لهواة النماذج ذوي الخبرة الباحثين عن تخصيص شخصي.
+AR2: تحوّل CyberBrick 4WD Car مطبوعة 3D إلى مشروع RC سريع وعملي بعمق ميكانيكي حقيقي. ويمنح نظام التعليق المستقل بذراعين مزدوجين (double wishbone) ومنصة الدفع الرباعي 4WD الصنّاعَ قيادةً أقدر من نموذج عرض بسيط. ويضيف نظام الإضاءة المركّب وظيفتين منفصلتين للمصابيح الأمامية وإشارات الانعطاف لإحساس قيادة أغنى. ويجعلها دعم منظومة CyberBrick خيارًا مثاليًا لهواة النماذج المتمرّسين الباحثين عن تخصيص شخصي.
+CK1: ئۆتۆمبێلی CyberBrick 4WD Car چاپێکی 3D دەگۆڕێت بۆ پڕۆژەیەکی خێرا و دەستیی RC بە قووڵاییەکی میکانیکیی ڕاستەقینە. کۆشەنی سەربەخۆی دوو باڵ (double wishbone) و پلاتفۆرمی 4WD لێخوڕینێکی بەتواناتر لە مۆدێلێکی نمایشیی سادە دەدەنە دروستکەران. سیستەمێکی ڕووناکیی تێکەڵ ئەرکی جیاواز بۆ گڵۆپە پێشەوەکان و گڵۆپەکانی ئاماژە زیاد دەکات بۆ هەستێکی دەوڵەمەندتری لێخوڕین. پشتگیریی سیستەمی CyberBrick دەیکاتە گونجاوترین هەڵبژاردن بۆ حەزلێکەرانی شارەزای مۆدێل کە بەدوای تایبەتکردنی کەسیدا دەگەڕێن.
+CK2: ئۆتۆمبێلی CyberBrick 4WD Car چاپێکی 3D دەگۆڕێت بۆ دروستکراوێکی خێرا و کرداریی RC بە قووڵاییەکی میکانیکیی ڕاستەقینە. سووسپێنشنی سەربەخۆی دوو باڵی (double wishbone) و پلاتفۆرمی 4WD لێخوڕینێکی بەتواناتر لە مۆدێلێکی سادەی نمایشی دەدەنە دروستکەران. سیستەمێکی ڕووناکیی تێکەڵ فەنکشنی جیاوازی گڵۆپی پێشەوە و ئاماژەی لادان زیاد دەکات بۆ هەستێکی دەوڵەمەندتری لێخوڕین. پاڵپشتیی سیستەمی CyberBrick دەیکاتە هەڵبژاردەیەکی نموونەیی بۆ حەزلێکەرانی شارەزای مۆدێل کە بەدوای تایبەتکردنی کەسیدا دەگەڕێن.
+
+### 40 SAMPLE keep=None nr=None
+EN : 4h to assemble
+AR1: 4 ساعات للتجميع
+AR2: 4 ساعات للتجميع
+CK1: 4 کاتژمێر بۆ پێکەوەنان
+CK2: 4 کاتژمێر بۆ پێکەوەنان
+
+### 41 SAMPLE keep=None nr=None
+EN : Real 4WD Fun
+AR1: متعة دفع رباعي 4WD حقيقية
+AR2: متعة 4WD حقيقية
+CK1: خۆشیی ڕاستەقینەی 4WD
+CK2: چێژی ڕاستەقینەی 4WD
+
+### 42 SAMPLE keep=None nr=None
+EN : Four-wheel drive gives the CyberBrick 4WD Car the grip to feel like a real RC build, not a shelf model. Its compact layout is designed for faster, more responsive driving than the earlier 4x4 Mini Off-Roader platform.
+AR1: يمنح الدفع الرباعي سيارة CyberBrick 4WD Car تماسكًا على الأرض يجعلها تبدو كمشروع RC حقيقي، لا نموذجًا للرفّ. وقد صُمّم تخطيطها الصغير لقيادة أسرع وأكثر استجابة من منصة 4x4 Mini Off-Roader السابقة.
+AR2: يمنح الدفع الرباعي CyberBrick 4WD Car قوة تماسك تجعلها تبدو كمشروع RC حقيقي، لا نموذجًا للرف. وقد صُمّم تخطيطها المدمج لقيادة أسرع وأكثر استجابة من منصة 4x4 Mini Off-Roader السابقة.
+CK1: ڕاکێشانی هەر چوار تایە گرتنی زەوییەک دەداتە ئۆتۆمبێلی CyberBrick 4WD Car کە وای لێدەکات وەک پڕۆژەیەکی ڕاستەقینەی RC هەست پێبکرێت، نەک مۆدێلێکی سەر ڕەف. ڕێکخستنە بچووکەکەی بۆ لێخوڕینێکی خێراتر و وەڵامدەرەوەتر لە پلاتفۆرمی پێشووی 4x4 Mini Off-Roader دیزاین کراوە.
+CK2: هێزی هەر چوار تایە گرتنێک دەداتە CyberBrick 4WD Car کە هەست بە دروستکراوێکی ڕاستەقینەی RC بکەیت، نەک مۆدێلێکی سەر ڕەف. ڕێکخستنە بچووکەکەی بۆ لێخوڕینێکی خێراتر و وەڵامدەرەوەتر لە پلاتفۆرمی پێشووی 4x4 Mini Off-Roader دیزاین کراوە.
+
+### 43 SAMPLE keep=None nr=None
+EN : Smoother Handling
+AR1: تحكّم أكثر سلاسة
+AR2: تحكّم أكثر سلاسة
+CK1: کۆنترۆڵێکی نەرمتر
+CK2: کۆنترۆڵی نەرمتر
+
+### 44 SAMPLE keep=None nr=None
+EN : Double wishbone independent suspension helps each wheel react cleanly over uneven surfaces. That means better control, smoother movement, and a more satisfying build for anyone who cares about mechanics.
+AR1: يساعد نظام التعليق المستقل ثنائي الأذرع (double wishbone) كل عجلة على الاستجابة بسلاسة ودقة فوق الأسطح غير المستوية. وهذا يعني تحكمًا أفضل، وحركة أنعم، ومشروعًا أكثر إمتاعًا لكل من يهتم بالميكانيكا.
+AR2: يساعد نظام التعليق المستقل بذراعين مزدوجين كل عجلة على الاستجابة بدقة فوق الأسطح غير المستوية. وهذا يعني تحكمًا أفضل وحركة أكثر سلاسة ومشروعًا أكثر إمتاعًا لكل من يهتم بالميكانيكا.
+CK1: کۆشەنی سەربەخۆی دوو باڵ (double wishbone) یارمەتی هەر تایەیەک دەدات بە ڕێکوپێکی لەسەر ڕووکاری ناڕێک کاردانەوەی هەبێت. واتە کۆنترۆڵی باشتر، جووڵەی نەرمتر و پڕۆژەیەکی دڵخۆشکەرتر بۆ هەر کەسێک گرنگی بە میکانیک بدات.
+CK2: سووسپێنشنی سەربەخۆی دوو باڵی یارمەتی هەر تایەیەک دەدات بە پاکی لەسەر ڕووە ناڕێکەکان کاردانەوەی هەبێت. ئەمەش واتە کۆنترۆڵی باشتر، جووڵەی نەرمتر و دروستکراوێکی دڵخۆشکەرتر بۆ هەر کەسێک کە گرنگی بە میکانیک دەدات.
+
+### 45 SAMPLE keep=None nr=None
+EN : Smarter Lighting
+AR1: إضاءة أذكى
+AR2: إضاءة أذكى
+CK1: ڕووناکیی زیرەکتر
+CK2: ڕووناکیی زیرەکتر
+
+### 46 outside keep=None nr=None
+EN : Separate headlight and indicator control adds a more realistic driving feel after assembly. Use the recommended transparent PETG lighting profile to get the clearest effect from the CyberBrick LEDs.
+AR1: يضيف التحكم المنفصل بالمصابيح الأمامية وإشارات الانعطاف إحساس قيادة أكثر واقعية بعد التجميع. استخدم ملف إعدادات الإضاءة الموصى به بفلامنت PETG الشفاف للحصول على أوضح تأثير من مصابيح CyberBrick LED.
+CK1: کۆنترۆڵی جیاوازی گڵۆپە پێشەوەکان و گڵۆپەکانی ئاماژە، دوای پێکەوەنان هەستێکی ڕاستەقینەتری لێخوڕین زیاد دەکات. پرۆفایلی ڕووناکیی پێشنیارکراو بە فیلامێنتی ڕوونی PETG بەکاربهێنە بۆ ئەوەی گڵۆپەکانی CyberBrick LED ڕوونترین کاریگەرییان هەبێت.

@@ -1,0 +1,1758 @@
+[
+ {
+  "h": "2c5a534140f43a8bf4c9dd51a9299a3a45fa0f75d41fe47184051bf6ea403075",
+  "en": "Compression Spring 1. Stainless steel high-lifespan compression springs. 2. Installed between moving parts to allow them to return to their original position after compression.",
+  "ar": "نابض الضغط (Compression Spring): 1. نوابض ضغط من الفولاذ المقاوم للصدأ طويلة العمر. 2. تُركَّب بين الأجزاء المتحركة لتمكينها من العودة إلى وضعها الأصلي بعد الانضغاط.",
+  "ckb": "فەنەری پەستان (Compression Spring): 1. فەنەری پەستانی پۆڵای زەنگنەگر بە تەمەنی بەکارهێنانی درێژ. 2. لە نێوان پارچە جووڵاوەکاندا دادەنرێن بۆ ئەوەی دوای پەستان بگەڕێنەوە شوێنی بنەڕەتیی خۆیان.",
+  "kind": "short_description"
+ },
+ {
+  "h": "2fcc3349da62989c8c6b89d2b90fc7fa65824ddb2949f37a1e191da7fb2dccde",
+  "en": "End Type",
+  "ar": "نوع الأطراف",
+  "ckb": "جۆری کۆتاییەکان",
+  "kind": "spec_label"
+ },
+ {
+  "h": "24170776fd0dbb640344b303f26ee188e27d7863db41f9a8bd0b53fad1c9c903",
+  "en": "Closed and Ground",
+  "ar": "مغلقة ومجلوخة",
+  "ckb": "داخراوە و تاشراوە",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "c704f88e87e9af551089142af5d8b3b8eaac0184a3665ca065de162b72de22db",
+  "en": "304 Stainless steel/SWP-B",
+  "ar": "فولاذ مقاوم للصدأ 304 / SWP-B",
+  "ckb": "پۆڵای زەنگنەگری 304 / SWP-B",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "3c57106a18a5ef4b8636e7144437246fb5ab563e9ba9195f21ab623dd62b1a14",
+  "en": "304 Stainless steel",
+  "ar": "فولاذ مقاوم للصدأ 304",
+  "ckb": "پۆڵای زەنگنەگری 304",
+  "kind": "block_cell"
+ },
+ {
+  "h": "2bb9ce60a7a92a53554aebb80de5867017895b9eb43972471737d795b7f29b60",
+  "en": "Torsion Spring 1. Stainless steel tangential force arm torsion spring. 2. Installed between moving parts to allow them to return to their original position after rotation. 3. Requires a shaft and pre-tensioning to prevent displacement.",
+  "ar": "نابض الالتواء (Torsion Spring): 1. نابض التواء من الفولاذ المقاوم للصدأ بذراعَي قوة مماسيّين. 2. يُركَّب بين الأجزاء المتحركة لتمكينها من العودة إلى وضعها الأصلي بعد الدوران. 3. يتطلب عمودًا وشدًّا مسبقًا لمنع انزياحه.",
+  "ckb": "فەنەری بادان (Torsion Spring): 1. فەنەری بادانی پۆڵای زەنگنەگر بە باڵی هێزی تانجێنتی. 2. لە نێوان پارچە جووڵاوەکاندا دادەنرێت بۆ ئەوەی دوای سووڕانەوە بگەڕێنەوە شوێنی بنەڕەتیی خۆیان. 3. پێویستی بە میلێک و توندکردنی پێشوەختە هەیە بۆ ئەوەی لە شوێنی خۆی لانەچێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "363d9c46450018581e73d46729927154648cb8b0c34993485777104ba8bd6027",
+  "en": "Winding Direction",
+  "ar": "اتجاه اللفّ",
+  "ckb": "ئاراستەی پێچانەوە",
+  "kind": "spec_label"
+ },
+ {
+  "h": "883361d5d682a1574410961ce51450b6e036a779c9f098dec71e28aec832bfa6",
+  "en": "Right",
+  "ar": "يمين",
+  "ckb": "ڕاست",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "4c900c5689a2da3c71293238a5b1544b2f106d7c9b67b58a45f178076d8ddb8e",
+  "en": "Leg Orientation",
+  "ar": "اتجاه الساقين",
+  "ckb": "ئاراستەی قاچەکان",
+  "kind": "spec_label"
+ },
+ {
+  "h": "78027fa2c8eb84bddb6fc7c3794c08278753043b0b103037951b4cbd8bcaeacc",
+  "en": "Tangential",
+  "ar": "مماسي",
+  "ckb": "تانجێنتی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "3a67eadd1acfc28acc95e653159874489ccf9cc87b9fb3c5d15818b93f84b2a3",
+  "en": "Leg Style",
+  "ar": "شكل الساقين",
+  "ckb": "شێوەی قاچەکان",
+  "kind": "spec_label"
+ },
+ {
+  "h": "dc81306b118237b3c8ffc88d79748a5e53788865c3ca48641ed21ddde8e2cec4",
+  "en": "Straight",
+  "ar": "مستقيم",
+  "ckb": "ڕاستەهێڵ",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "1b1f9469753ce917327d3a34581591890d65ebd78b9d5edad4e48a3675e2b486",
+  "en": "Round Magnets 1. Installed in pairs to allow easy assembly and disassembly of end cap-type parts. 2. Fixed installation angle achieved through the arrangement of positive and negative poles. 3. High temperature resistance, with a maximum operating temperature of 80°C.",
+  "ar": "مغناطيسات دائرية: 1. تُركَّب على شكل أزواج لتسهيل تركيب وفك القطع من نوع الأغطية الطرفية. 2. زاوية تركيب ثابتة تتحقق بفضل ترتيب القطبين الموجب والسالب. 3. مقاومة لدرجات الحرارة العالية، بحد أقصى لحرارة التشغيل يبلغ 80°C.",
+  "ckb": "موگناتیسی خڕ: 1. بە جووت دادەنرێن بۆ ئاسانکردنی پێکەوەنان و لێکردنەوەی ئەو پارچانەی لە جۆری قەپاغی کۆتایین. 2. گۆشەی دامەزراندنی جێگیر بە ڕیزکردنی جەمسەری پۆزەتیڤ و نێگەتیڤ بەدەست دێت. 3. بەرگەی پلەی گەرمیی بەرز، بە زۆرترین پلەی گەرمیی کارکردنی 80°C.",
+  "kind": "short_description"
+ },
+ {
+  "h": "5252a0159baea94504bb74c3a3cd52948136a0234985671524eed541c36642b1",
+  "en": "Nickel plating",
+  "ar": "طلاء بالنيكل",
+  "ckb": "ڕووپۆشی نیکڵ",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "99941d7f2f0d8886ce157033f53c706aaf3e3fc1845f096643fb94ab63312cdc",
+  "en": "Magnetic",
+  "ar": "مغناطيسي",
+  "ckb": "موگناتیسی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "0c3ae2c701889ea8d06a81b9a630c9c08b889600d366fa3ef3198e944ac492ec",
+  "en": "Disc",
+  "ar": "قرصي",
+  "ckb": "دیسکی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "8a0c1fb2513bf4a6ad7f93454a6dc4099c51cefc48d366802dd2a216940a3151",
+  "en": "Neodymium magnet",
+  "ar": "مغناطيس نيوديميوم",
+  "ckb": "موگناتیسی نیۆدیمیۆم",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "e89954c9c9f2a2d8094feae49fd45e61592753e27328216e8ee4cd0a1b85d38f",
+  "en": "Through thickness",
+  "ar": "عبر السماكة",
+  "ckb": "بە ناو ئەستووریدا",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "decd81b22ab606f335f460b376ef6afd871bd52ccefdf66ba8cf814ffe66ddb4",
+  "en": "Brass Dowel Pin 1. Widely used for part positioning and for various types of shafts. 2. Rounded corners at both ends for easy insertion into mounting holes. 3. The material is relatively soft, allowing for further simple processing.",
+  "ar": "مسمار التوجيه النحاسي (Brass Dowel Pin): 1. يُستخدم على نطاق واسع لتحديد مواضع القطع ولأنواع مختلفة من الأعمدة. 2. زوايا مستديرة عند الطرفين لتسهيل إدخاله في فتحات التركيب. 3. مادته لينة نسبيًا، مما يسمح بإجراء معالجة بسيطة إضافية عليه.",
+  "ckb": "بزماری جێگیرکەری برنج (Brass Dowel Pin): 1. بە فراوانی بۆ دیاریکردنی شوێنی پارچەکان و بۆ جۆرە جیاوازەکانی میل بەکاردێت. 2. گۆشەکانی هەردوو سەری خڕکراون بۆ ئەوەی بە ئاسانی بخرێتە ناو کونەکانی دامەزراندنەوە. 3. کەرەستەکەی بە ڕێژەیی نەرمە، بۆیە دەکرێت کاری سادەی زیاتری لەسەر بکرێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "cd9558acfc386bd3e1fb14da5d4ed7e9338f80fa29fc2447c36c94667c406295",
+  "en": "Round",
+  "ar": "مستدير",
+  "ckb": "خڕ",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "ef6691545d2c5523efed00424407cb261aeb0037d165ca5792f7f8bac3381362",
+  "en": "Standard",
+  "ar": "قياسي",
+  "ckb": "ستاندارد",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "54fb636380fa6abc133f1ebec7b7fb63ae079670acfeb8c5c29f5c9c6fdc2884",
+  "en": "Brass",
+  "ar": "نحاس أصفر",
+  "ckb": "برنج",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "ed4376c011223519ddd84a1cc0f51344da95f410dddf0892fa98d404da501bda",
+  "en": "Dowel",
+  "ar": "مسمار توجيه",
+  "ckb": "بزماری جێگیرکەر",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "d7f03db3c19abe447d8c7d33829a425c760001a6e8ffe58cf2d5168274db8f85",
+  "en": "Plastic Deep Groove Ball Bearings 1. Used to support rotating shafts, capable of withstanding both axial and radial loads. 2. Compared to steel bearings of the same model, it is lighter in weight and operates with lower noise.",
+  "ar": "محامل كروية بلاستيكية ذات مجرى عميق (Plastic Deep Groove Ball Bearings): 1. تُستخدم لدعم الأعمدة الدوّارة، وتتحمّل الأحمال المحورية والقطرية معًا. 2. مقارنةً بالمحامل الفولاذية من الطراز نفسه، فهي أخف وزنًا وتعمل بضجيج أقل.",
+  "ckb": "بێرینگی تۆپەڵەیی پلاستیکیی شیارقووڵ (Plastic Deep Groove Ball Bearings): 1. بۆ ڕاگرتنی میلە سووڕاوەکان بەکاردێن، و دەتوانن بەرگەی بارە تەوەرەیی و تیشکییەکان پێکەوە بگرن. 2. بە بەراورد لەگەڵ بێرینگە پۆڵاییەکانی هەمان مۆدێل، سووکترن و بە دەنگەدەنگی کەمتر کار دەکەن.",
+  "kind": "short_description"
+ },
+ {
+  "h": "28ed44416cb3c769ba6027b56d0d0e85f49131878acb2e284b6dceac78d08da0",
+  "en": "PA+GF",
+  "ar": "PA+GF",
+  "ckb": "PA+GF",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "ae5859eceacb8896e342285cc697d159a0107f1347a2fb94382029f2226d5444",
+  "en": "Ball",
+  "ar": "كروي",
+  "ckb": "تۆپەڵەیی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "2b1850ab978d91f9501ef5a82120927998d54bd9f34dfebb4fdfe91088f38826",
+  "en": "Single row",
+  "ar": "صف واحد",
+  "ckb": "یەک ڕیز",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "f123dc0e0e44a188bf18ca2c9df57c5193641ac328b8e3bafbf13f7762244636",
+  "en": "Product Type",
+  "ar": "نوع المنتج",
+  "ckb": "جۆری بەرهەم",
+  "kind": "block_cell"
+ },
+ {
+  "h": "c939327ca16dcf97ca32521d8b834bf1de16573d21deda3bb2a337cf403787a6",
+  "en": "Good",
+  "ar": "جيد",
+  "ckb": "باش",
+  "kind": "block_cell"
+ },
+ {
+  "h": "0dc8ee555c28ec1beeb7adcf7b2ce3ae6bfd980068f9a2413384ab019393b4b8",
+  "en": "Excellent",
+  "ar": "ممتاز",
+  "ckb": "نایاب",
+  "kind": "block_cell"
+ },
+ {
+  "h": "9bea59174904f47c93ed4d780c9b48059365a6f4a36ae16848cd9d5f2ac10e1a",
+  "en": "F8-14M Miniature Plane Thrust Ball Bearing Specifically used to bear larger axial loads, such as turntables, shaft ends, etc.",
+  "ar": "محمل كروي دفعي مسطّح مصغّر F8-14M: مخصّص لتحمّل الأحمال المحورية الأكبر، مثل الأقراص الدوّارة وأطراف الأعمدة وغيرها.",
+  "ckb": "بێرینگی تۆپەڵەیی پاڵنانی تەختی بچووکی F8-14M: بە تایبەتی بۆ هەڵگرتنی بارە تەوەرەییە گەورەترەکان بەکاردێت، وەک تەختە سووڕاوەکان، سەری میلەکان و هتد.",
+  "kind": "short_description"
+ },
+ {
+  "h": "b34a377135a7f9d5e18159d6e4bf08441c9ffd6a46c0fad0a12f1de918a2d6a5",
+  "en": "Washer Material",
+  "ar": "مادة الحلقات",
+  "ckb": "کەرەستەی واشەر",
+  "kind": "spec_label"
+ },
+ {
+  "h": "ea9973d1460ee95c08102b183f8c7fd7b4f05fa716cab4f91e9672ccd893a6d2",
+  "en": "Steel",
+  "ar": "فولاذ",
+  "ckb": "پۆڵا",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "0e7dfc73ffa59fec41d022ecbc6040120e62f27ac92e516bc37c7a95bc8c594d",
+  "en": "Ball Material",
+  "ar": "مادة الكرات",
+  "ckb": "کەرەستەی تۆپەڵەکان",
+  "kind": "spec_label"
+ },
+ {
+  "h": "b9ba1457dc4cd94fdd84515dce58f453c6e112b8a2fce74e5acd23ee45e21a0f",
+  "en": "For Load Direction",
+  "ar": "اتجاه الحمل",
+  "ckb": "ئاراستەی بار",
+  "kind": "spec_label"
+ },
+ {
+  "h": "61315705d257c44078434e26d4b322d29d1657aa6ce51cc15145d56e6a4e0246",
+  "en": "Thrust",
+  "ar": "دفعي",
+  "ckb": "پاڵنان",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "3094e46203aafbfa116b57c038bdd9a857d7c03dd3defe1b7789fbfe3fd78ec9",
+  "en": "Stainless Steel Ball 1. High precision and low roughness, suitable for use as rolling elements in homemade simple bearings and other situations requiring spheres. 2. When used in toys with removable balls, please be cautious to prevent children from swallowing them.",
+  "ar": "كرة الفولاذ المقاوم للصدأ: 1. دقة عالية وخشونة منخفضة، مناسبة للاستخدام كعناصر دحرجة في المحامل البسيطة المصنوعة منزليًا وفي الحالات الأخرى التي تتطلب كرات. 2. عند استخدامها في ألعاب ذات كرات قابلة للإزالة، يرجى الحذر لمنع الأطفال من ابتلاعها.",
+  "ckb": "تۆپەڵەی پۆڵای زەنگنەگر: 1. وردیی بەرز و زبریی کەم، گونجاوە بۆ بەکارهێنان وەک توخمی گلۆربوونەوە لە بێرینگی سادەی دەستکرد و ئەو حاڵەتانەی تر کە پێویستیان بە تۆپەڵە هەیە. 2. کاتێک لە یاریدا بە تۆپەڵەی لابراو بەکاردێت، تکایە وریا بە بۆ ئەوەی منداڵان قووتی نەدەن.",
+  "kind": "short_description"
+ },
+ {
+  "h": "d490d0cfcca7f3fd5284905299d21054a36917ddb71a21db35d58b5d04a9eb4f",
+  "en": "10 pcs",
+  "ar": "10 قطعة",
+  "ckb": "10 دانە",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "db4bc3f383ab3432fc570198d20349fe299627989349ecce0a3b9357a57cd5d2",
+  "en": "Plastic Balls 1. Bright in color, with a wide range of color options, non-toxic and harmless. 2. When used in toys with removable balls, please be cautious to prevent children from swallowing them.",
+  "ar": "الكرات البلاستيكية (Plastic Balls): 1. ألوان زاهية مع مجموعة واسعة من خيارات الألوان، غير سامة وغير ضارة. 2. عند استخدامها في ألعاب ذات كرات قابلة للإزالة، يرجى الحذر لمنع الأطفال من ابتلاعها.",
+  "ckb": "تۆپەڵە پلاستیکییەکان (Plastic Balls): 1. ڕەنگی گەش و هەڵبژاردنی ڕەنگی زۆر، بێ ژەهر و بێ زیانن. 2. کاتێک لە یاریدا بە تۆپەڵەی لابراو بەکاردێن، تکایە وریا بە بۆ ئەوەی منداڵان قووتیان نەدەن.",
+  "kind": "short_description"
+ },
+ {
+  "h": "3196828903707969c3e31704e4b75440b5f741c53f667bd4b24e66eb1cbd9e75",
+  "en": "Purple/Pink/Blue/Green/Orange（2 balls of each color）",
+  "ar": "بنفسجي/وردي/أزرق/أخضر/برتقالي (2 كرة من كل لون)",
+  "ckb": "مۆر/پەمەیی/شین/سەوز/پرتەقاڵی (2 تۆپەڵە لە هەر ڕەنگێک)",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "65bff453a310c52c4478d9c603544cd06979ca2c65f9737dbb1fc30142dd1c80",
+  "en": "TT Motor (DC5V 59RPM CCW Single Axis) 1. Connects to a 5V power source to drive gears, wheels, chains, and other moving parts. 2. Equipped with a USB cable, operating voltage 3-6V, compatible with most common USB power sources such as PC interfaces and charging adapters. 3. The motor terminals are coated with electronic glue to prevent detachment due to pulling.",
+  "ar": "محرك TT (DC5V، 59RPM، CCW، محور واحد): 1. يتصل بمصدر طاقة 5V لتشغيل التروس والعجلات والسلاسل وغيرها من الأجزاء المتحركة. 2. مزوّد بكابل USB، وجهد التشغيل 3-6V، ومتوافق مع معظم مصادر طاقة USB الشائعة مثل منافذ الحاسوب (PC) ومحوّلات الشحن. 3. أطراف توصيل المحرك مغطّاة بغراء إلكتروني لمنع انفصالها عند السحب.",
+  "ckb": "بزوێنەری TT (DC5V، 59RPM، CCW، یەک تەوەر): 1. بە سەرچاوەیەکی وزەی 5V دەبەسترێت بۆ جووڵاندنی چەرخە ددانەدارەکان، تایەکان، زنجیرەکان و پارچە جووڵاوەکانی تر. 2. لەگەڵ کێبڵی USB دێت، ڤۆڵتیەی کارکردنی 3-6V، و گونجاوە لەگەڵ زۆربەی سەرچاوە باوەکانی وزەی USB وەک دەرچەکانی کۆمپیوتەر (PC) و ئەداپتەرەکانی بارگاویکردن. 3. سەرەکانی پەیوەندیی بزوێنەرەکە بە چەسپی ئەلیکترۆنی داپۆشراون بۆ ئەوەی بە ڕاکێشان جیا نەبنەوە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "f76f661e242775daab59a1899843780d034796a64e52af35d70a9351b72bfe02",
+  "en": "5V DC CONSTANT",
+  "ar": "جهد ثابت 5V DC",
+  "ckb": "ڤۆڵتیەی جێگیری 5V DC",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "27e130e7d3595441b21687b14f6778f903077d676a3ede2abda00d2dfdc3717f",
+  "en": "Starting Voltage",
+  "ar": "جهد بدء التشغيل",
+  "ckb": "ڤۆڵتیەی دەستپێکردن",
+  "kind": "spec_label"
+ },
+ {
+  "h": "789bcb8a9d642e279b4b5c9a725425cc597fbe2345f75e963f7cdaa18d7b1f56",
+  "en": "No Load Speed",
+  "ar": "السرعة بدون حمل",
+  "ckb": "خێرایی بێ بار",
+  "kind": "spec_label"
+ },
+ {
+  "h": "c47792cfb26b976a1fa2c2a3539f1ed4f6aa9274423af79f1578ac1097bba8d5",
+  "en": "59±15% r/min",
+  "ar": "59±15% r/min",
+  "ckb": "59±15% r/min",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "7970c60a765d63f592b3604441b7befe06ea728ff73da52b796a106ec8ebec4e",
+  "en": "Direction of Rotation",
+  "ar": "اتجاه الدوران",
+  "ckb": "ئاراستەی سووڕانەوە",
+  "kind": "spec_label"
+ },
+ {
+  "h": "5cae1d99786da8d9e1741f612127badf73e4a3b4f1797faa712ce05bc485c345",
+  "en": "CCW",
+  "ar": "عكس اتجاه عقارب الساعة (CCW)",
+  "ckb": "پێچەوانەی ئاراستەی میلی کاتژمێر (CCW)",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "b9a9c4e762e850dd10df035486f6d63c715d65086295c233d6c0ae75fc2339c5",
+  "en": "No Load Current",
+  "ar": "التيار بدون حمل",
+  "ckb": "تەزووی بێ بار",
+  "kind": "spec_label"
+ },
+ {
+  "h": "ff595f4f21b33aa85f4f9237296e94524a61634f2528c7ab8ef39701a6ca0872",
+  "en": "≤ 55 mA",
+  "ar": "≤ 55 mA",
+  "ckb": "≤ 55 mA",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "ac46b7c4e5a015e48f0ffb4be2860f4ab1b20776fc16341a68d2dec3d9882ab5",
+  "en": "Starting Torque",
+  "ar": "عزم بدء التشغيل",
+  "ckb": "تۆرکی دەستپێکردن",
+  "kind": "spec_label"
+ },
+ {
+  "h": "c7a2e16bf9c2bea03046cee23cbbba98db9bdef41e6fbc0a5975bf53148ed77f",
+  "en": "≥300g.cm",
+  "ar": "≥300g.cm",
+  "ckb": "≥300g.cm",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "6d69679065b648c7cfd6f9afbc2c6dddcc2eb939f99821d81116795c1f07aac6",
+  "en": "Humidity Range",
+  "ar": "نطاق الرطوبة",
+  "ckb": "مەودای شێ",
+  "kind": "spec_label"
+ },
+ {
+  "h": "1d393b0081b632c54654eb08c345ff76b92ae4efe0768b4c0f64b9ebbe920492",
+  "en": "PDF",
+  "ar": "PDF",
+  "ckb": "PDF",
+  "kind": "doc_title",
+  "keep": true
+ },
+ {
+  "h": "5deb44163cb82ccfd007f2eaa413e4c39a72348f6cdd13d6aa0ac79be3383c83",
+  "en": "The N20 Reduction Gear Motor is a low-power reduction motor with a D-shaped output shaft, suitable for applications requiring continuous rotation of objects. This motor offers three speed options, including a low-speed version (150rpm), a medium-speed (400rpm), and a high-speed (1000rpm). The motor can be connected to the power distribution board with 4 channels using the wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "ar": "محرك N20 Reduction Gear Motor هو محرك تخفيض منخفض القدرة بعمود خرج على شكل حرف D، مناسب للاستخدامات التي تتطلب دورانًا مستمرًا للأجسام. يأتي هذا المحرك بثلاثة خيارات للسرعة: نسخة منخفضة السرعة (150rpm)، ونسخة متوسطة السرعة (400rpm)، ونسخة عالية السرعة (1000rpm). يمكن توصيل المحرك بلوحة توزيع الطاقة ذات 4 قنوات باستخدام زوج الأسلاك wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "ckb": "بزوێنەری N20 Reduction Gear Motor بزوێنەرێکی کەمکەرەوەی خێراییە بە وزەی کەم و میلی دەرچوونی بە شێوەی پیتی D، گونجاوە بۆ ئەو بەکارهێنانانەی پێویستیان بە سووڕانەوەی بەردەوامی تەنەکان هەیە. ئەم بزوێنەرە سێ هەڵبژاردەی خێرایی هەیە: وەشانی خێرایی نزم (150rpm)، خێرایی مامناوەند (400rpm) و خێرایی بەرز (1000rpm). دەتوانرێت بزوێنەرەکە بە بۆردی دابەشکردنی وزەی 4 کەناڵی ببەسترێت بە بەکارهێنانی جووتە وایەری wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "kind": "short_description"
+ },
+ {
+  "h": "d3151b18e57b1a5ea9d2ce7c15440d61e0dd6eb930323635b19500685cb69de7",
+  "en": "The N20 Reduction Gear Motor is a low-power reduction motor with a D-shaped output shaft, suitable for applications requiring continuous rotation of objects. This motor offers three speed options, including a low-speed version (150rpm), a medium-speed (400rpm), and a high-speed (1000rpm). The motor can be connected to the Power Distribution Board (PDB) with 4 Channels using the Wire Pair with SH1.0-2PIN-5CM/10CM/20CM.",
+  "ar": "محرك N20 Reduction Gear Motor هو محرك تخفيض منخفض القدرة بعمود خرج على شكل حرف D، مناسب للاستخدامات التي تتطلب دورانًا مستمرًا للأجسام. يأتي هذا المحرك بثلاثة خيارات للسرعة: نسخة منخفضة السرعة (150rpm)، ونسخة متوسطة السرعة (400rpm)، ونسخة عالية السرعة (1000rpm). يمكن توصيل المحرك بلوحة توزيع الطاقة (PDB) ذات 4 قنوات باستخدام زوج الأسلاك Wire Pair with SH1.0-2PIN-5CM/10CM/20CM.",
+  "ckb": "بزوێنەری N20 Reduction Gear Motor بزوێنەرێکی کەمکەرەوەی خێراییە بە وزەی کەم و میلی دەرچوونی بە شێوەی پیتی D، گونجاوە بۆ ئەو بەکارهێنانانەی پێویستیان بە سووڕانەوەی بەردەوامی تەنەکان هەیە. ئەم بزوێنەرە سێ هەڵبژاردەی خێرایی هەیە: وەشانی خێرایی نزم (150rpm)، خێرایی مامناوەند (400rpm) و خێرایی بەرز (1000rpm). دەتوانرێت بزوێنەرەکە بە بۆردی دابەشکردنی وزەی 4 کەناڵی (PDB) ببەسترێت بە بەکارهێنانی جووتە وایەری Wire Pair with SH1.0-2PIN-5CM/10CM/20CM.",
+  "kind": "block_line"
+ },
+ {
+  "h": "9dc0a6c5bdac847d851cec58481cd436cb5510d436e2b6840249aab24aa5e77a",
+  "en": "1. Plug the connector of the USB Speed Controller into a power source such as a phone charger, power bank, or computer USB interface (Ensure that the power of the power port is greater than the power required by the USB Speed Controller). Then, connect the TT motor with the female port of the speed controller. The speed controller defaults to output on. 2. Turn the thumbwheel counter-clockwise to increase voltage. Turn clockwise to decrease voltage. 3. Click the thumbwheel once to turn output ON/OFF 4. Double-click the thumbwheel to turn off the LED display. Press any button to wake up the digital display.",
+  "ar": "1. صِل موصل منظّم السرعة (USB Speed Controller) بمصدر طاقة مثل شاحن الهاتف أو باور بانك أو منفذ USB في الحاسوب (تأكّد من أن قدرة منفذ الطاقة أكبر من القدرة التي يحتاجها منظّم السرعة). ثم صِل محرك TT بالمنفذ الأنثوي لمنظّم السرعة. يكون خرج منظّم السرعة مفعّلًا افتراضيًا. 2. أدِر عجلة الإبهام عكس اتجاه عقارب الساعة لرفع الجهد. وأدِرها مع اتجاه عقارب الساعة لخفض الجهد. 3. انقر على عجلة الإبهام مرة واحدة لتشغيل الخرج أو إيقافه (ON/OFF). 4. انقر نقرًا مزدوجًا على عجلة الإبهام لإطفاء شاشة LED. اضغط أي زر لإيقاظ الشاشة الرقمية.",
+  "ckb": "1. گەیەنەری ڕێکخەری خێرایی (USB Speed Controller) بخە ناو سەرچاوەیەکی وزە وەک بارگاویکەری مۆبایل، پاوەر بانک یان دەرچەی USB لە کۆمپیوتەر (دڵنیابە کە وزەی دەرچەی وزەکە زیاترە لەو وزەیەی ڕێکخەری خێرایی پێویستیەتی). پاشان بزوێنەری TT بە دەرچەی مێی ڕێکخەری خێرایی ببەستە. بە شێوەی بنەڕەتی دەرچوونی ڕێکخەری خێرایی چالاکە. 2. چەرخی پەنجە بە پێچەوانەی ئاراستەی میلی کاتژمێر بسووڕێنە بۆ زیادکردنی ڤۆڵتیە. بە ئاراستەی میلی کاتژمێر بیسووڕێنە بۆ کەمکردنەوەی ڤۆڵتیە. 3. یەک جار کلیک لە چەرخی پەنجە بکە بۆ هەڵکردن یان کوژاندنەوەی دەرچوون (ON/OFF). 4. دوو جار کلیک لە چەرخی پەنجە بکە بۆ کوژاندنەوەی شاشەی LED. هەر دوگمەیەک دابگرە بۆ بەئاگاهێنانەوەی شاشە دیجیتاڵییەکە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "c4f18135524e7345ad4b3fb847b258398d4d6c644efb7d593c45c1285805bdec",
+  "en": "Plug the connector of the USB Speed Controller into a power source such as a phone charger, power bank, or computer USB interface (Ensure that the power of the power port is greater than the power required by the USB Speed Controller). Then, connect the TT motor with the female port of the speed controller. The speed controller defaults to output on.",
+  "ar": "صِل موصل منظّم السرعة (USB Speed Controller) بمصدر طاقة مثل شاحن الهاتف أو باور بانك أو منفذ USB في الحاسوب (تأكّد من أن قدرة منفذ الطاقة أكبر من القدرة التي يحتاجها منظّم السرعة). ثم صِل محرك TT بالمنفذ الأنثوي لمنظّم السرعة. يكون خرج منظّم السرعة مفعّلًا افتراضيًا.",
+  "ckb": "گەیەنەری ڕێکخەری خێرایی (USB Speed Controller) بخە ناو سەرچاوەیەکی وزە وەک بارگاویکەری مۆبایل، پاوەر بانک یان دەرچەی USB لە کۆمپیوتەر (دڵنیابە کە وزەی دەرچەی وزەکە زیاترە لەو وزەیەی ڕێکخەری خێرایی پێویستیەتی). پاشان بزوێنەری TT بە دەرچەی مێی ڕێکخەری خێرایی ببەستە. بە شێوەی بنەڕەتی دەرچوونی ڕێکخەری خێرایی چالاکە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "03b31ca482d50d5bd33c34a105ff540965914a0ecbaa45c3c356ec56298fa03f",
+  "en": "Turn the thumbwheel counter-clockwise to increase voltage. Turn clockwise to decrease voltage.",
+  "ar": "أدِر عجلة الإبهام عكس اتجاه عقارب الساعة لرفع الجهد. وأدِرها مع اتجاه عقارب الساعة لخفض الجهد.",
+  "ckb": "چەرخی پەنجە بە پێچەوانەی ئاراستەی میلی کاتژمێر بسووڕێنە بۆ زیادکردنی ڤۆڵتیە. بە ئاراستەی میلی کاتژمێر بیسووڕێنە بۆ کەمکردنەوەی ڤۆڵتیە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "965d1feda57e7f3830a80dc93387b014e84e399edb9a08aa7769ea70ccfa8975",
+  "en": "Click the thumbwheel once to turn output ON/OFF.",
+  "ar": "انقر على عجلة الإبهام مرة واحدة لتشغيل الخرج أو إيقافه (ON/OFF).",
+  "ckb": "یەک جار کلیک لە چەرخی پەنجە بکە بۆ هەڵکردن یان کوژاندنەوەی دەرچوون (ON/OFF).",
+  "kind": "usage_body"
+ },
+ {
+  "h": "0a6f7c4aad11a9eaefc830672bd3d5f68bc744e6398aa405e1250b651048e529",
+  "en": "Double-click the thumbwheel to turn off the LED display. Press any button to wake up the digital display.",
+  "ar": "انقر نقرًا مزدوجًا على عجلة الإبهام لإطفاء شاشة LED. اضغط أي زر لإيقاظ الشاشة الرقمية.",
+  "ckb": "دوو جار کلیک لە چەرخی پەنجە بکە بۆ کوژاندنەوەی شاشەی LED. هەر دوگمەیەک دابگرە بۆ بەئاگاهێنانەوەی شاشە دیجیتاڵییەکە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "5effe16e4a83684f831f51a1fb31aea13646b5e7435ea71b814a7cd464bf3f84",
+  "en": "1. Four AA/AAA batteries are connected in series 2. External power supply / battery box with a PH2.0 connector 3. Includes battery holder case box with cover and ON / OFF switch and connector (Batteries are not included)",
+  "ar": "1. أربع بطاريات AA/AAA موصولة بشكل متسلسل. 2. مزوّد طاقة خارجي / علبة بطاريات مع موصل PH2.0. 3. تتضمن علبة حامل البطاريات مع غطاء ومفتاح تشغيل/إيقاف (ON / OFF) وموصل (البطاريات غير مرفقة).",
+  "ckb": "1. چوار باتریی AA/AAA بە شێوەی زنجیرەیی پێکەوە بەستراون. 2. دابینکەری وزەی دەرەکی / سندوقی باتری لەگەڵ گەیەنەری PH2.0. 3. سندوقی هەڵگری باتری لەگەڵ قەپاغ و کلیلی هەڵکردن/کوژاندنەوە (ON / OFF) و گەیەنەر لەخۆ دەگرێت (باترییەکان لەگەڵدا نین).",
+  "kind": "short_description"
+ },
+ {
+  "h": "528ecd4019a4ed66974b063b4fe2f9ad93d823100ad1521c0c837ec8d0426513",
+  "en": "Used in conjunction with a power distribution board, it connects to the IN to provide power to the board.",
+  "ar": "يُستخدم مع لوحة توزيع الطاقة، إذ يتصل بمنفذ IN لتزويد اللوحة بالطاقة.",
+  "ckb": "لەگەڵ بۆردی دابەشکردنی وزە بەکاردێت، و بە دەرچەی IN دەبەسترێت بۆ دابینکردنی وزە بۆ بۆردەکە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "db2254cc1951f08b34daa0bb13c47bf138a08a7b5d735a8eb6a48339483f5ad2",
+  "en": "Used with power distribution boards, switches, and electrical appliances. It can be connected to the slot SW and switch of the power distribution board, or the slot CH and electrical appliances of the power distribution board, to achieve the connection and control of peripherals. The twisted wire design is easy to bend and wire, and will not scatter or detach from the fixed position.",
+  "ar": "يُستخدم مع لوحات توزيع الطاقة والمفاتيح والأجهزة الكهربائية. يمكن توصيله بين فتحة SW في لوحة توزيع الطاقة والمفتاح، أو بين فتحة CH في لوحة توزيع الطاقة والأجهزة الكهربائية، لتحقيق توصيل الأجهزة الطرفية والتحكم بها. تصميم الأسلاك المجدولة سهل الثني والتمديد، ولا تتفرّق أسلاكه أو تنفصل عن موضع تثبيتها.",
+  "ckb": "لەگەڵ بۆردەکانی دابەشکردنی وزە، کلیلەکان و ئامێرە کارەباییەکان بەکاردێت. دەتوانرێت لە نێوان شوێنی SW لە بۆردی دابەشکردنی وزە و کلیلەکەدا ببەسترێت، یان لە نێوان شوێنی CH لە بۆردی دابەشکردنی وزە و ئامێرە کارەباییەکاندا، بۆ بەدیهێنانی پەیوەندی و کۆنترۆڵی ئامێرە لاوەکییەکان. دیزاینی وایەری بادراو بە ئاسانی دەچەمێتەوە و وایەرکێشانی ئاسانە، و پەرش نابێتەوە و لە شوێنی جێگیرکراوی خۆی جیا نابێتەوە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "947dc005759f1c69e59f4fde02a5e4d27247aecb78424545bf55c43524a224bc",
+  "en": "Used with power distribution boards, switches, and electrical appliances. It can be connected to the SW and switch of the power distribution board, or the CH and electrical appliances of the power distribution board, to achieve the connection and control of peripherals. The twisted wire design is easy to bend and wire, and will not scatter or detach from the fixed position.",
+  "ar": "يُستخدم مع لوحات توزيع الطاقة والمفاتيح والأجهزة الكهربائية. يمكن توصيله بين منفذ SW في لوحة توزيع الطاقة والمفتاح، أو بين منفذ CH في لوحة توزيع الطاقة والأجهزة الكهربائية، لتحقيق توصيل الأجهزة الطرفية والتحكم بها. تصميم الأسلاك المجدولة سهل الثني والتمديد، ولا تتفرّق أسلاكه أو تنفصل عن موضع تثبيتها.",
+  "ckb": "لەگەڵ بۆردەکانی دابەشکردنی وزە، کلیلەکان و ئامێرە کارەباییەکان بەکاردێت. دەتوانرێت لە نێوان دەرچەی SW لە بۆردی دابەشکردنی وزە و کلیلەکەدا ببەسترێت، یان لە نێوان دەرچەی CH لە بۆردی دابەشکردنی وزە و ئامێرە کارەباییەکاندا، بۆ بەدیهێنانی پەیوەندی و کۆنترۆڵی ئامێرە لاوەکییەکان. دیزاینی وایەری بادراو بە ئاسانی دەچەمێتەوە و وایەرکێشانی ئاسانە، و پەرش نابێتەوە و لە شوێنی جێگیرکراوی خۆی جیا نابێتەوە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "45fd086d76010ccd1328aac680a3c871bc864e762b6d2756e158fd21cbd9d0cc",
+  "en": "High Precision Motion Control: Equipped with advanced digital control technology, the 9G Servo Motor with Clutch Protection can provide precise motion control, ensuring stable and accurate actions for models or mechanical devices. - Clutch Function: Unlike traditional servos, this servo has a clutch function to prevent overload damage. When external forces change the angle of the server during normal operation, the server can protect itself from damage through the integrated clutch mechanism. This function automatically resets and restores the servo to prevent any potential hazards. - Powerful Torque Output: Despite its compact size, the servo has excellent torque output capability. It can drive larger loads making it suitable for various applications requiring strong driving force. - Fast Response: With a quick response speed, it can rapidly respond to control signals, achieving fast and precise actions, enhancing the reaction speed and performance of models or devices. - Digital Co",
+  "ar": "تحكم عالي الدقة في الحركة: بفضل تقنية التحكم الرقمي المتقدمة، يوفّر محرك السيرفو (9G Servo Motor with Clutch Protection) تحكمًا دقيقًا في الحركة، ما يضمن حركات مستقرة ودقيقة للنماذج أو الأجهزة الميكانيكية. - وظيفة القابض: على عكس محركات السيرفو التقليدية، يتميّز هذا السيرفو بوظيفة قابض تمنع التلف الناتج عن الحمل الزائد. عندما تغيّر قوى خارجية زاوية السيرفو أثناء التشغيل العادي، يستطيع السيرفو حماية نفسه من التلف عبر آلية القابض المدمجة. تُعيد هذه الوظيفة ضبط السيرفو واستعادته تلقائيًا لمنع أي مخاطر محتملة. - عزم دوران قوي: رغم حجمه الصغير، يتمتع السيرفو بقدرة ممتازة على إخراج عزم الدوران، ويمكنه تحريك أحمال أكبر، ما يجعله مناسبًا لتطبيقات متنوعة تتطلب قوة دفع كبيرة. - استجابة سريعة: بفضل سرعة استجابته العالية، يستجيب بسرعة لإشارات التحكم، فينفّذ حركات سريعة ودقيقة، ويعزّز سرعة استجابة النماذج أو الأجهزة وأداءها. - Digital Co…",
+  "ckb": "کۆنترۆڵی جووڵە بە وردیی بەرز: بە تەکنەلۆژیای پێشکەوتووی کۆنترۆڵی دیجیتاڵ، بزوێنەری سێرڤۆ (9G Servo Motor with Clutch Protection) کۆنترۆڵێکی وردی جووڵە دابین دەکات، کە جووڵەی جێگیر و ورد بۆ مۆدێل یان ئامێرە میکانیکییەکان مسۆگەر دەکات. - ئەرکی کلەچ: بە پێچەوانەی سێرڤۆ ئاساییەکان، ئەم سێرڤۆیە ئەرکی کلەچی هەیە بۆ ڕێگریکردن لە زیانی بارگرانی. کاتێک هێزی دەرەکی لە کاتی کارکردنی ئاساییدا گۆشەی سێرڤۆکە دەگۆڕێت، سێرڤۆکە دەتوانێت لە ڕێگەی میکانیزمی کلەچی ناوخۆییەوە خۆی لە زیان بپارێزێت. ئەم ئەرکە بە شێوەی خۆکار سێرڤۆکە ڕێکدەخاتەوە و دەیگەڕێنێتەوە دۆخی خۆی بۆ ڕێگریکردن لە هەر مەترسییەکی ئەگەری. - تۆرکی بەهێز: سەرەڕای قەبارە بچووکەکەی، سێرڤۆکە توانایەکی نایابی دەرچوونی تۆرکی هەیە. دەتوانێت باری گەورەتر بجووڵێنێت، بۆیە گونجاوە بۆ بەکارهێنانە جۆراوجۆرەکان کە پێویستیان بە هێزی جووڵاندنی بەهێز هەیە. - وەڵامدانەوەی خێرا: بە خێرایی وەڵامدانەوەی بەرز، دەتوانێت بە خێرایی وەڵامی سیگناڵەکانی کۆنترۆڵ بداتەوە، جووڵەی خێرا و ورد ئەنجام دەدات، و خێرایی کاردانەوە و کارایی مۆدێل یان ئامێرەکان باشتر دەکات. - Digital Co…",
+  "kind": "short_description"
+ },
+ {
+  "h": "ae578be50e24c23932226b86dc94720067637b6bcdfb9f570d5778c241994dbd",
+  "en": "Standby Current",
+  "ar": "تيار الاستعداد",
+  "ckb": "تەزووی چاوەڕوانی",
+  "kind": "spec_label"
+ },
+ {
+  "h": "f8c342804b7c62dfc85537d0b66953f5e813d4560bff6fa0122e08b8747c97a7",
+  "en": "8mA at 6.0V",
+  "ar": "عند 6.0V: 8mA",
+  "ckb": "لە 6.0V: 8mA",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "d841befe37dcb4f350a2c4bf45e0b0ede2cef56fda2e934c3820647b80310c66",
+  "en": "Rotating Direction",
+  "ar": "اتجاه الدوران",
+  "ckb": "ئاراستەی سووڕانەوە",
+  "kind": "spec_label"
+ },
+ {
+  "h": "c0f83befa524e79fd0108e1de75d7205ead8946b40a1bea3fd2941916dc0f552",
+  "en": "CCW (1000→2000μs) / Counterclockwise",
+  "ar": "عكس اتجاه عقارب الساعة / CCW (1000→2000μs)",
+  "ckb": "پێچەوانەی ئاراستەی میلی کاتژمێر / CCW (1000→2000μs)",
+  "kind": "spec_value_text",
+  "needs_review": true
+ },
+ {
+  "h": "f19c0bc44be5840736de06f321f3192b1b5048e8afab985df091ef3a3824c064",
+  "en": "Gear Set Material",
+  "ar": "مادة مجموعة التروس",
+  "ckb": "کەرەستەی کۆمەڵەی چەرخە ددانەدارەکان",
+  "kind": "spec_label"
+ },
+ {
+  "h": "0f830aa4e821d72819b7c92fa6aeaa6c9df08e73cfd1e1c125fed82b33084656",
+  "en": "Plastic gear",
+  "ar": "ترس بلاستيكي",
+  "ckb": "چەرخی ددانەداری پلاستیکی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "e31172a2ec29f273a8dcb309564c35ad79692d651dad64cb07887969db17c0c3",
+  "en": "≤50mA at 4.8V / ≤60mA at 6.0V",
+  "ar": "عند 4.8V: ≤50mA / عند 6.0V: ≤60mA",
+  "ckb": "لە 4.8V: ≤50mA / لە 6.0V: ≤60mA",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "6e8952fe94a9c09a5a30e1b97472e62222ef1f242ea577edbbe6f1d73056f4d0",
+  "en": "≤0.14sec/60° at 4.8V / ≤0.12sec/60° at 6.0V",
+  "ar": "عند 4.8V: ≤0.14sec/60° / عند 6.0V: ≤0.12sec/60°",
+  "ckb": "لە 4.8V: ≤0.14sec/60° / لە 6.0V: ≤0.12sec/60°",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "2d60b008e4f439e9cd4af26ab362649e7e1f39a0e02670c65c61d55e2d1ea3a7",
+  "en": "Operating Travel Angle",
+  "ar": "زاوية الحركة التشغيلية",
+  "ckb": "گۆشەی جووڵەی کارکردن",
+  "kind": "spec_label"
+ },
+ {
+  "h": "71064d15d676c2b045f8f8b31fa70e58b5c0042a4672fbbeb3b694f0237344e1",
+  "en": "Motor Type",
+  "ar": "نوع المحرك",
+  "ckb": "جۆری بزوێنەر",
+  "kind": "spec_label"
+ },
+ {
+  "h": "bbdadca75911ee39c17376540695ee05b5f19ae7cedbb4fedf8103cd04dbc25a",
+  "en": "Iron core",
+  "ar": "قلب حديدي",
+  "ckb": "کرۆکی ئاسن",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "ff1e6d0a692c0cb39477a210ab3e8f4fdce25f3a18e204556abd4f2ac2ce6dc3",
+  "en": "Rated Torque (G*CM）",
+  "ar": "العزم المقدّر (G*CM)",
+  "ckb": "تۆرکی دیاریکراو (G*CM)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "326d482bc5d615004dbe1e81f175e50a42f3657b11ad66ef96faf1f03ae00bb9",
+  "en": "≥0.32kgf·cm at 4.8V / ≥0.4kgf·cm at 6.0V",
+  "ar": "عند 4.8V: ≥0.32kgf·cm / عند 6.0V: ≥0.4kgf·cm",
+  "ckb": "لە 4.8V: ≥0.32kgf·cm / لە 6.0V: ≥0.4kgf·cm",
+  "kind": "spec_value_text",
+  "needs_review": true
+ },
+ {
+  "h": "ff7d9bb74ef7406b3d1a2f13092a6ce6afb91aed886fc3506bcf449cde2ee3e8",
+  "en": "Stall Current",
+  "ar": "تيار التوقف",
+  "ckb": "تەزووی وەستان",
+  "kind": "spec_label"
+ },
+ {
+  "h": "b8e22c99dba3627f66e2c7105ca00df9a07749ba9c4de354287debb7dc41736f",
+  "en": "≤550mA at 4.8V / ≤650mA at 6.0V",
+  "ar": "عند 4.8V: ≤550mA / عند 6.0V: ≤650mA",
+  "ckb": "لە 4.8V: ≤550mA / لە 6.0V: ≤650mA",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "1913be4929f534d726a45eec3ecf6dfbcb2c8c312187a1e50b10b3e4c6960b77",
+  "en": "Stall Torque (G*CM）",
+  "ar": "عزم التوقف (G*CM)",
+  "ckb": "تۆرکی وەستان (G*CM)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "57e215c57f58e00e06d51c2f4863c9cba0cc91a54eea1f6788767e32bb81c57c",
+  "en": "≥1.0kgf·cm at4.8V / ≥1.2kgf·cm at6.0V",
+  "ar": "≥1.0kgf·cm at4.8V / ≥1.2kgf·cm at6.0V",
+  "ckb": "≥1.0kgf·cm at4.8V / ≥1.2kgf·cm at6.0V",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "f2f2cf554329ba3b0d971f32ba313b9005f5dccfd2eced9919b0eebf78882ae9",
+  "en": "Used in conjunction with a power distribution board, it connects the SW0-4 of the power distribution board to connect the corresponding switch channels, thereby achieving the function of maintaining power in the corresponding channels.",
+  "ar": "يُستخدم مع لوحة توزيع الطاقة، إذ يُوصَل بمنافذ SW0-4 في لوحة توزيع الطاقة لتوصيل قنوات المفاتيح المقابلة، وبذلك يحقق وظيفة إبقاء الطاقة متصلة في القنوات المقابلة.",
+  "ckb": "لەگەڵ بۆردی دابەشکردنی وزە بەکاردێت، و بە دەرچەکانی SW0-4 لە بۆردی دابەشکردنی وزە دەبەسترێت بۆ پەیوەستکردنی کەناڵە هاوتاکانی کلیل، بەم شێوەیە ئەرکی هێشتنەوەی وزە لە کەناڵە هاوتاکاندا بەدی دەهێنێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "80207de8c210551b0ec85c095d5dfdffebfe8f990a6f11c6ba2248dec9bc7e1d",
+  "en": "Used in conjunction with a power distribution board, connecting the OUT of one power distribution board to the IN of another power distribution board for the purpose of expanding the power distribution board.",
+  "ar": "يُستخدم مع لوحة توزيع الطاقة، لتوصيل منفذ OUT في إحدى لوحات توزيع الطاقة بمنفذ IN في لوحة توزيع طاقة أخرى بهدف توسيع لوحة توزيع الطاقة.",
+  "ckb": "لەگەڵ بۆردی دابەشکردنی وزە بەکاردێت، بۆ بەستنی دەرچەی OUT لە بۆردێکی دابەشکردنی وزە بە دەرچەی IN لە بۆردێکی تری دابەشکردنی وزە بە مەبەستی فراوانکردنی بۆردی دابەشکردنی وزە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "e03e575da66d8a4a5250e1a7378632c7b01c6756e31f6349f084a605d69006a7",
+  "en": "1. Provides bright and uniform lighting. 2. Easy to install. 3. Suitable for various models and creative projects, adding visual appeal to artwork.",
+  "ar": "1. يوفّر إضاءة ساطعة ومتجانسة. 2. سهل التركيب. 3. مناسب لمختلف النماذج والمشاريع الإبداعية، ويضيف جاذبية بصرية إلى الأعمال الفنية.",
+  "ckb": "1. ڕووناکیی گەش و یەکسان دابین دەکات. 2. دامەزراندنی ئاسانە. 3. گونجاوە بۆ مۆدێلە جۆراوجۆرەکان و پڕۆژە داهێنەرانەکان، و سەرنجڕاکێشیی بینراو بە کارە هونەرییەکان دەبەخشێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "6a3fc87b4691ce9c4b016f105eeea6d64b8d3013fda864ce676656f9f1085b96",
+  "en": "4 White 3030 LED Board with SH1.0 Connector 5V - KB001",
+  "ar": "لوحة LED 3030 بمصابيح بيضاء عدد 4 مع موصل SH1.0 بجهد 5V - KB001",
+  "ckb": "بۆردی LED 3030 بە 4 گڵۆپی سپی لەگەڵ گەیەنەری SH1.0 بە ڤۆڵتیەی 5V - KB001",
+  "kind": "box_item"
+ },
+ {
+  "h": "1b8b53e2b82c7c641c23d2081f33f0bc120667f0db67f82202c87598c9cd85f7",
+  "en": "KB001 x 2 PCS",
+  "ar": "KB001 × 2 قطعة",
+  "ckb": "KB001 × 2 دانە",
+  "kind": "box_item"
+ },
+ {
+  "h": "04bf1c115567d416dd2d44779a0a56c903d6376fd88d1f1a8664b7710c0b460b",
+  "en": "Wire Pair with SH1.0 x 2 PCS",
+  "ar": "زوج الأسلاك (Wire Pair with SH1.0) × 2 قطعة",
+  "ckb": "جووتە وایەر (Wire Pair with SH1.0) × 2 دانە",
+  "kind": "box_item"
+ },
+ {
+  "h": "fefc50f4fad4452147388a4108e2b572256397f6e3734cff8b396bf651b5734a",
+  "en": "1 White 3030 LED Board with SH1.0 Connector 5V (2 PCS) - KB002",
+  "ar": "لوحة LED 3030 بمصباح أبيض عدد 1 مع موصل SH1.0 بجهد 5V (2 قطعة) - KB002",
+  "ckb": "بۆردی LED 3030 بە 1 گڵۆپی سپی لەگەڵ گەیەنەری SH1.0 بە ڤۆڵتیەی 5V (2 دانە) - KB002",
+  "kind": "box_item"
+ },
+ {
+  "h": "84ff731ace6401b5e9df07cdc1275581f2dfd5c4f59f2500eee2345b73cc5bdd",
+  "en": "KB002 x 2 PCS",
+  "ar": "KB002 × 2 قطعة",
+  "ckb": "KB002 × 2 دانە",
+  "kind": "box_item"
+ },
+ {
+  "h": "ac397cd2997d8b7d601c870a8916684cb73e2071ddfb279c9ba1b87e16e1f309",
+  "en": "Used in conjunction with a distribution board, it controls the ON/OFF state of the corresponding channel, thereby achieving switch control functionality. - The self-locking button switch uses an SH1.0-2P connector. It requires an SH1.0-2P reverse double-headed connector wire to connect to the SW0 to SW4 channels on the spring contacts plate board. - When the switch is pressed down, it locks in and performs the connection. When the switch is pressed again, it springs up and disconnects. - If the switch board is connected to any of the SW1 to SW4 channels, ensure that the maximum current of the corresponding channel's device does not exceed 1A. - If the knob board is connected to the SW0 master switch, ensure that the maximum combined current of all channels SW1 to SW4 does not exceed 1A.",
+  "ar": "يُستخدم مع لوحة التوزيع للتحكم في حالة التشغيل/الإيقاف (ON/OFF) للقناة المقابلة، وبذلك يحقق وظيفة التحكم بالمفتاح. - يستخدم مفتاح الزر ذاتي القفل موصل SH1.0-2P، ويتطلب سلك توصيل SH1.0-2P معكوسًا ثنائي الرأس للاتصال بالقنوات SW0 إلى SW4 على لوحة صفيحة نوابض التلامس. - عند الضغط على المفتاح إلى الأسفل يثبت في وضعه ويُتمّ التوصيل، وعند الضغط عليه مرة أخرى يرتد إلى الأعلى ويفصل التوصيل. - إذا وُصلت لوحة المفتاح بأي من القنوات SW1 إلى SW4، فتأكّد من ألا يتجاوز أقصى تيار لجهاز القناة المقابلة 1A. - إذا وُصلت لوحة المقبض الدوّار بالمفتاح الرئيسي SW0، فتأكّد من ألا يتجاوز مجموع أقصى تيار لجميع القنوات SW1 إلى SW4 قيمة 1A.",
+  "ckb": "لەگەڵ بۆردی دابەشکردن بەکاردێت و کۆنترۆڵی دۆخی هەڵکردن/کوژاندنەوە (ON/OFF) لە کەناڵی هاوتادا دەکات، بەم شێوەیە ئەرکی کۆنترۆڵی کلیل بەدی دەهێنێت. - کلیلی دوگمەی خۆقفڵکەر گەیەنەری SH1.0-2P بەکاردەهێنێت. پێویستی بە وایەرێکی گەیەنەری پێچەوانەی دووسەر لە جۆری SH1.0-2P هەیە بۆ بەستن بە کەناڵەکانی SW0 تا SW4 لەسەر بۆردی پلێتی فەنەری بەرکەوتن. - کاتێک کلیلەکە دادەگیرێت، لە شوێنی خۆیدا قفڵ دەبێت و پەیوەندییەکە دەبەستێت. کاتێک دووبارە دادەگیرێتەوە، بەرز دەبێتەوە و پەیوەندییەکە دەپچڕێنێت. - ئەگەر بۆردی کلیلەکە بە هەر یەکێک لە کەناڵەکانی SW1 تا SW4 ببەسترێت، دڵنیابە کە زۆرترین تەزووی ئامێری کەناڵی هاوتا لە 1A تێناپەڕێت. - ئەگەر بۆردی دەسکی سووڕاوە بە کلیلی سەرەکیی SW0 ببەسترێت، دڵنیابە کە کۆی زۆرترین تەزووی هەموو کەناڵەکانی SW1 تا SW4 لە 1A تێناپەڕێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "70165a51481cbb3d6c86adb94bc8c1e4bdeba6a140c31bdda009679564efaef4",
+  "en": "Used with a Power Distribution Board (PDB) - 4 Channels, it controls the ON/OFF state of the corresponding channel, thereby achieving the function of switch control.",
+  "ar": "يُستخدم مع لوحة توزيع الطاقة (PDB) - 4 قنوات، للتحكم في حالة التشغيل/الإيقاف (ON/OFF) للقناة المقابلة، وبذلك يحقق وظيفة التحكم بالمفتاح.",
+  "ckb": "لەگەڵ بۆردی دابەشکردنی وزە (PDB) - 4 کەناڵ بەکاردێت، و کۆنترۆڵی دۆخی هەڵکردن/کوژاندنەوە (ON/OFF) لە کەناڵی هاوتادا دەکات، بەم شێوەیە ئەرکی کۆنترۆڵی کلیل بەدی دەهێنێت.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "543e9326aea1870597a6c0aec329646bfab5a0ba5d5949b6d2322edf85ab3dfa",
+  "en": "The Self-Locking Button Switch with SH1.0 Connector is a switch device that can be connected to SW0~4 on the Power Distribution Board (PDB) to control the switch of electric devices. Pressing the button down connects the circuit; pressing it again pops it up and disconnects the circuit.",
+  "ar": "مفتاح الزر ذاتي القفل (Self-Locking Button Switch with SH1.0 Connector) هو جهاز تبديل يمكن توصيله بمنافذ SW0~4 في لوحة توزيع الطاقة (PDB) للتحكم في تشغيل الأجهزة الكهربائية وإيقافها. الضغط على الزر إلى الأسفل يُغلق الدائرة، والضغط عليه مرة أخرى يجعله يرتد إلى الأعلى ويفتح الدائرة.",
+  "ckb": "کلیلی دوگمەی خۆقفڵکەر (Self-Locking Button Switch with SH1.0 Connector) ئامێرێکی کلیلە کە دەتوانرێت بە دەرچەکانی SW0~4 لەسەر بۆردی دابەشکردنی وزە (PDB) ببەسترێت بۆ کۆنترۆڵکردنی هەڵکردن و کوژاندنەوەی ئامێرە کارەباییەکان. داگرتنی دوگمەکە بازنەکە دەبەستێت؛ داگرتنەوەی بۆ جاری دووەم بەرزی دەکاتەوە و بازنەکە دەپچڕێنێت.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "bdfd62a8cb14e7fb3ad0ad734aebaa3a67077ae57e9c5a6d96dc028f8f9c8bc0",
+  "en": "When the Self-Locking Button Switch is connected to SW1~4, it's necessary to ensure that the maximum current of the electric devices in each corresponding channel does not exceed 1A.",
+  "ar": "عند توصيل مفتاح الزر ذاتي القفل بمنافذ SW1~4، يجب التأكّد من ألا يتجاوز أقصى تيار للأجهزة الكهربائية في كل قناة مقابلة 1A.",
+  "ckb": "کاتێک کلیلی دوگمەی خۆقفڵکەر بە SW1~4 دەبەسترێت، پێویستە دڵنیا بیت کە زۆرترین تەزووی ئامێرە کارەباییەکان لە هەر کەناڵێکی هاوتادا لە 1A تێناپەڕێت.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "f19919d5c70d9a2028e140aa7d5a4680e357fb8856ded3dfee9614742ffe1b9e",
+  "en": "When the Self-Locking Button Switch is connected to the SW0, it's necessary to ensure that the sum of the maximum currents of all electric devices does not exceed 1A.",
+  "ar": "عند توصيل مفتاح الزر ذاتي القفل بمنفذ SW0، يجب التأكّد من ألا يتجاوز مجموع أقصى تيار لجميع الأجهزة الكهربائية 1A.",
+  "ckb": "کاتێک کلیلی دوگمەی خۆقفڵکەر بە SW0 دەبەسترێت، پێویستە دڵنیا بیت کە کۆی زۆرترین تەزووی هەموو ئامێرە کارەباییەکان لە 1A تێناپەڕێت.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "e3b71b2f7e5bcfac1987695c30689ff4ab51435d30afb8c4ee662b2b0260209c",
+  "en": "Secured with two M2 screws.",
+  "ar": "يُثبَّت ببرغيين M2.",
+  "ckb": "بە دوو بورغیی M2 جێگیر دەکرێت.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "469e043c791ca1b4767f3969140fad6565d394c74465ccdd2eab0f7ccbfdaf00",
+  "en": "Self-Locking Button Switch with SH1.0 Connector x2pcs",
+  "ar": "مفتاح زر ذاتي القفل مع موصل SH1.0 × 2 قطعة",
+  "ckb": "کلیلی دوگمەی خۆقفڵکەر لەگەڵ گەیەنەری SH1.0 × 2 دانە",
+  "kind": "box_item"
+ },
+ {
+  "h": "7f587607d494740702fba2b436ac1b6165155c6dc9c196739933c700e8651062",
+  "en": "Used in conjunction with a power distribution board, it is used to adjust the voltage of the corresponding channel, thereby achieving the function of adjusting the speed or brightness of the corresponding device. - The potentiometer board is used for voltage regulation with an SH1.0-2P connector. It requires an SH1.0-2P reverse double-headed connector wire to connect to the SW0 to SW4 channels on the power distribution board. When the knob is turned counterclockwise, the output voltage of the corresponding channel decreases. When the knob is turned clockwise, the output voltage of the corresponding channel increases. - If the potentiometer board is connected to any of the SW1 to SW4 channels, ensure that the maximum current of the corresponding channel's device does not exceed 0.4A, and the battery voltage does not exceed 6V. - If the potentiometer board is connected to the SW0 main switch, ensure that the combined maximum current of all channels SW1 to SW4 does not exceed 0.4A, and th",
+  "ar": "يُستخدم مع لوحة توزيع الطاقة لضبط جهد القناة المقابلة، وبذلك يحقق وظيفة ضبط سرعة الجهاز المقابل أو سطوعه. - تُستخدم لوحة مقياس الجهد (البوتنشيومتر) لتنظيم الجهد عبر موصل SH1.0-2P، وتتطلب سلك توصيل SH1.0-2P معكوسًا ثنائي الرأس للاتصال بالقنوات SW0 إلى SW4 في لوحة توزيع الطاقة. عند تدوير المقبض عكس اتجاه عقارب الساعة ينخفض جهد الخرج للقناة المقابلة، وعند تدويره مع اتجاه عقارب الساعة يرتفع جهد الخرج للقناة المقابلة. - إذا وُصلت لوحة مقياس الجهد بأي من القنوات SW1 إلى SW4، فتأكّد من ألا يتجاوز أقصى تيار لجهاز القناة المقابلة 0.4A، وألا يتجاوز جهد البطارية 6V. - إذا وُصلت لوحة مقياس الجهد بالمفتاح الرئيسي SW0، فتأكّد من ألا يتجاوز مجموع أقصى تيار لجميع القنوات SW1 إلى SW4 قيمة 0.4A، و…",
+  "ckb": "لەگەڵ بۆردی دابەشکردنی وزە بەکاردێت بۆ ڕێکخستنی ڤۆڵتیەی کەناڵی هاوتا، بەم شێوەیە ئەرکی ڕێکخستنی خێرایی یان ڕووناکیی ئامێری هاوتا بەدی دەهێنێت. - بۆردی پۆتێنشیۆمیتەر بۆ ڕێکخستنی ڤۆڵتیە بە گەیەنەری SH1.0-2P بەکاردێت. پێویستی بە وایەرێکی گەیەنەری پێچەوانەی دووسەر لە جۆری SH1.0-2P هەیە بۆ بەستن بە کەناڵەکانی SW0 تا SW4 لەسەر بۆردی دابەشکردنی وزە. کاتێک دەسکە سووڕاوەکە بە پێچەوانەی ئاراستەی میلی کاتژمێر دەسووڕێنرێت، ڤۆڵتیەی دەرچوونی کەناڵی هاوتا کەم دەبێتەوە. کاتێک بە ئاراستەی میلی کاتژمێر دەسووڕێنرێت، ڤۆڵتیەی دەرچوونی کەناڵی هاوتا زیاد دەبێت. - ئەگەر بۆردی پۆتێنشیۆمیتەر بە هەر یەکێک لە کەناڵەکانی SW1 تا SW4 ببەسترێت، دڵنیابە کە زۆرترین تەزووی ئامێری کەناڵی هاوتا لە 0.4A تێناپەڕێت، و ڤۆڵتیەی باترییەکە لە 6V تێناپەڕێت. - ئەگەر بۆردی پۆتێنشیۆمیتەر بە کلیلی سەرەکیی SW0 ببەسترێت، دڵنیابە کە کۆی زۆرترین تەزووی هەموو کەناڵەکانی SW1 تا SW4 لە 0.4A تێناپەڕێت، و…",
+  "kind": "short_description"
+ },
+ {
+  "h": "bc6d2a6d431dad6c0fac6e4ae3c2067b196e9335cdf20a894c650ae0291a416f",
+  "en": "N20 M3 Threaded Shaft Reduction Gear Motor is a low-power reduction motor, compatible with M3 shaft, and suitable for making electric push rods and other linear drive devices. It offers a short, medium, and a long threaded shaft length option to meet different needs. The motor can be connected to the power distribution board with 4 channels using the wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "ar": "محرك N20 M3 Threaded Shaft Reduction Gear Motor هو محرك تخفيض منخفض القدرة، متوافق مع عمود M3، ومناسب لصنع قضبان الدفع الكهربائية وغيرها من أجهزة الحركة الخطية. يأتي بخيارات لطول العمود الملولب: قصير ومتوسط وطويل لتلبية الاحتياجات المختلفة. يمكن توصيل المحرك بلوحة توزيع الطاقة ذات 4 قنوات باستخدام زوج الأسلاك wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "ckb": "بزوێنەری N20 M3 Threaded Shaft Reduction Gear Motor بزوێنەرێکی کەمکەرەوەی خێراییە بە وزەی کەم، گونجاوە لەگەڵ میلی M3، و بۆ دروستکردنی شیشی پاڵنانی کارەبایی و ئامێرەکانی تری جووڵاندنی هێڵی دەشێت. هەڵبژاردەی درێژیی کورت، مامناوەند و درێژی میلی پێچداری هەیە بۆ پڕکردنەوەی پێداویستییە جیاوازەکان. دەتوانرێت بزوێنەرەکە بە بۆردی دابەشکردنی وزەی 4 کەناڵی ببەسترێت بە بەکارهێنانی جووتە وایەری wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "kind": "short_description"
+ },
+ {
+  "h": "00a74b5780aedd3b21e614c9352a349f6cecdfdb1ffb3a82d523712dad03d262",
+  "en": "The power distribution board is used for connecting various electrical devices, switches, and power supply, supporting electrical devices with 4 channels. - The IN is for connecting to a power source, such as a USB cable or battery box. IN and OUT are interconnected, and OUT can be used to connect to another power distribution board in series. IN/OUT uses a PH2.0-2P connector. - The slot SW0 to slot SW04 is used for connecting switches such as rotary boards, switch boards or jumper cables. - The slot CH1 to slot CH4 is used for connecting electrical devices su ch as N20 motors, light panels, fans, etc. Do not connect rotary boards, switch boards or jumper cables to these channels. - SW0 is the master switch, while SW1 to SW4 are individual switches for controlling channels CH1 to CH4 respectively. The SW0 to SW4 uses a SH1.0-2P connector. - The LED indicator shows the system status. When the battery box and master switch are connected, the LED lights up white, indicating normal statu",
+  "ar": "تُستخدم لوحة توزيع الطاقة لتوصيل مختلف الأجهزة الكهربائية والمفاتيح ومصدر الطاقة، وتدعم الأجهزة الكهربائية عبر 4 قنوات. - منفذ IN مخصّص للاتصال بمصدر طاقة، مثل كابل USB أو علبة البطاريات. المنفذان IN وOUT متصلان داخليًا، ويمكن استخدام OUT لتوصيل لوحة توزيع طاقة أخرى بشكل متسلسل. يستخدم IN/OUT موصل PH2.0-2P. - تُستخدم الفتحات من SW0 إلى SW04 لتوصيل المفاتيح مثل اللوحات الدوّارة أو لوحات المفاتيح أو كابلات الوصل (jumper). - تُستخدم الفتحات من CH1 إلى CH4 لتوصيل الأجهزة الكهربائية مثل محركات N20 وألواح الإضاءة والمراوح وغيرها. لا توصل اللوحات الدوّارة أو لوحات المفاتيح أو كابلات الوصل بهذه القنوات. - المفتاح SW0 هو المفتاح الرئيسي، بينما SW1 إلى SW4 مفاتيح فردية للتحكم في القنوات CH1 إلى CH4 على الترتيب. تستخدم المنافذ SW0 إلى SW4 موصل SH1.0-2P. - يعرض مؤشر LED حالة النظام. عند توصيل علبة البطاريات والمفتاح الرئيسي، يضيء مؤشر LED باللون الأبيض، ما يدل على الحالة الطبيعية…",
+  "ckb": "بۆردی دابەشکردنی وزە بۆ بەستنی ئامێرە کارەباییە جۆراوجۆرەکان، کلیلەکان و سەرچاوەی وزە بەکاردێت، و پشتگیری ئامێرە کارەباییەکان دەکات لە ڕێگەی 4 کەناڵەوە. - دەرچەی IN بۆ بەستن بە سەرچاوەیەکی وزەیە، وەک کێبڵی USB یان سندوقی باتری. IN و OUT بە یەکەوە بەستراون، و دەتوانرێت OUT بەکاربهێنرێت بۆ بەستنی بۆردێکی تری دابەشکردنی وزە بە شێوەی زنجیرەیی. IN/OUT گەیەنەری PH2.0-2P بەکاردەهێنێت. - شوێنەکانی SW0 تا SW04 بۆ بەستنی کلیلەکانن وەک بۆردە سووڕاوەکان، بۆردی کلیل یان کێبڵی پەڕینەوە (jumper). - شوێنەکانی CH1 تا CH4 بۆ بەستنی ئامێرە کارەباییەکانن وەک بزوێنەرەکانی N20، پانێڵی ڕووناکی، پانکە و هتد. بۆردە سووڕاوەکان، بۆردی کلیل یان کێبڵی پەڕینەوە بەم کەناڵانەوە مەبەستە. - کلیلی SW0 کلیلی سەرەکییە، لە کاتێکدا SW1 تا SW4 کلیلی تاکن بۆ کۆنترۆڵکردنی کەناڵەکانی CH1 تا CH4 بە ڕیزبەندی. SW0 تا SW4 گەیەنەری SH1.0-2P بەکاردەهێنن. - نیشاندەری LED دۆخی سیستەمەکە پیشان دەدات. کاتێک سندوقی باتری و کلیلی سەرەکی دەبەسترێن، LED بە ڕەنگی سپی دادەگیرسێت، کە ئاماژەیە بۆ دۆخی ئاسایی…",
+  "kind": "short_description"
+ },
+ {
+  "h": "de2570d41cf7dba589f410675e36b3d7b3fda81a8f9619cda74ab373d2880a21",
+  "en": "The Power Distribution Board (PDB) - 4 Channels is used for connecting various electrical devices, switches, and power supplies, supporting electric devices up to 4 channels.",
+  "ar": "تُستخدم لوحة توزيع الطاقة (PDB) - 4 قنوات لتوصيل مختلف الأجهزة الكهربائية والمفاتيح ومزوّدات الطاقة، وتدعم الأجهزة الكهربائية حتى 4 قنوات.",
+  "ckb": "بۆردی دابەشکردنی وزە (PDB) - 4 کەناڵ بۆ بەستنی ئامێرە کارەباییە جۆراوجۆرەکان، کلیلەکان و دابینکەرەکانی وزە بەکاردێت، و پشتگیری ئامێرە کارەباییەکان دەکات تا 4 کەناڵ.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "f6cad969ea499911ced9d723dc21d7bbdd018a3451951cb944de6cb8d093e9f7",
+  "en": "Use two M2 screws for fastening (unless otherwise specified, all fastening screws used for the kit's PCBA are M2 screws).",
+  "ar": "استخدم برغيين M2 للتثبيت (ما لم يُذكر خلاف ذلك، فإن جميع براغي التثبيت المستخدمة للوحات PCBA في الطقم هي براغي M2).",
+  "ckb": "دوو بورغیی M2 بۆ جێگیرکردن بەکاربهێنە (ئەگەر شتێکی تر دیاری نەکرابێت، بۆ جێگیرکردنی هەموو بۆردەکانی PCBA لە کیتەکەدا بورغیی M2 بەکاردەهێنرێت).",
+  "kind": "usage_body"
+ },
+ {
+  "h": "bad2643ff3f87ecf833e5df78365cdbdaa384f192416c1d04e8dc03af960fede",
+  "en": "The IN is for connecting to various power supplies, such as a USB-A Power Cable with PH2.0 Connector or battery box. IN and OUT are interconnected, and OUT can be used to connect to another Potentiometer Board with SH1.0 Connector in series. IN/OUT uses a PH2.0-2P connector.",
+  "ar": "منفذ IN مخصّص للاتصال بمختلف مزوّدات الطاقة، مثل كابل الطاقة USB-A Power Cable with PH2.0 Connector أو علبة البطاريات. المنفذان IN وOUT متصلان داخليًا، ويمكن استخدام OUT لتوصيل لوحة أخرى من نوع Potentiometer Board with SH1.0 Connector بشكل متسلسل. يستخدم IN/OUT موصل PH2.0-2P.",
+  "ckb": "دەرچەی IN بۆ بەستن بە دابینکەرە جۆراوجۆرەکانی وزەیە، وەک کێبڵی وزەی USB-A Power Cable with PH2.0 Connector یان سندوقی باتری. IN و OUT بە یەکەوە بەستراون، و دەتوانرێت OUT بەکاربهێنرێت بۆ بەستنی بۆردێکی تری Potentiometer Board with SH1.0 Connector بە شێوەی زنجیرەیی. IN/OUT گەیەنەری PH2.0-2P بەکاردەهێنێت.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "65f1d961b21332fc88fcaa50e91f19ad76cbb649ef2584ccc6436fbf93b9c177",
+  "en": "The SW0 to SW4 is used for connecting switches such as Potentiometer Board with SH1.0 Connector, Self-Locking Button Switch with SH1.0 Connector or Jumper Cable with SH1.0 Connector.",
+  "ar": "تُستخدم المنافذ من SW0 إلى SW4 لتوصيل المفاتيح مثل Potentiometer Board with SH1.0 Connector أو Self-Locking Button Switch with SH1.0 Connector أو Jumper Cable with SH1.0 Connector.",
+  "ckb": "دەرچەکانی SW0 تا SW4 بۆ بەستنی کلیلەکان بەکاردێن وەک Potentiometer Board with SH1.0 Connector، Self-Locking Button Switch with SH1.0 Connector یان Jumper Cable with SH1.0 Connector.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "7222dd55c9d631faeefa5014b622f637b01f475eee3b107f151c96721dfc4fa6",
+  "en": "The CH1 to CH4 is used for connecting electrical devices such as N20 Reduction Gear Motor, 3030-LED Board with SH1.0 Connector, 2510 5V DC Fan with SH1.0 Connector, etc. Please do not connect the Potentiometer Board with SH1.0 Connector, Self-Locking Button Switch with SH1.0 Connector or Jumper Cable with SH1.0 Connector to these channels.",
+  "ar": "تُستخدم المنافذ من CH1 إلى CH4 لتوصيل الأجهزة الكهربائية مثل N20 Reduction Gear Motor و3030-LED Board with SH1.0 Connector و2510 5V DC Fan with SH1.0 Connector وغيرها. يرجى عدم توصيل Potentiometer Board with SH1.0 Connector أو Self-Locking Button Switch with SH1.0 Connector أو Jumper Cable with SH1.0 Connector بهذه القنوات.",
+  "ckb": "دەرچەکانی CH1 تا CH4 بۆ بەستنی ئامێرە کارەباییەکان بەکاردێن وەک N20 Reduction Gear Motor، 3030-LED Board with SH1.0 Connector، 2510 5V DC Fan with SH1.0 Connector و هتد. تکایە Potentiometer Board with SH1.0 Connector، Self-Locking Button Switch with SH1.0 Connector یان Jumper Cable with SH1.0 Connector بەم کەناڵانەوە مەبەستە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "e182970b3705eae0c618f2ca497f71690af8a27c81670ef8264fc57648f5a9d2",
+  "en": "SW0 is the master switch, while SW1 to SW4 are individual switches for controlling channels CH1 to CH4 respectively. The SW0 to SW4 uses a SH1.0-2P connector.",
+  "ar": "المفتاح SW0 هو المفتاح الرئيسي، بينما SW1 إلى SW4 مفاتيح فردية للتحكم في القنوات CH1 إلى CH4 على الترتيب. تستخدم المنافذ SW0 إلى SW4 موصل SH1.0-2P.",
+  "ckb": "کلیلی SW0 کلیلی سەرەکییە، لە کاتێکدا SW1 تا SW4 کلیلی تاکن بۆ کۆنترۆڵکردنی کەناڵەکانی CH1 تا CH4 بە ڕیزبەندی. SW0 تا SW4 گەیەنەری SH1.0-2P بەکاردەهێنن.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "f610b62706eabee3b344eec2b585f93af5124f07b856bf2175270f4ce1e547c6",
+  "en": "The LED indicator shows the system status. When the battery box and master switch are connected, the LED lights up white, indicating normal status. If the total current exceeds 1A or if a short circuit occurs in any of the CH1 to CH4 channels, the current-limiting chip will cut off the power supply, and the LED will turn off. After the overcurrent or short-circuit condition is removed, the power supply will remain disconnected. To restore normal operation, the main switch must be turned off and then reconnected.",
+  "ar": "يعرض مؤشر LED حالة النظام. عند توصيل علبة البطاريات والمفتاح الرئيسي، يضيء مؤشر LED باللون الأبيض، ما يدل على الحالة الطبيعية. إذا تجاوز التيار الإجمالي 1A أو حدثت دائرة قصر في أي من القنوات CH1 إلى CH4، فإن شريحة تحديد التيار تقطع التغذية بالطاقة وينطفئ مؤشر LED. وبعد زوال حالة التيار الزائد أو دائرة القصر، تبقى التغذية بالطاقة مفصولة. ولاستعادة التشغيل الطبيعي، يجب إطفاء المفتاح الرئيسي ثم إعادة توصيله.",
+  "ckb": "نیشاندەری LED دۆخی سیستەمەکە پیشان دەدات. کاتێک سندوقی باتری و کلیلی سەرەکی دەبەسترێن، LED بە ڕەنگی سپی دادەگیرسێت، کە ئاماژەیە بۆ دۆخی ئاسایی. ئەگەر کۆی تەزوو لە 1A تێپەڕێت یان کورتە بازنە لە هەر یەکێک لە کەناڵەکانی CH1 تا CH4 ڕووبدات، چیپی سنووردارکردنی تەزوو دابینکردنی وزە دەپچڕێنێت و LED دەکوژێتەوە. دوای لابردنی دۆخی تەزووی زیادە یان کورتە بازنە، دابینکردنی وزە هەر پچڕاو دەمێنێتەوە. بۆ گەڕاندنەوەی کارکردنی ئاسایی، دەبێت کلیلی سەرەکی بکوژێنرێتەوە و پاشان دووبارە ببەسترێتەوە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "7a0fd321dfa99a16246ef55edc46f0ec3ad8c0285edd103af995dc240ba55fbc",
+  "en": "Please do not connect switches to the CH1 to CH4, and avoid connecting electrical devices to SW1 to SW4 as this may cause a short circuit.",
+  "ar": "يرجى عدم توصيل المفاتيح بالمنافذ CH1 إلى CH4، وتجنّب توصيل الأجهزة الكهربائية بالمنافذ SW1 إلى SW4 لأن ذلك قد يسبب دائرة قصر.",
+  "ckb": "تکایە کلیلەکان بە CH1 تا CH4 مەبەستە، و لە بەستنی ئامێرە کارەباییەکان بە SW1 تا SW4 دووربکەوە چونکە لەوانەیە ببێتە هۆی کورتە بازنە.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "f29b64282e5ec7a6c4f9a4a6ac49085e0b809d027f31df1b05e288f5ba6bb386",
+  "en": "Power Distribution Board (PDB) x1pcs",
+  "ar": "لوحة توزيع الطاقة (PDB) × 1 قطعة",
+  "ckb": "بۆردی دابەشکردنی وزە (PDB) × 1 دانە",
+  "kind": "box_item"
+ },
+ {
+  "h": "14905aabfd5db3896b4e4b5739cc9ade3abc82d8821289986139d86b656d1062",
+  "en": "Wire Pair with PH2.0 x1pcs",
+  "ar": "زوج أسلاك بموصل PH2.0 × 1 قطعة",
+  "ckb": "جووتە وایەر بە گەیەنەری PH2.0 × 1 دانە",
+  "kind": "box_item"
+ },
+ {
+  "h": "e6851b73fe2315d60c47a7c6bea86385882c140453894f01786f7b8f63712217",
+  "en": "Connector Model",
+  "ar": "طراز الموصل",
+  "ckb": "مۆدێلی گەیەنەر",
+  "kind": "block_title"
+ },
+ {
+  "h": "8df698367b77cc8de5ed748c1420590354bc61dbdc0524c80a0f610c849dcae7",
+  "en": "N20 Dual Shaft Worm Gear Motor is a low-power reduction motor. The motor features a double D-shaped output shaft that protrudes laterally, utilizing a worm gear gearbox. It is suitable for power drive devices such as toy cars and tanks. The motor can be connected to the power distribution board with 4 channels using the wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "ar": "محرك N20 Dual Shaft Worm Gear Motor هو محرك تخفيض منخفض القدرة. يتميّز المحرك بعمود خرج مزدوج على شكل حرف D يبرز جانبيًا، ويعتمد على علبة تروس دودية. وهو مناسب لأجهزة الدفع بالطاقة مثل سيارات ودبابات الألعاب. يمكن توصيل المحرك بلوحة توزيع الطاقة ذات 4 قنوات باستخدام زوج الأسلاك wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "ckb": "بزوێنەری N20 Dual Shaft Worm Gear Motor بزوێنەرێکی کەمکەرەوەی خێراییە بە وزەی کەم. بزوێنەرەکە میلێکی دەرچوونی دووانە بە شێوەی پیتی D هەیە کە بە لاتەنیشتدا دەردەچێت، و سندوقی چەرخی ددانەداری کرمی بەکاردەهێنێت. گونجاوە بۆ ئامێرەکانی جووڵاندن بە وزە وەک ئۆتۆمبێل و تانکی یاری. دەتوانرێت بزوێنەرەکە بە بۆردی دابەشکردنی وزەی 4 کەناڵی ببەسترێت بە بەکارهێنانی جووتە وایەری wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "kind": "short_description"
+ },
+ {
+  "h": "2791cab9f7fe57341947a886b7f8081082e4557417219360d3ec0c2f920d3356",
+  "en": "N20 Single Shaft Worm Gear Motor is a low-power reduction motor. The motor features a D-shaped output shaft that protrudes laterally, utilizing a worm gear gearbox. It is suitable for power drive devices such as toy cars and tanks. The motor can be connected to the power distribution board with 4 channels using the wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "ar": "محرك N20 Single Shaft Worm Gear Motor هو محرك تخفيض منخفض القدرة. يتميّز المحرك بعمود خرج مفرد على شكل حرف D يبرز جانبيًا، ويعتمد على علبة تروس دودية. وهو مناسب لأجهزة الدفع بالطاقة مثل سيارات ودبابات الألعاب. يمكن توصيل المحرك بلوحة توزيع الطاقة ذات 4 قنوات باستخدام زوج الأسلاك wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "ckb": "بزوێنەری N20 Single Shaft Worm Gear Motor بزوێنەرێکی کەمکەرەوەی خێراییە بە وزەی کەم. بزوێنەرەکە میلێکی دەرچوونی تاک بە شێوەی پیتی D هەیە کە بە لاتەنیشتدا دەردەچێت، و سندوقی چەرخی ددانەداری کرمی بەکاردەهێنێت. گونجاوە بۆ ئامێرەکانی جووڵاندن بە وزە وەک ئۆتۆمبێل و تانکی یاری. دەتوانرێت بزوێنەرەکە بە بۆردی دابەشکردنی وزەی 4 کەناڵی ببەسترێت بە بەکارهێنانی جووتە وایەری wire pair-SH1.0-2PIN-5CM/10CM/20CM.",
+  "kind": "short_description"
+ },
+ {
+  "h": "2fc3250dba70088c2832550ddc8d3454ebca0f67637a10eaed905665d0aaf130",
+  "en": "Battery spring contact plates can be used in the battery case box for AAA batteries - This spring contact plate is tailored for connecting AAA batteries using the PH2.0 connector. Users can easily link AAA batteries in series without the hassle of complex wiring or soldering to save time. It is suitable for various devices that require AAA batteries as a power source, such as remote controls, small electronic devices or toys.",
+  "ar": "يمكن استخدام صفائح تلامس البطارية النابضية في علبة البطاريات المخصّصة لبطاريات AAA - صُمّمت صفيحة التلامس النابضية هذه خصيصًا لتوصيل بطاريات AAA باستخدام موصل PH2.0. يمكن للمستخدمين توصيل بطاريات AAA بشكل متسلسل بسهولة دون عناء التوصيلات المعقّدة أو اللحام، مما يوفّر الوقت. وهي مناسبة لمختلف الأجهزة التي تعمل ببطاريات AAA كمصدر للطاقة، مثل أجهزة التحكم عن بُعد والأجهزة الإلكترونية الصغيرة أو الألعاب.",
+  "ckb": "پلێتی بەرکەوتنی فەنەریی باتری دەتوانرێت لە سندوقی باتریدا بۆ باتریی AAA بەکاربهێنرێت - ئەم پلێتی بەرکەوتنە فەنەرییە بە تایبەتی بۆ بەستنی باتریی AAA بە گەیەنەری PH2.0 دروستکراوە. بەکارهێنەران دەتوانن بە ئاسانی باتریی AAA بە شێوەی زنجیرەیی پێکەوە ببەستن بەبێ ماندووبوونی وایەرکێشانی ئاڵۆز یان لەحیمکردن، بۆ ئەوەی کات بپارێزن. گونجاوە بۆ ئامێرە جۆراوجۆرەکان کە پێویستیان بە باتریی AAA هەیە وەک سەرچاوەی وزە، وەک ڕیمۆت، ئامێری ئەلیکترۆنیی بچووک یان یاری.",
+  "kind": "short_description"
+ },
+ {
+  "h": "d5a4641bd80e02441e153bab346c90f112a900a087d508dc7377ea4ea66d9e67",
+  "en": "Battery spring contact plates can be used in the battery case box for AAA batteries.",
+  "ar": "يمكن استخدام صفائح تلامس البطارية النابضية في علبة البطاريات المخصّصة لبطاريات AAA.",
+  "ckb": "پلێتی بەرکەوتنی فەنەریی باتری دەتوانرێت لە سندوقی باتریدا بۆ باتریی AAA بەکاربهێنرێت.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "2ba3820313788e3ea3b90b2d6c18770c96b0e369d5c33102abef29b661c0dba2",
+  "en": "This spring contact plate is tailored for connecting AAA batteries using the PH2.0 connector. Users can easily link AAA batteries in series without the hassle of complex wiring or soldering to save time. It is suitable for various devices that require AAA batteries as a power source, such as remote controls, small electronic devices or toys.",
+  "ar": "صُمّمت صفيحة التلامس النابضية هذه خصيصًا لتوصيل بطاريات AAA باستخدام موصل PH2.0. يمكن للمستخدمين توصيل بطاريات AAA بشكل متسلسل بسهولة دون عناء التوصيلات المعقّدة أو اللحام، مما يوفّر الوقت. وهي مناسبة لمختلف الأجهزة التي تعمل ببطاريات AAA كمصدر للطاقة، مثل أجهزة التحكم عن بُعد والأجهزة الإلكترونية الصغيرة أو الألعاب.",
+  "ckb": "ئەم پلێتی بەرکەوتنە فەنەرییە بە تایبەتی بۆ بەستنی باتریی AAA بە گەیەنەری PH2.0 دروستکراوە. بەکارهێنەران دەتوانن بە ئاسانی باتریی AAA بە شێوەی زنجیرەیی پێکەوە ببەستن بەبێ ماندووبوونی وایەرکێشانی ئاڵۆز یان لەحیمکردن، بۆ ئەوەی کات بپارێزن. گونجاوە بۆ ئامێرە جۆراوجۆرەکان کە پێویستیان بە باتریی AAA هەیە وەک سەرچاوەی وزە، وەک ڕیمۆت، ئامێری ئەلیکترۆنیی بچووک یان یاری.",
+  "kind": "usage_body"
+ },
+ {
+  "h": "aaacca4ec3543ff1b6fa9b5487e2175a8ead65885e9519143a1b4fd6c30c8667",
+  "en": "Manganese steel nickel plated",
+  "ar": "فولاذ منغنيز مطلي بالنيكل",
+  "ckb": "پۆڵای مەنگەنیزی ڕووپۆشکراو بە نیکڵ",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "d1a37aff8cb7dbf5228ee9ac3af4d3318b7a8fca713fdf758e3a66376dda1f8f",
+  "en": "Born for creators! Each electronic part is meticulously selected to ensure you are fully supported at every step of your creative journey.",
+  "ar": "صُنع للمبدعين! تم اختيار كل قطعة إلكترونية بعناية فائقة لضمان حصولك على الدعم الكامل في كل خطوة من رحلتك الإبداعية.",
+  "ckb": "بۆ داهێنەران دروستکراوە! هەر پارچەیەکی ئەلیکترۆنی بە وردی هەڵبژێردراوە بۆ ئەوەی لە هەموو هەنگاوێکی گەشتی داهێنانتدا پشتگیریی تەواوت هەبێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "ae8878f427ede6e4ddadded019f1db8c98a198e85caa3b17136d6d3bdac21751",
+  "en": "M5x12 SHCS Machine Screw (5PCS) -AA001",
+  "ar": "برغي ميكانيكي M5x12 من نوع SHCS (5PCS) -AA001",
+  "ckb": "بورغیی ئامێری M5x12 جۆری SHCS (5PCS) -AA001",
+  "kind": "box_item"
+ },
+ {
+  "h": "1b5592714582196cf00467026115bd5ec475c43052b5771eb6361f53b47c0bd5",
+  "en": "M3x23 SHCS Machine Screw (10PCS) -AA003",
+  "ar": "برغي ميكانيكي M3x23 من نوع SHCS (10PCS) -AA003",
+  "ckb": "بورغیی ئامێری M3x23 جۆری SHCS (10PCS) -AA003",
+  "kind": "box_item"
+ },
+ {
+  "h": "a27f1f4bf9174170db7e3300a71b8ebc80dbab9f1e7079602c11b54d36cb635e",
+  "en": "BT2.6x8 SHCS Self Tapping Screw (20PCS) - AA004",
+  "ar": "برغي ذاتي اللولبة BT2.6x8 من نوع SHCS (20PCS) - AA004",
+  "ckb": "بورغیی خۆپێچی BT2.6x8 جۆری SHCS (20PCS) - AA004",
+  "kind": "box_item"
+ },
+ {
+  "h": "5d532407f0f590e56f824e1b0ad94f2805d3b651c09a269310c369856f29a342",
+  "en": "M2.5x10 SHCS Machine Screw (20PCS) - AA005",
+  "ar": "برغي ميكانيكي M2.5x10 من نوع SHCS (20PCS) - AA005",
+  "ckb": "بورغیی ئامێری M2.5x10 جۆری SHCS (20PCS) - AA005",
+  "kind": "box_item"
+ },
+ {
+  "h": "0ae99615e33011abfc71210c0f751794fbe561fd1e7498af5e9bd0399d7ca30c",
+  "en": "M2x10 FHCS Machine Screw (20PCS) - AA007",
+  "ar": "برغي ميكانيكي M2x10 من نوع FHCS (20PCS) - AA007",
+  "ckb": "بورغیی ئامێری M2x10 جۆری FHCS (20PCS) - AA007",
+  "kind": "box_item"
+ },
+ {
+  "h": "e7654230ec568ac3c7af6897e24a786e8d32d5cb1949d08604bf2b30e77fead2",
+  "en": "M2x6 FHCS Machine Screw (20PCS) - AA009",
+  "ar": "برغي ميكانيكي M2x6 من نوع FHCS (20PCS) - AA009",
+  "ckb": "بورغیی ئامێری M2x6 جۆری FHCS (20PCS) - AA009",
+  "kind": "box_item"
+ },
+ {
+  "h": "0a53480b2be1e5de8b0b90e016ccdf0dd5cef97aa529264fa8901a3ab63852b0",
+  "en": "M2x8 FHCS Machine Screw (20PCS) - AA011",
+  "ar": "برغي ميكانيكي M2x8 من نوع FHCS (20PCS) - AA011",
+  "ckb": "بورغیی ئامێری M2x8 جۆری FHCS (20PCS) - AA011",
+  "kind": "box_item"
+ },
+ {
+  "h": "c923119c6d8b93de4c281ea87eeaf4a89574f532f2cfba5e6856f2973659ee97",
+  "en": "M2.5x6 BHCS Machine Screw (20PCS) - AA013",
+  "ar": "برغي ميكانيكي M2.5x6 من نوع BHCS (20PCS) - AA013",
+  "ckb": "بورغیی ئامێری M2.5x6 جۆری BHCS (20PCS) - AA013",
+  "kind": "box_item"
+ },
+ {
+  "h": "7dff209f429761bde5cbd185c7b79a96e331681076bc1e816de26bc0b2bc808c",
+  "en": "M2x12 FHCS Machine Screw (20PCS) - AA015",
+  "ar": "برغي ميكانيكي M2x12 من نوع FHCS (20PCS) - AA015",
+  "ckb": "بورغیی ئامێری M2x12 جۆری FHCS (20PCS) - AA015",
+  "kind": "box_item"
+ },
+ {
+  "h": "564610bdba57f6321d9a961f55dff0681d5affa6b7af6cdb14b39f025fdb19e1",
+  "en": "M2x14 FHCS Machine Screw (20PCS) - AA017",
+  "ar": "برغي ميكانيكي M2x14 من نوع FHCS (20PCS) - AA017",
+  "ckb": "بورغیی ئامێری M2x14 جۆری FHCS (20PCS) - AA017",
+  "kind": "box_item"
+ },
+ {
+  "h": "bf801ec1ea60ec27efcb22d1e5a1875824bebc25f37aeea5df0afe334f1a29c6",
+  "en": "BT2x8 SHCS Self Tapping Screw (20PCS) - AA019",
+  "ar": "برغي ذاتي اللولبة BT2x8 من نوع SHCS (20PCS) - AA019",
+  "ckb": "بورغیی خۆپێچی BT2x8 جۆری SHCS (20PCS) - AA019",
+  "kind": "box_item"
+ },
+ {
+  "h": "b378f527c09b9b731cf3a5fcba2378d53cea7efef0f93a261df42b27dc880a23",
+  "en": "0.6x12x70 mm Helical Compression Spring (5PCS) - BB001",
+  "ar": "نابض ضغط حلزوني (Helical Compression Spring) مقاس 0.6x12x70 mm (5PCS) - BB001",
+  "ckb": "فەنەری پەستانی پێچاوپێچ (Helical Compression Spring) بە قەبارەی 0.6x12x70 mm (5PCS) - BB001",
+  "kind": "box_item"
+ },
+ {
+  "h": "729b1933d9c67e8359f0669c2dd3dc19edbfb4801a987ac48424f0487802b2ba",
+  "en": "0.3x6x80 mm Helical Compression Spring (5PCS) - BB002",
+  "ar": "نابض ضغط حلزوني (Helical Compression Spring) مقاس 0.3x6x80 mm (5PCS) - BB002",
+  "ckb": "فەنەری پەستانی پێچاوپێچ (Helical Compression Spring) بە قەبارەی 0.3x6x80 mm (5PCS) - BB002",
+  "kind": "box_item"
+ },
+ {
+  "h": "1aa8a1bfd8e0b7a70b094499a23956f8088c64f572e26e19af304d44077b4e50",
+  "en": "0.3x3x10 mm Helical Compression Spring (20PCS) - BB003",
+  "ar": "نابض ضغط حلزوني (Helical Compression Spring) مقاس 0.3x3x10 mm (20PCS) - BB003",
+  "ckb": "فەنەری پەستانی پێچاوپێچ (Helical Compression Spring) بە قەبارەی 0.3x3x10 mm (20PCS) - BB003",
+  "kind": "box_item"
+ },
+ {
+  "h": "b07b920d563cbc7cfc998ecc8bcc4f50c5cc96fa6b80b42025864997edd31903",
+  "en": "0.5x5x25 mm Helical Compression Spring (5PCS) - BB004",
+  "ar": "نابض ضغط حلزوني (Helical Compression Spring) مقاس 0.5x5x25 mm (5PCS) - BB004",
+  "ckb": "فەنەری پەستانی پێچاوپێچ (Helical Compression Spring) بە قەبارەی 0.5x5x25 mm (5PCS) - BB004",
+  "kind": "box_item"
+ },
+ {
+  "h": "45670594ba18e11e395df6e79326335564e4f000dbdaa2c6b46f566357d70c5e",
+  "en": "0.5x7x12 mm Helical Compression Spring (10PCS) - BB005",
+  "ar": "نابض ضغط حلزوني (Helical Compression Spring) مقاس 0.5x7x12 mm (10PCS) - BB005",
+  "ckb": "فەنەری پەستانی پێچاوپێچ (Helical Compression Spring) بە قەبارەی 0.5x7x12 mm (10PCS) - BB005",
+  "kind": "box_item"
+ },
+ {
+  "h": "fe8b3dc003b62eb2a2bc10b217c721777a3d0fe773757658853239b59f6dbb7b",
+  "en": "1x5x3 mm 120 Degree Torsion Spring (5PCS) - BC001",
+  "ar": "نابض التواء بزاوية 120 درجة (Torsion Spring) مقاس 1x5x3 mm (5PCS) - BC001",
+  "ckb": "فەنەری بادان بە گۆشەی 120 پلە (Torsion Spring) بە قەبارەی 1x5x3 mm (5PCS) - BC001",
+  "kind": "box_item"
+ },
+ {
+  "h": "f956320c8d4283af628153bf10e1a7b68693824488f5c5deb8567a4b4df19cc7",
+  "en": "0.4x4x6 mm 120 Degree Torsion Spring (10PCS) - BC002",
+  "ar": "نابض التواء بزاوية 120 درجة (Torsion Spring) مقاس 0.4x4x6 mm (10PCS) - BC002",
+  "ckb": "فەنەری بادان بە گۆشەی 120 پلە (Torsion Spring) بە قەبارەی 0.4x4x6 mm (10PCS) - BC002",
+  "kind": "box_item"
+ },
+ {
+  "h": "94e3f6004dd39bf047be9e31dc943381552254fc487b30a9f73b2ce39b7dad02",
+  "en": "4x2 mm Round Magnet (20PCS) - CA001",
+  "ar": "مغناطيس دائري (Round Magnet) مقاس 4x2 mm (20PCS) - CA001",
+  "ckb": "موگناتیسی خڕ (Round Magnet) بە قەبارەی 4x2 mm (20PCS) - CA001",
+  "kind": "box_item"
+ },
+ {
+  "h": "e1ed40e66bd20d38e9aae66f15b28074768840a52e4470f9338f9ef04db42a68",
+  "en": "2x18 mm Stainless Steel Dowel Pin (20PCS) - DA001",
+  "ar": "مسمار توجيه من الفولاذ المقاوم للصدأ مقاس 2x18 mm (20PCS) - DA001",
+  "ckb": "بزماری جێگیرکەری پۆڵای زەنگنەگر بە قەبارەی 2x18 mm (20PCS) - DA001",
+  "kind": "box_item"
+ },
+ {
+  "h": "05e80655abb1fa2166d7f143702d3e8d5cf9d37e00bae50d6d57c2e407063ce4",
+  "en": "2x25 mm Stainless Steel Dowel Pin (20PCS) - DA002",
+  "ar": "مسمار توجيه من الفولاذ المقاوم للصدأ مقاس 2x25 mm (20PCS) - DA002",
+  "ckb": "بزماری جێگیرکەری پۆڵای زەنگنەگر بە قەبارەی 2x25 mm (20PCS) - DA002",
+  "kind": "box_item"
+ },
+ {
+  "h": "1d20f42fc0dc9feaff0e082642609a2c19d3cc8adff131471d2353215d424090",
+  "en": "2x14 mm Stainless Steel Dowel Pin (20PCS) - DA003",
+  "ar": "مسمار توجيه من الفولاذ المقاوم للصدأ مقاس 2x14 mm (20PCS) - DA003",
+  "ckb": "بزماری جێگیرکەری پۆڵای زەنگنەگر بە قەبارەی 2x14 mm (20PCS) - DA003",
+  "kind": "box_item"
+ },
+ {
+  "h": "3ad067f101b5f9af8e6c1e355dd4acf3e6f008398279e90de3fa94e3cc56a754",
+  "en": "2x13 mm Brass Dowel Pin (20PCS) - DA004",
+  "ar": "مسمار توجيه نحاسي (Brass Dowel Pin) مقاس 2x13 mm (20PCS) - DA004",
+  "ckb": "بزماری جێگیرکەری برنج (Brass Dowel Pin) بە قەبارەی 2x13 mm (20PCS) - DA004",
+  "kind": "box_item"
+ },
+ {
+  "h": "b0cf2a0bae50407530b5036999254c263fcfedc17903ff56cb17bfce599372f3",
+  "en": "2x22 mm Brass Dowel Pin (20PCS) - DA005",
+  "ar": "مسمار توجيه نحاسي (Brass Dowel Pin) مقاس 2x22 mm (20PCS) - DA005",
+  "ckb": "بزماری جێگیرکەری برنج (Brass Dowel Pin) بە قەبارەی 2x22 mm (20PCS) - DA005",
+  "kind": "box_item"
+ },
+ {
+  "h": "e55bc93228cd8a11462c82bb7e5856fa197faf24a0ec35204c0f02eb2bb52900",
+  "en": "2x33 mm Brass Dowel Pin (10PCS) - DA006",
+  "ar": "مسمار توجيه نحاسي (Brass Dowel Pin) مقاس 2x33 mm (10PCS) - DA006",
+  "ckb": "بزماری جێگیرکەری برنج (Brass Dowel Pin) بە قەبارەی 2x33 mm (10PCS) - DA006",
+  "kind": "box_item"
+ },
+ {
+  "h": "a13c6c35b0d1a65a04bc73c0f77b6d45850e23994423801392710d242cd2b8c2",
+  "en": "F8-14M Miniature Plane Thrust Ball Bearing (1PCS) - EB001",
+  "ar": "محمل كروي دفعي مسطّح مصغّر F8-14M (1PCS) - EB001",
+  "ckb": "بێرینگی تۆپەڵەیی پاڵنانی تەختی بچووکی F8-14M (1PCS) - EB001",
+  "kind": "box_item"
+ },
+ {
+  "h": "ec34bf61187a22b1a93b5c5dc7d96f1e22bfbba071986cd3dcb69105b2038134",
+  "en": "USB Speed Controller-Compatible with TT motor (1PCS) - IA002",
+  "ar": "منظّم السرعة (USB Speed Controller) المتوافق مع محرك TT (1PCS) - IA002",
+  "ckb": "ڕێکخەری خێرایی (USB Speed Controller) گونجاو لەگەڵ بزوێنەری TT (1PCS) - IA002",
+  "kind": "box_item"
+ },
+ {
+  "h": "0582723381274e90fb09cea8efd43fcb4f133e5d36551071db08be16fa723116",
+  "en": "AA Battery Case with PH2.0 Connector (1PCS) - IA003",
+  "ar": "علبة بطاريات AA (Battery Case) مع موصل PH2.0 (1PCS) - IA003",
+  "ckb": "سندوقی باتریی AA (Battery Case) لەگەڵ گەیەنەری PH2.0 (1PCS) - IA003",
+  "kind": "box_item"
+ },
+ {
+  "h": "95e7abb27b687486e652f7daf27f29f4a7cc107e901c21a59af1b7aea8dac022",
+  "en": "AAA Battery Case with PH2.0 Connector (1PCS) - IA004",
+  "ar": "علبة بطاريات AAA (Battery Case) مع موصل PH2.0 (1PCS) - IA004",
+  "ckb": "سندوقی باتریی AAA (Battery Case) لەگەڵ گەیەنەری PH2.0 (1PCS) - IA004",
+  "kind": "box_item"
+ },
+ {
+  "h": "a1348b04245525f4968713755cf2dc6dc02f98a88cfdd705d4e8403deb34f970",
+  "en": "Power Distribution Board (PDB) - 4 Channels (1PCS) - IA005",
+  "ar": "لوحة توزيع الطاقة (PDB) - 4 قنوات (1PCS) - IA005",
+  "ckb": "بۆردی دابەشکردنی وزە (PDB) - 4 کەناڵ (1PCS) - IA005",
+  "kind": "box_item"
+ },
+ {
+  "h": "51b92b1db51bfb2f234eee5c6d302551aa2d8270aeb86f15998103bab7258bf7",
+  "en": "Self-Locking Button Switch with SH1.0 Connector (2PCS) - IA006",
+  "ar": "مفتاح زر ذاتي القفل مع موصل SH1.0 (2PCS) - IA006",
+  "ckb": "کلیلی دوگمەی خۆقفڵکەر لەگەڵ گەیەنەری SH1.0 (2PCS) - IA006",
+  "kind": "box_item"
+ },
+ {
+  "h": "a95fe440e550cdeff0c25ffb456dad51857eeff6b8bb11a451ef212928473b9d",
+  "en": "4 White 3030-LED Board with SH1.0 Connector 5V (2PCS) - KB001",
+  "ar": "لوحة 3030-LED بمصابيح بيضاء عدد 4 مع موصل SH1.0 بجهد 5V (2PCS) - KB001",
+  "ckb": "بۆردی 3030-LED بە 4 گڵۆپی سپی لەگەڵ گەیەنەری SH1.0 بە ڤۆڵتیەی 5V (2PCS) - KB001",
+  "kind": "box_item"
+ },
+ {
+  "h": "936c269f618ae02948094cc9b9bd191929483156fa97f473d5363bc8df0538f5",
+  "en": "1 White 3030-LED Board with SH1.0 Connector 5V (2PCS) - KB002",
+  "ar": "لوحة 3030-LED بمصباح أبيض عدد 1 مع موصل SH1.0 بجهد 5V (2PCS) - KB002",
+  "ckb": "بۆردی 3030-LED بە 1 گڵۆپی سپی لەگەڵ گەیەنەری SH1.0 بە ڤۆڵتیەی 5V (2PCS) - KB002",
+  "kind": "box_item"
+ },
+ {
+  "h": "541ac6fec5bf61c6ffd93995921a2827a169faaebc41122c5e4f3fbe2f1711cb",
+  "en": "N20 M3x25 Threaded Shaft Reduction Gear Motor 400rpm (1PCS) - LA005",
+  "ar": "محرك تخفيض N20 بعمود ملولب M3x25 بسرعة 400rpm (1PCS) - LA005",
+  "ckb": "بزوێنەری کەمکەرەوەی N20 بە میلی پێچداری M3x25، بە خێرایی 400rpm (1PCS) - LA005",
+  "kind": "box_item"
+ },
+ {
+  "h": "649831dd6a66e11b14e7c59fd3dd4667c83b3c6f18e570608f3f45820cca38fc",
+  "en": "N20 M3x45 Threaded Shaft Reduction Gear Motor 1000rpm (1PCS) - LA006",
+  "ar": "محرك تخفيض N20 بعمود ملولب M3x45 بسرعة 1000rpm (1PCS) - LA006",
+  "ckb": "بزوێنەری کەمکەرەوەی N20 بە میلی پێچداری M3x45، بە خێرایی 1000rpm (1PCS) - LA006",
+  "kind": "box_item"
+ },
+ {
+  "h": "7e3c71810d0566b449e83145f7d9dee1c3032e23d7856b82f65032e57d653f8d",
+  "en": "N20 M3x60 Threaded Shaft Reduction Gear Motor 1000rpm (1PCS) - LA007",
+  "ar": "محرك تخفيض N20 بعمود ملولب M3x60 بسرعة 1000rpm (1PCS) - LA007",
+  "ckb": "بزوێنەری کەمکەرەوەی N20 بە میلی پێچداری M3x60، بە خێرایی 1000rpm (1PCS) - LA007",
+  "kind": "box_item"
+ },
+ {
+  "h": "8ab7fcf5505ff719036d394f5739a9cebd52a492ef9b8dcdf33e6f306694490e",
+  "en": "N20 Single Shaft Worm Gear Motor 25rpm (1PCS) - LA008",
+  "ar": "محرك N20 بتروس دودية وعمود مفرد بسرعة 25rpm (1PCS) - LA008",
+  "ckb": "بزوێنەری N20 بە چەرخی کرمی و میلی تاک، بە خێرایی 25rpm (1PCS) - LA008",
+  "kind": "box_item"
+ },
+ {
+  "h": "2c430ea06e6d1e61566850f632d76edcd59bf643394ee3142ceaeb9c9a8e3423",
+  "en": "N20 Dual Shaft Worm Gear Motor 130rpm (1PCS) - LA009",
+  "ar": "محرك N20 بتروس دودية وعمود مزدوج بسرعة 130rpm (1PCS) - LA009",
+  "ckb": "بزوێنەری N20 بە چەرخی کرمی و میلی دووانە، بە خێرایی 130rpm (1PCS) - LA009",
+  "kind": "box_item"
+ },
+ {
+  "h": "80024eaf99f99f920aee023abeed3013e8aa71082cc771252f49f1ce92b1f752",
+  "en": "14mm Plastic ball (10PCS) - ZB001",
+  "ar": "كرة بلاستيكية 14mm (10PCS) - ZB001",
+  "ckb": "تۆپەڵەی پلاستیکیی 14mm (10PCS) - ZB001",
+  "kind": "box_item"
+ },
+ {
+  "h": "2cbf2075ead65465115b52183895f25f160409eaf1b7e294a73630bacafc6663",
+  "en": "The 2510 5V DC Fan is a low-power, low-noise and high-speed fan that can be used for heat dissipation and ventilation. It can also can be combined with 3D printing models to achieve various functions, such as mini humidifiers, purifiers, etc.",
+  "ar": "مروحة 2510 5V DC منخفضة القدرة ومنخفضة الضجيج وعالية السرعة، ويمكن استخدامها لتبديد الحرارة والتهوية. كما يمكن دمجها مع نماذج الطباعة 3D لتحقيق وظائف متنوعة، مثل أجهزة الترطيب والتنقية المصغّرة وغيرها.",
+  "ckb": "پانکەی 2510 5V DC پانکەیەکی وزە کەم، دەنگ کەم و خێرایی بەرزە کە دەتوانرێت بۆ بڵاوکردنەوەی گەرمی و هەواگۆڕکێ بەکاربهێنرێت. هەروەها دەتوانرێت لەگەڵ مۆدێلەکانی چاپی 3D تێکەڵ بکرێت بۆ بەدیهێنانی ئەرکی جۆراوجۆر، وەک شێدارکەرەوەی بچووک، پاککەرەوە و هتد.",
+  "kind": "short_description"
+ },
+ {
+  "h": "051cc15cbb178309682f8f2583696b8fe0832dc24fb8a1cf34689442d2380cd7",
+  "en": "Rated Voltage (V)",
+  "ar": "الجهد المقدّر (V)",
+  "ckb": "ڤۆڵتیەی دیاریکراو (V)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "34e5ed0f9a9a7a94f83fc505e73381159d021e72838f553de51554668a67095d",
+  "en": "Rated Current (A)",
+  "ar": "التيار المقدّر (A)",
+  "ckb": "تەزووی دیاریکراو (A)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "aadd8ac428daac11834b379676465732a03983e3ae7ac9a1942146867d704274",
+  "en": "Rated Speed (RPM)",
+  "ar": "السرعة المقدّرة (RPM)",
+  "ckb": "خێرایی دیاریکراو (RPM)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "babd510c9d3a6bf3229e5eaf96b262c3ea0323c098792d709f6c7f3fa44290c0",
+  "en": "Air Flow at Zero Static Pressure (CFM)",
+  "ar": "تدفق الهواء عند ضغط ساكن صفري (CFM)",
+  "ckb": "ڕۆیشتنی هەوا لە پەستانی وەستاوی سفردا (CFM)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "9ad239b41f9b951cbc9179662f763849b373fe7a8d5a887975a8dcda5bce907f",
+  "en": "Cable Length (mm)",
+  "ar": "طول الكابل (mm)",
+  "ckb": "درێژیی کێبڵ (mm)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "c61527bb91de4c9101ea5e0044767e8a8f71aff31b3655974a7872dbd6c99796",
+  "en": "Hole Distance (mm)",
+  "ar": "المسافة بين الثقوب (mm)",
+  "ckb": "دووریی نێوان کونەکان (mm)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "c51256ff8fa0459c3b362c2d9162698f46b2044e24c7a1a107617704df2d200d",
+  "en": "Noise (DB-A)",
+  "ar": "الضجيج (DB-A)",
+  "ckb": "دەنگەدەنگ (DB-A)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "e90b468a97d75865deb685118512a060eed14b802070958de150360bc059db9b",
+  "en": "35DB-A (Max:38DB-A)",
+  "ar": "35DB-A (الحد الأقصى: 38DB-A)",
+  "ckb": "35DB-A (زۆرترین: 38DB-A)",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "5c22df7df409590234d723fda8ee53580015aff953937d97922b57a5b4d05fb3",
+  "en": "Product Size (mm)",
+  "ar": "مقاس المنتج (mm)",
+  "ckb": "قەبارەی بەرهەم (mm)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "4853334a34a06562e50951fd7256bd25b2208f9c010a73563ad99b73cb02a765",
+  "en": "Product Weight (lb)",
+  "ar": "وزن المنتج (lb)",
+  "ckb": "کێشی بەرهەم (lb)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "fe3010b26706d631cba3f6aab8294865ff8e45dd645abccc1078569fc4594b63",
+  "en": "0.044 lb",
+  "ar": "0.044 lb",
+  "ckb": "0.044 lb",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "3acd98f5c73d0061a039d2f86374c05ad30062bf545af469adab5e7dee6893bf",
+  "en": "Easily get the parts you need and focus on creating! M2 Carbon Steel BHCS Machine Screw includes variou sizes from 4-30mm in length.",
+  "ar": "احصل بسهولة على القطع التي تحتاجها وركّز على الإبداع! تتضمن براغي M2 الميكانيكية من الفولاذ الكربوني من نوع BHCS مقاسات متنوعة بأطوال 4-30mm.",
+  "ckb": "بە ئاسانی ئەو پارچانەی پێویستتە بەدەستبهێنە و سەرنج بخەرە سەر داهێنان! بورغیی ئامێری M2 لە پۆڵای کاربۆنی جۆری BHCS قەبارەی جۆراوجۆری تێدایە بە درێژیی 4-30mm.",
+  "kind": "short_description"
+ },
+ {
+  "h": "ea3847ce66c43fb6c5acfd2f318691a4316d5650dac6293d20a902bdd5065e2b",
+  "en": "Easily get the parts you need and focus on creating! M3 Carbon Steel SHCS Machine Screw includes variou sizes from 5-30mm in length.",
+  "ar": "احصل بسهولة على القطع التي تحتاجها وركّز على الإبداع! تتضمن براغي M3 الميكانيكية من الفولاذ الكربوني من نوع SHCS مقاسات متنوعة بأطوال 5-30mm.",
+  "ckb": "بە ئاسانی ئەو پارچانەی پێویستتە بەدەستبهێنە و سەرنج بخەرە سەر داهێنان! بورغیی ئامێری M3 لە پۆڵای کاربۆنی جۆری SHCS قەبارەی جۆراوجۆری تێدایە بە درێژیی 5-30mm.",
+  "kind": "short_description"
+ },
+ {
+  "h": "1e4af44207eb6c84a807304df7a398351fabc064547c47b45b012ca43c9addc5",
+  "en": "Easily get the parts you need and focus on creating! M2.5 Carbon Steel BHCS Machine Screw includes variou sizes from 5-30mm in length.",
+  "ar": "احصل بسهولة على القطع التي تحتاجها وركّز على الإبداع! تتضمن براغي M2.5 الميكانيكية من الفولاذ الكربوني من نوع BHCS مقاسات متنوعة بأطوال 5-30mm.",
+  "ckb": "بە ئاسانی ئەو پارچانەی پێویستتە بەدەستبهێنە و سەرنج بخەرە سەر داهێنان! بورغیی ئامێری M2.5 لە پۆڵای کاربۆنی جۆری BHCS قەبارەی جۆراوجۆری تێدایە بە درێژیی 5-30mm.",
+  "kind": "short_description"
+ },
+ {
+  "h": "8ce8920e9cc10488f5c4854e22b8493032c04490995e76eb9e19898feb21fdd7",
+  "en": "Easily get the parts you need and focus on creating! M3 Carbon Steel BHCS Machine Screw includes variou sizes from 5-30mm in length.",
+  "ar": "احصل بسهولة على القطع التي تحتاجها وركّز على الإبداع! تتضمن براغي M3 الميكانيكية من الفولاذ الكربوني من نوع BHCS مقاسات متنوعة بأطوال 5-30mm.",
+  "ckb": "بە ئاسانی ئەو پارچانەی پێویستتە بەدەستبهێنە و سەرنج بخەرە سەر داهێنان! بورغیی ئامێری M3 لە پۆڵای کاربۆنی جۆری BHCS قەبارەی جۆراوجۆری تێدایە بە درێژیی 5-30mm.",
+  "kind": "short_description"
+ },
+ {
+  "h": "cfc8d3f8c0823aede4e11dcacb96548a8df6f7103e4f505f18d2dbceea48ee32",
+  "en": "Easily get the parts you need and focus on creating! M2.5 Carbon Steel SHCS Machine Screw includes variou sizes from 5-30mm in length.",
+  "ar": "احصل بسهولة على القطع التي تحتاجها وركّز على الإبداع! تتضمن براغي M2.5 الميكانيكية من الفولاذ الكربوني من نوع SHCS مقاسات متنوعة بأطوال 5-30mm.",
+  "ckb": "بە ئاسانی ئەو پارچانەی پێویستتە بەدەستبهێنە و سەرنج بخەرە سەر داهێنان! بورغیی ئامێری M2.5 لە پۆڵای کاربۆنی جۆری SHCS قەبارەی جۆراوجۆری تێدایە بە درێژیی 5-30mm.",
+  "kind": "short_description"
+ },
+ {
+  "h": "ee56e6cbb9f7572c3c885a6e255f252355e28d5d4158e6490696fb06d1036a4f",
+  "en": "Easily get the parts you need and focus on creating! M2 Carbon Steel SHCS Machine Screw (10PCS) includes variou sizes from 4-30mm in length.",
+  "ar": "احصل بسهولة على القطع التي تحتاجها وركّز على الإبداع! تتضمن براغي M2 الميكانيكية من الفولاذ الكربوني من نوع SHCS (10PCS) مقاسات متنوعة بأطوال 4-30mm.",
+  "ckb": "بە ئاسانی ئەو پارچانەی پێویستتە بەدەستبهێنە و سەرنج بخەرە سەر داهێنان! بورغیی ئامێری M2 لە پۆڵای کاربۆنی جۆری SHCS (10PCS) قەبارەی جۆراوجۆری تێدایە بە درێژیی 4-30mm.",
+  "kind": "short_description"
+ },
+ {
+  "h": "7d14289e829ea54b53cc832d97a0de6f8b7607fb8e81ddf90b5d2f9dec00419f",
+  "en": "Easily get the parts you need and focus on creating! M4 Carbon Steel BHCS Machine Screw includes variou sizes from 6-30mm in length.",
+  "ar": "احصل بسهولة على القطع التي تحتاجها وركّز على الإبداع! تتضمن براغي M4 الميكانيكية من الفولاذ الكربوني من نوع BHCS مقاسات متنوعة بأطوال 6-30mm.",
+  "ckb": "بە ئاسانی ئەو پارچانەی پێویستتە بەدەستبهێنە و سەرنج بخەرە سەر داهێنان! بورغیی ئامێری M4 لە پۆڵای کاربۆنی جۆری BHCS قەبارەی جۆراوجۆری تێدایە بە درێژیی 6-30mm.",
+  "kind": "short_description"
+ },
+ {
+  "h": "a747eb2b42900ac5a64f32e329bf5bdf3b9157c3d753d0e36de64b4085db4b4f",
+  "en": "M2 Double-pass Knurled Brass Stud includes variou sizes from 6-30mm in length. Light weight and durable features ensure a reliable connection, while a knurled design allows for easy handling.",
+  "ar": "تشمل أعمدة التباعد النحاسية (M2 Double-pass Knurled Brass Stud) مقاسات متنوعة بأطوال 6-30mm. تضمن خفة وزنها ومتانتها اتصالًا موثوقًا، بينما يتيح تصميمها المحزّز سهولة الإمساك بها والتعامل معها.",
+  "ckb": "ستوونی جیاکەرەوەی برنج (M2 Double-pass Knurled Brass Stud) قەبارەی جۆراوجۆری هەیە بە درێژیی 6-30mm. سووکی و بەرگەگرییەکەی پەیوەندییەکی متمانەپێکراو مسۆگەر دەکەن، لە کاتێکدا دیزاینە خەتدارەکەی گرتن و بەکارهێنانی ئاسان دەکات.",
+  "kind": "short_description"
+ },
+ {
+  "h": "85eb74ca164a4f2d4730d3bd5ec96bc46fcb8a1ca2dcab7c1a80d62f612c25b0",
+  "en": "Stud Shape",
+  "ar": "شكل عمود التباعد",
+  "ckb": "شێوەی ستوونی جیاکەرەوە",
+  "kind": "spec_label"
+ },
+ {
+  "h": "68fd2ce5ab20669fcfdf9d4d6a9c2173a6544b0b9e90fc1604373231c87a3ceb",
+  "en": "Round knurled",
+  "ar": "دائري محزّز",
+  "ckb": "خڕی خەتدار",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "62bf7e5f7ec4bd26b0159f702c8c892a90b7d3567f3f60e9d4b418f783b4ea31",
+  "en": "Stud Type",
+  "ar": "نوع عمود التباعد",
+  "ckb": "جۆری ستوونی جیاکەرەوە",
+  "kind": "spec_label"
+ },
+ {
+  "h": "d513d58f8daca741a9eca34af9a0f34a8414830201c23ff0da291e93f8624ab1",
+  "en": "Double-pass",
+  "ar": "مُلولب من الطرفين (Double-pass)",
+  "ckb": "پێچدار لە هەردوو سەر (Double-pass)",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "540ad6bfb2c9b79e95e397e11c4da9912b61a9a096a1b01ef2984baa0b5b8fa1",
+  "en": "M2.5 Double-pass Knurled Brass Stud includes variou sizes from 6-30mm in length. Light weight and durable features ensure a reliable connection, while a knurled design allows for easy handling.",
+  "ar": "تشمل أعمدة التباعد النحاسية (M2.5 Double-pass Knurled Brass Stud) مقاسات متنوعة بأطوال 6-30mm. تضمن خفة وزنها ومتانتها اتصالًا موثوقًا، بينما يتيح تصميمها المحزّز سهولة الإمساك بها والتعامل معها.",
+  "ckb": "ستوونی جیاکەرەوەی برنج (M2.5 Double-pass Knurled Brass Stud) قەبارەی جۆراوجۆری هەیە بە درێژیی 6-30mm. سووکی و بەرگەگرییەکەی پەیوەندییەکی متمانەپێکراو مسۆگەر دەکەن، لە کاتێکدا دیزاینە خەتدارەکەی گرتن و بەکارهێنانی ئاسان دەکات.",
+  "kind": "short_description"
+ },
+ {
+  "h": "e990099a7c0c9744cb6b1e3f0ff965241f3938aed5c1208213202c820fdd94ca",
+  "en": "M3 Double-pass Knurled Brass Stud includes variou sizes from 6-30mm in length. Light weight and durable features ensure a reliable connection, while a knurled design allows for easy handling.",
+  "ar": "تشمل أعمدة التباعد النحاسية (M3 Double-pass Knurled Brass Stud) مقاسات متنوعة بأطوال 6-30mm. تضمن خفة وزنها ومتانتها اتصالًا موثوقًا، بينما يتيح تصميمها المحزّز سهولة الإمساك بها والتعامل معها.",
+  "ckb": "ستوونی جیاکەرەوەی برنج (M3 Double-pass Knurled Brass Stud) قەبارەی جۆراوجۆری هەیە بە درێژیی 6-30mm. سووکی و بەرگەگرییەکەی پەیوەندییەکی متمانەپێکراو مسۆگەر دەکەن، لە کاتێکدا دیزاینە خەتدارەکەی گرتن و بەکارهێنانی ئاسان دەکات.",
+  "kind": "short_description"
+ },
+ {
+  "h": "928a146b50197c20d9d97994799dfecfd6689b322d25f27450a0b8d26a33231c",
+  "en": "Easily get the parts you need and focus on creating!",
+  "ar": "احصل بسهولة على القطع التي تحتاجها وركّز على الإبداع!",
+  "ckb": "بە ئاسانی ئەو پارچانەی پێویستتە بەدەستبهێنە و سەرنج بخەرە سەر داهێنان!",
+  "kind": "short_description"
+ },
+ {
+  "h": "b2bc4e0de2bc59a0f181cb327c67752aef2a0634962d02c557dc74b0be54930e",
+  "en": "M2.5 Flat Head Cap Machine Screws (FHCS) 1. Stainless steel grade 4.8 countersunk hex socket full-thread screws. 2. The countersunk head can be concealed within a countersunk hole to achieve a flush surface. 3. The hex socket is not prone to slipping.",
+  "ar": "براغٍ ميكانيكية برأس مسطّح M2.5 Flat Head Cap Machine Screws (FHCS): 1. براغٍ من الفولاذ المقاوم للصدأ بدرجة 4.8، برأس غاطس وتجويف سداسي وسنّ كامل. 2. يمكن إخفاء الرأس الغاطس داخل فتحة غاطسة للحصول على سطح مستوٍ. 3. لا ينزلق التجويف السداسي بسهولة.",
+  "ckb": "بورغیی ئامێری سەرتەخت M2.5 Flat Head Cap Machine Screws (FHCS): 1. بورغیی پۆڵای زەنگنەگر بە پلەی 4.8، سەرنوقم، بە کونی شەشپاڵوو و پێچی تەواو. 2. سەرە نوقمەکە دەتوانرێت لەناو کونێکی نوقمدا بشاردرێتەوە بۆ بەدەستهێنانی ڕووێکی تەخت و هاوئاست. 3. کونە شەشپاڵووەکە بە ئاسانی ناخلیسکێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "7c26a462cc39873d926c01fc19521e6f3acc504828e4bb20e46c817fb2c19180",
+  "en": "M3 Flat Head Cap Machine Screws (FHCS) 1. Stainless steel grade 4.8 countersunk hex socket full-thread screws. 2. The countersunk head can be concealed within a countersunk hole to achieve a flush surface. 3. The hex socket is not prone to slipping.",
+  "ar": "براغٍ ميكانيكية برأس مسطّح M3 Flat Head Cap Machine Screws (FHCS): 1. براغٍ من الفولاذ المقاوم للصدأ بدرجة 4.8، برأس غاطس وتجويف سداسي وسنّ كامل. 2. يمكن إخفاء الرأس الغاطس داخل فتحة غاطسة للحصول على سطح مستوٍ. 3. لا ينزلق التجويف السداسي بسهولة.",
+  "ckb": "بورغیی ئامێری سەرتەخت M3 Flat Head Cap Machine Screws (FHCS): 1. بورغیی پۆڵای زەنگنەگر بە پلەی 4.8، سەرنوقم، بە کونی شەشپاڵوو و پێچی تەواو. 2. سەرە نوقمەکە دەتوانرێت لەناو کونێکی نوقمدا بشاردرێتەوە بۆ بەدەستهێنانی ڕووێکی تەخت و هاوئاست. 3. کونە شەشپاڵووەکە بە ئاسانی ناخلیسکێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "8ec16c8329f9a0a88f8e07942a6ebf3612f12cb87c522f42fc1ffb18c631f280",
+  "en": "Flat Washer 1. Carbon steel flat washers. 2. Used between screws, nuts, and parts to distribute pre-tension pressure, enhance anti-loosening effect, and prevent damage to the parts.",
+  "ar": "الحلقة المسطّحة (Flat Washer): 1. حلقات مسطّحة من الفولاذ الكربوني. 2. تُستخدم بين البراغي والصواميل والقطع لتوزيع ضغط الشد المسبق، وتعزيز مقاومة الارتخاء، ومنع تلف القطع.",
+  "ckb": "واشەری تەخت (Flat Washer): 1. واشەری تەختی پۆڵای کاربۆنی. 2. لە نێوان بورغی، سامۆڵە و پارچەکاندا بەکاردێت بۆ دابەشکردنی پەستانی توندکردنی پێشوەختە، بەهێزکردنی کاریگەریی دژە شلبوونەوە و ڕێگریکردن لە زیانگەیاندن بە پارچەکان.",
+  "kind": "short_description"
+ },
+ {
+  "h": "407d799a2ec040d269ee33539e294b35a93b0f551b0700b006ca555ba31e9652",
+  "en": "100 pcs /10 pcs",
+  "ar": "100 قطعة / 10 قطعة",
+  "ckb": "100 دانە / 10 دانە",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "fbdacfc7f9268cbdd39476d861801e4e7582aa2404538c731e680b1484716a86",
+  "en": "BT2.5 Socket Head Cap Self Tapping Screw (SHCS) 1. Carbon steel cup head hex socket BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+  "ar": "برغي ذاتي اللولبة برأس أسطواني BT2.5 Socket Head Cap Self Tapping Screw (SHCS): 1. براغٍ ذاتية اللولبة من الفولاذ الكربوني برأس كأسي وتجويف سداسي وسنّ من نوع BT. 2. مطلية بسبيكة الزنك والنيكل السوداء، ملساء ولا تصدأ بسهولة. 3. يُفضَّل استخدام البراغي ذاتية اللولبة بسنّ BT لربطها دون جهد وتثبيتها بإحكام. 4. الرأس الكأسي صغير القطر ومنتظم الشكل، ويمكن إخفاؤه في الفتحات المدرّجة. 5. لا ينزلق التجويف السداسي بسهولة.",
+  "ckb": "بورغیی خۆپێچی سەرلوولەیی BT2.5 Socket Head Cap Self Tapping Screw (SHCS): 1. بورغیی خۆپێچی پۆڵای کاربۆنی بە سەری پەرداخی، کونی شەشپاڵوو و پێچی جۆری BT. 2. بە ئاوێتەی زینک و نیکڵی ڕەش ڕووپۆشکراوە، لووسە و بە ئاسانی ژەنگ ناگرێت. 3. باشترە بورغیی خۆپێچی پێچی BT بەکاربهێنرێت بۆ پێچدانی بێ ماندووبوون و جێگیرکردنی پتەو. 4. سەرە پەرداخییەکە تیرەیەکی بچووک و شێوەیەکی ڕێکی هەیە، و دەتوانرێت لە کونی پلەپلەدا بشاردرێتەوە. 5. کونە شەشپاڵووەکە بە ئاسانی ناخلیسکێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "06b1be0d94b4123c6f6f0cd6c01bc056e107cc9f5089202980923e12ce1a3109",
+  "en": "BT3 Socket Head Cap Self Tapping Screw (SHCS) 1. Carbon steel cup head hex socket BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+  "ar": "برغي ذاتي اللولبة برأس أسطواني BT3 Socket Head Cap Self Tapping Screw (SHCS): 1. براغٍ ذاتية اللولبة من الفولاذ الكربوني برأس كأسي وتجويف سداسي وسنّ من نوع BT. 2. مطلية بسبيكة الزنك والنيكل السوداء، ملساء ولا تصدأ بسهولة. 3. يُفضَّل استخدام البراغي ذاتية اللولبة بسنّ BT لربطها دون جهد وتثبيتها بإحكام. 4. الرأس الكأسي صغير القطر ومنتظم الشكل، ويمكن إخفاؤه في الفتحات المدرّجة. 5. لا ينزلق التجويف السداسي بسهولة.",
+  "ckb": "بورغیی خۆپێچی سەرلوولەیی BT3 Socket Head Cap Self Tapping Screw (SHCS): 1. بورغیی خۆپێچی پۆڵای کاربۆنی بە سەری پەرداخی، کونی شەشپاڵوو و پێچی جۆری BT. 2. بە ئاوێتەی زینک و نیکڵی ڕەش ڕووپۆشکراوە، لووسە و بە ئاسانی ژەنگ ناگرێت. 3. باشترە بورغیی خۆپێچی پێچی BT بەکاربهێنرێت بۆ پێچدانی بێ ماندووبوون و جێگیرکردنی پتەو. 4. سەرە پەرداخییەکە تیرەیەکی بچووک و شێوەیەکی ڕێکی هەیە، و دەتوانرێت لە کونی پلەپلەدا بشاردرێتەوە. 5. کونە شەشپاڵووەکە بە ئاسانی ناخلیسکێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "b38b61774d266cc9fa1a3c2bdf1368d0538b3cd2c3c85f26dffaca741c8a0e50",
+  "en": "BT2 Button Head Cap Self Tapping Screw (BHCS) 1. Carbon steel cup head hex button BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+  "ar": "برغي ذاتي اللولبة برأس دائري BT2 Button Head Cap Self Tapping Screw (BHCS): 1. براغٍ ذاتية اللولبة من الفولاذ الكربوني برأس كأسي دائري (button) بتجويف سداسي وسنّ من نوع BT. 2. مطلية بسبيكة الزنك والنيكل السوداء، ملساء ولا تصدأ بسهولة. 3. يُفضَّل استخدام البراغي ذاتية اللولبة بسنّ BT لربطها دون جهد وتثبيتها بإحكام. 4. الرأس الكأسي صغير القطر ومنتظم الشكل، ويمكن إخفاؤه في الفتحات المدرّجة. 5. لا ينزلق التجويف السداسي بسهولة.",
+  "ckb": "بورغیی خۆپێچی سەرخڕ BT2 Button Head Cap Self Tapping Screw (BHCS): 1. بورغیی خۆپێچی پۆڵای کاربۆنی بە سەری پەرداخیی خڕ (button) بە کونی شەشپاڵوو و پێچی جۆری BT. 2. بە ئاوێتەی زینک و نیکڵی ڕەش ڕووپۆشکراوە، لووسە و بە ئاسانی ژەنگ ناگرێت. 3. باشترە بورغیی خۆپێچی پێچی BT بەکاربهێنرێت بۆ پێچدانی بێ ماندووبوون و جێگیرکردنی پتەو. 4. سەرە پەرداخییەکە تیرەیەکی بچووک و شێوەیەکی ڕێکی هەیە، و دەتوانرێت لە کونی پلەپلەدا بشاردرێتەوە. 5. کونە شەشپاڵووەکە بە ئاسانی ناخلیسکێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "806aa8ddf9123c505b08e5afd41390f94ad7a7428d6d1c640365b93c1918212c",
+  "en": "BT2.5 Button Head Cap Self Tapping Screw (BHCS) 1. Carbon steel cup head hex button BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+  "ar": "برغي ذاتي اللولبة برأس دائري BT2.5 Button Head Cap Self Tapping Screw (BHCS): 1. براغٍ ذاتية اللولبة من الفولاذ الكربوني برأس كأسي دائري (button) بتجويف سداسي وسنّ من نوع BT. 2. مطلية بسبيكة الزنك والنيكل السوداء، ملساء ولا تصدأ بسهولة. 3. يُفضَّل استخدام البراغي ذاتية اللولبة بسنّ BT لربطها دون جهد وتثبيتها بإحكام. 4. الرأس الكأسي صغير القطر ومنتظم الشكل، ويمكن إخفاؤه في الفتحات المدرّجة. 5. لا ينزلق التجويف السداسي بسهولة.",
+  "ckb": "بورغیی خۆپێچی سەرخڕ BT2.5 Button Head Cap Self Tapping Screw (BHCS): 1. بورغیی خۆپێچی پۆڵای کاربۆنی بە سەری پەرداخیی خڕ (button) بە کونی شەشپاڵوو و پێچی جۆری BT. 2. بە ئاوێتەی زینک و نیکڵی ڕەش ڕووپۆشکراوە، لووسە و بە ئاسانی ژەنگ ناگرێت. 3. باشترە بورغیی خۆپێچی پێچی BT بەکاربهێنرێت بۆ پێچدانی بێ ماندووبوون و جێگیرکردنی پتەو. 4. سەرە پەرداخییەکە تیرەیەکی بچووک و شێوەیەکی ڕێکی هەیە، و دەتوانرێت لە کونی پلەپلەدا بشاردرێتەوە. 5. کونە شەشپاڵووەکە بە ئاسانی ناخلیسکێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "d721c1357ef1a45334a836c8460e07c93e7d1fcc1520a853ff87c9200a894d00",
+  "en": "BT3 Button Head Cap Self Tapping Screw (BHCS) 1. Carbon steel cup head hex button BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+  "ar": "برغي ذاتي اللولبة برأس دائري BT3 Button Head Cap Self Tapping Screw (BHCS): 1. براغٍ ذاتية اللولبة من الفولاذ الكربوني برأس كأسي دائري (button) بتجويف سداسي وسنّ من نوع BT. 2. مطلية بسبيكة الزنك والنيكل السوداء، ملساء ولا تصدأ بسهولة. 3. يُفضَّل استخدام البراغي ذاتية اللولبة بسنّ BT لربطها دون جهد وتثبيتها بإحكام. 4. الرأس الكأسي صغير القطر ومنتظم الشكل، ويمكن إخفاؤه في الفتحات المدرّجة. 5. لا ينزلق التجويف السداسي بسهولة.",
+  "ckb": "بورغیی خۆپێچی سەرخڕ BT3 Button Head Cap Self Tapping Screw (BHCS): 1. بورغیی خۆپێچی پۆڵای کاربۆنی بە سەری پەرداخیی خڕ (button) بە کونی شەشپاڵوو و پێچی جۆری BT. 2. بە ئاوێتەی زینک و نیکڵی ڕەش ڕووپۆشکراوە، لووسە و بە ئاسانی ژەنگ ناگرێت. 3. باشترە بورغیی خۆپێچی پێچی BT بەکاربهێنرێت بۆ پێچدانی بێ ماندووبوون و جێگیرکردنی پتەو. 4. سەرە پەرداخییەکە تیرەیەکی بچووک و شێوەیەکی ڕێکی هەیە، و دەتوانرێت لە کونی پلەپلەدا بشاردرێتەوە. 5. کونە شەشپاڵووەکە بە ئاسانی ناخلیسکێت.",
+  "kind": "short_description"
+ },
+ {
+  "h": "ec4c663fd2bfc97f156dccb2bfff1cfa2450117f70259aab9f414e3bbbdcfccd",
+  "en": "Easily get the parts you need and focus on creating! M3 Socket Head Shoulder Machine Screws (SHSS), 4.8 Strength grade, Half thread series, Using a shoulder section as a bare shaft for easy mounting of bearings or other components.",
+  "ar": "احصل بسهولة على القطع التي تحتاجها وركّز على الإبداع! براغٍ كتفية ميكانيكية برأس أسطواني M3 Socket Head Shoulder Machine Screws (SHSS)، بدرجة متانة 4.8، من سلسلة نصف السنّ، تستخدم جزء الكتف كعمود أملس لتسهيل تركيب المحامل أو المكوّنات الأخرى.",
+  "ckb": "بە ئاسانی ئەو پارچانەی پێویستتە بەدەستبهێنە و سەرنج بخەرە سەر داهێنان! بورغیی ئامێری شانەداری سەرلوولەیی M3 Socket Head Shoulder Machine Screws (SHSS)، پلەی بەهێزی 4.8، زنجیرەی نیوە پێچ، بەشی شانەکە وەک میلێکی ڕووت بەکاردێت بۆ دامەزراندنی ئاسانی بێرینگ یان پێکهاتەکانی تر.",
+  "kind": "short_description"
+ },
+ {
+  "h": "d0bcdf4c8b3f0690035493df51083e0f82f8c58429eb589b50e4555a7975505d",
+  "en": "Stainless Steel Dowel Pin 1. Widely used for part positioning and for various types of shafts. 2. Rounded corners at both ends for easy insertion into mounting holes.",
+  "ar": "مسمار التوجيه من الفولاذ المقاوم للصدأ: 1. يُستخدم على نطاق واسع لتحديد مواضع القطع ولأنواع مختلفة من الأعمدة. 2. زوايا مستديرة عند الطرفين لتسهيل إدخاله في فتحات التركيب.",
+  "ckb": "بزماری جێگیرکەری پۆڵای زەنگنەگر: 1. بە فراوانی بۆ دیاریکردنی شوێنی پارچەکان و بۆ جۆرە جیاوازەکانی میل بەکاردێت. 2. گۆشەکانی هەردوو سەری خڕکراون بۆ ئەوەی بە ئاسانی بخرێتە ناو کونەکانی دامەزراندنەوە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "4ed5f68b374a132ea0d8e51c1f80bc3357ec1059431c3e95efb84b8921bae4f6",
+  "en": "Chamfer/Round",
+  "ar": "مشطوف/مستدير",
+  "ckb": "لێوارتاشراو/خڕ",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "2dc35b64a697d5c09dd7652bfc44b8cb63f4694b51af7368d3a9ad3ba04b68fd",
+  "en": "Carbon Steel Hex Nut 1. Carbon Steel Hex Nut. 2. Used in conjunction with screws to fasten parts, can be concealed in hexagonal slots.",
+  "ar": "صامولة سداسية من الفولاذ الكربوني (Carbon Steel Hex Nut): 1. صامولة سداسية من الفولاذ الكربوني. 2. تُستخدم مع البراغي لتثبيت القطع، ويمكن إخفاؤها في التجاويف السداسية.",
+  "ckb": "سامۆڵەی شەشپاڵووی پۆڵای کاربۆنی (Carbon Steel Hex Nut): 1. سامۆڵەی شەشپاڵووی پۆڵای کاربۆنی. 2. لەگەڵ بورغی بەکاردێت بۆ جێگیرکردنی پارچەکان، و دەتوانرێت لە شیارە شەشپاڵووەکاندا بشاردرێتەوە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "4336242a78f78008ed0e8548672d658981cfda3964f1c53e676e0cc8878347de",
+  "en": "Carbon Steel Self Locking Hex 1. Prevents screws from loosening under vibration. 2. Used in conjunction with screws to fasten parts, can be concealed in hexagonal slots.",
+  "ar": "صامولة سداسية ذاتية القفل من الفولاذ الكربوني: 1. تمنع ارتخاء البراغي تحت الاهتزاز. 2. تُستخدم مع البراغي لتثبيت القطع، ويمكن إخفاؤها في التجاويف السداسية.",
+  "ckb": "سامۆڵەی شەشپاڵووی خۆقفڵکەری پۆڵای کاربۆنی: 1. ڕێگری لە شلبوونەوەی بورغی دەکات لە کاتی لەرینەوەدا. 2. لەگەڵ بورغی بەکاردێت بۆ جێگیرکردنی پارچەکان، و دەتوانرێت لە شیارە شەشپاڵووەکاندا بشاردرێتەوە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "23b0fdbf14706b9869b1f14e59c013befa8b161bf9415a997faa6086a5ab41b4",
+  "en": "Round Threaded Brass Heat-Insert Nut 1. Used in conjunction with screws to fasten parts, can be concealed in hexagonal slots. 2. Better filling in the installation compared to Diamond Knurling 3. Stronger pull-out resistance than straight knurling 4. Easy to install in 3D printed parts with a heated soldering iron",
+  "ar": "صامولة الإدخال الحراري النحاسية الملولبة الدائرية (Round Threaded Brass Heat-Insert Nut): 1. تُستخدم مع البراغي لتثبيت القطع، ويمكن إخفاؤها في التجاويف السداسية. 2. امتلاء أفضل عند التركيب مقارنةً بالتحزيز الماسي (Diamond Knurling). 3. مقاومة أقوى للاقتلاع مقارنةً بالتحزيز المستقيم. 4. سهلة التركيب في القطع المطبوعة بطابعة 3D باستخدام كاوية لحام ساخنة.",
+  "ckb": "سامۆڵەی ئینسێرتی گەرمیی برنجی خڕی پێچدار (Round Threaded Brass Heat-Insert Nut): 1. لەگەڵ بورغی بەکاردێت بۆ جێگیرکردنی پارچەکان، و دەتوانرێت لە شیارە شەشپاڵووەکاندا بشاردرێتەوە. 2. لە کاتی دامەزراندندا باشتر پڕ دەکاتەوە بە بەراورد لەگەڵ خەتکردنی ئەڵماسی (Diamond Knurling). 3. بەرگەی بەهێزتری هەڵکێشانی هەیە لە خەتکردنی ڕاستەهێڵ. 4. بە ئاسانی لە پارچە چاپکراوەکانی 3D دادەمەزرێت بە ئامێری لەحیمکردنی گەرم.",
+  "kind": "short_description"
+ },
+ {
+  "h": "950ec9f8a3f987cf0e93442cd52abb9d21415923d5240556ef26fc81a132404a",
+  "en": "Knurling type",
+  "ar": "نوع التحزيز",
+  "ckb": "جۆری خەتکردن",
+  "kind": "spec_label"
+ },
+ {
+  "h": "53b45c5d3c59cf290150c2d66022ba927d2d6fa221becfc0f0fdd68d2dc0d76a",
+  "en": "Herringbone twill knurling",
+  "ar": "تحزيز مائل بنمط عظم السمكة",
+  "ckb": "خەتکردنی لار بە شێوەی ئێسکی ماسی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "5d7b9bb70a138243984df209352fc0e670667912f131fe96a2de4af8838f7157",
+  "en": "Carbon Steel Square Nut 1. Used in conjunction with screws to fasten parts, can be concealed in hexagonal slots. 2. Inserting parts from the side to hide",
+  "ar": "صامولة مربعة من الفولاذ الكربوني (Carbon Steel Square Nut): 1. تُستخدم مع البراغي لتثبيت القطع، ويمكن إخفاؤها في التجاويف السداسية. 2. تُدخَل في القطع من الجانب لإخفائها.",
+  "ckb": "سامۆڵەی چوارگۆشەی پۆڵای کاربۆنی (Carbon Steel Square Nut): 1. لەگەڵ بورغی بەکاردێت بۆ جێگیرکردنی پارچەکان، و دەتوانرێت لە شیارە شەشپاڵووەکاندا بشاردرێتەوە. 2. لە لاتەنیشتەوە دەخرێتە ناو پارچەکانەوە بۆ شاردنەوەی.",
+  "kind": "short_description"
+ },
+ {
+  "h": "c11092bc0861591e9ce5d9a97e83d4fae3c6954a318977865fa85f5b3eeafda8",
+  "en": "Square",
+  "ar": "مربّع",
+  "ckb": "چوارگۆشە",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "b7a43b9c130e05d746c96507f064d97e42e86e5e43a60bb7c904b9ff1e9a8dd0",
+  "en": "High Performance Bearings 1. Skate board bearing and fingertip gyro bearing 1. Commonly used high-performance deep groove ball bearings 2. Higher precision for stable, durable rotation and higher load capacity",
+  "ar": "محامل عالية الأداء (High Performance Bearings): 1. محامل لألواح التزلج ومحامل لدوّامات الأصابع (سبينر). 1. محامل كروية عالية الأداء ذات مجرى عميق شائعة الاستخدام. 2. دقة أعلى لدوران مستقر ومتين وقدرة أعلى على تحمّل الأحمال.",
+  "ckb": "بێرینگی کارایی بەرز (High Performance Bearings): 1. بێرینگی تەختەی سکەیت و بێرینگی سپینەری پەنجە. 1. بێرینگی تۆپەڵەیی شیارقووڵی کارایی بەرز کە زۆر بەکاردێن. 2. وردیی بەرزتر بۆ سووڕانەوەی جێگیر و بەرگەگر و توانای هەڵگرتنی باری زیاتر.",
+  "kind": "short_description"
+ },
+ {
+  "h": "f66e7ebeea66a67e9b96362b5fc122d9eb842cc16bd188536006b9f33d60bbf1",
+  "en": "High performance",
+  "ar": "عالي الأداء",
+  "ckb": "کارایی بەرز",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "d965efa36beadfe4e75a42fefcfbfd68eb80a9b63e3e780b53ead48f6a2f53d0",
+  "en": "Sealing Part Structure",
+  "ar": "بنية جزء الإحكام",
+  "ckb": "پێکهاتەی بەشی داخەر",
+  "kind": "spec_label"
+ },
+ {
+  "h": "d06197c67c56636beb6080d2183a8e3dbb69128873a3927e7b5db2f7f1f29286",
+  "en": "Metal shielded/Open",
+  "ar": "مغطّى بدرع معدني/مفتوح",
+  "ckb": "پارێزراو بە کانزا/کراوە",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "c26244f5893c0cdf7b9f2904d0ef006c90086b0e01bfdf1b6ead4e42e12d9acd",
+  "en": "Outer Ring Type",
+  "ar": "نوع الحلقة الخارجية",
+  "ckb": "جۆری ئەڵقەی دەرەوە",
+  "kind": "spec_label"
+ },
+ {
+  "h": "9285cedcf26a7cbb5277c70b4651a54679ee9d2c89767bc9dbe532b14f4bb697",
+  "en": "Flat",
+  "ar": "مسطّح",
+  "ckb": "تەخت",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "22415e29a716d8c7b661389c7d898a81f6be11476bc563d8074a2f3b295d9bdb",
+  "en": "POM/Bearing steel",
+  "ar": "POM/فولاذ المحامل",
+  "ckb": "POM/پۆڵای بێرینگ",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "d0c30c9b89d06a4d48aaba1224fdf5914266f94a5ec51c40efcf49d1b66be8e1",
+  "en": "Ceramic/Bearing steel",
+  "ar": "سيراميك/فولاذ المحامل",
+  "ckb": "سیرامیک/پۆڵای بێرینگ",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "6759f22e1e54bf17b7aa0fe6d9c0366e7689c71c26cf1143d90aff27c36a4eb5",
+  "en": "Steel Deep Groove Ball Bearings 1. Used to support rotating shafts, capable of withstanding both axial and radial loads. 2. Features higher limit speed and load capacity, with smaller clearance.",
+  "ar": "محامل كروية فولاذية ذات مجرى عميق (Steel Deep Groove Ball Bearings): 1. تُستخدم لدعم الأعمدة الدوّارة، وتتحمّل الأحمال المحورية والقطرية معًا. 2. تتميّز بسرعة حدّية وقدرة تحمّل أعلى، مع خلوص أصغر.",
+  "ckb": "بێرینگی تۆپەڵەیی پۆڵایی شیارقووڵ (Steel Deep Groove Ball Bearings): 1. بۆ ڕاگرتنی میلە سووڕاوەکان بەکاردێن، و دەتوانن بەرگەی بارە تەوەرەیی و تیشکییەکان پێکەوە بگرن. 2. خێرایی سنووری و توانای هەڵگرتنی باری بەرزتریان هەیە، لەگەڵ بۆشایی بچووکتر.",
+  "kind": "short_description"
+ },
+ {
+  "h": "cbece9881c14aa08bf224777b1b0aca0fe89fd02c95d8ca193838bb0617fd74e",
+  "en": "High-quality Oil Impregnated Bronze Bushings, wear-resistant and durable, suitable for various mechanical and industrial applications. Available in multiple specifications, precise dimensions, ensuring stable performance.",
+  "ar": "جُلَب برونزية مشبعة بالزيت (Oil Impregnated Bronze Bushings) عالية الجودة، مقاومة للتآكل بالاحتكاك ومتينة، ومناسبة لمختلف التطبيقات الميكانيكية والصناعية. تأتي بمواصفات متعددة وأبعاد دقيقة تضمن أداءً مستقرًا.",
+  "ckb": "بووشی برۆنزی تێراوکراو بە ڕۆن (Oil Impregnated Bronze Bushings) بە جۆرایەتیی بەرز، بەرگەی سووان دەگرن و بەرگەگرن، و گونجاون بۆ بەکارهێنانە میکانیکی و پیشەسازییە جۆراوجۆرەکان. بە چەندین تایبەتمەندی و ڕەهەندی ورد دێن، کە کارایی جێگیر مسۆگەر دەکەن.",
+  "kind": "short_description"
+ },
+ {
+  "h": "da855699eacc47292e49dca517cd14498e7fd325f52f537ead56c42656e5ddf5",
+  "en": "Tubular",
+  "ar": "أنبوبي",
+  "ckb": "لوولەیی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "3ad25f6356d98406b8a23e4b96f7c32c730141a110f8741465d814ae7aef6ece",
+  "en": "Enhance your 3D printing projects with our high-quality O-Rings. The circular design ensures the prevention of liquid and gas leaks, providing excellent sealing performance and durability. These O-Rings are ideal for creating reliable seals in various components such as pistons, cylinders, and hydraulic cylinders.",
+  "ar": "عزّز مشاريع الطباعة 3D لديك بحلقات O-Ring عالية الجودة. يضمن التصميم الدائري منع تسرّب السوائل والغازات، مع أداء إحكام ممتاز ومتانة عالية. هذه الحلقات مثالية لإنشاء إحكام موثوق في مكوّنات مختلفة مثل المكابس والأسطوانات والأسطوانات الهيدروليكية.",
+  "ckb": "بە ئەڵقەکانی O-Ring بە جۆرایەتیی بەرز، پڕۆژەکانی چاپی 3D باشتر بکە. دیزاینە بازنەییەکە ڕێگری لە دزەکردنی شلە و گاز مسۆگەر دەکات، و کارایی داخستنی نایاب و بەرگەگری دابین دەکات. ئەم ئەڵقانەی O-Ring گونجاوترینن بۆ دروستکردنی داخستنی متمانەپێکراو لە پێکهاتە جۆراوجۆرەکاندا وەک پیستۆن، سیلەندەر و سیلەندەری هایدرۆلیکی.",
+  "kind": "short_description"
+ },
+ {
+  "h": "67644d18f914cbf391edae0823d5839e030db108fe49f9fbda0561120d5e0b59",
+  "en": "Oil-Resistance",
+  "ar": "مقاومة الزيت",
+  "ckb": "بەرگەی ڕۆن",
+  "kind": "spec_label"
+ },
+ {
+  "h": "4a4395e452d3321ad8bbeb7ecd5bf43c73450100b6e0e7e3f455b5b1ec89a80d",
+  "en": "Aging-Resistance",
+  "ar": "مقاومة التقادم",
+  "ckb": "بەرگەی کۆنبوون",
+  "kind": "spec_label"
+ },
+ {
+  "h": "78dd9242b7486a4c1e7483fff23cd734247615225cbec891f8314d9ed4bac7fe",
+  "en": "Nitrile Rubber (NBR)",
+  "ar": "مطاط النتريل (NBR)",
+  "ckb": "لاستیکی نایترایڵ (NBR)",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "d60fe26c4257a7a2973f4e90a43a5060f6d2f598a004ce53bebefa40cebe3fe8",
+  "en": "Circular",
+  "ar": "دائري",
+  "ckb": "بازنەیی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "143616d3274159d09867bc90219ef6dd10751e0efdd345b99484c74d13361ee7",
+  "en": "3 Pin 10mm LED Strip Connector Cable fits WS2812B RGB LED Strip Light, perfect DIY led light accessory kit.",
+  "ar": "كابل موصل 3 Pin لشريط LED بعرض 10mm، يناسب WS2812B RGB LED Strip Light، وهو طقم ملحقات مثالي لإضاءة LED في مشاريع DIY.",
+  "ckb": "کێبڵی گەیەنەری 3 Pin بۆ شریتی LED بە پانیی 10mm، لەگەڵ WS2812B RGB LED Strip Light دەگونجێت، و کیتێکی تەواو و گونجاوە بۆ پێداویستییەکانی ڕووناکیی LED لە پڕۆژەکانی DIY.",
+  "kind": "short_description"
+ },
+ {
+  "h": "f1f04a736e33d617bcfc0f261d8f0762515a90ea6fbfb2fc8bffbded2813f407",
+  "en": "USB-A to 2 Pin 8mm Solderless Quick Connector fits 6500K White LED Light Strip, a perfect DIY led light accessory kit.",
+  "ar": "موصل سريع بدون لحام من USB-A إلى 2 Pin بعرض 8mm، يناسب 6500K White LED Light Strip، وهو طقم ملحقات مثالي لإضاءة LED في مشاريع DIY.",
+  "ckb": "گەیەنەری خێرای بێ لەحیم لە USB-A بۆ 2 Pin بە پانیی 8mm، لەگەڵ 6500K White LED Light Strip دەگونجێت، و کیتێکی تەواو و گونجاوە بۆ پێداویستییەکانی ڕووناکیی LED لە پڕۆژەکانی DIY.",
+  "kind": "short_description"
+ },
+ {
+  "h": "1ea47a10e857ae1db6056308f27b2647ac73d17817d5e67e1602d803361b22dd",
+  "en": "The 3004 5V Slim Micro Fan can be combined with 3D printing models to achieve various functions, such as mini humidifiers, purifiers, etc. Compared with the same size DC Fan, 3004 5V Slim Micro Fan has a higher air pressure, more suitable for cooling and other application scenarios.",
+  "ar": "يمكن دمج مروحة 3004 5V Slim Micro Fan مع نماذج الطباعة 3D لتحقيق وظائف متنوعة، مثل أجهزة الترطيب والتنقية المصغّرة وغيرها. ومقارنةً بمروحة DC بالحجم نفسه، تتمتع مروحة 3004 5V Slim Micro Fan بضغط هواء أعلى، ما يجعلها أنسب للتبريد وسيناريوهات الاستخدام الأخرى.",
+  "ckb": "پانکەی 3004 5V Slim Micro Fan دەتوانرێت لەگەڵ مۆدێلەکانی چاپی 3D تێکەڵ بکرێت بۆ بەدیهێنانی ئەرکی جۆراوجۆر، وەک شێدارکەرەوەی بچووک، پاککەرەوە و هتد. بە بەراورد لەگەڵ پانکەی DC بە هەمان قەبارە، پانکەی 3004 5V Slim Micro Fan پەستانی هەوای بەرزتری هەیە، و گونجاوترە بۆ ساردکردنەوە و بوارەکانی تری بەکارهێنان.",
+  "kind": "short_description"
+ },
+ {
+  "h": "06eb86e392db1ba942e53ace7d72e69b6b750b4248aed2d26b1701e8aaf37f70",
+  "en": "30.7DB-A (Max:34.1DB-A)",
+  "ar": "30.7DB-A (الحد الأقصى: 34.1DB-A)",
+  "ckb": "30.7DB-A (زۆرترین: 34.1DB-A)",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "18a32bfa5a61848c0b0c7b9a850c129ad6e51f3dc53f24745241bdb8509bc57a",
+  "en": "Product Weight (g)",
+  "ar": "وزن المنتج (g)",
+  "ckb": "کێشی بەرهەم (g)",
+  "kind": "spec_label"
+ },
+ {
+  "h": "87df09e67084e8ad825d145721878a0dc67eed40d42b7cc024bbf1cbdae21ee2",
+  "en": "MXL Timing Belt 1. Small-sized trapezoidal teeth with high contact area and good meshing performance. 2. Suitable for light loads and precision drive systems. 3. smooth, quiet performance, along with rugged durability and enhanced longevity.",
+  "ar": "السير المسنّن MXL: 1. أسنان شبه منحرفة صغيرة الحجم بمساحة تلامس كبيرة وأداء تعشيق جيد. 2. مناسب للأحمال الخفيفة وأنظمة النقل الدقيقة. 3. أداء سلس وهادئ، مع متانة عالية وعمر استخدام أطول.",
+  "ckb": "قایشی ددانەداری MXL: 1. ددانی ترەپێزیی بچووک بە ڕووبەری بەرکەوتنی زۆر و کارایی باشی تێکگیربوون. 2. گونجاوە بۆ باری سووک و سیستەمەکانی گواستنەوەی ورد. 3. کارکردنی لووس و بێدەنگ، لەگەڵ بەرگەگریی بەهێز و تەمەنی درێژتر.",
+  "kind": "short_description"
+ },
+ {
+  "h": "7dbb20f35c8a6db50fc63a50d452a8caa9a94c20bcf192be28b503417fe82758",
+  "en": "MXL",
+  "ar": "MXL",
+  "ckb": "MXL",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "fb393ef798833bc5969ca149371c8a53674cae406aa32a8c57881598f1c1f106",
+  "en": "Single sided",
+  "ar": "أحادي الوجه",
+  "ckb": "یەک ڕوو",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "a1f1e8139476626329f4e234f383fc48b0d085279d6a6b372d6a64e348d0fdef",
+  "en": "Close loop",
+  "ar": "حلقة مغلقة",
+  "ckb": "ئەڵقەی داخراو",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "14f236709e516781cb62681deb062962b0a9515c14ae8b5de15e6e974171d950",
+  "en": "PU",
+  "ar": "PU",
+  "ckb": "PU",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "3f4a40a8c2ece0afff7073ed5b0ec64b100d04e007e974b1d1fa201e60c1cc82",
+  "en": "Enhance your precision drive systems with our XL Timing Belt, designed for light loads and accuracy. Featuring a trapezoidal tooth shape, it offers high contact area and excellent meshing performance. With a pitch of 5.08 mm (0.2 inches), this belt ensures precise timing and synchronization, making it ideal for delicate machinery.",
+  "ar": "عزّز أنظمة النقل الدقيقة لديك مع السير المسنّن XL المصمّم للأحمال الخفيفة والدقة. يتميّز بأسنان شبه منحرفة الشكل توفّر مساحة تلامس كبيرة وأداء تعشيق ممتازًا. وبخطوة أسنان تبلغ 5.08 mm (0.2 بوصة)، يضمن هذا السير توقيتًا وتزامنًا دقيقين، ما يجعله مثاليًا للآلات الدقيقة الحساسة.",
+  "ckb": "سیستەمەکانی گواستنەوەی وردت باشتر بکە بە قایشی ددانەداری XL، کە بۆ باری سووک و وردی دیزاین کراوە. بە شێوەی ددانی ترەپێزی، ڕووبەری بەرکەوتنی زۆر و کارایی نایابی تێکگیربوون دابین دەکات. بە هەنگاوی ددانی 5.08 mm (0.2 ئینچ)، ئەم قایشە کاتبەندی و هاوکاتیی ورد مسۆگەر دەکات، و گونجاوترینە بۆ ئامێرە هەستیارەکان.",
+  "kind": "short_description"
+ },
+ {
+  "h": "f365705bb0612eed918b30a166bd7b5d48908d58cbfb7da0deff2a7b953199ce",
+  "en": "XL",
+  "ar": "XL",
+  "ckb": "XL",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "708cd7074b0b21da9d02bf7487c0f2f9e61c4377c1ad6dc2e6bd7dd642db16ef",
+  "en": "Upgrade your 3D printing setup with our premium HTD Timing Belt. Designed for high load and high torque drive systems, this belt ensures precise synchronization of motors and connected components, essential for high-quality 3D prints. The innovative arc tooth design enhances torque transmission and meshing performance, reducing tooth slippage for smoother, more accurate motion control. This results in superior print quality and detailed output.",
+  "ar": "طوّر منظومة الطباعة 3D لديك مع السير المسنّن الممتاز HTD Timing Belt. صُمّم هذا السير لأنظمة النقل ذات الأحمال وعزم الدوران العاليين، ويضمن تزامنًا دقيقًا للمحركات والمكوّنات المتصلة بها، وهو أمر أساسي للحصول على مطبوعات 3D عالية الجودة. يعزّز تصميم الأسنان المقوّسة المبتكر نقل عزم الدوران وأداء التعشيق، ويقلّل انزلاق الأسنان لتحكم أكثر سلاسة ودقة في الحركة. والنتيجة جودة طباعة فائقة ومخرجات غنية بالتفاصيل.",
+  "ckb": "ڕێکخستنەکەت بۆ چاپی 3D نوێ بکەرەوە بە قایشی ددانەداری نایابی HTD Timing Belt. ئەم قایشە بۆ سیستەمەکانی گواستنەوەی باری قورس و تۆرکی بەرز دیزاین کراوە، و هاوکاتیی وردی بزوێنەرەکان و پێکهاتە پەیوەستەکان مسۆگەر دەکات، کە بۆ چاپکراوی 3D بە جۆرایەتیی بەرز پێویستە. دیزاینی داهێنەرانەی ددانی کەوانەیی گواستنەوەی تۆرک و کارایی تێکگیربوون باشتر دەکات، و خلیسکانی ددانەکان کەم دەکاتەوە بۆ کۆنترۆڵی جووڵەی نەرمتر و وردتر. ئەنجامەکەی جۆرایەتیی چاپی نایاب و بەرهەمی پڕ وردەکارییە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "38a497aa6da345482bc551661fa1ed0e49b7af44367daa62dbe25033e7d0baa0",
+  "en": "HTD",
+  "ar": "HTD",
+  "ckb": "HTD",
+  "kind": "spec_value_text",
+  "keep": true
+ },
+ {
+  "h": "892c8cef383edc912cd34a3292ae02e5b89d377883fb49b096829c1d5482d2ec",
+  "en": "Rubber Gasket Seal Ring -Prevents leakage of liquids and gases, with excellent sealing performanc -Used as foot pads or cushioning pads to reduce impact during movement",
+  "ar": "حلقة إحكام مطاطية (Rubber Gasket Seal Ring): - تمنع تسرّب السوائل والغازات، بأداء إحكام ممتاز. - تُستخدم كوسادات أرجل أو وسادات امتصاص لتقليل الصدمات أثناء الحركة.",
+  "ckb": "ئەڵقەی داخەری لاستیکی (Rubber Gasket Seal Ring): - ڕێگری لە دزەکردنی شلە و گاز دەکات، بە کارایی داخستنی نایاب. - وەک پەدی پێ یان پەدی کەمکەرەوەی لێدان بەکاردێت بۆ کەمکردنەوەی کاریگەریی لێدان لە کاتی جووڵەدا.",
+  "kind": "short_description"
+ },
+ {
+  "h": "8b5c0853ae8313518a592ba1e6091608262bded605d1585ed9cebdc96fccfe99",
+  "en": "Elasticity",
+  "ar": "المرونة",
+  "ckb": "نەرمونیانی",
+  "kind": "spec_label"
+ },
+ {
+  "h": "b3e665c7096463dfea42e970b5cb31b88f09385d6b2c2ef6dff4f3217cfaf585",
+  "en": "Designed for seamless connectivity, 50mm PH2.0 to SH1.0 Conversion Wire allows direct connection between appliances, power sources, and power supplies without the need for a distribution board. Its high-quality construction ensures reliable and efficient electrical performance, making it ideal for various applications, including 3D printing setups and other precision electronic projects. Simplify your wiring needs and ensure a stable power connection with our versatile 50mm PH2.0 to SH1.0 Conversion Wire, perfect for both professional and hobbyist use.",
+  "ar": "صُمّم سلك التحويل 50mm PH2.0 to SH1.0 Conversion Wire لتوصيل سلس، إذ يتيح الاتصال المباشر بين الأجهزة ومصادر الطاقة ومزوّدات الطاقة دون الحاجة إلى لوحة توزيع. يضمن تصنيعه عالي الجودة أداءً كهربائيًا موثوقًا وفعّالًا، ما يجعله مثاليًا لتطبيقات متنوعة، منها منظومات الطباعة 3D ومشاريع الإلكترونيات الدقيقة الأخرى. بسّط احتياجاتك من التوصيلات واضمن اتصالًا مستقرًا بالطاقة مع سلك التحويل متعدد الاستخدامات 50mm PH2.0 to SH1.0 Conversion Wire، المثالي للاستخدام الاحترافي ولهواة التصنيع على حدّ سواء.",
+  "ckb": "وایەری گۆڕینی 50mm PH2.0 to SH1.0 Conversion Wire بۆ پەیوەندییەکی بێکێشە دیزاین کراوە، و ڕێگە دەدات بە بەستنی ڕاستەوخۆی نێوان ئامێرەکان، سەرچاوەکانی وزە و دابینکەرەکانی وزە بەبێ پێویستی بە بۆردی دابەشکردن. دروستکردنە بە جۆرایەتیی بەرزەکەی کارایی کارەبایی متمانەپێکراو و کارا مسۆگەر دەکات، بۆیە گونجاوترینە بۆ بەکارهێنانی جۆراوجۆر، لەوانە ڕێکخستنەکانی چاپی 3D و پڕۆژە ئەلیکترۆنییە وردەکانی تر. پێداویستییەکانی وایەرکێشانت سادە بکەرەوە و پەیوەندییەکی جێگیری وزە مسۆگەر بکە بە وایەری گۆڕینی فرەبەکارهێنانی 50mm PH2.0 to SH1.0 Conversion Wire، کە بۆ بەکارهێنانی پیشەیی و خولیاداران گونجاوە.",
+  "kind": "short_description"
+ },
+ {
+  "h": "3909a973dd469988496dbcb03cbb7193c99ec318500ee9ff4ec2150b084d59cd",
+  "en": "The 50mm PH2.0 to SH1.0 Conversion Wire is used for directly connecting appliances and power sources, creating a circuit without the need for a distribution board",
+  "ar": "يُستخدم سلك التحويل 50mm PH2.0 to SH1.0 Conversion Wire لتوصيل الأجهزة بمصادر الطاقة مباشرةً، لتكوين دائرة كهربائية دون الحاجة إلى لوحة توزيع",
+  "ckb": "وایەری گۆڕینی 50mm PH2.0 to SH1.0 Conversion Wire بۆ بەستنی ڕاستەوخۆی ئامێرەکان و سەرچاوەکانی وزە بەکاردێت، و بازنەیەک دروست دەکات بەبێ پێویستی بە بۆردی دابەشکردن",
+  "kind": "usage_body"
+ },
+ {
+  "h": "1e8cff541cf2a64db9cb5c21b267b1631f5d2f094346f0eac088f2f08e969388",
+  "en": "Our 100mm Y-type PH2.0 to Dual SH1.0 Conversion Wire is designed for directly connecting appliances and power sources, ensuring seamless integration into your 3D printing system. It allows switches to be connected, providing direct control over circuit on/off or resistance without the need for a distribution board.",
+  "ar": "صُمّم سلك التحويل 100mm Y-type PH2.0 to Dual SH1.0 Conversion Wire لتوصيل الأجهزة بمصادر الطاقة مباشرةً، ما يضمن اندماجًا سلسًا في منظومة الطباعة 3D لديك. ويتيح توصيل المفاتيح، ما يوفّر تحكمًا مباشرًا في تشغيل الدائرة وإيقافها أو في المقاومة دون الحاجة إلى لوحة توزيع.",
+  "ckb": "وایەری گۆڕینی 100mm Y-type PH2.0 to Dual SH1.0 Conversion Wire بۆ بەستنی ڕاستەوخۆی ئامێرەکان و سەرچاوەکانی وزە دیزاین کراوە، و تێکەڵبوونێکی بێکێشە لەگەڵ سیستەمەکەت بۆ چاپی 3D مسۆگەر دەکات. ڕێگە دەدات کلیل ببەسترێت، و کۆنترۆڵی ڕاستەوخۆی هەڵکردن/کوژاندنەوەی بازنە یان بەرگری دابین دەکات بەبێ پێویستی بە بۆردی دابەشکردن.",
+  "kind": "short_description"
+ },
+ {
+  "h": "0f8fa648148b3709764c581ea7495ec03de9c03c67732978dbcdeb71cc60b129",
+  "en": "Used for directly connecting appliances and power sources, allowing switches to be connected for direct control of circuit on/off or resistance, and enabling appliance control without the need for a distribution board",
+  "ar": "يُستخدم لتوصيل الأجهزة بمصادر الطاقة مباشرةً، ويتيح توصيل المفاتيح للتحكم المباشر في تشغيل الدائرة وإيقافها أو في المقاومة، ويُمكّن من التحكم بالأجهزة دون الحاجة إلى لوحة توزيع",
+  "ckb": "بۆ بەستنی ڕاستەوخۆی ئامێرەکان و سەرچاوەکانی وزە بەکاردێت، ڕێگە دەدات کلیل ببەسترێت بۆ کۆنترۆڵی ڕاستەوخۆی هەڵکردن/کوژاندنەوەی بازنە یان بەرگری، و کۆنترۆڵکردنی ئامێرەکان بەبێ پێویستی بە بۆردی دابەشکردن دەڕەخسێنێت",
+  "kind": "usage_body"
+ },
+ {
+  "h": "7dfdf8239b132830528d2c31971d63c95e1f5ab446d02614ef7b06cf9bbee7f9",
+  "en": "1. Easy to install, ideal for securing small and light items for a variety of DIY projects 2. Firmly bonded liner with strong magnetism 3. Easy to bend and adjust shape, suitable for curved or irregular surfaces 4. Right angled rectangles are suitable for fitting right angled edges without leaving any gaps",
+  "ar": "1. سهلة التركيب، ومثالية لتثبيت الأغراض الصغيرة والخفيفة في مختلف مشاريع DIY. 2. بطانة مثبّتة بإحكام مع مغناطيسية قوية. 3. سهلة الثني وتعديل الشكل، ومناسبة للأسطح المنحنية أو غير المنتظمة. 4. المستطيلات ذات الزوايا القائمة مناسبة للتركيب على الحواف القائمة الزاوية دون ترك أي فراغات.",
+  "ckb": "1. دامەزراندنی ئاسانە، و گونجاوترینە بۆ جێگیرکردنی شتی بچووک و سووک لە پڕۆژە جۆراوجۆرەکانی DIY. 2. ڕووپۆشی پشتەوەی بە توندی لکاوە لەگەڵ موگناتیسیی بەهێز. 3. بە ئاسانی دەچەمێتەوە و شێوەکەی ڕێکدەخرێت، و گونجاوە بۆ ڕووی چەماوە یان ناڕێک. 4. لاکێشە گۆشەوەستاوەکان گونجاون بۆ لێوارە گۆشەوەستاوەکان بەبێ هێشتنەوەی هیچ بۆشاییەک.",
+  "kind": "short_description"
+ },
+ {
+  "h": "c8dc4902a8c3f552c29ae717d242b2bd999d2351a001db954bab48927c6be2fd",
+  "en": "Adhesive",
+  "ar": "لاصق",
+  "ckb": "چەسپدار",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "1e01ec31cadb642bf88a277d446624b03b3333f36b3ab7a83c0c54eb0c92b6aa",
+  "en": "Rubber ferrite",
+  "ar": "فريت مطاطي",
+  "ckb": "فێرایتی لاستیکی",
+  "kind": "spec_value_text"
+ },
+ {
+  "h": "8afbc02f6fcfeadfd3339304396cf8332baf7fad5d8d3c97def0fef1b3f6a7f6",
+  "en": "Rectangular",
+  "ar": "مستطيل",
+  "ckb": "لاکێشەیی",
+  "kind": "block_cell"
+ },
+ {
+  "h": "fdd335f2eda6609b5a420bccf5c36f3d9ed731d4d2b85b4999147144ce2adeb2",
+  "en": "1. Easy to install, ideal for securing small and light items for a variety of DIY projects 2. Firmly bonded liner with strong magnetism 3. Easy to bend and adjust shape, suitable for curved or irregular surfaces 4. Rounded contours for greater aesthetics",
+  "ar": "1. سهلة التركيب، ومثالية لتثبيت الأغراض الصغيرة والخفيفة في مختلف مشاريع DIY. 2. بطانة مثبّتة بإحكام مع مغناطيسية قوية. 3. سهلة الثني وتعديل الشكل، ومناسبة للأسطح المنحنية أو غير المنتظمة. 4. حواف مستديرة لمظهر أجمل.",
+  "ckb": "1. دامەزراندنی ئاسانە، و گونجاوترینە بۆ جێگیرکردنی شتی بچووک و سووک لە پڕۆژە جۆراوجۆرەکانی DIY. 2. ڕووپۆشی پشتەوەی بە توندی لکاوە لەگەڵ موگناتیسیی بەهێز. 3. بە ئاسانی دەچەمێتەوە و شێوەکەی ڕێکدەخرێت، و گونجاوە بۆ ڕووی چەماوە یان ناڕێک. 4. دەوروبەری خڕ بۆ جوانیی زیاتر.",
+  "kind": "short_description"
+ },
+ {
+  "h": "e04b618a8bbcc03a789301eed808e5cf209721e25b8b5f66ff065fd5e86cbef3",
+  "en": "1. Easy to install, ideal for securing small and light items for a variety of DIY projects 2. Moderate magnetism for easy attachment and detachment 3. Easy to bend and adjust shape, suitable for curved or irregular surfaces 4. Rounded corners for a more contoured fit",
+  "ar": "1. سهلة التركيب، ومثالية لتثبيت الأغراض الصغيرة والخفيفة في مختلف مشاريع DIY. 2. مغناطيسية معتدلة لسهولة التثبيت والفك. 3. سهلة الثني وتعديل الشكل، ومناسبة للأسطح المنحنية أو غير المنتظمة. 4. زوايا مستديرة لتلاؤم أفضل مع الأشكال.",
+  "ckb": "1. دامەزراندنی ئاسانە، و گونجاوترینە بۆ جێگیرکردنی شتی بچووک و سووک لە پڕۆژە جۆراوجۆرەکانی DIY. 2. موگناتیسیی مامناوەند بۆ لکاندن و لێکردنەوەی ئاسان. 3. بە ئاسانی دەچەمێتەوە و شێوەکەی ڕێکدەخرێت، و گونجاوە بۆ ڕووی چەماوە یان ناڕێک. 4. گۆشەی خڕ بۆ گونجانێکی باشتر لەگەڵ شێوەکان.",
+  "kind": "short_description"
+ },
+ {
+  "h": "043e309de0318a2a8d41737c07d33f58df00de42cb571d7b3127a3696ec68052",
+  "en": "1. Easy to install, ideal for securing small and light items for a variety of DIY projects 2. Moderate magnetism for easy attachment and removal 3. Back glue can be easily fixed to the parts 4. Durable and flexible design",
+  "ar": "1. سهلة التركيب، ومثالية لتثبيت الأغراض الصغيرة والخفيفة في مختلف مشاريع DIY. 2. مغناطيسية معتدلة لسهولة التثبيت والإزالة. 3. يمكن تثبيتها بسهولة على القطع بفضل الغراء الخلفي. 4. تصميم متين ومرن.",
+  "ckb": "1. دامەزراندنی ئاسانە، و گونجاوترینە بۆ جێگیرکردنی شتی بچووک و سووک لە پڕۆژە جۆراوجۆرەکانی DIY. 2. موگناتیسیی مامناوەند بۆ لکاندن و لابردنی ئاسان. 3. بە هۆی چەسپی پشتەوە بە ئاسانی لەسەر پارچەکان جێگیر دەکرێت. 4. دیزاینی بەرگەگر و نەرمونیان.",
+  "kind": "short_description"
+ },
+ {
+  "h": "6a2cb64966e404c83c895746c74837092f76ecfe098cd567ec6b4af162f644c2",
+  "en": "1. Long-lasting and strong 2. Ready-to-peel cut-to-size 3. Easy to bend and adjust shape 4. Suitable for fitting right angled edges without leaving any gaps 5. Adheres to a wide range of surfaces such as wood, glass, plastic, metal, etc.",
+  "ar": "1. يدوم طويلًا وقوي. 2. مقصوص مسبقًا بالمقاس وجاهز للنزع. 3. سهل الثني وتعديل الشكل. 4. مناسب للتركيب على الحواف القائمة الزاوية دون ترك أي فراغات. 5. يلتصق بمجموعة واسعة من الأسطح مثل الخشب والزجاج والبلاستيك والمعدن وغيرها.",
+  "ckb": "1. ماوەیەکی درێژ دەمێنێت و بەهێزە. 2. پێشتر بە قەبارە بڕدراوە و ئامادەیە بۆ لێکردنەوە. 3. بە ئاسانی دەچەمێتەوە و شێوەکەی ڕێکدەخرێت. 4. گونجاوە بۆ لێوارە گۆشەوەستاوەکان بەبێ هێشتنەوەی هیچ بۆشاییەک. 5. بە کۆمەڵێکی فراوان لە ڕووەکان دەلکێت وەک دار، شووشە، پلاستیک، کانزا و هتد.",
+  "kind": "short_description"
+ },
+ {
+  "h": "c3f00ea2f856ca6a23cb738c4be58391299178cbba1fd7cc5818c7767d7a491d",
+  "en": "Adhesion",
+  "ar": "الالتصاق",
+  "ckb": "لکان",
+  "kind": "spec_label"
+ },
+ {
+  "h": "30a04fdcb6bb10b03f55db14e88d7c1f5bcc9129d511e9b6b7dadd49bcb1a755",
+  "en": "Strong",
+  "ar": "قوي",
+  "ckb": "بەهێز",
+  "kind": "spec_value_text"
+ }
+]

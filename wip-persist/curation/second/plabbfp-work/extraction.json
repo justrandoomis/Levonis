@@ -1,0 +1,655 @@
+{
+ "sourceProductId": "630666201025138688",
+ "handle": "pla-basic-beginner-s-filament-pack",
+ "canonicalUrl": "https://us.store.bambulab.com/products/pla-basic-beginner-s-filament-pack",
+ "title": "PLA Basic Starter Classic Pack",
+ "seoMetaDescription": "",
+ "route": "552709755819347968>552709757576761344",
+ "isFilament": true,
+ "groups": [
+  {
+   "propertyKeyId": "630666201037721600",
+   "propertyKey": "Type",
+   "type": 1,
+   "title": "",
+   "position": 1,
+   "values": [
+    {
+     "id": "630666201037721601",
+     "value": "Filament with spool",
+     "selectedDefault": true,
+     "colorUrl": ""
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "630666201037721602",
+   "propertyKey": "Size",
+   "type": 1,
+   "title": "",
+   "position": 2,
+   "values": [
+    {
+     "id": "630666201037721603",
+     "value": "1kg*4",
+     "selectedDefault": true,
+     "colorUrl": ""
+    }
+   ]
+  }
+ ],
+ "skus": [
+  {
+   "id": "630666201037721604",
+   "props": [
+    {
+     "propertyKeyId": "630666201037721600",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "630666201037721602",
+     "propertyKey": "Size",
+     "value": "1kg*4"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "631291034482618368",
+    "url": "https://store.bblcdn.com/s7/default/eba4fb3d06fd416f99d5f78293ea5b2d/20250811-115747.jpg"
+   },
+   "description": "",
+   "soldOut": false
+  }
+ ],
+ "gallery": [
+  {
+   "resourceFileId": "631291034482618368",
+   "url": "https://store.bblcdn.com/s7/default/eba4fb3d06fd416f99d5f78293ea5b2d/20250811-115747.jpg"
+  }
+ ],
+ "featuresTitle": "Product Features",
+ "features": [
+  {
+   "title": "Product Features",
+   "html": "<div style=\"text-align: left; box-sizing: border-box;\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul style=\"margin: 0px; padding: 0px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">Easy to Print &amp; Beginner Friendly</li>\n<li style=\"box-sizing: border-box;\">Smooth Surface Finish</li>\n<li style=\"box-sizing: border-box;\">Biodegradable</li>\n<li style=\"box-sizing: border-box;\">Diameter: 1.75mm +/- 0.03mm</li>\n</ul>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<div class=\"bbl-title-4 text-bbl-grey-13 font-bold\">What's in the Bundle</div>\n<ul style=\"margin: 0px; padding: 0px; margin-top: 8px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">PLA Basic - Bambu Green (Filament with Spool / 1KG) *1</li>\n<li style=\"box-sizing: border-box;\">PLA Basic - Jade White (Filament with Spool / 1 KG)&nbsp; *1</li>\n<li style=\"box-sizing: border-box;\">PLA Basic - Gray (Filament with Spool / 1 KG ) *1</li>\n<li style=\"box-sizing: border-box;\">PLA Basic - Black (Filament with Spool / 1 KG) *1</li>\n</ul>"
+  }
+ ],
+ "videos": [],
+ "description": {
+  "kind": "page_builder",
+  "config": {
+   "schemaVersion": "1.0",
+   "templateId": "tpl-1776935009448",
+   "components": [
+    {
+     "id": "banner_1776859885795_imdr8wmzy",
+     "type": "banner",
+     "variant": "banner_1",
+     "name": "Banner",
+     "anchor": {
+      "enabled": true,
+      "name": "Overview",
+      "id": "banner_1776859885795_imdr8wmzy"
+     },
+     "modules": {
+      "media": {
+       "pc": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/40fadd432fe642a99769384bb573833f/Banner_Media-1.jpg",
+        "naturalWidth": 5120,
+        "naturalHeight": 1280
+       },
+       "mo": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/cc22b7d39419421788339f3d4750078d/banner.jpg",
+        "naturalWidth": 2048,
+        "naturalHeight": 960
+       }
+      },
+      "typeStyles": {
+       "content": {
+        "title": "PLA Basic",
+        "description": "Stand Out, Never Dull"
+       }
+      }
+     }
+    },
+    {
+     "id": "chapter_1776860120943_tabnn7pvy",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "卖点",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-9",
+      "id": "chapter_1776860120943_tabnn7pvy"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {}
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1776860161046_c2ynsoh65",
+       "type": "content_block",
+       "variant": "content-block-6",
+       "name": "卖点 1",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1776860161046_c2ynsoh65"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Find the Perfect Color",
+          "description": "With a palette of up to 30 colors, Bambu PLA Basic lets you find the perfect shade to bring flair to your projects. The colors remain consistent across prints, ensuring a stunning and uniform finish every time."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/9878a79d455a45ac973c064cba11e1bb/PC04-compressed.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/bf6b1b85b6b24cb6aeacd7772c788cd4/MO03-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {}
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/812fe90f47be4a2c96499483bad827ca/PC03-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/8261fdce11874f1782f76629a2279716/MO02-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {}
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/f9b914679123443e85ee257c208997af/PC01-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/d0d920d11697441d926347ab42cbfe0e/MO01-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {}
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860162526_2x88208di",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 2",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1776860162526_2x88208di"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Your Worry-Free Start",
+          "description": "Bambu PLA Basic, the easiest-to-use filament, delivers smooth printing right from the start. No complicated setups or calibrations needed. Ideal for both hobbyists and professionals seeking reliable, hassle-free results."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/dbadbe4fcd744e90846569f9a8e05a3f/PC02-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/2917e2d5c18a4c259d09018db664fa64/MO05-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {}
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/08a40083502e4bf6b23c0ead24ed186b/PC05-compressed.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/0926b2370f8b47c78044880af1c4c95d/MO04-compressed.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {}
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860163846_rda8jgx7m",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 3",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-3",
+        "id": "content_block_1776860163846_rda8jgx7m"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Built Stronger, Faster and to Last Longer",
+          "description": "With Bambu's exclusive fine-turned formulation based on 3D printing expertise and fine-turned settings, Bambu PLA Basic delivers stronger layer adhesion, enhanced impact resistance, and long-lasting durability compared to other standard PLA filaments on the market. Additionally, it reaches a print speed up to 258mm/s*, cutting your printing time without compromising quality.\n\n* 0.4mm nozzle, 0.4mm line width, 0.2mm layer height"
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/0dcf0ec8ffc7406090ffd5b0f10b8458/PC06-tuya.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/62c09c25a4aa466191f1fca20d3c4ba7/MO06-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 800
+            }
+           },
+           "linkButton": {},
+           "button": {}
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "content_block_1776744592796_vv35dwp6b",
+     "type": "content_block",
+     "variant": "content-block-1",
+     "name": "RFID",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-6",
+      "id": "content_block_1776744592796_vv35dwp6b"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "RFID for Intelligent Printing",
+        "description": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+       }
+      },
+      "featureConfig": {
+       "tabs": [
+        {
+         "name": "Tab 1",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7582b13ce2604750968dafbc244de91a/RFID_for_Intelligent_Printing-compressed.jpg",
+           "naturalWidth": 2400,
+           "naturalHeight": 918
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/06c6251453c340aeab1c0117f97fec75/RFID_for_Intelligent_PrintingMO-compressed.jpg",
+           "naturalWidth": 1344,
+           "naturalHeight": 840
+          }
+         }
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744650085_nu31krt23",
+     "type": "content_block",
+     "variant": "content-block-17",
+     "name": "Download",
+     "anchor": {
+      "enabled": true,
+      "name": "Download",
+      "id": "content_block_1776744650085_nu31krt23"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Download"
+       }
+      },
+      "featureConfig": {
+       "items": [
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/44b88c2274b2430397da892f1de79f70/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament TDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a2896066b2f4308b780cb9d101040a9/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7abf592a7bc44468bb2d86e22fde3d24/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/5575e961df094c9591a7faa849ca9b77/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament MSDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/531bad4351164f0a9c0391e0a33f2190/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/9b45266304a64648b14fcbecc220d043/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/6e47ce4e48b54b20b3afd3be7539ac27/SDS20250724A00_Bambu_PLA_Basic.pdf"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/bf5dbaee598d46e9bd8170e43facfa96/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament RoHS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a31a894dab64da9bf1df9f1f2b620db/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/f1d23869da8f41bab3454ccb28728347/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://cdn.shopify.com/s/files/1/0573/5320/7868/files/Bambu_PLA_Basic_RoHS.pdf"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/fdec58d7e8cd4820bb93af5ef7582247/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Hex Code",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/ce375e36d3db48b19db9ff0603549fc9/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/d8e728852e1d44b58088c7892cc9be49/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s2/default/787658cda148401e87a7f1c64508ae88/Bambu_PLA_Basic_4_pack_Hex_Code.pdf"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/d5be494e1bc144ccae3176f513b6f83d/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/87eb8e914bbc42c0b722dfd19521770d/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament POPs",
+         "link": "https://store.bblcdn.com/s1/default/d3a3d8d0a6ff44ad8c2098062569c460/2501A89116A_PLA_Basic-POPS.pdf"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/9a19c07aa34a40cfa353ef5b3031080d/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/a85afec4d3214c03997591a0d3e204c8/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament CP65",
+         "link": "https://store.bblcdn.com/s1/default/0f1d708b89414a568035f05a99d45974/2501A89118A_PLA_Basic_-CP65.pdf"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/6484a7acd377424a81a4b54e9c70e08a/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/f66d7aacccfc46b0af00de8e3619f02f/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament TSCA",
+         "link": "https://store.bblcdn.com/s1/default/b2dcc30798af47b79595b00d2600b8f4/2501A89117A_PLA_Basic-TSCA.pdf"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/6c23c27b680d4c32bad80a31e1f76158/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/83ed97b964ab4db6abba9cfad9654509/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament SVHC",
+         "link": "https://store.bblcdn.com/s1/default/000b9da1b4fd468c8122319ed8371fe4/2501A89114A_PLA_Basic-SVHC.pdf"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/ec1aa5c53a354e809efad38b2740b35e/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/8904f5259e974860a6851e3e33c88950/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Filament PAHs",
+         "link": "https://store.bblcdn.com/s1/default/cb6529eb16a642759314f3ebd58e510b/2501A89115A_PLA_Basic__PAHS.pdf"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/8a34eebe548147b1952fae1542bd7977/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/9c6f73b7375744c6a47f33a552c6bd5f/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "EN71-3",
+         "link": "https://store.bblcdn.com/s1/default/ab385dbf28074b54a181f802f7643164/EN71-3.pdf"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744740718_dwoqb1p7t",
+     "type": "content_block",
+     "variant": "content-block-21-pro",
+     "name": "FAQ",
+     "anchor": {
+      "enabled": true,
+      "name": "Printing Tips",
+      "id": "content_block_1776744740718_dwoqb1p7t"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Printing Tips"
+       }
+      },
+      "featureConfig": {
+       "faqs": [
+        {
+         "question": "1.Accessory Compatibility",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Compatible with all printers, AMS, build plate, and nozzles.</div>"
+          }
+         ]
+        },
+        {
+         "question": "2.Drying Recommendations",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: <a href=\"https://wiki.bambulab.com/en/filament-acc/filament/dry-filament\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">Filament drying instructions</span></span></a> on WIKI.</div>"
+          }
+         ]
+        },
+        {
+         "question": "3.Refill Guidelines",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>The refill filament needs to be used with a spool. For detailed instructions on how to swap in the new filament using the Bambu Reusable Spool, please refer to the <a href=\"https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">guide</span></span></a> on WIKI.</div>"
+          }
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ]
+  }
+ },
+ "jsonld": {
+  "productGroupId": "630666201025138688",
+  "variantSkus": [
+   "630666201037721604"
+  ],
+  "brand": "Bambu Lab"
+ }
+}

@@ -1,0 +1,605 @@
+{
+  "handle": "h2d-tpu-high-flow-kit",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T15:34:57Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "title": "Bambu Lab US store product page: H2D TPU High-Flow Kit",
+      "keys": [
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "motion.max_flow",
+        "extrusion.*",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "product.*",
+        "package.*",
+        "part.*",
+        "compat.statement",
+        "variant.note"
+      ],
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "note": "The P0 corpus copy, parsed with the package (extractPage + buildImportPayload, manifest row). Its Product Specifications table gives Materials \"Plastic, Metal\", Packaging Size 105*54*33 mm, Color \"Black\" and Packaging Weight 46.9 g, all at product scope (kept by the deterministic layer; the page does not say which option they describe). Its description adds a nozzle-size flow comparison table, a Filament Compatibility list, an In the Box table and an \"Important Notice Before Purchase\". It states no maximum nozzle temperature, nozzle material, product dimensions, net weight, filament diameter or electrical value."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "keys": [
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "motion.max_flow",
+        "extrusion.*",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "product.*",
+        "package.*",
+        "part.*",
+        "compat.statement",
+        "variant.note"
+      ],
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "note": "The product's own installation and use guide, linked from the store page. Read in full (cached HTML and text). It gives the kit content, precautions, compatible models, required tools, the Volumetric Flow Rate table (85A and 90A rows) and layer-height guidance per nozzle size. Its 250 °C (load) and 100 °C (unload) temperatures are procedure settings, not a maximum nozzle temperature. Its \"85A TPU: Only use with the H2D Flexible Filament Top-feed Rack\" (a MakerWorld model) and its TPU feed assist recommendation are not stored. No dimensions, weight, nozzle material, filament diameter or electrical value."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "keys": [
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "motion.max_flow",
+        "extrusion.*",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "product.*",
+        "package.*",
+        "part.*",
+        "compat.statement",
+        "variant.note"
+      ],
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "Read in full from the cached HTML (the cached text omits the tab panels). The \"TPU Hotend\" panel (purchase link \"H2D TPU High-Flow Kit\") gives \"Compatibility: H2D and H2D Pro (Right Hotend)\" and \"Size: 0.4mm/ 0.6mm\" and repeats the precautions; the Nozzle-Printer Compatibility table has the row \"TPU Hotend | H2D and H2D Pro (Right Hotend)\". Unlike the other panels it gives no \"Max. Printing Temp\" and no \"Materials\" line. Its general Size and Materials tables are not specific to this hotend."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "compat.statement",
+        "printing.layer_height"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "A general guide for every Bambu nozzle. Its Nozzle table has no column for the TPU High-Flow hotend: its \"0.4 / 0.6 / 0.8 mm High flow nozzle\" columns are the H2 series high-flow hotend (TPU 85A there: \"Not Compatible\" / \"Not Recommended\"), so none of its cells is applied to this product. Its nozzle temperatures (TPU rows \"200 - 250\") are per filament, not values of this hotend."
+    }
+  ],
+  "specs": [
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H2D and H2D Pro (right hotend only)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Types › TPU Hotend panel › Compatibility; Nozzle-Printer Compatibility › row \"TPU Hotend\"",
+      "quote": "Purchase link: H2D TPU High-Flow Kit | Compatibility: H2D and H2D Pro (Right Hotend) | Size: 0.4mm/ 0.6mm … TPU Hotend | H2D and H2D Pro (Right Hotend)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "conflict": "The deterministic layer stores the store page's \"Filament Compatibility\" list (\"Bambu TPU 85A Bambu TPU 90A Bambu TPU 95A Bambu TPU 95A HF Generic TPU\") as compat.statement; this row replaces it, and that list is curated as printing.supported_filament.",
+      "note": "Agrees with the store page: option value \"Compatibility: H2D/H2D Pro\", notice item 5 \"Only supported on H2D and H2D Pro. It is not compatible with other models.\" and item 3 \"The TPU hotend can only be installed on the right nozzle.\" The wiki manual's \"Compatible Models\" section names only \"Bambu Lab H2D\"."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Bambu TPU 85A",
+        "Bambu TPU 90A",
+        "Bambu TPU 95A",
+        "Bambu TPU 95A HF",
+        "Generic TPU"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Description › \"Filament Compatibility\" section",
+      "quote": "Filament Compatibility | Bambu TPU 85A | Bambu TPU 90A | Bambu TPU 95A | Bambu TPU 95A HF | Generic TPU",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "note": "The wiki manual and the nozzles wiki: \"Only flexible filaments are allowed\". The page adds: \"Parameter optimization and speed enhancements currently apply only to Bambu TPU 85A, Bambu TPU 90A, and Bambu TPU 95A HF.\" The deterministic parse records no printing.supported_filament for this page."
+    },
+    {
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Hard (non-flexible) filaments",
+        "PLA",
+        "PETG",
+        "TPU for AMS"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Overview › Precautions › item 2 (\"Only flexible filaments are allowed\")",
+      "quote": "Only flexible filaments are allowed: The TPU hotend has a special inner coating, printing hard filaments is prohibited (such as PLA, PETG, TPU for AMS)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "note": "PLA, PETG and TPU for AMS are the source's examples of hard filaments, not a complete list. The manual continues \"otherwise it will cause the coat to wear and fail\". The store page's notice item 2 and the nozzles wiki TPU Hotend panel say the same."
+    },
+    {
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "744058661233205254",
+        "value_text": "0.4 mm High-Flow TPU Hotend"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Option group \"Size\" › value \"0.4 mm High-Flow TPU Hotend\"",
+      "quote": "0.4 mm High-Flow TPU Hotend",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "note": "The nozzles wiki TPU Hotend panel agrees (\"Size: 0.4mm/ 0.6mm\"). The kit value \"High-flow TPU hotends (0.4 & 0.6 mm) with accessories\" holds both sizes, so it gets no single diameter (see package.contents). The deterministic parse records no nozzle.diameter for this page."
+    },
+    {
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "744058661233205255",
+        "value_text": "0.6 mm High-Flow TPU Hotend"
+      },
+      "value": 0.6,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Option group \"Size\" › value \"0.6 mm High-Flow TPU Hotend\"",
+      "quote": "0.6 mm High-Flow TPU Hotend",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "note": "The nozzles wiki TPU Hotend panel agrees (\"Size: 0.4mm/ 0.6mm\"). The deterministic parse records no nozzle.diameter for this page."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 5.6,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Printing Guidelines › Volumetric Flow Rate › table › row \"90A\" › columns \"0.4mm TPU Nozzle\" and \"0.6mm TPU Nozzle\"",
+      "quote": "TPU Hardness | 0.4mm TPU Nozzle | 0.4mm Standard Nozzle | 0.6mm TPU Nozzle | 0.6mm Standard Nozzle … 90A | 5.6 mm³/s | 2.8 mm³/s | 5.6 mm³/s | 2.8 mm³/s",
+      "test_method": "",
+      "test_condition": "Filament: TPU 90A",
+      "region": "",
+      "note": "Both TPU hotend sizes give 5.6 mm³/s with 90A TPU, so the row is product-wide. The store page's comparison table agrees for 90A. Other filaments (one row per scope, not stored): 85A, 0.4 mm: wiki 2.2, store page 2.5 mm³/s (the sources disagree); 85A, 0.6 mm: 4.8 mm³/s in both; 95A HF: 16 mm³/s for both sizes, store page only. The standard H2D hotend gives 2.8 mm³/s with 90A."
+    },
+    {
+      "key": "variant.note",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "744058661233205251",
+        "value_text": "High Flow Hotend (Spare Use)"
+      },
+      "value": "The TPU hotend must be used with the TPU-dedicated hotend cover (included in the High Flow Kit); it differs structurally from the standard H2 series hotend.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Overview › Note",
+      "quote": "The TPU dedicated hotend differs structurally from the standard H2 series hotend and must be used in conjunction with the TPU dedicated hotend cover.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "note": "The nozzles wiki TPU Hotend panel says the same. The cover is in the High Flow Kit (store In the Box: \"TPU Hotend Cover | 1\"; manual Kit content: \"5. TPU Hotend Cover\"); no separate store listing for it is known."
+    },
+    {
+      "key": "variant.note",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "744058661233205254",
+        "value_text": "0.4 mm High-Flow TPU Hotend"
+      },
+      "value": "Layer heights below 0.2 mm are not recommended with the 0.4 mm TPU hotend.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Printing Guidelines › Print Parameters › 2) Layer height recommendation › item 1",
+      "quote": "0.4mm Nozzle: Not recommended for use with layer heights below 0.2mm.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "note": "The manual gives only this lower limit, so no printing.layer_height range is stored (the general 0.1–0.3 mm guidance of the nozzles wiki Size table would contradict it)."
+    },
+    {
+      "key": "variant.note",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "744058661233205255",
+        "value_text": "0.6 mm High-Flow TPU Hotend"
+      },
+      "value": "Bambu Lab recommends the 0.6 mm TPU hotend first (larger channel, lower resistance); layer heights below 0.3 mm are not recommended with it.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Printing Guidelines › Print Parameters › 1) and 2) item 2",
+      "quote": "Prioritize using the 0.6mm TPU nozzle - The 0.6mm nozzle has a larger channel, lower resistance … 0.6mm Nozzle: Not recommended for use with layer heights below 0.3mm.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "note": "The manual gives only this lower limit, so no printing.layer_height range is stored."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "744058661233205250",
+        "value_text": "High Flow Kit"
+      },
+      "value": [
+        "0.4 mm High-Flow TPU Hotend",
+        "0.6 mm High-Flow TPU Hotend",
+        "TPU High-Flow Front Cover Guide",
+        "TPU Hotend Cover",
+        "Hotend Cover",
+        "M2×5 Screws for Hotend Cover ×2"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Description › \"In the Box\" › table",
+      "quote": "0.4 mm High-Flow TPU Hotend | 1 | 0.6 mm High-Flow TPU Hotend | 1 | TPU High-Flow Front Cover Guide | 1 | TPU Hotend Cover | 1 | Hotend Cover | 1 | M2×5 Screws for Hotend Cover | 2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "note": "The page shows this table for the whole product, but it lists both hotends and the covers, so it is the High Flow Kit's content (each spare-use value is one hotend; the page gives no box list for those). The wiki manual's \"Kit content\" agrees item for item (0.6mm TPU Hotend, 0.4mm TPU Hotend, Front Guide Cover, Standard Hotend Cover, TPU Hotend Cover, M2x5 Hotend Cover Fixing Screw). The deterministic parse records no box items for this page."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "H2D",
+      "target_family": "model_h2d",
+      "target_source_handle": "h2d",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Nozzle-Printer Compatibility › row \"TPU Hotend\"; Types › TPU Hotend panel › Compatibility",
+      "quote": "TPU Hotend | H2D and H2D Pro (Right Hotend) … Compatibility: H2D and H2D Pro (Right Hotend)",
+      "note": "Right hotend only: \"If it is installed on the left nozzle, it will cause the nozzle lifting mechanism to malfunction.\" compat-targets.json label \"H2D\" (family model_h2d: h2d and its refurbished listing). The store page agrees (\"Only supported on H2D and H2D Pro\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2D Pro",
+      "target_family": "",
+      "target_source_handle": "h2d-pro",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "locator": "Nozzle-Printer Compatibility › row \"TPU Hotend\"; Types › TPU Hotend panel › Compatibility",
+      "quote": "TPU Hotend | H2D and H2D Pro (Right Hotend) … Compatibility: H2D and H2D Pro (Right Hotend)",
+      "note": "Right hotend only. compat-targets.json label \"H2D Pro\" → h2d-pro. The store page agrees (\"Only supported on H2D and H2D Pro\"); the wiki manual's Compatible Models section names only \"Bambu Lab H2D\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Bambu TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Description › \"Filament Compatibility\" section › item 1",
+      "quote": "Filament Compatibility | Bambu TPU 85A | Bambu TPU 90A | Bambu TPU 95A | Bambu TPU 95A HF | Generic TPU"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Bambu TPU 90A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Description › \"Filament Compatibility\" section › item 2",
+      "quote": "Filament Compatibility | Bambu TPU 85A | Bambu TPU 90A | Bambu TPU 95A | Bambu TPU 95A HF | Generic TPU"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Bambu TPU 95A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Description › \"Filament Compatibility\" section › item 3",
+      "quote": "Filament Compatibility | Bambu TPU 85A | Bambu TPU 90A | Bambu TPU 95A | Bambu TPU 95A HF | Generic TPU"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Bambu TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Description › \"Filament Compatibility\" section › item 4",
+      "quote": "Filament Compatibility | Bambu TPU 85A | Bambu TPU 90A | Bambu TPU 95A | Bambu TPU 95A HF | Generic TPU"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Generic TPU",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Description › \"Filament Compatibility\" section › item 5",
+      "quote": "Filament Compatibility | Bambu TPU 85A | Bambu TPU 90A | Bambu TPU 95A | Bambu TPU 95A HF | Generic TPU"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA",
+      "target_source_handle": "",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Overview › Precautions › item 2 (\"Only flexible filaments are allowed\")",
+      "quote": "Only flexible filaments are allowed: The TPU hotend has a special inner coating, printing hard filaments is prohibited (such as PLA, PETG, TPU for AMS)",
+      "note": "An example the source gives of a prohibited hard filament; every hard (non-flexible) filament is prohibited. The store page's notice item 2 says the same."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG",
+      "target_source_handle": "",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Overview › Precautions › item 2 (\"Only flexible filaments are allowed\")",
+      "quote": "Only flexible filaments are allowed: The TPU hotend has a special inner coating, printing hard filaments is prohibited (such as PLA, PETG, TPU for AMS)",
+      "note": "An example the source gives of a prohibited hard filament; every hard (non-flexible) filament is prohibited. The store page's notice item 2 says the same."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Overview › Precautions › item 2 (\"Only flexible filaments are allowed\")",
+      "quote": "Only flexible filaments are allowed: The TPU hotend has a special inner coating, printing hard filaments is prohibited (such as PLA, PETG, TPU for AMS)",
+      "note": "An example the source gives of a prohibited hard filament; every hard (non-flexible) filament is prohibited. The store page's notice item 2 says the same."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "744058661233205251",
+        "value_text": "High Flow Hotend (Spare Use)"
+      },
+      "target_kind": "part",
+      "target_label": "TPU Hotend Cover",
+      "target_source_handle": "",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Overview › Note",
+      "quote": "The TPU dedicated hotend differs structurally from the standard H2 series hotend and must be used in conjunction with the TPU dedicated hotend cover.",
+      "note": "The cover comes in this product's High Flow Kit (In the Box: \"TPU Hotend Cover | 1\"); no separate store listing is known, so the target stays a label."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "H1.5 / H2.0 hex screwdriver",
+      "target_source_handle": "",
+      "evidence_kind": "manual",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "source_title": "TPU High Flow Kit for the H2D Series | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:27:03Z",
+      "locator": "Overview › Required Tools and Materials",
+      "quote": "Required Tools and Materials - TPU High Flow Kit - H1.5 / H2.0 Hex Screwdriver",
+      "note": "For installation (the H2.0 screwdriver removes the cutter lever, the filament guide and the original hotend cover; the H1.5 fixes the TPU hotend cover). Not in the kit's In the Box list."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "744058661233205250",
+        "value_text": "High Flow Kit"
+      },
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-tpu-high-flow-kit",
+      "source_title": "H2D TPU High-Flow Kit (store page)",
+      "retrieved_at": "2026-10-16T07:08:19Z",
+      "locator": "Description › \"In the Box\" › table",
+      "quote": "0.4 mm High-Flow TPU Hotend | 1 | 0.6 mm High-Flow TPU Hotend | 1 | TPU High-Flow Front Cover Guide | 1 | TPU Hotend Cover | 1 | Hotend Cover | 1 | M2×5 Screws for Hotend Cover | 2",
+      "items": [
+        {
+          "text": "0.4 mm High-Flow TPU Hotend",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "0.6 mm High-Flow TPU Hotend",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "TPU High-Flow Front Cover Guide",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "TPU Hotend Cover",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "Hotend Cover",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "M2×5 Screws for Hotend Cover",
+          "qty": 2,
+          "section": ""
+        }
+      ],
+      "note": "Scoped to the High Flow Kit (the table lists both hotends). The wiki manual's \"Kit content\" list agrees."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2d/manual/tpu-high-flow-hotend",
+      "title": "TPU High Flow Kit for the H2D Series",
+      "text": "TPU High Flow Kit for the H2D Series",
+      "note": "Linked from the store page (\"installation guide for the H2D TPU High-Flow Kit\"); the builder already records it (same id, so the merge does not add it twice)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles",
+      "text": "Introduction to Bambu Nozzles",
+      "note": "Not linked from the store page; the §F nozzles page. Its TPU Hotend panel and Nozzle-Printer Compatibility table name this product."
+    },
+    {
+      "kind": "video",
+      "url": "https://www.youtube.com/watch?v=B-rhzwB-hL0",
+      "title": "H2D TPU High-Flow Kit installation video",
+      "text": "H2D TPU High-Flow Kit installation video",
+      "note": "The video embedded under \"Installation Video\" in the wiki manual (embed URL https://www.youtube.com/embed/B-rhzwB-hL0, tracking parameter dropped). Not opened offline; its title is not known, so the title names what the manual places it under."
+    }
+  ],
+  "not_published": [
+    "thermal.max_nozzle_temp",
+    "nozzle.material",
+    "extrusion.filament_diameter",
+    "product.length",
+    "product.width",
+    "product.height",
+    "product.net_weight"
+  ]
+}

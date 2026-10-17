@@ -1,0 +1,322 @@
+[
+ {
+  "i": 0,
+  "h": "4e2335c378a375948d3c4edf0b96c775d262fdd186cc49aaf9ea3a971385a5f7",
+  "en": "This LED remote-controlled waterproof light offers 13 colors, 2 dynamic modes, and 4 brightness levels, perfect for 3D printed models, weddings, parties, and more. It’s waterproof for underwater use, with a long-lasting, replaceable battery that provides up to 16 hours of use. The remote control can manage multiple lights at once, making it easy to create the ideal ambiance for any occasion.",
+  "kind": "short_description",
+  "ar": "يوفّر ضوء LED هذا المقاوم للماء والذي يُتحكَّم به عن بُعد 13 لونًا و2 من الأوضاع الديناميكية و4 مستويات سطوع، وهو مثالي للنماذج المطبوعة بطابعة 3D وحفلات الزفاف والحفلات وغيرها. وهو مقاوم للماء ويمكن استخدامه تحت الماء، ومزوّد ببطارية تدوم طويلًا وقابلة للاستبدال تكفي لما يصل إلى 16 ساعة من الاستخدام. ويمكن لجهاز التحكم عن بُعد التحكم بعدة أضواء في وقت واحد، ما يسهّل تهيئة الأجواء المثالية لأي مناسبة.",
+  "ckb": "ئەم گڵۆپە دژە ئاوەی LED کە بە ڕیمۆت کۆنترۆڵ دەکرێت، 13 ڕەنگ و 2 دۆخی جووڵاو و 4 ئاستی ڕووناکی پێشکەش دەکات، و گونجاوە بۆ مۆدێلە چاپکراوەکانی 3D، ئاهەنگی هاوسەرگیری، ئاهەنگەکان و زۆر شتی تر. دژە ئاوە و دەکرێت لە ژێر ئاودا بەکاربهێنرێت، و باترییەکی تەمەن درێژ و گۆڕاوی هەیە کە تا 16 کاتژمێر بەکارهێنان دابین دەکات. ڕیمۆتەکە دەتوانێت لە یەک کاتدا چەند گڵۆپێک کۆنترۆڵ بکات، بەمەش دروستکردنی کەشێکی گونجاو بۆ هەر بۆنەیەک ئاسان دەکات."
+ },
+ {
+  "i": 6,
+  "h": "b60949380232a1da0475d3c6115a48be327133bae40d4f05bee87b3818547f44",
+  "en": "Life & Replacement",
+  "kind": "usage_body",
+  "ar": "العمر الافتراضي والاستبدال",
+  "ckb": "تەمەنی بەکارهێنان و گۆڕین"
+ },
+ {
+  "i": 12,
+  "h": "05a8972744270d5afac0c691e07bc3e24e85b3fa2211db07e8457bc4382a88a3",
+  "en": "Remote Control Type",
+  "kind": "spec_label",
+  "ar": "نوع جهاز التحكم عن بُعد",
+  "ckb": "جۆری کۆنترۆڵی لە دوورەوە"
+ },
+ {
+  "i": 18,
+  "h": "0b06109510291f9fe0cc800e5603fe0c3f9cede610a78f8086992cc696444823",
+  "en": "Waterproof Rating",
+  "kind": "spec_label",
+  "ar": "درجة مقاومة الماء",
+  "ckb": "پلەی دژە ئاوی"
+ },
+ {
+  "i": 24,
+  "h": "5130f918d40f43d27e687b529c071fd40ec4e05d0e024c60cd3771750b3e6647",
+  "en": "Black zinc-nickel alloy plated",
+  "kind": "spec_value_text",
+  "ar": "مطلي بسبيكة الزنك والنيكل باللون الأسود",
+  "ckb": "ڕووپۆشکراو بە ئاوێتەی زینک و نیکڵی ڕەش"
+ },
+ {
+  "i": 30,
+  "h": "15d6ddec48de12e9db7cf7d02f7fbe7c5ae736419d5044bc01d18f006bd77b45",
+  "en": "Zinc-nickel Alloy Plating",
+  "kind": "spec_value_text",
+  "ar": "طلاء بسبيكة الزنك والنيكل",
+  "ckb": "ڕووپۆشی ئاوێتەی زینک و نیکڵ"
+ },
+ {
+  "i": 36,
+  "h": "d639d8e3610c2f5702f8e904769d8d1b3612d8aa81e5000d22a934da3ebabf33",
+  "en": "Aluminum Alloy (Body), Brass (Ball)",
+  "kind": "spec_value_text",
+  "ar": "سبيكة ألمنيوم (الجسم)، نحاس أصفر (الكرة)",
+  "ckb": "ئاوێتەی ئەلەمنیۆم (لەش)، برنج (تۆپەڵە)"
+ },
+ {
+  "i": 42,
+  "h": "79b6985658aa18e3baa12d1d9efbf9580798a4e6b4bbcbf0eb68b6d17dd45301",
+  "en": "12 PCS",
+  "kind": "spec_value_text",
+  "ar": "12 قطعة",
+  "ckb": "12 دانە"
+ },
+ {
+  "i": 49,
+  "h": "75abf5c4eb7a45a1ddb0e92635e821cd07ed91cf089792ec45a6025fedea9144",
+  "en": "This COB LED Strip Light Combo Kit offers a seamless DIY lighting experiences. The set includes high-quality COB LED Strip Light, Solderless Quick Connector, and a 24V Power Adapter. Simply connect the components to control and switch between various lighting modes. Whether you're a beginner or an experienced maker, you can use this all-in-one kit to create lighting projects effortless.",
+  "kind": "short_description",
+  "ar": "يوفّر طقم COB LED Strip Light Combo Kit هذا تجربة إضاءة DIY سلسة. تتضمن المجموعة شريط COB LED Strip Light عالي الجودة، وموصلًا سريعًا بدون لحام (Solderless Quick Connector)، ومحوّل طاقة 24V. ما عليك سوى توصيل المكوّنات للتحكم بأوضاع الإضاءة المختلفة والتبديل بينها. سواء كنت مبتدئًا أو صانعًا متمرّسًا، يمكنك استخدام هذا الطقم المتكامل لإنشاء مشاريع إضاءة بسهولة.",
+  "ckb": "ئەم کیتە، COB LED Strip Light Combo Kit، ئەزموونێکی ڕووناکیی DIY ی بێگرێ پێشکەش دەکات. کۆمەڵەکە COB LED Strip Light ی جۆرایەتی بەرز، گەیەنەری خێرای بێ لەحیم (Solderless Quick Connector) و ئەداپتەری وزەی 24V لەخۆ دەگرێت. تەنها پێکهاتەکان پێکەوە ببەستە بۆ کۆنترۆڵکردن و گۆڕین لە نێوان دۆخە جیاوازەکانی ڕووناکیدا. جا سەرەتایی بیت یان دروستکەرێکی بەئەزموون، دەتوانیت ئەم کیتە هەمووی-لە-یەکدا بەکاربهێنیت بۆ دروستکردنی پڕۆژەی ڕووناکی بە ئاسانی."
+ },
+ {
+  "i": 55,
+  "h": "7f02ac0bc63dcb1f454da6b3a479c3f9ccaa7515f9eb8483acf1afdefc628e73",
+  "en": "Chromoly Steel",
+  "kind": "spec_value_text",
+  "ar": "فولاذ الكرومولي (كروم موليبدينوم)",
+  "ckb": "پۆڵای کرۆمۆلی (کرۆم-مۆلیبدینۆم)"
+ },
+ {
+  "i": 61,
+  "h": "b7a777462aaad49c0967084e5ea49dc6f8a457a7dbbcb97bf31fe49c029d55dd",
+  "en": "The Plastic Differential Gear Kit includes all the necessary gears and knurled shafts for assembling a differential. The completed differential can be combined with a gearbox built using the 030 Micro DC Motor and the 1:48 Single-axis Plastic Reduction Gear Kit to form a complete power transmission system.",
+  "kind": "short_description",
+  "ar": "يتضمن طقم Plastic Differential Gear Kit جميع التروس والأعمدة المخرّشة اللازمة لتجميع ترس تفاضلي. ويمكن دمج الترس التفاضلي بعد تجميعه مع علبة تروس مبنية باستخدام 030 Micro DC Motor و1:48 Single-axis Plastic Reduction Gear Kit لتكوين نظام نقل حركة متكامل.",
+  "ckb": "کیتی Plastic Differential Gear Kit هەموو چەرخە ددانەدارەکان و میلە زبرکراوەکانی پێویست بۆ پێکەوەنانی دیفرێنشاڵێک لەخۆ دەگرێت. دیفرێنشاڵە تەواوکراوەکە دەکرێت لەگەڵ گێربۆکسێک کە بە 030 Micro DC Motor و 1:48 Single-axis Plastic Reduction Gear Kit دروستکراوە یەکبخرێت بۆ پێکهێنانی سیستەمێکی تەواوی گواستنەوەی وزە."
+ },
+ {
+  "i": 67,
+  "h": "6836e2c1df51d6c6f553a93b0039051ef16b6189c66298da30d1dfbf902016fb",
+  "en": "The three-position rocker switch module is a 1CH input device with three fixed positions: left, center, and right, making it suitable as a state switch in various scenarios that require switching the state of lights, mechanical deformation, and more. For example, it can be used to control lighting states in vehicle models, or to switch between different vehicles in one-to-many remote control systems.",
+  "kind": "short_description",
+  "ar": "وحدة مفتاح الروكر ثلاثي الأوضاع هي جهاز إدخال 1CH بثلاثة أوضاع ثابتة: يسار ووسط ويمين، ما يجعلها مناسبة كمفتاح لتبديل الحالة في سيناريوهات متعددة تتطلب تبديل حالة الأضواء أو التحوّل الميكانيكي للشكل وغيرها. على سبيل المثال، يمكن استخدامها للتحكم بحالات الإضاءة في نماذج المركبات، أو للتبديل بين مركبات مختلفة في أنظمة التحكم عن بُعد من نوع واحد-إلى-متعدد.",
+  "ckb": "مۆدیولی کلیلی ڕۆکەری سێ دۆخی، ئامێرێکی چوونەژوورەوەیە بە کەناڵی 1CH و سێ دۆخی جێگیر: چەپ، ناوەڕاست و ڕاست، بۆیە گونجاوە وەک کلیلی گۆڕینی دۆخ لە زۆر بارودۆخی جیاوازدا کە پێویستیان بە گۆڕینی دۆخی گڵۆپەکان، گۆڕانی شێوەی میکانیکی و هی تر هەیە. بۆ نموونە، دەکرێت بۆ کۆنترۆڵکردنی دۆخەکانی ڕووناکی لە مۆدێلی ئۆتۆمبێلەکاندا بەکاربهێنرێت، یان بۆ گۆڕین لە نێوان ئۆتۆمبێلە جیاوازەکاندا لە سیستەمەکانی کۆنترۆڵی لە دوورەوەی یەک-بۆ-چەند."
+ },
+ {
+  "i": 73,
+  "h": "44694581307769b7cab71aa1165ada5fb629832167579c438b8cb328360ef701",
+  "en": "Visit our official Wiki to discover comprehensive resources and answers to all your questions.",
+  "kind": "usage_body",
+  "ar": "تفضّل بزيارة الويكي الرسمي لدينا للاطلاع على موارد شاملة وإجابات عن جميع أسئلتك.",
+  "ckb": "سەردانی ویکیی فەرمیی ئێمە بکە بۆ دۆزینەوەی سەرچاوەی گشتگیر و وەڵامی هەموو پرسیارەکانت."
+ },
+ {
+  "i": 79,
+  "h": "13dfe66a6a81ce96ffa4fce340366f77eee088d0dc549e127f84f1a7c2d05f94",
+  "en": "Developable Forms",
+  "kind": "spec_label",
+  "ar": "الأشكال الممكن بناؤها",
+  "ckb": "ئەو شێوانەی دەکرێت دروست بکرێن"
+ },
+ {
+  "i": 85,
+  "h": "0bcd3fc296d6c4bcf4643e1544d999f0aef93741b53f87c52c1159fe2447c3f6",
+  "en": "MicroPython",
+  "kind": "spec_value_text",
+  "ar": "MicroPython",
+  "ckb": "MicroPython"
+ },
+ {
+  "i": 91,
+  "h": "4ff7e6cf35a9da5f76108d8cbca03323dda4b36cceb812344af16c80224c361c",
+  "en": "The USB charger for this product only supports standard 5V 1-2A input. Please always use the original charger that meets the voltage/current requirements, or charge directly via a computer USB port. D",
+  "kind": "box_item",
+  "ar": "شاحن USB الخاص بهذا المنتج يدعم فقط دخلًا قياسيًا 5V 1-2A. يرجى دائمًا استخدام الشاحن الأصلي الذي يلبّي متطلبات الجهد/التيار، أو شحن البطارية مباشرة عبر منفذ USB في الحاسوب.",
+  "ckb": "بارگاویکەری USB ی ئەم بەرهەمە تەنها پشتگیری چوونەژوورەوەی ستانداردی 5V 1-2A دەکات. تکایە هەمیشە بارگاویکەرە ڕەسەنەکە بەکاربهێنە کە پێداویستییەکانی ڤۆڵتیە/تەزوو پڕ دەکاتەوە، یان ڕاستەوخۆ لە ڕێگەی دەرچەی USB ی کۆمپیوتەرەوە بارگاوی بکە."
+ },
+ {
+  "i": 98,
+  "h": "1cab6b45c1cad1b2e0c46bf7db3e5b8bb21019ffb6e3959bd0ec889d71bd226a",
+  "en": "2 › 6-Pin interface",
+  "kind": "spec_label",
+  "ar": "2 › منفذ 6-Pin",
+  "ckb": "2 › دەرچەی 6-Pin"
+ },
+ {
+  "i": 104,
+  "h": "0988306f081648f9b678e6830757062ca5d14daaed9ba232cdac4b0e5cb81cef",
+  "en": "5 › Servo connection",
+  "kind": "spec_label",
+  "ar": "5 › توصيل السيرفو",
+  "ckb": "5 › پەیوەستکردنی سێرڤۆ"
+ },
+ {
+  "i": 110,
+  "h": "285ee2d4d59a4bfb43eb28b05bfbeb9486c454308e2753e875b30ba01f1d47c3",
+  "en": "*The compatibility list is for reference only. Please verify compatibility with other brands/models yourself.",
+  "kind": "spec_value_text",
+  "ar": "*قائمة التوافق للاسترشاد فقط. يرجى التحقق بنفسك من التوافق مع العلامات التجارية/الطرازات الأخرى.",
+  "ckb": "*لیستی گونجاوی تەنها بۆ ئاگاداربوونە. تکایە خۆت گونجاوی لەگەڵ براند/مۆدێلەکانی تر پشتڕاست بکەرەوە."
+ },
+ {
+  "i": 116,
+  "h": "7e3a75d84ce140f35e7fbef2f4a9ca315810c541c05e89d7b7368b62b025a4f2",
+  "en": "Solderable pinout",
+  "kind": "spec_value_text",
+  "ar": "أطراف توصيل قابلة للحام",
+  "ckb": "پینی گونجاو بۆ لەحیمکردن"
+ },
+ {
+  "i": 122,
+  "h": "0d1f23b5902fb4ae21d391d74d87839991ea5935fc5317c93dd06ecc0ed7ca89",
+  "en": "Custom function",
+  "kind": "spec_value_text",
+  "ar": "وظيفة مخصّصة",
+  "ckb": "ئەرکی دڵخواز"
+ },
+ {
+  "i": 128,
+  "h": "573b845e04dec3e67eea300ae5ae1c164c17896b9847cf3ae3d2b961f7da6836",
+  "en": "Connectable with WS2812 LED hub or WS2812 LED strip",
+  "kind": "spec_value_text",
+  "ar": "قابل للتوصيل بموزّع LED من نوع WS2812 أو شريط LED من نوع WS2812",
+  "ckb": "دەکرێت بە دابەشکەری LED ی WS2812 یان شریتی LED ی WS2812 ببەسترێتەوە"
+ },
+ {
+  "i": 134,
+  "h": "512d1a520782261308027be901698842fe15026171277a596ed32eaf9be02e8c",
+  "en": "XH2.54 2Pin DC power input",
+  "kind": "spec_value_text",
+  "ar": "دخل طاقة DC بموصل XH2.54 2Pin",
+  "ckb": "چوونەژوورەوەی وزەی DC بە گەیەنەری XH2.54 2Pin"
+ },
+ {
+  "i": 140,
+  "h": "8280bf48a07b47708560f8379bb31aa20150e436426bd43cd9147b48c72a5025",
+  "en": "1 › Power Input",
+  "kind": "spec_label",
+  "ar": "1 › دخل الطاقة",
+  "ckb": "1 › چوونەژوورەوەی وزە"
+ },
+ {
+  "i": 147,
+  "h": "31bdaa80f0b3d3d3543108d7d9e558686d31c99ee4b0345e20a5de381719180c",
+  "en": "Ensure proper installation alignmen",
+  "kind": "spec_value_text",
+  "ar": "تأكّد من محاذاة التركيب بشكل صحيح",
+  "ckb": "دڵنیابە لە ڕێکخستنی دروستی ئاراستەی دامەزراندن"
+ },
+ {
+  "i": 153,
+  "h": "8a48898feb11555b1f1e98d1a5c6294fafe9131598ba054acaff463ab4d7e1fb",
+  "en": "Power switch module is a two-position switch that is often used to control power on/off without removing the battery. There are two 2pinXH2.54 connectors on the switch board, which are usually connected in series between the power supply and the expansion board.",
+  "kind": "short_description",
+  "ar": "وحدة مفتاح الطاقة هي مفتاح بوضعين يُستخدم غالبًا للتحكم بتشغيل الطاقة وإيقافها دون إزالة البطارية. توجد على لوحة المفتاح موصلان من نوع 2pinXH2.54، ويُوصَلان عادةً على التوالي بين مزوّد الطاقة ولوحة التوسعة.",
+  "ckb": "مۆدیولی کلیلی وزە کلیلێکی دوو دۆخییە کە زۆرجار بۆ کۆنترۆڵکردنی هەڵکردن و کوژاندنەوەی وزە بەبێ لابردنی باترییەکە بەکاردێت. دوو گەیەنەری 2pinXH2.54 لەسەر بۆردی کلیلەکە هەن، کە بەزۆری بە زنجیرەیی لە نێوان دابینکەری وزە و بۆردی فراوانکردندا دەبەسترێن."
+ },
+ {
+  "i": 159,
+  "h": "b7b77c3ef125e4d72ca3924f1b8fd301dde6240a243155a96c2e8109ce65445a",
+  "en": "Charging Current",
+  "kind": "spec_label",
+  "ar": "تيار الشحن",
+  "ckb": "تەزووی بارگاویکردن"
+ },
+ {
+  "i": 165,
+  "h": "8c866ed6f10fa5d017e9855ee3500e6d33a2f1a74595503e4a22f8863a2705a9",
+  "en": "Made of corrosion-resistant stainless steel, durable and anti-rust Standard 1/4''-12 UNC coarse thread, suitable for common photography and industrial mounting systems Precision-machined hex socket for easy installation with Allen wrench With bottom groove diameter for positioning or locking structures Ideal for camera tripod plates, rig systems, or quick-release systems",
+  "kind": "short_description",
+  "ar": "مصنوع من الفولاذ المقاوم للصدأ المقاوم للتآكل، متين ومضاد للصدأ. سنّ خشن قياسي 1/4''-12 UNC، مناسب لأنظمة التثبيت الشائعة في التصوير والصناعة. تجويف سداسي مشغول بدقة لسهولة التركيب باستخدام مفتاح Allen. مع قطر مجرى سفلي لتحديد الموضع أو لهياكل القفل. مثالي لصفائح حوامل الكاميرا الثلاثية، وأنظمة التجهيزات (rig)، وأنظمة التحرير السريع.",
+  "ckb": "لە پۆڵای زەنگنەگری بەرگەگر لە داخوران دروستکراوە، بەرگەگر و دژە ژەنگ. پێچی زبری ستانداردی 1/4''-12 UNC، گونجاوە بۆ سیستەمە باوەکانی جێگیرکردنی وێنەگرتن و پیشەسازی. کونی شەشپاڵووی بە وردی تاشراو بۆ دامەزراندنی ئاسان بە کلیلی Allen. لەگەڵ تیرەی شیاری خوارەوە بۆ دیاریکردنی شوێن یان پێکهاتەکانی قفڵکردن. گونجاوترین بۆ پلێتەکانی سێپێی کامێرا، سیستەمەکانی ڕیگ، یان سیستەمەکانی کردنەوەی خێرا."
+ },
+ {
+  "i": 171,
+  "h": "8c9d9f871da87af1497a4a0c6230a18ac3414f8c6038f68087519dbffd059abd",
+  "en": "Crafted from high-strength aluminum alloy, this 1/4-20 UNC screw is lightweight, corrosion-resistant, and built to last. Its tool-free design and 6-hole recessed head ensure easy handling and enhanced grip. Perfect for camera tripods, quick release plates, rigs, and other mounting gear.",
+  "kind": "short_description",
+  "ar": "هذا البرغي 1/4-20 UNC مصنوع من سبيكة ألمنيوم عالية المتانة، وهو خفيف الوزن ومقاوم للتآكل ومصمَّم ليدوم طويلًا. ويضمن تصميمه الذي لا يحتاج إلى أدوات ورأسه الغائر ذو 6 ثقوب سهولة الاستخدام وقبضة أفضل. مثالي لحوامل الكاميرا الثلاثية وصفائح التحرير السريع والتجهيزات (rigs) وغيرها من معدات التثبيت.",
+  "ckb": "ئەم بورغییە (1/4-20 UNC) لە ئاوێتەی ئەلەمنیۆمی بەهێز دروستکراوە، سووکە، بەرگەگرە لە داخوران و بۆ ماوەیەکی درێژ دەمێنێتەوە. دیزاینی بێ ئامرازی و سەری چاڵکراوی 6 کونی، بەکارهێنانی ئاسان و گرتنی باشتر دابین دەکەن. گونجاوترینە بۆ سێپێی کامێرا، پلێتەکانی کردنەوەی خێرا، ڕیگەکان و کەرەستەکانی تری جێگیرکردن."
+ },
+ {
+  "i": 177,
+  "h": "730e1f42e6d729da42dc8d2c548f68b8a83e35b1e8a39ccbac0470ca9caac97a",
+  "en": "Fiberglass composite fireproof cloth",
+  "kind": "spec_value_text",
+  "ar": "قماش مركّب مقاوم للحريق من ألياف الزجاج",
+  "ckb": "قوماشی ئاوێتەی ڕیشاڵی شووشەی دژە ئاگر"
+ },
+ {
+  "i": 183,
+  "h": "1ecae200d019d62957667573ced2189519226ea772c7156ad5de618f97f8fc63",
+  "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to this model.",
+  "kind": "usage_body",
+  "ar": "*فيما يلي طريقة الاتصال بالتطبيق لـ CyberBrick Official SoccerBot كمثال، وهي مشابهة لهذا النموذج.",
+  "ckb": "*ئەمەی خوارەوە وەک نموونە شێوازی پەیوەستکردنی ئەپ بۆ CyberBrick Official SoccerBot نیشان دەدات، کە هاوشێوەی ئەم مۆدێلەیە."
+ },
+ {
+  "i": 189,
+  "h": "bfe615d9a647a19c74486632999c9656970cb699d544f6e17e2c8e8af939359f",
+  "en": "MakerWorld Page",
+  "kind": "doc_title",
+  "ar": "صفحة MakerWorld",
+  "ckb": "پەڕەی MakerWorld"
+ },
+ {
+  "i": 196,
+  "h": "7889779f3c9c5bc9b421bf8ea622ca462b0466ac3b21f6a18b9f53348d8e11e1",
+  "en": "Supported Functions",
+  "kind": "spec_label",
+  "ar": "الوظائف المدعومة",
+  "ckb": "ئەرکە پشتگیریکراوەکان"
+ },
+ {
+  "i": 202,
+  "h": "4e901ec702bbc9899456362d5814ec38f956b6477d8e13869d621c291a2f2d60",
+  "en": "Type-C Port (Supports QC Protocol)",
+  "kind": "spec_value_text",
+  "ar": "منفذ Type-C (يدعم بروتوكول QC)",
+  "ckb": "دەرچەی Type-C (پشتگیری پرۆتۆکۆڵی QC دەکات)"
+ },
+ {
+  "i": 208,
+  "h": "3ae7566f8a0704ae2b11d0b51c2fcb2b54b7397144eebfcfa285e258a85dda56",
+  "en": "Full Charge Time",
+  "kind": "spec_label",
+  "ar": "مدة الشحن الكامل",
+  "ckb": "ماوەی بارگاویکردنی تەواو"
+ },
+ {
+  "i": 214,
+  "h": "97e772f03551a4ef7f8bc35f885e3ac71b74d2d8317113724b6a6fe1d26dea06",
+  "en": "The Forklift and Truck are designed to work with the CyberBrick Official Remote. Pre-configured settings have been uploaded for immediate play,",
+  "kind": "usage_body",
+  "ar": "صُمّمت الرافعة الشوكية والشاحنة (Forklift and Truck) للعمل مع CyberBrick Official Remote. وقد حُمّلت إعدادات مهيّأة مسبقًا للعب الفوري،",
+  "ckb": "فۆرکلیفت و بارهەڵگرەکە (Forklift and Truck) دیزاین کراون بۆ ئەوەی لەگەڵ CyberBrick Official Remote کار بکەن. ڕێکخستنی ئامادەکراو بارکراوە بۆ یاریکردنی دەستبەجێ،"
+ },
+ {
+  "i": 220,
+  "h": "02620c3e200e864b52bcca9ada0f7c60c77ee70e62fb0bc0a7c7bfa631efc549",
+  "en": "Holiday Edition",
+  "kind": "doc_title",
+  "ar": "إصدار العطلات",
+  "ckb": "وەشانی بۆنەی پشوو"
+ },
+ {
+  "i": 226,
+  "h": "8939ea17455d2f75158bcd91a8a3cff4f14a89fe20a4870bffcf0c8b557babe1",
+  "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Relic Rush Board Game.",
+  "kind": "usage_body",
+  "ar": "*فيما يلي طريقة الاتصال بالتطبيق لـ CyberBrick Official SoccerBot كمثال، وهي مشابهة لـ Relic Rush Board Game.",
+  "ckb": "*ئەمەی خوارەوە وەک نموونە شێوازی پەیوەستکردنی ئەپ بۆ CyberBrick Official SoccerBot نیشان دەدات، کە بۆ Relic Rush Board Game یش هەمان شێوەیە."
+ },
+ {
+  "i": 232,
+  "h": "914182d5e25f69e140a41e919664e5d16d3a9f67414c8cb1494b8ead668cd906",
+  "en": "Dimensions",
+  "kind": "spec_label",
+  "ar": "الأبعاد",
+  "ckb": "ڕەهەندەکان"
+ },
+ {
+  "i": 238,
+  "h": "cb77c6cfc72226535ad2def31737abba7b6887f20de3d15c90c4ee5cb489aef7",
+  "en": "Detailed Assembly Instructions",
+  "kind": "usage_title",
+  "ar": "تعليمات التجميع المفصّلة",
+  "ckb": "ڕێنماییە وردەکانی پێکەوەنان"
+ }
+]

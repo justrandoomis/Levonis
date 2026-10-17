@@ -1,0 +1,3380 @@
+{
+ "batch": 10,
+ "surface": "page",
+ "handles": [
+  "laser-tube-mount-r1",
+  "slat-r1",
+  "flame-sensor-r1",
+  "rubber-feet-r1",
+  "smoke-ventilation-hose-r1",
+  "base-tray",
+  "laser-tube-assembly-r1",
+  "4-pin-8-pin-extension-board-r1",
+  "air-pump-r1",
+  "mainboard-r1",
+  "usb-port-board-r1",
+  "air-pump-tube-kit-r1",
+  "led-lighting-kit-r1",
+  "laser-power-supply-r1",
+  "water-tube-clamp-r1",
+  "left-shell-r1",
+  "smoke-ventilation-filter-r1",
+  "conveyor-motor-with-belt",
+  "right-shell-r1",
+  "front-rear-panel-set-r1",
+  "top-lid-assemblyn-r1",
+  "top-lid-strut-r1",
+  "pinch-motor-r1",
+  "birds-eye-camera-with-lighting-r1",
+  "toolhead-cover-r1",
+  "laser-alignment-sensor-r1",
+  "reflective-mirror-r1",
+  "focusing-lens-short-focal",
+  "th-board-r1",
+  "optical-sensor-module-r1",
+  "spiral-torsion-spring-r1",
+  "z-axis-linear-rail-r1",
+  "z-axis-motor-r1",
+  "x-axis-motor-r1",
+  "y-axis-motor-r1",
+  "y-axis-linear-rod-r1",
+  "y-axis-motor-encoder-r1",
+  "y-axis-belt-r1",
+  "calibration-block-r1",
+  "birch-plywood",
+  "bambu-basswood-plywood",
+  "3mm-black-walnut-plywood-6pcs",
+  "2mm-cork-sheet-4pcs",
+  "3mm-bamboo-board-6pcs",
+  "bambu-stainless-steel-tag",
+  "black-aluminium-card-10pcs",
+  "250g-cardstock-25pcs",
+  "bambu-matte-heat-transfer-vinyl",
+  "carbon-fiber-textured-removable-vinyl-10pcs",
+  "light-gray-reflective-decal-sheet-5pcs",
+  "transfer-tape-10pcs",
+  "pebbled-pu-leatherette-fabric",
+  "pearlescent-white-greeting-card-set-ye004",
+  "rectangular-pu-iron-on-patch",
+  "matte-removable-vinyl-10pcs",
+  "bambu-opaque-glossy-acrylic-sheet",
+  "a4-200g-kraft-paper-25pcs",
+  "chrome-foil-heat-transfer-vinyl-10pcs",
+  "bambu-sapele-plywood",
+  "laser-material-kit-–-starter-pack-for-h-series",
+  "white-matte-printable-vinyl-sticker-paper-25pcs",
+  "cutting-material-kit-–-starter-pack",
+  "2-5d-framed-blueprint-pacific-clipper",
+  "2mm-basswood-plywood-6pcs",
+  "black-square-stone-slate-coasters-4pcs",
+  "material-mystery-box",
+  "winter-cottage-led-lamp",
+  "wooden-desktop-pinball",
+  "ultimate-opaque-glossy-acrylic-kit",
+  "round-pu-leather-patch-sticker",
+  "wide-white-masking-tape-1-roll",
+  "20oz-stainless-steel-tumbler",
+  "40oz-stainless-steel-tumbler",
+  "pu-leather-keychain-for-airtags-holder",
+  "color-felt-fabric-squares-22pcs",
+  "bone-stainless-steel-tag",
+  "stainless-steel-military-tag-5pcs",
+  "3mm-clear-glossy-acrylic-3pcs",
+  "laser-material-starter-pack-for-r1",
+  "bambu-cmyk-backlight-board",
+  "led-lamp-kit-001",
+  "wireless-mouse-components-kit-002",
+  "marble-run-components-kit-003",
+  "toy-shooter-components-kit-004",
+  "engine-model-components-kit-005",
+  "jet-engine-model-components-kit-006",
+  "6500k-white-led-light-strip",
+  "ws2812b-rgb-led-strip-light",
+  "white-cct-tunable-cob-led-strip-light",
+  "s-shape-led-strip-light-ws2812b-rgb",
+  "clock-components-kit-011",
+  "electric-coffee-wdt-tool-kit-k013",
+  "m2-5-socket-head-cap-machine-screws-shcs",
+  "bt2-socket-head-cap-self-tapping-screws-shcs",
+  "m3-socket-head-cap-machine-screws-shcs",
+  "m5-socket-head-cap-machine-screws-shcs",
+  "m2-5-button-head-cap-machine-screws-bhcs",
+  "m2-flat-head-cap-machine-screws-fhcs",
+  "m2-5-stainless-steel-hex-nut",
+  "bt2-6-socket-head-cap-self-tapping-screw-shcs",
+  "m2-5-stainless-steel-flat-washer"
+ ],
+ "strings": [
+  {
+   "h": "872ae0e18f1abe0852145d6b559c23ef085995eec4ac1f0e3444996b85ca55f0",
+   "en": "Upper Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-mount-r1",
+    "title": "Laser Tube Mount - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "185e7b04bf5fbb183e36ce67e6178ff158c703f7e053e1d01c2c19b51c60be3d",
+   "en": "Lower Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-mount-r1",
+    "title": "Laser Tube Mount - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "dc22e9b84eb6d157a613f9e6824bf846676b6392bd6ecaa0301af824f01dcb17",
+   "en": "- M3-21.5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-mount-r1",
+    "title": "Laser Tube Mount - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c545225393ac88af440d35c85b5b9b4356b74936e0af0cb8f50721cb65876a5a",
+   "en": "Silicone Pad",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-mount-r1",
+    "title": "Laser Tube Mount - R1",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "62d600a2da7fb566618cbead90088d7c4fb8afbe62af540d71bd4e57b4bd27c7",
+   "en": "Support Blade Strip",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "slat-r1",
+    "title": "Slat - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "12c5c0f72f749393f53df01d140505d994b2634746ea2e83f4e59fb22e2c67f5",
+   "en": "White, Blue, Red, etc.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "flame-sensor-r1",
+    "title": "Flame Sensor - R1",
+    "field": "specs[part.color]",
+    "near": "Colour"
+   },
+   "dict": null
+  },
+  {
+   "h": "3826d9336d33083155d3cfe8156e609c88673e08d697ba10112bbbe3803597ab",
+   "en": "Flame Sensor *1 (4 Sensor Cables)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "flame-sensor-r1",
+    "title": "Flame Sensor - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "575dd2173bc99c1c1d8b31a7d2a28f098437cb3f3b5bba6f72e804b1f5e3177b",
+   "en": "Door Cover Detection Hall Board",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "flame-sensor-r1",
+    "title": "Flame Sensor - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "32cd45af1d833852ca5f8eb7e5bc33b76a049fa0e343cbe8cdb81fa976fb914f",
+   "en": "Plastic Clamp",
+   "kind": "box_item",
+   "freq": 6,
+   "context": {
+    "handle": "flame-sensor-r1",
+    "title": "Flame Sensor - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "176db6437eb1ba32a6159d2ae2c673d67a56173f34b39bd1e79dd4dd64c6a6c5",
+   "en": "Foot Pad",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-feet-r1",
+    "title": "Rubber Feet - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3cd0b62012e5af73af26158dcba4b0b97af4b2c49ace049ca8e47e648e77db7d",
+   "en": "BT5-25 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-feet-r1",
+    "title": "Rubber Feet - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "37a047a1161395d2da0b91354b1996eb0e3f62b435dac83f74ccab05a2e77b50",
+   "en": "MG6-22 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "rubber-feet-r1",
+    "title": "Rubber Feet - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ecb79763efc010bcf708b0c444f7796622ee1a4a11ca1ba8537f6cab27fa27aa",
+   "en": "Smoke Exhaust Pipe",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-ventilation-hose-r1",
+    "title": "Smoke Ventilation Hose - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ba548ef4fa093eb19676d4c6163df6438e917b00912ab7a188c9150cd2c9e3e",
+   "en": "Tray",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "base-tray",
+    "title": "Base Tray",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0726c86e48c5e804ef2605e84ea49303e75db208225ad608677efd53d34bbc08",
+   "en": "Tray Fixing Angle Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "base-tray",
+    "title": "Base Tray",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "accd221bc3b3655b1c313a108a3e03fd078fa38300ce5cf6a05408af4b256b45",
+   "en": "Tray Buffer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "base-tray",
+    "title": "Base Tray",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f7e2fc2645ffbc1f4fa02b1f2c3ae10337f1a35732b0338b2677ba46991ebd13",
+   "en": "Laser Tube",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-assembly-r1",
+    "title": "Laser Tube Assembly - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "dbd974999ff456c0e2d08ab60ef1a2a387fb618ef78944af619e4fbbbb269274",
+   "en": "Cable Management Block",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-assembly-r1",
+    "title": "Laser Tube Assembly - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8dc520526a8d2244c6d08cfa2d0d9e8c08cc7e7de5aca808267428cbe774f7cd",
+   "en": "High-Voltage Cap",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-assembly-r1",
+    "title": "Laser Tube Assembly - R1",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0dcbf609238202e900d2583e2f50e036a628294ab12f01eeab23633b7b52d5b1",
+   "en": "Laser Tube Buffer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-assembly-r1",
+    "title": "Laser Tube Assembly - R1",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9114e95061493caba812b9ee7a1627997ce8c01ffa61108e2ffb475b9389649",
+   "en": "Laser Tube Buffer - PU Module",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-assembly-r1",
+    "title": "Laser Tube Assembly - R1",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9684ad79ec997522a47cd9aceb43e74ed1ec06192a2cef5ac81c0105f66bab2f",
+   "en": "Laser Tube Buffer - Left/Right Stopper",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-tube-assembly-r1",
+    "title": "Laser Tube Assembly - R1",
+    "field": "box[7]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "534b555f55df0f4875e48fbc34f5db42a217c839f53555604417442714638ed0",
+   "en": "5-Pin Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "4-pin-8-pin-extension-board-r1",
+    "title": "4-pin & 8-pin Extension Board - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "860cd50378c182c33fd884a8f4549a6a9586df11b236fec4183822929f69d0d4",
+   "en": "PCB Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "4-pin-8-pin-extension-board-r1",
+    "title": "4-pin & 8-pin Extension Board - R1",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4c15fdaa2bcaa62a02909a25d7bd2facc0c9eb11209fa2080207dd8a9f59a14",
+   "en": "N8 Air Pump Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "air-pump-r1",
+    "title": "Air Pump - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "72d2256f50186deada46091625df4d209d81ea9d30c8e56cd6dd03baf41f9f0f",
+   "en": "Metal Self-Tapping Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "air-pump-r1",
+    "title": "Air Pump - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "31c3bdc740d01e1b2c9a1647de5c6e523c056fa2981ffb7ddfd0e39f37b57d28",
+   "en": "Air Tube Plastic Clamp",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "air-pump-r1",
+    "title": "Air Pump - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "428e880b4b72a3c307b8c31ea81a6e6188df1053e501067d5f0b9354ffbf7d21",
+   "en": "Main Control Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "mainboard-r1",
+    "title": "Mainboard - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d54b5d1baf02b2cfaec9ba155df84ab6c3e17e20660dfcb131fb53dcbae2321",
+   "en": "Mainboard Thermal Pad",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "mainboard-r1",
+    "title": "Mainboard - R1",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f13b074c8c47ad5c0d4eff7fdf06b92ec9da4c0acad9c4a63c5167c4da55dbb",
+   "en": "USB Interface Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "usb-port-board-r1",
+    "title": "USB Port Board - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e524ae3e1d9d6e2da752c5b6f2c10fa17cbee23dedf41cfe910ff24927d6e29e",
+   "en": "Pagoda Connector",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "air-pump-tube-kit-r1",
+    "title": "Air Pump Tube Kit - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "973d464751f7acf37a9fc66d4587efdfc62799239e06b6980663899bacbb43da",
+   "en": "Air Pump Silicone Air Tube",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "air-pump-tube-kit-r1",
+    "title": "Air Pump Tube Kit - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ab4657c840d9b9e8a6103cf8e55178a241a0d4a1cf3b4bdbfee0bd42e2f9f9b",
+   "en": "Air Tube Bushing",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "air-pump-tube-kit-r1",
+    "title": "Air Pump Tube Kit - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cf43aa56b926be8ad5df09084c5e8dd148338516dc8a90b1b6eeb398f6f40b27",
+   "en": "Sleeve Flat-Head Tension Spring",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "air-pump-tube-kit-r1",
+    "title": "Air Pump Tube Kit - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d2d6b64ac03632988c5c135859de4bc66561c87a84fd0aeeb055e1999943b64",
+   "en": "LED Strip 1",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "led-lighting-kit-r1",
+    "title": "LED Lighting Kit - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "76e80d185cda11ae1b226e6312060c1a7dee694b42b4ee45248b2e383c6de2ee",
+   "en": "LED Strip 2",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "led-lighting-kit-r1",
+    "title": "LED Lighting Kit - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e759aadd2f4a16497481946ec1d3c729b535433fa8b1bdcba9c93697e75f0af8",
+   "en": "LED Strip 3",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "led-lighting-kit-r1",
+    "title": "LED Lighting Kit - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "945140c8fe2ad46c155489b9f857c4b52975eace9b48a1e82cdf8e8aeaedc944",
+   "en": "Laser Power Supply",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-power-supply-r1",
+    "title": "Laser Power Supply - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "04e7e129b08b502186355ea09802391d3f2ac32ed59617261c43e5cfb468a68b",
+   "en": "PC Sheet",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "laser-power-supply-r1",
+    "title": "Laser Power Supply - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "9afd32444779fea41b26eee09378eeebca010f2e4058690c63b75791074e5f7b",
+   "en": "Terminal Connecting Wire",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-power-supply-r1",
+    "title": "Laser Power Supply - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c452c90a7ffd4b1dba0d9815ddc78c0f4971fd7b21ac24a797d4d31003be2e65",
+   "en": "Green Terminal",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-power-supply-r1",
+    "title": "Laser Power Supply - R1",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c403bcbc999fa31c8519c5c9209e11c09b7e9a5be42c4328b7d4627ae4c7d119",
+   "en": "Air Pump Air Tube Plastic Clamp",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "water-tube-clamp-r1",
+    "title": "Water Tube Clamp - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f822d426da35c45f359f282338898294e737a9cf46f0c75bf7ad53083f9b07bd",
+   "en": "Left Housing Top Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "left-shell-r1",
+    "title": "Left Shell - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "65f8882614b22245ae6cd4cb924da086ce09022facb9a78056894a00fa5ce216",
+   "en": "Left Housing Side Panel",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "left-shell-r1",
+    "title": "Left Shell - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5dfd7ed6a6eb5eb5028a53f71f43d90174b845286cf24188a08383b38f023f0",
+   "en": "Dual-Band WiFi Antenna",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "left-shell-r1",
+    "title": "Left Shell - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cf791780153dbe89ed5746c8a8405d20e09e76f5d0c9c4facad60c3ef07160a2",
+   "en": "Internal Fire Extinguisher Connecting Hose",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "left-shell-r1",
+    "title": "Left Shell - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b0579d4ede267fb2fb178a538203021cb162972b877431f3e6874d3d3ca623f7",
+   "en": "Left Housing Buffer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "left-shell-r1",
+    "title": "Left Shell - R1",
+    "field": "box[8]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe855ee22db373121a1bc952bf0e123d502ed047cc971d6afbdf13dcbacb445d",
+   "en": "Smoke Exhaust Filter Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "smoke-ventilation-filter-r1",
+    "title": "Smoke Ventilation Filter - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "abf0edf636446b14e49470cc4faa7dbbd0655fcd0365fd293dc88ec96cfa0951",
+   "en": "Motor Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-motor-with-belt",
+    "title": "Conveyor Motor with Belt",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ba82f40faebed504009bfda19764b1938858c05495526443ef2853ddf414842",
+   "en": "X-Axis Motor Buffer",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "conveyor-motor-with-belt",
+    "title": "Conveyor Motor with Belt",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7bd131fbd29a8aebc5658d9b8ae5581fce7e717dcc28f711df01cb0d44cef7d9",
+   "en": "X-Axis Motor Buffer Top Cover",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "conveyor-motor-with-belt",
+    "title": "Conveyor Motor with Belt",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "721a54606d5274402cffe613b2983fefcfddd6b4b42ee8dce90143ab9ecb2a30",
+   "en": "Tensioning Metal Sheet",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-motor-with-belt",
+    "title": "Conveyor Motor with Belt",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ae336a58c8806d92016307287310eed95d30f1b1846cbbfb7d9502dc7bdf8c6",
+   "en": "BT2-5.5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-motor-with-belt",
+    "title": "Conveyor Motor with Belt",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8e68e98756578b45305d3aa9717618ffc5e7eada5ba40156b049621fe0034e4",
+   "en": "M3-3.5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-motor-with-belt",
+    "title": "Conveyor Motor with Belt",
+    "field": "box[7]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "eeebd533ebeefdf5ef52f3d0c0d965cf72cb53cc15c164e9c44344d0716556e6",
+   "en": "Belt",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-motor-with-belt",
+    "title": "Conveyor Motor with Belt",
+    "field": "box[8]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b652c99382d063353112cd654140b1e60fc15c23ffacb3e5e0483f138bbb3497",
+   "en": "Tension Spring",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "conveyor-motor-with-belt",
+    "title": "Conveyor Motor with Belt",
+    "field": "box[9]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "cebadcbe25e7bb6229fe2465260e612397ca9879fe223a0cac313237c577369c",
+   "en": "Right Top Panel",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "right-shell-r1",
+    "title": "Right Shell - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a52e9ad83b4124f2fd65c1bfd86cad725dc93b672d2a7161aeb75c3794c240e6",
+   "en": "Right Bottom Panel",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "right-shell-r1",
+    "title": "Right Shell - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ce04695fdde50407a13bfa62d8bc22b887aaf7f3798e3236a0abdbddbe6c045",
+   "en": "Right Housing Buffer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "right-shell-r1",
+    "title": "Right Shell - R1",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d9624c8190f389e49d95e6efa68e580de711f55a2dc967939a8e7ee235c7c87",
+   "en": "Right Housing Buffer Stopper",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "right-shell-r1",
+    "title": "Right Shell - R1",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "119f306df934840276a6eae00365f9d56f8e5e11a7d8ac7cb0f50e1887e47c09",
+   "en": "Right Housing Buffer Auxiliary Block",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "right-shell-r1",
+    "title": "Right Shell - R1",
+    "field": "box[7]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "904cb06449633b48e5976ca753d6623776d3e7826a531d0f45a5bb23bf866e25",
+   "en": "Laser Tube Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "front-rear-panel-set-r1",
+    "title": "Front & Rear Panel Set - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4e86866eba35bd5f75ff94f3c410aa2d67bc0e2ac6d04cf6f3594d96685e236",
+   "en": "Top Cover Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "top-lid-assemblyn-r1",
+    "title": "Top Lid Assemblyn - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "58ae50a4ae57a96787217c0722521162d2f6f69c8b26615c1f4d06012eab196f",
+   "en": "MK4-10 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "top-lid-assemblyn-r1",
+    "title": "Top Lid Assemblyn - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "7cec7633b4a0f1c4da5f0ba7bdb1803f47dec0a775ea15e42f128c9aa8d1d31b",
+   "en": "EPE Top Cover Door 1",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "top-lid-assemblyn-r1",
+    "title": "Top Lid Assemblyn - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "16379e3bd850b0625c5dd66d026e299c9dbb0e98b881a2c1cafad8f8485ef7d9",
+   "en": "EPE Top Cover Door 2",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "top-lid-assemblyn-r1",
+    "title": "Top Lid Assemblyn - R1",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a76304febf625db223ac8386134e19bd1ef972422526d1a87b2e21caeacf05ce",
+   "en": "Top Cover Gas Strut",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "top-lid-strut-r1",
+    "title": "Top Lid Strut - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "76deae101972648c00cbf2487e3c5183b38cdbae4e75c621a02ad279e049ea33",
+   "en": "MG4-24 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "top-lid-strut-r1",
+    "title": "Top Lid Strut - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6975419b143bce65090ded1326a055c9e95b7932611141944bfdc02e8bd44d7c",
+   "en": "Pressing Motor",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "pinch-motor-r1",
+    "title": "Pinch Motor - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d4ad5890b6e38ebbcc159d20e4be755bca9836715a652a6483fbf31f68cfe67",
+   "en": "M3-6-C5.5 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "pinch-motor-r1",
+    "title": "Pinch Motor - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "57cd99b4b354af392fc2ab46bcc4fd68112eb98ff9110b1bef72dcaedf1cb41d",
+   "en": "M3-6-C10 Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "pinch-motor-r1",
+    "title": "Pinch Motor - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca07c594b02018aa8ccdb3d99bbcadf2ae53d51dfe3ba572a89e5bf4759df407",
+   "en": "Knob",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "pinch-motor-r1",
+    "title": "Pinch Motor - R1",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "143fdc56078cac66e719f2aa4e50c077460617995180d8f5363dacb4f5187cd4",
+   "en": "Top-View Camera and Fill Light Assembly",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "birds-eye-camera-with-lighting-r1",
+    "title": "Birds Eye Camera with Lighting - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "345bb55c587a9634f9812d9a029c45384b919719465af3139d6b52af90343e21",
+   "en": "Camera Cable",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "birds-eye-camera-with-lighting-r1",
+    "title": "Birds Eye Camera with Lighting - R1",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff931aec2cc98c69ac2ff5f36bf0847dd8914a38a544e3b832bc066ef26db26a",
+   "en": "M2 Screw",
+   "kind": "box_item",
+   "freq": 2,
+   "context": {
+    "handle": "toolhead-cover-r1",
+    "title": "Toolhead Cover - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5b91d3adb081cac88288deb9a9315c54770c63d1cc601af93f8c208f0f045e38",
+   "en": "Optical Path Calibration Sensor",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-alignment-sensor-r1",
+    "title": "Laser Alignment Sensor - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6fec2206ec908559e999cfd8eda61b2c035376e4bb660e371347369ba4399c49",
+   "en": "Sensor Buffer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-alignment-sensor-r1",
+    "title": "Laser Alignment Sensor - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6298cb775c61692e0e0aa5f78c71367d428e1bbb52ed120ed9b7dfc5efcb635c",
+   "en": "Sensor Plastic Box",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "laser-alignment-sensor-r1",
+    "title": "Laser Alignment Sensor - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8994fa42598c34ed2e378d10878aa2983083a68e36af82e108d0b031c34f3c79",
+   "en": "Reflector Mirror",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "reflective-mirror-r1",
+    "title": "Reflective Mirror - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5856f7c82eedda314353ee12388c0a06986726147656592b38e64714255970b7",
+   "en": "Metal, Glass",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "focusing-lens-short-focal",
+    "title": "Focusing Lens - Short Focal",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": {
+    "ar": "معدن، زجاج",
+    "ckb": "کانزا، شووشە"
+   }
+  },
+  {
+   "h": "175952435d33f0cf07a9dd968306aa45b09315cad38dd6914924995ce420d274",
+   "en": "Circuit Board Bracket",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-r1",
+    "title": "TH Board - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d3c0202797f157a87b562f9dd597f248f20daa28ebcc3d9f0eaa0e436b4e32a",
+   "en": "M3 Screw",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "th-board-r1",
+    "title": "TH Board - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4f1b3c996e4765eb860c4b8cb528bedc5809207b5746915258783e045b7247b9",
+   "en": "ST3 Screw",
+   "kind": "box_item",
+   "freq": 3,
+   "context": {
+    "handle": "th-board-r1",
+    "title": "TH Board - R1",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c1d80a9869730e580001cb68c2de5af8c818fcd376641c9edc1b043eb0bb67d",
+   "en": "Optical Sensor Module",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "optical-sensor-module-r1",
+    "title": "Optical Sensor Module - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "32418a1a6395f7aa3099b8b23f84e43c3ad02b02dedbe9f0d505d12e248fc17d",
+   "en": "Three-Ball Buffer Top Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "optical-sensor-module-r1",
+    "title": "Optical Sensor Module - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c1d792bcd69ccf2a35e1fe3a9476d43c181f8713ede4ce83ab7174e66aa4bc69",
+   "en": "Three-Ball Buffer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "optical-sensor-module-r1",
+    "title": "Optical Sensor Module - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "6b40d9450369c6736a4d5f4d8b170ad83fb232230263c3b0ae76a19de37f73ea",
+   "en": "Coil Spring Sleeve",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "spiral-torsion-spring-r1",
+    "title": "Spiral Torsion Spring - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "91062956ac0baf5130254ab97b3c9d0f0cc93b421ff33d9a214216ad3bdd9c7f",
+   "en": "Coil Spring Sleeve Cover",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "spiral-torsion-spring-r1",
+    "title": "Spiral Torsion Spring - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "58bbaceb30b1212c03bd90a556287355646a33ac13327d84e147a69283c3a9bb",
+   "en": "Spiral Spring",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "spiral-torsion-spring-r1",
+    "title": "Spiral Torsion Spring - R1",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4b873c94bb8f5f611098598d60b17275a443e49570607626437a824c0b94c64",
+   "en": "Lifting Linear Rail",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-linear-rail-r1",
+    "title": "Z-axis Linear Rail - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4cd265c2b8c65fa69764f9ec0fe3fb4223906a064331bfb3fb0745a5255a7b7b",
+   "en": "Rack",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-motor-r1",
+    "title": "Z-axis Motor - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "8acc93d51e7d0126a9abfc99c0105f6ddc5e80645263d0d549b5fddd3e0549fc",
+   "en": "M3 Red Glue Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-motor-r1",
+    "title": "X-axis Motor - R1",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4f83853d97bb3eb7ebc50b03ec4e35568acb18eb66392c8904abf12ba48c9f7",
+   "en": "M3 Blue Glue Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-motor-r1",
+    "title": "X-axis Motor - R1",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "159b301d93059c74812fe53e8fba9b9e718250891542102ff7f682bf63b5a727",
+   "en": "Transmission Coupling",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-motor-r1",
+    "title": "Y-axis Motor - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4327c8a8b7fdf7bf2db9a14be49b3141cb13c0fe3df28d4ae6d9a0e4a29c98f",
+   "en": "Y-Axis Optical Shaft",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-linear-rod-r1",
+    "title": "Y-axis Linear Rod - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "33a2e6d869edee786fd9715bf2348a0841479500df0ea46f02cb7e755077a294",
+   "en": "Optical Rod Buffer",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-linear-rod-r1",
+    "title": "Y-axis Linear Rod - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5756ff96898bdb5277163b15378cdb0e6f03992ff8b868518acbe2f7b648568a",
+   "en": "Y-Motor Encoder Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-motor-encoder-r1",
+    "title": "Y-axis Motor Encoder - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4e701887596da10af40a5e68b46d24fda22fc6dacdb34fb458f73eb56edfba3",
+   "en": "Closed Belt",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-belt-r1",
+    "title": "Y-axis Belt - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "65f6d40d64985f7183583bed0f2677cb8453f51841ae86365bde25c49aa5a451",
+   "en": "Flame-Retardant PC Sheet",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "y-axis-belt-r1",
+    "title": "Y-axis Belt - R1",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "0a39f536ca31ff62a7ca2cedb256325fe9778c61b2b0c465bfb122dc7f71ae5d",
+   "en": "Calibration Board",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "calibration-block-r1",
+    "title": "Calibration Block - R1",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "35dc1544a1a3f9413bd6c8cea3999335633097ec6d0dd12b5d9c589060c0ef5c",
+   "en": "Bambu Birch Plywood is durable, free from warping or burrs and easy to cut, making it perfect for home decor, structural projects, storage boxes, puzzles, and more. Its natural wood grain adds a unique touch to your creations. With its soft wood color, Birch Plywood is also ideal for painting and finishing projects. Plus, the E0 glue* reduces formaldehyde, enhancing air quality.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "birch-plywood",
+    "title": "3mm Birch Plywood (6pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7b5b3cb8879bab32098a009454ee1d610e255be9f3b225b7bc08086fad67785d",
+   "en": "Bambu Basswood Plywood has a flat surface with subtle, even grains and free from warping or burrs, making it easy to laser cut and engrave. It's perfect for detailed decor and fine crafts. Its smooth surface provides an ideal foundation for painting and finishing, delivering vibrancy to your creations. Plus, the E0 glue reduces formaldehyde, enhancing air quality.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-basswood-plywood",
+    "title": "3mm Basswood Plywood (6pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6a5ff9afd4239e008a22e77b443b9b08bfb9c2e7cadff703cd46ede78a32b1cc",
+   "en": "Unique for its dark-colored aesthetics, Bambu Black Walnut Plywood, with its natural, flowing grain patterns, is perfect for elegant designs. With a smooth and flat surface for easy carving and cutting, and being durable and resistant to decay, it's the premium choice for sophisticated decor, fine crafts, and high-quality home furnishings. Plus, the E0 glue* reduces formaldehyde, enhancing air quality.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "3mm-black-walnut-plywood-6pcs",
+    "title": "3mm Black Walnut Plywood (6pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5df9992b6e42e20d104fae6090cc3dcc1e66de3dececc51738ae114d87f60713",
+   "en": "Bambu Cork Sheet is easy to cut and customize. With its excellent water and heat resistance, it's perfect for customizing, from DIY crafts to functional use.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-cork-sheet-4pcs",
+    "title": "2mm Cork Sheet (4pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "22d6e7c27b538cab20ffcf684292afa9fcd68b3fb7e9e87082f0ff3db78871a0",
+   "en": "Bamboo Board is made entirely of bamboo, featuring a natural bamboo grain and a flat surface that resists warping and burrs. It is reliable and durable—ideal for laser engraving and cutting. Plus, the E0 glue* reduces formaldehyde, enhancing air quality.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "3mm-bamboo-board-6pcs",
+    "title": "3mm Bamboo Board (6pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dfe334b8d19405baa58a62eac7ca2c4656d5d4e246fd35f52b26c6a9dc867239",
+   "en": "The Bambu Stainless Steel Tag is highly resistant to fading and warping to ensure long-lasting quality and is non-toxic and pet safe. You can customize it with a name, date or initials to a metal tag with laser engraving to create a quality charm.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-stainless-steel-tag",
+    "title": "Round Stainless Steel Tag (5pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "34189b1887b813c8d177db3ae7329f766ade221193c3b23ca8fe495f9a3621be",
+   "en": "Bambu Black Aluminum Card is designed for effortless engraving. Personalize it with your desired text or custom design to create a unique piece.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "black-aluminium-card-10pcs",
+    "title": "Aluminum Card",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "10e2a211ad78afd62275e04ea134113f5261fe557263a2de0ead4b97146e24c7",
+   "en": "The moderate thickness and smooth surface of 250g cardstock make it easy to cut accurately without burrs, and keep the edges neat after cutting. The smooth surface ensures a flawless paint finish.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "250g-cardstock-25pcs",
+    "title": "250g Cardstock (25pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5b43cf47707227c89cc9fd4db80dfafb92a0d63e7ddab4cd855def624eea16f9",
+   "en": "Bambu Matte Heat Transfer Vinyl features a matte texture* and a variety of vibrant color options. It is easy to cut and weed without leaving residue, sticking strongly and withstanding multiple washes and stretches for long term use.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "76e26ff9a2d3c12240a9e5624a47c3564b804ec0534af78f83a10144c8dd19a9",
+   "en": "Nylon",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-matte-heat-transfer-vinyl",
+    "title": "Matte Heat Transfer Vinyl Sheet (10pcs)",
+    "field": "blocks[5].line[8].cell[0]",
+    "near": "PU Synthetic Leather | 130°C | 12s"
+   },
+   "dict": null
+  },
+  {
+   "h": "814ac8a41afc400195731f25907ceebaf345ac9734b63935c3a07da60e515935",
+   "en": "Bambu Carbon Fiber Textured Removable Vinyl mimics the sleek and dynamic appearance of real carbon fiber, reflecting a 3D effect that adds a high-tech look to your projects. It's especially good for automotive customization, giving your car or motorcycle an upgraded, stylish appearance.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "carbon-fiber-textured-removable-vinyl-10pcs",
+    "title": "Carbon Fiber Textured Removable Vinyl (10pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0fb96993435e7baaeef3200c751978fcfc65e8c5e7822009f8120b112b77dd84",
+   "en": "Bambu Light Gray Reflective Decal Sheet adds a high-visibility touch to any surface, making your items stand out in low light and at night. With excellent UV resistance and waterproof properties, it’s perfect for outdoor use, not only enhancing the appearance of your gear but also improving safety.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "light-gray-reflective-decal-sheet-5pcs",
+    "title": "Light Gray Reflective Decal Sheet (5pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8c1b1899e2a5c692ba1ee3053fb8bb7b908c8ca5f32cf5bb78c59e3f759ee3bd",
+   "en": "Simplify your transfer process with Bambu Transfer Tape, designed for removable vinyl projects. Use it to decorate everyday items like bottles and boxes, as well as household surfaces like windows and doors. It works on various materials, including glass, ceramics, and metals. The tape easily picks up every detail and places it exactly where you want it without leaving residue. Whether you're new to vinyl projects or an experienced crafter, Bambu Transfer Tape is a reliable choice for a clean, hassle-free transfer every time.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "transfer-tape-10pcs",
+    "title": "Transfer Tape (10pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6ef09fb1b7694ade4c7a10b5dca418f5ebcbd3f5c509d6ca5e1b260950142038",
+   "en": "Crafted from high-quality PU leather, Bambu Pebbled PU Leatherette Fabric is easy to cut and offers a sleek appearance with excellent durability and waterproof properties. It's perfect for creating handbags, eyeglass cases, and fashion accessories, as well as laminating onto phone cases or automotive interiors for decorative purposes.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "pebbled-pu-leatherette-fabric",
+    "title": "Pebbled PU Leatherette Fabric (5pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0ba8097f576298be84f4de58d3edd0cb9eb8a947ac133eac0471fd9a596844a2",
+   "en": "Bambu Greeting Card Set includes 2 pearlescent white card stocks for intricate blade cutting, paired with 2 sky-blue inner cards for your heartfelt messages, and comes with the matching envelopes! Whether it's a birthday, holiday, wedding, or any special occasion, this set allows you to craft personalized, one-of-a-kind cards that truly stand out. The beautiful pearl shimmer on the cards adds elegance to your work. Design your wishes and make every celebration unforgettable with the Bambu Pearlescent White Greeting Card Set!",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "pearlescent-white-greeting-card-set-ye004",
+    "title": "Pearlescent White Greeting Card Set (2pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8dc6d8ab897f92679ca83c3ef957081c91aa715a86762059faedd3bc1670fef5",
+   "en": "Bambu PU iron-on patch enables precise laser engraving to remove the surface coating, revealing pre-layered contrasting color underneath. Ideal for creating distinctive decorative effects on everyday fabrics like canvas bags and baseball caps. Its adhesive backing allows multiple repositioning adjustments before heat-pressing.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "rectangular-pu-iron-on-patch",
+    "title": "Rectangular PU Iron-on Patch (10pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "20623530df78cf4b4b4218ed91a1e908bdae37828b2ffcd43bb01824b5fd286c",
+   "en": "Bambu Matte Removable Vinyl offers 7 vibrant colors and a matte finish. It’s easy to cut, weed, stick, and remove without leaving residue. Perfect for decorating household items, accessories, signs, and personalized gifts.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "matte-removable-vinyl-10pcs",
+    "title": "Matte Removable Vinyl (10pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c8bd667cc1c8324a171e9acda014bde0eb0be08940967b563fbe1311e4d3f872",
+   "en": "Bambu Opaque Glossy Acrylic Sheet offers vivid color options and an opaque style. With the breakthrough of reducing thickness tolerance to ±0.25mm, Bambu Acrylic sheet is perfect for creating personal decorative projects but also intricate small business items. Durable and easy to work with, the Bambu Acrylic sheet ensures your creations stand out with quality and style.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-opaque-glossy-acrylic-sheet",
+    "title": "3mm Opaque Glossy Acrylic Sheet (3pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c497b550d6aef5afb5ef8a36758bc492f29b5603877de829d4f8d14cf16a6698",
+   "en": "Bambu A4 Kraft Paper is designed for laser cutting, engraving, and blade cutting. Its moderate thickness ensures that every cut is free of burrs, delivering clean and neat edges every time, while its smooth surface makes writing, drawing, or stamping easy. Whether you're crafting cards, envelopes, scrapbooking, wrapping paper or gift tags, Bambu Kraft Paper is reliable to your projects.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "a4-200g-kraft-paper-25pcs",
+    "title": "A4 200g Kraft Paper (25pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "621432459293f6e785704bb309c9542194bebdcab76c5853d44d7fc5d068bfbe",
+   "en": "Bambu Chrome Foil Heat Transfer Vinyl comes with an eye-catching, mirror-like metallic finish, making your everyday items stand out. It's easy to cut and weed without leaving residue, sticking strongly and withstanding multiple washes and stretches for long term use.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "chrome-foil-heat-transfer-vinyl-10pcs",
+    "title": "Chrome Foil Heat Transfer Vinyl (10pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5299ebbb45dccc17d57f9d49717ebf39271c807877c6b2a6a41ad4a541d2e24b",
+   "en": "Unique for its reddish-brown color, Bambu Sapele Plywood features smooth rosewood grain patterns that enhance the natural beauty of your designs. It is flat, free from warping or burrs, highly durable and tough, making it perfect for detailed carvings, luxurious furnishings, decor, gifts, and more. Plus, the E0 glue* reduces formaldehyde, enhancing air quality.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-sapele-plywood",
+    "title": "3mm Sapele Plywood (6pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1a2242648c241bc6a682b0e2804ffbf0ae472f772e384de25aba0f7c87e2a268",
+   "en": "This all-in-one material set includes plywood, acrylic, cork sheets, metal tags, and leather, perfect for both laser beginners and enthusiasts. Whether you want to cut car models, create acrylic garden signs, or personalize a tag for your pet, the Starter Pack takes guesswork out of selecting materials. Simply start crafting and discovering everything laser art has to offer in a single convenient package!",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "laser-material-kit-–-starter-pack-for-h-series",
+    "title": "Laser Material Kit – Starter Pack (For H Series)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8288fecf1b44204e01b71bf0801983c37c69b344a76f9b55d097ccb0f981ea0a",
+   "en": "Turn your designs into durable, professional stickers with our Matte Printable Vinyl Sticker Paper. This material delivers vibrant prints that dry instantly.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "white-matte-printable-vinyl-sticker-paper-25pcs",
+    "title": "White Matte Printable Vinyl Sticker Paper (25PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c309b2308873550918aaaff8a5bdf1670c272f37d11566cdbf4dbcbdb9af0433",
+   "en": "This all-in-one cutting material set includes PU leatherette, cardstock, greeting card paper, heat transfer vinyl, removable vinyl, and reflective decal sheets — all carefully selected to work seamlessly with the blade tool of your 3D printers. Whether you’re making stickers, cards, or leather crafts, the Starter Pack ensures smooth cutting and easy compatibility with your printers.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "cutting-material-kit-–-starter-pack",
+    "title": "Cutting Material Kit – Starter Pack",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9845d36c28f7574e9c6ee71918745b9d1269c5ca902cc9d19e8805ca209da357",
+   "en": "2.5D Framed Blueprint - Pacific Clipper is a stereoscopic blueprint frame that presents the appearance and internal structure of the \"Pacific Clipper\" through detailed three-view drawings. This model integrates multiple making techniques, including 3D printing, laser cutting, and knife cutting, using the Maker’s Supply kit along with a few simple processes. For more details, please see the Documentations section for installation instructions.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "58af3dcfaee3c6d44187f38d140c6cf82143bf8683faee4f84d9ccecf21d9536",
+   "en": "YA001 › 3mm Basswood Plywood",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "specs[x.3mm_basswood_plywood].label",
+    "near": "12"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a300929646a44e6b274bc9c7fad78d34f68a2c5d288ea2206a0f6800ac5090b",
+   "en": "YB001 › 3mm Black Opaque Glossy Acrylic",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "specs[x.3mm_black_opaque_glossy_acrylic].label",
+    "near": "3"
+   },
+   "dict": null
+  },
+  {
+   "h": "93397f9a8832b5ba8b9983406471e4eb8623a8c9e460257b822099235fb8d3da",
+   "en": "Simple Installation Guide",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "documents[0]",
+    "near": "installation"
+   },
+   "dict": null
+  },
+  {
+   "h": "47cdb7ca171e366f2fac59874f903c0997efdd11248cddbef7655f853d72f866",
+   "en": "Instructions for the Transfer Sticker",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "documents[1]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "f94e0e91ec8a18a4c620055785be3b07cd502dd9d00e91f71f6cde7000de95b9",
+   "en": "Blueprint Printing Instructions",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a74d5e2c7e64398458a246d4dd13cc0054e8e16b4182515e920bad12369d372",
+   "en": "Blueprint File",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "documents[3]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "808413f6642ce7b0a25df6078723248f69764783c0ef5bbd336f1feb72002af4",
+   "en": "Transfer Sticker File",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "2-5d-framed-blueprint-pacific-clipper",
+    "title": "2.5D Framed Blueprint - Pacific Clipper",
+    "field": "documents[4]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbab6cc0125a0a3d55fe152ab7a1d345b6f26ad08d00388e662124800ceba300",
+   "en": "Bambu 2mm Basswood Plywood features a precisely controlled thickness that enables exceptional detail and smooth curves. Its flat, fine-grained surface is free from warping or burrs, making it easy to laser cut and engrave.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "fe5c4f2ca0a56d93e6947d4f7b1c9fa1385c9331f2fd46a1087dc590120bea18",
+   "en": "3mm Basswood Plywood",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "2mm-basswood-plywood-6pcs",
+    "title": "2mm Basswood Plywood (6pcs)",
+    "field": "blocks[1].line[3].cell[0]",
+    "near": "2mm Basswood Plywood | Fine wood grain, beige-yellow color | Intricate detail crafts, mechanical transmission models, puzzles | High precision for intricate cut"
+   },
+   "dict": null
+  },
+  {
+   "h": "8a53cb6154a1649601b2d15d354d0e36b4fd24f3e3476c69c66656167672022d",
+   "en": "Made from premium natural black slate, these elegant coasters combine style with everyday functionality. Perfect for laser engraving or DIY customization, they allow you to create personalized designs that match your taste. The durable stone offers excellent heat resistance and protection for your surfaces, while the non-slip backing keeps each coaster securely in place. Sleek, versatile, and gift-ready, they’re a sophisticated addition to any home or workspace.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "black-square-stone-slate-coasters-4pcs",
+    "title": "Black Square Stone Slate Coasters (4pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1956af35ac4703eadef3ad2cf2cf31cb3f58e6d8375bbb58494459ffdf8f5e9d",
+   "en": "Scope of the Materials type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.scope_of_the_materials_type].label",
+    "near": "Probability"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c9be01ba2123edfb4cecc60ff81e5b802abe9bbe88193b3a2bc25a095874612",
+   "en": "Probability",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.scope_of_the_materials_type]",
+    "near": "Scope of the Materials type"
+   },
+   "dict": null
+  },
+  {
+   "h": "27374df770c70cbcee2a641f9f091fdbea396d355fa7c03e2bba9bcca47a36e0",
+   "en": "Laser Material",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.laser_material].label",
+    "near": "Plywood"
+   },
+   "dict": {
+    "ar": "مادة ليزر",
+    "ckb": "کەرەستەی لەیزەر"
+   }
+  },
+  {
+   "h": "7aaa37a14e7695bc36a41ebb16508b4aba780436fa8a30cbe8afd5d28830eee1",
+   "en": "Plywood",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.laser_material]",
+    "near": "Laser Material"
+   },
+   "dict": {
+    "ar": "خشب أبلكاش",
+    "ckb": "ئەبلەکاش"
+   }
+  },
+  {
+   "h": "d3ab7a7b023e7741e071fa053c733d72c6a08d20dab931e02ff622df58d98ddc",
+   "en": "Guaranteed",
+   "kind": "spec_label",
+   "freq": 6,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.guaranteed].label",
+    "near": "Randomly"
+   },
+   "dict": null
+  },
+  {
+   "h": "51541086dc22e6e794c729368e5a3f0744b8fee9a0b9ed54d2d1389af596ed5f",
+   "en": "Randomly",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.guaranteed]",
+    "near": "Guaranteed"
+   },
+   "dict": null
+  },
+  {
+   "h": "35cdbe170d782868c1cb7ae85c082f7c70b0ca64b61b2849778ee0adbd451879",
+   "en": "Laser Material › Acrylic",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.acrylic].label",
+    "near": "Guaranteed"
+   },
+   "dict": null
+  },
+  {
+   "h": "91aa6a843a24baa378f371f91ee81fb30f8f3ba4e4f440cc670b8dca6ec68c4b",
+   "en": "Laser Material › PU Leather Fabric",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.pu_leather_fabric].label",
+    "near": "Guaranteed"
+   },
+   "dict": null
+  },
+  {
+   "h": "13a862bb0662de28987686faf67f4aadaf40f2e6b0d7ca23d414bcc27816a17f",
+   "en": "Laser Material › Stainless Steel Tag",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.stainless_steel_tag].label",
+    "near": "Guaranteed"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb27ee16a406243e627b0f0fd6394f1d93b7d58296f0258d639b9ba9d45efc37",
+   "en": "Laser Plywood & Bamboo Trial Kit",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.laser_material_2]",
+    "near": "Laser Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "6c869220c919080574b45b3f3f349a5b59d4be7730439a76f617f5fa3530403a",
+   "en": "Cutting Material",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.cutting_material].label",
+    "near": "Matte Heat Transfer Vinyl"
+   },
+   "dict": null
+  },
+  {
+   "h": "abdb6f9ad8c19e29612b50c261a0f1ddf4503afb572fb6609abd7d34c24afdc8",
+   "en": "Matte Heat Transfer Vinyl",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.cutting_material]",
+    "near": "Cutting Material"
+   },
+   "dict": null
+  },
+  {
+   "h": "6bcb960c726bc5b29acce6395abe5486089582040b58c7dc401521414c2f30d9",
+   "en": "Cutting Material › Matte Removable Vinyl",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.matte_removable_vinyl].label",
+    "near": "Guaranteed"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e0017da2b697b92b6209c33a9de45716b62166cace11f8d0d64dc14a908d629",
+   "en": "Cutting Material › Paper",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.paper].label",
+    "near": "Guaranteed"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0db8b5e364b6989e4b8f38a2b3846b87d99a51c1592ebf35d21cc66405a8e39",
+   "en": "Options",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.options].label",
+    "near": "Compatible Bambu Lab Printers"
+   },
+   "dict": null
+  },
+  {
+   "h": "481bcd216169bb5c38b2126f11d20bb6436b110c7b2584f507acfc8114ffce2a",
+   "en": "Laser Mystery Box (Inc. Plywood/Acrylic/PU/Metal Tag)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.laser_mystery_box_inc_plywood_acrylic_pu_metal_tag].label",
+    "near": "1. H-series Machine（Laser Full Combo） / 2. Laser Upgrade Kit for H2"
+   },
+   "dict": null
+  },
+  {
+   "h": "960e208aeb125134f7e2af4f6c0744031c33a251b31b8a7933d8d97aeeb0ff13",
+   "en": "1. H-series Machine（Laser Full Combo） / 2. Laser Upgrade Kit for H2",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.laser_mystery_box_inc_plywood_acrylic_pu_metal_tag]",
+    "near": "Laser Mystery Box (Inc. Plywood/Acrylic/PU/Metal Tag)"
+   },
+   "dict": null
+  },
+  {
+   "h": "37bcc4025f401b9a9f14d979057ce81e20bb9b7a110e599fd519bbfacdc911ba",
+   "en": "Cutting Mystery Box (Inc. HTV/Removable Vinyl/Paper/PU)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.cutting_mystery_box_inc_htv_removable_vinyl_paper_pu].label",
+    "near": "1. H-series Machine（Laser Full Combo） / 2.Cutting Upgrade Kit for H2"
+   },
+   "dict": null
+  },
+  {
+   "h": "f9a0aa68a7348336feac70daf392684c8ac9022d600399f8c09829a52d57d6ba",
+   "en": "1. H-series Machine（Laser Full Combo） / 2.Cutting Upgrade Kit for H2",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "material-mystery-box",
+    "title": "Material Mystery Box",
+    "field": "specs[x.cutting_mystery_box_inc_htv_removable_vinyl_paper_pu]",
+    "near": "Cutting Mystery Box (Inc. HTV/Removable Vinyl/Paper/PU)"
+   },
+   "dict": null
+  },
+  {
+   "h": "901e9c0eed983ff57bfb0468ad1ecae7c66be99f5d3428310678dfb72cc3a770",
+   "en": "Create a warm winter scene with this hybrid decorative house, expertly crafted with laser-cut wood and 3D-printed details. Featuring engraved wood textures, a snowy base, and frosted rooftops, it blends handcrafted charm with modern making techniques. The house includes a complete LED lamp kit, allowing it to glow softly from within, with light shining gently through the windows. Add your own small seasonal decorations to complete a festive display that’s both enchanting and personal.Ideal as a centerpiece, a DIY project, or a gift, this illuminated cottage brings a cozy, inviting atmosphere to any space.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "winter-cottage-led-lamp",
+    "title": "Winter Cottage LED Lamp",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c582b0b58b8ac6027a0dc1a74e899f713c5e6e6e080b7ad3d8c4977e3c48a7f7",
+   "en": "This pinball machine is a unique hybrid project that combines two different technologies: laser cutting/engraving and 3D printing, bringing to life a retro-style game inspired by the world of Pac-Man.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c733cf077ceeb2d8d323c93660c7609cf8153fa2abf7f78d2b54ae5479ce50c5",
+   "en": "Materials Used for the Model",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "df9c9cf0aeda057cfc701c274d8bdd6adf8dc56f5cd24ac4fa9cba68f845e762",
+   "en": "Maker's Beginner Kit 5x OD24x2.5mm O-Ring 11x vBT3x8 SHCS Self-Tapping Screw 2x 1.4x20mm Basic Rubber Bands 5x 8mm Stainless Steel Balls 2x 0.5x5x25mm Helical Compression Spring",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3573de841fbcaafdaf9f1e001963d64c470073d32523d9200842db29aede5a10",
+   "en": "PLA Basic (Not included)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wooden-desktop-pinball",
+    "title": "Wooden Desktop Pinball",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d49864cb2200098c74827691ab1b324c1fccf9d1effde281192b5b01b6aa9648",
+   "en": "No need to settle for one when you can have the full palette! This curated acrylic kit is designed to help you master intricate models with ease.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ultimate-opaque-glossy-acrylic-kit",
+    "title": "Ultimate 3mm Opaque Glossy Acrylic Kit (15 pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9f1e1e0380117c30fa36c513d2c43b51c4642cd73bbf8df3cb3f124f19524ab0",
+   "en": "Bambu PU Leather Patches are crafted from premium, waterproof leather with a heavy-duty 3M self-adhesive backing.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "round-pu-leather-patch-sticker",
+    "title": "Round PU Leather Patch Sticker",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d1234dd73166f8c937d200a34b89ac147f6d5cdd519b44f7a41e1f87b5481ae3",
+   "en": "This product is designed to elevate your laser processing results. Its key feature effectively prevents wood from scorching and darkening, protecting the material's natural beauty while delivering clean processing. The residue-free adhesive ensures easy and secure application on various surfaces, helping you reliably achieve professional-quality finishes.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "wide-white-masking-tape-1-roll",
+    "title": "Wide White Masking Tape（1 Roll）",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "65774a611888c7d609e592148ad42c0ed4de158f0831f07412535b88a517643c",
+   "en": "1 Roll",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wide-white-masking-tape-1-roll",
+    "title": "Wide White Masking Tape（1 Roll）",
+    "field": "specs[x.ye005]",
+    "near": "YE005"
+   },
+   "dict": {
+    "ar": "1 بكرة",
+    "ckb": "1 بۆبین"
+   }
+  },
+  {
+   "h": "86304da11a7fe4fe451c4a1bfcb6d64a41699d55df569210c2dba216a07fda51",
+   "en": "Beige White",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wide-white-masking-tape-1-roll",
+    "title": "Wide White Masking Tape（1 Roll）",
+    "field": "specs[x.beige_white].label",
+    "near": "15*350"
+   },
+   "dict": null
+  },
+  {
+   "h": "483699414733cfcdd918ed054b1deaec04612ed6b12e6c37064304bb11ede9fb",
+   "en": "This stainless steel tumbler seamlessly blends creativity with everyday practicality. It enables you to engrave personalized patterns in a variety of colors—making it an ideal choice for both custom gifts and expressing your unique style. Crafted from food-grade 304 stainless steel, it is safe, durable, and maintains temperature all day (keeps contents hot for 6 hours, cold for 12 hours). Equipped with a leak-proof seal and essential accessories including straws and a cleaning brush, it ensures worry-free use and effortless portability wherever you go.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "20oz-stainless-steel-tumbler",
+    "title": "20oz Stainless Steel Tumbler",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "55df9654249579e81cec04f690c2a9ea7634df0fd7b5de2419e009a9c0aa69a7",
+   "en": "This 40oz high-capacity tumbler balances artistic flair with everyday utility. Engineered with dual-wall vacuum insulation, it keeps beverages hot for 6h",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "40oz-stainless-steel-tumbler",
+    "title": "40oz Stainless Steel Tumbler",
+    "field": "description.line[0].cell[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "dde592f12feafe6a14c28ea54ee23991c4a3a0ba2f2d7e9effa9dedbdbfed064",
+   "en": "cold for 12h—from your first morning sip to late-night gatherings.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "40oz-stainless-steel-tumbler",
+    "title": "40oz Stainless Steel Tumbler",
+    "field": "description.line[0].cell[1]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "95390242d0686249acae8f9baad62f673fd8cb906f8713c9d85784f3d50829b2",
+   "en": "Bambu PU Leather Keychain Holder for AirTag combines sophisticated design with robust protection. Crafted from durable PU leather, it securely encases your airtag against daily wear, scratches, and drops. The integrated metal keyring attaches effortlessly to keys, backpacks, luggage, or pet collars. Compatible with Bambu laser engraving, personalize it with names, initials, or unique patterns to make it truly yours.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "pu-leather-keychain-for-airtags-holder",
+    "title": "PU Leather Keychain Holder for AirTag",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8709ee0703a7b6484888a1fcc638b8439e341947fbfa26e219be82b6fe68e3d6",
+   "en": "Bambu Color Felt Fabric Squares come in a vibrant 22-piece set, with each pre-cut square offering a rich, consistent color and a soft, durable texture. Ideal for educational activities, decorative accents, and intricate DIY designs, these versatile felt squares are perfect for crafters of all ages and skill levels. Fully compatible with Bambu laser cutting machines, our felt fabric enables you to achieve intricate patterns and delicate details that elevate every project to a new level of precision and richness. Quality felt that's easy to cut, glue, and manipulate.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "color-felt-fabric-squares-22pcs",
+    "title": "Color Felt Fabric Squares (22pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0ab75c8043530f2f5174e91b0bf4e0931ac7fd916f59461622b90bad3da0666e",
+   "en": "This bone-shaped stainless steel pet tag is crafted from premium stainless steel, built to last with excellent rust and corrosion resistance, ready for your pet's everyday adventures. With laser engraving, you can personalize it with custom details that stay clear and fade-free. Available in two sizes to ensure a comfortable fit for pets of all builds, keeping them safe and giving you peace of mind.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "bone-stainless-steel-tag",
+    "title": "Bone Stainless Steel Tag",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9cb1729c598b56b0380401549b42804a51495c1acb46c5d9a4ceca0be04cd41b",
+   "en": "Bambu Mmilitary Ttags are made from premium stainless steel, durable enough to withstand daily wear, with a smooth surface ideal for laser engraving. Whether as a gift, a keepsake, or an ID tag, these long-lasting tags help you preserve memories, express your personality, and unleash your creativity.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-military-tag-5pcs",
+    "title": "Stainless Steel Military Tag (5PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d1b5492abf364947c65893b9be5f62a7ec64d68af511fa8927e8cfbee1efb851",
+   "en": "Bambu Clear Glossy Acrylic Sheet gives makers a polished, transparent base for signs, displays, décor, and personalized gifts. Its rigid acrylic construction delivers optical clarity with everyday strength, so projects look refined and hold their shape. Its cast acrylic construction is ideal for laser engraving and cutting, producing smoother edges and clearer engraved details, suits both polished business projects and weekend DIY builds.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "3mm-clear-glossy-acrylic-3pcs",
+    "title": "3mm Clear Glossy Acrylic (3 pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "db4c23f50c88c30b0d81a0dd3e0be97975db5c282983e672c47493fae5c6eb74",
+   "en": "This all-in-one material set includes plywood, acrylic, cork sheets, paper, and leather, perfect for both laser beginners and enthusiasts. Whether you want to cut car models, create acrylic garden signs, or personalize a tag for your pet, the Starter Pack takes guesswork out of selecting materials. Simply start crafting and discovering everything laser art has to offer in a single convenient package!",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "laser-material-starter-pack-for-r1",
+    "title": "Laser Material - Starter Pack (For R1)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "71dd06dfaf002bb690975159d88689a8a9b5c22c2fd273f5ce733ffd490a0b0c",
+   "en": "Frame and Light Guide Plate",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "documents[0]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "e20a331a48cd332ec4b8e3471243866d626679429e9c4fc2015976d896ffb9a1",
+   "en": "Light Color",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "bambu-cmyk-backlight-board",
+    "title": "Bambu CMYK LED Backlight Board",
+    "field": "blocks[0].line[6].cell[0]",
+    "near": "Power Port Type | USB-C"
+   },
+   "dict": null
+  },
+  {
+   "h": "bba6f63384fc7826efb1fd32d2d462bac6d436415a59b7b7de4e2f97b8705eb2",
+   "en": "Discover the LED Lamp Kit, your all-in-one solution for assembling a stylish LED Lamp. This kit includes all essential hardware components, with downloadable 3D print model files for custom parts. Perfect for indoor use, it features a compact design, USB power supply, and warm white color temperature.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "10260833971ed6f69137b35837708153a6c7451e4cf937d0be633df0ea9e639e",
+   "en": "Product Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "specs[x.product_size].label",
+    "near": "D59*H8 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd965cc0bf3ea7c76df579ebc3cbcd52b454487974cd54e012ea1a8992e07446",
+   "en": "Cable Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "specs[x.cable_length].label",
+    "near": "1.5 m"
+   },
+   "dict": null
+  },
+  {
+   "h": "dda489d099ab2a3ed00ff475a5974329b2717d6c99a711a742182e05309929c4",
+   "en": "Color Temperature",
+   "kind": "spec_label",
+   "freq": 5,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "specs[x.color_temperature].label",
+    "near": "Warm White"
+   },
+   "dict": null
+  },
+  {
+   "h": "10ba19d8ede917cc5939e35d0fb0df9ed62f23e2ba2d3bee40c616a53ecf9597",
+   "en": "Warm White",
+   "kind": "spec_value_text",
+   "freq": 5,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "specs[x.color_temperature]",
+    "near": "Color Temperature"
+   },
+   "dict": null
+  },
+  {
+   "h": "e5b6273a9267ca8d45e5e8499b373e0a37bf8108bddad5a3a4c28a476188513b",
+   "en": "Application Instruction",
+   "kind": "doc_title",
+   "freq": 27,
+   "context": {
+    "handle": "led-lamp-kit-001",
+    "title": "LED Lamp Kit Collection",
+    "field": "documents[1]",
+    "near": "model_file"
+   },
+   "dict": null
+  },
+  {
+   "h": "b22afd3a9abc6d8fd414f94bf3851de630dd1dfd72e3a4db51dd8d2d5244e849",
+   "en": "Wireless, 2.4G USB Receiver",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "specs[part.connection]",
+    "near": "Connection"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b7ff951fce31e44558a0392630b55f61e81752c28b1efa4d3e8e42b9241ec4a",
+   "en": "Silence Button",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "specs[part.buttons]",
+    "near": "Buttons"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b3795aa25390811064d8e7276e56384b720d78e3ab2780e415c7dc9d4e9522b",
+   "en": "Mac",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "specs[part.platforms].items[1]",
+    "near": "Compatible platforms"
+   },
+   "dict": null
+  },
+  {
+   "h": "8765d9177e335090c9848fb17372ff7b0809f99a936ddb45dcddb8813b5be59f",
+   "en": "PC, Mac",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "spec_groups.sg_bambu_official[part.platforms]",
+    "near": "Compatible platforms"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d321d844876e44c50bc82aac0440daaac3f6c757eddf48ab3e84aa369983ed6",
+   "en": "Optical",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "specs[part.sensor_type]",
+    "near": "Sensor type"
+   },
+   "dict": null
+  },
+  {
+   "h": "e68bcce7f0f46cd769630b1725c90a41b7c7e3de27012354d2f52401c82dfaa3",
+   "en": "Mac OS",
+   "kind": "spec_list_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "specs[connectivity.operating_systems].items[2]",
+    "near": "Supported operating systems"
+   },
+   "dict": null
+  },
+  {
+   "h": "86618c556de8c5136b6bf60a14a372d5db6ab216fea683ba7ee962b006eec49f",
+   "en": "Windows, Linux, Mac OS",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "spec_groups.sg_bambu_official[connectivity.operating_systems]",
+    "near": "Supported operating systems"
+   },
+   "dict": null
+  },
+  {
+   "h": "a17e823b117ff1611433eeb6f0a23906e2c5aaa35904d48059a1986b31b772c2",
+   "en": "Battery Source",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "specs[part.power_source]",
+    "near": "Power source"
+   },
+   "dict": null
+  },
+  {
+   "h": "cfd83ece7cf5b74286d73f951a34fe4ab2bbab5a8f48ca5878ae3abf0a3efaf8",
+   "en": "AA battery * 1 required (not included)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "specs[electrical.battery]",
+    "near": "Battery"
+   },
+   "dict": null
+  },
+  {
+   "h": "8bbb4bcb47fbb81c890c3c48cc5c7b8365342be202d72c646aa43d2434b76187",
+   "en": "1. Mainboard",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3151923b537e349b5783417a980464e59fe3ba2b811fc4507507232dce7e7dbf",
+   "en": "2. Mouse Scroll Wheel",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "de185e17bc300684bea239e51e80a67ee900c37b5a843d21b4596c5f5459cb15",
+   "en": "3. Optical Lens",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "65c69fe38a99bf8ab77bb80198e7c2c41afd53d01311f9612d85d1dd5b4eff70",
+   "en": "4. Receiver",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "ffad3d51ea078c2c59491ab3f6b534d43a9c9d5fa97a33d3c1c91f707ec7a3ed",
+   "en": "5. Battery Holder with Leads",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "5c801c9589be74cf28aa5c8bef546e795a256cabed709d7e98b030ca9f41a373",
+   "en": "6. Toggle Switch",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "box[5]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "147654fc43da256a83134a12fb6cee59e13be0e84d316a0b0c28e9e5a2ffb74a",
+   "en": "7. BT2.6*8 Screw * 6 (including 1 spare)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "214689a479d494a07b09da31dc5bc9595245e168396ebeb194ab2fe3860c2c05",
+   "en": "8. Mouse Skate",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "box[7]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2b0c870549fb150fb2d0d357b744c4a5ed3b3dee3e428aa0741842ee92532db",
+   "en": "Solid Model",
+   "kind": "block_line",
+   "freq": 30,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[0].line[1]",
+    "near": "Documentation"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe8729df46fd72e49fe6bb7550105ff923618ba4826fe6c2a89d2ad589f15780",
+   "en": "3D Files with Structure and Dimensions.",
+   "kind": "block_line",
+   "freq": 9,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[0].line[2]",
+    "near": "Solid Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "d6eafe82359100423c93c5ce53c352c1b51ca1e699215fcec3f5c5dd9bf12d24",
+   "en": "Download",
+   "kind": "block_line",
+   "freq": 15,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[0].line[3]",
+    "near": "3D Files with Structure and Dimensions."
+   },
+   "dict": null
+  },
+  {
+   "h": "7e5a48774219e24f4f578626d323b4413c5afb33045895afec961a10eff71f43",
+   "en": "Product Installation and Operation Guide.",
+   "kind": "block_line",
+   "freq": 5,
+   "context": {
+    "handle": "wireless-mouse-components-kit-002",
+    "title": "Wireless Mouse Kit Collection",
+    "field": "blocks[1].line[1]",
+    "near": "Application Instruction"
+   },
+   "dict": null
+  },
+  {
+   "h": "b35e89421de55e1edf380248d40c8d6263a520bc5edd520c1074c77a90bb8b88",
+   "en": "1. Motor * 1 (USB)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "marble-run-components-kit-003",
+    "title": "Marble Run Components Kit 003",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "876674dcd2033d4c8818fd6cc32307210aa4ce45c75f6ae645d9fa66a1e2b53e",
+   "en": "2. Marble * 10 (5 Colors)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "marble-run-components-kit-003",
+    "title": "Marble Run Components Kit 003",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "611586ef372118ba8a9d57ad6aea2a15d6050a10f3fec44e436dbfedb10a5fcd",
+   "en": "The Toy Shooter Components Kit&nbsp;contains all the necessary hardware components for assembling a Toy Shooter. To complete the assembly for an entirely functional piece,&nbsp;users also need to download the model files and 3D print the remaining parts.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "toy-shooter-components-kit-004",
+    "title": "Toy Shooter Components Kit 004",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5d67816f1d8a4b902960c9eb0bfaca7d2bdd9801176ebbef4651e8e48d9173a2",
+   "en": "TT Motor (DC5V 59RPM CCW Single Axis)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d749059dd8b4b479494ee20564d579dd6961f396b1ab5b981c746d42f4e16f1",
+   "en": "BT2.6x8 SHCS Self Tapping Screw * 58±4 (44 pcs for assembly, remaining extras can be kept as spares)",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "29638e20ae8d745c50edce4751ecc39b946ad308d0aab92e374fd236b2d29b6d",
+   "en": "M3x23 SHCS Machine Screw",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "box[2]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4bf6e63d15d077a3daba67c0598ab75a3d76f359d453bc2c0fd3b9b69883786",
+   "en": "4x2 mm Round Magnet",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "box[3]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "bd36f0492d29bbc9311c1fb8f25b8dbcea88b3d3b99ff7807fe608e100d8efaf",
+   "en": "0.5x7x12 mm Helical Compression Spring",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "engine-model-components-kit-005",
+    "title": "Engine Model Components Kit 005",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "d45c8af06874b1033eabc47a3e8a09898d8afd59b617cb1da90822f36a36b36a",
+   "en": "The Jet Engine Model Components Kit contains all the necessary hardware components for assembling a Jet Engine Model. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "jet-engine-model-components-kit-006",
+    "title": "Jet Engine Kit Collection",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "50930e5692e1152c9df570747a614a4e2417946981ba9adbd8a7533edf4d30ea",
+   "en": "This 6500K white LED light is designed with the ability to be cut into any desired length, catering to your specific model requirements. Suitable for P1 Series This LED light strip operates on 5V power and features a built-in USB plug, allowing for easy connection to the external power port of P1P or P1S printers.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "affaede8ca3ca71c979d3575fe894d2d58062a6297d9a4fb911098f6b18ae16e",
+   "en": "Waterproof",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "6500k-white-led-light-strip",
+    "title": "6500K White LED Light Strip",
+    "field": "blocks[2].line[9].cell[0]",
+    "near": "Length of the strip light | 5 Meters"
+   },
+   "dict": null
+  },
+  {
+   "h": "54f68fe64c78056f4c9dc27d6caddfd7c217c1305e99c04992faac0143a97047",
+   "en": "Discover the Enchantment of Dream Full-Color Programmable LED Strips. Customize Every LED to Create Stunning Colors and Adjust Brightness to Suit Your Mood. Experience the Magic of Effortless Lighting with the Included Controller, Choose from a Wide Range of Patterns to Make Your LED Strip Shine Brightly and Beautifully. No Programming Skills are needed if you are new",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "187f5e94bea3d9a6879551523a0b3087d4fa9f0160dd79123d7e88c4930d2a23",
+   "en": "Remote Control Instruction",
+   "kind": "usage_title",
+   "freq": 23,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b1af1a6867577add65e9296f30a54df56e764fb3b5310b206be3fd4dd7501fae",
+   "en": "Click here to purchase a replacement for the remote control if you need one.",
+   "kind": "usage_body",
+   "freq": 3,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "bd4f61c5d9ed8a45d24996363a4e80dff57d5399bf4095539883b597c3411024",
+   "en": "LED Type",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[4].cell[0]",
+    "near": "Product Specification | Product Specification"
+   },
+   "dict": null
+  },
+  {
+   "h": "bff0c0ddb0ea2e17393ed4ea9333727e3e095a0778250fed0c39c0c7779f6632",
+   "en": "Input Voltage",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "ws2812b-rgb-led-strip-light",
+    "title": "WS2812B RGB LED Strip Light",
+    "field": "blocks[2].line[9].cell[0]",
+    "near": "Product Specification |"
+   },
+   "dict": {
+    "ar": "جهد الدخل",
+    "ckb": "ڤۆڵتاژی چوونەژوورەوە"
+   }
+  },
+  {
+   "h": "72927196887263565914187035db4d1f03cc8e8a348e943c7781a437529cf376",
+   "en": "This LED light strip offers adjustable white light with a color temperature range from warm white to cool white (2700K-6500K). You can automatically select the appropriate mode based on your own model design. It fulfills your various needs, providing you with more possibilities for your creations.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light",
+    "title": "White CCT Tunable COB LED Strip Light",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7eb82fe3e55aa33535dcc3f27efb4c2a80866b55d70dd3b3f7ae325c4c7c771b",
+   "en": "Shape LED light strip that offers exceptional flexibility, allowing you to effortlessly design and mold it into any desired shape. Its unique construction ensures that bending the strip will not cause any damage to the FPCB (Flexible Printed Circuit Board) board.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "s-shape-led-strip-light-ws2812b-rgb",
+    "title": "S-shape LED Strip Light (WS2812B RGB)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b2ef7e4287c006211938eabb827adeeba59eb62432bc607db44bd4639d68457d",
+   "en": "AA Battery × 1",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "specs[electrical.rated_power]",
+    "near": "Rated power"
+   },
+   "dict": null
+  },
+  {
+   "h": "2c759e2447ec8f0a7fa71a1ceb6a3d239841d463a62ac0970ff681b041f8e1f3",
+   "en": "Download 3D Model Files",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "documents[0]",
+    "near": "model_file"
+   },
+   "dict": null
+  },
+  {
+   "h": "65a72bce86e2c90ef605613526a8dd1d267868b402207cd9ea46fec75b2f6606",
+   "en": "MakerWorld model page",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "clock-components-kit-011",
+    "title": "Clock Components Kit 011",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "c4606b356fe71f9f85c489625fde0a1c7d14923b10caa5da85248dea2ecf1535",
+   "en": "BooKoo Coffee Electric WDT",
+   "kind": "doc_title",
+   "freq": 3,
+   "context": {
+    "handle": "electric-coffee-wdt-tool-kit-k013",
+    "title": "Electric Coffee WDT Tool Kit-K013",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "00476e9a907d7672bc93c5d93b6337b5b8565ecb3eba95aad677b0842278e187",
+   "en": "M2.5 Socket Head Cap Machine Screws (SHCS) 1. Stainless steel grade 4.8 round head hex socket full-thread screws. 2. The round head has a small thickness and is rounded, not protruding conspicuously on the surface. 3. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-5-socket-head-cap-machine-screws-shcs",
+    "title": "M2.5 Stainless Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "67c7d88a48450abc36cdcca3fdc5616ba2132e14d2ed1d4b4438b9e1f214d414",
+   "en": "Hex socket",
+   "kind": "spec_value_text",
+   "freq": 31,
+   "context": {
+    "handle": "m2-5-socket-head-cap-machine-screws-shcs",
+    "title": "M2.5 Stainless Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "specs[part.drive_shape]",
+    "near": "Mounting hole shape"
+   },
+   "dict": null
+  },
+  {
+   "h": "469001ffa5f1b732b27aab8af685bf3f0f89d3197146482e2161e3571a1e1c6a",
+   "en": "Complete thread",
+   "kind": "spec_value_text",
+   "freq": 25,
+   "context": {
+    "handle": "m2-5-socket-head-cap-machine-screws-shcs",
+    "title": "M2.5 Stainless Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "specs[part.screw_type]",
+    "near": "Screw type"
+   },
+   "dict": null
+  },
+  {
+   "h": "bb4c2e134189817b4882717baf405b006bb0fb5bb999cf78610ce7980a5f6481",
+   "en": "Metric coarse",
+   "kind": "spec_value_text",
+   "freq": 32,
+   "context": {
+    "handle": "m2-5-socket-head-cap-machine-screws-shcs",
+    "title": "M2.5 Stainless Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "specs[part.thread_type]",
+    "near": "Thread type"
+   },
+   "dict": null
+  },
+  {
+   "h": "e68a0c76229dc3aabda2ba0a1b331baeb03364c974bcaf2f435e3d0dbaf2165c",
+   "en": "2D Drawing",
+   "kind": "doc_title",
+   "freq": 11,
+   "context": {
+    "handle": "m2-5-socket-head-cap-machine-screws-shcs",
+    "title": "M2.5 Stainless Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "documents[0]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4e81f52d7ba1097bde430d8e7c24e8da9daeca1719a837f34750cb5bb83c151",
+   "en": "3D Document",
+   "kind": "doc_title",
+   "freq": 14,
+   "context": {
+    "handle": "m2-5-socket-head-cap-machine-screws-shcs",
+    "title": "M2.5 Stainless Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "documents[1]",
+    "near": "model_file"
+   },
+   "dict": null
+  },
+  {
+   "h": "a0e98a3bc8b8a4ebe9cee4de221d28ee4f5c3bf25b36ecacd16dfdfaaefa295e",
+   "en": "Screw Gauge",
+   "kind": "doc_title",
+   "freq": 19,
+   "context": {
+    "handle": "m2-5-socket-head-cap-machine-screws-shcs",
+    "title": "M2.5 Stainless Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "c76c9e7682bc84b6a3032a5a7e3900d1eb2a2252077ba57868f828554e4280c3",
+   "en": "Product ID",
+   "kind": "block_cell",
+   "freq": 104,
+   "context": {
+    "handle": "m2-5-socket-head-cap-machine-screws-shcs",
+    "title": "M2.5 Stainless Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "blocks[0].line[0].cell[0]",
+    "near": "AA005 | 2.5 | 0.45 | 10 | 4.5 | 2.5 | 2 | 1.1 | H2"
+   },
+   "dict": null
+  },
+  {
+   "h": "5fb0abc58390f16cf360feeb558b5f7d2b9f36e6c7182b3d17872937f3549c74",
+   "en": "BT2x8 Socket Head Cap Self Tapping Screw (SHCS) 1. Carbon steel cup head hex socket BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "bt2-socket-head-cap-self-tapping-screws-shcs",
+    "title": "BT2x8 Socket Head Cap Self Tapping Screws (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d254a024627053920fc0b139d7e423430f60c7aee1052773c0e848ef3e57b8f9",
+   "en": "Black zinc-nickel alloy plating",
+   "kind": "spec_value_text",
+   "freq": 9,
+   "context": {
+    "handle": "bt2-socket-head-cap-self-tapping-screws-shcs",
+    "title": "BT2x8 Socket Head Cap Self Tapping Screws (SHCS)",
+    "field": "specs[part.surface_treatment]",
+    "near": "Surface treatment"
+   },
+   "dict": null
+  },
+  {
+   "h": "d06330596dd93170b35305bfb925b325b72cafd3417b4daac7665c0cff332b47",
+   "en": "Carbon steel",
+   "kind": "spec_value_text",
+   "freq": 29,
+   "context": {
+    "handle": "bt2-socket-head-cap-self-tapping-screws-shcs",
+    "title": "BT2x8 Socket Head Cap Self Tapping Screws (SHCS)",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "aa9f0addeb4e791b488eecc29700be1499669fa080c932d3bb8119402498f282",
+   "en": "3D Document for Screws Test",
+   "kind": "doc_title",
+   "freq": 9,
+   "context": {
+    "handle": "bt2-socket-head-cap-self-tapping-screws-shcs",
+    "title": "BT2x8 Socket Head Cap Self Tapping Screws (SHCS)",
+    "field": "documents[0]",
+    "near": "model_file"
+   },
+   "dict": null
+  },
+  {
+   "h": "b2ec91822925b5ad483ed2a4498448ca3f87318e4bcf9cf57a9309956c549632",
+   "en": "M3 Socket Head Cap Machine Screws (SHCS) 1. Carbon steel grade 4.8 cup head hex socket half-thread screws. 2. Galvanized nickel alloy, smooth and not easy to rust. 3. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 4. The hex socket is not prone to slipping. 5. Half-thread screws are convenient for screwing into deep holes.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m3-socket-head-cap-machine-screws-shcs",
+    "title": "M3 Socket Head Cap Machine Screws (SHCS) - Half Thread",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "a1f688c05b609b16d0140a517e3fc8b62fbde8c2ff427942b6a9678abe9d1356",
+   "en": "Zinc-nickel alloy plating",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "m3-socket-head-cap-machine-screws-shcs",
+    "title": "M3 Socket Head Cap Machine Screws (SHCS) - Half Thread",
+    "field": "specs[part.surface_treatment]",
+    "near": "Surface treatment"
+   },
+   "dict": null
+  },
+  {
+   "h": "71b0b80ad596ae19f38441a6068da568567f67c37d85b12005804b96a2db1d33",
+   "en": "Half thread",
+   "kind": "spec_value_text",
+   "freq": 6,
+   "context": {
+    "handle": "m3-socket-head-cap-machine-screws-shcs",
+    "title": "M3 Socket Head Cap Machine Screws (SHCS) - Half Thread",
+    "field": "specs[part.screw_type]",
+    "near": "Screw type"
+   },
+   "dict": null
+  },
+  {
+   "h": "397324160ebbc766bbf841c44bc3fa7e7d3edb4de06bc88edaaf837194ba9bf6",
+   "en": "Specification",
+   "kind": "doc_title",
+   "freq": 173,
+   "context": {
+    "handle": "m3-socket-head-cap-machine-screws-shcs",
+    "title": "M3 Socket Head Cap Machine Screws (SHCS) - Half Thread",
+    "field": "documents[0]",
+    "near": "spec_sheet"
+   },
+   "dict": null
+  },
+  {
+   "h": "5bce76431895e269eb0cce8a54337100eda90e78b10cd952df40638b51ce0b3d",
+   "en": "M5 Socket Head Cap Machine Screws (SHCS) 1. Carbon steel grade 4.8 cup head hex socket full-thread screws. 2. Galvanized nickel alloy, smooth and not easy to rust. 3. Large diameter flat head, with a small protrusion on the surface.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m5-socket-head-cap-machine-screws-shcs",
+    "title": "M5 Flat Head Socket Cap Machine Screw (FHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9557caf92d210c014da0135dea8790fd766cb999a94291a1e9b55434f3fbe78c",
+   "en": "Screw Gauge model from MakerWorld",
+   "kind": "doc_title",
+   "freq": 9,
+   "context": {
+    "handle": "m5-socket-head-cap-machine-screws-shcs",
+    "title": "M5 Flat Head Socket Cap Machine Screw (FHCS)",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "7dc3d9939e4ea28dba3ffea3a9593037904786c835ebd8a5c9eee737a1b0c143",
+   "en": "M2.5 Button Head Cap Machine Screws (BHCS) 1. Stainless steel grade 4.8 cup head hex socket full-thread screws. 2. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 3. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-5-button-head-cap-machine-screws-bhcs",
+    "title": "M2.5 Stainless Steel Button Head Cap Machine Screws (BHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "77467f41d98c74ee3ead02940b5be8fca26253cdac354984f713d19061544338",
+   "en": "M2 Flat Head Cap Machine Screws (FHCS) 1. Stainless steel grade 4.8 countersunk hex socket full-thread screws. 2. The countersunk head can be concealed within a countersunk hole to achieve a flush surface. 3. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "m2-flat-head-cap-machine-screws-fhcs",
+    "title": "M2 Stainless Steel Flat Head Cap Machine Screws (FHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4882b303523422f0008583a714608e363bde2119544ee597330aa04d6ff74a4f",
+   "en": "M2.5 Stainless Steel Hex Nut 1. Stainless steel hex nuts. 2. Used in conjunction with screws to fasten parts, can be concealed in hexagonal slots.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-5-stainless-steel-hex-nut",
+    "title": "M2.5 Stainless Steel Hex Nut (20PCS) - AB001",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "69493e6f1a6957cad7e3ece5267a57e8a8ed035b5ea5fd7e360ce9eb2405c30b",
+   "en": "Hex",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "m2-5-stainless-steel-hex-nut",
+    "title": "M2.5 Stainless Steel Hex Nut (20PCS) - AB001",
+    "field": "specs[part.fastener_type]",
+    "near": "Fastener type"
+   },
+   "dict": null
+  },
+  {
+   "h": "210774a2f1cffb5412ee39c095090f7d9e5dc006ea5d1c9cee6c463e23ff3a64",
+   "en": "20 pcs",
+   "kind": "spec_value_text",
+   "freq": 4,
+   "context": {
+    "handle": "m2-5-stainless-steel-hex-nut",
+    "title": "M2.5 Stainless Steel Hex Nut (20PCS) - AB001",
+    "field": "specs[contents.pieces]",
+    "near": "Pieces per pack"
+   },
+   "dict": {
+    "ar": "20 قطعة",
+    "ckb": "20 دانە"
+   }
+  },
+  {
+   "h": "787eb20538e6550f0285e301bd3891f615f0d42ebdbc28f4068709416b0ab713",
+   "en": "BT2 Socket Head Cap Self Tapping Screw (SHCS) 1. Carbon steel cup head hex socket BT thread self-tapping screws. 2. Plated with black zinc-nickel alloy, smooth and not easy to rust. 3. Preferably using BT thread self-tapping screws for effortless driving and secure fastening. 4. The cup head has a small diameter, a regular shape, and can be hidden in stepped holes. 5. The hex socket is not prone to slipping.",
+   "kind": "short_description",
+   "freq": 3,
+   "context": {
+    "handle": "bt2-6-socket-head-cap-self-tapping-screw-shcs",
+    "title": "BT2.6 Socket Head Cap Self Tapping Screw (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "582df7c8bfbe2371049d132f828870d55caa970ea2471553983da6f7be7df9e2",
+   "en": "Flat Washer 1. Stainless steel flat washers. 2. Used between screws, nuts, and parts to distribute pre-tension pressure, enhance anti-loosening effect, and prevent damage to the parts.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m2-5-stainless-steel-flat-washer",
+    "title": "Stainless Steel Flat Washer",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "496b73172a84446dad70516c884655321c75483a2c421df3787ed468058c6e9b",
+   "en": "100 pcs",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m2-5-stainless-steel-flat-washer",
+    "title": "Stainless Steel Flat Washer",
+    "field": "specs[contents.pieces]",
+    "near": "Pieces per pack"
+   },
+   "dict": {
+    "ar": "100 قطعة",
+    "ckb": "100 دانە"
+   }
+  }
+ ]
+}

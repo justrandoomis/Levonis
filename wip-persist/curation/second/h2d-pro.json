@@ -1,0 +1,427 @@
+{
+  "handle": "h2d-pro",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T19:54:55Z",
+  "searched": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2d-pro/manual/acc-in-the-box",
+      "title": "H2D Pro Packaging List | Bambu Lab Wiki",
+      "keys": [
+        "package.contents",
+        "printing.included_build_plate"
+      ],
+      "retrieved_at": "2026-10-16T08:23:32Z",
+      "also": "relations (compatible_with) from the packing list; the page states a build plate is pre-installed but does not name its type"
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/h2d-pro",
+      "title": "Bambu Lab H2D Pro store page",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "safety.*",
+        "product.*",
+        "package.*",
+        "shipment.*"
+      ],
+      "retrieved_at": "2026-10-16T06:54:56Z",
+      "also": "Product Features highlights only: the page has no specification table, no in-the-box section, no document links and an empty description (reseller-only product); its messages bundle has no H2D Pro namespace (the H2D, AMS HT and A1 messages it carries belong to other products and were not used)"
+    }
+  ],
+  "specs": [
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "H2D Pro Printer (with build plate pre-installed)",
+        "AMS 2 Pro",
+        "AMS HT",
+        "Spool Holder",
+        "PTFE Tube",
+        "Emergency Stop Button",
+        "Tool Box",
+        "Power Adapter",
+        "HT Power Cable",
+        "6-pin Cable ×2",
+        "Power Cable ×2",
+        "User Manual",
+        "Vision Encoder",
+        "Desiccant",
+        "Scraper Blade",
+        "Scraper Screw",
+        "Filament Cutter ×2",
+        "Lubricant Oil",
+        "Lubricant Grease",
+        "Nozzle Blocker",
+        "Camera Privacy Cover",
+        "Spool Holder Screw",
+        "Unclogging Pin",
+        "H1.5 Allen Key",
+        "H2.0 Allen Key",
+        "0.4mm High-Flow Nozzle ×2",
+        "Silicone Sock for Hotend",
+        "Nozzle Wiping Pad"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d-pro/manual/acc-in-the-box",
+      "source_title": "H2D Pro Packaging List | Bambu Lab Wiki",
+      "locator": "¶ Packing list (table); ¶ Accessory Box (table); ¶ Tool Box (table)",
+      "quote": "H2D Pro Printer (with build plate pre-installed) | AMS 2 Pro | AMS HT | Spool Holder | PTFE Tube | Emergency Stop Button | Tool Box | Power Adapter | HT Power Cable | 6-pin Cable *2 | Power Cable *2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:32Z",
+      "note": "Packing list items first (quantities from the packing list: 6-pin Cable *2, Power Cable *2), then the two Accessory Box items the packing list does not name (Vision Encoder, Desiccant), then the Tool Box contents (\"Unclogging Pin, can be used to unclog hotend\" shortened to its name). The wiki says: \"The type and quantity of accessories may change from time to time.\" The store page has no in-the-box section."
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-pro",
+      "source_title": "Bambu Lab H2D Pro store page",
+      "locator": "Product Features (P.productFeaturesModuleList) › bullet 1",
+      "quote": "350℃ (662°F) High-Temperature Dual Nozzle Printing",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:54:56Z",
+      "note": "Highlights bullet (feature prose): kept unverified; no H2D Pro spec sheet was available to verify it."
+    },
+    {
+      "key": "thermal.chamber_heating",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-pro",
+      "source_title": "Bambu Lab H2D Pro store page",
+      "locator": "Product Features (P.productFeaturesModuleList) › bullet 4",
+      "quote": "65℃ (149°F) Active Chamber Heating",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:54:56Z",
+      "note": "Highlights bullet (feature prose): kept unverified; no H2D Pro spec sheet was available to verify it."
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "°C",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-pro",
+      "source_title": "Bambu Lab H2D Pro store page",
+      "locator": "Product Features (P.productFeaturesModuleList) › bullet 4",
+      "quote": "65℃ (149°F) Active Chamber Heating",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:54:56Z",
+      "note": "Highlights bullet (feature prose): kept unverified; no H2D Pro spec sheet was available to verify it. The bullet gives the active chamber heating temperature, not a measured range."
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Tungsten Carbide",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-pro",
+      "source_title": "Bambu Lab H2D Pro store page",
+      "locator": "Product Features (P.productFeaturesModuleList) › bullet 3",
+      "quote": "Tungsten Carbide Super Durable Nozzle",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:54:56Z",
+      "note": "Highlights bullet (feature prose): kept unverified; no H2D Pro spec sheet was available to verify it."
+    },
+    {
+      "key": "connectivity.ethernet",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Available",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-pro",
+      "source_title": "Bambu Lab H2D Pro store page",
+      "locator": "Product Features (P.productFeaturesModuleList) › bullet 6",
+      "quote": "Ethernet Connection",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:54:56Z",
+      "note": "Highlights bullet (feature prose): kept unverified; no H2D Pro spec sheet was available to verify it. \"Available\" is the wording Bambu's own H2-series spec tables use for this row."
+    },
+    {
+      "key": "connectivity.network_kill_switch",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2d-pro",
+      "source_title": "Bambu Lab H2D Pro store page",
+      "locator": "Product Features (P.productFeaturesModuleList) › bullet 7",
+      "quote": "Physical Network Killswitch",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:54:56Z",
+      "note": "Highlights bullet (feature prose): kept unverified; no H2D Pro spec sheet was available to verify it."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d-pro/manual/acc-in-the-box",
+      "source_title": "H2D Pro Packaging List | Bambu Lab Wiki",
+      "locator": "¶ Packing list (table)",
+      "quote": "H2D Pro Printer (with build plate pre-installed) | AMS 2 Pro | AMS HT",
+      "condition": "Ships in the H2D Pro box",
+      "retrieved_at": "2026-10-16T08:23:32Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d-pro/manual/acc-in-the-box",
+      "source_title": "H2D Pro Packaging List | Bambu Lab Wiki",
+      "locator": "¶ Packing list (table)",
+      "quote": "H2D Pro Printer (with build plate pre-installed) | AMS 2 Pro | AMS HT",
+      "condition": "Ships in the H2D Pro box",
+      "retrieved_at": "2026-10-16T08:23:32Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "Vision Encoder",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d-pro/manual/acc-in-the-box",
+      "source_title": "H2D Pro Packaging List | Bambu Lab Wiki",
+      "locator": "¶ Accessory Box (table)",
+      "quote": "Accessory Box | Vision Encoder",
+      "condition": "Ships in the H2D Pro accessory box",
+      "retrieved_at": "2026-10-16T08:23:32Z"
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/h2d-pro/manual/acc-in-the-box",
+      "source_title": "H2D Pro Packaging List | Bambu Lab Wiki",
+      "locator": "¶ Packing list; ¶ Accessory Box; ¶ Tool Box",
+      "quote": "H2D Pro Printer (with build plate pre-installed) | AMS 2 Pro | AMS HT | Spool Holder | PTFE Tube | Emergency Stop Button | Tool Box | Power Adapter | HT Power Cable | 6-pin Cable *2 | Power Cable *2",
+      "retrieved_at": "2026-10-16T08:23:32Z",
+      "note": "The wiki says: \"The type and quantity of accessories may change from time to time. Please refer to the actual items you receive.\" Accessory Box rows that repeat a packing-list item (Tool Box, Spool Holder, PTFE Tube, Power Adapter, Emergency Stop Button, Power Cable, 6-pin Cable, HT Power Cable) are not listed twice.",
+      "items": [
+        {
+          "text": "H2D Pro Printer",
+          "qty": null,
+          "section": "Packing list",
+          "note": "with build plate pre-installed"
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null,
+          "section": "Packing list"
+        },
+        {
+          "text": "AMS HT",
+          "qty": null,
+          "section": "Packing list"
+        },
+        {
+          "text": "Spool Holder",
+          "qty": null,
+          "section": "Packing list"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null,
+          "section": "Packing list"
+        },
+        {
+          "text": "Emergency Stop Button",
+          "qty": null,
+          "section": "Packing list"
+        },
+        {
+          "text": "Tool Box",
+          "qty": null,
+          "section": "Packing list"
+        },
+        {
+          "text": "Power Adapter",
+          "qty": null,
+          "section": "Packing list"
+        },
+        {
+          "text": "HT Power Cable",
+          "qty": null,
+          "section": "Packing list"
+        },
+        {
+          "text": "6-pin Cable",
+          "qty": 2,
+          "section": "Packing list"
+        },
+        {
+          "text": "Power Cable",
+          "qty": 2,
+          "section": "Packing list"
+        },
+        {
+          "text": "User Manual",
+          "qty": null,
+          "section": "Packing list"
+        },
+        {
+          "text": "Vision Encoder",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Desiccant",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Scraper Screw",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": 2,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Blocker",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Camera Privacy Cover",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Spool Holder Screw",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Tool Box",
+          "note": "can be used to unclog hotend"
+        },
+        {
+          "text": "H1.5 Allen Key",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "H2.0 Allen Key",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "0.4mm High-Flow Nozzle",
+          "qty": 2,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Silicone Sock for Hotend",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Tool Box"
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2d-pro/manual/acc-in-the-box",
+      "title": "H2D Pro Packaging List"
+    }
+  ],
+  "not_published": []
+}

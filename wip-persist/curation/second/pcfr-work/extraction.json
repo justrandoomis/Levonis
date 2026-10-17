@@ -1,0 +1,595 @@
+{
+ "sourceProductId": "8441318244488",
+ "handle": "pc-fr",
+ "canonicalUrl": "https://us.store.bambulab.com/products/pc-fr",
+ "title": "PC FR",
+ "seoMetaDescription": "",
+ "route": "552709755819347968>552709756834369536>552709756901478400",
+ "isFilament": true,
+ "groups": [
+  {
+   "propertyKeyId": "11138417459336",
+   "propertyKey": "Color",
+   "type": 1,
+   "title": "",
+   "position": 1,
+   "values": [
+    {
+     "id": "564681962718785540",
+     "value": "Black (63100)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/b26293fe5b874ab68991e3aa77768161/c77c831a3d1b4d70845e860b277044f9.png"
+    },
+    {
+     "id": "564681962718785541",
+     "value": "White (63101)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/b2f18998223e41bea66f27af0c87cf31/948510dcfbf4499f945fe6528ada710e.png"
+    },
+    {
+     "id": "564681962718785542",
+     "value": "Gray (63102)",
+     "selectedDefault": false,
+     "colorUrl": "https://store.bblcdn.com/s7/default/1698585819314488b4ee28fb8f46f2b1/f4d4c5abbc8242c294d255ce5da4f467.png"
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "11138417492104",
+   "propertyKey": "Type",
+   "type": 1,
+   "title": "",
+   "position": 2,
+   "values": [
+    {
+     "id": "564681962718785543",
+     "value": "Filament with spool",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "11138417524872",
+   "propertyKey": "Size",
+   "type": 1,
+   "title": "",
+   "position": 3,
+   "values": [
+    {
+     "id": "564681962718785544",
+     "value": "1 kg",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  }
+ ],
+ "skus": [
+  {
+   "id": "43160587993224",
+   "props": [
+    {
+     "propertyKeyId": "11138417459336",
+     "propertyKey": "Color",
+     "value": "White (63101)"
+    },
+    {
+     "propertyKeyId": "11138417492104",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "11138417524872",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "42928117186696",
+    "url": "https://store.bblcdn.com/s7/default/e4b4c08445c04eb6812147c18cdfc4e0/2_45300790-0a35-4652-8fb4-bc5ebcb466bd.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "43160588025992",
+   "props": [
+    {
+     "propertyKeyId": "11138417459336",
+     "propertyKey": "Color",
+     "value": "Gray (63102)"
+    },
+    {
+     "propertyKeyId": "11138417492104",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "11138417524872",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "42928117153928",
+    "url": "https://store.bblcdn.com/s7/default/0a2e96d9a27e40d6bc4556dbaf481a98/1_ecff4b9c-4943-4364-8593-3b9e9fa9bab5.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  },
+  {
+   "id": "43160588058760",
+   "props": [
+    {
+     "propertyKeyId": "11138417459336",
+     "propertyKey": "Color",
+     "value": "Black (63100)"
+    },
+    {
+     "propertyKeyId": "11138417492104",
+     "propertyKey": "Type",
+     "value": "Filament with spool"
+    },
+    {
+     "propertyKeyId": "11138417524872",
+     "propertyKey": "Size",
+     "value": "1 kg"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "570744915879718912",
+    "url": "https://store.bblcdn.com/s7/default/5ecd124435bb4b24b96c5e35460d433d/20250224-142244.jpg"
+   },
+   "description": "",
+   "soldOut": true
+  }
+ ],
+ "gallery": [
+  {
+   "resourceFileId": "570744915879718912",
+   "url": "https://store.bblcdn.com/s7/default/5ecd124435bb4b24b96c5e35460d433d/20250224-142244.jpg"
+  },
+  {
+   "resourceFileId": "42928119873672",
+   "url": "https://store.bblcdn.com/s7/default/72a56ba4fac24997a86949b0303f3a66/PC_FR.png"
+  },
+  {
+   "resourceFileId": "42928117186696",
+   "url": "https://store.bblcdn.com/s7/default/e4b4c08445c04eb6812147c18cdfc4e0/2_45300790-0a35-4652-8fb4-bc5ebcb466bd.jpg"
+  },
+  {
+   "resourceFileId": "42928117153928",
+   "url": "https://store.bblcdn.com/s7/default/0a2e96d9a27e40d6bc4556dbaf481a98/1_ecff4b9c-4943-4364-8593-3b9e9fa9bab5.jpg"
+  }
+ ],
+ "featuresTitle": "Product Features",
+ "features": [
+  {
+   "title": "Product Features",
+   "html": "<div style=\"text-align: left; box-sizing: border-box;\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<div data-page-id=\"XQp2da9ZDoBR0fx29PGcd0Z7nNc\" data-lark-html-role=\"root\" data-docx-has-block-data=\"false\">\n<ul style=\"margin: 0px; padding: 0px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">UL 94-2023 V-0 Flame Retardancy</li>\n<li style=\"box-sizing: border-box;\">Engineering-Level Mechanical Properties</li>\n<li style=\"box-sizing: border-box;\">Comes with High Temperature Reusable Spool</li>\n<li style=\"box-sizing: border-box;\">Diameter: 1.75mm +/- 0.03mm</li>\n</ul>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<div class=\"bbl-title-4 text-bbl-grey-13 font-bold\">Cautions for Use</div>\n<ul style=\"margin: 0px; padding: 0px; margin-top: 8px; list-style-position: inside; text-align: left; white-space: normal; box-sizing: border-box;\">\n<li style=\"box-sizing: border-box;\">AMS 2 Pro, AMS HT &amp; AMS Compatible</li>\n<li style=\"box-sizing: border-box;\">AMS lite <strong>NOT </strong>Compatible</li>\n<li style=\"box-sizing: border-box;\">Dry Out Before Use</li>\n</ul>"
+  }
+ ],
+ "videos": [],
+ "description": {
+  "kind": "page_builder",
+  "config": {
+   "schemaVersion": "1.0",
+   "templateId": "tpl-1776935009448",
+   "components": [
+    {
+     "id": "banner_1776859885795_imdr8wmzy",
+     "type": "banner",
+     "variant": "banner_1",
+     "name": "Banner",
+     "anchor": {
+      "enabled": true,
+      "name": "Overview",
+      "id": "banner_1776859885795_imdr8wmzy"
+     },
+     "modules": {
+      "media": {
+       "pc": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/f871297ca812463187952cbc32b8768c/Banner_Media-1-tuya.jpg",
+        "naturalWidth": 5120,
+        "naturalHeight": 1280
+       },
+       "mo": {
+        "type": "image",
+        "src": "https://store.bblcdn.com/s7/default/b68d1f0656bd4c7491559381559176d0/20260511-181957.jpg",
+        "naturalWidth": 1536,
+        "naturalHeight": 960
+       }
+      },
+      "typeStyles": {
+       "content": {
+        "title": "PC FR",
+        "description": "· UL 94-2023 V-0 Flame Retardancy\n· Engineering-Level Mechanical Properties"
+       }
+      }
+     }
+    },
+    {
+     "id": "chapter_1776860120943_tabnn7pvy",
+     "type": "chapter",
+     "variant": "chapter_1",
+     "name": "卖点",
+     "anchor": {
+      "enabled": false,
+      "name": "Chapter-9",
+      "id": "chapter_1776860120943_tabnn7pvy"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "",
+        "description": ""
+       }
+      }
+     },
+     "children": [
+      {
+       "id": "content_block_1776860161046_c2ynsoh65",
+       "type": "content_block",
+       "variant": "content-block-6",
+       "name": "卖点 1",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-1",
+        "id": "content_block_1776860161046_c2ynsoh65"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Top-Tier Flame Retardancy",
+          "description": "Tested to meet the UL 94-2023 V-0 standard, the top level of flame resistance for 3D printing filament, Bambu PC FR is engineered to prevent or slow flame propagation with exceptional self-extinguishing properties. Ideal for critical applications in electronics, automotive, and mechanical engineering.\n\n* UL 94 is a plastics flammability standard established by Underwriters Laboratories (USA). V-0—the highest UL 94 V rating—indicates that burning stops within 10 seconds on a vertically positioned specimen, with dripping particles allowed as long as they are not ignited."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/81ba552c931046d3baaac63d3a3eeb3c/Frame_1123864805-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/50015fb5fe3a4c5890c75a251d19684d/Frame_1123867015-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789716119203_7nkrpleab"
+          },
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/b31ac01bd82745d0bbfd2f3fe22bc90f/Frame_1123864806-tuya.jpg",
+             "naturalWidth": 1176,
+             "naturalHeight": 1036
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/508198eef58b44f182e7de5b72e3929f/Frame_1123867016-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789716119203_j21zq4wi4"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "content_block_1776860162526_2x88208di",
+       "type": "content_block",
+       "variant": "content-block-8",
+       "name": "卖点 2",
+       "anchor": {
+        "enabled": true,
+        "name": "Content Block-2",
+        "id": "content_block_1776860162526_2x88208di"
+       },
+       "modules": {
+        "typeStyles": {
+         "content": {
+          "title": "Engineering-Level Mechanical Properties",
+          "description": "Bambu PC FR is an engineering-grade material with toughness comparable to PAHT-CF. Its exceptional stiffness and strength make it a top choice for structural components and protective casings."
+         }
+        },
+        "featureConfig": {
+         "cards": [
+          {
+           "title": "",
+           "subtitle": "",
+           "description": "",
+           "media": {
+            "pc": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/9dd9bab72974435fbfed7ba24b7ee415/PC06-tuya.jpg",
+             "naturalWidth": 2400,
+             "naturalHeight": 1080
+            },
+            "mo": {
+             "type": "image",
+             "src": "https://store.bblcdn.com/s7/default/1f175c4481c84649a1c33d55585e3a68/Content_Block-1-tuya.jpg",
+             "naturalWidth": 1344,
+             "naturalHeight": 700
+            }
+           },
+           "linkButton": {},
+           "button": {},
+           "id": "comp_1789716119203_wlvsvltev"
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "content_block_1776744592796_vv35dwp6b",
+     "type": "content_block",
+     "variant": "content-block-1",
+     "name": "RFID",
+     "anchor": {
+      "enabled": false,
+      "name": "Content Block-6",
+      "id": "content_block_1776744592796_vv35dwp6b"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "RFID for Intelligent Printing",
+        "description": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System)."
+       }
+      },
+      "featureConfig": {
+       "tabs": [
+        {
+         "name": "Tab 1",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7582b13ce2604750968dafbc244de91a/RFID_for_Intelligent_Printing-compressed.jpg",
+           "naturalWidth": 2400,
+           "naturalHeight": 918
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/06c6251453c340aeab1c0117f97fec75/RFID_for_Intelligent_PrintingMO-compressed.jpg",
+           "naturalWidth": 1344,
+           "naturalHeight": 840
+          }
+         },
+         "id": "comp_1789716119203_vosxi1h57"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744650085_nu31krt23",
+     "type": "content_block",
+     "variant": "content-block-17",
+     "name": "Download",
+     "anchor": {
+      "enabled": true,
+      "name": "Download",
+      "id": "content_block_1776744650085_nu31krt23"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Download"
+       }
+      },
+      "featureConfig": {
+       "items": [
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/44b88c2274b2430397da892f1de79f70/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament TDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a2896066b2f4308b780cb9d101040a9/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7abf592a7bc44468bb2d86e22fde3d24/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s1/default/4adf3c9827a0475d8777e9b8cfd11fbe.pdf",
+         "id": "comp_1789716119203_t8rnp53oy"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/5575e961df094c9591a7faa849ca9b77/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament MSDS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/531bad4351164f0a9c0391e0a33f2190/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/9b45266304a64648b14fcbecc220d043/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s7/default/6193891bd51e4a5d806125e1d6117583/SDS20250724C01_Bambu_PC_FR.pdf",
+         "id": "comp_1789716119203_rwgsc941y"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/bf5dbaee598d46e9bd8170e43facfa96/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament RoHS",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/7a31a894dab64da9bf1df9f1f2b620db/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/f1d23869da8f41bab3454ccb28728347/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s1/default/8f1f399e5f7f4101980977fc59f34687.pdf",
+         "id": "comp_1789716119203_aodsao1xu"
+        },
+        {
+         "image": {
+          "type": "image",
+          "src": "https://store-test.bblcdn.com/s7/default/fdec58d7e8cd4820bb93af5ef7582247/Downloads-compressed.jpg",
+          "naturalWidth": 564,
+          "naturalHeight": 240
+         },
+         "description": "Filament UL 94 Test Report",
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/ce375e36d3db48b19db9ff0603549fc9/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/d8e728852e1d44b58088c7892cc9be49/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "link": "https://store.bblcdn.com/s1/default/a7ac91acf11b41bea0883615f46ed557.pdf",
+         "id": "comp_1789716119203_67zqxsa1c"
+        },
+        {
+         "media": {
+          "pc": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/4c3aaf0d470f4bcfb99837d39a7b9e42/Downloads-compressed.jpg",
+           "naturalWidth": 564,
+           "naturalHeight": 240
+          },
+          "mo": {
+           "type": "image",
+           "src": "https://store.bblcdn.com/s7/default/2923a143e09744c7b5c3e4cb378ae13d/Download_mo.jpg",
+           "naturalWidth": 312,
+           "naturalHeight": 178
+          }
+         },
+         "description": "Hex Code",
+         "link": "https://store.bblcdn.com/s7/default/9fc931c1464542df9c5fc5d9f6f9bf4b/PC_FR_Hex_Code_Table.pdf",
+         "id": "comp_1789716119203_iy4oasqrg"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "id": "content_block_1776744740718_dwoqb1p7t",
+     "type": "content_block",
+     "variant": "content-block-21-pro",
+     "name": "FAQ",
+     "anchor": {
+      "enabled": true,
+      "name": "Printing Tips",
+      "id": "content_block_1776744740718_dwoqb1p7t"
+     },
+     "modules": {
+      "typeStyles": {
+       "content": {
+        "title": "Printing Tips"
+       }
+      },
+      "featureConfig": {
+       "faqs": [
+        {
+         "question": "1.Accessory Compatibility",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>Not compatible with <strong>Cool Plate SuperTack and AMS lite</strong>.</div>",
+           "id": "comp_1789716119203_nspmapzg3"
+          }
+         ],
+         "id": "comp_1789716119203_qrzc1ycam"
+        },
+        {
+         "question": "2.Drying Recommendations",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<div>As this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing. For more details, please refer to: <a href=\"https://wiki.bambulab.com/en/filament-acc/filament/dry-filament\" target=\"_blank\" rel=\"noopener\"><span style=\"text-decoration: underline;\"><span style=\"color: #00ae42; text-decoration: underline;\">Filament drying instructions</span></span></a> on WIKI.</div>",
+           "id": "comp_1789716119203_h1g7edt8s"
+          }
+         ],
+         "id": "comp_1789716119203_skdyib48r"
+        },
+        {
+         "question": "3.Safety Tips",
+         "answerBlocks": [
+          {
+           "type": "rich-text",
+           "content": "<ul>\n<li>The nozzle temperature should be between 260-280&deg;C, and the heat bed temperature should be between 90-110&deg;C. Please ensure safety during printing.</li>\n<li>Please store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.</li>\n<li>Please keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.</li>\n<li>Please print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.</li>\n<li>As this filament is not food-grade, please avoid using finished prints for food storage or contact.</li>\n</ul>",
+           "id": "comp_1789716119203_8k3fcs5bo"
+          }
+         ],
+         "id": "comp_1789716119203_75sogwsvc"
+        }
+       ]
+      }
+     }
+    }
+   ]
+  }
+ },
+ "jsonld": {
+  "productGroupId": "8441318244488",
+  "variantSkus": [
+   "43160587993224",
+   "43160588025992",
+   "43160588058760"
+  ],
+  "brand": "Bambu Lab"
+ }
+}

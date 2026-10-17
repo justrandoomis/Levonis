@@ -1,0 +1,550 @@
+{
+ "batch": 14,
+ "surface": "page",
+ "handles": [
+  "wireless-inductive-coil-kit",
+  "excalibur-the-puzzle",
+  "cuby-cyberbrick-robot-buddy",
+  "helixcore-–-press-to-spin-squishy-ball",
+  "cyberbrick-mk20-1a4-waffenträger",
+  "chewing-gum-spiral-dispenser",
+  "magic-night-cat-pumpkin-lantern",
+  "the-modular-lantern",
+  "modular-truck-platform-cyberbrick-rc"
+ ],
+ "strings": [
+  {
+   "h": "6d1356d2ef6667444e96ac79afab250aba674f1d568c76b68444190dd936bfd5",
+   "en": "Board Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.board_size].label",
+    "near": "59.3 × 1 × 34mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad1ed1476f0485375d78a9c3202f3e3f1281c0c25ab47491750a93407c9bdfc1",
+   "en": "Power Input",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.power_input].label",
+    "near": "DC 5V / 2A (USB Type-C)"
+   },
+   "dict": null
+  },
+  {
+   "h": "03b857716c579ca65a59b0fdca905e2d322c953193e1cd5059ec2c1b2317452e",
+   "en": "DC 5V / 2A (USB Type-C)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.power_input]",
+    "near": "Power Input"
+   },
+   "dict": null
+  },
+  {
+   "h": "a34c4beb935cfdfc6ee91f609bd5d8edb5802c7d481942109aeab790150910d3",
+   "en": "Supported Protocols",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.supported_protocols].label",
+    "near": "PD / QC Fast Charging"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0a943ae1b6edde3f59fc89726eec107645b9bb0ac5b8d4f4c3453146804fcb4",
+   "en": "PD / QC Fast Charging",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.supported_protocols]",
+    "near": "Supported Protocols"
+   },
+   "dict": null
+  },
+  {
+   "h": "51e090a57b14dfc3bc351f5eb3a7604cd630246b1948eb24583878f8fbf62516",
+   "en": "Lighting Modes",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.lighting_modes].label",
+    "near": "Always On / Slow Flash / Fast Flash / Off"
+   },
+   "dict": null
+  },
+  {
+   "h": "ee821a4ff851d9d4b7519526363d14d978e0080ccf3c62dfdf46db3712e13ce5",
+   "en": "Always On / Slow Flash / Fast Flash / Off",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.lighting_modes]",
+    "near": "Lighting Modes"
+   },
+   "dict": null
+  },
+  {
+   "h": "f12931a6ae3bc0b9ccff629b30d5f196d77d3d20911937de5a3d84ec39e59e3c",
+   "en": "Working Frequency",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.working_frequency].label",
+    "near": "182KHz"
+   },
+   "dict": null
+  },
+  {
+   "h": "89fd95e093b6be3689a2a04990086ca35728929ee569d58d983aaf68cc72fccf",
+   "en": "Coil Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.coil_size].label",
+    "near": "90 × 7 × 77mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a5dc0e081f379e6fde77b9ed7b90860d694af90e9bee9db1af76974cc9e9acf",
+   "en": "Installed inside miniature bases and powered platforms",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.recommended_use]",
+    "near": "Recommended Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "823073b83ac894f693964c6f8070abd81472a2a4e03bfc4cb7bde92bab20da8d",
+   "en": "LED Types",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.led_types].label",
+    "near": "CD54 / CD43"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a548ee28ceb01afc9dde691e0980b2e3a361878113693299fca66d8b912aa3d",
+   "en": "CD54 Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.cd54_size].label",
+    "near": "5.8 × 6 × 5.2mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "b684ea22fe99ea6e6a4c36539c54bf39e15beab983988f167c03d20004bc41c5",
+   "en": "CD43 Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.cd43_size].label",
+    "near": "4.5 × 4.9 × 4mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0e4b1c1c7c4ea1c03695cb8f96ff7dae7ddaae426b231e7a70d356bc50a84f2",
+   "en": "LED Colors",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.led_colors].label",
+    "near": "Red / Green / Blue / Warm White / White"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6907b71508336591b9e5f95e44e57eae870e7cfbbb45dbe12032186267d8d4c",
+   "en": "Red / Green / Blue / Warm White / White",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.led_colors]",
+    "near": "LED Colors"
+   },
+   "dict": null
+  },
+  {
+   "h": "036af3255fa1bd28a37f68fa954c83e25b41629c6210edc87b3106e1a79a4a34",
+   "en": "Wireless Receiving",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.wireless_receiving].label",
+    "near": "Built directly into the LED module"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb04c0720749875054808c3966a2c8a5f699c673d251dc09068889243ea3dc3d",
+   "en": "Built directly into the LED module",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.wireless_receiving]",
+    "near": "Wireless Receiving"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e6bfd4da6b29bbcb3794e3b39c800840f7925cb81518fdd38dbdfe7c97d5ca3",
+   "en": "Inductive Distance",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.inductive_distance].label",
+    "near": "0–14cm (depending on installation position and LED color)"
+   },
+   "dict": null
+  },
+  {
+   "h": "0af47bc0382b3f4316b02c353a0d908aac95504138b00cc73cd8b33c3368dcf8",
+   "en": "0–14cm (depending on installation position and LED color)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.inductive_distance]",
+    "near": "Inductive Distance"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c24e5eb50b4c997c058b20a45d2a1e3cfdb69e5c18e1e5f8634910d62e9915e",
+   "en": "Receiver Sizes",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.receiver_sizes].label",
+    "near": "15mm / 50mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5e9f3ac4823ccb2b2e15ed3b6f0c88db298c6147464228c0fc0f6d5d12cd8da",
+   "en": "15mm Receiver",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.15mm_receiver].label",
+    "near": "Supports 1 light strip"
+   },
+   "dict": null
+  },
+  {
+   "h": "24da457439c8cabf21022aea2bd101bb05653a48a4ea58bb882fc0e0498c8b5f",
+   "en": "Supports 1 light strip",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.15mm_receiver]",
+    "near": "15mm Receiver"
+   },
+   "dict": null
+  },
+  {
+   "h": "b3a40229e4c544bc63a895adca8552664e3ce986cb639d938a7f48fd8924c69b",
+   "en": "50mm Receiver",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.50mm_receiver].label",
+    "near": "Supports up to 2 light strips"
+   },
+   "dict": null
+  },
+  {
+   "h": "43c4b72556ca2ac40f6307ff2a1c549722cb77efc77f62e82037206882e1e98b",
+   "en": "Supports up to 2 light strips",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.50mm_receiver]",
+    "near": "50mm Receiver"
+   },
+   "dict": null
+  },
+  {
+   "h": "90a7970a7396b5e4dfbe4855aa71d17f31142d9d4ccdf9de6a49dd7b67f4e218",
+   "en": "COB Strip Length",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.cob_strip_length].label",
+    "near": "300mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "be97661c1b4b3fe51a1465b8a5c8e4aad4ec79b3ea27d44756c0cd55a821d109",
+   "en": "Light Colors",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.light_colors].label",
+    "near": "White / Blue / Purple / Pink / Ice Blue / Green / Red"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4dbfac2ed1ae3dc25375bb9c4b648fc855b87fa0f5e49c5bb630272a22650a7",
+   "en": "White / Blue / Purple / Pink / Ice Blue / Green / Red",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.light_colors]",
+    "near": "Light Colors"
+   },
+   "dict": null
+  },
+  {
+   "h": "e355a192cf018e537b7474deefd4663a431de7c92139c3e382b84822fb8c3384",
+   "en": "CRI",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.cri].label",
+    "near": "Ra ＞ 90"
+   },
+   "dict": null
+  },
+  {
+   "h": "783883f34ceeb9fca1117e860739ed470c39fbe4c4225f490f307dbb2ef7cde8",
+   "en": "Ra ＞ 90",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.cri]",
+    "near": "CRI"
+   },
+   "dict": null
+  },
+  {
+   "h": "b690dc270d3c473bd138a69c8dc5ad1900d370af6950c93aa35f175f8dfc2983",
+   "en": "Brightness Efficiency",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.brightness_efficiency].label",
+    "near": "100lm/W"
+   },
+   "dict": null
+  },
+  {
+   "h": "747197a106d13f1b81c7024af378ad8727df178fce2f8dd80e833b1e35a062f3",
+   "en": "Protection Rating",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "wireless-inductive-coil-kit",
+    "title": "Wireless Inductive Coil Kit",
+    "field": "specs[x.protection_rating].label",
+    "near": "IP20"
+   },
+   "dict": null
+  },
+  {
+   "h": "39444b8266ed5fb8594b6601ad57982b2cee9e34930a4698e111d26f37621e1f",
+   "en": "Excalibur is a fantasy-inspired tabletop puzzle experience that combines 3D printing with simple electronics to create a fully interactive escape-room-style challenge. Designed as a sequential puzzle journey, each solved mechanism unlocks the next. Hidden interactions, mechanical triggers, and subtle clues guide the player deeper into the stone structure — until the final secret is revealed: a hidden drawer opened by the sword, ready to hold your own personal gift.",
+   "kind": "short_description",
+   "freq": 4,
+   "context": {
+    "handle": "excalibur-the-puzzle",
+    "title": "Excalibur - The Puzzle",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "254944948e3f0af1a3d5448b20aa403ee483345e77e3961bc4b700ef435a2363",
+   "en": "This model is designed to work with the CyberBrick Remote. The pre-configured settings have been uploaded for immediate play,",
+   "kind": "usage_body",
+   "freq": 5,
+   "context": {
+    "handle": "cuby-cyberbrick-robot-buddy",
+    "title": "CUBY - CyberBrick Robot Buddy",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "f87988a212ec191be642a9f74a78b7b9a4f332fdd26e120c175257a7f775c76e",
+   "en": "Download Model on MakerWorld ↗",
+   "kind": "doc_title",
+   "freq": 14,
+   "context": {
+    "handle": "cuby-cyberbrick-robot-buddy",
+    "title": "CUBY - CyberBrick Robot Buddy",
+    "field": "documents[9]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "22b9b9110b913eca300b8c80c98d54baa811fd8be33e15971af943699164069d",
+   "en": "Turn Every Squeeze into a Spin.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "helixcore-–-press-to-spin-squishy-ball",
+    "title": "Press-to-Spin Squishy Ball",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "27b33d69b464615d438f869bb20865c4ca8e10c420995f3a1b539126cf072a54",
+   "en": "The German Bundeswehr usualy operated the Waffenträger’s 20mm along with a TOW variant. Creating a duo that easily could take down the lightest and heaviest targets with ease. The models are made to be fully compatible with the MakerWorld Crowdfunded 1A1 and 1A2 TOW for a complete squadron.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mk20-1a4-waffenträger",
+    "title": "CyberBrick Mk20 & 1A4 Waffenträger",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "acd533cef35e1d49218d7b075a3214605125a5c538ea0219ef0ae7a3feb56d4a",
+   "en": "Crowdfunded 1A1 and 1A2 TOW",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mk20-1a4-waffenträger",
+    "title": "CyberBrick Mk20 & 1A4 Waffenträger",
+    "field": "documents[4]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "650f84646adf688a8c7d81e58c87cae6e5119db389c0aaa1929d31798fc5ff41",
+   "en": "Download our 3D print model for a compact chewing gum dispenser! Store and dispense gums or Mentos effortlessly. Easy assembly, no glue needed.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "chewing-gum-spiral-dispenser",
+    "title": "Chewing Gum Spiral Dispenser",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d5a69963f200276a87667a30bc7fdfd3e6b2cf90abb927ee1dd47aac6f631c34",
+   "en": "Bring spooky charm to your home with the Magic Night Cat Pumpkin Lantern, featuring playful Halloween cats, glowing pumpkins, and enchanting seasonal style.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "magic-night-cat-pumpkin-lantern",
+    "title": "Magic Night Cat Pumpkin Lantern",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3f4c9468ae06728145379c0789eefc5dad7ccfa5ba2df00e201063b75524675b",
+   "en": "The Modular Lantern combines creative design with practical lighting. Its customizable modular system adds a warm, personal touch to homes, holiday décor, and outdoor spaces.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "the-modular-lantern",
+    "title": "The Modular Lantern",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e8a8e662191729c5ad504a119afd59bdb23c3661c3aed4572b9b469ba8dfd8b5",
+   "en": "Purchase & Download Models on MakerWorld ↗",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "modular-truck-platform-cyberbrick-rc",
+    "title": "Modular Truck Platform - CyberBrick RC",
+    "field": "documents[2]",
+    "near": "other"
+   },
+   "dict": null
+  }
+ ]
+}

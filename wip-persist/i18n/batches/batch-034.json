@@ -1,0 +1,3289 @@
+{
+ "batch": 34,
+ "surface": "api",
+ "handles": [
+  "wind-up-walking-mechanisms",
+  "magnetic-levitation-diy-kit",
+  "catmaw-afv-model-car-for-scx10",
+  "motion-activated-sound-and-light-props-kit",
+  "decoration-display-kit",
+  "multi-ratio-motorized-system-kit",
+  "easy-mounting-kit",
+  "dynamic-installation-art-kit",
+  "desktop-ornament-components-kit",
+  "filament-protection-kit",
+  "fastener-kit",
+  "workshop-modification-kit",
+  "eye-bolt-with-self-tapping-thread",
+  "precision-shaft-system-kit",
+  "led-light-strip-remote-controller",
+  "makers-beginner-kit",
+  "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+  "150mm-zh1-5-to-sh1-0-conversion-wire",
+  "turntable-kit",
+  "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+  "flaming-fox-v8-engine",
+  "hexagon-twist-fidget-v2"
+ ],
+ "strings": [
+  {
+   "h": "e94b8e248fbc7944ac6670d7539bb6951cfbddfdf0dba7bcdeacc0387d1eb4c2",
+   "en": "This Wind-Up Walking Mechanism is a fun and interactive addition to your 3D-printed models, perfect for bringing characters like cute ghosts and grim reapers to life with just a wind-up. The smooth, burr-free surface ensures safe handling, especially for children. The compact design makes it easy to carry and enjoy anytime, anywhere.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[1].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "7fa59f95f5645c789b9f7639c42ee6110201079484d9b42804cf39ea096fcf87",
+   "en": "Ideal for DIY projects, this mechanism encourages hands-on creativity while adding movement to your models. Simply attach it to the base, wind it up, and watch it walk across any flat surface!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[1].line[2]",
+    "near": "This Wind-Up Walking Mechanism is a fun and interactive addition to your 3D-printed models, perfect for bringing characters like cute ghosts and grim reapers to"
+   },
+   "dict": null
+  },
+  {
+   "h": "db622c0a48614d99c9bfd1bb9849191752ef1ce96c78850d879d6445baba381a",
+   "en": "Note：Be careful not to overwind the mechanism, as this may cause damage.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[1].line[3]",
+    "near": "Ideal for DIY projects, this mechanism encourages hands-on creativity while adding movement to your models. Simply attach it to the base, wind it up, and watch "
+   },
+   "dict": null
+  },
+  {
+   "h": "9764b3ad6c56c1e4fbcb023b302e4fe222a2eb7b762bc432ce263e74900c0f6d",
+   "en": "Simulates Human Gait: The mechanism replicates a natural walking motion, allowing your models to step forward smoothly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[1]",
+    "near": "Product Feature"
+   },
+   "dict": null
+  },
+  {
+   "h": "dbb2446d4fda878ee4e6489a425112a3c0a832c06a7ee979d1d76e46bc1add5b",
+   "en": "Compact and Lightweight: Easily fits into small models, enabling portable, on-the-go fun.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[2]",
+    "near": "• Simulates Human Gait: The mechanism replicates a natural walking motion, allowing your models to step forward smoothly."
+   },
+   "dict": null
+  },
+  {
+   "h": "d6eb6d02328b8c47376db3731f7ade92155af470ebf18452ea15bc16cf223547",
+   "en": "Customizable for Creativity : Ideal for 3D-printed characters or DIY projects, allowing unique personalization.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[3]",
+    "near": "• Compact and Lightweight: Easily fits into small models, enabling portable, on-the-go fun."
+   },
+   "dict": null
+  },
+  {
+   "h": "19b3242b512e201f03a028439eca887f27741261e2bb6c124bfd72daf68e08ae",
+   "en": "Eco-Friendly Material : Made from eco-friendly plastic, it aligns with sustainable practices while providing durability.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[4]",
+    "near": "• Customizable for Creativity : Ideal for 3D-printed characters or DIY projects, allowing unique personalization."
+   },
+   "dict": null
+  },
+  {
+   "h": "c2b3eb5277f646f526b9536df13de237b8c55b190b6e4221b3ceb619e2e494fa",
+   "en": "Reliable and Durable Built for repeated use, it maintains quality performance with each wind-up.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[5]",
+    "near": "• Eco-Friendly Material : Made from eco-friendly plastic, it aligns with sustainable practices while providing durability."
+   },
+   "dict": null
+  },
+  {
+   "h": "1f6a5ffd21f324ea8dd914cfd06dfe953687d1750f45867c1af6f67ebfba0eb4",
+   "en": "Walking Christmas Ghost",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[7].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "b7bc343e395e382fa925d543dcf24636cd4f6eeb5e8659ebfd8efbf674d82ab6",
+   "en": "Santa Claus is a little busy",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[8].cell[0]",
+    "near": "Walking Christmas Ghost | Romwba3D | Walking Christmas Ghost"
+   },
+   "dict": null
+  },
+  {
+   "h": "5bf02082965e993c97749dc45ac698765c95a69538c0b64b535a30df2a0b1925",
+   "en": "flowercat",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[8].cell[1]",
+    "near": "Walking Christmas Ghost | Romwba3D | Walking Christmas Ghost"
+   },
+   "dict": null
+  },
+  {
+   "h": "387b7cb1e772a9235f3c506c605e7075cdbdfab59d9896c936a824ad6a8ffff3",
+   "en": "Christmas Tree Gnome",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[9].cell[0]",
+    "near": "Santa Claus is a little busy | flowercat | Santa Claus is a little busy"
+   },
+   "dict": null
+  },
+  {
+   "h": "26f46623bf5bc1830b9517b5dd4704460b014ec893fdac7ff7815eb2300bb27d",
+   "en": "Cute Death - Grim Reaper Halloween decoration",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[10].cell[0]",
+    "near": "Christmas Tree Gnome | Makerize3D | Christmas Tree Gnome"
+   },
+   "dict": null
+  },
+  {
+   "h": "ee9db11dd8be698db0f1c1f51b0ff6d8f5cb285281e37cd112267f56b9bae3f7",
+   "en": "DIY Wizard",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[10].cell[1]",
+    "near": "Christmas Tree Gnome | Makerize3D | Christmas Tree Gnome"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e72dabfda7b172989f19415d24e94364c9c238f81f52d39bd07bbc5aa5f5291",
+   "en": "Cute and Simple Ghost",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[11].cell[0]",
+    "near": "Cute Death - Grim Reaper Halloween decoration | DIY Wizard | Cute Death - Grim Reaper Halloween decoration"
+   },
+   "dict": null
+  },
+  {
+   "h": "baf05099b3288bd5b69c676279614acad962998d13f46e1169a4ca45cadc9454",
+   "en": "Chingoo.Jeesoo",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[11].cell[1]",
+    "near": "Cute Death - Grim Reaper Halloween decoration | DIY Wizard | Cute Death - Grim Reaper Halloween decoration"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e38f5c2325a1dc77b84ab01f2b09c494057d028f596b4667e7af96c920145d8",
+   "en": "WitchyBoo",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[12].cell[0]",
+    "near": "Cute and Simple Ghost | Chingoo.Jeesoo | Cute and Simple Ghost"
+   },
+   "dict": null
+  },
+  {
+   "h": "00baa0ba3ad0b9667a5e6e090f55c5c11e9f2813d39940c3d35074a91f58799e",
+   "en": "Wind-Up Walking KIWI",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[13].cell[0]",
+    "near": "WitchyBoo | Makerize3D | WitchyBoo"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb160e93e87ca5c76f1307b4569163ad7b219d82fa496eef3ca8d01ad4e1a63e",
+   "en": "Wind-Up Walking Capybara",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[14].cell[0]",
+    "near": "Wind-Up Walking KIWI | wuguigui | Wind-Up Walking KIWI"
+   },
+   "dict": null
+  },
+  {
+   "h": "1473541ce0dd9f4cfa7ae379b0da365528e7f824e628548a298cff1ccb07573c",
+   "en": "Wind-Up Walking Pigeon",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[15].cell[0]",
+    "near": "Wind-Up Walking Capybara | wuguigui | Wind-Up Walking Capybara"
+   },
+   "dict": null
+  },
+  {
+   "h": "6c9307b09eb33c0929a8c60973cce141dd556debe3e6d32ba24329ded50a3c90",
+   "en": "Makerize",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[15].cell[1]",
+    "near": "Wind-Up Walking Capybara | wuguigui | Wind-Up Walking Capybara"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ac3343642581e6bb8eb8b67b542dae3a97ce904610b1ba6397043fe8edbebac",
+   "en": "Wind-up Wacky Walking Valentine Walkers - Hearts",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[16].cell[0]",
+    "near": "Wind-Up Walking Pigeon | Makerize | Wind-Up Walking Pigeon"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b9cb8a0fe7269a695fd6917e3639a387c59c16dc909c7f981378770a2f629e7",
+   "en": "PrinterMcgee",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[16].cell[1]",
+    "near": "Wind-Up Walking Pigeon | Makerize | Wind-Up Walking Pigeon"
+   },
+   "dict": null
+  },
+  {
+   "h": "89ecf2a89b8e3bd680823d4a99b19c7693f4113954ea247528d8a2d4e420d59b",
+   "en": "Wind-Up Walking Present",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[17].cell[0]",
+    "near": "Wind-up Wacky Walking Valentine Walkers - Hearts | PrinterMcgee | Wind-up Wacky Walking Valentine Walkers - Hearts"
+   },
+   "dict": null
+  },
+  {
+   "h": "da130956c3b9b927122de0fe2670b07d5f34b9bd763cabdac235f46b2efbb9d5",
+   "en": "Walking Valentine Dino",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[18].cell[0]",
+    "near": "Wind-Up Walking Present | Sakul | Wind-Up Walking Present"
+   },
+   "dict": null
+  },
+  {
+   "h": "268112908d6120be13ffbac04d03e39f4c9cb0dfe543d60a67704bb736cd0ef6",
+   "en": "M&M`s Treat - dropping Chick",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[19].cell[0]",
+    "near": "Walking Valentine Dino | Makerize3D | Walking Valentine Dino"
+   },
+   "dict": null
+  },
+  {
+   "h": "2cf531e029a3a2ba7e9731989ccce1a13e43f33d962d297ff5fd09a7b55a166f",
+   "en": "HenryFang",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "wind-up-walking-mechanisms",
+    "title": "Wind-Up Walking Mechanisms (8PCS)",
+    "field": "blocks[2].line[19].cell[1]",
+    "near": "Walking Valentine Dino | Makerize3D | Walking Valentine Dino"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f484442d1a2930263261a82fc5f1fb7af422195e2a51a659d4d836574bd6907",
+   "en": "The Magnetic Levitation DIY Kit combines science with creativity, unlocking the unique charm of magnetic levitation technology. It includes a base, a floating module and a power supply, enabling objects to float smoothly in mid-air and creating an enchanting floating effect. With easy assembly and durable construction, the kit transforms complex magnetic levitation technology into an accessible DIY experience, allowing you to easily step into the wonderful world of magnetic levitation and create stunning floating displays.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e6e9e2c33f4b13c063f71521f58564a9da89379d37faea960a2eac960a198b5",
+   "en": "Whether you’re a DIY hobbyist, tech enthusiast, or someone who loves unique decor, this kit lets you bring futuristic charm to any space. Transform collectible figures, mini moon lamps, custom 3D-printed creations, or even small keepsakes into eye-catching desktop centerpieces—there’s no limit to what you can create. The sleek, tech-inspired design adds a modern touch to offices, bedrooms, or workspaces, making it both a fun project and a standout decoration.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[2]",
+    "near": "The Magnetic Levitation DIY Kit combines science with creativity, unlocking the unique charm of magnetic levitation technology. It includes a base, a floating m"
+   },
+   "dict": null
+  },
+  {
+   "h": "b031bfb16f89dae0f4e8c950a476425189b88e9d55d2bbf6119d79b26665c3bf",
+   "en": "Floating Meditating LED Reaper",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[5].cell[0]",
+    "near": "Model Links | Creators | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ba287918a6b3b73c5c9e01cce63604e6e0769ef0b97b8442b19f12d1440161d",
+   "en": "@ONI.FORGE",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[5].cell[1]",
+    "near": "Model Links | Creators | Need Other Accessories"
+   },
+   "dict": null
+  },
+  {
+   "h": "23794d91c53ae875c8e247d72561e35d9d06ee07c70c9e0dbcc977a6d161504a",
+   "en": "NO",
+   "kind": "block_cell",
+   "freq": 12,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[5].cell[2]",
+    "near": "Model Links | Creators | Need Other Accessories"
+   },
+   "dict": {
+    "ar": "لا",
+    "ckb": "نەخێر"
+   }
+  },
+  {
+   "h": "421e37054059dca427ca712241b64a18ef832bc0c24adb8b386c3e86a21741bb",
+   "en": "Levitation Pyramid of Time Fragments",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[6].cell[0]",
+    "near": "Floating Meditating LED Reaper | @ONI.FORGE | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "d49445644875a8a5b5218ae68ebdad1ca2d0c7e24cae8a175c06bef7c3a79b30",
+   "en": "Halloween hat Levitation",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[7].cell[0]",
+    "near": "Levitation Pyramid of Time Fragments | @flowercat | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3aaa46d01b5213151a615c2b05744612ea1c28f30634c7db136e26c235d73fb",
+   "en": "LLevitating Moon",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[8].cell[0]",
+    "near": "Halloween hat Levitation | @SouthLab | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "72c4b49c21a26b6f5491f6775a5ac7b6add01cca13c2c751fe2b907526bf997a",
+   "en": "@TBone_427120",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[8].cell[1]",
+    "near": "Halloween hat Levitation | @SouthLab | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "a96e2cdaccf197803576d25577cdcc966b2e55cdfa86c02d2ca47a8d7be00fb9",
+   "en": "Floating Mage Tower - Magnetic Levitation Light",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[9].cell[0]",
+    "near": "LLevitating Moon | @TBone_427120 | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "3aef3a2adba927f44a5dbc665acfcd93b93a03c872796e984a0b7715556e8cf6",
+   "en": "Levitation Energy Reactor",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[10].cell[0]",
+    "near": "Floating Mage Tower - Magnetic Levitation Light | @MaKim | NO"
+   },
+   "dict": null
+  },
+  {
+   "h": "7840368761342f456c30d3d512ae7374f90af52071e754767a192a45e5c015fe",
+   "en": "Magnetic Levitating Soccer Ball",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[11].cell[0]",
+    "near": "Levitation Energy Reactor | @mc2.project3D | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "8dfb25b4bdfeb1c984992ee8aaddcdb9a50f83a8c3a0f1fd9c9846a764516821",
+   "en": "Minka Skyland - Levitating Island",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[12].cell[0]",
+    "near": "Magnetic Levitating Soccer Ball | @mc2.project3D | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "ae34f86fdaf7d85f8ae647e42a933b404f29e88aca608a77a72c966aa34c7470",
+   "en": "@entropytamed",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[0].line[12].cell[1]",
+    "near": "Magnetic Levitating Soccer Ball | @mc2.project3D | YES"
+   },
+   "dict": null
+  },
+  {
+   "h": "cefff9bf622a468c29e2a2c77d35f86f5d5e829a43129769066fe358f909bc1d",
+   "en": "PrintMon Maker Edition",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[1].line[0]",
+    "near": "The PrintMon Maker Edition includes two bags of steel balls to help balance the weight of your 3D-printed creations, ensuring perfect stability. If your design "
+   },
+   "dict": null
+  },
+  {
+   "h": "600e1022265fd1aa9647c19563bfa807c412a4abdac2203f4e0481bca55f1dd5",
+   "en": "The PrintMon Maker Edition includes two bags of steel balls to help balance the weight of your 3D-printed creations, ensuring perfect stability. If your design requires weight adjustments for balance, consider selecting the Magnetic Levitation DIY Kit (PrintMon Maker Edition) .",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[1].line[1]",
+    "near": "PrintMon Maker Edition"
+   },
+   "dict": null
+  },
+  {
+   "h": "afd2eb9d0f7104ac23049ca6a661b99235c6dab2c7224bc77750f7670232e410",
+   "en": "LED Light Control (External Touch Switch)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "4647cf852d561a91bd17e7d76b523aee910a5a1f0190eb021c9f8bf40fdad56a",
+   "en": "3D-Printed Protective Shell",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• LED Light Control (External Touch Switch)"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c46222e4b54b328bc77e22f69ba0e4baf1f2dd5d564e8dae70178a515ace05d",
+   "en": "Energy Efficient with Low Standby Power.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• 3D-Printed Protective Shell"
+   },
+   "dict": null
+  },
+  {
+   "h": "deaefea5b55145422e0d23eaf919d8273001fea4e1bbbb3d19cfb39a85ca1081",
+   "en": "Quiet & Stable Levitation",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[2].line[4]",
+    "near": "• Energy Efficient with Low Standby Power."
+   },
+   "dict": null
+  },
+  {
+   "h": "df498bc1aa268610663a2427037dc6395ca8be9cf2af307f0669f1c270c6e9ae",
+   "en": "Appropriate Load-bearing (Up to 200g)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "magnetic-levitation-diy-kit",
+    "title": "Magnetic Levitation DIY Kit",
+    "field": "blocks[2].line[5]",
+    "near": "• Quiet & Stable Levitation"
+   },
+   "dict": null
+  },
+  {
+   "h": "d013f3f82418f19a810f3513f1d62945d6549db78290f68d832be5352587b062",
+   "en": "This product contains all the necessary hardware components for assembling a Catmaw AFV - Model Car For SCX10. To complete the assembly for an entirely functional piece, users also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "catmaw-afv-model-car-for-scx10",
+    "title": "Catmaw AFV - Model Car For SCX10",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "6161bb6ed9c89be004512a56cf09ef117d46c5476002303a28f3dfaa87ff25e5",
+   "en": "To download the model files of Catmaw AFV - Model Car For SCX10 and obtain detailed information, please visit the Catmaw AFV - Model Car For SCX10 on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "catmaw-afv-model-car-for-scx10",
+    "title": "Catmaw AFV - Model Car For SCX10",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "6de315b5a175dfd2e22ff63bd73e519e9ca149acf4410204a6874fdb59ddadb8",
+   "en": "The Motion-Activated Sound and Light Props Kit is a multifunctional toolkit specifically designed for handheld props, combining lighting, sound, and motion-sensing controls to deliver a personalized, immersive experience. Featuring high-brightness LED strips paired with diffused pearl cotton, it offers smooth and natural lighting effects. An integrated speaker cavity ensures clear audio quality, while the built-in IMU motion sensor captures real-time movements, triggering corresponding light and sound effects for actions like turning on/off, swinging, thrusting, or striking.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b01e3edeb9d01256b19f88cebfea628055b2ec0b2040e0722133458dfaa8a47",
+   "en": "The Motion-Activated Sound and Light Props Kit offers two configurations: Kit 01 (Complete Set with LED strips, aluminum alloy tubes, and diffused pearl cotton for large-scale props like the Golden Staff) and Kit 02 (Compact Edition requiring user-provided LED light strip 256RGB 5050LED 815MM, optimized for swords/daggers). Unlike purely aesthetic prop sets that lack hardware, this kit is more than just a prop—it's your creative partner. It supports extensive customization across appearance, lighting effects, and sound effects, compatible with various prop forms such as Golden Staff, Double-Bladed Weapon, and Pixel Lightsaber. Leveraging 3D printing and professional design, it unlocks limitless possibilities for your imagination. With app connectivity, users can easily adjust light colors, flashing frequencies, and even upload custom sound and light effects, creating a one-of-a-kind, personalized prop with ease.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[2]",
+    "near": "The Motion-Activated Sound and Light Props Kit is a multifunctional toolkit specifically designed for handheld props, combining lighting, sound, and motion-sens"
+   },
+   "dict": null
+  },
+  {
+   "h": "680ba5e813103594dbccc1b5db21b34cf2108b7d4db51ce49ba444245b2482bf",
+   "en": "Compatible Kit",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[4].cell[2]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "ca39eb8336c3a0d3161beb1870046ad52f33972f0ff9054e50669f5be8b015d5",
+   "en": "1:1 Ruyi Jingu Bang Wukong Staff Weapon",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[5].cell[0]",
+    "near": "Model Links | Creators | Compatible Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8f00e12bac1b84c3d30c0991d52641bcaa02966332f5c987a504ea77f5745fd",
+   "en": "@DaDaland",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[5].cell[1]",
+    "near": "Model Links | Creators | Compatible Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "338dac5171cba8a2d6f5d34ca7638f38faf198875465ae5d30b0872377ce65df",
+   "en": "Kit 01",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[5].cell[2]",
+    "near": "Model Links | Creators | Compatible Kit"
+   },
+   "dict": null
+  },
+  {
+   "h": "bc8fe8db3b95cd29c98b1ed39fd6e3e40466804eb9806c01d554158d60aea990",
+   "en": "Lightning Zelda Master Sword 100cm",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[6].cell[0]",
+    "near": "1:1 Ruyi Jingu Bang Wukong Staff Weapon | @DaDaland | Kit 01"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd2c5975813752dc8b7fae870cb78b42bdba3d4a71579d1b101ad701258e84e5",
+   "en": "Kit 01 OR Kit 02",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[6].cell[2]",
+    "near": "1:1 Ruyi Jingu Bang Wukong Staff Weapon | @DaDaland | Kit 01"
+   },
+   "dict": {
+    "ar": "Kit 01 وKit 02",
+    "ckb": "Kit 01 و Kit 02"
+   }
+  },
+  {
+   "h": "58927cc99f5432dd6104f2627e996a1a6ff9fb5f83d1b755ae4a12a32f551ecb",
+   "en": "Double Bladed Lightsaber",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[7].cell[0]",
+    "near": "Lightning Zelda Master Sword 100cm | @168888 | Kit 01 OR Kit 02"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd77f2ecb7b80027ebbe05c01855959268f50de891ccb59c85551d04239763cd",
+   "en": "@joel.he",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[7].cell[1]",
+    "near": "Lightning Zelda Master Sword 100cm | @168888 | Kit 01 OR Kit 02"
+   },
+   "dict": null
+  },
+  {
+   "h": "75346d9af8fc4c21fa20d18d33cb5c439cab8b9bd04f3fb19250034bc2e2123c",
+   "en": "Brick Star Wars Lightsaber",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[8].cell[0]",
+    "near": "Double Bladed Lightsaber | @joel.he | Kit 01"
+   },
+   "dict": null
+  },
+  {
+   "h": "8eb678eccb891ed388e85315da70955be59d031b8a457c4c880fba04504dd431",
+   "en": "@collinliao",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[8].cell[1]",
+    "near": "Double Bladed Lightsaber | @joel.he | Kit 01"
+   },
+   "dict": null
+  },
+  {
+   "h": "570b3f8a6cf6a9039fdc75984bd7e4d32cd78ea5eaf736f43e29ecff0b5cdcc5",
+   "en": "Cyber Golden Cudgel",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[0].line[9].cell[0]",
+    "near": "Brick Star Wars Lightsaber | @collinliao | Kit 01 OR Kit 02"
+   },
+   "dict": null
+  },
+  {
+   "h": "19dd28565b05522379c965545437ece407a94b9c5777b650effa074a356f8999",
+   "en": "APP Operation",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[1].line[0]",
+    "near": "iOS Users: Search for \"Frocepark V2\" in the App Store"
+   },
+   "dict": null
+  },
+  {
+   "h": "4062a097f42b68ce0f2a56894ece916864a8c5923e440b6cf71aabbd374208da",
+   "en": "iOS Users: Search for \"Frocepark V2\" in the App Store",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[1].line[1]",
+    "near": "APP Operation"
+   },
+   "dict": null
+  },
+  {
+   "h": "a07c2042509cf2d9c2d1105aa610273ec8945810c408e9da9efe86a196c5625d",
+   "en": "Android Users: Please scan the QR code to download the app.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[1].line[2]",
+    "near": "iOS Users: Search for \"Frocepark V2\" in the App Store"
+   },
+   "dict": null
+  },
+  {
+   "h": "7975300f01bc46f86e52e528b29955be87a361f05f2fb96e14629bc0a5495d03",
+   "en": "Hardware",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[0]",
+    "near": "Item Number | Component | Description | Size | Wire Length"
+   },
+   "dict": null
+  },
+  {
+   "h": "ce54f0e22dbb39de8a6d9ae0b32b3ecac5bc749fddcb78e4f1e572212b338d63",
+   "en": "Component",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[1].cell[1]",
+    "near": "Hardware"
+   },
+   "dict": null
+  },
+  {
+   "h": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
+   "en": "Description",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[1].cell[2]",
+    "near": "Hardware"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c6d8e2e58e76ae43f5f59d08d8238c55624074afed87a350d2e5844563a617d",
+   "en": "Wire Length",
+   "kind": "block_cell",
+   "freq": 3,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[1].cell[4]",
+    "near": "Hardware"
+   },
+   "dict": null
+  },
+  {
+   "h": "a9e0c70585121f5f79e52330eaf56937d5088e388f0e8b0e14968d9891044f2c",
+   "en": "Speaker",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[2].cell[1]",
+    "near": "Item Number | Component | Description | Size | Wire Length"
+   },
+   "dict": null
+  },
+  {
+   "h": "44721fec59909771311d814f9da9cac47d7008fcf9c1789780256b53022cc9cc",
+   "en": "Used for sound effects. Connects via the 2P cable to the mainboard.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[2].cell[2]",
+    "near": "Item Number | Component | Description | Size | Wire Length"
+   },
+   "dict": null
+  },
+  {
+   "h": "d738010ec803da598f6361227bcdd10aedc60f9bc24c851a1ab9acbb7a366c2e",
+   "en": "Control panel",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[3].cell[1]",
+    "near": "1 | Speaker | Used for sound effects. Connects via the 2P cable to the mainboard. | 23.8(φ)*12(h)mm | 50 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4684ff2e286eee1fbe3cdede7044e601614df8fc3c48fbb8b1f1b8fa0d5bd47",
+   "en": "Includes 1 control power button, 1 USB-C charging and power interface, 4 connection ports for LED, buttons, and speakers.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[3].cell[2]",
+    "near": "1 | Speaker | Used for sound effects. Connects via the 2P cable to the mainboard. | 23.8(φ)*12(h)mm | 50 mm"
+   },
+   "dict": null
+  },
+  {
+   "h": "e78978be8dfcbf17cd27439bb17c8390bc80e6951639128c0e0e1db53cbf0c24",
+   "en": "Supports 18650 battery: 3.7V, 2600mAh capacity. Battery life: 50-60 minutes (depending on power consumption). Charging time: approximately 4-5 hours. Charges via USB-C, with a 5V/1A charging input. Note: does not support fast charging protocols.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[4].cell[2]",
+    "near": "2 | Control panel | Includes 1 control power button, 1 USB-C charging and power interface, 4 connection ports for LED, buttons, and speakers. | 41*13*21mm | 45 "
+   },
+   "dict": null
+  },
+  {
+   "h": "e3446a152e7af5935cf6fe179dbe2f15ba429ecced8700f97183072424bd3408",
+   "en": "Main Board",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[5].cell[1]",
+    "near": "3 | Battery | Supports 18650 battery: 3.7V, 2600mAh capacity. Battery life: 50-60 minutes (depending on power consumption). Charging time: approximately 4-5 hou"
+   },
+   "dict": null
+  },
+  {
+   "h": "452c2512357ade7ae118d41655a145919e5f1a771b667235f7e2c42282577d56",
+   "en": "Equipped with a built-in 32G TF card. Displays various lighting and sound effects with an integrated motion sensor. Features two dedicated ports for accessory modules. Supports multiple power modes. Includes an 18650 lithium battery connector, with internal overcharge and discharge protection.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[5].cell[2]",
+    "near": "3 | Battery | Supports 18650 battery: 3.7V, 2600mAh capacity. Battery life: 50-60 minutes (depending on power consumption). Charging time: approximately 4-5 hou"
+   },
+   "dict": null
+  },
+  {
+   "h": "4f29f2adf4f5c2bc0877ab12b2525240916ec07ed2213ef1cb3207bd3e2d6646",
+   "en": "LED strip1：600 mm LED strip2: 750 mm Battery：30 mm",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[5].cell[4]",
+    "near": "3 | Battery | Supports 18650 battery: 3.7V, 2600mAh capacity. Battery life: 50-60 minutes (depending on power consumption). Charging time: approximately 4-5 hou"
+   },
+   "dict": null
+  },
+  {
+   "h": "39c0d5bbb92d86ae4157b8216d824b3347c6d90817a84dda2e98d9e4c18a1fcf",
+   "en": "Set Screw",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[6].cell[1]",
+    "near": "4 | Main Board | Equipped with a built-in 32G TF card. Displays various lighting and sound effects with an integrated motion sensor. Features two dedicated port"
+   },
+   "dict": null
+  },
+  {
+   "h": "da8bf3320d92efd90ac983b59aab0deb14a56bfd3b7c6c42de3ab07efc2dbb07",
+   "en": "Used to secure the 3D-printed base inside the aluminum tube.",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[6].cell[2]",
+    "near": "4 | Main Board | Equipped with a built-in 32G TF card. Displays various lighting and sound effects with an integrated motion sensor. Features two dedicated port"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e61d51e67aa7a35c752f19553c666d9ddc45c3989629a10d939f2628577f588",
+   "en": "Self Tapping Screw",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[7].cell[1]",
+    "near": "5 | Set Screw | Used to secure the 3D-printed base inside the aluminum tube. | M3*12 | /"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a1bb54b0d57d501d258fa5a99523eb228dc856f37b8b91457f57c29b6a02337",
+   "en": "Used to secure the main board and button board onto the 3D-printed PCB base.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[7].cell[2]",
+    "near": "5 | Set Screw | Used to secure the 3D-printed base inside the aluminum tube. | M3*12 | /"
+   },
+   "dict": null
+  },
+  {
+   "h": "89c37f9160f671e95826a910023eba05c798f6cc4b042df5a6dd01244b0d7e6c",
+   "en": "Connection Part",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[2].line[8].cell[1]",
+    "near": "6 | Self Tapping Screw | Used to secure the main board and button board onto the 3D-printed PCB base. | BT2*5 | /"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ff5d9599c0ffa3be0cadd0c12d8d4b15094e3bf61c4a615d7cf683310b85538",
+   "en": "Light Diffusion Foam",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[3].line[1].cell[1]",
+    "near": "Item Number | Component | Description | Size | Wire Length"
+   },
+   "dict": null
+  },
+  {
+   "h": "269ef03cea86f39f29f914a7870647d41e737dfeb0adb82edc44d964fe04b8d2",
+   "en": "Light-diffusing foam can be inserted into the LED strip, ensuring smooth and even light distribution.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[3].line[1].cell[2]",
+    "near": "Item Number | Component | Description | Size | Wire Length"
+   },
+   "dict": null
+  },
+  {
+   "h": "9be698fa1ae98c601b7d1e933914ed90c87299bcdeec848f0fac8cdff0c1d73b",
+   "en": "Pixel LED Strip light",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[3].line[2].cell[1]",
+    "near": "9 | Light Diffusion Foam | Light-diffusing foam can be inserted into the LED strip, ensuring smooth and even light distribution. | 29(φ)*440(h)mm | /"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c261bcc6628281b62abc87d196c08b1ed6fb6d5b131f2dd276f11ca7123274d",
+   "en": "The single side consists of 62 high-brightness LED beads, with a total of 124 beads on both sides, creating vibrant and dynamic pixel LED strip lighting effects. The strip is connected to the mainboard via a 3P connector.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[3].line[2].cell[2]",
+    "near": "9 | Light Diffusion Foam | Light-diffusing foam can be inserted into the LED strip, ensuring smooth and even light distribution. | 29(φ)*440(h)mm | /"
+   },
+   "dict": null
+  },
+  {
+   "h": "c89850a81a9a5c9c3e467c52f80bff7ba9bf9f467f4b7c77f28c80e23b081319",
+   "en": "Aluminum tube",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[3].line[3].cell[1]",
+    "near": "10 | Pixel LED Strip light | The single side consists of 62 high-brightness LED beads, with a total of 124 beads on both sides, creating vibrant and dynamic pix"
+   },
+   "dict": null
+  },
+  {
+   "h": "c726fc88b2b5eb87c25ba89a714cd1b19c44dfb5120b9d5a15a78ccb3c94e1b6",
+   "en": "Aluminum tube with button and charging port",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[3].line[4].cell[1]",
+    "near": "11 | Aluminum tube | / | 35(φ)*600(h)mm | /"
+   },
+   "dict": null
+  },
+  {
+   "h": "0928d3d290de394bee72359b2e8387bbf96afea98d7194d462d89e0fca3addbf",
+   "en": "Equipped with a charging port, a button hole, and a reset hole. The tube houses a main board and battery.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[3].line[4].cell[2]",
+    "near": "11 | Aluminum tube | / | 35(φ)*600(h)mm | /"
+   },
+   "dict": null
+  },
+  {
+   "h": "b7179fe74411d2b7d53889fa3937b70113687339a4a1b7c81adcae9ea33c3236",
+   "en": "APP",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[4].line[2].cell[0]",
+    "near": "Component | Description"
+   },
+   "dict": null
+  },
+  {
+   "h": "6727c9ad67f87d981b0fd5546da3ce6f074e71888017ba90aec2feea04762454",
+   "en": "Connects to the device via Bluetooth, allowing users to adjust lighting and sound effects on their phone. Supports both Android and iOS systems.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[4].line[2].cell[1]",
+    "near": "Component | Description"
+   },
+   "dict": null
+  },
+  {
+   "h": "6404a6a1f6f1c670df996fbb150d563a6e137c35eea53541ebfe5991b8e8f9d8",
+   "en": "Lighting Effects",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[4].line[3].cell[0]",
+    "near": "APP | Connects to the device via Bluetooth, allowing users to adjust lighting and sound effects on their phone. Supports both Android and iOS systems."
+   },
+   "dict": null
+  },
+  {
+   "h": "777b45f46c5c34d481a4ba574cb1a4101ecc8c6a2772581bc6cc9be7c6fa68a7",
+   "en": "Over 20 pre-installed lighting effects, supports custom lighting effects and allows users to design their own.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[4].line[3].cell[1]",
+    "near": "APP | Connects to the device via Bluetooth, allowing users to adjust lighting and sound effects on their phone. Supports both Android and iOS systems."
+   },
+   "dict": null
+  },
+  {
+   "h": "de7b57b57b05d02090b4091094e2117271e7df2bf17553017bb0c634ec3492c0",
+   "en": "Sound Effects",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[4].line[4].cell[0]",
+    "near": "Lighting Effects | Over 20 pre-installed lighting effects, supports custom lighting effects and allows users to design their own."
+   },
+   "dict": null
+  },
+  {
+   "h": "190e1f79641cbe5948f0dff243c2c18c6d1a943c9ee795ffd9a971f92cc6feae",
+   "en": "Includes 27 sound effects and supports updating the sound library via an TF card to add more desired effects.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[4].line[4].cell[1]",
+    "near": "Lighting Effects | Over 20 pre-installed lighting effects, supports custom lighting effects and allows users to design their own."
+   },
+   "dict": null
+  },
+  {
+   "h": "ed638133f5c2d8efb5859240feac87a997ff8db4c0a83370e445f3ab7299a7ca",
+   "en": "Motion Sensory",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[4].line[5].cell[0]",
+    "near": "Sound Effects | Includes 27 sound effects and supports updating the sound library via an TF card to add more desired effects."
+   },
+   "dict": null
+  },
+  {
+   "h": "7dd38f5dbab2725c250ed25b8ce5351f557292141aff0ae15d8bd6e7717ded1c",
+   "en": "The motion sensor triggers lighting and sound effects based on movement characteristics, enhancing the immersive experience.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[4].line[5].cell[1]",
+    "near": "Sound Effects | Includes 27 sound effects and supports updating the sound library via an TF card to add more desired effects."
+   },
+   "dict": null
+  },
+  {
+   "h": "08be98a8e2e3c077a9475186e96e5a8cffa0d6708543b46b9c8d3ebc45bb3fbe",
+   "en": "Instruction Manual",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[6].line[0]",
+    "near": "Product Installation and Operation Guide."
+   },
+   "dict": null
+  },
+  {
+   "h": "4f40db74b082f7a1b86726e6383351d565688393d3f27fdd450e58c8161d6c04",
+   "en": "Firmware Guide",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[6].line[2]",
+    "near": "Product Installation and Operation Guide."
+   },
+   "dict": null
+  },
+  {
+   "h": "b1280fdf95a95cfc45358113e8006c70eb46780451bf802a98dc669bec6194d3",
+   "en": "Update the firmware to optimize motion response for different weapon models.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[6].line[3]",
+    "near": "Firmware Guide"
+   },
+   "dict": null
+  },
+  {
+   "h": "2061e3abab30c31d764bc9ccfcafe28ae2c62ed6396dd6bb48ba4ed872487913",
+   "en": "Immersive Motion Interaction (Included with All Kits)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[10].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "3020e7fb68182811c67b5b460d596f70252bf5f775e6acb3cf46a515811089b9",
+   "en": "Optimized Sound Performance (Included with All Kits)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[10].line[2]",
+    "near": "• Immersive Motion Interaction (Included with All Kits)"
+   },
+   "dict": null
+  },
+  {
+   "h": "2fb3abeb8280a7f071928f842558254670a55c809487df24efbbf4c42384e957",
+   "en": "Bluetooth Smart Control (Included with All Kits)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[10].line[3]",
+    "near": "• Optimized Sound Performance (Included with All Kits)"
+   },
+   "dict": null
+  },
+  {
+   "h": "24cd12435dde20c11a6b59c8ea830344f5b9fe11cfea88520043fdbe9902c22c",
+   "en": "Dynamic Pixel Lighting Effects (Kit 01 Exclusive)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[10].line[4]",
+    "near": "• Bluetooth Smart Control (Included with All Kits)"
+   },
+   "dict": null
+  },
+  {
+   "h": "055616edcf7c53fe2510953e7fd814ddea11a05dba3741e1fbb77627dc641998",
+   "en": "Aluminum Alloy Core Shaft (Kit 01 Exclusive)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "motion-activated-sound-and-light-props-kit",
+    "title": "Motion-Activated Sound and Light Props Kit",
+    "field": "blocks[10].line[5]",
+    "near": "• Dynamic Pixel Lighting Effects (Kit 01 Exclusive)"
+   },
+   "dict": null
+  },
+  {
+   "h": "6054438ed4c379626204965c3b0e12643c72c7c2225a793d6e855e44ebfc7438",
+   "en": "This Decoration & Display Kit includes Plastic Button Ornaments For Shoe Charms, Split Ring Keychains, Reclosable Fastener Mounting Tape, Magnet Stickers and Eye Bolts with Self-Tapping Threads, making it ideal for creating personalized shoe decorations, home displays, keychain customizations, and more. It offers flexible solutions for various needs. Whether for home organization, creative decoration, or personalized customization, this set opens up a world of possibilities.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "decoration-display-kit",
+    "title": "Decoration & Display Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "22129979d605243b9ba0da38e7179b69f730d03bd8d784cc4830085243109c22",
+   "en": "Plastic Button Ornaments For Shoe Charms: You can design fun 3D model accessories and attach them to the buttons, adding unique style and personalized decorations to your shoes",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "decoration-display-kit",
+    "title": "Decoration & Display Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "f8590fe52f6114079e8963db8a983ae8263db96523e064039ec9d0584cd2be42",
+   "en": "Reclosable Fastener Mounting Tape: This can be paired with Pixel Puzzle Maker and Make My Lithophane for wall displays, creating personalized artistic decorations. Additionally, its unique mushroom-head design can be combined with the PrintMon Maker to securely hold 3D printed model, ensuring they stay in place for display on desks or in cars, preventing accidental tipping and damage to the models.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "decoration-display-kit",
+    "title": "Decoration & Display Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• Plastic Button Ornaments For Shoe Charms: You can design fun 3D model accessories and attach them to the buttons, adding unique style and personalized decorat"
+   },
+   "dict": null
+  },
+  {
+   "h": "41530cc27aa17bc0f16a294b5bab205618f95e94964ed194837cf9d34844c254",
+   "en": "Split Ring Keychain: These are ideal for creating personalized keychains; creators can design various shapes, such as animals, toys, names, and more to add a personal touch to everyday keys.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "decoration-display-kit",
+    "title": "Decoration & Display Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• Reclosable Fastener Mounting Tape: This can be paired with Pixel Puzzle Maker and Make My Lithophane for wall displays, creating personalized artistic decorat"
+   },
+   "dict": null
+  },
+  {
+   "h": "9cee687b12330ca07dfbf2b624bb52e55544d4a48f6b3b3f3f306ae8318c9d9d",
+   "en": "Magnet Sticker: These stickers are ideal for designing magnetic whiteboard tools for schools, such as letters, numbers, and shapes, making it easier for interactive teaching. They can also be combined with memo clips and other practical items to create adhesive designs for convenient storage and organization. Additionally, magnetic sticker are perfect for creating magnetic chessboards and pieces, adding fun to tabletop games. They can also be used to print personalized fridge magnets, combining creative patterns with magnets to create unique home decorations.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "decoration-display-kit",
+    "title": "Decoration & Display Kit",
+    "field": "blocks[2].line[4]",
+    "near": "• Split Ring Keychain: These are ideal for creating personalized keychains; creators can design various shapes, such as animals, toys, names, and more to add a "
+   },
+   "dict": null
+  },
+  {
+   "h": "de49d757d0dcce1b89411590c0d4e90a3b92a0e4f697864af558482ed18d4ef2",
+   "en": "Eye Bolt with Self-Tapping Thread: The ring design of the eye bolts with self-tapping thread makes them perfect for use as hooks, easily integrated into the design of hangers, racks, or other hanging items. Additionally, they can be part of personalized accessories, such as keychain charms or small decorative toys, enhancing the functionality and aesthetic of your models.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "decoration-display-kit",
+    "title": "Decoration & Display Kit",
+    "field": "blocks[2].line[5]",
+    "near": "• Magnet Sticker: These stickers are ideal for designing magnetic whiteboard tools for schools, such as letters, numbers, and shapes, making it easier for inter"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b4b4a2f7fca4e076c08efcc95fc8bf0e7339a56d7752764fed02a83ea742659",
+   "en": "Key Features:",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[2].line[0]",
+    "near": "• Compact and Powerful motor: The 030 motor strikes a balance between the N20 motor and TT motor in terms of size and power. It can be used independently or pai"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3616a069a32f2994902ecd60842c7790c070688c690905bfed2bd99eadc8c27",
+   "en": "Compact and Powerful motor: The 030 motor strikes a balance between the N20 motor and TT motor in terms of size and power. It can be used independently or paired with a gearbox. When used alone, it can directly drive 3D-printed propellers, eccentric wheels, and other components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Key Features:"
+   },
+   "dict": null
+  },
+  {
+   "h": "99b65a8830cc1624326faaa2b4b14be1c0fe29de7fa066471f7a89a2c0827ead",
+   "en": "Diverse Gear Ratios: The kit includes four gear ratios and single/dual-shaft output options, allowing for various output shaft speeds at the same power level. This caters to different speed requirements for various models, such as slow-speed, high-torque escalator models or high-speed, low-torque vehicle models. 3D printable gearbox housing models and assembly instructions are also provided.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• Compact and Powerful motor: The 030 motor strikes a balance between the N20 motor and TT motor in terms of size and power. It can be used independently or pai"
+   },
+   "dict": null
+  },
+  {
+   "h": "531dbda5757836e7d7bd8a683dcf8a3722f8d99e981126c905a93ac51c351ab2",
+   "en": "Flexible Control: Equipped with a PDB set and Y type wire, it can connect to distribution boards, push-button switches, or rotary switches via SH1.0 connectors, enabling diverse and multi-channel control.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• Diverse Gear Ratios: The kit includes four gear ratios and single/dual-shaft output options, allowing for various output shaft speeds at the same power level."
+   },
+   "dict": null
+  },
+  {
+   "h": "7a3f4ae20974b3e847518caff3e1d6a452bd32db5d32ba31f6141b276bab9f92",
+   "en": "Dual Power Supply: Supports both USB and AAA battery power supply, catering to models that require long-term power or those that need to be free from power cords.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[2].line[4]",
+    "near": "• Flexible Control: Equipped with a PDB set and Y type wire, it can connect to distribution boards, push-button switches, or rotary switches via SH1.0 connector"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad06c386e6a1e2f0b04f3946afe5d57750d5341b78e05efc3aec330c7495f154",
+   "en": "Applications:",
+   "kind": "block_title",
+   "freq": 6,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[3].line[0]",
+    "near": "• Train models"
+   },
+   "dict": null
+  },
+  {
+   "h": "070dc435e4f1b9fd7958c5efe08319909abe7106b9806fa6c45c683f141a7ef8",
+   "en": "Train models",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Applications:"
+   },
+   "dict": null
+  },
+  {
+   "h": "54209f8cb2339331eb23add5b496a65ce39f19eb6dbd4e4067fa7476ff5c7b48",
+   "en": "Rotating display stand",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[3].line[2]",
+    "near": "• Train models"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b22568e6872b00f107e540f5157d5636e7da3dfa1966f1eed16ea623097a0d3",
+   "en": "Escalator models",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[3].line[3]",
+    "near": "• Rotating display stand"
+   },
+   "dict": null
+  },
+  {
+   "h": "91a76248c08500216483cf4090979effad7b4b1f2d2b42d7dbd8e1695832c289",
+   "en": "Fans",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "multi-ratio-motorized-system-kit",
+    "title": "Multi Ratio Motorized System Kit",
+    "field": "blocks[3].line[4]",
+    "near": "• Escalator models"
+   },
+   "dict": null
+  },
+  {
+   "h": "09c8c370d440149d9b6ec7243212ab8c3079cde3ae383bd284a0e193cb3c1952",
+   "en": "Effortless Model Mounting: Securely attach models to smooth surfaces such as glass, tiles, or cabinets with suction caps, making it easy to move and reposition your projects as needed for different settings.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "easy-mounting-kit",
+    "title": "Easy Mounting Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Applications:"
+   },
+   "dict": null
+  },
+  {
+   "h": "1eb223ad4469e4a2cb11d51f331520752aa4ff246ea0fc5db1b88aef498d3f1c",
+   "en": "Flexible Display and Adjustment: Reclosable Fastener Mounting Tape offers a convenient, removable solution, allowing you to change and adjust the placement of decorations effortlessly for dynamic and versatile displays.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "easy-mounting-kit",
+    "title": "Easy Mounting Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• Effortless Model Mounting: Securely attach models to smooth surfaces such as glass, tiles, or cabinets with suction caps, making it easy to move and repositio"
+   },
+   "dict": null
+  },
+  {
+   "h": "16b1de8870ed2ff6f09000054fcf8881707ec54bc5c913f22704b8f965c18925",
+   "en": "Reliable and Strong Installation: Double-Sided Foam Tape provides a firm hold, is residue-free upon removal, and is waterproof, delivering lasting support for your models.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "easy-mounting-kit",
+    "title": "Easy Mounting Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• Flexible Display and Adjustment: Reclosable Fastener Mounting Tape offers a convenient, removable solution, allowing you to change and adjust the placement of"
+   },
+   "dict": null
+  },
+  {
+   "h": "5c8f2645bb3bd8a5df41806603b36d5526d60ed21d11a3e28d3b719d33b0f0c8",
+   "en": "Kit Includes:",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[2].line[0]",
+    "near": "• A variety of motors: Different models to meet varying load and speed requirements, ensuring your devices are both stable and versatile."
+   },
+   "dict": null
+  },
+  {
+   "h": "ce3cbea6e1ae03a3d19151eb007dce8404cd38019d795b8469cd3750f3181d9f",
+   "en": "A variety of motors: Different models to meet varying load and speed requirements, ensuring your devices are both stable and versatile.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Kit Includes:"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a5734a1423a1e8dc526d4e8759a2dadf8caa285a42b073c1e84db928713904a",
+   "en": "LED lights: Add visual appeal to your creations, producing unique lighting effects—especially suitable for display stands and interactive art installations.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• A variety of motors: Different models to meet varying load and speed requirements, ensuring your devices are both stable and versatile."
+   },
+   "dict": null
+  },
+  {
+   "h": "362a1da688aacc21d27cacb919f30e080c02d7a7b7780a554666de89947a527e",
+   "en": "Slip ring: Provide stable power transmission while supporting continuous 360-degree rotation, achieving seamless dynamic effects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• LED lights: Add visual appeal to your creations, producing unique lighting effects—especially suitable for display stands and interactive art installations."
+   },
+   "dict": null
+  },
+  {
+   "h": "f6bd5dd529f7f0ad25b5c8fb3ba8cd1a3ae1b302c7e9e1d3e4817917f2606d07",
+   "en": "Magnetic connectors: Offer a creative way to connect and disconnect power with a snap, serving as both an electrical connector and a switch.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[2].line[4]",
+    "near": "• Slip ring: Provide stable power transmission while supporting continuous 360-degree rotation, achieving seamless dynamic effects."
+   },
+   "dict": null
+  },
+  {
+   "h": "cc5edc2e8003f77164ed125711cbae32492a49a964bb7df09518047409dab4c2",
+   "en": "Motor speed controller: Pair with TT motors to easily adjust motor speed and precisely control the movement of your devices.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[2].line[5]",
+    "near": "• Magnetic connectors: Offer a creative way to connect and disconnect power with a snap, serving as both an electrical connector and a switch."
+   },
+   "dict": null
+  },
+  {
+   "h": "9cb3f1ff1da46166d2822d032cf3130c1477c7b7963d96bd440852d66cd2571b",
+   "en": "Power distribution board set: Connect switches, potentiometers, N20 motors, LED lights, slip rings, and magnetic connectors for flexible assembly and control.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[2].line[6]",
+    "near": "• Motor speed controller: Pair with TT motors to easily adjust motor speed and precisely control the movement of your devices."
+   },
+   "dict": null
+  },
+  {
+   "h": "ee873cf00575f18cdbaeeeebb8b97989caa6219c649eef98460b90e88bf19b88",
+   "en": "Automata devices: Create artistic automated mechanical devices, combining LED lighting and fine-tuned motor adjustments to showcase intricate motion patterns.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Applications:"
+   },
+   "dict": null
+  },
+  {
+   "h": "e1a3fc6e99b748d931d9f35659ba1c0d86d0925ab08372bcf0102804f758729e",
+   "en": "Tourbillon models: Design and craft elegant tourbillon mechanisms, achieving graceful rotation effects with speed controllers.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[3].line[2]",
+    "near": "• Automata devices: Create artistic automated mechanical devices, combining LED lighting and fine-tuned motor adjustments to showcase intricate motion patterns."
+   },
+   "dict": null
+  },
+  {
+   "h": "b802f9d5c73484b529392226040c108013827603cb8c8a18d45632d0d4570e64",
+   "en": "Marble run models: Use motors to drive automatic and continuous marble movement, making fun and engaging mechanical toys.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[3].line[3]",
+    "near": "• Tourbillon models: Design and craft elegant tourbillon mechanisms, achieving graceful rotation effects with speed controllers."
+   },
+   "dict": null
+  },
+  {
+   "h": "0a1fa15537eee8a8ebb44e5b41a6f8a81f937f333c9aa514b7eb53f13a9bc492",
+   "en": "Rotating display stands: Add dynamic flair to your 3D-printed figures or art pieces, making your displays more captivating.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "dynamic-installation-art-kit",
+    "title": "Dynamic Installation Art Kit",
+    "field": "blocks[3].line[4]",
+    "near": "• Marble run models: Use motors to drive automatic and continuous marble movement, making fun and engaging mechanical toys."
+   },
+   "dict": null
+  },
+  {
+   "h": "af01712cf001f8a6e6075fc307e21c3b7849e575a221b9289eb74e4f7eee9eb4",
+   "en": "The Desktop Ornament Components Kit is designed to bring endless possibilities and personalized creativity to your tabletop. The kit includes a wide variety of electronic and mechanical parts that can be easily assembled with 3D-printed models to create different styles of desktop decorations. Whether you want to craft a playful clock, an ambient lamp, a music box, or any unique tabletop decor, this set of components will meet your needs and help bring your creative ideas to life.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "desktop-ornament-components-kit",
+    "title": "Desktop Ornament Components Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f8c9c2fd216c4a7272a65fa8063a39fd4a93fc30aabd7de2fb39774fbd0a2195",
+   "en": "DIY Desktop Clock: Create a one-of-a-kind personalized clock by combining clock components with a custom 3D-printed frame.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "desktop-ornament-components-kit",
+    "title": "Desktop Ornament Components Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Applications"
+   },
+   "dict": null
+  },
+  {
+   "h": "6b6afeed7fcee1aeaba28de81f766efba4f86c2908070827e130b4292a2b7218",
+   "en": "Mood Lighting: Use LED strips and RGB lights to craft vibrant, dynamic lighting effects that enhance the ambiance of any room.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "desktop-ornament-components-kit",
+    "title": "Desktop Ornament Components Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• DIY Desktop Clock: Create a one-of-a-kind personalized clock by combining clock components with a custom 3D-printed frame."
+   },
+   "dict": null
+  },
+  {
+   "h": "3be15d3c5453d9fb10540d9ca529081957975d0f3255f60e0e59d8a7afa9dd97",
+   "en": "Romantic Candlelight: The LED candlelight kit provides a warm and cozy glow, perfectly mimicking the gentle flicker of real candlelight.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "desktop-ornament-components-kit",
+    "title": "Desktop Ornament Components Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• Mood Lighting: Use LED strips and RGB lights to craft vibrant, dynamic lighting effects that enhance the ambiance of any room."
+   },
+   "dict": null
+  },
+  {
+   "h": "c0fa14b61524c4d10ab506162663f3802997b92e5b7918da345c14c5f691fb97",
+   "en": "Music Box Ornament: Easily assemble a charming and melodious music box with the included Piano Music Box Winding Kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "desktop-ornament-components-kit",
+    "title": "Desktop Ornament Components Kit",
+    "field": "blocks[2].line[4]",
+    "near": "• Romantic Candlelight: The LED candlelight kit provides a warm and cozy glow, perfectly mimicking the gentle flicker of real candlelight."
+   },
+   "dict": null
+  },
+  {
+   "h": "f6bff22083e7e4257baa2e734308f415e640249013df5bf63ab1fc3b431e0aea",
+   "en": "Artistic Light Decor: Combine an acrylic cylinder, adjustable COB light strips, and power components to design a minimalist and elegant art lamp with customizable lighting effects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "desktop-ornament-components-kit",
+    "title": "Desktop Ornament Components Kit",
+    "field": "blocks[2].line[5]",
+    "near": "• Music Box Ornament: Easily assemble a charming and melodious music box with the included Piano Music Box Winding Kit."
+   },
+   "dict": null
+  },
+  {
+   "h": "a12bfd22a7e5be692608e3656ef660bee6613bf7bbeac89b6fc332c56300f694",
+   "en": "Adhesive Foam Roll: Securely attach and stabilize tabletop ornaments on any flat surface for a firm and steady display.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "desktop-ornament-components-kit",
+    "title": "Desktop Ornament Components Kit",
+    "field": "blocks[2].line[6]",
+    "near": "• Artistic Light Decor: Combine an acrylic cylinder, adjustable COB light strips, and power components to design a minimalist and elegant art lamp with customiz"
+   },
+   "dict": null
+  },
+  {
+   "h": "080768915317c4fa9db3629052750d0c8512d03f68e754b78ef2f5f9a66acc0e",
+   "en": "This Filament Protection Kit includes 6 packs of desiccant, 2 thermometer hygrometers, and 1 roll of adhesive foam sponge strip roll, effectively preventing filaments to absorb moisture by humid environments. The components in the kit can replace expired desiccants in the AMS and add standalone hygrometers. Additionally, they can be used to modify multiple filament storage boxes, providing a safer storage environment for opened filaments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-protection-kit",
+    "title": "Filament Protection Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "45930b2dc5bc4c8f6b3aafa341c58b3dd52c3d27dfc14fdfa5f59f6df6dc1354",
+   "en": "AMS and Filament Box Maintenance: Equipped with sufficient desiccants to meet the replacement needs for expired desiccants.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-protection-kit",
+    "title": "Filament Protection Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Application"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7bb2dc5b37bbd0dffae5bf3400c1cf2790fc14f5623ecdcdbe6205e608acb5a",
+   "en": "Filament Box Upgrades: Use adhesive foam sponge strip roll to enhance the sealing performance of DIY filament box, place desiccants inside to absorb moisture, and install hygrometers for real-time monitoring of storage conditions, ensuring filaments remain in optimal condition.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-protection-kit",
+    "title": "Filament Protection Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• AMS and Filament Box Maintenance: Equipped with sufficient desiccants to meet the replacement needs for expired desiccants."
+   },
+   "dict": null
+  },
+  {
+   "h": "fa8db91833889bce3a89a2476ade0e4a00d91ed2335d8a93ac2ab184deedf370",
+   "en": "Standardized Connections: The kit contains a wide range of standardized screws and nuts, with screw sizes ranging from M2 to M4 and lengths from 4mm to 30mm, covering most screw sizes commonly used in 3D printed models.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fastener-kit",
+    "title": "Fastener Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Kit Includes:"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbd9a08b40d77b87988c7f0cb90c919dec4ae6e63611e1297a902160a2c0dbf7",
+   "en": "Efficient Assembly: Creators can directly use high-precision, high-quality fasteners, eliminating the need for repeated testing and searching for suitable components. This allows for faster assembly and improved work efficiency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fastener-kit",
+    "title": "Fastener Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• Standardized Connections: The kit contains a wide range of standardized screws and nuts, with screw sizes ranging from M2 to M4 and lengths from 4mm to 30mm, "
+   },
+   "dict": null
+  },
+  {
+   "h": "66034e9889b2dea962ce025d5036ff05c99fb0cc70093374d1600510a29c78f9",
+   "en": "Small Quantities in Separate Packs: The kit features small, individually packaged quantities, enabling designers to freely match the required fasteners for their models without needing to modify designs to accommodate compatible screws.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fastener-kit",
+    "title": "Fastener Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• Efficient Assembly: Creators can directly use high-precision, high-quality fasteners, eliminating the need for repeated testing and searching for suitable com"
+   },
+   "dict": null
+  },
+  {
+   "h": "e1259c0e97de95a263d2e295ff654b86b4c6876501cb285bca8d29429384c0e0",
+   "en": "Mechanical Structures and Toy Models: Suitable for structural connections in various mechanical structures and toy models, such as car models, robot models, brackets, and scene models, ensuring tight fits and stable connections.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fastener-kit",
+    "title": "Fastener Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Applications:"
+   },
+   "dict": null
+  },
+  {
+   "h": "73141ea7523796852ead41cfbce2ae401e0aec945a23120aa54d54e0dd30c726",
+   "en": "Electronic Device Assembly: Ideal for assembling and securing electronic devices, sensors, hardware boards, and other commonly used electronic components. The selection includes various head types and popular sizes, ensuring the compatibility and reliability of the parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fastener-kit",
+    "title": "Fastener Kit",
+    "field": "blocks[3].line[2]",
+    "near": "• Mechanical Structures and Toy Models: Suitable for structural connections in various mechanical structures and toy models, such as car models, robot models, b"
+   },
+   "dict": null
+  },
+  {
+   "h": "098fbc676d9d6ae58f70c94de9664f2f62970e3e4e0aa89d834b351c72ae5b52",
+   "en": "Home Decoration: Suitable for home decoration projects such as wall racks, display stands, and lighting fixtures, providing reliable and durable connections.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "fastener-kit",
+    "title": "Fastener Kit",
+    "field": "blocks[3].line[3]",
+    "near": "• Electronic Device Assembly: Ideal for assembling and securing electronic devices, sensors, hardware boards, and other commonly used electronic components. The"
+   },
+   "dict": null
+  },
+  {
+   "h": "1ab025f41a352133b63bdb6186ac84facbd97717c74c28d02de33dbd0cbbffff",
+   "en": "It's time to give your 3D printing workshop an upgrade with the Workshop Modification Kit! This kit contains medium sized bearings, a thermometer hygrometer, LED solderless quick connector, magnets, pneumatic fittings, desiccant, adhesive foam sponge strip and silicone tube.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "workshop-modification-kit",
+    "title": "Workshop Modification Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c6ab9ad16826786524a21240db48e3dc59e0ab93557ad96dc9caf89e4dc2d5b2",
+   "en": "Whether you need to make your own filament spool winder, drybox, AMS stand, hanging light, tool box or temperature and humidity monitoring kit, this kit will provide you with the parts you need to create the most impressive workshop.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "workshop-modification-kit",
+    "title": "Workshop Modification Kit",
+    "field": "blocks[1].line[2]",
+    "near": "It's time to give your 3D printing workshop an upgrade with the Workshop Modification Kit! This kit contains medium sized bearings, a thermometer hygrometer, LE"
+   },
+   "dict": null
+  },
+  {
+   "h": "e0df7b360d5e83e9f638b170cc27d180fd6d9f76f36e6fea5def2d643128148e",
+   "en": "AMS Riser: Use the LED strip to light up the printer. Add drawers and magnets to organise your tools.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "workshop-modification-kit",
+    "title": "Workshop Modification Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Applications:"
+   },
+   "dict": null
+  },
+  {
+   "h": "db67e220732971e6a79f9d249c1813e8363239f29139458819ae20cc07a02b26",
+   "en": "Filament Spool Winder: Use deep groove ball bearings to keep the filament spool rolling smoothly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "workshop-modification-kit",
+    "title": "Workshop Modification Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• AMS Riser: Use the LED strip to light up the printer. Add drawers and magnets to organise your tools."
+   },
+   "dict": null
+  },
+  {
+   "h": "a00d0e9742ba7a17d4e37da8b9d716e32280897fc95cc38bb6dc8fdebf13d262",
+   "en": "Drybox: Pneumatic connectors, adhesive foam sponge strip and desiccant will help you keep your filament dry. Add a circular thermometer hygrometer to monitor the environment.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "workshop-modification-kit",
+    "title": "Workshop Modification Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• Filament Spool Winder: Use deep groove ball bearings to keep the filament spool rolling smoothly."
+   },
+   "dict": null
+  },
+  {
+   "h": "6878e3af185d2c43b0f5e1af3a055d025cd0774a73ce261809b81166d1c26c13",
+   "en": "Tool Boxes & Hangers: Magnets can be used to create self-returning tool boxes, magnetic hangers, and use adhesive foam sponge strips to reduce noise and prevent slipping.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "workshop-modification-kit",
+    "title": "Workshop Modification Kit",
+    "field": "blocks[2].line[4]",
+    "near": "• Drybox: Pneumatic connectors, adhesive foam sponge strip and desiccant will help you keep your filament dry. Add a circular thermometer hygrometer to monitor "
+   },
+   "dict": null
+  },
+  {
+   "h": "504bce95d54d31bc77de9a6af89446c16693e20e75da518b57039137b51526f5",
+   "en": "The Eye Bolt with Self-Tapping Thread offers a practical and versatile solution for enhancing the functionality of 3D-printed models. Their unique design—featuring a circular loop and a threaded shaft—makes them ideal for decorative, integrating mechanical, and structural capabilities into printed objects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[2].line[1]",
+    "near": "Introduction"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ed375545604dd64f748fe591dfa2cae17427079b2c2d641fcfe6cbead3da679",
+   "en": "O (mm) Outer diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[3].line[0].cell[1]",
+    "near": "FC006 | 4 ± 0.3 | 2 | 6 ± 0.3 | 10 ± 0.3 | 2 | 1.3 | 1 ± 0.3 | Stainless Steel | 20"
+   },
+   "dict": null
+  },
+  {
+   "h": "9561d21eeebef55489f4a869926e8b8212575f7c62e6cea8c32bd003c36f8ade",
+   "en": "I (mm) Inner diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[3].line[0].cell[2]",
+    "near": "FC006 | 4 ± 0.3 | 2 | 6 ± 0.3 | 10 ± 0.3 | 2 | 1.3 | 1 ± 0.3 | Stainless Steel | 20"
+   },
+   "dict": null
+  },
+  {
+   "h": "bbde304b09e5d218c5651b1ba518bed16c12f5053599d0260b68360cf0b4add0",
+   "en": "T (mm) Threaded section length",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[3].line[0].cell[3]",
+    "near": "FC006 | 4 ± 0.3 | 2 | 6 ± 0.3 | 10 ± 0.3 | 2 | 1.3 | 1 ± 0.3 | Stainless Steel | 20"
+   },
+   "dict": null
+  },
+  {
+   "h": "a12141847abe1d4c611451b66734bc1f597cc88a05354034e574fd35181af588",
+   "en": "L (mm) Overall length",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[3].line[0].cell[4]",
+    "near": "FC006 | 4 ± 0.3 | 2 | 6 ± 0.3 | 10 ± 0.3 | 2 | 1.3 | 1 ± 0.3 | Stainless Steel | 20"
+   },
+   "dict": null
+  },
+  {
+   "h": "87135eaff60dfa67fc0d34796d0a46a322ebc7f49bd96aabd614de89caf66628",
+   "en": "W (mm) Opening width",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[3].line[0].cell[5]",
+    "near": "FC006 | 4 ± 0.3 | 2 | 6 ± 0.3 | 10 ± 0.3 | 2 | 1.3 | 1 ± 0.3 | Stainless Steel | 20"
+   },
+   "dict": null
+  },
+  {
+   "h": "c3d94a3e0def5a9effb2039bb63ff5260c29ee79c2dbf7f47ed483303a8bbed7",
+   "en": "M (mm) Minor diameter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[3].line[0].cell[6]",
+    "near": "FC006 | 4 ± 0.3 | 2 | 6 ± 0.3 | 10 ± 0.3 | 2 | 1.3 | 1 ± 0.3 | Stainless Steel | 20"
+   },
+   "dict": null
+  },
+  {
+   "h": "f05229da7b5a8d01bdf4c92df961717a985d60cd3e8f9d31c821c728587abf2e",
+   "en": "C (mm) Cross-sectional width",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[3].line[0].cell[7]",
+    "near": "FC006 | 4 ± 0.3 | 2 | 6 ± 0.3 | 10 ± 0.3 | 2 | 1.3 | 1 ± 0.3 | Stainless Steel | 20"
+   },
+   "dict": null
+  },
+  {
+   "h": "d7d4f59db48fb4b8d9fe1fe1b7ec5bff489fc305e0ce38500bbb4acc2166e4ca",
+   "en": "pcs",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[3].line[0].cell[9]",
+    "near": "FC006 | 4 ± 0.3 | 2 | 6 ± 0.3 | 10 ± 0.3 | 2 | 1.3 | 1 ± 0.3 | Stainless Steel | 20"
+   },
+   "dict": null
+  },
+  {
+   "h": "49ddfd8b03cc08bc92b88c53452e896c597f52e0fceed750b0f077177da28527",
+   "en": "Hanging and Display: Attach to models like ornaments, keychains, or wall decor for easy suspension.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[4].line[1]",
+    "near": "Applications"
+   },
+   "dict": null
+  },
+  {
+   "h": "a380a55a6336c7bceca0769481754800d834ad06e830adf021bfff6b9a5d1206",
+   "en": "Moving Parts: Use as pivots or connectors for dynamic assemblies like hinges or linked components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[4].line[2]",
+    "near": "• Hanging and Display: Attach to models like ornaments, keychains, or wall decor for easy suspension."
+   },
+   "dict": null
+  },
+  {
+   "h": "7c6f5adb9dd8b6dcaaefbec2bf585fe0c09a3f69fa66f287fd6c704a00a7f1a9",
+   "en": "Reinforcement: Strengthen load-bearing models or secure them to walls or ceilings.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[4].line[3]",
+    "near": "• Moving Parts: Use as pivots or connectors for dynamic assemblies like hinges or linked components."
+   },
+   "dict": null
+  },
+  {
+   "h": "8312373525da0bf7b6602cbc423b7aeb192dbc4f2dfd1adb96d72bf7d08a3e3e",
+   "en": "Interactive Prototypes: Enhance toys, educational kits, or functional prototypes with mechanical connections.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "eye-bolt-with-self-tapping-thread",
+    "title": "Eye Bolt with Self-Tapping Thread",
+    "field": "blocks[4].line[4]",
+    "near": "• Reinforcement: Strengthen load-bearing models or secure them to walls or ceilings."
+   },
+   "dict": null
+  },
+  {
+   "h": "e3fbf57a5a70599533693b0613428fff4b4480df57eda7d6ffaa6370bd777087",
+   "en": "Miniature shaft system: Use metal shafts and bearings as rotating shafts when making gearboxes and other shaft systems to improve shaft parallelism and stability of shaft distance and reduce rotating resistance.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "precision-shaft-system-kit",
+    "title": "Precision Shaft System Kit",
+    "field": "blocks[2].line[1]",
+    "near": "Applications:"
+   },
+   "dict": null
+  },
+  {
+   "h": "634b0605e3070b0ba467a037d5242f60859a5d75ab98a013280e57c89a7f0424",
+   "en": "Miniature Linkage: Use thrust ball bearings and shoulder screws to improve parallelism between linkages for smoother reciprocating motion.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "precision-shaft-system-kit",
+    "title": "Precision Shaft System Kit",
+    "field": "blocks[2].line[2]",
+    "near": "• Miniature shaft system: Use metal shafts and bearings as rotating shafts when making gearboxes and other shaft systems to improve shaft parallelism and stabil"
+   },
+   "dict": null
+  },
+  {
+   "h": "71852f451eca7d1e14cd9f3b81a288bfbd290b2dafcfaffd82a8e640fce96670",
+   "en": "Miniature carriage: Use miniature bearings to make the carriage, reduce the resistance of linear movement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "precision-shaft-system-kit",
+    "title": "Precision Shaft System Kit",
+    "field": "blocks[2].line[3]",
+    "near": "• Miniature Linkage: Use thrust ball bearings and shoulder screws to improve parallelism between linkages for smoother reciprocating motion."
+   },
+   "dict": null
+  },
+  {
+   "h": "e89ac29f9d32ae62c9bfe120b3c2b9106efe345d56432faf52eca4bd326c2511",
+   "en": "Miniature guide: Use metal shaft and copper sleeve to make miniature guide, which makes the linear motion of the model free from the interference of layer lines and smoother and more stable.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "precision-shaft-system-kit",
+    "title": "Precision Shaft System Kit",
+    "field": "blocks[2].line[4]",
+    "near": "• Miniature carriage: Use miniature bearings to make the carriage, reduce the resistance of linear movement."
+   },
+   "dict": null
+  },
+  {
+   "h": "a7341251fe62abbd4e61e68efaa48aef4e3dc38228b84d759a2be6b57dfdf436",
+   "en": "Miniature hinge: Use metal shaft as the miniature hinge shaft to improve the strength and rigidity of the model's shaft.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "precision-shaft-system-kit",
+    "title": "Precision Shaft System Kit",
+    "field": "blocks[2].line[5]",
+    "near": "• Miniature guide: Use metal shaft and copper sleeve to make miniature guide, which makes the linear motion of the model free from the interference of layer lin"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3c6f27c768a7f20e12eba91a373518da71882dc6aaa57f3dcf805a0c989be73",
+   "en": "This kit contains a Remote Controller and a USB controller. We have prepared this replacement kit for RGB LED Strip Light and S-shape LED Strip Light (WS2812B RGB) to cover any possible loss or damage during the crafting process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-remote-controller",
+    "title": "LED Light Strip Remote Controller",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa0dda95eb2ce0d35fb20396b2480dc3ed330b76c0c192ab83954a9e05c6ec09",
+   "en": "Start Your 3D Printing Journey with This Maker's Beginner Kit!",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[0].line[0]",
+    "near": "Imagine having your own mini-factory at home, where you can create one-of-a-kind masterpieces! This accessory pack is your secret weapon. Packed with a variety "
+   },
+   "dict": null
+  },
+  {
+   "h": "0abcae3eede7959205acc77c185d14998e50ae054a42ad1d11b9c995d9754d8c",
+   "en": "Why Maker's Beginner Kit?",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[1].line[0]",
+    "near": "• Beginner-friendly: Carefully curated models, continuously updated, and easy-to-follow tutorials. No complex tools needed!"
+   },
+   "dict": null
+  },
+  {
+   "h": "746b4a9062e072745b120d8690aa0d2d6a3312a5b98e2094b261674e66a86256",
+   "en": "Beginner-friendly: Carefully curated models, continuously updated, and easy-to-follow tutorials. No complex tools needed!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[1].line[1]",
+    "near": "Why Maker's Beginner Kit?"
+   },
+   "dict": null
+  },
+  {
+   "h": "890006566d0d080ca9e89a3bd0f59a7342c97bd4c1c3c1865f1ee9eeffe32c97",
+   "en": "Endless creativity: With motors, gears, springs, and more, you can let your imagination run wild and create unexpected designs.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[1].line[2]",
+    "near": "• Beginner-friendly: Carefully curated models, continuously updated, and easy-to-follow tutorials. No complex tools needed!"
+   },
+   "dict": null
+  },
+  {
+   "h": "0bfb8e3e00c598b2edf9068d43227fecde0959c0481247427a0edbee4a9fffdd",
+   "en": "What Can You Make?",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[2].line[0]",
+    "near": "You can easily build these models and more with our Maker's Beginner Kit!"
+   },
+   "dict": null
+  },
+  {
+   "h": "09679dc5bc0bd2d6c64d017cf26cbb13d58a19c3b0d316b0b383cb8a1b3119aa",
+   "en": "You can easily build these models and more with our Maker's Beginner Kit!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[2].line[1]",
+    "near": "What Can You Make?"
+   },
+   "dict": null
+  },
+  {
+   "h": "053ff0b9d69f4f146d54b6cb98193bf24ae9e23cf55b9391735430625da4229f",
+   "en": "Ready to Dive In?",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[3].line[0]",
+    "near": "Join the fun of 3D printing! Use your hands to create a fantastic world of your own."
+   },
+   "dict": null
+  },
+  {
+   "h": "439ca46eeb75428ca4dac13f9c74c003919f74b663fd56a52e16bfffa14df767",
+   "en": "Join the fun of 3D printing! Use your hands to create a fantastic world of your own.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[3].line[1]",
+    "near": "Ready to Dive In?"
+   },
+   "dict": null
+  },
+  {
+   "h": "b16c924ded1e7634be5b49d6d456db9052d1a358cc17664efb2438b1bd34e66f",
+   "en": "Explore Our Model Collection: Scan QR code via Bambu Handy or visit Maker's Beginner Kit Model Collection to access our continuously updated model collection specifically designed for this Kit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[3].line[2]",
+    "near": "Join the fun of 3D printing! Use your hands to create a fantastic world of your own."
+   },
+   "dict": null
+  },
+  {
+   "h": "f0666dd080810f637fdcdb0ec3061e76bed9a1f844dbf05c61e016f2d1638953",
+   "en": "Share Your Creations: Show off your work in community via BambuHandy or MakerWorld web page and connect with fellow makers.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[3].line[3]",
+    "near": "• Explore Our Model Collection: Scan QR code via Bambu Handy or visit Maker's Beginner Kit Model Collection to access our continuously updated model collection "
+   },
+   "dict": null
+  },
+  {
+   "h": "f8a452301c76aaf00fbf4969b978abdcd7628b0dcc5f31a9c3c4963f0f38fa7a",
+   "en": "Join the Design Discussions: Visit the Maker's Supply topic on the MakerWorld forum to discuss creative uses for your parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[3].line[4]",
+    "near": "• Share Your Creations: Show off your work in community via BambuHandy or MakerWorld web page and connect with fellow makers."
+   },
+   "dict": null
+  },
+  {
+   "h": "3262e92ed8b0c64e8186a11119619957d770727c974c0f5b4443afd3ffb40260",
+   "en": "Compete in Creative Contests: Participate in our Maker's Beginner Kit model contest on the MakerWorld contest page. Outstanding designs may be featured in our model collection and win amazing prizes!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[3].line[5]",
+    "near": "• Join the Design Discussions: Visit the Maker's Supply topic on the MakerWorld forum to discuss creative uses for your parts."
+   },
+   "dict": null
+  },
+  {
+   "h": "4eca262c69e8b0586705941da4e058229f7f02a15ba6ca994cb8b5e3e8f6d6e4",
+   "en": "Models List",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[0]",
+    "near": "No. | Compatible Models | Creators | Skill Level | Time | Filament Used"
+   },
+   "dict": null
+  },
+  {
+   "h": "38178a20b470cfd18299fb1593dd4ba706f1a83321dac051d01086efd8b7a96f",
+   "en": "No.",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[1].cell[0]",
+    "near": "Models List"
+   },
+   "dict": {
+    "ar": "لا.",
+    "ckb": "نەخێر."
+   }
+  },
+  {
+   "h": "a1139260dc643b4a4a2cb67febd5efa0843244b7d957af54d3ada23ecd596dd0",
+   "en": "Skill Level",
+   "kind": "block_cell",
+   "freq": 15,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[1].cell[3]",
+    "near": "Models List"
+   },
+   "dict": null
+  },
+  {
+   "h": "572b17f1fad176fddda8037cf4589d033cadd27b6fd76d753d9d4032b25bfcdb",
+   "en": "Filament Used",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[1].cell[5]",
+    "near": "Models List"
+   },
+   "dict": null
+  },
+  {
+   "h": "259352694f669f0c5c0acc6a5478774ba58d0bd548ea52d89f8b8648364dabd1",
+   "en": "6-Shot Disc Shooter",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[2].cell[1]",
+    "near": "No. | Compatible Models | Creators | Skill Level | Time | Filament Used"
+   },
+   "dict": null
+  },
+  {
+   "h": "2dd9b9088b5fefa554b2919e524d24540982f7cc4007dbaaa0f7e661ca3d12ab",
+   "en": "@uhltimate",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[2].cell[2]",
+    "near": "No. | Compatible Models | Creators | Skill Level | Time | Filament Used"
+   },
+   "dict": null
+  },
+  {
+   "h": "ce4cb0bd74c79940dd08ecb5450fd278605c8ed741fdf1fecbb6a464bc0d27c1",
+   "en": "Disc Launcher Semi Auto Rapid Fire Print-in-Place",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[3].cell[1]",
+    "near": "1 | 6-Shot Disc Shooter | @uhltimate | | 1h50min | 41.82g"
+   },
+   "dict": null
+  },
+  {
+   "h": "6a18d9deec862cda91aa8b8f0e3def370f101ca873992ca2527a80250e74e564",
+   "en": "@DKdevt",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[3].cell[2]",
+    "near": "1 | 6-Shot Disc Shooter | @uhltimate | | 1h50min | 41.82g"
+   },
+   "dict": null
+  },
+  {
+   "h": "a3996548dd7c7d168e9343fec13edaa3a65527677fd0f5e3d5e94d9a4174bdfc",
+   "en": "Functional Escalator Model - Redux",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[4].cell[1]",
+    "near": "2 | Disc Launcher Semi Auto Rapid Fire Print-in-Place | @DKdevt | | 2h49min | 66.50g"
+   },
+   "dict": null
+  },
+  {
+   "h": "c22de662e94151f38865fc1ddcac6efe5b94b237cb8dbf0ee6ab3a624b4c721a",
+   "en": "@AlexY_",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[4].cell[2]",
+    "near": "2 | Disc Launcher Semi Auto Rapid Fire Print-in-Place | @DKdevt | | 2h49min | 66.50g"
+   },
+   "dict": null
+  },
+  {
+   "h": "88c2c20b2bfa5ffe6569e7d66599a8d120608ad866c063d08cfe922ba6688a20",
+   "en": "Custom Length Ski Chairlift",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[5].cell[1]",
+    "near": "3 | Functional Escalator Model - Redux | @AlexY_ | | 14h53min | 358.41g"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c23917b94c1871869e87cca180c6713eebe348de28e263a788740fb833a3ce1",
+   "en": "@Darts_3D",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[5].cell[2]",
+    "near": "3 | Functional Escalator Model - Redux | @AlexY_ | | 14h53min | 358.41g"
+   },
+   "dict": null
+  },
+  {
+   "h": "078ba733ca03816e1021a5af311a6868ff26db97ae41e0b2818e66b746816f8e",
+   "en": "Retractable Ballpoint Pen",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[6].cell[1]",
+    "near": "4 | Custom Length Ski Chairlift | @Darts_3D | | 23h54min | 642.96g"
+   },
+   "dict": null
+  },
+  {
+   "h": "4432726b7ba944cce75d9b2eae693eea2effc3626470843240c52e6069f45386",
+   "en": "@wuguigui",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[6].cell[2]",
+    "near": "4 | Custom Length Ski Chairlift | @Darts_3D | | 23h54min | 642.96g"
+   },
+   "dict": null
+  },
+  {
+   "h": "ac21d33e835fda0e3f8b7ed3f7274124d7c6005ef9a9d3936a22dfcadf7e91da",
+   "en": "Marble Castle - Desk Fidget Toy",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[7].cell[1]",
+    "near": "5 | Retractable Ballpoint Pen | @wuguigui | | 2h20min | 18.97g"
+   },
+   "dict": null
+  },
+  {
+   "h": "ae4fd2eac458a34f8f11084470e3b93401df533d15e3a4ed89dafd4b1b6790b5",
+   "en": "@BamBam Design",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[7].cell[2]",
+    "near": "5 | Retractable Ballpoint Pen | @wuguigui | | 2h20min | 18.97g"
+   },
+   "dict": null
+  },
+  {
+   "h": "b97ca77e7e9078d944a6b5f62fc600d2b8daf39dbadd22dda728a2145f953029",
+   "en": "Racing Seat Phone Holder",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[8].cell[1]",
+    "near": "6 | Marble Castle - Desk Fidget Toy | @BamBam Design | | 3h29m | 70.64g"
+   },
+   "dict": null
+  },
+  {
+   "h": "84f7d1f97a7905039a3a8d76c9902149f6f48bd33af2e007ca0e61d2194bce4f",
+   "en": "Stylish Modern Tech Inspired Pen/Pencil cases",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[9].cell[1]",
+    "near": "7 | Racing Seat Phone Holder | @BrandedAbstract3D | | 3h32m | 48.49g"
+   },
+   "dict": null
+  },
+  {
+   "h": "37bd9fb9504be5bdde3092fa8d2331946af43601d5dd063d18549266e0e1f78b",
+   "en": "@Josh-3D",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[9].cell[2]",
+    "near": "7 | Racing Seat Phone Holder | @BrandedAbstract3D | | 3h32m | 48.49g"
+   },
+   "dict": null
+  },
+  {
+   "h": "c9398a64697d20a7e184349f4fd8d8c9590b4210bb784dc993d01ea52ee85e78",
+   "en": "Cute Flexi Pets Chameleon (Keychain Magnet)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[10].cell[1]",
+    "near": "8 | Stylish Modern Tech Inspired Pen/Pencil cases | @Josh-3D | | 4h3m | 114.66g"
+   },
+   "dict": null
+  },
+  {
+   "h": "a196039b16eda1352a29ef0484645ef80ba0ca4dc3a7fe8e12c8bb5c7c90264a",
+   "en": "@Valeria Momo & Mattia",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[10].cell[2]",
+    "near": "8 | Stylish Modern Tech Inspired Pen/Pencil cases | @Josh-3D | | 4h3m | 114.66g"
+   },
+   "dict": null
+  },
+  {
+   "h": "6ba93b6a3264339021fe0d200a1ab203dce626ef88a90db4a33d965737a11dac",
+   "en": "Christmas Tree Tea Light Ornament",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[11].cell[1]",
+    "near": "9 | Cute Flexi Pets Chameleon (Keychain Magnet) | @Valeria Momo & Mattia | | 3h10min | 52.56g"
+   },
+   "dict": null
+  },
+  {
+   "h": "95cefdd8a61608457deb870ec63da2cf6b0ba8edfed0a3a2ae3d0db5c8d6581a",
+   "en": "@TrendtB",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[11].cell[2]",
+    "near": "9 | Cute Flexi Pets Chameleon (Keychain Magnet) | @Valeria Momo & Mattia | | 3h10min | 52.56g"
+   },
+   "dict": null
+  },
+  {
+   "h": "079385fd1fcdd5b90c941a92bc0dff878112386a8d8b9b312f9f57e3f864266b",
+   "en": "@NUKDDD",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[12].cell[2]",
+    "near": "10 | Christmas Tree Tea Light Ornament | @TrendtB | | 2h6m | 38.37g"
+   },
+   "dict": null
+  },
+  {
+   "h": "6b062a8f7a381b930f9304920a6fef12db9055402f8013122cae0ab24cd92389",
+   "en": "Tealight Christmas pets",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[13].cell[1]",
+    "near": "11 | Easter Bunny Egg Lamp | @NUKDDD | | 4h18m | 50.67g"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c5a2437286f899817bf98ed4ab9e002ff7a01240ab8cd6e3337b33a053d6a8e",
+   "en": "Mechanical Wave Simulator with Lighthouse & Boat",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[14].cell[1]",
+    "near": "12 | Tealight Christmas pets | @G_W__ | | 2h1m | 54.52g"
+   },
+   "dict": null
+  },
+  {
+   "h": "d018cbec84e6c614575636e8f990fbbb687a114db1851959d530fe81e147b013",
+   "en": "@iabrcam",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[14].cell[2]",
+    "near": "12 | Tealight Christmas pets | @G_W__ | | 2h1m | 54.52g"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e23035600cd87c6fa389233d08baa4b906d0808145d8d10a1d4b75f37758c10",
+   "en": "Magnetic Fishing Toy Set",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[15].cell[1]",
+    "near": "13 | Mechanical Wave Simulator with Lighthouse & Boat | @iabrcam | | 5h7m | 157.01g"
+   },
+   "dict": null
+  },
+  {
+   "h": "2df033ccb09ec9d5df290921b2497089f58eff1a79e3271f2f8010cb2c1c08b6",
+   "en": "@wontonnn",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[15].cell[2]",
+    "near": "13 | Mechanical Wave Simulator with Lighthouse & Boat | @iabrcam | | 5h7m | 157.01g"
+   },
+   "dict": null
+  },
+  {
+   "h": "fa9105493e54129cafaaea1495bc37cd53b7e7f90c46fa306dc69fcee20aa753",
+   "en": "Pizza Oven LED Tea Light Holder + Miniatures",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "makers-beginner-kit",
+    "title": "Maker's Beginner Kit",
+    "field": "blocks[4].line[16].cell[1]",
+    "near": "14 | Magnetic Fishing Toy Set | @wontonnn | | 12h39m | 114.66g"
+   },
+   "dict": null
+  },
+  {
+   "h": "c49e71ce56688ff40189d9c5aeff179df7a30203a4dbe545c280f67d67419328",
+   "en": "3D Model Application instruction",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[0].line[1]",
+    "near": "Documentation"
+   },
+   "dict": null
+  },
+  {
+   "h": "0085f9f172c8b0eca7195328864070431ef34f3aae52163944c9653e317252da",
+   "en": "Mushroom on A Shelf",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[1].line[3].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "98e657e28fd30a0dc42e74c9285df776f6cbb748215c47197b710a2226f72a3d",
+   "en": "Jellyfish with remote control LED light",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[1].line[4].cell[0]",
+    "near": "Mushroom on A Shelf | NUKDDD | Mushroom on A Shelf"
+   },
+   "dict": null
+  },
+  {
+   "h": "c5317964f9963d57f5d6a3903f63dc8bd36ef4b88bafe1e5aead553005cd26ae",
+   "en": "WimV",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "Mushroom on A Shelf | NUKDDD | Mushroom on A Shelf"
+   },
+   "dict": null
+  },
+  {
+   "h": "ab18d8f6585040e0b161cf1393e8dd90a63d595878701c319c27e5bacc5053ed",
+   "en": "ARC Raiders Leaper – Articulated & RGB LED",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[1].line[5].cell[0]",
+    "near": "Jellyfish with remote control LED light | WimV | Jellyfish with remote control LED light"
+   },
+   "dict": null
+  },
+  {
+   "h": "937b488fe5c100b579b41f1f0490daca42202f6a976dddba81bc218b0634a8df",
+   "en": "13 Colors and 2 Modes:Adjustable fade and strobe effects to suit various scene requirements.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[2].line[1]",
+    "near": "Product Features"
+   },
+   "dict": null
+  },
+  {
+   "h": "b28f36c37aef371a05d1bbfbf4b8b617fefdcd8644a525dd6a2ee0e9a953d667",
+   "en": "4 Brightness Levels: Allows you to create the perfect lighting effect.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[2].line[2]",
+    "near": "• 13 Colors and 2 Modes:Adjustable fade and strobe effects to suit various scene requirements."
+   },
+   "dict": null
+  },
+  {
+   "h": "cdce3ddb690b1c67f8e54f290acf9c055c66e23d14b2af896161d8914e3ceb95",
+   "en": "Waterproof Design: Suitable for water-based decorations such as ponds and vases.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[2].line[3]",
+    "near": "• 4 Brightness Levels: Allows you to create the perfect lighting effect."
+   },
+   "dict": null
+  },
+  {
+   "h": "812301f3cec1fc5e1fe55932546f51ba7ef1af7f8d545fc73584aada812aad2b",
+   "en": "16-Hour Battery Life: Replaceable batteries ensure long-lasting use.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[2].line[4]",
+    "near": "• Waterproof Design: Suitable for water-based decorations such as ponds and vases."
+   },
+   "dict": null
+  },
+  {
+   "h": "9b514f1f3fa1ae69bb521c69e24ab0453a49f21f7ea7a13350158ac012c3e809",
+   "en": "Remote Control Operation: Can control multiple lights simultaneously, with flexible adjustment of lighting effects.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[2].line[5]",
+    "near": "• 16-Hour Battery Life: Replaceable batteries ensure long-lasting use."
+   },
+   "dict": null
+  },
+  {
+   "h": "8bdafdc413a63a4679fbd45057d41b3b29ee798dc564b72990053a974552f92e",
+   "en": "The remote control is not waterproof, so keep it away from water.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[3].line[2]",
+    "near": "• This product contains small parts and poses a choking hazard. Do not ingest. If accidentally swallowed, seek immediate medical attention. Keep out of reach of"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e3a9b265ce23e116d8d9897dc6983e4bb1a049a96e12dfebb1afc640bbb137c",
+   "en": "The infrared remote control has a range of 5-10 meters. Please operate the LED light within this effective range.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[3].line[3]",
+    "near": "• The remote control is not waterproof, so keep it away from water."
+   },
+   "dict": null
+  },
+  {
+   "h": "3066699d25b3d42814f930fb0121f650df3f301ad6f14af81a896ecd0e0ffdbe",
+   "en": "When the remote is working normally, pressing the \"OFF\" button will turn the light off. Press \"ON\" again to restore the light to its previous mode before it was turned off.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[3].line[4]",
+    "near": "• The infrared remote control has a range of 5-10 meters. Please operate the LED light within this effective range."
+   },
+   "dict": null
+  },
+  {
+   "h": "0e0fa42b21823c3d24537dfd028c34531ddeff8947be562aa76ff445c97690b7",
+   "en": "Multiple lights can be controlled simultaneously: The remote control communicates with the light through the receiver (black dot) on the light. Ensure the light is within the effective remote range and aim directly at the light when operating.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[3].line[5]",
+    "near": "• When the remote is working normally, pressing the \"OFF\" button will turn the light off. Press \"ON\" again to restore the light to its previous mode before it w"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a461a8e49d292ce58a65bbacd6143d3da87557a20146308884973a80a6ee206",
+   "en": "If the light still doesn't respond after replacing the batteries: If you’ve replaced the 2*CR2032 button batteries but the remote still doesn't control the light, check and replace the remote’s battery with 1*CR2025.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[3].line[6]",
+    "near": "• Multiple lights can be controlled simultaneously: The remote control communicates with the light through the receiver (black dot) on the light. Ensure the lig"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6980e6f184a2bc932aa23b93286c6abe3178ffda792ef02a7b39ee47e540b90",
+   "en": "If not in use for a long time: For extended periods of inactivity, it’s recommended to install the battery insulation sheet or remove the batteries to prolong their life.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[3].line[7]",
+    "near": "• If the light still doesn't respond after replacing the batteries: If you’ve replaced the 2*CR2032 button batteries but the remote still doesn't control the li"
+   },
+   "dict": null
+  },
+  {
+   "h": "48263755cc7da08fd97ef659a451361ee36136b7c55022e733637d1e75ae7d21",
+   "en": "Use high-quality batteries to ensure proper functioning of the device.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "blocks[3].line[8]",
+    "near": "• If not in use for a long time: For extended periods of inactivity, it’s recommended to install the battery insulation sheet or remove the batteries to prolong"
+   },
+   "dict": null
+  },
+  {
+   "h": "722d4bf74b183f768191ff7e97161c97c2057e3ce3241358656816d60ab79606",
+   "en": "Please pay attention to the connector markings on the PCB and plug the appliance into the CN-MOTO connector.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "150mm-zh1-5-to-sh1-0-conversion-wire",
+    "title": "150mm ZH1.5 to SH1.0 Conversion Wire",
+    "field": "blocks[0].line[1]",
+    "near": "Consideration"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5cd4a8838edaf8f00060ea16ffe3aed360cbb6fa9d29b9d9e41d04aba062a6c",
+   "en": "Your PrintMon, Your Stage! Ever dreamed of adding your own twist to a popular animation? With PrintMon Maker, you can turn those ideas into reality and transform them into real, tangible creations! No 3D modeling skills are required—this AI-powered generator helps you hatch your one-of-a-kind PrintMon effortlessly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "turntable-kit",
+    "title": "Turntable Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4da78580c32f6ad569803ebcdd3f2992ecb06427b539b1cfe4ab36eba3afa994",
+   "en": "To showcase your unique creation, pair it with our Turntable Kit—the perfect stage for your PrintMon. Designed with rechargeable components and 608ZZ bearings, this kit ensures smooth, quiet rotations while enhancing load-bearing capacity. The turntable supports 360-degree rotation, bringing your design to life and making every angle shine.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "turntable-kit",
+    "title": "Turntable Kit",
+    "field": "blocks[0].line[2]",
+    "near": "Your PrintMon, Your Stage! Ever dreamed of adding your own twist to a popular animation? With PrintMon Maker, you can turn those ideas into reality and transfor"
+   },
+   "dict": null
+  },
+  {
+   "h": "ba8213d436583e6b5caa0180f0d01e6190c0bed67499f0b2b11b0e6cb4b80099",
+   "en": "Start creating your own PrintMon today with PrintMon Maker, and let the Turntable Kit elevate your creations to the next level!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "turntable-kit",
+    "title": "Turntable Kit",
+    "field": "blocks[0].line[3]",
+    "near": "To showcase your unique creation, pair it with our Turntable Kit—the perfect stage for your PrintMon. Designed with rechargeable components and 608ZZ bearings, "
+   },
+   "dict": null
+  },
+  {
+   "h": "8ea5204920a19589cce2337c0750d04a0be827ac2b0b95ea5594ad284ced02e9",
+   "en": "Fantasy Creatures Display Turntable",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "turntable-kit",
+    "title": "Turntable Kit",
+    "field": "blocks[0].line[5].cell[0]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "4baa33a3d3fd1d370c772c9b484a3a446cc611835ba31f4ff2d8e7b5d17ee023",
+   "en": "@parkeryaojj",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "turntable-kit",
+    "title": "Turntable Kit",
+    "field": "blocks[0].line[5].cell[1]",
+    "near": "Models | Creators | Model Links"
+   },
+   "dict": null
+  },
+  {
+   "h": "878c240fd717f39d8cec9f7a5cf936873ffcc0757beef703ad2c5f9ed1890344",
+   "en": "maker",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+    "title": "M6 Carbon Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "blocks[1].line[1]",
+    "near": "3D Model"
+   },
+   "dict": null
+  },
+  {
+   "h": "d4d768b2d4d90d2ac1a3ccc098cfd3fd86c5fdcff84e3ad373419ac30ab9d0ee",
+   "en": "Nominal thread: M6",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+    "title": "M6 Carbon Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "blocks[3].line[2]",
+    "near": "• Carbon Steel Socket Head Cap Machine Screws (SHCS)"
+   },
+   "dict": null
+  },
+  {
+   "h": "43ef62bfa1d0e4ed6d06af73d41820b5b343253817526003a78e28e482e43589",
+   "en": "Strength grade: 12.9",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+    "title": "M6 Carbon Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "blocks[3].line[3]",
+    "near": "• Nominal thread: M6"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c33b220ce31fe251a0b145d601f91a11bb71a31c79f21ee75a1236c5cc0ce92",
+   "en": "Type of thread: Full thread",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+    "title": "M6 Carbon Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "blocks[3].line[5]",
+    "near": "• Full thread series"
+   },
+   "dict": null
+  },
+  {
+   "h": "10fce9f075a7fd596163a6ee94548a56cbb9f43d8b21b363f2718bfc65cde822",
+   "en": "The product contains all the non-3D printed parts for assembling a fully functional Flaming Fox V8 Engine. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "flaming-fox-v8-engine",
+    "title": "Flaming Fox V8 Engine Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0b6c3cff490ea8444efcec6bdda086359203ae909aea38f97d6b0ddee340e29",
+   "en": "To download the model files of the Flaming Fox V8 Engine and obtain detailed information, please visit the Flaming Fox V8 Engine on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "flaming-fox-v8-engine",
+    "title": "Flaming Fox V8 Engine Kit",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  },
+  {
+   "h": "cff4cecf56e51ad3f3774707fcc0fafcae672a12c4695170bd944b9face226ab",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Hexagon Twist Fidget (V2). To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hexagon-twist-fidget-v2",
+    "title": "Hexagon Twist Fidget (V2)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0930b1f202993042d649ada9eef066570e6663d6d131ca3bfc069ecbe98695c",
+   "en": "To download the model files please visit the Hexagon Twist Fidget (V2)on MakerWorld.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hexagon-twist-fidget-v2",
+    "title": "Hexagon Twist Fidget (V2)",
+    "field": "blocks[0].line[3]",
+    "near": "Creator Program: The Creator Program is a collaborative program between Bambu Lab and creators. Creators unleash their creativity to design 3D printing models, "
+   },
+   "dict": null
+  }
+ ]
+}

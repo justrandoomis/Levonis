@@ -1,0 +1,683 @@
+{
+ "protocol": 2,
+ "source": "bambu_us",
+ "source_product_id": "749063516266602496",
+ "handle": "3d-effect-plate-full-combo",
+ "route": "552709757765505024",
+ "write_mode": "create",
+ "product_id": "p_74e12cbcef79e4a143d9e073",
+ "curated_sha256": "",
+ "extraction_sha256": "bcb0f6234fafc55acf888908f71f92840a84e58b50cdcf4797ac650a1fab2a74",
+ "product": {
+  "title_en": "3D Effect Plate Full Combo",
+  "short_description_en": "",
+  "variant_mode": "VARIANT_COMBINATION",
+  "usage_steps": [],
+  "usage_official_url": ""
+ },
+ "groups": [
+  {
+   "id": "og_cbb138a374706eb19d4055fb",
+   "source_id": "749063516270796801",
+   "sort": 1,
+   "name_en": "Compatibility",
+   "name_ar": "التوافق",
+   "name_ckb": "گونجاوی",
+   "kind": "other",
+   "source_label": "Compatibility",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_e79d0eeae95769ace3467569",
+     "source_id": "749063516274991104",
+     "name_en": "X1/P1/A1/X2/P2",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-761bbfe1ea933767fe82f206",
+     "variant_label": "X1/P1/A1/X2/P2",
+     "sort": 0,
+     "colour_code": ""
+    },
+    {
+     "id": "ov_1bf583c058972b183f60af9a",
+     "source_id": "749063516274991105",
+     "name_en": "A1 mini",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-dde2d8afa4f2772623da05c8",
+     "variant_label": "A1 mini",
+     "sort": 1,
+     "colour_code": ""
+    }
+   ]
+  },
+  {
+   "id": "og_4834dfb02b9715aa9586ea94",
+   "source_id": "749063516274991106",
+   "sort": 2,
+   "name_en": "Texture",
+   "name_ar": "",
+   "name_ckb": "",
+   "kind": "other",
+   "source_label": "Texture",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_99917f836bffcae7fe107984",
+     "source_id": "749063516274991107",
+     "name_en": "Carbon Fiber+Diamond+Galaxy+Starry",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-999097c2254edd63bc71d74e",
+     "variant_label": "Carbon Fiber+Diamond+Galaxy+Starry",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  }
+ ],
+ "variants": [
+  {
+   "id": "pv_e6effcdd6cbf9489a72865ed",
+   "source_id": "749063516279185408",
+   "combo_key": "o:ov_99917f836bffcae7fe107984|o:ov_e79d0eeae95769ace3467569",
+   "value_ids": [
+    "ov_e79d0eeae95769ace3467569",
+    "ov_99917f836bffcae7fe107984"
+   ]
+  },
+  {
+   "id": "pv_82f2e27127c3c303a6008ee3",
+   "source_id": "749063516279185413",
+   "combo_key": "o:ov_1bf583c058972b183f60af9a|o:ov_99917f836bffcae7fe107984",
+   "value_ids": [
+    "ov_1bf583c058972b183f60af9a",
+    "ov_99917f836bffcae7fe107984"
+   ]
+  }
+ ],
+ "images": [
+  {
+   "id": "pi_b20be1a704cfdb7fe341c09e",
+   "source_media_id": "759267687661568000",
+   "source_url": "https://store.bblcdn.com/s7/default/181f6bc6bab74cb8abf12d7ee57312e4/3D_Effect_Plate_Full_Combo.jpg",
+   "sort_order": 0,
+   "is_primary": true,
+   "option_value_id": "ov_99917f836bffcae7fe107984",
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "value",
+   "alt_en": "3D Effect Plate Full Combo — Carbon Fiber+Diamond+Galaxy+Starry",
+   "alt_ar": "صورة 3D Effect Plate Full Combo — Carbon Fiber+Diamond+Galaxy+Starry",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo — Carbon Fiber+Diamond+Galaxy+Starry"
+  },
+  {
+   "id": "pi_48766a96db31c22a12882ccf",
+   "source_media_id": "759267687661568000",
+   "source_url": "https://store.bblcdn.com/s7/default/181f6bc6bab74cb8abf12d7ee57312e4/3D_Effect_Plate_Full_Combo.jpg",
+   "sort_order": 1,
+   "is_primary": false,
+   "option_value_id": "ov_e79d0eeae95769ace3467569",
+   "variant_id": null,
+   "via_variant_id": "pv_e6effcdd6cbf9489a72865ed",
+   "binding_rule": "representative",
+   "alt_en": "3D Effect Plate Full Combo — X1/P1/A1/X2/P2",
+   "alt_ar": "صورة 3D Effect Plate Full Combo — X1/P1/A1/X2/P2",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo — X1/P1/A1/X2/P2"
+  },
+  {
+   "id": "pi_87510323a7e7e44763e7729c",
+   "source_media_id": "759267687661568000",
+   "source_url": "https://store.bblcdn.com/s7/default/181f6bc6bab74cb8abf12d7ee57312e4/3D_Effect_Plate_Full_Combo.jpg",
+   "sort_order": 2,
+   "is_primary": false,
+   "option_value_id": "ov_1bf583c058972b183f60af9a",
+   "variant_id": null,
+   "via_variant_id": "pv_82f2e27127c3c303a6008ee3",
+   "binding_rule": "representative",
+   "alt_en": "3D Effect Plate Full Combo — A1 mini",
+   "alt_ar": "صورة 3D Effect Plate Full Combo — A1 mini",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo — A1 mini"
+  }
+ ],
+ "swatches": [],
+ "content_blocks": [
+  {
+   "id": "cb_de6eb0008773d0fc5594c1b7",
+   "order": 0,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:72b1058d317031f2becfc164",
+   "source_url": "https://store.bblcdn.com/s7/default/60083f2084a94483954dd573f475aeab/3D_Effect_Plate_Banner.jpg",
+   "alt_en": "3D Effect Plate Full Combo",
+   "alt_ar": "صورة 3D Effect Plate Full Combo",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "html"
+  },
+  {
+   "id": "cb_4177e71dd521523c694d51f2",
+   "order": 1,
+   "title_en": "Bambu 3D Effect Plate",
+   "body_en": "Need some extra pizazz for your prints? Bambu 3D Effect Plate can transfer interesting surface textures to your printed objects. There are 4 exciting textures, ranging from Carbon Fiber all the way to Starry, Galaxy, and Diamond! Want to make your prints stand out? Get Bambu 3D Effect Plate and unlock a world of textural possibilities!",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "html › 1"
+  },
+  {
+   "id": "cb_63008f626551ec720f470494",
+   "order": 2,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:9b2d84b91509277267a3fb92",
+   "source_url": "https://store.bblcdn.com/s7/default/8438cd598c124228b409c44b6619b810/22.png",
+   "alt_en": "3D Effect Plate Full Combo",
+   "alt_ar": "صورة 3D Effect Plate Full Combo",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "html › 1"
+  },
+  {
+   "id": "cb_35663a2998f6ddd9744b3665",
+   "order": 3,
+   "title_en": "Galaxy Surface",
+   "body_en": "The Galaxy Surface transfers a vibrant galaxy rainbow effect on the first layer of the print, which glitters and changes color depending on the angle. It works best with silk or shiny filaments to take advantage of the pattern transfer.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "html › 2"
+  },
+  {
+   "id": "cb_41fce27d1055ef8254831d8e",
+   "order": 4,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:df14a63fb1855ddbc3f90066",
+   "source_url": "https://store.bblcdn.com/s7/default/a8e17af1c7114780a489db263cc1b117/33.jpg",
+   "alt_en": "3D Effect Plate Full Combo",
+   "alt_ar": "صورة 3D Effect Plate Full Combo",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "html › 2"
+  },
+  {
+   "id": "cb_8ea42875503808337094f7f1",
+   "order": 5,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:104ec2f81474a5f485e6e34d",
+   "source_url": "https://store.bblcdn.com/s7/default/6925be6dff2b482a834edabd5b25d595/4_b151ca6c-c1cd-467c-ab09-7316c13e8fa2.jpg",
+   "alt_en": "3D Effect Plate Full Combo",
+   "alt_ar": "صورة 3D Effect Plate Full Combo",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "html › 2"
+  },
+  {
+   "id": "cb_9216dc5a790b0fc0aa07429f",
+   "order": 6,
+   "title_en": "Carbon Fiber Surface",
+   "body_en": "The Carbon Fiber has a very slight texture similar to real Carbon Fiber. The pattern transfers to the first layer of the 3D printed model, creating a 3D effect with a distinctive texture, especially when used with a gray carbon filament color.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "html › 3"
+  },
+  {
+   "id": "cb_521c305be698c6c20c2171bc",
+   "order": 7,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:83ff2b6964b9c68400a62ef3",
+   "source_url": "https://store.bblcdn.com/s7/default/c40b05d944a54f9c85d94a4956485f7a/5_b3a52c65-3ca6-4067-9761-270f0a3f4588.jpg",
+   "alt_en": "3D Effect Plate Full Combo",
+   "alt_ar": "صورة 3D Effect Plate Full Combo",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "html › 3"
+  },
+  {
+   "id": "cb_111ff3880691e69af7e3357d",
+   "order": 8,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:c0254c7f1bef4a17ad1d96f7",
+   "source_url": "https://store.bblcdn.com/s7/default/b76e0ea82b1f41759ae527f450591f19/6_90c11933-049d-406d-b0d2-884a2ee5c948.jpg",
+   "alt_en": "3D Effect Plate Full Combo",
+   "alt_ar": "صورة 3D Effect Plate Full Combo",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "html › 3"
+  },
+  {
+   "id": "cb_cc4b57698d36a221dccae57c",
+   "order": 9,
+   "title_en": "Starry Surface",
+   "body_en": "The Starry Surface transfers a rainbow kaleidoscope starry effect on the first layer of the print, which glitters and changes color depending on the angle. It works best with silk or shiny filaments to take advantage of the pattern transfer.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "html › 4"
+  },
+  {
+   "id": "cb_834ad4ee603fee2e2f15ec79",
+   "order": 10,
+   "title_en": "Diamond Surface",
+   "body_en": "The Diamond Surface imprints a diamond pattern on the first layer with a mix of glossy and matte shapes applied to the smooth surface. It's best used with silk or shiny filaments, to take advantage of the pattern transfer.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "html › 5"
+  },
+  {
+   "id": "cb_029612516a592ae9ee5d4f1e",
+   "order": 11,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:f39eb3b9dac2d0ee98e864af",
+   "source_url": "https://store.bblcdn.com/s7/default/ccf92091cbd046bb9eb72bb1091f5243/7.jpg",
+   "alt_en": "3D Effect Plate Full Combo",
+   "alt_ar": "صورة 3D Effect Plate Full Combo",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "html › 5"
+  },
+  {
+   "id": "cb_16254e9d2c11b459c7109ac8",
+   "order": 12,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:a10e28f23330c2a71f510d7c",
+   "source_url": "https://store.bblcdn.com/s7/default/1f16f1b04801494794bc46b1db43795f/8.jpg",
+   "alt_en": "3D Effect Plate Full Combo",
+   "alt_ar": "صورة 3D Effect Plate Full Combo",
+   "alt_ckb": "وێنەی 3D Effect Plate Full Combo",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "html › 5"
+  },
+  {
+   "id": "cb_0c0dc1b8acb821cfac4c823b",
+   "order": 13,
+   "title_en": "Considerations",
+   "body_en": "1. Please set the plate type to Smooth PEI/High Temp Plate and carefully follow the Heatbed Recommended Settings when using the Bambu 3D Effect Plate. For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.\n2. The 3D effect patterns require a clean surface to remain visible. Grease can cause the patterns to disappear. It is essential to keep the surface clean. We recommend using hot water and detergent for cleaning, and avoid touching the surface.\n3. Due to reflections, the LIDAR calibration will not work as expected when using Effect Plates. We recommend skipping the LIDAR calibration sequence, or calibrating with a regular plate.\n4. The 3D Effect Plates are considered consumables. To prolong the lifespan of the transfer textures, try placing your print objects on different areas of the sheet.\n5. Do not apply glue to the plate surface.\n6. Pay close attention when using a scraper to remove prints, to avoid damaging the plate surface.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "html › 6"
+  },
+  {
+   "id": "cb_a05c9165e3ef53a0262e13da",
+   "order": 14,
+   "title_en": "Recommended Settings",
+   "body_en": "We recommend using PLA and TPU filament for printing. Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements. Please select Smooth PEI Plate/High Temp Plate for the Plate Type in Bambu Studio.\nFilaments | Heatbed Temperature\nPLA | 60~65℃\nTPU | 35~45℃",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "html › 7"
+  }
+ ],
+ "specs": [
+  {
+   "id": "sv_8def61df5b5225d02e3ccd8a",
+   "key": "variant.note",
+   "group": "variant",
+   "scope_kind": "variant",
+   "scope_id": "pv_e6effcdd6cbf9489a72865ed",
+   "region": "",
+   "data_type": "string",
+   "original_label": "",
+   "original_value": "For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.",
+   "value_text": "For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "",
+   "status": "unverified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "variant 749063516279185408 › description",
+   "source_excerpt": "For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings ->Print Options -> Enable the detection of build plate position' when printing with the 3D Effect Plate to avo",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 0
+  }
+ ],
+ "documents": [
+  {
+   "id": "pd_8d6ade79fadc5d23f713bb9e",
+   "kind": "video",
+   "title_en": "Video",
+   "title_ar": "فيديو",
+   "title_ckb": "ڤیدیۆ",
+   "url": "https://store.bblcdn.com/s7/default/0b95757807a24347bff0b8c9b702cb43/c53aa9da8c3348879464907845298d2e.mp4",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 0
+  }
+ ],
+ "relations": [
+  {
+   "id": "pr_d1539e91753a1381f286768e",
+   "scope_kind": "option_value",
+   "scope_id": "ov_e79d0eeae95769ace3467569",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "refurbished-x1c",
+   "target_family": "x1_series",
+   "target_label": "X1 Series",
+   "state": "pending",
+   "evidence_kind": "option_value",
+   "evidence_text": "Compatibility: X1/P1/A1/X2/P2"
+  },
+  {
+   "id": "pr_25fb578e1407d9248bcce71e",
+   "scope_kind": "option_value",
+   "scope_id": "ov_e79d0eeae95769ace3467569",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "p1s",
+   "target_family": "p1_series",
+   "target_label": "P1 Series",
+   "state": "pending",
+   "evidence_kind": "option_value",
+   "evidence_text": "Compatibility: X1/P1/A1/X2/P2"
+  },
+  {
+   "id": "pr_4ec22b996549d084845d0175",
+   "scope_kind": "option_value",
+   "scope_id": "ov_e79d0eeae95769ace3467569",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "refurbished-p1s",
+   "target_family": "p1_series",
+   "target_label": "P1 Series",
+   "state": "pending",
+   "evidence_kind": "option_value",
+   "evidence_text": "Compatibility: X1/P1/A1/X2/P2"
+  },
+  {
+   "id": "pr_46af6d77ab3b4e628338d7bd",
+   "scope_kind": "option_value",
+   "scope_id": "ov_e79d0eeae95769ace3467569",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "a1",
+   "target_family": "a1_series",
+   "target_label": "A1 Series",
+   "state": "pending",
+   "evidence_kind": "option_value",
+   "evidence_text": "Compatibility: X1/P1/A1/X2/P2"
+  },
+  {
+   "id": "pr_d4326487675c062f277e0708",
+   "scope_kind": "option_value",
+   "scope_id": "ov_e79d0eeae95769ace3467569",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "refurbished-a1",
+   "target_family": "a1_series",
+   "target_label": "A1 Series",
+   "state": "pending",
+   "evidence_kind": "option_value",
+   "evidence_text": "Compatibility: X1/P1/A1/X2/P2"
+  },
+  {
+   "id": "pr_8fe6f8a9b730af1c32a363fc",
+   "scope_kind": "option_value",
+   "scope_id": "ov_e79d0eeae95769ace3467569",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "x2d",
+   "target_family": "x2_series",
+   "target_label": "X2 Series",
+   "state": "pending",
+   "evidence_kind": "option_value",
+   "evidence_text": "Compatibility: X1/P1/A1/X2/P2"
+  },
+  {
+   "id": "pr_dd7bc3e7e0c530912540e438",
+   "scope_kind": "option_value",
+   "scope_id": "ov_e79d0eeae95769ace3467569",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "p2s",
+   "target_family": "p2_series",
+   "target_label": "P2 Series",
+   "state": "pending",
+   "evidence_kind": "option_value",
+   "evidence_text": "Compatibility: X1/P1/A1/X2/P2"
+  },
+  {
+   "id": "pr_84dfdcea6f30106720a46e92",
+   "scope_kind": "option_value",
+   "scope_id": "ov_e79d0eeae95769ace3467569",
+   "relation": "compatible_with",
+   "target_kind": "family",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "refurbished-bambu-lab-p2s-3d-printer",
+   "target_family": "p2_series",
+   "target_label": "P2 Series",
+   "state": "pending",
+   "evidence_kind": "option_value",
+   "evidence_text": "Compatibility: X1/P1/A1/X2/P2"
+  },
+  {
+   "id": "pr_9dee6311830a97c631c33f17",
+   "scope_kind": "option_value",
+   "scope_id": "ov_1bf583c058972b183f60af9a",
+   "relation": "compatible_with",
+   "target_kind": "printer",
+   "target_product_id": null,
+   "target_source": "bambu_us",
+   "target_source_handle": "a1-mini",
+   "target_family": "",
+   "target_label": "A1 mini",
+   "state": "pending",
+   "evidence_kind": "option_value",
+   "evidence_text": "Compatibility: A1 mini"
+  }
+ ],
+ "external_ids": [
+  {
+   "scope_kind": "product",
+   "scope_id": "",
+   "id_type": "bambu_product_id",
+   "value": "749063516266602496",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_e6effcdd6cbf9489a72865ed",
+   "id_type": "bambu_variant_id",
+   "value": "749063516279185408",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_82f2e27127c3c303a6008ee3",
+   "id_type": "bambu_variant_id",
+   "value": "749063516279185413",
+   "searchable": false
+  }
+ ],
+ "source_refs": [
+  {
+   "kind": "group",
+   "source_id": "749063516270796801",
+   "levonis_id": "og_cbb138a374706eb19d4055fb",
+   "source_label": "Compatibility",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "749063516274991104",
+   "levonis_id": "ov_e79d0eeae95769ace3467569",
+   "source_label": "X1/P1/A1/X2/P2",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "749063516274991105",
+   "levonis_id": "ov_1bf583c058972b183f60af9a",
+   "source_label": "A1 mini",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "749063516274991106",
+   "levonis_id": "og_4834dfb02b9715aa9586ea94",
+   "source_label": "Texture",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "749063516274991107",
+   "levonis_id": "ov_99917f836bffcae7fe107984",
+   "source_label": "Carbon Fiber+Diamond+Galaxy+Starry",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "749063516279185408",
+   "levonis_id": "pv_e6effcdd6cbf9489a72865ed",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "749063516279185413",
+   "levonis_id": "pv_82f2e27127c3c303a6008ee3",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "759267687661568000",
+   "levonis_id": "pi_b20be1a704cfdb7fe341c09e",
+   "source_label": "",
+   "binding_rule": "value",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "759267687661568000",
+   "levonis_id": "pi_48766a96db31c22a12882ccf",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_e6effcdd6cbf9489a72865ed"
+  },
+  {
+   "kind": "image",
+   "source_id": "759267687661568000",
+   "levonis_id": "pi_87510323a7e7e44763e7729c",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_82f2e27127c3c303a6008ee3"
+  }
+ ],
+ "notes": [
+  {
+   "kind": "relation_unresolvable",
+   "field": "compatible_with"
+  },
+  {
+   "kind": "relation_unresolvable",
+   "field": "compatible_with"
+  },
+  {
+   "kind": "relation_unresolvable",
+   "field": "compatible_with"
+  },
+  {
+   "kind": "relation_unresolvable",
+   "field": "compatible_with"
+  },
+  {
+   "kind": "translation_review",
+   "field": "option_groups"
+  }
+ ]
+}

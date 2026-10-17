@@ -1,0 +1,214 @@
+H2S & H2S Laser Edition Spec Sheet
+Item Specification
+Printing Technology Fused Deposition Modeling
+Body
+Build Volume (W*D*H)
+Chassis & Shell
+Laser Safety Windows
+Air Assist Pump
+340*320*340 mm³
+Aluminum and Steel
+Equipped on Laser Edition, normal H2S can upgrade through Laser Upgrade Kit
+Equipped on Laser Edition, normal H2S can upgrade through Laser Upgrade Kit
+Physical Dimensions
+Physical Dimensions
+Net Weight
+492*514*626 mm³
+30 kg
+Toolhead
+Hotend
+Extruder Gear
+Nozzle
+Max Nozzle Temperature
+Included Nozzle Diameter
+Supported Nozzle Diameter
+Filament Cutter
+Filament Diameter
+Extruder Motor
+All Metal
+Hardened Steel
+Hardened Steel
+350 ℃
+0.4 mm
+0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm
+Built-in
+1.75 mm
+Bambu Lab High-precision Permanent Magnet Synchronous Motor
+Heatbed
+Supported Build Plate Type
+Max Heatbed Temperature
+Textured PEI plate, Smooth PEI Plate
+120 ℃
+Speed
+Max Speed of Toolhead
+Max Acceleration of Toolhead
+Max Flow for Hotend 
+
+(Standard Flow Hotend)
+Max Flow for Hotend
+
+(Optional High Flow Hotend)
+1000 mm/s
+20,000 mm/s²
+40 mm³/s
+
+(Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS;
+
+280 ℃ printing temperature)
+65 mm³/s
+
+(Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 ℃
+printing temperature)
+Chamber
+Temperature Control
+Active Chamber Heating
+Max Temperature
+Supported
+65 ℃
+Air Purification
+Pre-filter Grade
+HEPA Filter Grade
+Activated Carbon Filter Type
+VOC Filtration
+Particulate Matter Filtration
+G3
+H12
+Granulated Coconut Shell
+Superior
+Supported
+Cooling
+Part Cooling Fan
+Cooling Fan for Hotend
+Main Control Board Fan
+Chamber Exhaust Fan
+Chamber Heat Circulation Fan
+Auxiliary Part Cooling Fan
+Closed Loop Control
+Closed Loop Control
+Closed Loop Control
+Closed Loop Control
+Closed Loop Control
+Closed Loop Control
+Filament Supported
+PLA, PETG, TPU, PVA, BVOH, ABS, ASA, PC, PA, PET, PPS;
+
+Carbon/Glass Fiber Reinforced PLA, PETG, PA, PET, PC, ABS, ASA, PPA, PPS
+Sensor
+Live View Camera
+Toolhead Camera
+BirdsEye Camera
+Door Sensor
+Filament Run Out Sensor
+Filament Tangle Sensor
+Filament Odometry
+Power Loss Recovery
+Built-in; 1920*1080
+Built-in; 1600*1200
+Built-in; 3264*2448 (Equipped with Laser Edition)
+Supported
+Supported
+Supported
+Supported with AMS
+Supported
+Electrical
+Requirements
+Voltage
+Max Power¹
+100–120 VAC / 200–240 VAC, 50/60 Hz
+2050 W@220 V / 1170 W@110 V
+Working Temperature 10 ℃-30 ℃
+Electronics
+Touchscreen
+Storage
+Control Interface
+Neural Processing Unit
+5-inch 720*1280 Touchscreen
+Built-in 8 GB EMMC and USB Port
+Touchscreen, mobile App, PC App
+2 TOPS
+Software
+Slicer
+Supported Operating System
+Bambu Studio
+
+Supports third-party slicers which export standard G-code, such as Super Slicer,
+PrusaSlicer and Cura, but certain advanced features may not be supported.
+MacOS, Windows, Linux
+Network Control
+Ethernet
+Wireless Network
+Network Kill Switch
+Removable Network Module
+802.1X Network Access Control
+Not Available
+Wi-Fi
+Not Available
+Not Available
+Not Available
+Wi-Fi
+Operating Frequency
+Wi-Fi Transmitter Power (EIRP)
+Wi-Fi Protocol
+2412-2472 MHz (CE/FCC), 2400-2483.5 MHz (SRRC)
+
+5150-5850 MHz
+2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC)
+
+5 GHz Band1/2: <23 dBm (FCC/CE/SRRC/MIC)
+
+5 GHz Band3: <30 dBm (CE); <24 dBm (FCC)
+
+5 GHz Band4: <23 dBm (FCC/SRRC); <14 dBm (CE)
+IEEE 802.11 a/b/g/n
+10W Laser
+
+Module Spec
+Laser Type Semiconductor Laser
+Laser Wavelength
+Engraving Laser: 455 nm ± 5 nm Blue Light
+
+Height Measuring Laser: 850 nm ± 5 nm Infrared Light
+Laser Power 10 W ± 1 W
+Laser Spot Dimension 0.03 * 0.14 mm²
+Working Temperature 0 ℃–35 ℃
+Max Engraving Speed 400 mm/s
+Max Cutting Thickness 5 mm (Basswood Plywood)
+Laser Safety Class for Laser Module Class 4
+Overall Laser Safety Class² Class 1
+Engraving Area
+H2D: 310 * 270 mm²
+
+H2S: 310 * 260 mm²
+XYPositioning Method Visual Positioning
+XYPositioning Accuracy <0.3 mm
+ZHeight Measuring Method Micro Lidar
+ZHeight Measuring Accuracy ± 0.1 mm
+Flame Detection Supported
+Temperature Detection Supported
+Door Sensor Supported
+Laser Module Installation Detection Supported
+Safety Key Included
+Air Pump Built-in;30 kPa,30 L/min
+Ventilation Pipe Adapter Outer Diameter 100 mm
+Supported Material Type Wood,rubber,metal sheet,leather,dark acrylic,stone,and more
+Cutting Module
+
+Spec
+Cutting Area
+H2D：300*285 mm²
+
+H2S：297.5*300 mm²
+Drawing Area 300*255 mm²
+Supported Pen Diameter 10.5 mm–12.5 mm
+Cutting Mat Type LightGrip and StrongGrip Cutting Mats
+Blade Type 45°*0.35 mm
+Blade Pressure Range 50 gf–600 gf
+Max Cutting Thickness 0.5 mm
+Blade and Pen Recognition Supported
+Cutting Mat Type Detection Supported
+Supported Image Type Bitmap and Vector Images
+Supported Material Type Paper,PVC,vinyl,leather,and more
+¹To ensure the heatbed quickly reaches the needed temperature,the printer will maintain maximum power for about 3 minutes.
+
+² When the printer's protection is complete and properly working,the printer and laser module work as a class 1 laser product.
+

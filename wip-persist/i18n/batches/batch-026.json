@@ -1,0 +1,3276 @@
+{
+ "batch": 26,
+ "surface": "api",
+ "handles": [
+  "glass-cover-plate",
+  "control-board-fan",
+  "chamber-temperature-regulator-fan",
+  "cooling-fan-for-hotend-x1c",
+  "thermistor-x1c",
+  "ceramic-heater-x1c",
+  "bambu-usb-c-cable",
+  "bambu-scraper-3-pcs",
+  "activated-carbon-air-filter-x1-p1-series",
+  "chamber-camera-x1-series",
+  "display-connector-flex-cable",
+  "hardened-steel-extruder-unit-x1-series",
+  "ams-driven-support-shaft-assembly",
+  "ams-active-support-shaft-assembly",
+  "ams-active-extrusion-wheel-assembly",
+  "front-glass-door",
+  "xy-belt",
+  "z-belt",
+  "ams-feeder-unit-hall",
+  "silicone-sock-for-hotend",
+  "ams-feeding-funnel",
+  "ceramic-heater-thermistor-p1p",
+  "hardened-steel-extruder-gear-assembly",
+  "display-connector-cable-p1-series",
+  "ptfe-tubes",
+  "p1-series-toolhead-cable",
+  "p1-series-screen",
+  "stainless-steel-extruder-unit-p1-series",
+  "front-door-mounting-kit",
+  "auxiliary-part-cooling-fan",
+  "cable-chain-assembly",
+  "heatbed-signal-cable",
+  "ptfe-tube-coupler",
+  "x-axis-carbon-rods-assembly",
+  "th-board-p1-series",
+  "th-board-fpc-cable-p1-series",
+  "front-cover-p1-series",
+  "right-plastic-panel-p1-series",
+  "left-plastic-panel-p1-series",
+  "rear-metal-panel-p1-series",
+  "ams-cable-pack-5-in-1",
+  "rear-panel-p1p",
+  "th-board-fpc-cable-v9-x1c",
+  "toolhead-rear-housing",
+  "heatbed-sensor-interface-board",
+  "logo-led-cable-x1-series",
+  "extruder-interface-board-v9-x1c",
+  "heatbed-piezo-interface-board",
+  "mc-to-ap-cable-p1-series",
+  "ams-bottom-cover-unit",
+  "toolhead-middle-housing",
+  "rear-metal-panel-x1c",
+  "ams-top-lid",
+  "printer-cable-pack-4-in-1",
+  "mc-ap-cable-pack-2-in-1-x1-series",
+  "x-axis-assembly-a1-mini",
+  "toolhead-rear-housing-a1-series",
+  "hardened-steel-extruder-gear-assembly-a1-series",
+  "toolhead-board-a1-mini",
+  "filament-sensor-a1-series",
+  "th-board-set-v9-dual-red-laser-x1c",
+  "print-head-front-cover-a1-series",
+  "extruder-unit-a1-series",
+  "part-cooling-fan-a1-series",
+  "hotend-cooling-fan-a1-series",
+  "hotend-heating-assembly-a1-series",
+  "ams-lite-filament-hub",
+  "ams-lite-housing-assembly",
+  "ams-lite-feeder-unit",
+  "ams-lite-filament-funnel-unit",
+  "ams-lite-rotary-spool-holder",
+  "ams-lite-spool-claw",
+  "x-belt-a1-mini",
+  "heatbed-cable-a1-mini",
+  "bambu-usb-c-cable-a1-mini",
+  "live-view-camera-a1-mini",
+  "heatbed-nozzle-wiper-a1-mini",
+  "bambu-micro-lidar-cover-x1-series",
+  "purge-wiper-a1-series",
+  "z-axis-coupler-a1-mini",
+  "x-motor-a1-mini",
+  "y-motor-a1-mini",
+  "a1-mini-heatbed-unit",
+  "extruder-filament-sensor-p1-series",
+  "extruder-filament-sensor-x1-series",
+  "ams-power-board",
+  "ams-connector-board",
+  "idler-pulley",
+  "front-cover-x1c",
+  "mc-board-p1-series-1",
+  "z-axis-top-cover-a1-mini",
+  "p1s-heatsink-for-mc-board",
+  "purge-chute",
+  "bambu-usb-c-cable-a1",
+  "live-view-camera-a1",
+  "touch-screen-a1-a2l",
+  "y-belt-a1",
+  "z-belt-a1",
+  "spool-holder-a1",
+  "ams-lite-top-mount-screws-kit",
+  "x-belt-a1",
+  "heatbed-nozzle-wiper-a1-a2l",
+  "ams-main-frame-v3",
+  "ams-rfid-board",
+  "filament-buffer-connection-board",
+  "ap-board-p1p",
+  "z-belt-timing-pulley",
+  "button-board-with-chamber-temperature-sensor-x1-series",
+  "bambu-micro-lidar-dual-red-laser-x1-series",
+  "ams-top-lid-handle",
+  "xy-belt-tensioner-with-pulley",
+  "supportive-footpad-a1",
+  "ptfe-tube-connector-a1",
+  "ams-rubber-seal",
+  "screws-kit-a1-series-and-ams-lite",
+  "right-side-panel-hr-x1-series",
+  "left-side-panel-hl-x1-series",
+  "heatbed-surface-magnet-without-cutout",
+  "heatbed-surface-magnet-with-cutout-p1p",
+  "heatbed-unit-v3-p1-series",
+  "heatbed-unit-v3-x1-series",
+  "ac-board-x1-series-and-p1-series"
+ ],
+ "strings": [
+  {
+   "h": "eb67a78bf0dccf05ad2813e5bd97670482d331512b6dd046427f9251f25dd751",
+   "en": "The P1 series and X1C use the same specification of glass cover plate, which is suitable for both P1P and P1S. It is recommended to use the glass cover plate when installing the side panels to avoid the glass cover plate from slipping.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "glass-cover-plate",
+    "title": "Glass Cover Plate",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7b83e7d70b06ca73cdd3e61691abb73f353df1ab453d78944a90529fb879fd2",
+   "en": "The control board fan is used to cool the control board to prevent the control board from overheating and shutting down. The control board fan cannot be manually controlled, and the printer automatically adjusts the speed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "control-board-fan",
+    "title": "Control Board Fan",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e8a2417587e5bf88b25d1b18edbb4d78d98877839391380c086b7c1496dc46e0",
+   "en": "The Chamber Temperature Regulator Fan is responsible for adjusting the temperature within the chamber. The fan operates based on the detected chamber temperature, determining both its on/off status and the speed at which it operates.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-temperature-regulator-fan",
+    "title": "Chamber Temperature Regulator Fan",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e4e7ff16abc8e8bc08bb014bf5ff0d4553383df1a4a60d7eef674c0cd516908",
+   "en": "The Cooling Fan for Hotend is used to cool and reduce the temperature of the ceramic heater.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f7ea45814add6ec1ecc2eef5e6bfb52fa41a1cad91f93e93b65ee52238b47ee",
+   "en": "The cooling fan for hotend has an auto-shutoff function while being locked at rated voltage for 1-3 seconds. The circuit attempts to restart in 2 to 6 seconds. There is no damage after 72 hours of locking.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "blocks[0].line[2]",
+    "near": "The Cooling Fan for Hotend is used to cool and reduce the temperature of the ceramic heater."
+   },
+   "dict": null
+  },
+  {
+   "h": "aaa1fea95d6d5c515e5bb6859156378f69a3ade137457528c6d5bd520b6f08d1",
+   "en": "The cooling fan is a high-speed rotating part, so do not touch it while it is running.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "cooling-fan-for-hotend-x1c",
+    "title": "Cooling Fan for Hotend - X1C",
+    "field": "blocks[0].line[3]",
+    "near": "The cooling fan for hotend has an auto-shutoff function while being locked at rated voltage for 1-3 seconds. The circuit attempts to restart in 2 to 6 seconds. "
+   },
+   "dict": null
+  },
+  {
+   "h": "03722edb79fa1779b18e2115c52bbfca0ba642dc875509081969a7fb5ac96b5c",
+   "en": "The thermistor has highly accurate temperature measurement and reliable structural design. It is for use with Bambu Lab complete hotend assembly only.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "thermistor-x1c",
+    "title": "Thermistor 3 pcs - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "82f273281623410a0164d1e40dae711e11dfe86ec35bac224a698c3acaa9a2d0",
+   "en": "The ceramic heater can heat the nozzle up to 300℃, which is for use with Bambu Lab complete hotend assembly only.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ceramic-heater-x1c",
+    "title": "Ceramic Heater 3 pcs - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8dcf3e71dc5cf33804f49972487cdb4acc2d065c5dac6c63ff136008a36e5359",
+   "en": "The Bambu Lab USB-C cable is installed in the towing chain and is only suitable for Bambu Lab X1 series printers.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-usb-c-cable",
+    "title": "Bambu USB-C Cable - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f4c55928fb4c7903c50a6dfcee7d21365ce6fcffa2ef4f052d5312a5b9f49f78",
+   "en": "To prolong the lifetime of the build plate, use a sharp scraper to release the model from the printing surface. After the plate has cooled down, gently slide the scraper underneath one of the corners of the model. Then, carefully bend the sheet to remove the model.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-scraper-3-pcs",
+    "title": "Bambu Scraper 3 pcs",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "10af9928ba801e7d223b816e783edf7c6d77d3bf5390ae16616eb6a5a1a195a8",
+   "en": "Guidance",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-scraper-3-pcs",
+    "title": "Bambu Scraper 3 pcs",
+    "field": "blocks[1].line[0]",
+    "near": "Please watch the video on how to install the scraper:"
+   },
+   "dict": null
+  },
+  {
+   "h": "ffb900090c237d47bb226200031d85bea5e5c53e438465c1e0789a66339cdcf1",
+   "en": "Please watch the video on how to install the scraper:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-scraper-3-pcs",
+    "title": "Bambu Scraper 3 pcs",
+    "field": "blocks[1].line[1]",
+    "near": "Guidance"
+   },
+   "dict": null
+  },
+  {
+   "h": "6ffc6352e8b3654a9eeca8d654505ff51c8963abb51ee2bca60607de7c5fd52c",
+   "en": "Melt extrusion printers will generate VOCs while printing because the heating temperature of ABS, PC, PA and other materials is relatively high, resulting in more VOCs. Materials such as PLA with lower melting points produce much fewer VOCs during printing. These VOCs are absorbed by our activated carbon air filter.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "activated-carbon-air-filter-x1-p1-series",
+    "title": "Activated Carbon Air Filter - X1/P1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The Activated Carbon Air Filter is used for filtering the air from the enclosure before it is expelled outside. Each one's working life is about 1440 hours (60 "
+   },
+   "dict": null
+  },
+  {
+   "h": "e52dde4843c7869597fd4776a7dfda1008c02600712bf2737a36028edfeaf54c",
+   "en": "Remote livestream: you can observe print progress anytime, anywhere.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The chamber camera is included by default in the X1-Carbon and is an optional upgrade that you can install for the X1. The chamber camera has three functions, w"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2f6080a68a18b4c19e8b137cf32f91b438fc66277fef5f098c0e5a501e25286",
+   "en": "Spaghetti Detection: Spaghetti detection uses AI to detect print failures. If this feature is enabled, once spaghetti is detected, the printer pauses and waits for your input before continuing or stopping the print.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "blocks[0].line[3]",
+    "near": "Remote livestream: you can observe print progress anytime, anywhere."
+   },
+   "dict": null
+  },
+  {
+   "h": "ca42bd8ef0dfbeaef5238248d1cb957b9e5827b8de8f328c43944b19d5336548",
+   "en": "Time-lapses: This feature uses the chamber camera to automatically create a time-lapse video of a print and make an innovative video.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "chamber-camera-x1-series",
+    "title": "Chamber Camera - X1 Series",
+    "field": "blocks[0].line[4]",
+    "near": "Spaghetti Detection: Spaghetti detection uses AI to detect print failures. If this feature is enabled, once spaghetti is detected, the printer pauses and waits "
+   },
+   "dict": null
+  },
+  {
+   "h": "0fd0df8123998ed1ee13ee2898b01504c88e9bac2ddd6c15cbc2a3657cc7fea7",
+   "en": "The display connect flex cable is used to connect the motherboard and high-resolution screen. Its function is to transmit SD card data and display images between the screen and printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "display-connector-flex-cable",
+    "title": "Display Connector Flex Cable - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3414f541b668bb6135a375e80f5a673fbe8b8876bba7ab11130a06e36d8d4591",
+   "en": "The hardened steel extruder unit is equipped with double gears made of hardened steel, which provides increased extrusion force, prevents slippage, and enhances abrasion resistance. These gears enable the extruder unit to handle tough engineering filaments such as carbon fiber nylon and glass fiber nylon.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-unit-x1-series",
+    "title": "Hardened Steel Extruder Unit - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ba9fc5640990efbc1dd5af528d222429bccd56595f885a94c5ad54d0363e637a",
+   "en": "In addition, the extruder unit includes a sensor that supports filament break detection, which can help prevent print failures and improve overall printing efficiency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-unit-x1-series",
+    "title": "Hardened Steel Extruder Unit - X1C",
+    "field": "blocks[0].line[2]",
+    "near": "The hardened steel extruder unit is equipped with double gears made of hardened steel, which provides increased extrusion force, prevents slippage, and enhances"
+   },
+   "dict": null
+  },
+  {
+   "h": "69445c5cb4762eceeee0a16fc09881ea27029ccfa828bb59e955b5e89c51f5b6",
+   "en": "The AMS Driven Support Shaft Assembly is a roller for supporting the filament spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-driven-support-shaft-assembly",
+    "title": "AMS Driven Support Shaft Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2e99543b8ecdb0831b41e24d5010fa0d0586fc2a57239bf3f94b3bc73c7a782",
+   "en": "The AMS Active Support Shaft Assembly is a roller for supporting the filament spool and also for actively driving the spool to roll.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-active-support-shaft-assembly",
+    "title": "AMS Active Support Shaft Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e68070c5154dfec5069c42906b5a6042b4524dc161c61c0eeae6a2be3b32a97",
+   "en": "The AMS Active Extrusion Wheel Assembly is a friction wheel assembly for actively driving the filament forward.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-active-extrusion-wheel-assembly",
+    "title": "AMS Active Extrusion Wheel Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5306e87c07fd5fa1b100d53b42eb4a1af7e255eec7b9da1879742332a11bf13c",
+   "en": "The purpose of the front glass door is to keep the inside of the printer closed, thus providing protection for the printing process while also insulating the enclosure for high-temperature printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-glass-door",
+    "title": "Front Glass Door",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "84ec5767b7418cd33a98414843302c8f37ebea8794df3f71c4261da536d0679c",
+   "en": "The XY belt is an open drive belt with a pitch length of 1442mm. Its main function is to transmit the motion of the motor to the tool head with high precision.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt",
+    "title": "XY Belt",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d1ee5c590134333b5d38eda6decf1d5847c2048133e20282beeb6b841c1cfca4",
+   "en": "Important to know",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "z-belt",
+    "title": "Z Belt",
+    "field": "blocks[0].line[0]",
+    "near": "1. The label on the Z belt you received may be labeled as \"XY belt\" due to an improper production operation, the actual product is the Z belt you ordered, which"
+   },
+   "dict": null
+  },
+  {
+   "h": "8911f3c379ee853889a2c638d3f47a9b4029cd76f887acb93d3a7c07baa220e4",
+   "en": "1. The label on the Z belt you received may be labeled as \"XY belt\" due to an improper production operation, the actual product is the Z belt you ordered, which will not affect its functionality.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt",
+    "title": "Z Belt",
+    "field": "blocks[0].line[1]",
+    "near": "Important to know"
+   },
+   "dict": null
+  },
+  {
+   "h": "b74ed9f28580274764329c0471bc79621c4c6a5ea03367d1709a450130f156ce",
+   "en": "2. We apologize for any confusion this may have caused. Rest assured, we are taking immediate corrective actions to address this issue. Thank you for your understanding.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt",
+    "title": "Z Belt",
+    "field": "blocks[0].line[2]",
+    "near": "1. The label on the Z belt you received may be labeled as \"XY belt\" due to an improper production operation, the actual product is the Z belt you ordered, which"
+   },
+   "dict": null
+  },
+  {
+   "h": "412479aba4b62a7fb5cbc64965a78ca248c202c55e22365a651b078b390caf7a",
+   "en": "The Z belt is a close drive belt with a pitch length of 1142mm, it is installed at the bottom of the Bambu Lab X1/X1C printer. Its main function is to transmit the motion of the Z motor to the three Z-axis lead screws.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt",
+    "title": "Z Belt",
+    "field": "blocks[1].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5557df10e6860f3b409e0718ee04d881a5ab2ccf46eef7c8813ed1cb5b268b98",
+   "en": "The AMS Feeder Unit (Hall) is specially designed to support the AMS for printing multiple colors and materials.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-feeder-unit-hall",
+    "title": "AMS Feeder Unit (Hall)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7de1ca3b7c2b04cdd6a9f89db2c648160352b77a50fd44a51c9b0e6afb56eb06",
+   "en": "Each AMS has 4 feeder units, and each feeder unit has its own motor and gears to actively push the filament forward or wind it back to the spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-feeder-unit-hall",
+    "title": "AMS Feeder Unit (Hall)",
+    "field": "blocks[0].line[2]",
+    "near": "The AMS Feeder Unit (Hall) is specially designed to support the AMS for printing multiple colors and materials."
+   },
+   "dict": null
+  },
+  {
+   "h": "abd2c5e6548e70381e775057c809079708f80e4e46978b8cbe57de2053a97546",
+   "en": "The feeder unit has a sensor to detect filament. When a filament is inserted, the feeder unit will pull the filament automatically. When a filament needs to be wound back, the feeder unit will drive the AMS driving sleeve to rotate the spool for filament winding.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-feeder-unit-hall",
+    "title": "AMS Feeder Unit (Hall)",
+    "field": "blocks[0].line[3]",
+    "near": "Each AMS has 4 feeder units, and each feeder unit has its own motor and gears to actively push the filament forward or wind it back to the spool."
+   },
+   "dict": null
+  },
+  {
+   "h": "44f8c48d62af12b02e51d9ffa51df152ae9d7b4120761fa66396fbdeec5fa3cb",
+   "en": "The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating impurities, preventing the filament from soiling the nozzle and affecting print quality.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "bab1131cf1e44aa68bc5a436fc6f1af22613c1000d92b625d1ac0474506e095b",
+   "en": "You should replace the silicone hotend cover if any of the following signs occur:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[2]",
+    "near": "The silicone sock is a black cover that serves the primary function of maintaining nozzle temperature stability and isolating impurities, preventing the filamen"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a66c96f4e701f608521354d377d976dda52468401b2f7ecdc48f3dbe2a29b55",
+   "en": "1. Cracks or Damage",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[3]",
+    "near": "You should replace the silicone hotend cover if any of the following signs occur:"
+   },
+   "dict": null
+  },
+  {
+   "h": "638528d945dcd4ede6e72b33d356e448f17fc9075927fed41d5f2ba0e8848cbc",
+   "en": "If the silicone cover shows visible cracks or tears, it should be replaced immediately. Any opening can compromise the insulation performance of the hotend, allowing heat to escape and resulting in unstable printing temperatures.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[4]",
+    "near": "1. Cracks or Damage"
+   },
+   "dict": null
+  },
+  {
+   "h": "83724566ba759997895f5ab068b6cc034f2c992f78093b22febc986c1343cf5a",
+   "en": "2. Looseness or Detachment",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[5]",
+    "near": "If the silicone cover shows visible cracks or tears, it should be replaced immediately. Any opening can compromise the insulation performance of the hotend, all"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca361924abe16bda01b4cb3179beb5940cf1bb0b6aa740420d69ef5db0772043",
+   "en": "The silicone cover should fit tightly around the hotend. If it becomes loose or easily slips off, it cannot effectively protect the nozzle and heating block. Cold air from the environment may cause temperature fluctuations and could interfere with the printer’s wiping or leveling functions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[6]",
+    "near": "2. Looseness or Detachment"
+   },
+   "dict": null
+  },
+  {
+   "h": "f22dc5b1b7cc7febededfb1624444eadd605a951b4e91d9dbe7eb48f4855c43b",
+   "en": "3. Deformation Due to Prolonged High Temperatures",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[7]",
+    "near": "The silicone cover should fit tightly around the hotend. If it becomes loose or easily slips off, it cannot effectively protect the nozzle and heating block. Co"
+   },
+   "dict": null
+  },
+  {
+   "h": "dc38cc034938a06750730ac5a5cc6f462d19059f6ec3ab96e620e93d1575cde2",
+   "en": "Extended exposure to high temperatures can cause the silicone cover to stretch or deform, preventing it from fitting tightly or fully covering the hotend. If deformation is observed, replacement is necessary.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[8]",
+    "near": "3. Deformation Due to Prolonged High Temperatures"
+   },
+   "dict": null
+  },
+  {
+   "h": "83a608a56885a79af61ba108bece2cb5128d9f1a1d56e40bfe30dfd6be1582d6",
+   "en": "4. Frequent Filament Build-up on the Heating Block",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[9]",
+    "near": "Extended exposure to high temperatures can cause the silicone cover to stretch or deform, preventing it from fitting tightly or fully covering the hotend. If de"
+   },
+   "dict": null
+  },
+  {
+   "h": "24ef26880cfd3d9b98a1cbecf1492600c888cbd7a8352adad1504212272e6cf3",
+   "en": "If you notice frequent residue or filament build-up around the hotend, it may indicate that the silicone cover has failed. A damaged cover cannot effectively block oozing or retracted filament, which can lead to clogging and other issues.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[10]",
+    "near": "4. Frequent Filament Build-up on the Heating Block"
+   },
+   "dict": null
+  },
+  {
+   "h": "a2771b67f4872e12223228d9ff802311d0638eeb72d4ecf977f1c902e7345782",
+   "en": "5. Discoloration or Brittleness",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[11]",
+    "near": "If you notice frequent residue or filament build-up around the hotend, it may indicate that the silicone cover has failed. A damaged cover cannot effectively bl"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e18a66000692b7476111109800588149134850f57d4563e9ec33f4502720b30",
+   "en": "Prolonged high temperatures can cause the silicone to age, discolor, or become brittle. If any of these signs appear, the cover is nearing failure and should be replaced as soon as possible.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[12]",
+    "near": "5. Discoloration or Brittleness"
+   },
+   "dict": null
+  },
+  {
+   "h": "7bcc8e57319532b30a1487f70f6b4655e6c56e14d1505c982b8234d1f3ac1075",
+   "en": "6. Friction With Moving Parts (e.g, Nozzle Wiper)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[13]",
+    "near": "Prolonged high temperatures can cause the silicone to age, discolor, or become brittle. If any of these signs appear, the cover is nearing failure and should be"
+   },
+   "dict": null
+  },
+  {
+   "h": "913c66479e7e1803f9124983ea835dff03cd505094a54629e0b9cbc504dd1a08",
+   "en": "If the cover comes into contact with the other parts of the 3D printer, it may tear or shift out of place. Repeated friction can cause physical wear or misalignment, exposing the nozzle or heating block and affecting heat retention and distribution. It is recommended to inspect the silicone cover after cleaning.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "silicone-sock-for-hotend",
+    "title": "Silicone Sock for Hotend",
+    "field": "blocks[0].line[14]",
+    "near": "6. Friction With Moving Parts (e.g, Nozzle Wiper)"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb499e0fd8833322a208b4b2ccf5b7a6f5a8c60b2e548c04a2971358519b28d1",
+   "en": "The AMS Feeding Funnel is the inner component of the AMS First Stage Feeder, which consists of structural parts and a filament detection sensor board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-feeding-funnel",
+    "title": "AMS Feeding Funnel",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a42f2245eb7b3d3b656b906b32ddee5a2178ab1b2a61833e1f8ec7353033073a",
+   "en": "When the sensor board detects the insertion of filament, the AMS first stage feeder will pull the filament forward automatically. When the filament insertion is abnormal, the sensor board will also identify it and feed that information back to the 3D printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-feeding-funnel",
+    "title": "AMS Feeding Funnel",
+    "field": "blocks[0].line[2]",
+    "near": "The AMS Feeding Funnel is the inner component of the AMS First Stage Feeder, which consists of structural parts and a filament detection sensor board."
+   },
+   "dict": null
+  },
+  {
+   "h": "d84fdd54ce25a34ccc47e7c10af56fc3376cb2de983a459c5e0867dcf16f7148",
+   "en": "The ceramic heater and thermistor for Bambu Lab P1P 3D printer are combined into one module with an integrated terminal connector. With this design, the reliability of the terminal connector under extreme conditions is improved.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ceramic-heater-thermistor-p1p",
+    "title": "Ceramic Heater & Thermistor 3 pcs - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3fdbc73a464f6a4d1f9337b88ab8a29fca44eeb5b4a8d9de0d91d818c65693e5",
+   "en": "The ceramic heater can heat the nozzle up to 300℃ while the thermistor has highly accurate temperature measurement and reliable structural design.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ceramic-heater-thermistor-p1p",
+    "title": "Ceramic Heater & Thermistor 3 pcs - P1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The ceramic heater and thermistor for Bambu Lab P1P 3D printer are combined into one module with an integrated terminal connector. With this design, the reliabi"
+   },
+   "dict": null
+  },
+  {
+   "h": "38585859099a42ccda923787a9aad7d0f756df2d971e855b6ca6ca3302944db6",
+   "en": "The hardened steel extruder gear assembly is an internal component of the hardened steel extruder unit. It comprises a driven gear and an active gear that work together to feed filament into the hotend.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-gear-assembly",
+    "title": "Hardened Steel Extruder Gear Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c25c9923b677aa5db4db72d777c538c53b5e5dad9e185a039eb5497cd21ae756",
+   "en": "Built with heavy-duty materials, the hardened steel extruder gear has a better capability of printing with tough engineering filaments like PAHT-CF and PET-CF for long-lasting performance. If abrasion or clogging occurs due to extended use, users can just replace the extruder gear assembly rather than the whole extruder unit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-gear-assembly",
+    "title": "Hardened Steel Extruder Gear Assembly",
+    "field": "blocks[0].line[2]",
+    "near": "The hardened steel extruder gear assembly is an internal component of the hardened steel extruder unit. It comprises a driven gear and an active gear that work "
+   },
+   "dict": null
+  },
+  {
+   "h": "58c618fc4f7ee6249da99c1d989206993558846e35e799a1f89f5580e50cd786",
+   "en": "*The P1 Series Extruder Unit comes with stainless steel extruder gear. Users can upgrade it to hardened steel extruder gear for better abrasion resistance to engineering filaments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-gear-assembly",
+    "title": "Hardened Steel Extruder Gear Assembly",
+    "field": "blocks[0].line[3]",
+    "near": "Built with heavy-duty materials, the hardened steel extruder gear has a better capability of printing with tough engineering filaments like PAHT-CF and PET-CF f"
+   },
+   "dict": null
+  },
+  {
+   "h": "f3936493496d214d4fdc3f942c4275ff54cc6f02b94143e23abf5e4c3b6d17fd",
+   "en": "The display connector cable for P1P is used to connect the motherboard and high-resolution screen. Its function is to transmit SD card data and display images between the screen and printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "display-connector-cable-p1-series",
+    "title": "Display Connector Cable - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3e6a5d40faa187897314214684502ec24bfb481d3d3aa7832e97a5e554005e3d",
+   "en": "The function of PTFE Tube is to reduce resistance and guide filament. The tube's inner diameter is 2.5mm, and its outer diameter is 4mm.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tubes",
+    "title": "PTFE Tubes",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ec2f629f7e878532c8cb69312f7c50d324082b72375211de5f5a7da5ed281fc",
+   "en": "Please note that the PTFE tubes are consumables and are at risk of wear, as they may rub against the filament over time. We recommend that you check the PTFE tubes for wear during your maintenance of the machine.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tubes",
+    "title": "PTFE Tubes",
+    "field": "blocks[0].line[2]",
+    "near": "The function of PTFE Tube is to reduce resistance and guide filament. The tube's inner diameter is 2.5mm, and its outer diameter is 4mm."
+   },
+   "dict": null
+  },
+  {
+   "h": "06f19778745867c6af5835f45b6bd4d5d25d7c416ad7e9a7a4865eae81959bb6",
+   "en": "If the tubes are worn and not replaced in time, this may lead to feeding failures, filament accumulation inside the AMS, etc.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tubes",
+    "title": "PTFE Tubes",
+    "field": "blocks[0].line[3]",
+    "near": "Please note that the PTFE tubes are consumables and are at risk of wear, as they may rub against the filament over time. We recommend that you check the PTFE tu"
+   },
+   "dict": null
+  },
+  {
+   "h": "b205029d540e4fed423973a07e992ec4660616a573c75f4cef21bce2f3ef8be0",
+   "en": "The P1 Series Toolhead Cable connects the printer headboard and the motion control mainboard to supply power and data communication.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1-series-toolhead-cable",
+    "title": "P1 Series Toolhead Cable",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "591ed1e7b0910b3bd8cbe9e0201c7d3f3c53b148d394ee4675cda54e2900fa71",
+   "en": "The P1S version without rubber plug is mainly designed for P1S to adapt the cable chain. It is also compatible with P1P especially when cable chain is added.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1-series-toolhead-cable",
+    "title": "P1 Series Toolhead Cable",
+    "field": "blocks[0].line[2]",
+    "near": "The P1 Series Toolhead Cable connects the printer headboard and the motion control mainboard to supply power and data communication."
+   },
+   "dict": null
+  },
+  {
+   "h": "83457715e4162f1026e49cce66768cafaf0eb29f4855bf6cab9927152b5b5c2b",
+   "en": "The screen module with LCD screen and physical control buttons can be used to display printing parameters and control the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1-series-screen",
+    "title": "P1 Series Screen",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b95a7751764c6cde3558b60e66631db6cfe7ed5d4692a279add879d7aaba9f3e",
+   "en": "The stainless steel extruder unit features double gears made of stainless steel, which increases extrusion force and prevents slippage. It is suitable for commonly used 3D printing filaments such as PLA, PETG, TPU, and more.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-extruder-unit-p1-series",
+    "title": "Stainless Steel Extruder Unit - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "36e61882f9165d0ff1dd25290080c3cdd36250b94c04549293544be8a9af174b",
+   "en": "The extruder unit also includes a sensor that supports filament break detection, helping to prevent print failures and improving overall printing efficiency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-extruder-unit-p1-series",
+    "title": "Stainless Steel Extruder Unit - P1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The stainless steel extruder unit features double gears made of stainless steel, which increases extrusion force and prevents slippage. It is suitable for commo"
+   },
+   "dict": null
+  },
+  {
+   "h": "69362ff557d219ffec9072569e0b5b2a1f037d7969a94c698da1dce2372ac00f",
+   "en": "*Please keep all the screws from your original extruder unit for replacement.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "stainless-steel-extruder-unit-p1-series",
+    "title": "Stainless Steel Extruder Unit - P1 Series",
+    "field": "blocks[0].line[3]",
+    "near": "The extruder unit also includes a sensor that supports filament break detection, helping to prevent print failures and improving overall printing efficiency."
+   },
+   "dict": null
+  },
+  {
+   "h": "c5eaf1cfb88d70b921dc7f2bee63079de906e4365b1a455fa85791b63faae589",
+   "en": "The front door mounting kit is an accessory package for installing the glass front door of X1 and P1 series printers",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-door-mounting-kit",
+    "title": "Front Door Mounting Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d538c68afe23a7bb9c87624e124f1aaee740fb51ad7ac86496570107cbd3a3a0",
+   "en": "The auxiliary part cooling fan is a powerful 12W cooling fan installed on the left side of the chamber, it provides a better cooling condition for high-speed printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auxiliary-part-cooling-fan",
+    "title": "Auxiliary Part Cooling Fan",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f83c10ae0bf642bfe93a81c036bf1193344b6f180c60f4eb3e1d845a9b91f2ff",
+   "en": "When using an Auxiliary Part Cooling Fan on an X1 printer (not X1C), you need to set the printer model to X1C in the slicer for the fan to start correctly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "auxiliary-part-cooling-fan",
+    "title": "Auxiliary Part Cooling Fan",
+    "field": "blocks[1].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "fbd3732ce7e1e99ed0a808269a62026054f21f12baabd485fdd4d0752feeaa62",
+   "en": "With the cable chain assembled, the trajectory of the toolhead cable and feeding tube can be safely confined to the horizontal plane during printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cable-chain-assembly",
+    "title": "Cable Chain Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "6128641b77bb3bfa93b4408ea3f301d462783a8682e4d0f43b1a0372d5754eef",
+   "en": "It can also protect the toolhead cable and feeding tube from being damaged during repetitive bending as a result of motion.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "cable-chain-assembly",
+    "title": "Cable Chain Assembly",
+    "field": "blocks[0].line[2]",
+    "near": "With the cable chain assembled, the trajectory of the toolhead cable and feeding tube can be safely confined to the horizontal plane during printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "99daddfdee69292639a91ac17799d55df1ed2f80d9101e41e2b6f006931f06e8",
+   "en": "The heatbed signal cable is a 6pin cable connected to the hotbed Sensor for temperature measurement and leveling.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-signal-cable",
+    "title": "Heatbed Signal Cable",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "cefd665229744cd945523e0c83aa2e6bce40cb8367c85bd3e68dbd5f76ae1ecf",
+   "en": "Replacement",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-signal-cable",
+    "title": "Heatbed Signal Cable",
+    "field": "blocks[1].line[0]",
+    "near": "To learn more about replacing the heatbed signal cable"
+   },
+   "dict": null
+  },
+  {
+   "h": "c5c0a569c23abbd7853c1e772d648a710ae41934c5f2df54e2b8da22a0a2ae22",
+   "en": "To learn more about replacing the heatbed signal cable",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-signal-cable",
+    "title": "Heatbed Signal Cable",
+    "field": "blocks[1].line[1]",
+    "near": "Replacement"
+   },
+   "dict": null
+  },
+  {
+   "h": "c56325acf34b352c8de955dfde4a5a9a7762501507162d5da825a3073ee11e18",
+   "en": "X1 Series: https://wiki.bambulab.com/en/x1/maintenance/Replacing-the-heat-bed-cable.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-signal-cable",
+    "title": "Heatbed Signal Cable",
+    "field": "blocks[1].line[2]",
+    "near": "To learn more about replacing the heatbed signal cable"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ac79b5e02ed135442dbc483e97819bc0918141f61cfa8f1e59e31dbd6ae255f",
+   "en": "The PTFE Tube Coupler is a component used to connect the PTFE tube, which is mounted on the back of the printer and used to connect the PTFE tube between the buffer and the tool head. You may need to replace the pneumatic connector when you encounter the following situations:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-coupler",
+    "title": "PTFE Tube Coupler",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "a04b530aababc2e7d47b0ebc0ba1a614593ed0a4112ec8c980b1941e46d806e4",
+   "en": "1. The PTFE tube can not be secured. For example, the PTFE tube can not be fixed on the extruder.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-coupler",
+    "title": "PTFE Tube Coupler",
+    "field": "blocks[0].line[2]",
+    "near": "The PTFE Tube Coupler is a component used to connect the PTFE tube, which is mounted on the back of the printer and used to connect the PTFE tube between the bu"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f780c3bdf604fb4d91bf96727d78bf8342fb51566c65bd6ec8915be53f2067a",
+   "en": "2. The filament cannot pass through the pneumatic connector. For example, the filament cannot pass through the buffer (as shown in the picture below, it may be due to internal damage to the pneumatic connector).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-coupler",
+    "title": "PTFE Tube Coupler",
+    "field": "blocks[0].line[3]",
+    "near": "1. The PTFE tube can not be secured. For example, the PTFE tube can not be fixed on the extruder."
+   },
+   "dict": null
+  },
+  {
+   "h": "bdc3de881db09834f1d6f96e8e619dd67e846c7ddb2dd3f126afecf49a6934ce",
+   "en": "The X-axis carbon rods assembly ensures that the X-axis movement of the toolhead remains consistently fixed on the horizontal plane. Its lightweight and high rigidity characteristics enable the toolhead to achieve stable and high-speed movement along the Y-axis, enabling high-speed printing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-carbon-rods-assembly",
+    "title": "X-Axis Carbon Rods Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a7c661a0b78e811ffcb666f798037dc298f3d14f6a65138400c2af9b3cc2bd7",
+   "en": "The toolhead (TH) board is the main board of the toolhead to ensure the smooth functioning of the toolhead parts, including but not limited to the hotend, extruder, cooling fan, filament cutter, etc.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-p1-series",
+    "title": "TH Board - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e0549a42d19896401d3d32f071a3c56739386ab89882a30ba0fad147e39601eb",
+   "en": "The TH Board FPC Cable connects the Extruder Connection Board (Interface board in the front) and the TH Board (in the rear) to supply power and data communication.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-fpc-cable-p1-series",
+    "title": "TH Board FPC Cable - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "133175a3450e11e77b4982d580b1f0bcba1dadd35fa0da3c8f355d78b50641a8",
+   "en": "The front cover of the P1S printer is a black-gray cover that is installed on the front of the printer and printed with P1S.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-cover-p1-series",
+    "title": "Front Cover - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4b3a03e87c2318f47fda3880fbca9a24cd0d2d1c31ebab767404b34b479ae641",
+   "en": "It is the plastic panel that is installed on the right side of the printer when facing the screen of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "right-plastic-panel-p1-series",
+    "title": "Right Plastic Panel - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0f90e39f9fca742316c45b5ed38d1b5ae2ba390889388b5e230df91bca9b35e6",
+   "en": "Two types of bases for the P1P model",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "right-plastic-panel-p1-series",
+    "title": "Right Plastic Panel - P1 Series",
+    "field": "blocks[1].line[0]",
+    "near": "We have two types of bases for the P1P model. One version comes with side panel tab slots, while the other version does not have these slots. It is possible tha"
+   },
+   "dict": null
+  },
+  {
+   "h": "26048c81d4fa6e6cde76d7e1ea537a806c611672468e77321b04f910a0f472d8",
+   "en": "We have two types of bases for the P1P model. One version comes with side panel tab slots, while the other version does not have these slots. It is possible that earlier shipments of the P1P model were of the older version without the tab slots, while recent and future shipments of the P1P will be of the newer version with the tab slots. Please check if your printer base has tab slots or not.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "right-plastic-panel-p1-series",
+    "title": "Right Plastic Panel - P1 Series",
+    "field": "blocks[1].line[1]",
+    "near": "Two types of bases for the P1P model"
+   },
+   "dict": null
+  },
+  {
+   "h": "bcc44fe5f7f14ead05c660443e2232a3e35036c4e543686ab6d9ec4f436f62b5",
+   "en": "Two types of side panel",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "right-plastic-panel-p1-series",
+    "title": "Right Plastic Panel - P1 Series",
+    "field": "blocks[2].line[0]",
+    "near": "The side panels we shipped earlier also did not have tabs. Due to a change in production plans, the side panels we will be shipping in the near future and onwar"
+   },
+   "dict": null
+  },
+  {
+   "h": "c12254134640eae56d160a8dab6e6db17126122eb552f02d887e6d8d7fec1dd0",
+   "en": "The side panels we shipped earlier also did not have tabs. Due to a change in production plans, the side panels we will be shipping in the near future and onwards will have tabs.If your printer base does not have tab slots but you received side panels with tabs, please remove the tabs from the side panels.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "right-plastic-panel-p1-series",
+    "title": "Right Plastic Panel - P1 Series",
+    "field": "blocks[2].line[1]",
+    "near": "Two types of side panel"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d5f9c0c66a4080534cf35fb726437557ff01a309095a2f42409115707857b92",
+   "en": "It is the plastic panel that is installed on the left side of the printer when facing the screen of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "left-plastic-panel-p1-series",
+    "title": "Left Plastic Panel - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b4b7b8992f088850db64d4f91af24eb35995d7420d2d7709f8590b83b969898",
+   "en": "It is the black metal panel that is installed on the back of the P1S printer (Please use the original screws from the printer for black metal rear pannel installation, as there are no screws included in the package of this spare part).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rear-metal-panel-p1-series",
+    "title": "Rear Metal Panel - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ddcb27aff765c228c12c67b983f78168e2f5ce6b4f33d8cc7e4de84cd8dce661",
+   "en": "Some cables used inside AMS, include 1 RFID board connection cable, 1 power supply connection cable, 1 485 bus connection cable, 1 speed measurement board connection cable, and 1 filament selection board connection cable.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-cable-pack-5-in-1",
+    "title": "AMS Cable Pack (5-in-1)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "710a4685d27825cf35e2da48799d98749ca9a080f46f3bc22f3d719582ca80bb",
+   "en": "The Rear Panel refers to the metal panel installed on the back of the P1P printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rear-panel-p1p",
+    "title": "Rear Panel - P1P",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e4c14273d209c4a3aa868524124f9db37115f59e2d4bee5664a41d4c7ed071bb",
+   "en": "The TH Board FPC Cable V9 connects the TH main board and the interface board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-fpc-cable-v9-x1c",
+    "title": "TH Board FPC Cable V9 - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "1130087092cab7b0ffab2b184d402505ace9139c89b1bcfef305bde490497569",
+   "en": "The rear cover of the printer's toolhead.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-rear-housing",
+    "title": "Toolhead Rear Housing",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "66ac699232de74c47a7ea5f70456d19981aa4100045644da5a34e515f296a67e",
+   "en": "The circuit board installed in the rear part of the heatbed with 5 connectors.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-sensor-interface-board",
+    "title": "Heatbed Sensor Interface Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "247ce18712c70d386acc9795a7abf03fd5e9ab28118a14d17463a0672d62a67f",
+   "en": "The cable connecting the front housing of the toolhead to the extruder board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "logo-led-cable-x1-series",
+    "title": "LOGO LED Cable - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a8f08d124ee27031e497ea0357638baa26356fed3356a447efaf5fe42b5b116",
+   "en": "Extruder Interface Board V9 is the part of the tool head board where the print head wires are connected. It's also connected to the main TH board V9 and it's only compatible with V9 version of the TH board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-interface-board-v9-x1c",
+    "title": "Extruder Interface Board V9 - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "72bc3a47257f1eb2fa3c4e541adfe5df067d6572e7e4afcf651876bfcb0eaa8a",
+   "en": "A small circuit board installed underneath the heatbed, which connects the heatbed sensors to the MC board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-piezo-interface-board",
+    "title": "Heatbed Piezo Interface Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "77304bc3602f1673ee7b6d8fea65d2e0c1b1008b40b420568296d8950e739c40",
+   "en": "The cable connects the MC board to the AP board on the P1 series printers. It supplies power and data.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mc-to-ap-cable-p1-series",
+    "title": "MC to AP Cable - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0bc1438fff14b26598f19dbb1f7e991cc56c7470c8c8713fdb259bf3f197fc8",
+   "en": "The AMS bottom cover unit is the bottom shell of the AMS with all sealings installed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-bottom-cover-unit",
+    "title": "AMS Bottom Cover Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d947b3e45392b85edfabee0d167db670b071c55da83ded842dc0ca3487d85da7",
+   "en": "The middle cover of the printer's toolhead.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-middle-housing",
+    "title": "Toolhead Middle Housing",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d918f72da8f3910e52e4b9963c591d844ff79a32d1caf9f3ac41a3725248442",
+   "en": "The rear panel is the metallic panel installed on the back of the X series printers.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "rear-metal-panel-x1c",
+    "title": "Rear Metal Panel - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "649dd9b8105ca4cbda7244e666c09187621a64b202fe1ef7d801f993b8c403b0",
+   "en": "The transparent top lid of the AMS.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-top-lid",
+    "title": "AMS Top Lid",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e14be7aba0b57add051cf833a3895b3c67d599a259d0283f79e23ab8ee0b18dc",
+   "en": "The pack comes with 4 cables including the communication cable connecting the AC board and MC cable, the MC board power supply cable, the heat bed power cable for V3 heatbed, and the cable connecting the MC board and the AMS interface board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "printer-cable-pack-4-in-1",
+    "title": "Printer Cable Pack (4-in-1)",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "303e9f1e1893f91310712220a28fc6b74fe117e495eba7581d05c965b88898c7",
+   "en": "The 2 cables that connecting the AP board and MC board of the X series printers, supplying the power from MC to AP, and and data interaction between them.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mc-ap-cable-pack-2-in-1-x1-series",
+    "title": "MC AP Cable Pack (2-in-1) - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "98d5dd9d15e0e4ab7fbc136e752781822479d7f5da9f5e7dcc7195820e6ce7dd",
+   "en": "The X-Axis Assembly ensures that the X-axis movement of the toolhead remains consistently fixed on the horizontal plane. The X-axis utilizes linear rail guidance, which provides stability, smooth motion, improved guiding precision, and longevity.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "x-axis-assembly-a1-mini",
+    "title": "X-Axis Assembly - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f70d159cf28a4da7e1cf6c12a8f867607ad5cf31b9b9f95dcf407c01b7973c8",
+   "en": "The Toolhead Rear Housing is designed to protect the rear part of the print head.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "toolhead-rear-housing-a1-series",
+    "title": "Toolhead Rear Housing - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "aaad2b75106dff0b6818f59dbc059a3a24d861e574f6676b50b8a88c1b3b5a63",
+   "en": "The Hardened Steel Extruder Gear Assembly is an internal component of the Extruder Unit. It comprises a driven gear and an active gear that work together to feed filament into the hotend.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-gear-assembly-a1-series",
+    "title": "Hardened Steel Extruder Gear Assembly - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e7591b42a9403b63242dd171521b61f0336f5892393d37c99269cde9d5417d72",
+   "en": "Built with heavy-duty materials, the extruder gear assembly is designed for long-lasting performance. If abrasion or clogging occurs due to extended use, users can simply replace the extruder gear assembly rather than the whole extruder unit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hardened-steel-extruder-gear-assembly-a1-series",
+    "title": "Hardened Steel Extruder Gear Assembly - A1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The Hardened Steel Extruder Gear Assembly is an internal component of the Extruder Unit. It comprises a driven gear and an active gear that work together to fee"
+   },
+   "dict": null
+  },
+  {
+   "h": "cfe5ad11ea2cad60f8af9d18511e4c23ae2cbfbd3cd0c274169b81815d2751eb",
+   "en": "The Toolhead Board is the main circuit board of the toolhead which provides connectivity to the toolhead parts, including the hotend heating assembly, extruder unit, hotend cooling fan, filament sensor, etc.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "toolhead-board-a1-mini",
+    "title": "Toolhead Board - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9a11e94f65697a7f2d4e14169a3cbd6ce9342a2345be41ba74afe6ce8620cf1",
+   "en": "The Filament Sensor is used to detect the filament feeding status to help prevent print failures and improve overall printing efficiency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-a1-series",
+    "title": "Filament Sensor - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "c34438c4bcee55de2cb26614fecbdc24be1187473fdf96d1b3181c3411eb5f2d",
+   "en": "When printing with multiple filaments, the filament sensor can recognize the input and output of filaments and transmit the information to the AMS Lite for filament switching.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-a1-series",
+    "title": "Filament Sensor - A1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The Filament Sensor is used to detect the filament feeding status to help prevent print failures and improve overall printing efficiency."
+   },
+   "dict": null
+  },
+  {
+   "h": "d04456427041d2019aaff65e1c965ba901a4ac099991ad9eed924beb26e94bcc",
+   "en": "It can also detect filament jamming situations and transmit the information to the printer immediately.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-sensor-a1-series",
+    "title": "Filament Sensor - A1 Series",
+    "field": "blocks[0].line[3]",
+    "near": "When printing with multiple filaments, the filament sensor can recognize the input and output of filaments and transmit the information to the AMS Lite for fila"
+   },
+   "dict": null
+  },
+  {
+   "h": "995c22b52c6eb5119f9ec22f2a6af87e6a381a741c982d2f2ad416bda2779342",
+   "en": "A set of circuit boards installed on the printer's toolhead.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-set-v9-dual-red-laser-x1c",
+    "title": "TH Board Set V9 (Dual Red Laser) - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "11c674f96b2ca1e0f372d2e1154955f0a9c83c72ba997f450fc08b498f04e486",
+   "en": "Please refer to the Wiki page here to check the version of your X1 Series TH board. There is no difference in functionality between the Dual Red Laser version and the Single Red Laser version.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-set-v9-dual-red-laser-x1c",
+    "title": "TH Board Set V9 (Dual Red Laser) - X1C",
+    "field": "blocks[1].line[1]",
+    "near": "Important to know"
+   },
+   "dict": null
+  },
+  {
+   "h": "594d4e2032301da78b17a1a331095b3f69df0c4ac98991b266ae38de7f90a311",
+   "en": "The Single Red Laser TH board is discontinued and has been replaced by the Dual Red Laser TH board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-set-v9-dual-red-laser-x1c",
+    "title": "TH Board Set V9 (Dual Red Laser) - X1C",
+    "field": "blocks[1].line[2]",
+    "near": "Please refer to the Wiki page here to check the version of your X1 Series TH board. There is no difference in functionality between the Dual Red Laser version a"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5a015fa4479e906cd52b268f76c59103c839787823650d88406b2388430270c",
+   "en": "The Dual Red Laser TH board works with the Dual Red Laser LIDAR.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "th-board-set-v9-dual-red-laser-x1c",
+    "title": "TH Board Set V9 (Dual Red Laser) - X1C",
+    "field": "blocks[1].line[3]",
+    "near": "The Single Red Laser TH board is discontinued and has been replaced by the Dual Red Laser TH board."
+   },
+   "dict": null
+  },
+  {
+   "h": "963f02dabd5f3ffe45674bf60f7ec6fabf808047a25fcfb3deea5b16e455ef95",
+   "en": "To do so, please open a ticket by following this link, and our team will handle your request ASAP.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "th-board-set-v9-dual-red-laser-x1c",
+    "title": "TH Board Set V9 (Dual Red Laser) - X1C",
+    "field": "blocks[1].line[4]",
+    "near": "The Dual Red Laser TH board works with the Dual Red Laser LIDAR."
+   },
+   "dict": null
+  },
+  {
+   "h": "c1736ddeba1b95e24ed83e4daa97f5a66027ee93fa2819063e1e0bb0acf6c121",
+   "en": "The Print Head Front Cover is designed to protect the front part of the print head. It features a circular window that allows observation of the rotating status of the extruder gear.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "print-head-front-cover-a1-series",
+    "title": "Print Head Front Cover - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e45feed5d11650a49cc8293cf157351d0a5205149ded605a06e82a74320e0ec",
+   "en": "The Extruder Unit features dual gears made of hardened steel to feed filament into the hotend. The hardened steel gears provide increased extrusion force, prevent slippage, and enhance abrasion resistance. These gears enable the extruder unit to handle tough engineering filaments such as carbon fiber nylon and glass fiber nylon.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-unit-a1-series",
+    "title": "Extruder Unit - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e3a75d3f90fb91e53ea2c28801a754c8e2158b0fb507bc1561f1c4063300dc1",
+   "en": "The extruder unit is also equipped with a filament cutter for filament unloading or switching, and an extruder motor that supplies the required power for the extrusion process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-unit-a1-series",
+    "title": "Extruder Unit - A1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The Extruder Unit features dual gears made of hardened steel to feed filament into the hotend. The hardened steel gears provide increased extrusion force, preve"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd4982fbd0b03224c92550c8c60b8b3fb7bdb788a47b0d7f5ef4230b8e19cdbd",
+   "en": "The Part Cooling Fan is used to ensure adequate cooling of the printed layers during the printing process. It helps in rapidly cooling the material as it is extruded, allowing each layer to solidify and maintain its shape before the next layer is deposited.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "part-cooling-fan-a1-series",
+    "title": "Part Cooling Fan - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "87dfcf3aaabaeb28b90a938fd5c1817ee41b1b4b8892cd9871031eb9e968590b",
+   "en": "The Hotend Cooling Fan is used to cool down both the hotend heating assembly and the hotend.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-cooling-fan-a1-series",
+    "title": "Hotend Cooling Fan - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b049551ea202117faf0d52f38e5cb46f09d7fd7c432b1e28938ea08183300888",
+   "en": "The Hotend Heating Assembly is specially designed to support the quick swap design of the hotend. A quick clamping mechanism is used to secure the heater block and heating base, enabling easy separation of the thermal and electronic components of the hotend.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "hotend-heating-assembly-a1-series",
+    "title": "Hotend Heating Assembly - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fb6b1e91cc84633bd0d46c89057ab6607a9d41179f9b28aef1724e64e1a5b1e5",
+   "en": "The hotend heating assembly can heat the hotend up to 300℃ and measure the real-time temperature of the hotend with the included thermistor.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-heating-assembly-a1-series",
+    "title": "Hotend Heating Assembly - A1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The Hotend Heating Assembly is specially designed to support the quick swap design of the hotend. A quick clamping mechanism is used to secure the heater block "
+   },
+   "dict": null
+  },
+  {
+   "h": "4c4385665732571b81f7f440a9760de340631b138f76366725bb2590f3b4aac4",
+   "en": "When replacing the hotend heating assembly, please make sure to align the gasket with the screw holes and pre-install two screws at first, then secure the heating assembly to the toolhead.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "hotend-heating-assembly-a1-series",
+    "title": "Hotend Heating Assembly - A1 Series",
+    "field": "blocks[0].line[3]",
+    "near": "The hotend heating assembly can heat the hotend up to 300℃ and measure the real-time temperature of the hotend with the included thermistor."
+   },
+   "dict": null
+  },
+  {
+   "h": "db117c47c811c2df9d3405c22926ed0035c698bd6efcb1d8924081ffcb1e99ad",
+   "en": "The AMS lite Filament Hub is a key part of reliable filament switching during multi-color or multi-filament printing. One end of the hub connects to 4 different PTFE tubes (up to 4 filaments), while the other end connects to the top of the extruder to feed filament.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-filament-hub",
+    "title": "AMS lite Filament Hub",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ddb830d053b3785a8234baab8a5dbd895cdbdcd15f5dffdeb1a6e8d262aafa6f",
+   "en": "The AMS lite Housing Assembly is the outer casing of the AMS lite body. It provides protection for the internal structure of the AMS Lite.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-housing-assembly",
+    "title": "AMS lite Housing Assembly",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "edae9aa026f7c4246b1476a28ac28a1a307b0a90c5e7d7bb68ea83259a10e656",
+   "en": "The AMS lite Feeder Unit is specially designed to support the AMS lite for printing multiple colors and materials. Due to its unique symmetrical design, the feeder unit is designed in both left and right versions. Both left and right feeder units have their corresponding slots. The left feeder unit corresponds to Slot 1 and Slot 2, while the right feeder unit corresponds to Slot 3 and Slot 4.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-unit",
+    "title": "AMS lite Feeder Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6de36da7640ae5ccf71cc22b5ac8c14ae4896de0176f843d5ad82ecafc5f56c",
+   "en": "The left and right feeder units have only minor structural differences, while their functionality and purpose remain identical. Please note that both the left and right feeder units can only be installed in their respective positions. Please confirm that you have selected the correct version (left or right) before purchase.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-unit",
+    "title": "AMS lite Feeder Unit",
+    "field": "blocks[0].line[2]",
+    "near": "The AMS lite Feeder Unit is specially designed to support the AMS lite for printing multiple colors and materials. Due to its unique symmetrical design, the fee"
+   },
+   "dict": null
+  },
+  {
+   "h": "367033a18a68134ef2392f77d11a7e6c9a3dd165f344102dbe6e85344f9dae72",
+   "en": "Each feeder unit has its own motors and gears to actively push the filament forward. When the filament is inserted, the feeder unit will pull the filament automatically and send the filament to the toolhead through the PTFE Tube.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-feeder-unit",
+    "title": "AMS lite Feeder Unit",
+    "field": "blocks[0].line[3]",
+    "near": "The left and right feeder units have only minor structural differences, while their functionality and purpose remain identical. Please note that both the left a"
+   },
+   "dict": null
+  },
+  {
+   "h": "65b88ae5467b2ec8ebdc27f87eb5de10dd46510e8cba537da5e101b1b888ef30",
+   "en": "The AMS lite Filament Funnel Unit is the inner component of the AMS lite Feeder Unit. It consists of structural parts and a filament detection sensor board. In line with the feeder unit, the funnel unit is also designed in both left and right versions.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-filament-funnel-unit",
+    "title": "AMS lite Filament Funnel Unit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e61baaa2792cf9a47773d58f4fdfa3d5cf75ddfe58506a2526be437c20259af",
+   "en": "Please note that both the left and right funnel units can only be installed in their corresponding feeder units. Please confirm that you have selected the correct version (left or right) before purchase.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-filament-funnel-unit",
+    "title": "AMS lite Filament Funnel Unit",
+    "field": "blocks[0].line[2]",
+    "near": "The AMS lite Filament Funnel Unit is the inner component of the AMS lite Feeder Unit. It consists of structural parts and a filament detection sensor board. In "
+   },
+   "dict": null
+  },
+  {
+   "h": "8cd358ea3402c6e17b82f4f1453adf4f41c10f4e86e40a37d669a826899b599e",
+   "en": "When the sensor board detects the insertion of filament, the funnel unit will pull the filament forward automatically. When the filament insertion is abnormal, the sensor board will also identify it and feed that information back to the 3D printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-filament-funnel-unit",
+    "title": "AMS lite Filament Funnel Unit",
+    "field": "blocks[0].line[3]",
+    "near": "Please note that both the left and right funnel units can only be installed in their corresponding feeder units. Please confirm that you have selected the corre"
+   },
+   "dict": null
+  },
+  {
+   "h": "2136b2bf4e910a8169cdcf37f6396881ae05f22bd17ac11b7c6c0f2ca5f5f1ea",
+   "en": "The AMS lite Rotary Spool Holder is designed to support and hold the spool when it's attached to the AMS lite. Each rotary spool holder has 3 spool claws to secure the spool in place. While the feeder unit pulls the filament, the rotary spool holder works in coordination to enable the spool to rotate during the printing process. This ensures continuous filament feeding and smooth operation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-rotary-spool-holder",
+    "title": "AMS lite Rotary Spool Holder",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4d50eb99e003b3baa7a05400c71f08d45cedd94802f89f60548f0006a9e27b78",
+   "en": "The rotary spool holder is designed in both green and yellow versions to work with the left and right feeder units for filament feeding. For the green version, the two holders are installed on the bottom-right roller and top-left roller, rotating counterclockwise to feed filament to slots 1 and 3. For the yellow version, the two holders are installed on the bottom-left roller and top-right roller, rotating clockwise to feed filament to slots 2 and 4.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-rotary-spool-holder",
+    "title": "AMS lite Rotary Spool Holder",
+    "field": "blocks[0].line[2]",
+    "near": "The AMS lite Rotary Spool Holder is designed to support and hold the spool when it's attached to the AMS lite. Each rotary spool holder has 3 spool claws to sec"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e0b32924b9d5ff1471d9e9e6a8b0857e28b422f5ce8300c51bb9c2b4ba6b311",
+   "en": "Please note that the spool holder can only be installed and correctly operated on the roller that matches its color version. Please confirm that you have selected the correct version (green or yellow) before purchase.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-rotary-spool-holder",
+    "title": "AMS lite Rotary Spool Holder",
+    "field": "blocks[0].line[3]",
+    "near": "The rotary spool holder is designed in both green and yellow versions to work with the left and right feeder units for filament feeding. For the green version, "
+   },
+   "dict": null
+  },
+  {
+   "h": "edcb6c007a7e622e99346786f7caf37a07e0cea4538f4f74a8f8e4ae01cbc67b",
+   "en": "The AMS lite Spool Claw is assembled on the Rotary Spool Holder and is used to secure the spool in place. The 3 rubber pads on the claws are used to increase the friction between the claws and the spool, preventing the spool from detaching from the spool holder during the printing process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-spool-claw",
+    "title": "AMS lite Spool Claw",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "801f28b041bcd899472948cfb98015deec0d462e92e603768f33ac1387163a65",
+   "en": "The X Belt is a crucial transmission component within the X-axis assembly, facilitating the connection between the X motor and the tool head, enabling smooth movement along the X-direction. It is imperative to replace the X Belt promptly in cases of severe wear or breakage to avoid operational disruptions of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "x-belt-a1-mini",
+    "title": "X Belt - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9c0229fb14939653f63fb464d61fb399e669860c0b78e3452c3fe6840fa73968",
+   "en": "Connects the A1 mini hotbed to the Mainboard, which is used to power the hotbed and provide feedback on the temperature of the hotbed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-cable-a1-mini",
+    "title": "Heatbed Cable - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "155be31eae5fafc70c3fea1c9b8b5a19fc5e56113a9b057b50d009f35d280cdc",
+   "en": "Facilitates the connection between the Mainboard and the TH Extrusion board for MC-TH power supply and serial communication.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-usb-c-cable-a1-mini",
+    "title": "Bambu USB-C Cable - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6530eb83b104be3a727f9daa1df601ee7f0b6a96d271c773386300e479379f5",
+   "en": "The live view camera is a low-FPS camera included by default in the A1 mini. The chamber camera has two functions, which are Remote Livestreams and Time-lapses respectively. This camera is used as a replacement part. It does not upgrade the camera quality or FPS for the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-a1-mini",
+    "title": "Live View Camera - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "79530157366c285f24ca315af1be5decf518936c9e1c82a1b512eb3eec7aa259",
+   "en": "Remote livestream: You can observe print progress anytime, anywhere.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-a1-mini",
+    "title": "Live View Camera - A1 mini",
+    "field": "blocks[0].line[2]",
+    "near": "The live view camera is a low-FPS camera included by default in the A1 mini. The chamber camera has two functions, which are Remote Livestreams and Time-lapses "
+   },
+   "dict": null
+  },
+  {
+   "h": "04a9c9bfb0d5fc43e7e3efa09d147fc777da145c13845ea8743fec433369ebf9",
+   "en": "Time-lapses: This feature uses the chamber camera to automatically create time-lapse videos of prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-a1-mini",
+    "title": "Live View Camera - A1 mini",
+    "field": "blocks[0].line[3]",
+    "near": "Remote livestream: You can observe print progress anytime, anywhere."
+   },
+   "dict": null
+  },
+  {
+   "h": "934c4bf69b2ef8caf3ad9e24475a848fcb4c4b8c3fe6b92569993fd83b8f73b0",
+   "en": "The heatbed nozzle wiper is designed for cleaning the hotend nozzle before starting a print job. The machine's heated bed comes with a built-in nozzle wiping kit, and the cleaning action is automatically performed after initiating each print task without the need for manual intervention.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-mini",
+    "title": "Heatbed Nozzle Wiper - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4b3af664667ba2bc766b0aa24daa5fc3a31135b3363a803b1b1aa390a81469b8",
+   "en": "Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that may indicate the need for replacement of the A1 mini nozzle wipers include:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-mini",
+    "title": "Heatbed Nozzle Wiper - A1 mini",
+    "field": "blocks[0].line[2]",
+    "near": "The heatbed nozzle wiper is designed for cleaning the hotend nozzle before starting a print job. The machine's heated bed comes with a built-in nozzle wiping ki"
+   },
+   "dict": null
+  },
+  {
+   "h": "530faed4edf0cd965242b0bc599229a781d2321ed9a08e29d67a8342d45c1e69",
+   "en": "1. Inadequate cleaning of the nozzle during the pre-print preparation step",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-mini",
+    "title": "Heatbed Nozzle Wiper - A1 mini",
+    "field": "blocks[0].line[3]",
+    "near": "Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that may indicate the need for repl"
+   },
+   "dict": null
+  },
+  {
+   "h": "97b153966675f6ae964905be93990144fca25661b491140bdb9ff8ab7dda3328",
+   "en": "2. Filament adhering to the nozzle tip during bed leveling, resulting in an inconsistent first layer",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-mini",
+    "title": "Heatbed Nozzle Wiper - A1 mini",
+    "field": "blocks[0].line[4]",
+    "near": "1. Inadequate cleaning of the nozzle during the pre-print preparation step"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd9c0674f58bbd5d47909181492a73b52c2a094e9ea5bebbddceecc2fec1e9cb",
+   "en": "3. Visible damage or wear on the nozzle wipers.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-mini",
+    "title": "Heatbed Nozzle Wiper - A1 mini",
+    "field": "blocks[0].line[5]",
+    "near": "2. Filament adhering to the nozzle tip during bed leveling, resulting in an inconsistent first layer"
+   },
+   "dict": null
+  },
+  {
+   "h": "51f247f7d1e111509c43da466e58b6b0e0e06a621b8a321120cf6c624233b202",
+   "en": "The Bambu Micro Lidar shell consists of three segments, a top cover, a bottom cover, and a protective lens.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-micro-lidar-cover-x1-series",
+    "title": "Bambu Micro Lidar Cover - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "98487e54e078c3a1be01b1c7f4e7e05d1fd0b19dbd706efd9bc5bc7b922422c2",
+   "en": "This Purge Wiper is designed to efficiently remove waste filament generated by the printer's hotend. It gathers and dislodges waste filament during different stages, including printer setup, pause and resume operations, and filament changes for multi-color printing. Its purpose is to ensure the proper management and disposal of waste materials for seamless printing processes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a1-series",
+    "title": "Purge Wiper - A1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0f6f30f564a7efa92212eeb700bc08a02dacac311407a10472b41d05a319dde5",
+   "en": "Over time, the purge wiper can become damaged, and the metallic flap of the wiper may wear out or become bent. Common issues that may indicate the need for replacement of the A1 purge wiper include:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a1-series",
+    "title": "Purge Wiper - A1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "This Purge Wiper is designed to efficiently remove waste filament generated by the printer's hotend. It gathers and dislodges waste filament during different st"
+   },
+   "dict": null
+  },
+  {
+   "h": "eacd594262d865c1500d2d34fdbd711cfd5e6a482184b5cf98f775911c4a6af0",
+   "en": "1. Inadequate cleaning of the nozzle during the pre-print preparation step.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a1-series",
+    "title": "Purge Wiper - A1 Series",
+    "field": "blocks[0].line[3]",
+    "near": "Over time, the purge wiper can become damaged, and the metallic flap of the wiper may wear out or become bent. Common issues that may indicate the need for repl"
+   },
+   "dict": null
+  },
+  {
+   "h": "ce50f26741d1dff29d99e6dc9de6a4566f8ad0f95184b59369d4bf16b8df209b",
+   "en": "2. Filament adhering to the purge wiper flap.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a1-series",
+    "title": "Purge Wiper - A1 Series",
+    "field": "blocks[0].line[4]",
+    "near": "1. Inadequate cleaning of the nozzle during the pre-print preparation step."
+   },
+   "dict": null
+  },
+  {
+   "h": "47af5028528c000ce1186acd6f5c820138b2608bc5bf7a2bd106f39c96fc4dbf",
+   "en": "3. Visible damage or wear on the purge wiper.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "purge-wiper-a1-series",
+    "title": "Purge Wiper - A1 Series",
+    "field": "blocks[0].line[5]",
+    "near": "2. Filament adhering to the purge wiper flap."
+   },
+   "dict": null
+  },
+  {
+   "h": "1f25dad65ac72cf8e0e744db6dce670a5e8b5b1dcd915a352507f0ece118d302",
+   "en": "The Z-axis Coupler is used to connect the Z-axis motor and the Z-axis lead screw. It enables precise transmission of motion and torque while accommodating certain levels of radial, axial, and angular misalignment.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-coupler-a1-mini",
+    "title": "Z-Axis Coupler - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "32f131a0ab3f14d0ca47cb625671dc08921a969041ba7381aa50f4563ebec449",
+   "en": "The X Motor is utilized to drive the tool head in the back-and-forth motion along the X-axis.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "x-motor-a1-mini",
+    "title": "X Motor - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f08772e8fc636287b780d27da6687e9c8364bdadf0b822f66c519dafb57fc8a",
+   "en": "The Y Motor is used to drive the heated bed in the back-and-forth motion along the Y-axis.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "y-motor-a1-mini",
+    "title": "Y Motor - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "3eb47599fdef5c8d9ae79270b501507320b75c833f4b197db072f1535625b3e0",
+   "en": "The heatbed unit of the A1 mini is a printing platform installed on the printer, which can move back and forward along the Y direction and can be heated according to the temperature set by the user. Setting a suitable heat bed temperature can effectively improve adhesion between the model and the build plate and prevent the model from warping. Please follow our recommended heatbed temperatures for each filament to get the best results.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "a1-mini-heatbed-unit",
+    "title": "Heatbed Unit - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4fd7bb64210cb3116ae2d5d272ccb2cfeda52017efe015f351d0bb0ee511baea",
+   "en": "This sensor is used in the Extruder to detect the presence of the filament, and also detect the Filament Cutter lever.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-filament-sensor-p1-series",
+    "title": "Extruder Filament Sensor - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "37c690006e9af27ccc6672e17f610537c4f3431419a149deb6316ee033fa3dfa",
+   "en": "This sensor is used in the Extruder to detect the presence of the filament, and also detect the Filament Cutter lever",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "extruder-filament-sensor-x1-series",
+    "title": "Extruder Filament Sensor - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f69d9c384516688ec7359f83679a3b23040330d7b80fb3d37ef46d95e8b346d3",
+   "en": "The AMS power board is a circuit board that receives power from the printer and supplies it to the AMS.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-power-board",
+    "title": "AMS Power Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "50b3cbafd20e3e2207743bc9de42fe5899b8962843f39602f242d818977c2342",
+   "en": "The AMS interface board is a circuit board that provides 24V power and also handles communication between the AMS and the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-connector-board",
+    "title": "AMS Connector Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e4e5af9fe30abce8ef6d5cb0c390006588aaf934e881d27201df6b2182c5e33",
+   "en": "The XY tensioner idler is an idler mounted on the XY belt tensioner, one on each side (XY), each containing two washers, and an idler.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "idler-pulley",
+    "title": "Idler Pulley",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "38917503357ea33f3d81198d93bcbe1af16284a97382c4d827b03e947d0ab848",
+   "en": "The front cover of the X1C printer is a cover that is installed on the upper front of the printer and printed with its model name.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "front-cover-x1c",
+    "title": "Front Cover - X1C",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd4d59568687ed4743f6958e4aeee35e22a2ffa4e55951ba005d495767640db0",
+   "en": "MC stands for Machine Controller, which is the unit that controls all the moving parts of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "mc-board-p1-series-1",
+    "title": "MC Board - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e8461f23be93a3530f66a3240795b6cebb22529d5a04dfdfd5cdafe7d1741c6",
+   "en": "The Z-Axis Top Cover is designed to protect the top of the Z-axis assembly.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-axis-top-cover-a1-mini",
+    "title": "Z-Axis Top Cover - A1 mini",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "874f914295d523900acc52b3c2be1187919fbc9d67168c7016cedd0d2d794928",
+   "en": "The P1S Heatsink for MC Board serves the purpose of dissipating heat generated by the MC board. The P1S heatsink is horizontal oriented to work with the control board fan for heat dissipation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1s-heatsink-for-mc-board",
+    "title": "P1S Heatsink for MC Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2333857dcf6b186d745657c12def8413b2172539f243c6651fb67f53e9391d94",
+   "en": "It is also compatible with the P1P 3D Printer and can be used as an upgrade part, if you wish to enclose the printer and add an MC Board fan.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "p1s-heatsink-for-mc-board",
+    "title": "P1S Heatsink for MC Board",
+    "field": "blocks[0].line[2]",
+    "near": "The P1S Heatsink for MC Board serves the purpose of dissipating heat generated by the MC board. The P1S heatsink is horizontal oriented to work with the control"
+   },
+   "dict": null
+  },
+  {
+   "h": "0c01fc6cb36c6088f28ac90b0c9ffcba3fd4829d540d95ceb7dcb05c277d5c50",
+   "en": "An assembly that is installed on the back of the printer and it is used to clean the nozzle and slide the excess filament out of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "purge-chute",
+    "title": "Purge Chute",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4f26fcdee911253d0d2274810b169be1ea02acfdc5afd829c26003fde28cbafb",
+   "en": "Facilitates the connection between the Mainboard and the TH Extrusion Board for MC-TH power and serial communication.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-usb-c-cable-a1",
+    "title": "Bambu USB-C Cable - A1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b9d5a153f81a0e36c5c329e0cfea335edf9130782cbf3e8ff0627a4d52644d9e",
+   "en": "The Live View camera is a low-FPS camera included by default in the A1. The Live View camera has two functions, which are Remote Livestreams and Time-lapse. This camera is used as a replacement part. It does not upgrade the camera quality or FPS for the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-a1",
+    "title": "Live View Camera - A1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2869b08e2775da0ba7812e2a1d2de788d9992169ba5b8655b9cce7986b9b06d8",
+   "en": "Remote Livestream: You can observe the printing progress anytime, anywhere.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-a1",
+    "title": "Live View Camera - A1",
+    "field": "blocks[0].line[2]",
+    "near": "The Live View camera is a low-FPS camera included by default in the A1. The Live View camera has two functions, which are Remote Livestreams and Time-lapse. Thi"
+   },
+   "dict": null
+  },
+  {
+   "h": "ae2f483b76c4b59a38bfee26c4337e628967dc2e1ca1f858d283077f2959b34a",
+   "en": "Time-lapse: This feature uses the chamber camera to automatically create time-lapse videos of prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "live-view-camera-a1",
+    "title": "Live View Camera - A1",
+    "field": "blocks[0].line[3]",
+    "near": "Remote Livestream: You can observe the printing progress anytime, anywhere."
+   },
+   "dict": null
+  },
+  {
+   "h": "b375ca2e52ea719467216e979451b59587137da7273c096a27fb2cb94c8339a4",
+   "en": "3.5-inch IPS capacitive touchscreen which connects to the Mainboard which is used to control the printer through the touchscreen interface.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "touch-screen-a1-a2l",
+    "title": "Touch Screen - A1/A2L",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "b37540e86e1e1423f91c135bada0bcd4fe477aed972ca728b2af89a0215d51b7",
+   "en": "The Y Belt is a crucial transmission component within the Y-axis assembly, facilitating the connection between the Y motor and the heatbed, enabling smooth movement along the Y-direction. It is imperative to replace the Y-Axis Belt promptly in cases of severe wear or breakage to avoid disrupting printer operations.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "y-belt-a1",
+    "title": "Y Belt - A1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "77a986fe57fd22332eaafb5b07808380c6aee45c74861eff5ed9823d5dbeb084",
+   "en": "Used to drive the Z-axis lead screws for vertical movement of the X-axis, ensuring the consistency in elevation.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "z-belt-a1",
+    "title": "Z Belt - A1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "643c0ecf24f6482ae24d7d0e1f7695c75fcf894af514564ccf764add9647b3b4",
+   "en": "Used to mount the filament to the printer when the AMS Lite is not used.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "spool-holder-a1",
+    "title": "Spool Holder - A1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "956e9e46c74007c0a23713e188c5154c37d01473f948449f739c54f05fb134b0",
+   "en": "The AMS lite Top Mount Screws Kit contains all the necessary screws for installing the Top Mount Bracket Set on top of the A1/A2L 3D printer. The screws kit can help to safely mount the AMS lite.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-top-mount-screws-kit",
+    "title": "AMS lite Top Mount Screws Kit",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c90379daf2f65d7d1f99db2518663ffe5687790bd709ad381aaaaf6e2dbfffa",
+   "en": "Please note that the Top Mount Bracket Set is a set of printable components which is available on MakerWorld for download.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-lite-top-mount-screws-kit",
+    "title": "AMS lite Top Mount Screws Kit",
+    "field": "blocks[0].line[2]",
+    "near": "The AMS lite Top Mount Screws Kit contains all the necessary screws for installing the Top Mount Bracket Set on top of the A1/A2L 3D printer. The screws kit can"
+   },
+   "dict": null
+  },
+  {
+   "h": "2308c5b06e59e0426a7fcccdbb9ccd2f39463f2ceae20f1dd51226a6b047a8e0",
+   "en": "The X Belt is a crucial transmission component within the X-Axis assembly, facilitating the connection between the X motor and the tool head, enabling smooth movement along the X-axis. It is imperative to replace the X belt promptly in cases of severe wear or breakage to avoid operational disruptions of the printer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "x-belt-a1",
+    "title": "X Belt - A1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d105b6b514ac0f8e2c0d65a052c516dd5b3c8b6ae3a636596ed278e47499950e",
+   "en": "The heatbed nozzle wiper is designed for cleaning the hotend nozzle before starting a print job. The machine's heatbed comes with a built-in nozzle wiping kit, and the cleaning action is automatically performed after initiating each print task without the need for manual intervention.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-a2l",
+    "title": "Heatbed Nozzle Wiper - A1/A2L",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2b4c556dedb5ce868ce63b5fb82246dccf90d3272fc4fb3013e63e007bc5c85",
+   "en": "Over time, the silicone wiper bristles can become damaged, and the metallic wiper may wear out or become bent. Common issues that may indicate the need for replacement of the A1/A2L nozzle wiper include:",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-a2l",
+    "title": "Heatbed Nozzle Wiper - A1/A2L",
+    "field": "blocks[0].line[2]",
+    "near": "The heatbed nozzle wiper is designed for cleaning the hotend nozzle before starting a print job. The machine's heatbed comes with a built-in nozzle wiping kit, "
+   },
+   "dict": null
+  },
+  {
+   "h": "6700dffba2e49096c6f331a4a2dede2d5dc379b936fcf9aa80127dead08396c7",
+   "en": "3. Visible damage or wear on the nozzle wiper.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-nozzle-wiper-a1-a2l",
+    "title": "Heatbed Nozzle Wiper - A1/A2L",
+    "field": "blocks[0].line[5]",
+    "near": "2. Filament adhering to the nozzle tip during bed leveling, resulting in an inconsistent first layer"
+   },
+   "dict": null
+  },
+  {
+   "h": "bdae3726e654d1d680d639684c9ddb61523b06259d2812acf7f7fec79f303d0a",
+   "en": "A casted holder for assembled parts of the AMS.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-main-frame-v3",
+    "title": "AMS Main Frame V3",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f44ee6056b79fc156ffcce610a178433967e98389fb92c9a08ed94deccd3279c",
+   "en": "The RFID System can automatically identify the RFID tag on the Bambulab filament spools, which can then sync the filament information to the Bambulab slicer (Bambu Studio).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-rfid-board",
+    "title": "AMS RFID Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "20551d956a19b004bae5cd65911976d84df15b75579e496d9ebf085aa2e01491",
+   "en": "The filament buffer connection board is located inside the AMS filament buffer and is equipped with a Hall sensor. It monitors the filament loading status by detecting the position changes of the buffer slider.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "filament-buffer-connection-board",
+    "title": "Filament Buffer Connection Board",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "89826f051a289c68df03b19f4caf3c01a9d925a5dcb7e2344a4a699b0cf05077",
+   "en": "The AP board is a circuit board that controls the printer and provides the required Wi-Fi connectivity and processing power for the printer.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "ap-board-p1p",
+    "title": "AP Board - P1P",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f463a0fd89ba7b615adabd86225372ed0a9034bd413485f7f1e7498a3ac8bacd",
+   "en": "Precautions",
+   "kind": "block_title",
+   "freq": 4,
+   "context": {
+    "handle": "ap-board-p1p",
+    "title": "AP Board - P1P",
+    "field": "blocks[1].line[0]",
+    "near": "1. When replacing the AP board, be sure to skip the step of binding the machine when turning it on for the first time."
+   },
+   "dict": null
+  },
+  {
+   "h": "d3df7b10c325d458e51d5b8637d06d4a847cbb4739219bdb4891946f471305ba",
+   "en": "1. When replacing the AP board, be sure to skip the step of binding the machine when turning it on for the first time.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-p1p",
+    "title": "AP Board - P1P",
+    "field": "blocks[1].line[1]",
+    "near": "Precautions"
+   },
+   "dict": null
+  },
+  {
+   "h": "62f6312f945d6fd6a3910ca4527df1b67488a0eb24560416dc6c4d2c6e4ec09e",
+   "en": "2. After confirming that the replacement is completed, it is necessary to update the SN. To do this, please contact the service team and provide the new and old SN to complete the SN replacement process. (The printer SN of P1P is begins with 01S)",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-p1p",
+    "title": "AP Board - P1P",
+    "field": "blocks[1].line[2]",
+    "near": "1. When replacing the AP board, be sure to skip the step of binding the machine when turning it on for the first time."
+   },
+   "dict": null
+  },
+  {
+   "h": "bd0e4c30a1064cfecaf009e9c062d7c00f7efaea5996a2b86d2430146f6c9835",
+   "en": "3. Changing a new AP board does not remove the region lock.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ap-board-p1p",
+    "title": "AP Board - P1P",
+    "field": "blocks[1].line[3]",
+    "near": "2. After confirming that the replacement is completed, it is necessary to update the SN. To do this, please contact the service team and provide the new and old"
+   },
+   "dict": null
+  },
+  {
+   "h": "7ced19c1dfe01b7a24fc3dfaed4d01f06ccdecefa24ff83f86aa83a6c6dd06e7",
+   "en": "The Z Belt Timing Pulley is located on the bottom side of the printer, and used to connect the Z axis leadscrew to the belt of the printer.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "z-belt-timing-pulley",
+    "title": "Z Belt Timing Pulley",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "e67c5954d7da200d8fee012fcb94e58a7d4b39d8d51016fcbdf09f0348afe741",
+   "en": "Button Board with Chamber Temperature Sensor is a circuit board installed in the upper right-hand corner of the X1 printer to control the emergency stop button and the sleep (screen off) button. It also contains the chamber's temperature sensor.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "button-board-with-chamber-temperature-sensor-x1-series",
+    "title": "Button Board with Chamber Temperature Sensor - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "49b751bf3a9390caf0065c9dcc436faa7047aa7422c0c7813cc82e86fa67021c",
+   "en": "The Bambu Micro Lidar (Dual Red Laser) is a sensor capable of measuring depth in micrometers. Using this unit, the system can measure the distance, calibrate the flow extruded from the nozzle, and scan the first layer.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "bambu-micro-lidar-dual-red-laser-x1-series",
+    "title": "Bambu Micro Lidar (Dual Red Laser) - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "62150de59eadee8dad68ddc992f7f3bd9fb14152f428a8d21b6c443c94863404",
+   "en": "A round handle used to open and close the AMS top lid",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-top-lid-handle",
+    "title": "AMS Top Lid Handle",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ed53fd197b37b3e78b72b1441c6a7214089a1b73a3cd8211b65be19129e7a74",
+   "en": "The XY Belt Tensioner with Pulley is composed of an idler pulley and a bracket, which can change the belt travel distance under the tension of the spring.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "xy-belt-tensioner-with-pulley",
+    "title": "XY Belt Tensioner with Pulley",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fde149ea627c83e6ed3953978b613775ab4a1504d8d8ee8e9bc75357ca1e8580",
+   "en": "Used to support the printer and help insulate it from vibrations.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "supportive-footpad-a1",
+    "title": "Supportive Footpad - A1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "d36b859a398171d3d20ba818ad9294ae821dbf33f97ccf81faa142cdf34d44a7",
+   "en": "The A1 PTFE Tube Connector is used to connect filament to the PTFE tube when printing with an external spool.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ptfe-tube-connector-a1",
+    "title": "PTFE Tube Connector - A1",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "617d35e1378be7cfbd2d3645f7751d39e17e62cc5fb97010e3b92bde951fa79e",
+   "en": "AMS Rubber Seal keeps the inside of the AMS dry, reducing the rate at which filaments and desiccants absorb water from the air.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ams-rubber-seal",
+    "title": "AMS Rubber Seal",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "4bc19896592a9163be67cb37275522fa1ed8f9ac5076ecf3d8f5676adf47fb51",
+   "en": "The Screws Kit for A1 Series and AMS lite offers the screws most commonly used based on user feedback.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6b8c2060d3bd4df92791e5ea6ef4551eb300333d36de81c95d0e5335fb3577d",
+   "en": "For more detailed information and image guide, please visit the Bambu Lab Wiki.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[0].line[2]",
+    "near": "The Screws Kit for A1 Series and AMS lite offers the screws most commonly used based on user feedback."
+   },
+   "dict": null
+  },
+  {
+   "h": "ff7c91fa8617f54adb32efa3c5411bb093bbae7eba8611c35906d21c9fa99789",
+   "en": "Screws Information",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[0]",
+    "near": "Item Number | Item Name | QTY | Location"
+   },
+   "dict": null
+  },
+  {
+   "h": "f7b4556177d1215c5fcedd1489b625ef61032820d54d774cde66a998f898086f",
+   "en": "Item Number",
+   "kind": "block_cell",
+   "freq": 6,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[1].cell[0]",
+    "near": "Screws Information"
+   },
+   "dict": null
+  },
+  {
+   "h": "06d4918fe3e6838d2d1b1df08325e67f712ecc2361e676995bbbe211747fa28e",
+   "en": "Item Name",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[1].cell[1]",
+    "near": "Screws Information"
+   },
+   "dict": null
+  },
+  {
+   "h": "efd7b769a999d370ca9c1df955f398d35e7c53cb17ae551436880214d005c491",
+   "en": "QTY",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[1].cell[2]",
+    "near": "Screws Information"
+   },
+   "dict": null
+  },
+  {
+   "h": "15b61974b2707a7b3d4201385e0f01f4ff5eb1f17c5639d98788ee5add2025cd",
+   "en": "Location",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[1].cell[3]",
+    "near": "Screws Information"
+   },
+   "dict": null
+  },
+  {
+   "h": "13e1066f18792ec9709c5280fbaf2c9f7b5c8fe115b50a261fcfa6ff5b08f6ec",
+   "en": "M2x2.5 FHCS (Machine Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[2].cell[1]",
+    "near": "Item Number | Item Name | QTY | Location"
+   },
+   "dict": null
+  },
+  {
+   "h": "3dc4576f886958f5b1dde43836f93d680a59ef7586ed7f89051e005c82f43ed8",
+   "en": "Coil and the Heat Sink of A1 Main Board",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[2].cell[3]",
+    "near": "Item Number | Item Name | QTY | Location"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e19c75467843ab035bcd84017b13bfd7b07ddb5c1fefd046045b72b59c91dff",
+   "en": "M2.5x5 FHCS (Machine Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[3].cell[1]",
+    "near": "1 | M2x2.5 FHCS (Machine Screw) | 10 | Coil and the Heat Sink of A1 Main Board"
+   },
+   "dict": null
+  },
+  {
+   "h": "58c73aaeaef7700e01da286ddaa3406b2ac7c044888ac558e51174dc2e370c2a",
+   "en": "A1 mini Heatbed",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[3].cell[3]",
+    "near": "1 | M2x2.5 FHCS (Machine Screw) | 10 | Coil and the Heat Sink of A1 Main Board"
+   },
+   "dict": null
+  },
+  {
+   "h": "049577c8cd2fc1c62534eb47b8d3ea55f006621bf4dfdbb335bfc341e7e8fbdf",
+   "en": "BT2x5 SHCS (Self Tapping Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[4].cell[1]",
+    "near": "2 | M2.5x5 FHCS (Machine Screw) | 10 | A1 mini Heatbed"
+   },
+   "dict": null
+  },
+  {
+   "h": "4cfbcf0e577bcd3bd5df941ab4223519c5bbfe59fd34d895af376d92aee06980",
+   "en": "Feeder unit and the Filament Sensor",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[4].cell[3]",
+    "near": "2 | M2.5x5 FHCS (Machine Screw) | 10 | A1 mini Heatbed"
+   },
+   "dict": null
+  },
+  {
+   "h": "d2e51139af132dc12aefac09f1d258522759a9867eecb11f15aa19c7c682016d",
+   "en": "BT2.6x5 SHCS (Self Tapping Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[5].cell[1]",
+    "near": "3 | BT2x5 SHCS (Self Tapping Screw) | 20 | Feeder unit and the Filament Sensor"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d5093b6dc4472065b988f25c22a2bc71a9582461278ce467e2a8d6d4f3b9417",
+   "en": "BT2.3x7 SHCS (Self Tapping Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[6].cell[1]",
+    "near": "4 | BT2.6x5 SHCS (Self Tapping Screw) | 10 | Filament Sensor Base"
+   },
+   "dict": null
+  },
+  {
+   "h": "e0a36d4da2bbb0d1568fbafb4bd87ddd8cc5b70463289b6745c7ac2bc5ffe569",
+   "en": "Extruder Unit and its front cover",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[6].cell[3]",
+    "near": "4 | BT2.6x5 SHCS (Self Tapping Screw) | 10 | Filament Sensor Base"
+   },
+   "dict": null
+  },
+  {
+   "h": "5fc479767814252642262198f0a0db7dbb521fc13776be02519215bb3c3f461c",
+   "en": "BT2x8 SHCS (Self Tapping Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[7].cell[1]",
+    "near": "5 | BT2.3x7 SHCS (Self Tapping Screw) | 20 | Extruder Unit and its front cover"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ebae9e5a96b0a31b24cb5f8edbca42fa1aac8de127f76ffe3418be34158ca8f",
+   "en": "Filament Pressing Block",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[7].cell[3]",
+    "near": "5 | BT2.3x7 SHCS (Self Tapping Screw) | 20 | Extruder Unit and its front cover"
+   },
+   "dict": null
+  },
+  {
+   "h": "fafe443ebe407bd1ca075c6d6950dfefdb733c00968197dea15f5a705ba91955",
+   "en": "BT2.6x14 SHCS (Self Tapping Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[8].cell[1]",
+    "near": "6 | BT2x8 SHCS (Self Tapping Screw) | 10 | Filament Pressing Block"
+   },
+   "dict": null
+  },
+  {
+   "h": "ec7e4c313fa141fcdb732f1c5e226e91fd667efd4e37835cff928ca45e45f9ff",
+   "en": "Cutter Lever",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[8].cell[3]",
+    "near": "6 | BT2x8 SHCS (Self Tapping Screw) | 10 | Filament Pressing Block"
+   },
+   "dict": null
+  },
+  {
+   "h": "5926aa0f06fc2fc65d7fc169ba15377e188287f569aae875cc8cb80ab2416511",
+   "en": "Extruder Gear Assembly",
+   "kind": "block_cell",
+   "freq": 4,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[9].cell[3]",
+    "near": "7 | BT2.6x14 SHCS (Self Tapping Screw) | 5 | Cutter Lever"
+   },
+   "dict": null
+  },
+  {
+   "h": "eec682a13d168a53d3bbd621a9db9431e1cbc20813a5c1d0410bacf58aece97c",
+   "en": "BT2.6x8 SHCS (Self Tapping Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[10].cell[1]",
+    "near": "8 | Stainless Steel Flat Washer | 10 | Extruder Gear Assembly"
+   },
+   "dict": null
+  },
+  {
+   "h": "ebb6552099a973e31ccaf98f81b1b271ac3933fe0b61b817f0b257596fe0581a",
+   "en": "Scraper",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[10].cell[3]",
+    "near": "8 | Stainless Steel Flat Washer | 10 | Extruder Gear Assembly"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e528333d0adb7d9d9bf7f0109ee068e3f292a5d1420b0ebf65c0433f1bda642",
+   "en": "BT3x8 SHCS (Self Tapping Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[11].cell[1]",
+    "near": "9 | BT2.6x8 SHCS (Self Tapping Screw) | 10 | Scraper"
+   },
+   "dict": null
+  },
+  {
+   "h": "2954a367901e8654164827183c1ebfe29d157492db337eb69ebd459ec684fea3",
+   "en": "Bottom Plate of A1& A1 mini",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[11].cell[3]",
+    "near": "9 | BT2.6x8 SHCS (Self Tapping Screw) | 10 | Scraper"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e90928519909c93dfb1d3b4299ed63da3648a118486d815d2c7a319cc283306",
+   "en": "BT3x12 SHCS (Self Tapping Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[12].cell[1]",
+    "near": "10 | BT3x8 SHCS (Self Tapping Screw) | 10 | Bottom Plate of A1& A1 mini"
+   },
+   "dict": null
+  },
+  {
+   "h": "fec58940f6560f2f7398f9d2a2b6d9c9ba510bd8286ca943802837005ad36a95",
+   "en": "M3x12 FHCS (Machine Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[13].cell[1]",
+    "near": "11 | BT3x12 SHCS (Self Tapping Screw) | 10 | Extruder Unit"
+   },
+   "dict": null
+  },
+  {
+   "h": "5d160a9a60d5b9ce90cf92c4184e4ff543fd42a555954585928b548531ee7787",
+   "en": "Purge Unit and the A1 mini Z Cover",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[13].cell[3]",
+    "near": "11 | BT3x12 SHCS (Self Tapping Screw) | 10 | Extruder Unit"
+   },
+   "dict": null
+  },
+  {
+   "h": "56c0b4c91c53e262dab13ff7e478898f4d1ac4191cba5b77e47959dd40b620bf",
+   "en": "BT2x13 SHCS (Self Tapping Screw)",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[14].cell[1]",
+    "near": "12 | M3x12 FHCS (Machine Screw) | 5 | Purge Unit and the A1 mini Z Cover"
+   },
+   "dict": null
+  },
+  {
+   "h": "3472083da12d0ba598beb583fc19a2515054aa956a36d89de8d3f356daa6b685",
+   "en": "Filament Funnel Unit",
+   "kind": "block_cell",
+   "freq": 1,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[14].cell[3]",
+    "near": "12 | M3x12 FHCS (Machine Screw) | 5 | Purge Unit and the A1 mini Z Cover"
+   },
+   "dict": null
+  },
+  {
+   "h": "d3fbccd9740e75b3f8be70f140dbff038c2ce166cc9fb86edc184cbabea14410",
+   "en": "0.9x11 mm Helical Compression Spring",
+   "kind": "block_cell",
+   "freq": 2,
+   "context": {
+    "handle": "screws-kit-a1-series-and-ams-lite",
+    "title": "Screws Kit - A1 Series and AMS lite",
+    "field": "blocks[1].line[15].cell[1]",
+    "near": "13 | BT2x13 SHCS (Self Tapping Screw) | 20 | Filament Funnel Unit"
+   },
+   "dict": null
+  },
+  {
+   "h": "f1cb38b5081c19bfba01f7c7d5fc29d47421197ab0c73c09bb4751dd0a2da0d9",
+   "en": "When facing the printer's front door, the right side cover is referred to as the right panel. It is a metal panel.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "right-side-panel-hr-x1-series",
+    "title": "Right Side Panel (HR) - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "ee5cc207d0e7e70aeda4a9bb281f1fe9de6cce7bbd4668bebb1f267b30f0a03c",
+   "en": "When facing the printer's front door, the left side cover is referred to as the left panel. It is a metal panel.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "left-side-panel-hl-x1-series",
+    "title": "Left Side Panel (HL) - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "98eb94644070f7bcc9f62803f346950bd13eb880acbc39f58f5ff62a25b01427",
+   "en": "The Heatbed Surface Magnet is a magnetized soft rubber adhered to the heatbed aluminum base plate. Its primary purpose is to ensure a strong magnetic connection with the build plate.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "heatbed-surface-magnet-without-cutout",
+    "title": "Heatbed Surface Magnet (without Cutout) - X1 Series and P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "64c6f90f58618dbe46c32873cb64570f49295b19d839e8736ce532f83c3b8865",
+   "en": "The X1 Series printers utilize the version without cutout.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-surface-magnet-without-cutout",
+    "title": "Heatbed Surface Magnet (without Cutout) - X1 Series and P1 Series",
+    "field": "blocks[0].line[2]",
+    "near": "The Heatbed Surface Magnet is a magnetized soft rubber adhered to the heatbed aluminum base plate. Its primary purpose is to ensure a strong magnetic connection"
+   },
+   "dict": null
+  },
+  {
+   "h": "9e13d6e310dec527c110dc761a9dac79d32d0507fc567af90292a89dbc6f219a",
+   "en": "The P1 Series printers, there are two versions of the Heatbed Surface Magnet due to structural differences. One version features cutout to accommodate leveling screws, while the other version does not.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "heatbed-surface-magnet-without-cutout",
+    "title": "Heatbed Surface Magnet (without Cutout) - X1 Series and P1 Series",
+    "field": "blocks[0].line[3]",
+    "near": "- The X1 Series printers utilize the version without cutout."
+   },
+   "dict": null
+  },
+  {
+   "h": "e45fa86334ae1d097e73557f2fbb55ac539b567492144e72936d237fdcbb7b20",
+   "en": "If your printer requires a replacement for the surface magnet, please ensure that you order the correct version to avoid any errors.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "heatbed-surface-magnet-without-cutout",
+    "title": "Heatbed Surface Magnet (without Cutout) - X1 Series and P1 Series",
+    "field": "blocks[0].line[4]",
+    "near": "- The P1 Series printers, there are two versions of the Heatbed Surface Magnet due to structural differences. One version features cutout to accommodate levelin"
+   },
+   "dict": null
+  },
+  {
+   "h": "e9e669b0f931870663193609ff8441571a35fd88fe893379a9eea8fd53d968c3",
+   "en": "The Heatbed Surface Magnet (with Cutout) is available in this listing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-surface-magnet-without-cutout",
+    "title": "Heatbed Surface Magnet (without Cutout) - X1 Series and P1 Series",
+    "field": "blocks[0].line[5]",
+    "near": "If your printer requires a replacement for the surface magnet, please ensure that you order the correct version to avoid any errors."
+   },
+   "dict": null
+  },
+  {
+   "h": "52d133244994b97c027b90088f1e04fb29335e9f022c483f11975db5e5474e79",
+   "en": "The Heatbed Surface Magnet (without Cutout) is available in this listing.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-surface-magnet-with-cutout-p1p",
+    "title": "Heatbed Surface Magnet (with Cutout) - P1P",
+    "field": "blocks[0].line[4]",
+    "near": "If your printer requires a replacement for the surface magnet, please ensure that you order the correct version to avoid any errors."
+   },
+   "dict": null
+  },
+  {
+   "h": "d811917e04056d3b43d82a85ffb7263165b07e903919a1086e8185d274ff232a",
+   "en": "The heatbed in the P1 series printer is a platform installed inside the printer chamber. It can move up and down along the Z-axis and can be heated based on the temperature set by the user. Setting an appropriate heat bed temperature can enhance model adhesion to the build plate, preventing warping.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-v3-p1-series",
+    "title": "Heatbed Unit V3 - P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "fda59b229bfa78dbd80b22ffc6d1732e5026ca07e673befb2df1752ca2dbdd60",
+   "en": "The heatbed in the X1 series printer is a platform installed inside the printer chamber. It can move up and down along the Z-axis and can be heated based on the temperature set by the user. Setting an appropriate heat bed temperature can enhance model adhesion to the build plate, preventing warping.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-v3-x1-series",
+    "title": "Heatbed Unit V3 - X1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  },
+  {
+   "h": "40d5b07eeffa9c2c2275e952ce9a2988e4d7f70d1fb68dde045d39c7add4cd39",
+   "en": "Please refer to the Wiki page here to check the version of your X1 Series Heatbed Unit.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-v3-x1-series",
+    "title": "Heatbed Unit V3 - X1 Series",
+    "field": "blocks[1].line[1]",
+    "near": "Important to know"
+   },
+   "dict": null
+  },
+  {
+   "h": "79ce87ee9c0cad3975139623b29a86804cc4149bf8ec51693b6ad6d896e18fff",
+   "en": "The X1 series printers currently have both Heatbed Unit V3 and V2 heatbed options. All printers will eventually shift to the V3 heatbed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-v3-x1-series",
+    "title": "Heatbed Unit V3 - X1 Series",
+    "field": "blocks[1].line[2]",
+    "near": "Please refer to the Wiki page here to check the version of your X1 Series Heatbed Unit."
+   },
+   "dict": null
+  },
+  {
+   "h": "8426fb56a285ac700d9977884049f37013e6cb5b9dddbe6ce89a509e5908b394",
+   "en": "Heatbed Unit V3 is more user-friendly for replacement, while maintaining the same functionality as the Heatbed Unit V2. This change is part of our updated production schedule.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-v3-x1-series",
+    "title": "Heatbed Unit V3 - X1 Series",
+    "field": "blocks[1].line[3]",
+    "near": "The X1 series printers currently have both Heatbed Unit V3 and V2 heatbed options. All printers will eventually shift to the V3 heatbed."
+   },
+   "dict": null
+  },
+  {
+   "h": "176afe8f4350f33bebc8728a48fceba7f5bdae302fe6317c0f99e61e7688a864",
+   "en": "In addition, please note that different versions of the heatbed must correlate to the relevant version of the AC board.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-v3-x1-series",
+    "title": "Heatbed Unit V3 - X1 Series",
+    "field": "blocks[1].line[4]",
+    "near": "Heatbed Unit V3 is more user-friendly for replacement, while maintaining the same functionality as the Heatbed Unit V2. This change is part of our updated produ"
+   },
+   "dict": null
+  },
+  {
+   "h": "20fbf18f897e2ccc34ae8117c3eaddd1c53febe6ce4195c075a897bd73d678f5",
+   "en": "If your printer initially had a Heatbed Unit V2 and you intend to upgrade to a Heatbed Unit V3, it's essential to upgrade the original AC board to the version compatible with the Heatbed Unit V3.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "heatbed-unit-v3-x1-series",
+    "title": "Heatbed Unit V3 - X1 Series",
+    "field": "blocks[1].line[5]",
+    "near": "In addition, please note that different versions of the heatbed must correlate to the relevant version of the AC board."
+   },
+   "dict": null
+  },
+  {
+   "h": "48e5ab7fd8f9e2299b5b43cb88ba702a90703d7c915b06125331ed5661975fd0",
+   "en": "The AC board is a circuit board providing AC power for the X1 Series and P1 Series heatbed.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "ac-board-x1-series-and-p1-series",
+    "title": "AC Board - X1 Series and P1 Series",
+    "field": "blocks[0].line[1]",
+    "near": "Overview"
+   },
+   "dict": null
+  }
+ ]
+}

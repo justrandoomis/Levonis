@@ -1,0 +1,1223 @@
+{
+ "protocol": 2,
+ "source": "bambu_us",
+ "source_product_id": "7225380929672",
+ "handle": "pla-sparkle",
+ "route": "552709755819347968>552709755857096704>552709756133920768",
+ "write_mode": "create",
+ "product_id": "p_b7589861560da32bccb89171",
+ "curated_sha256": "",
+ "extraction_sha256": "b76eb90c5d0fb058cfcababca366b515124e1eb9f10f09e10993efe00b246ea0",
+ "product": {
+  "title_en": "PLA Sparkle",
+  "short_description_en": "Unleash your creativity with Bambu PLA Sparkle, a shiny, sparkling PLA. Perfect for adding a touch of glamour to your prints, and stand out from the normal PLA prints.",
+  "variant_mode": "VARIANT_COMBINATION",
+  "usage_steps": [],
+  "usage_official_url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament"
+ },
+ "groups": [
+  {
+   "id": "og_c7e0bdea973a78ae35d3ce35",
+   "source_id": "9329898225800",
+   "sort": 1,
+   "name_en": "Colour",
+   "name_ar": "اللون",
+   "name_ckb": "ڕەنگ",
+   "kind": "color",
+   "source_label": "Color",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_cc5105b5146405c21b3c28ee",
+     "source_id": "564681919551008776",
+     "name_en": "Alpine Green Sparkle (13501)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-f240ebe5ae1b6c15acadf3b6",
+     "variant_label": "Alpine Green Sparkle (13501)",
+     "sort": 0,
+     "colour_code": "13501"
+    },
+    {
+     "id": "ov_bccea17c5b9774809d47d039",
+     "source_id": "564681919551008777",
+     "name_en": "Slate Gray Sparkle (13102)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-2376c3a9536c9974218ba896",
+     "variant_label": "Slate Gray Sparkle (13102)",
+     "sort": 1,
+     "colour_code": "13102"
+    },
+    {
+     "id": "ov_61b9c2f3d60ce217b319f294",
+     "source_id": "564681919551008778",
+     "name_en": "Royal Purple Sparkle (13700)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-8d4bf0c68083bbead126cafa",
+     "variant_label": "Royal Purple Sparkle (13700)",
+     "sort": 2,
+     "colour_code": "13700"
+    },
+    {
+     "id": "ov_44ba067f13adcf9690a1cded",
+     "source_id": "564681919551008779",
+     "name_en": "Crimson Red Sparkle (13200)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-5a9f8927c176b58ffe19b96e",
+     "variant_label": "Crimson Red Sparkle (13200)",
+     "sort": 3,
+     "colour_code": "13200"
+    },
+    {
+     "id": "ov_24ae73e616c1871a24be648d",
+     "source_id": "564681919551008780",
+     "name_en": "Onyx Black Sparkle (13101)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-4699c9e92806f7d355f0c684",
+     "variant_label": "Onyx Black Sparkle (13101)",
+     "sort": 4,
+     "colour_code": "13101"
+    },
+    {
+     "id": "ov_824b4fbe9a43b0e84c82f673",
+     "source_id": "564681919551008781",
+     "name_en": "Classic Gold Sparkle (13402)",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-bf2bf97503b32c08c8818822",
+     "variant_label": "Classic Gold Sparkle (13402)",
+     "sort": 5,
+     "colour_code": "13402"
+    }
+   ]
+  },
+  {
+   "id": "og_57443917115c9940aa491be7",
+   "source_id": "9329898160264",
+   "sort": 2,
+   "name_en": "Spool",
+   "name_ar": "البكرة",
+   "name_ckb": "ماسوورە",
+   "kind": "spool",
+   "source_label": "Type",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_629d71aa4eda1b9890cbd720",
+     "source_id": "564681919551008782",
+     "name_en": "Filament with spool",
+     "name_ar": "مع بكرة",
+     "name_ckb": "لەگەڵ ماسوورە",
+     "variant_key": "bv-12a7b6dd1c32bd2bef1d6ab3",
+     "variant_label": "Filament with spool",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  },
+  {
+   "id": "og_e577c61cdad0ac939fb86150",
+   "source_id": "9329898193032",
+   "sort": 3,
+   "name_en": "Net weight",
+   "name_ar": "الوزن الصافي",
+   "name_ckb": "کێشی پوخت",
+   "kind": "pack",
+   "source_label": "Size",
+   "default_value_id": "",
+   "values": [
+    {
+     "id": "ov_b5ffdf074d63ab5f4f40d89e",
+     "source_id": "564681919551008783",
+     "name_en": "1kg",
+     "name_ar": "",
+     "name_ckb": "",
+     "variant_key": "bv-455b54f2661f6eb4df7d3268",
+     "variant_label": "1kg",
+     "sort": 0,
+     "colour_code": ""
+    }
+   ]
+  }
+ ],
+ "variants": [
+  {
+   "id": "pv_72b359ecdb39f7df8422042f",
+   "source_id": "41002885349512",
+   "combo_key": "o:ov_629d71aa4eda1b9890cbd720|o:ov_b5ffdf074d63ab5f4f40d89e|o:ov_cc5105b5146405c21b3c28ee",
+   "value_ids": [
+    "ov_cc5105b5146405c21b3c28ee",
+    "ov_629d71aa4eda1b9890cbd720",
+    "ov_b5ffdf074d63ab5f4f40d89e"
+   ]
+  },
+  {
+   "id": "pv_d69eea1af09eec448b9c9d5c",
+   "source_id": "41002885382280",
+   "combo_key": "o:ov_44ba067f13adcf9690a1cded|o:ov_629d71aa4eda1b9890cbd720|o:ov_b5ffdf074d63ab5f4f40d89e",
+   "value_ids": [
+    "ov_44ba067f13adcf9690a1cded",
+    "ov_629d71aa4eda1b9890cbd720",
+    "ov_b5ffdf074d63ab5f4f40d89e"
+   ]
+  },
+  {
+   "id": "pv_7c0d5c0913c11e707283c134",
+   "source_id": "41002885415048",
+   "combo_key": "o:ov_24ae73e616c1871a24be648d|o:ov_629d71aa4eda1b9890cbd720|o:ov_b5ffdf074d63ab5f4f40d89e",
+   "value_ids": [
+    "ov_24ae73e616c1871a24be648d",
+    "ov_629d71aa4eda1b9890cbd720",
+    "ov_b5ffdf074d63ab5f4f40d89e"
+   ]
+  },
+  {
+   "id": "pv_2b69c1ed93dff9b8ed6c86fb",
+   "source_id": "41158137544840",
+   "combo_key": "o:ov_629d71aa4eda1b9890cbd720|o:ov_b5ffdf074d63ab5f4f40d89e|o:ov_bccea17c5b9774809d47d039",
+   "value_ids": [
+    "ov_bccea17c5b9774809d47d039",
+    "ov_629d71aa4eda1b9890cbd720",
+    "ov_b5ffdf074d63ab5f4f40d89e"
+   ]
+  },
+  {
+   "id": "pv_0722d313f55797fe507fa605",
+   "source_id": "41158137577608",
+   "combo_key": "o:ov_61b9c2f3d60ce217b319f294|o:ov_629d71aa4eda1b9890cbd720|o:ov_b5ffdf074d63ab5f4f40d89e",
+   "value_ids": [
+    "ov_61b9c2f3d60ce217b319f294",
+    "ov_629d71aa4eda1b9890cbd720",
+    "ov_b5ffdf074d63ab5f4f40d89e"
+   ]
+  },
+  {
+   "id": "pv_52c559539dc953935234a87f",
+   "source_id": "42259081789576",
+   "combo_key": "o:ov_629d71aa4eda1b9890cbd720|o:ov_824b4fbe9a43b0e84c82f673|o:ov_b5ffdf074d63ab5f4f40d89e",
+   "value_ids": [
+    "ov_824b4fbe9a43b0e84c82f673",
+    "ov_629d71aa4eda1b9890cbd720",
+    "ov_b5ffdf074d63ab5f4f40d89e"
+   ]
+  }
+ ],
+ "images": [
+  {
+   "id": "pi_1537887921117e6e64d3352c",
+   "source_media_id": "35953393696904",
+   "source_url": "https://store.bblcdn.com/s7/default/b33fcdd91bfc4dffa7ec8ddbe7b50a91/Sparklegreen.png",
+   "sort_order": 0,
+   "is_primary": true,
+   "option_value_id": null,
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "general",
+   "alt_en": "PLA Sparkle",
+   "alt_ar": "صورة PLA Sparkle",
+   "alt_ckb": "وێنەی PLA Sparkle"
+  },
+  {
+   "id": "pi_055150b8e5f37d454057a0fc",
+   "source_media_id": "35963335344264",
+   "source_url": "https://store.bblcdn.com/s7/default/f85fca41c8db45b493d1019db7604c25/PLASparkle.jpg",
+   "sort_order": 1,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": null,
+   "via_variant_id": null,
+   "binding_rule": "general",
+   "alt_en": "PLA Sparkle",
+   "alt_ar": "صورة PLA Sparkle",
+   "alt_ckb": "وێنەی PLA Sparkle"
+  },
+  {
+   "id": "pi_6784859f78790c1e3dfa73aa",
+   "source_media_id": "32388306403464",
+   "source_url": "https://store.bblcdn.com/s7/default/715852b15d6a4342a0cbd7bb13fa7e6f/PLASparkle-SlateGray.png",
+   "sort_order": 2,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_2b69c1ed93dff9b8ed6c86fb",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Sparkle — Slate Gray Sparkle (13102) / Filament with spool / 1kg",
+   "alt_ar": "صورة PLA Sparkle — Slate Gray Sparkle (13102) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی PLA Sparkle — Slate Gray Sparkle (13102) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_4902aeda38eea60f7041e8ae",
+   "source_media_id": "32388306403464",
+   "source_url": "https://store.bblcdn.com/s7/default/715852b15d6a4342a0cbd7bb13fa7e6f/PLASparkle-SlateGray.png",
+   "sort_order": 3,
+   "is_primary": false,
+   "option_value_id": "ov_bccea17c5b9774809d47d039",
+   "variant_id": null,
+   "via_variant_id": "pv_2b69c1ed93dff9b8ed6c86fb",
+   "binding_rule": "representative",
+   "alt_en": "PLA Sparkle — Slate Gray Sparkle (13102)",
+   "alt_ar": "صورة PLA Sparkle — Slate Gray Sparkle (13102)",
+   "alt_ckb": "وێنەی PLA Sparkle — Slate Gray Sparkle (13102)"
+  },
+  {
+   "id": "pi_042c0ce3361e021dee59b7bb",
+   "source_media_id": "32388306337928",
+   "source_url": "https://store.bblcdn.com/s7/default/d34f98f6d5fd4efcba3b675018392895/PLASparkle-RoyalPurpleSparkle.png",
+   "sort_order": 4,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_0722d313f55797fe507fa605",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Sparkle — Royal Purple Sparkle (13700) / Filament with spool / 1kg",
+   "alt_ar": "صورة PLA Sparkle — Royal Purple Sparkle (13700) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی PLA Sparkle — Royal Purple Sparkle (13700) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_924020b569d0e96f7d12a51f",
+   "source_media_id": "32388306337928",
+   "source_url": "https://store.bblcdn.com/s7/default/d34f98f6d5fd4efcba3b675018392895/PLASparkle-RoyalPurpleSparkle.png",
+   "sort_order": 5,
+   "is_primary": false,
+   "option_value_id": "ov_61b9c2f3d60ce217b319f294",
+   "variant_id": null,
+   "via_variant_id": "pv_0722d313f55797fe507fa605",
+   "binding_rule": "representative",
+   "alt_en": "PLA Sparkle — Royal Purple Sparkle (13700)",
+   "alt_ar": "صورة PLA Sparkle — Royal Purple Sparkle (13700)",
+   "alt_ckb": "وێنەی PLA Sparkle — Royal Purple Sparkle (13700)"
+  },
+  {
+   "id": "pi_5c9afc87d6c149d0399c6765",
+   "source_media_id": "32187284357256",
+   "source_url": "https://store.bblcdn.com/s7/default/f809b82a992647fb94cf34d2f2cd44ea/PLA-Sparkle_Crimson-Red-Sparkle.png",
+   "sort_order": 6,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_d69eea1af09eec448b9c9d5c",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Sparkle — Crimson Red Sparkle (13200) / Filament with spool / 1kg",
+   "alt_ar": "صورة PLA Sparkle — Crimson Red Sparkle (13200) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی PLA Sparkle — Crimson Red Sparkle (13200) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_2fbcc9788675ebb5d9e20b8f",
+   "source_media_id": "32187284357256",
+   "source_url": "https://store.bblcdn.com/s7/default/f809b82a992647fb94cf34d2f2cd44ea/PLA-Sparkle_Crimson-Red-Sparkle.png",
+   "sort_order": 7,
+   "is_primary": false,
+   "option_value_id": "ov_44ba067f13adcf9690a1cded",
+   "variant_id": null,
+   "via_variant_id": "pv_d69eea1af09eec448b9c9d5c",
+   "binding_rule": "representative",
+   "alt_en": "PLA Sparkle — Crimson Red Sparkle (13200)",
+   "alt_ar": "صورة PLA Sparkle — Crimson Red Sparkle (13200)",
+   "alt_ckb": "وێنەی PLA Sparkle — Crimson Red Sparkle (13200)"
+  },
+  {
+   "id": "pi_d17cbc00ec9c983ad25b592b",
+   "source_media_id": "32187284390024",
+   "source_url": "https://store.bblcdn.com/s7/default/f97e08749626411f89ac590ecd696b74/PLA-Sparkle_Onyx-Black-Sparkle.png",
+   "sort_order": 8,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_7c0d5c0913c11e707283c134",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Sparkle — Onyx Black Sparkle (13101) / Filament with spool / 1kg",
+   "alt_ar": "صورة PLA Sparkle — Onyx Black Sparkle (13101) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی PLA Sparkle — Onyx Black Sparkle (13101) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_a43135ae9aced0d3d65158a7",
+   "source_media_id": "32187284390024",
+   "source_url": "https://store.bblcdn.com/s7/default/f97e08749626411f89ac590ecd696b74/PLA-Sparkle_Onyx-Black-Sparkle.png",
+   "sort_order": 9,
+   "is_primary": false,
+   "option_value_id": "ov_24ae73e616c1871a24be648d",
+   "variant_id": null,
+   "via_variant_id": "pv_7c0d5c0913c11e707283c134",
+   "binding_rule": "representative",
+   "alt_en": "PLA Sparkle — Onyx Black Sparkle (13101)",
+   "alt_ar": "صورة PLA Sparkle — Onyx Black Sparkle (13101)",
+   "alt_ckb": "وێنەی PLA Sparkle — Onyx Black Sparkle (13101)"
+  },
+  {
+   "id": "pi_2422e8cc00893651c06bb510",
+   "source_media_id": "34677475606664",
+   "source_url": "https://store.bblcdn.com/s7/default/6d253f46ee464ca2b75c6ea613efb05c/sparkle_gold.png",
+   "sort_order": 10,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_52c559539dc953935234a87f",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Sparkle — Classic Gold Sparkle (13402) / Filament with spool / 1kg",
+   "alt_ar": "صورة PLA Sparkle — Classic Gold Sparkle (13402) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی PLA Sparkle — Classic Gold Sparkle (13402) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_5ec56cf35153c4f393612cc7",
+   "source_media_id": "34677475606664",
+   "source_url": "https://store.bblcdn.com/s7/default/6d253f46ee464ca2b75c6ea613efb05c/sparkle_gold.png",
+   "sort_order": 11,
+   "is_primary": false,
+   "option_value_id": "ov_824b4fbe9a43b0e84c82f673",
+   "variant_id": null,
+   "via_variant_id": "pv_52c559539dc953935234a87f",
+   "binding_rule": "representative",
+   "alt_en": "PLA Sparkle — Classic Gold Sparkle (13402)",
+   "alt_ar": "صورة PLA Sparkle — Classic Gold Sparkle (13402)",
+   "alt_ckb": "وێنەی PLA Sparkle — Classic Gold Sparkle (13402)"
+  },
+  {
+   "id": "pi_a044f1105478f2d742361cea",
+   "source_media_id": "35953396449416",
+   "source_url": "https://store.bblcdn.com/s7/default/49600549250e48c090ccdec0b1dd7061/Sparkle_green.png",
+   "sort_order": 12,
+   "is_primary": false,
+   "option_value_id": null,
+   "variant_id": "pv_72b359ecdb39f7df8422042f",
+   "via_variant_id": null,
+   "binding_rule": "variant",
+   "alt_en": "PLA Sparkle — Alpine Green Sparkle (13501) / Filament with spool / 1kg",
+   "alt_ar": "صورة PLA Sparkle — Alpine Green Sparkle (13501) / مع بكرة / 1kg",
+   "alt_ckb": "وێنەی PLA Sparkle — Alpine Green Sparkle (13501) / لەگەڵ ماسوورە / 1kg"
+  },
+  {
+   "id": "pi_7bc0c65a6cf8e1e8d51c71cc",
+   "source_media_id": "35953396449416",
+   "source_url": "https://store.bblcdn.com/s7/default/49600549250e48c090ccdec0b1dd7061/Sparkle_green.png",
+   "sort_order": 13,
+   "is_primary": false,
+   "option_value_id": "ov_cc5105b5146405c21b3c28ee",
+   "variant_id": null,
+   "via_variant_id": "pv_72b359ecdb39f7df8422042f",
+   "binding_rule": "representative",
+   "alt_en": "PLA Sparkle — Alpine Green Sparkle (13501)",
+   "alt_ar": "صورة PLA Sparkle — Alpine Green Sparkle (13501)",
+   "alt_ckb": "وێنەی PLA Sparkle — Alpine Green Sparkle (13501)"
+  }
+ ],
+ "swatches": [
+  {
+   "value_id": "ov_cc5105b5146405c21b3c28ee",
+   "source_media_id": "swatch:564681919551008776",
+   "source_url": "https://store.bblcdn.com/s7/default/237d208680e14916970892c267ca6e00/8246b8e6a11e49868ad15c121c6613f1.media"
+  },
+  {
+   "value_id": "ov_bccea17c5b9774809d47d039",
+   "source_media_id": "swatch:564681919551008777",
+   "source_url": "https://store.bblcdn.com/s7/default/6b33ef78e008497bbae68140505c42d8/fa9db10ecf7a4587a7e242b069b41cda.media"
+  },
+  {
+   "value_id": "ov_61b9c2f3d60ce217b319f294",
+   "source_media_id": "swatch:564681919551008778",
+   "source_url": "https://store.bblcdn.com/s7/default/7bd462202b384a8aad1a67b63b6c8a88/dbd75d2187f24cdcb31a6e19399189ff.media"
+  },
+  {
+   "value_id": "ov_44ba067f13adcf9690a1cded",
+   "source_media_id": "swatch:564681919551008779",
+   "source_url": "https://store.bblcdn.com/s7/default/7fe7da4a95164b5095cb1e1eef14a1ef/7ce5463b91f942489dccfe3660ac8167.media"
+  },
+  {
+   "value_id": "ov_24ae73e616c1871a24be648d",
+   "source_media_id": "swatch:564681919551008780",
+   "source_url": "https://store.bblcdn.com/s7/default/c94563c3b70a46c285eeb00340edacaa/39cb6cb6eeee4eb088b240625c54450d.media"
+  },
+  {
+   "value_id": "ov_824b4fbe9a43b0e84c82f673",
+   "source_media_id": "swatch:564681919551008781",
+   "source_url": "https://store.bblcdn.com/s7/default/e45a7321ed4542388dbbe7bf115d1205/fa6f82dee4bb4abaa5d35ba0336e8cc2.media"
+  }
+ ],
+ "content_blocks": [
+  {
+   "id": "cb_422dd5efa08d9223158ae667",
+   "order": 0,
+   "title_en": "PLA Sparkle",
+   "body_en": "Special Sparkling Look",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_5813d1ffdcf8f19fcf75983c",
+   "order": 1,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:60ea574696a1356d493d6964",
+   "source_url": "https://store.bblcdn.com/s7/default/be567c7af0bb429992198b7d089f8037/Bambu_PLA_Sparkle01-compressed.jpg",
+   "alt_en": "PLA Sparkle",
+   "alt_ar": "صورة PLA Sparkle",
+   "alt_ckb": "وێنەی PLA Sparkle",
+   "kind": "image",
+   "section_kind": "overview",
+   "section_path": "components[0]"
+  },
+  {
+   "id": "cb_ecc81761748c12fbf820e8ad",
+   "order": 2,
+   "title_en": "Display of PLA Sparkle Prints",
+   "body_en": "Bambu PLA Sparkle is a next-level aesthetic filament that combines strength and sparkle. With metal particles included in its composition, Bambu PLA Sparkle adds a special sparkling look to your prints that sets them apart from the rest.\nHowever, it is not recommended to use a 0.2 mm nozzle for printing as clogging may occur. Take your 3D printing projects to new heights with Bambu PLA Sparkle!",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_b40ff4d6b86e8ff77628f001",
+   "order": 3,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:769b856c218cf37217774336",
+   "source_url": "https://store.bblcdn.com/s7/default/5f5ef63145f2421abd5d7b0485ce4413/Bambu_PLA_Sparkle04-compressed.jpg",
+   "alt_en": "PLA Sparkle",
+   "alt_ar": "صورة PLA Sparkle",
+   "alt_ckb": "وێنەی PLA Sparkle",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_e8356d373a28528897a0c10a",
+   "order": 4,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:70ce24baffb5e64fd8683b43",
+   "source_url": "https://store.bblcdn.com/s7/default/9f2bf63451cb4751ae4bf3c2708d7f3e/Bambu_PLA_Sparkle03-compressed.jpg",
+   "alt_en": "PLA Sparkle",
+   "alt_ar": "صورة PLA Sparkle",
+   "alt_ckb": "وێنەی PLA Sparkle",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_26de70893bd2b9b3846d85e1",
+   "order": 5,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:18f469affe9fd410d10a2ae4",
+   "source_url": "https://store.bblcdn.com/s7/default/91f0025f3e1f4208baca1b585849a496/Bambu_PLA_Sparkle06-compressed.jpg",
+   "alt_en": "PLA Sparkle",
+   "alt_ar": "صورة PLA Sparkle",
+   "alt_ckb": "وێنەی PLA Sparkle",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_4a83bac5c2d7646159e2a845",
+   "order": 6,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:1d96f3c31fde84a5bcc0d9c4",
+   "source_url": "https://store.bblcdn.com/s7/default/e2cb06aef16e4ed294b28259232c515a/Bambu_PLA_Sparkle05-compressed.jpg",
+   "alt_en": "PLA Sparkle",
+   "alt_ar": "صورة PLA Sparkle",
+   "alt_ckb": "وێنەی PLA Sparkle",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_e0f9c85ed5c496851c9994d8",
+   "order": 7,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:9c863762a8ef652d79d3e109",
+   "source_url": "https://store.bblcdn.com/s7/default/250faa25d5284d48ae0fb745dc3bcb11/Bambu_PLA_Sparkle02-compressed.jpg",
+   "alt_en": "PLA Sparkle",
+   "alt_ar": "صورة PLA Sparkle",
+   "alt_ckb": "وێنەی PLA Sparkle",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[1] › 0"
+  },
+  {
+   "id": "cb_496fd0ca619d549487bc2936",
+   "order": 8,
+   "title_en": "RFID for Intelligent Printing",
+   "body_en": "All printing parameters are embedded in RFID, which can be read through our AMS (Automatic Material System).",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_13a59c797a454a8151899e26",
+   "order": 9,
+   "title_en": "",
+   "body_en": "",
+   "url": "",
+   "source_media_id": "content:5fb86f1f5b34bbd0d44070b4",
+   "source_url": "https://store.bblcdn.com/s7/default/eb199b5c0cf04800ae839c7ba0a8723e/RFID_for_Intelligent_Printing-compressed.jpg",
+   "alt_en": "PLA Sparkle",
+   "alt_ar": "صورة PLA Sparkle",
+   "alt_ckb": "وێنەی PLA Sparkle",
+   "kind": "image",
+   "section_kind": "features",
+   "section_path": "components[2]"
+  },
+  {
+   "id": "cb_18fb71bbe8864ff85ab49a37",
+   "order": 10,
+   "title_en": "FAQ",
+   "body_en": "1.Accessory Compatibility\nNot compatible with Hotend with Stainless Steel Nozzle 0.2 mm.\n\n2.Drying Recommendations\nDry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to: Filament drying instructions on WIKI.\nFor opened filament, we recommend drying before use according to the wiki’s recommended temperature and time settings.\n\n3.Safety Tips\nPlease store the filament in a cool, dark, and dry environment away from direct sunlight and high temperatures.\nPlease keep filament and any broken fragments out of reach of infants, children, and pets to prevent swallowing or choking.\nPlease print this filament in a well-ventilated area, or install an effective air filtration or exhaust system.\nAs this filament is not food-grade, please avoid using finished prints for food storage or contact.",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "faq",
+   "section_path": "components[4]"
+  },
+  {
+   "id": "cb_4e21eddfb20358abd0281db1",
+   "order": 11,
+   "title_en": "Highlights",
+   "body_en": "• Special Sparkling Look\n• Relatively High Impact Strength\n• Comes with Basic Reusable Spool\n• Cautions for Use",
+   "url": "",
+   "source_media_id": "",
+   "source_url": "",
+   "alt_en": "",
+   "alt_ar": "",
+   "alt_ckb": "",
+   "kind": "text",
+   "section_kind": "features",
+   "section_path": "P.productFeaturesModuleList"
+  }
+ ],
+ "specs": [
+  {
+   "id": "sv_87782c3c0b7e52c667af7894",
+   "key": "material.diameter",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "1.75 mm",
+   "value_num": 1.75,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 4",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 0
+  },
+  {
+   "id": "sv_17e809fb54c9effb6d3eb815",
+   "key": "material.diameter_tolerance",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Diameter",
+   "original_value": "1.75mm +/- 0.03mm",
+   "value_text": "± 0.03 mm",
+   "value_num": 0.03,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "mm",
+   "status": "verified",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "Product Features › bullet 4",
+   "source_excerpt": "Diameter: 1.75mm +/- 0.03mm",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 1
+  },
+  {
+   "id": "sv_3ac126fc4567846515471c46",
+   "key": "material.net_weight",
+   "group": "material",
+   "scope_kind": "option_value",
+   "scope_id": "ov_b5ffdf074d63ab5f4f40d89e",
+   "region": "",
+   "data_type": "number",
+   "original_label": "Size",
+   "original_value": "1kg",
+   "value_text": "1000 g",
+   "value_num": 1000,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g",
+   "status": "verified",
+   "confidence": "official_variant",
+   "source_kind": "store_page",
+   "source_title": "Bambu Lab US store product page",
+   "source_locator": "option Size › 1kg",
+   "source_excerpt": "1kg",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "",
+   "checked_sources": [],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 2
+  },
+  {
+   "id": "sv_c2ad81db91d1f3d04af430a7",
+   "key": "material.density",
+   "group": "material",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "number",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "g/cm³",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/pla-sparkle",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 3
+  },
+  {
+   "id": "sv_77a608a0dfc5308da767b44d",
+   "key": "print_settings.nozzle_temp",
+   "group": "print_settings",
+   "scope_kind": "product",
+   "scope_id": "",
+   "region": "",
+   "data_type": "range",
+   "original_label": "",
+   "original_value": "",
+   "value_text": "",
+   "value_num": null,
+   "value_num_max": null,
+   "value_bool": null,
+   "value_list": [],
+   "unit": "°C",
+   "status": "not_found",
+   "confidence": "official_page",
+   "source_kind": "store_page",
+   "source_title": "",
+   "source_locator": "",
+   "source_excerpt": "",
+   "test_method": "",
+   "test_condition": "",
+   "derived_from": "",
+   "missing_reason": "not_found_in_checked_sources",
+   "checked_sources": [
+    {
+     "kind": "store_page",
+     "url": "https://us.store.bambulab.com/products/pla-sparkle",
+     "title": "Bambu Lab US store product page"
+    }
+   ],
+   "visibility": "public",
+   "conflict": "",
+   "sort": 4
+  }
+ ],
+ "documents": [
+  {
+   "id": "pd_115340b9be8f59349cfc7c00",
+   "kind": "tds",
+   "title_en": "Filament TDS",
+   "title_ar": "ورقة البيانات الفنية (TDS) — Filament TDS",
+   "title_ckb": "پەڕەی زانیاری تەکنیکی (TDS) — Filament TDS",
+   "url": "https://store.bblcdn.com/169532c9ce4d4610a9e85d92c0222bb9.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 0
+  },
+  {
+   "id": "pd_c797c29974a8937d8b33d5bd",
+   "kind": "sds",
+   "title_en": "Filament MSDS",
+   "title_ar": "ورقة بيانات السلامة (SDS) — Filament MSDS",
+   "title_ckb": "پەڕەی زانیاری سەلامەتی (SDS) — Filament MSDS",
+   "url": "https://store.bblcdn.com/s7/default/87526cb8bcce4898b578797781045e57/SDS20251127A08_Bambu_PLA_Sparkle.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 1
+  },
+  {
+   "id": "pd_c1dd5d821340ee1f32343ac8",
+   "kind": "certificate",
+   "title_en": "Filament RoHS",
+   "title_ar": "شهادة مطابقة — Filament RoHS",
+   "title_ckb": "بڕوانامەی گونجان — Filament RoHS",
+   "url": "https://store.bblcdn.com/088f0999da0c419a9630876c48842088.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 2
+  },
+  {
+   "id": "pd_791739677bb4ad615cd92ccb",
+   "kind": "hex_codes",
+   "title_en": "Hex Code",
+   "title_ar": "رموز الألوان — Hex Code",
+   "title_ckb": "کۆدەکانی ڕەنگ — Hex Code",
+   "url": "https://store.bblcdn.com/s7/default/2a16583d2dc6404ea2ebcdf192441852/PLA_Sparkle_Hex_Code_Table.pdf",
+   "host": "store.bblcdn.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 3
+  },
+  {
+   "id": "pd_b8af112f9e4843373c64c7c2",
+   "kind": "wiki",
+   "title_en": "Filament drying instructions",
+   "title_ar": "ويكي Bambu Lab — Filament drying instructions",
+   "title_ckb": "ویکی Bambu Lab — Filament drying instructions",
+   "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+   "host": "wiki.bambulab.com",
+   "scope_kind": "product",
+   "scope_id": "",
+   "language": "en",
+   "sort": 4
+  }
+ ],
+ "relations": [
+  {
+   "id": "pr_ed2f16d70a7f04eacf8f6c11",
+   "scope_kind": "product",
+   "scope_id": "",
+   "relation": "compatible_with",
+   "target_kind": "other",
+   "target_product_id": null,
+   "target_source": "",
+   "target_source_handle": "",
+   "target_family": "",
+   "target_label": "AMS Series",
+   "state": "unresolvable",
+   "evidence_kind": "feature_bullet",
+   "evidence_text": "All AMS Series Compatible"
+  }
+ ],
+ "external_ids": [
+  {
+   "scope_kind": "product",
+   "scope_id": "",
+   "id_type": "bambu_product_id",
+   "value": "7225380929672",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_72b359ecdb39f7df8422042f",
+   "id_type": "bambu_variant_id",
+   "value": "41002885349512",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_d69eea1af09eec448b9c9d5c",
+   "id_type": "bambu_variant_id",
+   "value": "41002885382280",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_7c0d5c0913c11e707283c134",
+   "id_type": "bambu_variant_id",
+   "value": "41002885415048",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_2b69c1ed93dff9b8ed6c86fb",
+   "id_type": "bambu_variant_id",
+   "value": "41158137544840",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_0722d313f55797fe507fa605",
+   "id_type": "bambu_variant_id",
+   "value": "41158137577608",
+   "searchable": false
+  },
+  {
+   "scope_kind": "variant",
+   "scope_id": "pv_52c559539dc953935234a87f",
+   "id_type": "bambu_variant_id",
+   "value": "42259081789576",
+   "searchable": false
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_cc5105b5146405c21b3c28ee",
+   "id_type": "color_code",
+   "value": "13501",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_bccea17c5b9774809d47d039",
+   "id_type": "color_code",
+   "value": "13102",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_61b9c2f3d60ce217b319f294",
+   "id_type": "color_code",
+   "value": "13700",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_44ba067f13adcf9690a1cded",
+   "id_type": "color_code",
+   "value": "13200",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_24ae73e616c1871a24be648d",
+   "id_type": "color_code",
+   "value": "13101",
+   "searchable": true
+  },
+  {
+   "scope_kind": "option_value",
+   "scope_id": "ov_824b4fbe9a43b0e84c82f673",
+   "id_type": "color_code",
+   "value": "13402",
+   "searchable": true
+  }
+ ],
+ "source_refs": [
+  {
+   "kind": "group",
+   "source_id": "9329898225800",
+   "levonis_id": "og_c7e0bdea973a78ae35d3ce35",
+   "source_label": "Color",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681919551008776",
+   "levonis_id": "ov_cc5105b5146405c21b3c28ee",
+   "source_label": "Alpine Green Sparkle (13501)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681919551008777",
+   "levonis_id": "ov_bccea17c5b9774809d47d039",
+   "source_label": "Slate Gray Sparkle (13102)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681919551008778",
+   "levonis_id": "ov_61b9c2f3d60ce217b319f294",
+   "source_label": "Royal Purple Sparkle (13700)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681919551008779",
+   "levonis_id": "ov_44ba067f13adcf9690a1cded",
+   "source_label": "Crimson Red Sparkle (13200)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681919551008780",
+   "levonis_id": "ov_24ae73e616c1871a24be648d",
+   "source_label": "Onyx Black Sparkle (13101)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681919551008781",
+   "levonis_id": "ov_824b4fbe9a43b0e84c82f673",
+   "source_label": "Classic Gold Sparkle (13402)",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "9329898160264",
+   "levonis_id": "og_57443917115c9940aa491be7",
+   "source_label": "Type",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681919551008782",
+   "levonis_id": "ov_629d71aa4eda1b9890cbd720",
+   "source_label": "Filament with spool",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "group",
+   "source_id": "9329898193032",
+   "levonis_id": "og_e577c61cdad0ac939fb86150",
+   "source_label": "Size",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "value",
+   "source_id": "564681919551008783",
+   "levonis_id": "ov_b5ffdf074d63ab5f4f40d89e",
+   "source_label": "1kg",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41002885349512",
+   "levonis_id": "pv_72b359ecdb39f7df8422042f",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41002885382280",
+   "levonis_id": "pv_d69eea1af09eec448b9c9d5c",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41002885415048",
+   "levonis_id": "pv_7c0d5c0913c11e707283c134",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41158137544840",
+   "levonis_id": "pv_2b69c1ed93dff9b8ed6c86fb",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "41158137577608",
+   "levonis_id": "pv_0722d313f55797fe507fa605",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "variant",
+   "source_id": "42259081789576",
+   "levonis_id": "pv_52c559539dc953935234a87f",
+   "source_label": "",
+   "binding_rule": "",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "35953393696904",
+   "levonis_id": "pi_1537887921117e6e64d3352c",
+   "source_label": "",
+   "binding_rule": "general",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "35963335344264",
+   "levonis_id": "pi_055150b8e5f37d454057a0fc",
+   "source_label": "",
+   "binding_rule": "general",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32388306403464",
+   "levonis_id": "pi_6784859f78790c1e3dfa73aa",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32388306403464",
+   "levonis_id": "pi_4902aeda38eea60f7041e8ae",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_2b69c1ed93dff9b8ed6c86fb"
+  },
+  {
+   "kind": "image",
+   "source_id": "32388306337928",
+   "levonis_id": "pi_042c0ce3361e021dee59b7bb",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32388306337928",
+   "levonis_id": "pi_924020b569d0e96f7d12a51f",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_0722d313f55797fe507fa605"
+  },
+  {
+   "kind": "image",
+   "source_id": "32187284357256",
+   "levonis_id": "pi_5c9afc87d6c149d0399c6765",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32187284357256",
+   "levonis_id": "pi_2fbcc9788675ebb5d9e20b8f",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_d69eea1af09eec448b9c9d5c"
+  },
+  {
+   "kind": "image",
+   "source_id": "32187284390024",
+   "levonis_id": "pi_d17cbc00ec9c983ad25b592b",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "32187284390024",
+   "levonis_id": "pi_a43135ae9aced0d3d65158a7",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_7c0d5c0913c11e707283c134"
+  },
+  {
+   "kind": "image",
+   "source_id": "34677475606664",
+   "levonis_id": "pi_2422e8cc00893651c06bb510",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "34677475606664",
+   "levonis_id": "pi_5ec56cf35153c4f393612cc7",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_52c559539dc953935234a87f"
+  },
+  {
+   "kind": "image",
+   "source_id": "35953396449416",
+   "levonis_id": "pi_a044f1105478f2d742361cea",
+   "source_label": "",
+   "binding_rule": "variant",
+   "via_variant_id": ""
+  },
+  {
+   "kind": "image",
+   "source_id": "35953396449416",
+   "levonis_id": "pi_7bc0c65a6cf8e1e8d51c71cc",
+   "source_label": "",
+   "binding_rule": "representative",
+   "via_variant_id": "pv_72b359ecdb39f7df8422042f"
+  }
+ ],
+ "notes": [
+  {
+   "kind": "relation_unresolvable",
+   "field": "compatible_with"
+  }
+ ]
+}

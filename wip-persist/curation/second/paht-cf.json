@@ -1,0 +1,896 @@
+{
+  "handle": "paht-cf",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T21:50:15Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.heat_deflection_temp",
+        "thermal.vicat_softening",
+        "thermal.melting_temp",
+        "thermal.glass_transition",
+        "thermal.chamber_temp",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "identity.*",
+        "compat.*",
+        "package.contents"
+      ]
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/2a1e4b730beb4c2baf680d927f95e7a5/SDS20260701N04_Bambu_PAHT-CF.pdf",
+      "title": "Bambu PAHT-CF Safety Data Sheet SDS20260701N04 (Jul. 01. 2026)",
+      "keys": [
+        "material.*",
+        "thermal.melting_temp",
+        "safety.*",
+        "identity.*"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "print_settings.nozzle_temp",
+        "print_settings.bed_temp",
+        "print_settings.recommended_plate",
+        "drying.*",
+        "compat.*",
+        "mechanical.*",
+        "thermal.heat_deflection_temp"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "title": "ASA CF / PAHT CF Usage Guide | Bambu Lab Wiki",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "compat.*",
+        "motion.max_flow",
+        "mechanical.*",
+        "thermal.heat_deflection_temp",
+        "material.*"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations | Bambu Lab Wiki",
+      "keys": [
+        "drying.*"
+      ]
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PAHT-CF",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › title and Basic Info",
+      "quote": "PAHT-CF • Basic Info Bambu PAHT-CF is a high-temperature engineering-grade carbon-fiber reinforced nylon",
+      "test_method": "",
+      "test_condition": "TDS title and Basic Info",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "TDS Specifications table",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\")"
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681885254184969",
+        "id": "ov_12b447044a61077eba7a0df1",
+        "group": "Size",
+        "value_text": "0.5 kg"
+      },
+      "value": 500,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 0.5 kg, 1 kg",
+      "test_method": "",
+      "test_condition": "TDS Specifications table",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "agrees with the store page option Size › 0.5 kg"
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681885254184970",
+        "id": "ov_3396f660bc00e7cfe92e64b2",
+        "group": "Size",
+        "value_text": "1 kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 0.5 kg, 1 kg",
+      "test_method": "",
+      "test_condition": "TDS Specifications table",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "agrees with the store page option Size › 1 kg"
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PC + ABS spool (temperature resistance 90 °C)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Specifications › Spool Material",
+      "quote": "Spool Material PC + ABS (Temperature resistance 90 °C)",
+      "test_method": "",
+      "test_condition": "TDS Specifications table (spool size: diameter 200 mm, height 67 mm)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.06,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Properties › Physical Properties › Density",
+      "quote": "Density ISO 1183 1.06 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "TDS Physical Properties, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "the SDS (p.9, section 9) states \"Density: No data available\"; the TDS value is used"
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 225,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Properties › Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 225 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "TDS Physical Properties, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "the SDS (p.9, section 9) states \"Melting Point: No data available\"; the TDS value is used"
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 70,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Properties › Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 70 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "TDS Physical Properties, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 220,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Properties › Physical Properties › Vicat Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 220 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "TDS Physical Properties, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 194,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Properties › Physical Properties › Heat Deflection Temperature (0.45 MPa row)",
+      "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 194 °C",
+      "test_method": "ISO 75",
+      "test_condition": "0.45 MPa load (the TDS also gives 170 °C at 1.8 MPa)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "the wiki asacf_pahtcf §1.2 table also gives 194 ℃ (HDT, 0.45 MPa load): agrees"
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 92,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Mechanical Properties (Dry state) › Tensile Strength (X-Y) (conditions: p.3 › Specimen Test)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 92 ± 7 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "printed specimen, X-Y, dry state; specimens printed at nozzle 290 °C, bed 100 °C, 100 mm/s, 100% infill, annealed and dried at 80 °C for 12 h before testing; ± 7 MPa; Z: 47 ± 5 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8.4,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Mechanical Properties (Dry state) › Breaking Elongation Rate (X-Y) (conditions: p.3 › Specimen Test)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 8.4 ± 1.8 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "printed specimen, X-Y, dry state; specimens printed at nozzle 290 °C, bed 100 °C, 100 mm/s, 100% infill, annealed and dried at 80 °C for 12 h before testing; ± 1.8 %; Z: 4.1 ± 1.2 %",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 125,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Mechanical Properties (Dry state) › Bending Strength (X-Y) (conditions: p.3 › Specimen Test)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 125 ± 7 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "printed specimen, X-Y, dry state; specimens printed at nozzle 290 °C, bed 100 °C, 100 mm/s, 100% infill, annealed and dried at 80 °C for 12 h before testing; ± 7 MPa; Z: 61 ± 5 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "the wiki asacf_pahtcf §1.2 table also gives 125 MPa (Flexural Strength - XY): agrees"
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 4230,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Mechanical Properties (Dry state) › Bending Modulus (X-Y) (conditions: p.3 › Specimen Test)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 4230 ± 210 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "printed specimen, X-Y, dry state; specimens printed at nozzle 290 °C, bed 100 °C, 100 mm/s, 100% infill, annealed and dried at 80 °C for 12 h before testing; ± 210 MPa; Z: 1820 ± 170 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 57.5,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Mechanical Properties (Dry state) › Impact Strength (X-Y) (conditions: p.3 › Specimen Test)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 57.5 ± 3.4 kJ/m²; 22.8 ± 1.8 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "printed specimen, X-Y, dry state; specimens printed at nozzle 290 °C, bed 100 °C, 100 mm/s, 100% infill, annealed and dried at 80 °C for 12 h before testing; ± 3.4 kJ/m², the row's value not marked notched (notched X-Y: 22.8 ± 1.8 kJ/m²; Z: 13.3 ± 0.8 kJ/m²)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "the wiki asacf_pahtcf §1.2 table also gives 57.5 KJ/m² (Impact Strength - XY): agrees"
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 260,
+        "max": 290
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 260 - 290 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "conflict_note": "the wiki filament-guide-material-table (Nozzle table, family row \"PAHT-CF/GF\") gives \"260 - 300\" (±10 °C); the product TDS value is kept (higher rank, product-specific)"
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 80,
+        "max": 100
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 100 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "conflict_note": "the wiki filament-guide-material-table gives family values for \"PA / PA-CF/GF / PAHT-CF/GF\": glue stick 90 - 110 °C, and 100 - 120 ℃ on Engineering / Smooth PEI / Textured PEI plates; the product TDS value is kept"
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 100 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 100 mm/s",
+      "test_method": "",
+      "test_condition": "recommended printing setting; an upper bound only (no lower bound is published)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "the wiki asacf_pahtcf §5.1 table gives \"PAHT-CF | ＜100 mm/s\": agrees"
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0–40 %",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 40%",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Texture PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Texture PEI Plate",
+      "test_method": "",
+      "test_condition": "recommended printing setting; bed surface preparation: Glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 45,
+        "max": 60
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.2 › Recommended Printing Settings › Chamber Temperature",
+      "quote": "Chamber Temperature 45 - 60 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting (recommended printer chamber temperature while printing this filament)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 - 12 h",
+      "test_method": "",
+      "test_condition": "blast drying oven, 8 - 12 h (the TDS also gives: X1 Series printer heatbed 90 – 100 °C, 12 h)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z",
+      "note": "the wiki pages agree: material table \"80 ℃ for 8 - 12 h\" (blast drying oven), asacf_pahtcf §2.1 \"80 °C, 8 - 12h\"; the drying wiki gives a forced-air oven 75-85 °C, 8-12 h for \"PA6-CF/GF, PAHT-CF/GF, etc.\""
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 8,
+        "max": 12
+      },
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "source_title": "Bambu PAHT-CF Technical Data Sheet V3.0",
+      "locator": "p.1 › Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 - 12 h",
+      "test_method": "",
+      "test_condition": "blast drying oven at 80 °C",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:26Z"
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide | Bambu Lab Wiki",
+      "locator": "§5.1 Improving Surface Quality › recommended printing speeds table › PAHT-CF row (Suggested Maximum Volumetric Flow Rate)",
+      "quote": "PAHT-CF | ＜100 mm/s | 8 mm³/s |",
+      "test_method": "",
+      "test_condition": "suggested maximum volumetric flow rate for this filament (not a printer capability)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:57Z"
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Requires an enclosed printer; not compatible with P1P / A1 series",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "source_title": "ASA CF / PAHT CF Usage Guide | Bambu Lab Wiki",
+      "locator": "§1.3 Hardware Compatibility › Printer Compatibility (the cell spans the ASA CF and PAHT CF rows)",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 series",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:57Z",
+      "note": "agrees with the store page Cautions for Use (\"Enclosure Printer Required\")"
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/paht-cf",
+      "locator": "store page › Product Features › Cautions for Use",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "feeding compatibility; for DRYING, the drying wiki (Appendix I) lists AMS 2 Pro as \"Not compatible\" and the material table as \"Not recommended\" for PAHT-CF/GF"
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/paht-cf",
+      "locator": "store page › Product Features › Cautions for Use",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "the drying wiki (Appendix I) and the material table also give AMS HT drying at 85 ℃ for 12 h for PAHT-CF/GF"
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "feature_bullet",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/paht-cf",
+      "locator": "store page › Product Features › Cautions for Use",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "the wiki material table AMS column also says \"Bambu PA-CF, PAHT-CF Compatible\""
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "locator": "§1.3 Hardware Compatibility › PAHT CF row",
+      "quote": "PAHT CF | AMS lite is not compatible",
+      "note": "the store page agrees: \"AMS lite NOT Compatible\""
+    },
+    {
+      "relation": "requires",
+      "target_kind": "family",
+      "target_label": "Enclosed printer",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "locator": "§1.3 Hardware Compatibility › PAHT CF row",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 series",
+      "note": "the store page agrees: \"Enclosure Printer Required\"; the material table lists open-frame printers as \"Not Recommended\""
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "printer",
+      "target_label": "P1P",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "locator": "§1.3 Hardware Compatibility › PAHT CF row",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 series"
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "locator": "§1.3 Hardware Compatibility › PAHT CF row",
+      "quote": "Requires an enclosed printer; not compatible with P1P / A1 series",
+      "note": "source words: \"A1 series\""
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "Hardened steel nozzle",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "locator": "§1.3 Hardware Compatibility › PAHT CF row › Nozzle Compatibility",
+      "quote": "Hardened steel nozzle only; 0.6 mm nozzle recommended; not compatible with 0.2 mm nozzle",
+      "note": "the material table also says hardened steel nozzles are \"Required\" for PAHT-CF/GF; the store page says \"Stainless Steel Nozzle NOT Recommended\""
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "0.2 mm nozzle",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "locator": "§1.3 Hardware Compatibility › PAHT CF row › Nozzle Compatibility",
+      "quote": "Hardened steel nozzle only; 0.6 mm nozzle recommended; not compatible with 0.2 mm nozzle",
+      "note": "the store page agrees: \"0.2 mm Nozzle NOT Compatible\" and \"Not compatible with ... Hotend with Stainless Steel Nozzle 0.2 mm\""
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "0.4 mm nozzle",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "curated",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "locator": "p.1 › Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6(recommended), 0.8 mm",
+      "note": "hardened steel; the material table marks the 0.4 mm high-flow nozzle \"Not Recommended\""
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "0.6 mm nozzle",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "curated",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "locator": "p.1 › Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6(recommended), 0.8 mm",
+      "note": "hardened steel; recommended (TDS, wiki and store page)"
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "0.8 mm nozzle",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "curated",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "locator": "p.1 › Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6(recommended), 0.8 mm",
+      "note": "hardened steel"
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "curated",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "locator": "p.1 › Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Texture PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "curated",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "locator": "p.1 › Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Texture PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "Texture PEI Plate",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "curated",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "locator": "p.1 › Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Texture PEI Plate"
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Low-temperature engineering plate",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "locator": "§1.3 Hardware Compatibility › PAHT CF row › Build Plate Compatibility",
+      "quote": "Glue-assisted printing required; not compatible with low-temperature engineering plate"
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/paht-cf",
+      "locator": "store page › Printing Tips › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, and Bambu Liquid Glue.",
+      "note": "the material table marks Bambu Cool Plate / PLA Plate \"Not recommended\" for PAHT-CF/GF"
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Bambu Liquid Glue",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "description_text",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/paht-cf",
+      "locator": "store page › Printing Tips › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, and Bambu Liquid Glue.",
+      "note": "the material table marks Liquid Glue \"Not Recommended\" for PA / PA-CF/GF / PAHT-CF/GF"
+    },
+    {
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "Glue stick",
+      "scope": {
+        "kind": "product"
+      },
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "locator": "§1.3 Hardware Compatibility › PAHT CF row › Build Plate Compatibility",
+      "quote": "Glue-assisted printing required; not compatible with low-temperature engineering plate",
+      "note": "the TDS says \"Bed Surface Preparation Glue\"; the material table: \"Use Bambu Lab Glue Stick for ... PAHT-CF printing\""
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf",
+      "title": "Filament TDS"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/2a1e4b730beb4c2baf680d927f95e7a5/SDS20260701N04_Bambu_PAHT-CF.pdf",
+      "title": "Filament MSDS"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/asacf_pahtcf",
+      "title": "printing tips"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament drying instructions"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "hex: no Hex Code document is linked from the store page or cached for PAHT-CF; the one colour Black (70100) gets no published hex.",
+    "in_the_box: no official in-the-box list exists for this filament; none is invented.",
+    "TDS facts with no registry key, not stored: Young's Modulus (X-Y 3860 ± 230 MPa, Z 2180 ± 130 MPa); Z-direction mechanical values; notched impact X-Y 22.8 ± 1.8 kJ/m²; HDT 170 °C at 1.8 MPa; Melt Index 14.4 ± 2.0 g/10 min (280 °C, 2.16 kg); Crystallization Temperature 140 °C; Saturated Water Absorption 0.88% (25 °C, 55% RH); Spool Size 200 mm diameter, 67 mm height; Nozzle Size 0.4/0.6(recommended)/0.8 mm (kept as relations); Printing and Storage Humidity < 20% RH; Retraction 0.8 - 1.4 mm, 20 - 40 mm/s; Max Overhang ~70°; Max Bridging ~40 mm; Support Material: Bambu Support for PA/PET; annealing 80 to 130 °C, 6 to 12 h.",
+    "SDS facts with no registry key: Model \"N04-xx\"; composition Nylon 12 and copolymer 80-88 %, carbon fiber 12-20 %; not classified under CLP; not hazardous goods for transport.",
+    "The RoHS certificate linked from the store page (https://store.bblcdn.com/40190d6568d7406bacb58b3bcb09b783.pdf) is not cached: safety.certifications is neither stated nor marked not_published."
+  ]
+}

@@ -1,0 +1,475 @@
+{
+ "format": "page_builder",
+ "sections": [
+  {
+   "kind": "overview",
+   "title": "Big job. Light work.",
+   "path": "components[0]",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "Bambu Lab R1"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/8de5449ede1b44ac9eaf476d02d4fea6/Property_1PC-compressed.jpg",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "features",
+   "title": "See what R1 can make.",
+   "path": "components[1] › 1",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "PlayDeck – Modular Play Table & Stool Set @janberrydesign"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/04bd3c3709c1479d8e5456e1c7daacc0/SizeWebNum01compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Crystal Canyon Mine – Marble Run @Daniel4d"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/cbf46b5dc56940378a2391cf358cbcbb/SizeWeNum02compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Prairie Lamp @Makim"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/56b77b4bf54d4a04a5e48a2bb6c0ab76/SizeWebNumompressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Sunflower Painting @miyabi"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/fe20cc2573c24a4abab68bef02e29371/SizeWebNum04compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Thundercloud – Layered Acrylic Lamp @Daniel4d"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/3631d08557744a5da09b6af8b6521d16/SizeWebNum05compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Layered Clock @Bambu Lab"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/5caacaf522ca4376af3c41de5cd29977/SizeWebNum06compressed.jpg",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "features",
+   "title": "CO₂ laser. Wood to glass. Tabletop decor to furniture.",
+   "path": "components[2] › 0",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "A 55W CO₂ laser with Bambu Lab's proven motion control, making laser work faster, finer, and easier."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/9fcf038df507488c9342bca575a45e9c/N8-Web_1.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "The 55W CO₂ laser cuts up to 18 mm walnut and 20 mm acrylic¹ in a single pass — fast, clean, and without the extra passes that slow you down."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/cf12fa1fcf9d4f23a7df5dead69902ab/PC.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "With the auto-feed conveyor³, R1 handles material up to 3 meters long. Pass-through feeding and deep cutting turn full-length panels into tables, shelving and furniture."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/217c8c2519484f7b9fb67474cf6a0858/pc.mp4",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "features",
+   "title": "Bring out the best in every material.",
+   "path": "components[2] › 1",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "Powered by a 55W CO₂ laser, R1 works across a wide range of materials — from wood and acrylic to glass, leather, fabric, and more — each bringing its own character to the piece."
+    },
+    {
+     "t": "text",
+     "text": "Wood"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/df0347d497aa492e827ffc9055cde03b/1.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Transparent acrylic"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/d84069a8bf1946f6bd20f4d323ed4088/Property_1Clear_acrylic-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Glass"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/ed75559b19bc41d991fb29a16d52f8bf/Property_1Glass-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Fabric"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/82e0b970e98b4853936b5e4c1bb2d057/Property_1Fabric-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Leather"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/d6ff0d8afe2b44289534eb3564742c6f/Property_1Leather-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Anodized aluminum"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/8d14153008ab48058418e4afb740a0da/Property_1Anodized_aluminum-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Slate"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/23200d8044114796a862cc716894fe5f/Property_1Slate-compressed.jpg",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "features",
+   "title": "What you mark is what you cut.",
+   "path": "components[3] › 0",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "Drop in your workpiece — crooked, curved, or tiny. R1 locates it, reads the surface, and tracks every move as it works, so every line lands exactly where you set it. This is TriSense. What you mark is what you cut."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/ca84e0c820ec426c93297457a7c86516/EN_PC.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "From curved cups and spheres to uneven surfaces. Height sensing follows every rise and fall to keep the engraving sharp and consistent across the entire surface.⁴"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/7c0dd5c350894f12b67c025f6cf6f3a8/1_1.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "R1 keeps surface measurement accurate even on transparent materials like glass and clear acrylic, so engraving stays precisely placed."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/3f7783b205db4d3e833a72d7063ff72d/2_1.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "The Toolhead Camera pinpoints small objects and places fine detail exactly where you want it."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/e0c06b2cd6b048989098b20b03a45048/3.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Cut around a printed design, trim a sticker, or follow a drawn outline. The Toolhead Camera traces the edge and keeps the cut precisely on path."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/0d2be898ff7f4f8188947dacbc735891/4_1.mp4",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "features",
+   "title": "The motion control that keeps our printers precise. Now in R1.",
+   "path": "components[3] › 1",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "When the toolhead changes direction, a split-second shake can ripple the line that follows. R1's vibration compensation cancels it out, keeping lines crisp right out of the turn — the same technology as in our 3D printers."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/a63d605b0d1e4a33b48712050c86cb36/pcpc2.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Higher speeds usually mean shallower engraving. R1 compensates as it moves, keeping engraving depth consistent at up to 1,000 mm/s — while completing the same job nearly 3× as fast.²"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/9cc4952d9f9443708d36dae0a9fedd7e/pc.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Mechanical accuracy can drift with use. The Vision Encoder⁵ corrects for it, keeping absolute motion accuracy within 0.1 mm across the full work area. Draw 300 mm. Cut 300 mm."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/6d3aa6b90bae4c4a96ff3fdbae5318f3/pc.mp4",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "instructions",
+   "title": "Tricky setup? Solved.",
+   "path": "components[4] › 0",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "Usually, aligning the optical path meant test shots, manual adjustments, and trial and error — with no telling how long it might take. With R1, that chore comes down to one small sensor. Mount the Laser Alignment Sensor on the toolhead, and it measures the beam, detects the misalignment, and corrects the path automatically, in just one minute."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/a5708d1434114e978fd3e883198ad4fd/size-web-num-1.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "R1 puts a touchscreen right on the machine. Follow every job in real time, watch the optical path calibrate, and check the machine's health status — all without a computer."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/38f67b5277654d9c81364e8cb909b431/size-web-num-2.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "R1 recognizes Bambu Lab material automatically and applies the right power and speed, so you can skip test grids and manual parameter setup."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/6092699463f945f6bdf0cbc3077cf9d5/pcen.mp4",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "features",
+   "title": "Safer by design. Made for everyday spaces.",
+   "path": "components[4] › 1",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "Most lasers rely on a single exhaust fan. R1 brings fresh air in from one side and exhausts smoke from the other, creating a steady crossflow through the entire chamber."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/e7bee7cdea424135845d1db5059a2506/pc.mp4",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "R1 is Class 1 under IEC 60825-1 in standard enclosed use. Laser radiation stays contained inside the enclosure, so no safety goggles or dedicated laser room are needed.⁷"
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/f4d2c380bf944bf8bbaa21b56cebf4a0/Class_1_laser_safety..jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Open the lid and the laser stops immediately. It stays disabled while the lid is open."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/20bec793a1c2407093af046a98f1cc18/Lid-open_stop-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Built-in sensors continuously watch for signs of flame and respond as soon as one is detected."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/dcc6c171e7cb42fb872396bd8c7a906e/Flame_detection-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "One press cuts power to the machine immediately."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/03a6598e2c3a4ff2bfdba728d818cc6b/Emergency_stop.jpg",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "features",
+   "title": "Same work area. Smaller footprint.",
+   "path": "components[4] › 2",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "R1 delivers the same working area as a typical CO₂ laser while taking up about a third less space.⁸"
+    }
+   ]
+  },
+  {
+   "kind": "features",
+   "title": "E1 Pro Air Purifier. Cleaner air, back in the room.",
+   "path": "components[4] › 3",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "Built for R1, E1 Pro⁶ connects directly to R1's exhaust outlet and pulls smoke out at the source. Multiple filter layers, with activated carbon, catch smoke and fine particles and reduce odors."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/08f86a8127a945ba994a3bc2ae597750/E1P-compressed.jpg",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "features",
+   "title": "Go taller. Rounder. Longer. Thicker.",
+   "path": "components[4] › 4",
+   "blocks": [
+    {
+     "t": "text",
+     "text": "Add the setup you need for taller objects, round pieces, thicker stock, and extra-long boards.³"
+    },
+    {
+     "t": "text",
+     "text": "Raises R1 to create clearance for taller objects. Also required for the Conveyor and Rotary.\nLearn more."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/665365adf3e64fdd9a745e1f68a3a468/Num1-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Automatically feeds long stock through R1, letting you cut and engrave boards up to 3 meters long.\nLearn more."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/dc752b2400bc46c4bf0807facfe08579/Num2-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Rotates round objects for full 360° engraving on bottles, bowls, cups, and more. Requires the Riser Base.\nLearn more."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/bb164326a2b84df5ae7015626503afb5/Num3-compressed.jpg",
+     "alt": ""
+    },
+    {
+     "t": "text",
+     "text": "Greater depth of focus for cleaner cuts through thicker materials — up to 20 mm with the long-focus lens.\nLearn more."
+    },
+    {
+     "t": "image",
+     "url": "https://store.bblcdn.com/s7/kpwam/7531b4fd78244597aa68e13fa084259d/Num4-compressed.jpg",
+     "alt": ""
+    }
+   ]
+  },
+  {
+   "kind": "faq",
+   "title": "FAQ",
+   "path": "components[8]",
+   "blocks": [
+    {
+     "t": "faq",
+     "question": "1.What are the differences between focusing lenses of different specifications?",
+     "answer": ""
+    },
+    {
+     "t": "faq",
+     "question": "2.When does the R1 require optical path calibration?",
+     "answer": ""
+    },
+    {
+     "t": "faq",
+     "question": "3.What are the differences in processing capabilities between the R1 and H2 series laser modules?",
+     "answer": ""
+    },
+    {
+     "t": "faq",
+     "question": "4.Which materials are not recommended for processing?",
+     "answer": ""
+    },
+    {
+     "t": "faq",
+     "question": "5.Which Bambu Lab air purifier is the R1 compatible with? Are older models compatible?",
+     "answer": ""
+    }
+   ]
+  }
+ ],
+ "documents": [],
+ "wikiLinks": [],
+ "trackerLinks": [],
+ "videos": [],
+ "otherLinks": [],
+ "storeLinks": [],
+ "specPairs": []
+}

@@ -1,0 +1,839 @@
+{
+  "handle": "bambu-textured-pei-plate",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T19:47:17Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate",
+      "title": "Bambu Textured PEI Plate (Bambu Lab US store product page)",
+      "retrieved_at": "2026-10-16T06:53:50Z",
+      "keys": [
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "product.*",
+        "package.*",
+        "contents.pieces",
+        "compat.statement",
+        "thermal.*",
+        "safety.certifications"
+      ],
+      "note": "P0 corpus copy parsed with extractPage + buildImportPayload (manifest row applied): Product Specifications table (6 rows), Recommended Settings table, Considerations, Installation Steps, feature sections, 10 Printer Model values (no variant descriptions)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "keys": [
+        "part.*",
+        "physical.*",
+        "printing.usable_print_size",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "product.*",
+        "package.contents",
+        "contents.pieces",
+        "compat.statement",
+        "safety.certifications"
+      ],
+      "note": "Cached HTML (wiki dated 2026-09-28): Build Plate intro, Build Plate Dimensions table, Important Notice (plate generations), Textured PEI Plate tab (description, features, Size table, Features, glue note), Appendix (wipe zone, gluing). No weight, outer dimensions, colour, thickness, lifetime, in-the-box list or certification for this plate."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "part.max_temperature",
+        "part.life_cycle"
+      ],
+      "note": "Cached HTML (wiki dated 2026-10-14): Build Plate Settings tables (glue/bed temperature table, build plate compatibility table with the \"Bambu Textured PEI Plate\" column), cleaning note."
+    }
+  ],
+  "specs": [
+    {
+      "key": "part.material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Stainless steel sheet with PEI powder coating on both sides",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › paragraph 1",
+      "quote": "The Textured PEI Plate is manufactured by spraying PEI powder onto both sides of a stainless steel sheet.",
+      "conflict_note": "Same material as the store page row \"Material: PEI Powder Coating + Magnetic Stainless Steel Plate\" (Product Specifications › row 1); the wording differs and the wiki adds that both sides are coated, so the text comparison will record spec_sources_disagree."
+    },
+    {
+      "key": "part.surface_treatment",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PEI powder sprayed onto both sides (powder-coated PEI)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › paragraph 1",
+      "quote": "The Textured PEI Plate is manufactured by spraying PEI powder onto both sides of a stainless steel sheet."
+    },
+    {
+      "key": "part.surface_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Textured PEI",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › features list › item 1",
+      "quote": "Special textured surface: Adds a unique textured finish to the bottom surface of printed parts."
+    },
+    {
+      "key": "part.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Textured PEI Plate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate › \"Build Plate Types\" list › item 1",
+      "quote": "Currently, Bambu Lab build plates mainly include the following types: Textured PEI Plate"
+    },
+    {
+      "key": "part.mount_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Magnetic (secured magnetically to the printer heatbed)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate › paragraph 1",
+      "quote": "It is magnetically secured to the printer's heatbed and serves as the platform that supports the model.",
+      "note": "Stated for Bambu Lab build plates in general (section intro); the store page installation steps also say \"secure to the magnetic platform\"."
+    },
+    {
+      "key": "part.feature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Flexible plate: flex it to release the print after printing",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate › paragraph 1",
+      "quote": "the build plate features a flexible design, so once printing is complete, you can simply flex the plate to quickly and easily remove the print.",
+      "note": "Stated for Bambu Lab build plates in general (section intro)."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "350*320 mm (H2D / H2S); 330*320 mm (H2C / A2L); 256*256 mm (X2D / P2S / P1 Series / X1 Series / A1); 180*180 mm (A1 mini)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › rows 1–4",
+      "quote": "350*320mm | H2D / H2S | 330*320mm | H2C / A2L | 256*256mm | X2D / P2S / P1 Series / X1 Series / A1 | 180*180mm | A1 mini",
+      "note": "The wiki labels these values \"Size\" (\"available in the following specifications\"); they are the same numbers the store page labels \"Usable Print Size\".",
+      "conflict_note": "The store page row \"Usable Print Size\" lists 350*320mm / 256*256mm / 180*180mm without naming models. It has no 330*320mm value although the product sells H2C and A2L options (both use a hero image of their own, distinct from the H2D/H2S one); the wiki states 330*320mm for H2C / A2L."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_283d6d4b3224634c503a3b6f",
+        "source_value_id": "564681826642980864",
+        "group": "Printer Model",
+        "value_text": "H2D"
+      },
+      "value": "350*320 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 1",
+      "quote": "350*320mm | H2D / H2S"
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_7c1a3b25dd6e86486ffd6c79",
+        "source_value_id": "564681826642980865",
+        "group": "Printer Model",
+        "value_text": "H2S"
+      },
+      "value": "350*320 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 1",
+      "quote": "350*320mm | H2D / H2S"
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_ef62690844669a42c1f2eda4",
+        "source_value_id": "581073343537422336",
+        "group": "Printer Model",
+        "value_text": "H2C"
+      },
+      "value": "330*320 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 2",
+      "quote": "330*320mm | H2C / A2L",
+      "conflict_note": "The store page row \"Usable Print Size\" lists 350*320mm / 256*256mm / 180*180mm without naming models. 330*320mm is not among them; the wiki states 330*320mm for H2C / A2L."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_f0305b755c48ed828851fb0f",
+        "source_value_id": "737888340796665857",
+        "group": "Printer Model",
+        "value_text": "A2L"
+      },
+      "value": "330*320 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 2",
+      "quote": "330*320mm | H2C / A2L",
+      "conflict_note": "The store page row \"Usable Print Size\" lists 350*320mm / 256*256mm / 180*180mm without naming models. 330*320mm is not among them; the wiki states 330*320mm for H2C / A2L."
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_059cf7b418c50b9b5eeb209d",
+        "source_value_id": "654581737346600961",
+        "group": "Printer Model",
+        "value_text": "X2D"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_caa7c03b72b0477442c00070",
+        "source_value_id": "667511502641102849",
+        "group": "Printer Model",
+        "value_text": "P2S"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_4ce644b8841dd03e636f2f47",
+        "source_value_id": "746609042228801539",
+        "group": "Printer Model",
+        "value_text": "P1 Series"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_918bbce4496ad5fe05a6fe9a",
+        "source_value_id": "746609042228801540",
+        "group": "Printer Model",
+        "value_text": "X1 Series"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_c92911d80f45d5721b7eb59e",
+        "source_value_id": "746609042228801537",
+        "group": "Printer Model",
+        "value_text": "A1"
+      },
+      "value": "256*256 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "key": "printing.usable_print_size",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_8140f51fbeb8f8242ace91c1",
+        "source_value_id": "746609042228801538",
+        "group": "Printer Model",
+        "value_text": "A1 mini"
+      },
+      "value": "180*180 mm",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 4",
+      "quote": "180*180mm | A1 mini"
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_059cf7b418c50b9b5eeb209d",
+        "source_value_id": "654581737346600961",
+        "group": "Printer Model",
+        "value_text": "X2D"
+      },
+      "value": "Second-generation 256×256 mm plates are made for the P2S/X2D. P2S/X2D printers can physically use first-generation plates, but the plate type is not recognised automatically.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate › Important Notice › items 1–2",
+      "quote": "Second-generation plates are compatible with the P2S/X2D printer. | 2.P2S/X2D printers can physically use first-generation build plates, but the plate type will not be automatically recognized."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_caa7c03b72b0477442c00070",
+        "source_value_id": "667511502641102849",
+        "group": "Printer Model",
+        "value_text": "P2S"
+      },
+      "value": "Second-generation 256×256 mm plates are made for the P2S/X2D. P2S/X2D printers can physically use first-generation plates, but the plate type is not recognised automatically.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate › Important Notice › items 1–2",
+      "quote": "Second-generation plates are compatible with the P2S/X2D printer. | 2.P2S/X2D printers can physically use first-generation build plates, but the plate type will not be automatically recognized."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_c92911d80f45d5721b7eb59e",
+        "source_value_id": "746609042228801537",
+        "group": "Printer Model",
+        "value_text": "A1"
+      },
+      "value": "First-generation 256×256 mm plates are made for A1 and X1/P1 series printers; A1 and P1 series printers are also fully compatible with second-generation plates.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate › Important Notice › items 1 and 4",
+      "quote": "First-generation plates are compatible with A1 and X1/P1 series printers. | 4.A1 and P1 series printers are fully compatible with second-generation build plates."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_4ce644b8841dd03e636f2f47",
+        "source_value_id": "746609042228801539",
+        "group": "Printer Model",
+        "value_text": "P1 Series"
+      },
+      "value": "First-generation 256×256 mm plates are made for A1 and X1/P1 series printers; A1 and P1 series printers are also fully compatible with second-generation plates.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate › Important Notice › items 1 and 4",
+      "quote": "First-generation plates are compatible with A1 and X1/P1 series printers. | 4.A1 and P1 series printers are fully compatible with second-generation build plates."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_918bbce4496ad5fe05a6fe9a",
+        "source_value_id": "746609042228801540",
+        "group": "Printer Model",
+        "value_text": "X1 Series"
+      },
+      "value": "First-generation 256×256 mm plates are made for X1/P1 series printers; X1 series printers can also use second-generation plates, but they are not identified automatically.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "locator": "Build Plate › Important Notice › items 1 and 3",
+      "quote": "First-generation plates are compatible with A1 and X1/P1 series printers. | 3.X1 series printers can also use second-generation build plates, but they will not be automatically identified."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PLA Metal / Wood / Marble",
+        "PLA-CF",
+        "PVA",
+        "TPU",
+        "PETG / PETG HF / PETG Translucent",
+        "PETG-CF",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "PA-CF/GF, PA6-CF/GF, PAHT-CF/GF",
+        "PET-CF/GF",
+        "PPA-CF/GF",
+        "PPS",
+        "PPS-CF/GF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › table \"compatible build plates and bed temperatures\" › column \"Bambu Textured PEI Plate\", rows 1–16",
+      "quote": "The table below shows the compatible build plates and bed temperatures for different filaments",
+      "note": "Every row of the Textured PEI column gives a bed temperature (none says \"Not recommended\"). Bed temperatures per filament have no plate key in the registry and are not stored.",
+      "conflict_note": "The store page \"Recommended Settings\" table names PLA/PLA-CF/PLA-GF, ABS, PETG/PETG-CF, PET-CF, TPU 85A/90A, TPU 95A for AMS, ASA, PVA, PC/PC-CF, PA/PA-CF/PAHT-CF: it adds PLA-GF and PC-CF, which this table does not name, and its bed temperatures differ for PLA (45~60℃ vs 45 - 65 ℃), PC and PA (90~110℃ vs 100 - 120 ℃) and PET-CF (80~100℃ vs 100 - 120 ℃). The store page gives no spec row for this key."
+    },
+    {
+      "key": "part.max_temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 180,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate",
+      "source_title": "Bambu Textured PEI Plate (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:50Z",
+      "locator": "Product Specifications › row 2",
+      "quote": "Surface Temperature Resistance | Up to 180℃",
+      "note": "The deterministic parse files this row as x.surface_temperature_resistance (\"Up to 180℃\", unverified): the registry has no \"Surface Temperature Resistance\" synonym. Same value, no conflict."
+    },
+    {
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_8140f51fbeb8f8242ace91c1",
+        "source_value_id": "746609042228801538",
+        "group": "Printer Model",
+        "value_text": "A1 mini"
+      },
+      "value": [
+        "ABS",
+        "PET-CF",
+        "ASA",
+        "PC/PC-CF",
+        "PA/PA-CF/PAHT-CF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-textured-pei-plate",
+      "source_title": "Bambu Textured PEI Plate (Bambu Lab US store product page)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:53:50Z",
+      "locator": "Recommended Settings › Materials column, rows 2, 4, 7, 9 and 10",
+      "quote": "ABS (not for A1 mini) | PET-CF (not for A1 mini) | ASA (not for A1 mini) | PC/PC-CF (not for A1 mini) | PA/PA-CF/PAHT-CF (not for A1 mini)",
+      "note": "The store page matrix table stays text in the deterministic parse (§C.6); these five rows carry \"(not for A1 mini)\"."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "target_label": "H2D",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_283d6d4b3224634c503a3b6f",
+        "source_value_id": "564681826642980864",
+        "group": "Printer Model",
+        "value_text": "H2D"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 1",
+      "quote": "350*320mm | H2D / H2S"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "H2S",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_7c1a3b25dd6e86486ffd6c79",
+        "source_value_id": "564681826642980865",
+        "group": "Printer Model",
+        "value_text": "H2S"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 1",
+      "quote": "350*320mm | H2D / H2S"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "H2C",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_ef62690844669a42c1f2eda4",
+        "source_value_id": "581073343537422336",
+        "group": "Printer Model",
+        "value_text": "H2C"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 2",
+      "quote": "330*320mm | H2C / A2L"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "A2L",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_f0305b755c48ed828851fb0f",
+        "source_value_id": "737888340796665857",
+        "group": "Printer Model",
+        "value_text": "A2L"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 2",
+      "quote": "330*320mm | H2C / A2L"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "X2D",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_059cf7b418c50b9b5eeb209d",
+        "source_value_id": "654581737346600961",
+        "group": "Printer Model",
+        "value_text": "X2D"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "P2S",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_caa7c03b72b0477442c00070",
+        "source_value_id": "667511502641102849",
+        "group": "Printer Model",
+        "value_text": "P2S"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "P1 Series",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_4ce644b8841dd03e636f2f47",
+        "source_value_id": "746609042228801539",
+        "group": "Printer Model",
+        "value_text": "P1 Series"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "X1 Series",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_918bbce4496ad5fe05a6fe9a",
+        "source_value_id": "746609042228801540",
+        "group": "Printer Model",
+        "value_text": "X1 Series"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "A1",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_c92911d80f45d5721b7eb59e",
+        "source_value_id": "746609042228801537",
+        "group": "Printer Model",
+        "value_text": "A1"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 3",
+      "quote": "256*256mm | X2D / P2S / P1 Series / X1 Series / A1"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "A1 mini",
+      "scope": {
+        "kind": "option_value",
+        "id": "ov_8140f51fbeb8f8242ace91c1",
+        "source_value_id": "746609042228801538",
+        "group": "Printer Model",
+        "value_text": "A1 mini"
+      },
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Textured PEI Plate tab › table \"Size | Compatible Models\" › row 4",
+      "quote": "180*180mm | A1 mini"
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters"
+    }
+  ],
+  "not_published": [
+    "product.net_weight",
+    "product.length",
+    "product.width",
+    "product.height",
+    "part.color",
+    "part.life_cycle",
+    "package.contents"
+  ],
+  "conflicts": [
+    {
+      "key": "printing.usable_print_size",
+      "scope": "product",
+      "store_value": "350*320mm / 256*256mm / 180*180mm",
+      "curated_value": "350*320 / 330*320 / 256*256 / 180*180 mm by model",
+      "resolution": "The wiki table is complete for the ten sold options; the store row omits the H2C / A2L size."
+    },
+    {
+      "key": "part.material",
+      "scope": "product",
+      "store_value": "PEI Powder Coating + Magnetic Stainless Steel Plate",
+      "curated_value": "Stainless steel sheet with PEI powder coating on both sides",
+      "resolution": "Same material; wording only."
+    }
+  ],
+  "notes": [
+    "Not stored (no registry key): bed temperature per filament on this plate (wiki 45 - 65 ℃ PLA … 100 - 120 ℃ PC/PA/PET-CF/PPA/PPS; the store table differs, see the supported_filament conflict_note); glue stick \"may be necessary\" for PC/PA/ABS/ASA (wiki Textured PEI tab) and \"Yes\" for ABS, ASA, PC/PC-CF, PA/PA-CF/PAHT-CF (store table) — conditional, so no requires relation.",
+    "physical.thickness stays with the store page row: \"PEI Powder Coating - 0.075mm / Stainless Steel Plate - 0.5mm/0.4mm\"; no source maps 0.5 mm / 0.4 mm to a model, so no option-scoped thickness is curated.",
+    "Packaging size and weight (three values each on the store page) are not mapped to models by any source; nothing curated."
+  ]
+}

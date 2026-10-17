@@ -1,0 +1,718 @@
+{
+  "handle": "pa6-cf",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T17:11:28Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "extrusion.supported_nozzle_diameters",
+        "motion.max_flow",
+        "safety.certifications"
+      ]
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/20b45bf29b0142d8b13fae213eda751a/SDS20260701N05_Bambu_PA6-CF.pdf",
+      "title": "Bambu PA6-CF Safety Data Sheet SDS20260701N05",
+      "retrieved_at": "2026-10-16T08:23:58Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.certifications"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "extrusion.supported_nozzle_diameters"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:09Z",
+      "keys": [
+        "mechanical.*",
+        "thermal.heat_deflection_temp",
+        "drying.*",
+        "print_settings.print_speed",
+        "motion.max_flow",
+        "extrusion.supported_nozzle_diameters"
+      ]
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament drying instructions",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ]
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PA6-CF",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Basic Info",
+      "quote": "Bambu PA6-CF is a carbon fiber reinforced PA6 (Nylon 6) filament.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: 'Diameter: 1.75mm +/- 0.03mm')."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681928002531338",
+        "id": "ov_deb079a9acbc65d620071e71",
+        "value_text": "1kg"
+      },
+      "value": 1000,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "The TDS names one net weight (1 kg); scoped to the store's '1kg' Size value, where it agrees with the store page (1000 g). The '0.5kg' value has no TDS weight."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.09,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.09 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PC + ABS spool (temperature resistance 90 °C)",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Specifications › Spool Material",
+      "quote": "Spool Material PC + ABS (Temperature resistance 90 °C)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 102,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 102 ± 7 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "printed specimen, X-Y; specimens annealed and dried at 80 °C for 12 h before testing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "Z direction: 48 ± 6 MPa (no registry key for the Z value)."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 5.8,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 5.8 ± 1.6 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "printed specimen, X-Y; specimens annealed and dried at 80 °C for 12 h before testing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "Z direction: 3.7 ± 0.8 % (no registry key for the Z value)."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 151,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 151 ± 8 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "printed specimen, X-Y; specimens annealed and dried at 80 °C for 12 h before testing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "Z direction: 80 ± 7 MPa. The wiki CF guide gives 151 MPa dry and 95 MPa humid (X-Y)."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 5460,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 5460 ± 280 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "printed specimen, X-Y; specimens annealed and dried at 80 °C for 12 h before testing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "Z direction: 2240 ± 220 MPa. The wiki CF guide gives 5460 MPa dry and 3560 MPa humid (X-Y)."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 40.3,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 40.3 ± 2.5 kJ/m²; 13.4 ± 1.7 kJ/m² （notched）",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "printed specimen, X-Y; specimens annealed and dried at 80 °C for 12 h before testing; unnotched (the notched X-Y value 13.4 ± 1.7 kJ/m² is listed beside it)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "Z direction: 15.5 ± 1.7 kJ/m². The wiki CF guide also gives 40.3 kJ/m² as Impact Strength - XY."
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 186,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (0.45 MPa)",
+      "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 186 °C",
+      "test_method": "ISO 75",
+      "test_condition": "0.45 MPa load",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "The TDS also gives 164 °C at 1.8 MPa (ISO 75); one row per key and scope, the 0.45 MPa value is the one the wiki CF guide quotes."
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 212,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Vicat Softening Temperature",
+      "quote": "Vicat Softening Temperature ISO 306, GB/T 1633 212 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 223,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 223 °C",
+      "test_method": "DSC",
+      "test_condition": "10 °C/min",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 68,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 68 °C",
+      "test_method": "DSC",
+      "test_condition": "10 °C/min",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 45,
+        "max": 60
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Chamber Temperature",
+      "quote": "Chamber Temperature 45 - 60 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 260,
+        "max": 290
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 260 - 290 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "The store page states no nozzle temperature (its row is not_found). The wiki material table gives 260 - 300 °C (±10 °C) for the shared PA-CF/GF, PA6-CF/GF, PAHT-CF/GF row; the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 80,
+        "max": 100
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 100 °C",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "The wiki material table gives 100 - 120 ℃ (Engineering, Smooth PEI / High-Temperature, Textured PEI plates) for the shared PA-CF/GF, PA6-CF/GF, PAHT-CF/GF row; the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 100 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 100 mm/s",
+      "test_method": "",
+      "test_condition": "recommended printing setting; an upper bound only, so kept as text",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0 - 60%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 60%",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "recommended printing setting; build plate surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.4 mm",
+        "0.6 mm (recommended)",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6 ( Recommended ), 0.8 mm",
+      "test_method": "",
+      "test_condition": "recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z"
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 - 12 h",
+      "test_method": "",
+      "test_condition": "blast drying oven, before printing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "Alternative on the same row: X1 Series printer heatbed 90 - 100 °C, 12 h. The wiki drying table gives 75-85 °C forced-air oven for PA6-CF/GF; the wiki CF guide gives 80 °C, 8–12 h (convection oven)."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 8,
+        "max": 12
+      },
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 - 12 h",
+      "test_method": "",
+      "test_condition": "blast drying oven at 80 °C, before printing",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:57Z",
+      "note": "Alternative on the same row: X1 Series printer heatbed, 12 h. The wiki drying table and CF guide also give 8-12 h for the oven."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "not_compatible_with",
+      "target_label": "All AMS Series",
+      "target_kind": "family",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "source_title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide",
+      "locator": "1.3 Hardware Compatibility › row PPA-CF / PA6-CF",
+      "quote": "Glue-assisted printing required; not compatible with low-temperature engineering plate | AMS series not compatible",
+      "also": {
+        "evidence_kind": "feature_bullet",
+        "source_url": "https://us.store.bambulab.com/products/pa6-cf",
+        "quote": "All AMS Series NOT Compatible"
+      }
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_label": "P1P",
+      "target_kind": "printer",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "source_title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide",
+      "locator": "1.3 Hardware Compatibility › row PPA-CF / PA6-CF",
+      "quote": "PPA-CF / PA6-CF | Requires an enclosed printer; not compatible with P1P / A1 series"
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_label": "A1 Series",
+      "target_kind": "family",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "source_title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide",
+      "locator": "1.3 Hardware Compatibility › row PPA-CF / PA6-CF",
+      "quote": "PPA-CF / PA6-CF | Requires an enclosed printer; not compatible with P1P / A1 series"
+    },
+    {
+      "relation": "requires",
+      "target_label": "Enclosed printer",
+      "target_kind": "other",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "source_title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide",
+      "locator": "1.3 Hardware Compatibility › row PPA-CF / PA6-CF",
+      "quote": "PPA-CF / PA6-CF | Requires an enclosed printer; not compatible with P1P / A1 series"
+    },
+    {
+      "relation": "requires",
+      "target_label": "Hardened steel nozzle",
+      "target_kind": "other",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › row PA-CF/GF, PA6-CF/GF, PAHT-CF/GF › column 'Is it necessary to use hardened steel nozzles?'",
+      "quote": "PAHT-CF/GF | Not Compatible | Compatible | Recommended | Compatible | Not Recommended | Compatible | Compatible | Required | 260 - 300 |",
+      "also": {
+        "evidence_kind": "wiki_table",
+        "source_url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+        "quote": "Only suitable for hardened steel and high-flow nozzles; 0.6 mm nozzle recommended, 0.4 mm high-flow nozzle not recommended"
+      }
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_label": "0.2 mm Nozzle",
+      "target_kind": "other",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › row PA-CF/GF, PA6-CF/GF, PAHT-CF/GF › column 0.2 mm Nozzle",
+      "quote": "PAHT-CF/GF | Not Compatible | Compatible | Recommended | Compatible | Not Recommended | Compatible | Compatible | Required | 260 - 300 |",
+      "also": {
+        "evidence_kind": "feature_bullet",
+        "source_url": "https://us.store.bambulab.com/products/pa6-cf",
+        "quote": "0.2 mm Nozzle NOT Compatible"
+      }
+    },
+    {
+      "relation": "not_compatible_with",
+      "target_label": "Cool Plate SuperTack",
+      "target_kind": "part",
+      "evidence_kind": "store_faq",
+      "source_url": "https://us.store.bambulab.com/products/pa6-cf",
+      "source_title": "PA6-CF store page FAQ",
+      "locator": "FAQ › 1.Accessory Compatibility",
+      "quote": "Not compatible with AMS Series, Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm."
+    },
+    {
+      "relation": "requires",
+      "target_label": "Bambu Lab Glue Stick",
+      "target_kind": "part",
+      "evidence_kind": "wiki_text",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Build Plate Settings › 1. Recommended Bed Temperatures for Different Filament & Glue Combinations",
+      "quote": "Use Bambu Lab Glue Stick for ASA-CF, PA6-GF/CF, PPA-CF, PPS-CF, PET-CF, and PAHT-CF printing.",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "also": {
+        "evidence_kind": "tds",
+        "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+        "locator": "p.1, Recommended Printing Settings › Build Plate Surface Preparation",
+        "quote": "Build Plate Surface Preparation Glue"
+      }
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "Bambu Engineering Plate",
+      "target_kind": "part",
+      "evidence_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "Bambu High Temperature Plate",
+      "target_kind": "part",
+      "evidence_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "Bambu Textured PEI Plate",
+      "target_kind": "part",
+      "evidence_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "target_label": "Support for PA/PET",
+      "target_kind": "material",
+      "evidence_kind": "tds",
+      "source_url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0",
+      "locator": "p.2, Recommended Printing Settings › Support",
+      "quote": "Support Support for PA/PET"
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf",
+      "title": "Filament TDS",
+      "source_title": "Bambu PA6-CF Technical Data Sheet V3.0"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/20b45bf29b0142d8b13fae213eda751a/SDS20260701N05_Bambu_PA6-CF.pdf",
+      "title": "Filament MSDS",
+      "source_title": "Bambu PA6-CF Safety Data Sheet SDS20260701N05"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament drying instructions"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness",
+    "motion.max_flow"
+  ]
+}

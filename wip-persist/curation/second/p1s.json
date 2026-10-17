@@ -1,0 +1,1934 @@
+{
+  "handle": "p1s",
+  "schema": 2,
+  "curated_by": "agent-2",
+  "curated_at": "2026-10-16T16:46:20Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "title": "Bambu Lab P1S Technical Specifications",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "safety.*",
+        "product.*",
+        "package.*",
+        "shipment.*"
+      ],
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/0ee32e36b56d4c6fa57380ced46fb212.pdf",
+      "title": "Bambu Lab P1S Technical Specifications",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "safety.*",
+        "product.*",
+        "package.*",
+        "shipment.*"
+      ],
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/p1/manual/p1s-acc-in-the-box",
+      "title": "Supplementary instructions for accessories in the P1S box",
+      "keys": [
+        "package.contents"
+      ],
+      "retrieved_at": "2026-10-16T08:23:08Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "title": "Supplementary instructions for accessories in the P1S combo box",
+      "keys": [
+        "package.contents"
+      ],
+      "retrieved_at": "2026-10-16T08:23:14Z"
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.technology",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Fused Deposition Modeling",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Printing Technology",
+      "quote": "Printing Technology Fused Deposition Modeling",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "256 × 256 × 256 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Body › Build Volume(W × D × H)",
+      "quote": "Build Volume(W × D × H) 256 x 256 x 256 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Object key written as text (W × D × H): mergeCurated has no object form, so value_list stays empty. Store page footnote: Bambu Studio sets the default printable height to 250 mm (remaining 6 mm per the wiki safety article). Agrees with the store page (256 x 256 x 256 mm³), whose parse left this key not_found and wrote x.build_volume_wxdxh."
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Chassis: Steel; Shell: Plastic & Glass",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Body › Chassis; Body › Shell",
+      "quote": "Chassis Steel; Shell Plastic & Glass",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "conflict_note": "Store page parse gives \"Open frame (Printable Modplates Available) — Enclosed (Plastic & Glass)\": it joined the P1P column; the P1S column \"Enclosed (Plastic & Glass)\" agrees with the PDF shell."
+    },
+    {
+      "key": "extrusion.hotend",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "All-Metal",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Toolhead › Hot End",
+      "quote": "Hot End All-Metal",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "extrusion.extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Toolhead › Extruder Gears",
+      "quote": "Extruder Gears Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Stainless Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Toolhead › Nozzle",
+      "quote": "Nozzle Stainless Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "conflict_note": "Store page row reads \"0.4 mm Stainless Steel Included\": same material, the page adds the included diameter."
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Toolhead › Max Hot End Temperature",
+      "quote": "Max Hot End Temperature 300℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "The PDF text layer drops the degree glyph (CID font without a language pack); the value and unit were read from the rendered page."
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Toolhead › Nozzle Diameter (Included)",
+      "quote": "Nozzle Diameter (Included) 0.4 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Toolhead › Nozzle Diameter (Included); Nozzle Diameter (Optional)",
+      "quote": "Nozzle Diameter (Included) 0.4 mm; Nozzle Diameter (Optional) 0.2 mm, 0.6 mm, 0.8 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Supported = the included 0.4 mm plus the optional 0.2/0.6/0.8 mm, both rows of the same table."
+    },
+    {
+      "key": "printing.filament_cutter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Yes",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Toolhead › Filament Cutter",
+      "quote": "Filament Cutter Yes",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Toolhead › Filament Diameter",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Bambu Dual-Sided Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Heatbed › Build Plate (Included)",
+      "quote": "Build Plate (Included) Bambu Dual-Sided Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "printing.build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Bambu Dual-Sided Textured PEI Plate",
+        "Bambu Cool Plate",
+        "Bambu Engineering Plate",
+        "Bambu High Temperature Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Heatbed › Build Plate (Included); Build Plate (Optional)",
+      "quote": "Build Plate (Included) Bambu Dual-Sided Textured PEI Plate; Build Plate (Optional) Bambu Cool Plate, Bambu Engineering Plate, Bambu High Temperature Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Supported plates = the included plate plus the optional plates.",
+      "conflict_note": "Store page lists the same four plates but names the included one \"Bambu Textured PEI Plate\" (the PDF says \"Dual-Sided Textured\")."
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 100,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Heatbed › Max Build Plate Temperature",
+      "quote": "Max Build Plate Temperature 100℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "The PDF text layer drops the degree glyph (CID font without a language pack); the value and unit were read from the rendered page."
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 500,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Speed › Max Speed of Toolhead",
+      "quote": "Max Speed of Toolhead 500 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Speed › Max Acceleration of Toolhead",
+      "quote": "Max Acceleration of Toolhead 20 m/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Published as 20 m/s²; stored in the registry unit: 20 m/s² = 20000 mm/s².",
+      "conflict_note": "Store page also says \"20 m/s²\"; its deterministic parse kept no number (m/s² is not converted), so the merge records a difference that is only the missing conversion."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 32,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Speed › Max Hot End Flow",
+      "quote": "Max Hot End Flow 32 mm³/s @ABS(Model: 150*150mm single wall; Material: Bambu ABS; Temperature: 280℃ )",
+      "test_method": "Printed model: 150*150 mm single wall",
+      "test_condition": "Bambu ABS at 280 °C",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "The PDF text layer drops the degree glyph (CID font without a language pack); the value and unit were read from the rendered page."
+    },
+    {
+      "key": "thermal.part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Cooling&Filtration › Part Cooling Fan",
+      "quote": "Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "thermal.hotend_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Cooling&Filtration › Hot End Fan",
+      "quote": "Hot End Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "thermal.control_board_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Cooling&Filtration › Control Board Fan",
+      "quote": "Control Board Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "conflict_note": "Store page parse gives \"Optional — Closed Loop Control\": it joined the P1P column (\"Optional\"); the P1S column agrees."
+    },
+    {
+      "key": "thermal.aux_part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Cooling&Filtration › Auxiliary Part Cooling Fan",
+      "quote": "Auxiliary Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "conflict_note": "Store page parse gives \"Optional — Closed Loop Control\": it joined the P1P column (\"Optional\"); the P1S column agrees."
+    },
+    {
+      "key": "safety.carbon_filter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Activated Carbon Filter",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Cooling&Filtration › Air Filter",
+      "quote": "Air Filter Activated Carbon Filter",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "The PDF row label is \"Air Filter\"; it names the filter kind, no finer type is published."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Ideal: PLA, PETG, TPU, ABS, ASA, PVA, PET",
+        "Capable: PA, PC",
+        "Not recommended: Carbon/Glass Fiber Reinforced Polymer"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Supported Filament (3 rows)",
+      "quote": "PLA, PETG, TPU, ABS , ASA , PVA, PET Ideal; PA, PC Capable; Carbon/Glass Fiber Reinforced Polymer Not Recommended",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "\"Not Recommended\" is kept as a tier of this list, not as printing.unsupported_filament: the sheet does not say \"not supported\".",
+      "conflict_note": "Store page parse joined the P1P and P1S columns; the P1S column \"Ideal: PLA, PETG, TPU, PVA, PET, ABS, ASA Capable: PA, PC\" agrees (the page omits the not-recommended row)."
+    },
+    {
+      "key": "printing.camera",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Low Rate Camera 1280 x 720/0.5fps / Timelapse Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Sensors › Chamber Monitoring Camera",
+      "quote": "Chamber Monitoring Camera Low Rate Camera 1280 x 720/0.5fps Timelapse Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Sensors › Filament Run Out Sensor",
+      "quote": "Filament Run Out Sensor Yes",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Optional with AMS",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Sensors › Filament Odometry",
+      "quote": "Filament Odometry Optional with AMS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Boolean key; the sheet publishes a condition, not yes/no, so the words are kept as text."
+    },
+    {
+      "key": "printing.power_loss_recovery",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Sensors › Power Loss Recover",
+      "quote": "Power Loss Recover Yes",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 389,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Physical Dimensions › Dimensions (WxDxH)",
+      "quote": "Dimensions (WxDxH) 389*389*458 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Published as W×D×H 389*389*458 mm: width = W, length = D, height = H. Agrees with the store page P1S column \"389 * 389 * 458 mm³\" (parsed there only into an x.* row)."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 389,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Physical Dimensions › Dimensions (WxDxH)",
+      "quote": "Dimensions (WxDxH) 389*389*458 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Published as W×D×H 389*389*458 mm: width = W, length = D, height = H. Agrees with the store page P1S column \"389 * 389 * 458 mm³\" (parsed there only into an x.* row)."
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 458,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Physical Dimensions › Dimensions (WxDxH)",
+      "quote": "Dimensions (WxDxH) 389*389*458 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Published as W×D×H 389*389*458 mm: width = W, length = D, height = H. Agrees with the store page P1S column \"389 * 389 * 458 mm³\" (parsed there only into an x.* row)."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 12.95,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Physical Dimensions › Net Weight",
+      "quote": "Net Weight 12.95 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Agrees with the store page \"Net weight 12.95kg\" (parsed there only into an x.* row; product.net_weight was not_found)."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-240 VAC",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electrical Parameters › Input Voltage",
+      "quote": "Input Voltage 100-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "A universal input range that covers 220 V and 110 V mains, so it is region-free (it also replaces the page's region-free not_found row). Agrees with the store page Electrical Requirements row (kept there as electrical.requirements, us_110v)."
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electrical Parameters › Input Voltage",
+      "quote": "Input Voltage 100-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Universal, region-free, as electrical.voltage."
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electrical Parameters › Max Power",
+      "quote": "Max Power 1000 W @220 V, 350W@110V",
+      "test_method": "",
+      "test_condition": "@220 V",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "Agrees with the store page Electrical Requirements row \"1000 W @220 V, 350W@110V\"."
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electrical Parameters › Max Power",
+      "quote": "Max Power 1000 W @220 V, 350W@110V",
+      "test_method": "",
+      "test_condition": "@110 V",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "The 110 V figure of the same row; us_110v rows are unverified by rule (CHECK)."
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "2.7-inch 192x64 Screen",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electronics › Display",
+      "quote": "Display 2.7-inch 192x64 Screen",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Yes",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electronics › Connectivity",
+      "quote": "Connectivity Wi-Fi, Bluetooth, Bambu-Bus",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "connectivity.bluetooth",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Yes",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electronics › Connectivity",
+      "quote": "Connectivity Wi-Fi, Bluetooth, Bambu-Bus",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "connectivity.interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu-Bus",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electronics › Connectivity",
+      "quote": "Connectivity Wi-Fi, Bluetooth, Bambu-Bus",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "note": "The wired interface named in the Connectivity row (Wi-Fi and Bluetooth are their own keys)."
+    },
+    {
+      "key": "connectivity.storage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Micro SD Card",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electronics › Storage",
+      "quote": "Storage Micro SD Card",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "connectivity.control_interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Button",
+        "APP",
+        "PC Application"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electronics › Control Interface",
+      "quote": "Control Interface Button, APP, PC Application",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "connectivity.motion_controller",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-Core Cortex M4",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Electronics › Motion Controller",
+      "quote": "Motion Controller Dual-Core Cortex M4",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Studio. Supports third-party slicers that export standard G-code, such as Superslicer, Prusaslicer and Cura, but certain advanced features may not be supported.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Software › Slicer",
+      "quote": "Slicer Bambu Studio Support third party slicers which export standard G-code such as Superslicer, Prusaslicer and Cura, but certain advanced features may not be supported.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "MacOS",
+        "Windows"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Software › Slicer Supported OS",
+      "quote": "Slicer Supported OS MacOS, Windows",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:21Z"
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898887",
+        "value_text": "P1S"
+      },
+      "value": 485,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 2",
+      "quote": "P1S：389 * 389 * 458 mm³, Package size 485 × 480 × 530 mm³,",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. Order as published (L × W × H assumed as for every package parse)."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898887",
+        "value_text": "P1S"
+      },
+      "value": 480,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 2",
+      "quote": "P1S：389 * 389 * 458 mm³, Package size 485 × 480 × 530 mm³,",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. Order as published (L × W × H assumed as for every package parse)."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898887",
+        "value_text": "P1S"
+      },
+      "value": 530,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 2",
+      "quote": "P1S：389 * 389 * 458 mm³, Package size 485 × 480 × 530 mm³,",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. Order as published (L × W × H assumed as for every package parse)."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898887",
+        "value_text": "P1S"
+      },
+      "value": 17.6,
+      "unit": "kg",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 3",
+      "quote": "Net weight 12.95kg, Gross weight 17.60 kg",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898886",
+        "value_text": "P1S AMS Combo"
+      },
+      "value": 485,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 4",
+      "quote": "P1S Combo：Package size 485 × 480 × 585 mm³,",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. \"P1S Combo\" is the P1S AMS Combo version."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898886",
+        "value_text": "P1S AMS Combo"
+      },
+      "value": 480,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 4",
+      "quote": "P1S Combo：Package size 485 × 480 × 585 mm³,",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. \"P1S Combo\" is the P1S AMS Combo version."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898886",
+        "value_text": "P1S AMS Combo"
+      },
+      "value": 585,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 4",
+      "quote": "P1S Combo：Package size 485 × 480 × 585 mm³,",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. \"P1S Combo\" is the P1S AMS Combo version."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898886",
+        "value_text": "P1S AMS Combo"
+      },
+      "value": 21.6,
+      "unit": "kg",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 5",
+      "quote": "Gross weight (AMS included) 21.60 kg",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. \"P1S Combo\" is the P1S AMS Combo version."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "583855874739507206",
+        "value_text": "P1S AMS 2 Pro Combo"
+      },
+      "value": 480,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 6",
+      "quote": "P1S AMS 2 Combo: Package size 480 × 480 × 565 mm³,",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. The table says \"P1S AMS 2 Combo\"; the only version with an AMS 2 is \"P1S AMS 2 Pro Combo\"."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "583855874739507206",
+        "value_text": "P1S AMS 2 Pro Combo"
+      },
+      "value": 480,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 6",
+      "quote": "P1S AMS 2 Combo: Package size 480 × 480 × 565 mm³,",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. The table says \"P1S AMS 2 Combo\"; the only version with an AMS 2 is \"P1S AMS 2 Pro Combo\"."
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "583855874739507206",
+        "value_text": "P1S AMS 2 Pro Combo"
+      },
+      "value": 565,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 6",
+      "quote": "P1S AMS 2 Combo: Package size 480 × 480 × 565 mm³,",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. The table says \"P1S AMS 2 Combo\"; the only version with an AMS 2 is \"P1S AMS 2 Pro Combo\"."
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "583855874739507206",
+        "value_text": "P1S AMS 2 Pro Combo"
+      },
+      "value": 21,
+      "unit": "kg",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Parameters Comparison › row 19 (Physical Dimensions) › P1S column › segment 7",
+      "quote": "Gross weight (AMS included) 21kg",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "The store comparison table is a US table (its Electrical Requirements row carries \"350W@110V\"), so package and gross-weight values are us_110v and unverified (§C.6). No 220 V package value is published for P1S. The table says \"P1S AMS 2 Combo\"; the only version with an AMS 2 is \"P1S AMS 2 Pro Combo\"."
+    },
+    {
+      "key": "printing.auto_leveling",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Auto-Bed Leveling",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Description › All-around performance right out of the box",
+      "quote": "simply hit print, and the printer will handle all the calibrations (Auto-Bed Leveling, Vibration compensation) for you.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "Description prose, not a spec table: kept unverified (§C.6, §6)."
+    },
+    {
+      "key": "printing.multi_color",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Multi-color printing with AMS (up to 16 colors with 4 AMS units)",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/p1s",
+      "source_title": "Bambu Lab US store product page",
+      "locator": "Description › Multi-color capability",
+      "quote": "Get the AMS combo to unleash Multi-color printing capability. (up to 16-color if you stack up 4 AMS units).",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:54:23Z",
+      "note": "Description prose, not a spec table: kept unverified (§C.6, §6)."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898886",
+        "value_text": "P1S AMS Combo"
+      },
+      "value": [
+        "Bambu Lab AMS",
+        "Spare Filament Cutter (x2)",
+        "Bambu Bus Cable-6 Pin",
+        "Bambu Bus Cable-4 Pin",
+        "250g Bambu Filament (Random Color/Type, Contains 2 spools)"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "¶ P1S AMS Combo add-ons (table)",
+      "quote": "Bambu Lab AMS | Spare Filament Cutter (x2) | Bambu Bus Cable-6 Pin | Bambu Bus Cable-4 Pin | 250g Bambu Filament filament (Random Color/Type，Contains 2 spools)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:14Z",
+      "note": "Add-ons only; the shared box list is the product-level row. The doubled word \"filament\" of the source is dropped from the item text.",
+      "conflict_note": "The store page puts the AMS Combo and AMS 2 Pro Combo add-ons into one row scoped to the \"P1S\" value (parser scoping fault); this row scopes the AMS Combo add-ons to their own version. Store text: \"Bambu Filament Samples (Random Color/Type，Contains 2 spools)\"."
+    },
+    {
+      "key": "package.contents",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "583855874739507206",
+        "value_text": "P1S AMS 2 Pro Combo"
+      },
+      "value": [
+        "Bambu Lab AMS 2 Pro",
+        "Bambu Bus Cable-4Pin",
+        "Switching Adapter",
+        "Filament Buffer (only included with 'Combo with buffer')",
+        "AMS Hub (only included with 'Combo with hub')",
+        "Bambu 4-in-1 PTFE Adapter or PTFE Tube Coupler (randomly shipped)"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "¶ P1S AMS 2 Pro Combo add-ons (table)",
+      "quote": "Bambu Lab AMS 2 Pro | Bambu Bus Cable-4Pin | Switching Adapter | Filament Buffer (Only Included with 'Combo with buffer') | AMS Hub (Only Included with 'Combo with hub') | … PTFE Tube Coupler",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:14Z",
+      "note": "Add-ons only. The wiki names two AMS 2 Pro combo kinds (with buffer / with hub); the store sells one \"P1S AMS 2 Pro Combo\".",
+      "conflict_note": "Store page lists \"Filament Buffer\" and \"PTFE Tube Coupler\" (no hub, no 4-in-1 adapter alternative) and scopes them to the \"P1S\" value (parser scoping fault). It also says the PLA filament is not included in the AMS 2 Pro Combo, which the wiki main list does not say."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "Bambu Lab AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "¶ P1S AMS Combo add-ons",
+      "quote": "P1S AMS Combo add-ons: Bambu Lab AMS"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "Bambu Lab AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "¶ P1S AMS 2 Pro Combo add-ons",
+      "quote": "P1S AMS 2 Pro Combo add-ons: Bambu Lab AMS 2 Pro"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Dual-Sided Textured PEI Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Heatbed › Build Plate (Included)",
+      "quote": "Build Plate (Included) Bambu Dual-Sided Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Heatbed › Build Plate (Optional)",
+      "quote": "Build Plate (Optional) Bambu Cool Plate, Bambu Engineering Plate, Bambu High Temperature Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Heatbed › Build Plate (Optional)",
+      "quote": "Build Plate (Optional) Bambu Cool Plate, Bambu Engineering Plate, Bambu High Temperature Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu High Temperature Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "source_title": "Bambu Lab P1S Technical Specifications",
+      "locator": "p.1, Heatbed › Build Plate (Optional)",
+      "quote": "Build Plate (Optional) Bambu Cool Plate, Bambu Engineering Plate, Bambu High Temperature Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Spare 0.4 mm stainless steel hotend",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S box",
+      "locator": "Accessories table › row 6",
+      "quote": "Spare 0.4 mm stainless steel hotend | P1S spare hotend, replace the original nozzle when it is damaged."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898887",
+        "value_text": "P1S"
+      },
+      "section": "P1S package",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S box",
+      "locator": "Accessories table, rows 1–20",
+      "retrieved_at": "2026-10-16T08:23:08Z",
+      "items": [
+        {
+          "text": "Bambu textured PEI plate (pre-installed on the heat bed)",
+          "qty": null
+        },
+        {
+          "text": "LCD Screen",
+          "qty": null
+        },
+        {
+          "text": "Spool holder",
+          "qty": null
+        },
+        {
+          "text": "Bambu Reusable Spool",
+          "qty": null
+        },
+        {
+          "text": "Filament 250g (the color is shipped randomly)",
+          "qty": null
+        },
+        {
+          "text": "Spare 0.4 mm stainless steel hotend",
+          "qty": null
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null
+        },
+        {
+          "text": "Power Cord",
+          "qty": null
+        },
+        {
+          "text": "Unclogged tool for 0.4 mm nozzle",
+          "qty": null
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null
+        },
+        {
+          "text": "Bambu scraper",
+          "qty": null
+        },
+        {
+          "text": "H1.5/H2.0 hex keys",
+          "qty": null
+        },
+        {
+          "text": "Thermal grease",
+          "qty": null
+        },
+        {
+          "text": "Lubricant grease",
+          "qty": null
+        },
+        {
+          "text": "Spare screws for the extruder",
+          "qty": null
+        },
+        {
+          "text": "Hotend retaining clip",
+          "qty": null
+        },
+        {
+          "text": "Double-sided tape",
+          "qty": null
+        },
+        {
+          "text": "Quick start guide",
+          "qty": null
+        },
+        {
+          "text": "Disclaimer and Safety Guidelines",
+          "qty": null
+        },
+        {
+          "text": "32 GB Micro SD card (pre-installed in the printer)",
+          "qty": null
+        }
+      ],
+      "note": "The page gives no counts (qty null). The intro also names a warranty leaflet and screw packs for the scraper and spool holder, which the table does not list. \"The type and quantity of accessories may change from time to time.\""
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898886",
+        "value_text": "P1S AMS Combo"
+      },
+      "section": "P1S combo package (shared list)",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "main table",
+      "retrieved_at": "2026-10-16T08:23:14Z",
+      "items": [
+        {
+          "text": "Bambu Lab P1S",
+          "qty": null
+        },
+        {
+          "text": "Stainless Steel Hotend with Nozzle",
+          "qty": null
+        },
+        {
+          "text": "Build Plate",
+          "qty": null
+        },
+        {
+          "text": "250g Bambu PLA Filament (with a spool)",
+          "qty": null
+        },
+        {
+          "text": "Unclogging Pin Tool",
+          "qty": null
+        },
+        {
+          "text": "Power Cable",
+          "qty": null
+        },
+        {
+          "text": "Accessory Box",
+          "qty": null
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898886",
+        "value_text": "P1S AMS Combo"
+      },
+      "section": "P1S AMS Combo add-ons",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "¶ P1S AMS Combo add-ons",
+      "retrieved_at": "2026-10-16T08:23:14Z",
+      "items": [
+        {
+          "text": "Bambu Lab AMS",
+          "qty": null
+        },
+        {
+          "text": "Spare Filament Cutter",
+          "qty": 2
+        },
+        {
+          "text": "Bambu Bus Cable-6 Pin",
+          "qty": null
+        },
+        {
+          "text": "Bambu Bus Cable-4 Pin",
+          "qty": null
+        },
+        {
+          "text": "250g Bambu Filament (Random Color/Type, Contains 2 spools)",
+          "qty": null
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681793419898886",
+        "value_text": "P1S AMS Combo"
+      },
+      "section": "Accessory Box",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "¶ Accessory Box (Item Name | Quantity)",
+      "retrieved_at": "2026-10-16T08:23:14Z",
+      "items": [
+        {
+          "text": "BT2*5 Screws",
+          "qty": 4
+        },
+        {
+          "text": "M3*14 Screws",
+          "qty": 1
+        },
+        {
+          "text": "M3*6 Screws",
+          "qty": 4
+        },
+        {
+          "text": "BT2.6*5 Screws",
+          "qty": 2
+        },
+        {
+          "text": "BT2.6*8 Screws",
+          "qty": 3
+        },
+        {
+          "text": "M3145 Screws",
+          "qty": 2
+        },
+        {
+          "text": "ST3*8 Screws",
+          "qty": 2
+        },
+        {
+          "text": "H1.5 Hex Key",
+          "qty": 1
+        },
+        {
+          "text": "H2 Hex Key",
+          "qty": 1
+        },
+        {
+          "text": "Nozzle Wiper",
+          "qty": 2
+        },
+        {
+          "text": "Bambu Scraper",
+          "qty": 1
+        },
+        {
+          "text": "Spool Holder",
+          "qty": 1
+        },
+        {
+          "text": "Hotend Retaining Clip",
+          "qty": 1
+        },
+        {
+          "text": "Soft Magnet",
+          "qty": 2
+        },
+        {
+          "text": "Pin",
+          "qty": 1
+        },
+        {
+          "text": "Thermal Grease 0.5g",
+          "qty": 1
+        },
+        {
+          "text": "Lubricant Grease 1g",
+          "qty": 5
+        },
+        {
+          "text": "0.4mm Stainless Steel Hotend",
+          "qty": 1
+        },
+        {
+          "text": "Screen",
+          "qty": 1
+        },
+        {
+          "text": "Power Cable",
+          "qty": 1
+        }
+      ],
+      "note": "\"M3145 Screws\" is verbatim from the wiki (likely a typo of a screw size)."
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "583855874739507206",
+        "value_text": "P1S AMS 2 Pro Combo"
+      },
+      "section": "P1S combo package (shared list)",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "main table",
+      "retrieved_at": "2026-10-16T08:23:14Z",
+      "items": [
+        {
+          "text": "Bambu Lab P1S",
+          "qty": null
+        },
+        {
+          "text": "Stainless Steel Hotend with Nozzle",
+          "qty": null
+        },
+        {
+          "text": "Build Plate",
+          "qty": null
+        },
+        {
+          "text": "250g Bambu PLA Filament (with a spool)",
+          "qty": null
+        },
+        {
+          "text": "Unclogging Pin Tool",
+          "qty": null
+        },
+        {
+          "text": "Power Cable",
+          "qty": null
+        },
+        {
+          "text": "Accessory Box",
+          "qty": null
+        }
+      ],
+      "note": "The store page says the PLA filament is not included in the P1S AMS 2 Pro Combo; the wiki main list makes no exception."
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "583855874739507206",
+        "value_text": "P1S AMS 2 Pro Combo"
+      },
+      "section": "P1S AMS 2 Pro Combo add-ons",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "¶ P1S AMS 2 Pro Combo add-ons",
+      "retrieved_at": "2026-10-16T08:23:14Z",
+      "items": [
+        {
+          "text": "Bambu Lab AMS 2 Pro",
+          "qty": null
+        },
+        {
+          "text": "Bambu Bus Cable-4Pin",
+          "qty": null
+        },
+        {
+          "text": "Switching Adapter",
+          "qty": null
+        },
+        {
+          "text": "Filament Buffer (only included with 'Combo with buffer')",
+          "qty": null
+        },
+        {
+          "text": "AMS Hub (only included with 'Combo with hub')",
+          "qty": null
+        },
+        {
+          "text": "Bambu 4-in-1 PTFE Adapter or PTFE Tube Coupler (randomly shipped)",
+          "qty": null
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "583855874739507206",
+        "value_text": "P1S AMS 2 Pro Combo"
+      },
+      "section": "Accessory Box",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "source_title": "Supplementary instructions for accessories in the P1S combo box",
+      "locator": "¶ Accessory Box (Item Name | Quantity)",
+      "retrieved_at": "2026-10-16T08:23:14Z",
+      "items": [
+        {
+          "text": "BT2*5 Screws",
+          "qty": 4
+        },
+        {
+          "text": "M3*14 Screws",
+          "qty": 1
+        },
+        {
+          "text": "M3*6 Screws",
+          "qty": 4
+        },
+        {
+          "text": "BT2.6*5 Screws",
+          "qty": 2
+        },
+        {
+          "text": "BT2.6*8 Screws",
+          "qty": 3
+        },
+        {
+          "text": "M3145 Screws",
+          "qty": 2
+        },
+        {
+          "text": "ST3*8 Screws",
+          "qty": 2
+        },
+        {
+          "text": "H1.5 Hex Key",
+          "qty": 1
+        },
+        {
+          "text": "H2 Hex Key",
+          "qty": 1
+        },
+        {
+          "text": "Nozzle Wiper",
+          "qty": 2
+        },
+        {
+          "text": "Bambu Scraper",
+          "qty": 1
+        },
+        {
+          "text": "Spool Holder",
+          "qty": 1
+        },
+        {
+          "text": "Hotend Retaining Clip",
+          "qty": 1
+        },
+        {
+          "text": "Soft Magnet",
+          "qty": 2
+        },
+        {
+          "text": "Pin",
+          "qty": 1
+        },
+        {
+          "text": "Thermal Grease 0.5g",
+          "qty": 1
+        },
+        {
+          "text": "Lubricant Grease 1g",
+          "qty": 5
+        },
+        {
+          "text": "0.4mm Stainless Steel Hotend",
+          "qty": 1
+        },
+        {
+          "text": "Screen",
+          "qty": 1
+        },
+        {
+          "text": "Power Cable",
+          "qty": 1
+        }
+      ],
+      "note": "\"M3145 Screws\" is verbatim from the wiki (likely a typo of a screw size)."
+    }
+  ],
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/s7/default/9e9c1948dd61491199a52c3f1497b9c7/bambu-lab-P1S-tech-specs.pdf",
+      "title": "Bambu Lab P1S Technical Specifications",
+      "language": "en",
+      "published_on": "2023-07-14",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "sha256": "95b14783bd5bb4cdbd12899ad7ba483360c3fe1cbf5043154b72e7d5c82ea6c1"
+    },
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/0ee32e36b56d4c6fa57380ced46fb212.pdf",
+      "title": "Bambu Lab P1S Technical Specifications",
+      "language": "en",
+      "published_on": "2023-07-14",
+      "retrieved_at": "2026-10-16T08:21:21Z",
+      "sha256": "95b14783bd5bb4cdbd12899ad7ba483360c3fe1cbf5043154b72e7d5c82ea6c1",
+      "note": "Byte-identical to the tech-specs PDF. The store page links it as \"Download P1S TDS\", but it is the printer spec sheet, not a TDS."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/p1/manual/p1s-acc-in-the-box",
+      "title": "Supplementary instructions for accessories in the P1S box",
+      "language": "en",
+      "published_on": "2026-04-08",
+      "retrieved_at": "2026-10-16T08:23:08Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/p1/manual/p1s-combo-acc-in-the-box",
+      "title": "Supplementary instructions for accessories in the P1S combo box",
+      "language": "en",
+      "published_on": "2026-05-07",
+      "retrieved_at": "2026-10-16T08:23:14Z"
+    }
+  ],
+  "not_published": [
+    "printing.layer_height",
+    "printing.unsupported_filament",
+    "printing.camera_toolhead",
+    "printing.camera_nozzle",
+    "printing.camera_birdseye",
+    "printing.filament_tangle_sensor",
+    "printing.build_plate_material",
+    "printing.door_sensor",
+    "motion.max_flow_high_flow",
+    "extrusion.extruder_motor",
+    "thermal.chamber_temp",
+    "thermal.chamber_heating",
+    "electrical.rated_power",
+    "electrical.current",
+    "electrical.standby_power",
+    "electrical.steady_state_power",
+    "connectivity.npu",
+    "connectivity.application_processor",
+    "connectivity.ethernet",
+    "connectivity.network_kill_switch",
+    "connectivity.removable_network_module",
+    "connectivity.network_access_control",
+    "physical.recommended_space",
+    "physical.noise",
+    "physical.operating_temp",
+    "safety.prefilter_grade",
+    "safety.hepa_grade",
+    "safety.voc_filtration",
+    "safety.particulate_filtration"
+  ]
+}

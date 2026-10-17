@@ -1,0 +1,3117 @@
+{
+ "batch": 21,
+ "surface": "api",
+ "handles": [
+  "asa-filament",
+  "pla-aero",
+  "pa6-cf",
+  "tpu-95a-hf",
+  "pla-glow",
+  "pla-silk-multi-color",
+  "petg-translucent",
+  "pla-galaxy",
+  "pva",
+  "pa6-gf",
+  "asa-aero",
+  "abs-gf",
+  "support-for-pla-petg",
+  "support-for-abs",
+  "petg-hf"
+ ],
+ "strings": [
+  {
+   "h": "c1a58b1d36a64b80fb4551ceb8eeb5514071be4b24dd4cfd5fa89c3918a00b24",
+   "en": "Extraordinary UV Resistance",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[0].line[1]",
+    "near": "ASA"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0f009718ba08c41ba6dc1483ba9407c4e14f52bdbc140ec0eb664c815d277e0",
+   "en": "Exceptional Temperature Resistance",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[0].line[2]",
+    "near": "· Extraordinary UV Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "bcc305f54ad3c36f102d4a46a4e828b8d5bd33b0261b098c2412fac5063d1a06",
+   "en": "Extraordinary Weather & UV Resistance",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[1].line[0]",
+    "near": "Bambu ASA offers extraordinary UV, oxidation, and aging resistance, providing effective protection against breakage and color degradation when used outdoors for"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e30777abffe23d529d543b8ba06d6ceaabadb1552a3217f44ebfbeb8d8d0d60",
+   "en": "Bambu ASA offers extraordinary UV, oxidation, and aging resistance, providing effective protection against breakage and color degradation when used outdoors for long-term purposes.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[1].line[1]",
+    "near": "Extraordinary Weather & UV Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "e43e6481bbd3fe3cf09a286bc64f2083e05c3ae6db67605fcf707c321f16b47a",
+   "en": "Suitable for outdoor applications and regular structural requirements due to its toughness and high impact strength.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[2].line[1]",
+    "near": "Tough and Durable"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b766001984d79d53f2ddfa995f86e0dfb85bc3b3e173d9b4a62f741d610ceaa",
+   "en": "Better Temperature Resistance",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[3].line[0]",
+    "near": "Compared to normal PETG or ABS, Bambu ASA can remain in shape even at a temperature of 100°C."
+   },
+   "dict": null
+  },
+  {
+   "h": "15519f09e2294218c29d1df943d0da7c8fe840e15102f9450f141f625b7bb644",
+   "en": "Compared to normal PETG or ABS, Bambu ASA can remain in shape even at a temperature of 100°C.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[3].line[1]",
+    "near": "Better Temperature Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d843172886c994acd58cd8a41042419ea70648fb359b817efe152cb79edc834",
+   "en": "1.What's the difference between ABS and ASA?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[5].line[1]",
+    "near": "FAQ"
+   },
+   "dict": null
+  },
+  {
+   "h": "b2213dd7455d8f75b5f8973c6eb1efe1ee8e1cd19b103a6c65b6470738ef5640",
+   "en": "ABS is composed of acrylonitrile, butadiene, and styrene, while ASA is composed of acrylonitrile, styrene, and acrylate.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[5].line[2]",
+    "near": "1.What's the difference between ABS and ASA?"
+   },
+   "dict": null
+  },
+  {
+   "h": "e6f7f4b83ad7d59fc8de1ec41deacc8a6d161f59d6b3b0cc9717353ab262f029",
+   "en": "ASA is a modified version of ABS that contains an additional acrylate component, which improves its weather adaptability and UV resistance.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[5].line[3]",
+    "near": "ABS is composed of acrylonitrile, butadiene, and styrene, while ASA is composed of acrylonitrile, styrene, and acrylate."
+   },
+   "dict": null
+  },
+  {
+   "h": "2922c08ba70d032012634a694c2565d373bba631054ce566804be8ddc7803b27",
+   "en": "ASA retains the impact resistance and processability of ABS while providing better resistance to fading, yellowing, and degradation from sunlight exposure. Both of them may release pungent and unpleasant odors during printing, but the pungent odor of ASA is notably lighter than ABS.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[5].line[4]",
+    "near": "ASA is a modified version of ABS that contains an additional acrylate component, which improves its weather adaptability and UV resistance."
+   },
+   "dict": null
+  },
+  {
+   "h": "0b73b529ceb6cc7f3f1dd893f5e54ad725a3cecc32b16812daf7170e7894c53a",
+   "en": "2.What are the different applications of ABS and ASA?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[5].line[6]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "352d6e1be8de6491a05183d9461fa62b08c137f25cddb0dab8cbe23dd5cbc982",
+   "en": "ASA is ideal for outdoor applications, such as automotive exterior parts, signage, and outdoor equipment, thanks to its enhanced weather resistance and color stability. ABS is a versatile material with excellent mechanical properties that is commonly used for indoor applications.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[5].line[7]",
+    "near": "2.What are the different applications of ABS and ASA?"
+   },
+   "dict": null
+  },
+  {
+   "h": "363f3ebe1fac9794c6b3da963c60bea42eae4ac88d6df121a4ad1d9a27ace4ce",
+   "en": "3.What are the similarities between ABS and ASA?",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[5].line[9]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c77472ed7f5cc89c246e80de2eab61a43aadcabbb31cb3b8b03d604b1336ffbf",
+   "en": "In terms of physical and mechanical properties, both exhibit good impact resistance and high tensile strength, with almost the same levels of strength, toughness, and stiffness. Both ABS and ASA may release pungent and unpleasant odors during printing and the same warping tendency and enclosed printer requirement when printing large-size and/or high infill density models.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[5].line[10]",
+    "near": "3.What are the similarities between ABS and ASA?"
+   },
+   "dict": null
+  },
+  {
+   "h": "4cdceae49ed570c1c339ef026b6aac4926f2c85a425c593b451f36b0358593f4",
+   "en": "Not compatible with Cool Plate SuperTack.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[6].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "3b580d6a54b1638d2a43a64d83f81d9abf3a2ac8697571a0d11220bb2eb70a95",
+   "en": "3.Ventilation & Odor Notice",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[6].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9e0d2fd0744d650c189626ae3b6f4d9c923d8597d9b65b02b48d6790b4f5489b",
+   "en": "4.Warping Prevention Tips",
+   "kind": "faq_q",
+   "freq": 3,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[6].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "30102f45a6613e9ebbf26b94150280a8374c30b227a62f08ace8de0c629e737b",
+   "en": "ASA is prone to warping when printing large size and/or high infill density model. To avoid warping: 1) Not recommended to print too large size and/or high infill density models. 2) Use enclosure printers and ensure the build plate is properly glued before printing. 3) Set lower printing speed and higher heatbed temperature. For more details, please refer to: Common print quality problems and solutions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[6].line[11]",
+    "near": "4.Warping Prevention Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "c8d6d591af6c1b0feca59935ab9183d89557a4a91d76600f5ea9fd39366d1023",
+   "en": "Outdoor Use for Long-Term Purpose",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-filament",
+    "title": "ASA",
+    "field": "blocks[7].line[4]",
+    "near": "• High Impact Strength and Durability"
+   },
+   "dict": null
+  },
+  {
+   "h": "6bb07e0705bc250a25460efd9adcf59653cb37caf1eb7ee1d2b2c9b283e449ab",
+   "en": "Specialized for printing 3D RC planes",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Aero"
+   },
+   "dict": null
+  },
+  {
+   "h": "86c509895e3b117fc217468f3ae3bb16c3960813a5f6b85b334197e23e1ac597",
+   "en": "Relatively tough with good impact resistance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[0].line[2]",
+    "near": "· Specialized for printing 3D RC planes"
+   },
+   "dict": null
+  },
+  {
+   "h": "6ed7516545fa76c2ba1fcbc305a36d48900c51fcb67e84bfaf4dfb19e6cb320f",
+   "en": "Easy to paint with matte texture",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[0].line[3]",
+    "near": "· Relatively tough with good impact resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "a69785face63f60564d4e1da150433a9d251fb62b22b0f77afc4e472182e12f0",
+   "en": "Low Density and Light Weight",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[1].line[0]",
+    "near": "Bambu PLA Aero has almost the same filament density as regular PLA, while the prints density is only 50% to 80%."
+   },
+   "dict": null
+  },
+  {
+   "h": "bd92b6927332a9f1529138f20cd669452db7282bd09d429972b68d6eb1f0dd39",
+   "en": "Bambu PLA Aero has almost the same filament density as regular PLA, while the prints density is only 50% to 80%.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[1].line[1]",
+    "near": "Low Density and Light Weight"
+   },
+   "dict": null
+  },
+  {
+   "h": "8eb4e77329d4955d6063eb625440cba54f26e573a400211e5773e7aab8800cc1",
+   "en": "When printing models of the same volume, PLA Aero is about half the weight of PLA Basic.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[1].line[2]",
+    "near": "Bambu PLA Aero has almost the same filament density as regular PLA, while the prints density is only 50% to 80%."
+   },
+   "dict": null
+  },
+  {
+   "h": "0e2f35bf5dba61964eda1bfec967baa3652ed515ccc0a9a4b207c8485a946ef5",
+   "en": "Controllable Model Density",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[2].line[0]",
+    "near": "Achieve lower density of the prints by increasing printing temperature and lowering flow rate."
+   },
+   "dict": null
+  },
+  {
+   "h": "3843338e1d32f15a0108dd11c266b1739877bdd76aa06edb77072e084411415d",
+   "en": "Achieve lower density of the prints by increasing printing temperature and lowering flow rate.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[2].line[1]",
+    "near": "Controllable Model Density"
+   },
+   "dict": null
+  },
+  {
+   "h": "5f50ec1e8f766a5ed0d6792d80bc294ecd20bb15c6a300333a7d4d2eb3ca10f2",
+   "en": "The average density of prints will vary with changes in parameters such as actual printing temperature, flow rate ratio, printing speed, model size, wall thickness and infill density.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[2].line[2]",
+    "near": "Achieve lower density of the prints by increasing printing temperature and lowering flow rate."
+   },
+   "dict": null
+  },
+  {
+   "h": "f7e939df5004af953f6c1f2305a5fc46587a663d6e638fb186cd4728141ba65b",
+   "en": "The relationship between the maximum foaming rate, minimum print density, and printing temperature of PLA Aero.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[3].line[1]",
+    "near": "Content Block-5"
+   },
+   "dict": null
+  },
+  {
+   "h": "09d32efc784f7cac8710ec7f1bd9db254799a4d1447757a4f6e598c2a0434738",
+   "en": "Specimen Test: Nozzle Type: 0.4 mm; Printing Speed: 80 mm/s; Model size (L*W*H): 80*10*4 mm³ (the XY direction)",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[3].line[2]",
+    "near": "The relationship between the maximum foaming rate, minimum print density, and printing temperature of PLA Aero."
+   },
+   "dict": null
+  },
+  {
+   "h": "a17ba91827dc304035ae16664efb8b60491312662e79793342d5d45c76d5ac1f",
+   "en": "The actual required flow rate ratio and final model density may vary with different models.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[3].line[3]",
+    "near": "* Specimen Test: Nozzle Type: 0.4 mm; Printing Speed: 80 mm/s; Model size (L*W*H): 80*10*4 mm³ (the XY direction)"
+   },
+   "dict": null
+  },
+  {
+   "h": "bbe50d75e898d01f17057faead9a8440a6839fb1a9ab6839c2c683ae56f6c8ff",
+   "en": "Tough with Good Impact Resistance",
+   "kind": "block_title",
+   "freq": 4,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[4].line[0]",
+    "near": "Compared to pre-foaming Wood PLA, Bambu PLA Aero and its prints are tougher and more resistant to impact, collision, and falling."
+   },
+   "dict": null
+  },
+  {
+   "h": "65f15fd50f0c02f55dad5c993290248923f8559b00579d1791b7055efb8a204d",
+   "en": "Compared to pre-foaming Wood PLA, Bambu PLA Aero and its prints are tougher and more resistant to impact, collision, and falling.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[4].line[1]",
+    "near": "Tough with Good Impact Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "907f67de3124fad7edd88fc5bcd2a783b8d8cffbbc2033c97eb253c812bc3f1e",
+   "en": "Matte Finish For Easy Coloring",
+   "kind": "block_title",
+   "freq": 3,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[5].line[0]",
+    "near": "Bambu PLA Aero provides an easy-to-color matte surface texture with better dyeing results as compared to PLA Basic."
+   },
+   "dict": null
+  },
+  {
+   "h": "afb8b683be347d13b1ea6721aadc8cd20a75d4eaad452756bc0bc0675d1671d2",
+   "en": "Bambu PLA Aero provides an easy-to-color matte surface texture with better dyeing results as compared to PLA Basic.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[5].line[1]",
+    "near": "Matte Finish For Easy Coloring"
+   },
+   "dict": null
+  },
+  {
+   "h": "a08b3fabd48aff56b46becab793e9b99e2f36acad6a79741fada6b4d04a3b89c",
+   "en": "Not compatible with Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[7].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "3885b09202e1b3abe199c4dfd599ab5faca5b8e0dabccce82001be65c9b4ef35",
+   "en": "PLA Aero is highly sensitive to humidity. To achieve optimal printing performance, it is recommended further drying before use and after storage. For more details, please refer to the filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[7].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "16ce9b71b0629e4a8e930ca386c7e7495ec2504513869de7db45ea1b18a2b905",
+   "en": "3.AMS Compatibility Warning",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[7].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c84d01bea6478179a55a2004c29b39c5bff97e586977d6d56c3a0fb164ac9c61",
+   "en": "PLA Aero filament is relatively soft which may result in material loading and unloading failures during AMS printing.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[7].line[8]",
+    "near": "3.AMS Compatibility Warning"
+   },
+   "dict": null
+  },
+  {
+   "h": "856a83a46a5c1418523a57fc99bf8224a5b09659593868c3e2067c015e699cf5",
+   "en": "4.Printing RC model",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[7].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "4a03e01281333b38e52f6ba1f1a01c124bc803c428b8844115fab14597de284a",
+   "en": "Foaming PLA materials (PLA Aero) have high requirements for material drying and parameter settings. Please carefully read the instructions for printing aircraft model with foaming PLA (PLA Aero) before starting the printing process.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[7].line[11]",
+    "near": "4.Printing RC model"
+   },
+   "dict": null
+  },
+  {
+   "h": "bdbea196e32ed96cf10e8bde059157f8db507eaaee8d13aa17c85fcd5f77ee5a",
+   "en": "Specialized for 3D RC Planes Printing",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[8].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "e18c4ca690d99220cec6628eae1aedd81a58d3434a381c9b1911451fcd78f2c7",
+   "en": "Recommended to dry out before use",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-aero",
+    "title": "PLA Aero",
+    "field": "blocks[8].line[5]",
+    "near": "• Matte Finish For Easy Coloring"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c978e78506a0b122705558b4d5d8fb834ae2901c720e1cb646f1bf0c3c1774d",
+   "en": "Superior Strength and Stiffness",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[0].line[1]",
+    "near": "PA6-CF"
+   },
+   "dict": null
+  },
+  {
+   "h": "d56d6b1ec22fe79d33ce55e0294bedfda942fffc32cbd2ae58ed0e394d73a84e",
+   "en": "Toughness & Vibration Resistance",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[0].line[2]",
+    "near": "· Superior Strength and Stiffness"
+   },
+   "dict": null
+  },
+  {
+   "h": "7028bd95d8821288a795003c5ab483ba5b1398c6c437140d2074e640b4bbd61d",
+   "en": "As a new member of Bambu high performance filaments, PA6-CF keeps superior stiffness and strength properties in dry environments, it is perfect for printing load-bearing structural components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[1].line[1]",
+    "near": "Superior Strength and Stiffness"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b99e0d4c455508ce0815c202f9fda9d65db6b883665e96eed09eeaedbca9323",
+   "en": "Impact & Vibration Resistance",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[2].line[0]",
+    "near": "Bambu PA6-CF offers excellent impact resistance, ensuring effective vibration resistance for your prints. It is commonly used to print models that need to withs"
+   },
+   "dict": null
+  },
+  {
+   "h": "79ced0924a6523010800405f73a2dcdf0a21f69c46204b4d06c402a43f951285",
+   "en": "Bambu PA6-CF offers excellent impact resistance, ensuring effective vibration resistance for your prints. It is commonly used to print models that need to withstand impact, collision, and vibration.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[2].line[1]",
+    "near": "Impact & Vibration Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "e0cec7287d3abcf5e8faa1553868b1cd39c30f54a07fe292793d393159870541",
+   "en": "The prints of PA6-CF will be tougher after putting in humid environment more than 1 day.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[2].line[2]",
+    "near": "Bambu PA6-CF offers excellent impact resistance, ensuring effective vibration resistance for your prints. It is commonly used to print models that need to withs"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a20da077f4a1d8d7aa4f0a5b8f89a30b9605c767737fff31a8ded14dece6694",
+   "en": "Not compatible with AMS Series, Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[3].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "a539ba4a47a37fc0cf6c0649e297cf27c7b9e25c7b74b86539ee3cf21147feb6",
+   "en": "3.Mechanical Properties & Moisture Impact",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[3].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6e9a41de6c85aa7fb440a38008807b1a085a4962bb52243d79ca7d283cdbfdd6",
+   "en": "Bambu PA6-CF will experience a decrease in strength and stiffness after absorbing water, making it not recommended for printing models with high requirements for strength, stiffness, and dimensional stability, especially thin and elongated models. The prints of PA6-CF usually become tougher and more resistant to impacts, drops, and collisions when they get damp; you can dampen and soften the prints in advance if the model requires high toughness.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[3].line[8]",
+    "near": "3.Mechanical Properties & Moisture Impact"
+   },
+   "dict": null
+  },
+  {
+   "h": "185cd580f55bc83a362f62f482e2e68e4ab9b7337e820db48ca35902dd7cb966",
+   "en": "4.Support Removal & Post-Printing Timing",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[3].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "362131cd16c479e9dd2bdcbcae8db428af58243aea37049814e4b510fbccc5d6",
+   "en": "When printing a model with support, it is necessary to remove the support structure within 2 hours to prevent it from being difficult to remove after being damp and softened. Please dry the prints and let them cool down if it is difficult to remove the support, and then remove the support in time.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[3].line[11]",
+    "near": "4.Support Removal & Post-Printing Timing"
+   },
+   "dict": null
+  },
+  {
+   "h": "6f8cc97fb7f33bd5417cd0d86e6b8568fdb83f96073fce88b3d453f112ccec93",
+   "en": "5.Surface Protection & Treatment",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[3].line[13]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e66a059df167d0fbe7555cf263dccccc9957821174f28c36aaef2c6ef3c620d0",
+   "en": "Fully impregnating the surface of the prints with paint, wax and other waterproof coatings can inhibit water absorption and prevent them from becoming soft.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-cf",
+    "title": "PA6-CF",
+    "field": "blocks[3].line[14]",
+    "near": "5.Surface Protection & Treatment"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e083ae67dea73db927392cbca2680c2767f7b449b1f772c295ed4ad6c83c143",
+   "en": "High-speed Printing TPU",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[0].line[1]",
+    "near": "TPU 95A HF"
+   },
+   "dict": null
+  },
+  {
+   "h": "262db0e7f31fb46cd3897caae0b4952a545e7c1e53bd3dbd8b8090b2e2230cab",
+   "en": "Excellent Flexibility and Elasticity",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[0].line[2]",
+    "near": "· High-speed Printing TPU"
+   },
+   "dict": null
+  },
+  {
+   "h": "70ca322f496a77f42db98f6c22f0576f2fd884b01fe81ae47886f98a70d6b702",
+   "en": "High Speed Printing",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[1].line[0]",
+    "near": "Elevate your TPU printing efficiency to the next level with Bambu TPU 95A HF, featuring a print speed that's 3 times faster than standard TPU 95A."
+   },
+   "dict": null
+  },
+  {
+   "h": "b6759866d1c549e59524b1a8c048f52f7cbf740aa6d335ae80585ca25e24c89d",
+   "en": "Elevate your TPU printing efficiency to the next level with Bambu TPU 95A HF, featuring a print speed that's 3 times faster than standard TPU 95A.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[1].line[1]",
+    "near": "High Speed Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "7a329a0e31e0e00868bc617e5d3fe35c7840cd9d3364fb12e5150db52fd132e9",
+   "en": "Soft and Flexible",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[2].line[0]",
+    "near": "Bambu TPU HF is an exceptionally soft and flexible filament with extraordinary impact resistance, enabling you to print parts that need withstand impact, collis"
+   },
+   "dict": null
+  },
+  {
+   "h": "c73dbad886ddaf5187e9941716982fde17a4d8a317081466f231942af9529da8",
+   "en": "Bambu TPU HF is an exceptionally soft and flexible filament with extraordinary impact resistance, enabling you to print parts that need withstand impact, collision, and falling.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[2].line[1]",
+    "near": "Soft and Flexible"
+   },
+   "dict": null
+  },
+  {
+   "h": "eb9ec76f4cf4940a7b384bd74009638ab4f7bf13cf9e5698c59a685cf5ba42dd",
+   "en": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[3].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "46466acf93bbc498ed16ea7f484e4d2f55652a110997f6e13ce86da741585893",
+   "en": "TPU 95A HF is highly sensitive to humidity. To achieve optimal printing performance, it is recommended further drying before use and after storage. For more details, please refer to: Filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[3].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "c89bafe49a91960026f5fc4a8d88cc7148e9147bd43255493ad11124f0f12fe8",
+   "en": "3.Printing Guide",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[3].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7f662cc885fbc32f9536b635ec1160c48d055a38afaeb93280fb160a6d9079e1",
+   "en": "To obtain higher printing quality, please check the TPU Printing Guide before printing.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[3].line[8]",
+    "near": "3.Printing Guide"
+   },
+   "dict": null
+  },
+  {
+   "h": "97396f4ccaf6992a9d7b054bc38a6163953cfeda337ed1d42c61c86ccb214558",
+   "en": "As this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing.",
+   "kind": "faq_a",
+   "freq": 10,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[3].line[16]",
+    "near": "As this filament is not food-grade, please avoid using finished prints for food storage or contact."
+   },
+   "dict": null
+  },
+  {
+   "h": "c6d4c3bf76b0e52fbd99ebbb6ee50f5dc3f6e86582b841fdc02c50d25d513460",
+   "en": "As this filament contains highly hygroscopic wood fibers, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing.",
+   "kind": "faq_a",
+   "freq": 6,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[3].line[17]",
+    "near": "As this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before prin"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b530aee091ef2e936ff824336f17f94cf10f7c44acec3209cd7df9b5f319ab1",
+   "en": "High-speed printing TPU",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[4].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "4fb0176bd939a8e2181db6130d62e5033673f70d39e84aed7e2478dd47eba22d",
+   "en": "Soft, Flexible & Tough",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[4].line[2]",
+    "near": "• High-speed printing TPU"
+   },
+   "dict": null
+  },
+  {
+   "h": "f1bea062c43e46efb4b94a0896583367001e7e035ccaeb0cbac9523a6f65b1a5",
+   "en": "Outstanding Impact Resistance and Flexibility",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "tpu-95a-hf",
+    "title": "TPU 95A HF",
+    "field": "blocks[4].line[3]",
+    "near": "• Soft, Flexible & Tough"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe2e34f00ff4286e067e21b66b5f4febeff4f018aae8d7697122f23b69b6feff",
+   "en": "Unique Glow in Low Light Conditions",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-glow",
+    "title": "PLA Glow",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Glow"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ea4a9eee63b1972c922b33056c79a3034593e95de9cf81724901e5d4ebcb562",
+   "en": "Bambu PLA Glow incorporates a distinct additive: luminous powder, which imparts a special property to printed objects, causing them to emit a captivating glow in the dark.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-glow",
+    "title": "PLA Glow",
+    "field": "blocks[1].line[1]",
+    "near": "Unique Glow in Low Light Conditions"
+   },
+   "dict": null
+  },
+  {
+   "h": "6a559979940494616cb73dcd42bfb56bbaf127cc8366ff28c819dc79a912366b",
+   "en": "Not compatible with Hotend with Stainless Steel Nozzle 0.2mm, and AMS lite.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-glow",
+    "title": "PLA Glow",
+    "field": "blocks[3].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "79b9f73e29e6efca1aed72ab785d2920802fca069bee5e79f22ea9e6457668a9",
+   "en": "Utilizing AMS lite may result in high feed resistance and an increased risk of feed failure. Consider alternative methods such as pre-use drying for better outcomes.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-glow",
+    "title": "PLA Glow",
+    "field": "blocks[3].line[3]",
+    "near": "Not compatible with Hotend with Stainless Steel Nozzle 0.2mm, and AMS lite."
+   },
+   "dict": null
+  },
+  {
+   "h": "46efbd30ddd64a4a3484cc67c20902118a1ca998dedea0dac5a5bf68ad5acf25",
+   "en": "3. Appearance Change",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-glow",
+    "title": "PLA Glow",
+    "field": "blocks[3].line[9]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "038001f86da8a187fd7ddca231343a914b9324069777f20ac0c6e80af0ab5b0e",
+   "en": "The model's luminous intensity diminishes over time, but exposure to ultraviolet or sunlight for a brief period (approximately 2 hours) can rejuvenate its glow. However, prolonged or frequent irradiation may expedite PLA aging.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-glow",
+    "title": "PLA Glow",
+    "field": "blocks[3].line[10]",
+    "near": "3. Appearance Change"
+   },
+   "dict": null
+  },
+  {
+   "h": "83443ced4c3af57cfc2aff80c36fbfb3e9c47a73978b2f102fb11c9afc8b50ec",
+   "en": "Where dynamic color shifts meet",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Silk Multi-Color"
+   },
+   "dict": null
+  },
+  {
+   "h": "461839283d644c5ec0171c9ade258999e279510907901bfdb6136aaec6a44e4f",
+   "en": "Captivating silk elegance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[0].line[2]",
+    "near": "· Where dynamic color shifts meet"
+   },
+   "dict": null
+  },
+  {
+   "h": "f63e1715daad7ddd17b1da3a6ce6f2d004ed28588d90e72244caa001377cdb79",
+   "en": "PLA Silk Dual Color: Captivating Silk Appearance with Dynamic Effects",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[1].line[0]",
+    "near": "Experience stunning dual-color effects with Bambu PLA Silk Dual Color. Each filament combines two distinct hues, seamlessly merged into one strand. As you rotat"
+   },
+   "dict": null
+  },
+  {
+   "h": "c5526f9f234338fafb33bd741d7bdb51b5d92576866d337ca843e9fe44c913a3",
+   "en": "Experience stunning dual-color effects with Bambu PLA Silk Dual Color. Each filament combines two distinct hues, seamlessly merged into one strand. As you rotate the printed object, shifting color perspectives reveal vibrant, ever-changing patterns. Ideal for decorative models, figurines, and display pieces.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[1].line[1]",
+    "near": "PLA Silk Dual Color: Captivating Silk Appearance with Dynamic Effects"
+   },
+   "dict": null
+  },
+  {
+   "h": "9f1cf47aa962682f034f0e8dbccf5b2a4aad383007736e8ca69f0ecfbd80ad1b",
+   "en": "PLA Silk Gradient: Smooth, Stunning Color Transitions in One Spool",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[2].line[0]",
+    "near": "Bambu PLA Silk Gradient offers 2 to 4 graceful color shifts within a single spool, producing elegant, eye-catching prints. Whether you're creating vases, sculpt"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb119cbd1e3b97c98d8789ec52e91f51e0fe78cb51302ff24c0194f3d0325869",
+   "en": "Bambu PLA Silk Gradient offers 2 to 4 graceful color shifts within a single spool, producing elegant, eye-catching prints. Whether you're creating vases, sculptures, or decorative designs, this filament brings depth and brilliance through its flowing, silk-like gradients.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[2].line[1]",
+    "near": "PLA Silk Gradient: Smooth, Stunning Color Transitions in One Spool"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ca2ff70f249bf66270c8f7e1c4a1d0c054313c56efb894c25ae2a36ea3aaabb",
+   "en": "Not Compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "37ffbaa06de732cb89546710fff84204a75f02a41d60b8026bfce6abdabe023c",
+   "en": "2.Gradient Effects",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[4]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2483b5396a5cebd9716d471f204c764c5081550bb499c97fb510321a14fcc4b9",
+   "en": "The gradient effect depends on the amount of filament used, which can be influenced by adjusting sparse infill density, print quantity, or the filament spool starting point.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[5]",
+    "near": "2.Gradient Effects"
+   },
+   "dict": null
+  },
+  {
+   "h": "7d701b8cb2a2294d4343eb29c92c8f279e271916967ec63c32993bfd27c2b9af",
+   "en": "Each color segment in Bambu PLA Silk Gradient spans approximately 20m (65g+).",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[6]",
+    "near": "The gradient effect depends on the amount of filament used, which can be influenced by adjusting sparse infill density, print quantity, or the filament spool st"
+   },
+   "dict": null
+  },
+  {
+   "h": "54187b6c1cc4f597fbb75c440c34be03fcda669125ec31093f6784d58ba46812",
+   "en": "Using 40m (125g+) of filament guarantees at least one two-color transition.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[7]",
+    "near": "Each color segment in Bambu PLA Silk Gradient spans approximately 20m (65g+)."
+   },
+   "dict": null
+  },
+  {
+   "h": "b66f7f4f2685143abbb8e69572ea877b5607747388aef864d7870b8bbeff3e80",
+   "en": "For four-color transitions (e.g., Bambu PLA Gradient – Dawn Radiance), using 80m (250g+) or more ensures the full effect.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[8]",
+    "near": "Using 40m (125g+) of filament guarantees at least one two-color transition."
+   },
+   "dict": null
+  },
+  {
+   "h": "20158ab50cbabb0a9cc68a4dbbfd4fdc282b3044825ccd690e182d6e45fa3887",
+   "en": "3.Printing Tips",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c311303c417d0737c5cfe616a0d64dd44d55f8f1b0e2a03167c67a557de69b7b",
+   "en": "It's strongly recommended to reduce the outer wall speed to 40 mm/s to optimize print quality.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[11]",
+    "near": "3.Printing Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "174bbeb27a13c5a21464c75fa24bfda1059ea0465be390fecdd0b4409ebd407e",
+   "en": "When printing with PLA Silk Dual Color filament, there is a small chance of filament rotation, potentially causing uneven color transitions. The A-series printers have a higher risk due to their special structure, so use of this filament with A-series printers is not recommended.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[12]",
+    "near": "It's strongly recommended to reduce the outer wall speed to 40 mm/s to optimize print quality."
+   },
+   "dict": null
+  },
+  {
+   "h": "7c199f482d7f5b2774086caf29274d61d078c79ffb9e3c9eb8f2570366baab4b",
+   "en": "4.Drying Recommendations",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[14]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "503f09a62a4414c55075d36bc081ce48df53c31cb8b588125445f25968007105",
+   "en": "Although PLA Silk Multi-Color is thoroughly dried and vacuum-sealed prior to shipping, variations in transport conditions may affect its moisture level. We strongly recommend drying it right after opening and storing it in a sealed container with desiccant or AMS. Repeat drying and moisture-proofing before each long-term storage period.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[15]",
+    "near": "4.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "45f53112d3d50fa255d50b07364937e7b66b2e04931c57db03fa92c6db4ac178",
+   "en": "Dry before use to ensure the best print quality and consistent finish. Store in a dry environment after use. For more details, please refer to the filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[4].line[16]",
+    "near": "Although PLA Silk Multi-Color is thoroughly dried and vacuum-sealed prior to shipping, variations in transport conditions may affect its moisture level. We stro"
+   },
+   "dict": null
+  },
+  {
+   "h": "336f0f4396e8209f2d76a32c0c820a2440bc358d2bcdccc20eb094bc2975a6e4",
+   "en": "Silk finish with dynamic color transformations",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f56d5150ccbea70a38c85f72b97976b9a34a2e304ff22f5bc04be96aa576365",
+   "en": "Dry Out Before Use",
+   "kind": "block_line",
+   "freq": 14,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[5].line[3]",
+    "near": "• Comes with Basic Reusable Spool"
+   },
+   "dict": null
+  },
+  {
+   "h": "36b0b38fd0ebf8b7de7ceac0cbaee0bdab3ab156a2a31b04fa998001895c6538",
+   "en": "Note: It's strongly recommended to slow down the Outer wall speed to 40 mm/s to optimize printing results.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-silk-multi-color",
+    "title": "PLA Silk Multi-Color",
+    "field": "blocks[5].line[5]",
+    "near": "• Cautions for Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "5b6af78af9cd928aeaac6309d2b3139c8c01b158b4816b8c4aa95c860ed49754",
+   "en": "Translucent Appearance",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[0].line[1]",
+    "near": "PETG Translucent"
+   },
+   "dict": null
+  },
+  {
+   "h": "bda3d3d0c829c00ddcde8406114209c1b8fe24a0069599d2c4c0ce96c2f9df1d",
+   "en": "Robust Endurance",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[0].line[2]",
+    "near": "· Translucent Appearance"
+   },
+   "dict": null
+  },
+  {
+   "h": "1c2f739c068a8ad71b18ef38fb257c4f64a3000cceefd9ca8a5c17ff617ca365",
+   "en": "Effortless Printing Experience",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[0].line[3]",
+    "near": "· Robust Endurance"
+   },
+   "dict": null
+  },
+  {
+   "h": "b341622ef7f7d20ba56a0f034fae53b5b2180fdfcd497b689c89171c54926c4f",
+   "en": "Minimal Warping",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[0].line[4]",
+    "near": "· Effortless Printing Experience"
+   },
+   "dict": null
+  },
+  {
+   "h": "ff0f2f2849a416bb9ae14f83177aa024dc60fb5f497e020c0b5e68b1705b9f8d",
+   "en": "Bambu PETG Translucent stands out with its exceptional printing characteristics, setting it apart from standard PETG materials. This specially tuned filament minimizes common issues like nozzle sticking, leakage, and clumping during the printing process, providing a hassle-free experience compared to ordinary PETG materials. The filament also exhibits water resistance, UV resistance, and resistance to temperature changes, making it an excellent choice for outdoor applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[1].line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "da86334983b4b436d09273e71d9c0c8e76217b81a4baa56b7c1bd18646603563",
+   "en": "Create with Light, Shadow and a Wide Range of Colors",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[2].line[0]",
+    "near": "Bambu PETG Translucent offers 8 vibrant colors for you to choose from. Elevate your prints by seamlessly blending different colors and experimenting with variou"
+   },
+   "dict": null
+  },
+  {
+   "h": "461e64e39a3abc2c88ebe0c4cbe7e470eaf290140c8a259b9776430c00a6c3b0",
+   "en": "Bambu PETG Translucent offers 8 vibrant colors for you to choose from. Elevate your prints by seamlessly blending different colors and experimenting with various thicknesses of layers and walls.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[2].line[1]",
+    "near": "Create with Light, Shadow and a Wide Range of Colors"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6bd62f3135a68d1b4a70dfd66bed27bc15dddfe04cfbcc47ad11d59f48e523f",
+   "en": "Durable, Weather-Resistant, and Long-Lasting",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[3].line[0]",
+    "near": "Bambu PETG Translucent series, designed to withstand the elements with exceptional impact resistance. This filament is not only waterproof but also exhibits imp"
+   },
+   "dict": null
+  },
+  {
+   "h": "0494b500150d50870296936b6027cefddd3973fd51d04b0385ed53016440c1c4",
+   "en": "Bambu PETG Translucent series, designed to withstand the elements with exceptional impact resistance. This filament is not only waterproof but also exhibits impressive resilience under prolonged exposure to UV.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[3].line[1]",
+    "near": "Durable, Weather-Resistant, and Long-Lasting"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f0a77d334429805b475d2dd21c05c188fa27f53127135bcf02bbb91933cb1ae",
+   "en": "Excellent light transmittance",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[4].line[0]",
+    "near": "Optimized for exceptional light transmittance, Bambu PETG Translucent provides unmatched levels of translucency."
+   },
+   "dict": null
+  },
+  {
+   "h": "5f27ef0eb2316d80d43c29c9d7cd57dc4f0912d3748db2e361a80ba3d83b3da1",
+   "en": "Optimized for exceptional light transmittance, Bambu PETG Translucent provides unmatched levels of translucency.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[4].line[1]",
+    "near": "Excellent light transmittance"
+   },
+   "dict": null
+  },
+  {
+   "h": "a0b43b34ecb704e81f1dd41fe22c2ea8e88f77594f9162aced572530b818cf70",
+   "en": "Please note that the transparency of the prints may vary depending on factors such as size and structure, as well as printing parameters (including speed, nozzle temperature, and infill density).",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[4].line[2]",
+    "near": "Optimized for exceptional light transmittance, Bambu PETG Translucent provides unmatched levels of translucency."
+   },
+   "dict": null
+  },
+  {
+   "h": "e2dff947980d8e7ed397d829ed421695b96f9fdccca2e51fad394180bb691725",
+   "en": "Bambu PETG Translucent series boasts an optimized formula that ensures a seamless 3D printing process. This formula helps minimize common challenges such as stringing, clumping, nozzle sticking, and leaking, this filament guarantees a hassle-free experience.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[5].line[1]",
+    "near": "Effortless Printing Experience"
+   },
+   "dict": null
+  },
+  {
+   "h": "d0f64e7586bfc70c15c72265697173fdfb24d949ab489a1b1bd54c6df95e3878",
+   "en": "Experience enhanced printing versatility with Bambu PETG Translucent, featuring exceptional anti-warping performance. This filament is designed to be used with closed or open printers, providing you with the flexibility to explore a wide range of printing setups. Additionally, Bambu PETG Translucent ensures reliable dimensional stability after the printing process, allowing you to achieve precise and accurate results.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[6].line[1]",
+    "near": "Minimal Warping"
+   },
+   "dict": null
+  },
+  {
+   "h": "5925f6d7e7aeced15746adbff13dc228b5ff239b4a82b3e9013b4cad949ea6c2",
+   "en": "PETG Translucent must be dried before use and moisture protection is required for the printing process, otherwise the quality of prints will be low due to bubbles. For more details, please refer to: Filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[8].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d65ff268e5e7b29bab519fa5e9c47c5b41b6ee1c2c1887cbb4a03fb7cdb359d",
+   "en": "4.Transparency Printing Tips",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[8].line[12]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d212992ec5f68e502b0ce5c5eb7be0125869cb069281843a1c404d5cb5a45c8c",
+   "en": "Printing PETG Translucent with the appropriate print parameters can achieve an appearance ranging from tinted translucent to tinted transparent. Learn more about Printing tips for transparent PETG on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[8].line[13]",
+    "near": "4.Transparency Printing Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "ba93f6658191faca519a717fc40345d9f94b6771fa9959094f82380d8616e99c",
+   "en": "Please note that the transparency of the prints may vary depending on such factors as size, thickness and structure, as well as printing parameters (including speed, nozzle temperature, and infill density).",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[8].line[14]",
+    "near": "Printing PETG Translucent with the appropriate print parameters can achieve an appearance ranging from tinted translucent to tinted transparent. Learn more abou"
+   },
+   "dict": null
+  },
+  {
+   "h": "11ea2b1c93bbbfd9104da74d6be596ebd817aa5a244123ee5f6aa962f888b80f",
+   "en": "Before printing, please kindly refer to the Printing Tips for optimal results.",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "petg-translucent",
+    "title": "PETG Translucent",
+    "field": "blocks[9].line[8]",
+    "near": "• Note:"
+   },
+   "dict": null
+  },
+  {
+   "h": "73f041e641f926d89810c14d34e4f8f98e0385339a26e3080700d1b19c2ef5aa",
+   "en": "Appealing from Every Angle",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-galaxy",
+    "title": "PLA Galaxy",
+    "field": "blocks[0].line[1]",
+    "near": "PLA Galaxy"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f784366bc9cdb2b44656e706972efa6039d92edcfbb0a7e0663c73768d57768",
+   "en": "Sleek Glossy Finish",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-galaxy",
+    "title": "PLA Galaxy",
+    "field": "blocks[0].line[2]",
+    "near": "· Appealing from Every Angle"
+   },
+   "dict": null
+  },
+  {
+   "h": "55563eb07de9b63eecda5cbd40e1adcf4e960d4f6507e954903de041c59c6da6",
+   "en": "Effortless Printing",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pla-galaxy",
+    "title": "PLA Galaxy",
+    "field": "blocks[0].line[3]",
+    "near": "· Sleek Glossy Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "80f85cad7db7cd69dac6f1d37bcb82d29fccfdbdf2ab866a746adbae01630238",
+   "en": "PLA Galaxy's glass microsphere additives create unique light effects, offering dynamic reflections from various perspectives.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-galaxy",
+    "title": "PLA Galaxy",
+    "field": "blocks[1].line[1]",
+    "near": "Appealing from Every Angle"
+   },
+   "dict": null
+  },
+  {
+   "h": "17e7e922c4d4955039f38454ed4e80c0003ce9f245dd536e5041683fa804c820",
+   "en": "Enriched with glass microsphere additives, PLA Galaxy ensures a clear, seamlessly smooth surface texture, enhancing your prints with a captivating fluidity that is both dynamic and refined.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-galaxy",
+    "title": "PLA Galaxy",
+    "field": "blocks[2].line[1]",
+    "near": "Sleek Glossy Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "1714ff284e3f1bff21f6410e3c4e2d695cd494e4a19266e188708ad21dc4569a",
+   "en": "Crafted with premium materials, PLA Galaxy inherits the exceptional printability of PLA Basic, ensuring a hassle-free printing process.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pla-galaxy",
+    "title": "PLA Galaxy",
+    "field": "blocks[3].line[1]",
+    "near": "Effortless Printing"
+   },
+   "dict": null
+  },
+  {
+   "h": "db1ad895ca2deff1b03b0acd3005abfdd7bd71422f70290776777fd960624905",
+   "en": "Not compatible with Engineering Plate and Hotend with Stainless Steel Nozzle 0.2 mm.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pla-galaxy",
+    "title": "PLA Galaxy",
+    "field": "blocks[5].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f09f87b2012eaa3f2cf339e61321de798959c5771c6856b18bedf75240248f0",
+   "en": "Soak and Dissolve",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[0].line[1]",
+    "near": "PVA"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5a165a54211b4d07b878faec8df0de46c761e6df790a63aa629716d6a67b142",
+   "en": "Smooth Support Contact Surface",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[0].line[2]",
+    "near": "· Soak and Dissolve"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8824d9df4f299b246498f22a29486e44dd79934a2d0063fd32fd32c0c42ae1e",
+   "en": "Thorough and Clean Dissolution",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[0].line[3]",
+    "near": "· Smooth Support Contact Surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "92696f9ad679da492b56d8901358cfb6b3ff58ae10ab757615e6a3bb79a26b4a",
+   "en": "Soak and Dissolve for Supporting Intricate Details",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[1].line[0]",
+    "near": "Bambu PVA possesses the ability to dissolve in water, penetrating deep into the intricacies to provide support where regular supports fall short. With Bambu PVA"
+   },
+   "dict": null
+  },
+  {
+   "h": "1096a4d294e8fd7b4486c26ca2a18057300548f436935dd9f619ddc2a5545e15",
+   "en": "Bambu PVA possesses the ability to dissolve in water, penetrating deep into the intricacies to provide support where regular supports fall short. With Bambu PVA you can design and print models that were previously impossible.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[1].line[1]",
+    "near": "Soak and Dissolve for Supporting Intricate Details"
+   },
+   "dict": null
+  },
+  {
+   "h": "3aef9dd513c906c1604a9173a53d89ef630bf2d632bd42852ac9c42af5f21117",
+   "en": "Seamless Support Interface Surface",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[2].line[0]",
+    "near": "Water-soluble support material can accommodate zero top interface spacing, guaranteeing a seamless bond with the print surface, resulting in precise and smooth "
+   },
+   "dict": null
+  },
+  {
+   "h": "504d2987c8c92c201aa687af5a60df1bd71c1e607e124f81e1ff1304b2ce6657",
+   "en": "Water-soluble support material can accommodate zero top interface spacing, guaranteeing a seamless bond with the print surface, resulting in precise and smooth support contact surfaces for your prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[2].line[1]",
+    "near": "Seamless Support Interface Surface"
+   },
+   "dict": null
+  },
+  {
+   "h": "f393ac5a29148d4cd73f17f5a12c7c0854ef90ecb1eff46ed5319b5f75f7a2f2",
+   "en": "Bambu PVA utilizes a high-quality formula that dissolves easily and thoroughly in water, effortlessly removing support material and eliminating the hassle of manual cleaning.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[3].line[1]",
+    "near": "Thorough and Clean Dissolution"
+   },
+   "dict": null
+  },
+  {
+   "h": "c78924066c71a4dd1852532de93048527f40cd6e231357dfeef68c0db124c548",
+   "en": "3.Pre-Printing & Storage",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "465bd2c5df59c8ce66ff3889b5f5c887b1e637f499f9e5b05eee061e164b5bac",
+   "en": "Please carefully read PVA Printing Guide before starting the printing process.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[8]",
+    "near": "3.Pre-Printing & Storage"
+   },
+   "dict": null
+  },
+  {
+   "h": "b150de611ab643b837336b63b47be3e3ec5d3f50085f0e809b51b530cacccdff",
+   "en": "PVA is suitable for use with AMS and AMS lite in a dry state. If the filament becomes soft or sticky due to moisture, it must be dried again before use to prevent issues such as feeding failure, nozzle clogging, and low print quality.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[9]",
+    "near": "Please carefully read PVA Printing Guide before starting the printing process."
+   },
+   "dict": null
+  },
+  {
+   "h": "921d4260a8cc5a3e6a31ff0431f52df650c761e7d178c57abbad599e066fdb6a",
+   "en": "PVA may darken in color after extended storage or multiple drying cycles, but it won't affect its printing performance or support capabilities.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[10]",
+    "near": "PVA is suitable for use with AMS and AMS lite in a dry state. If the filament becomes soft or sticky due to moisture, it must be dried again before use to preve"
+   },
+   "dict": null
+  },
+  {
+   "h": "169a0ea5266ebe33b66a1cd3fba9c9a29a52389255897397ff0c9a7667c5fef5",
+   "en": "4.Slicing & Printing Settings",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[12]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "bc3daf3d553332dbb15e56be6fe402b49dd87b9821676c291a9fdaab102e7956",
+   "en": "Recommend to use normal support instead of tree support. Tree support is more likely to collapse during printing.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[13]",
+    "near": "4.Slicing & Printing Settings"
+   },
+   "dict": null
+  },
+  {
+   "h": "67dec7a1293c367c299b4ae46961e55cfa73f98b16897631d38cb8b2683d5315",
+   "en": "Depending on the use case, Bambu PVA can also be used solely for printing the support interface to minimize material waste and printing time.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[14]",
+    "near": "Recommend to use normal support instead of tree support. Tree support is more likely to collapse during printing."
+   },
+   "dict": null
+  },
+  {
+   "h": "2a619fa80bd886ef8b6b058855750abab22ea803175c52ee938a5891b40f4295",
+   "en": "5.Dissolution Process",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[16]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5f8648dd010c834b9db0607888bb04ce9d94e7ac580dc86ed60935c244e20340",
+   "en": "Use warm water to speed up the dissolving process. But if supporting PLA, the maximum water soaking temperature should not exceed 50°C to prevent deformation of the main model.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[17]",
+    "near": "5.Dissolution Process"
+   },
+   "dict": null
+  },
+  {
+   "h": "03e2c0981ea4086d86426f663344071566d3e0bddc5a9582d30fbfc5036ad9d2",
+   "en": "Waiting for complete dissolution is not necessary when soaking and dissolving PVA support. You can manually remove the partially dissolved PVA support to reduce the waiting time.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[18]",
+    "near": "Use warm water to speed up the dissolving process. But if supporting PLA, the maximum water soaking temperature should not exceed 50°C to prevent deformation of"
+   },
+   "dict": null
+  },
+  {
+   "h": "63aa6f4e1bd7cfd13c77e6a117ed7ce7f67354b85b186368b74c4f4909c56b72",
+   "en": "6.Post-Processing Safety",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[20]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6fd3a007e27b838b16a5ffe2e592dc0c08e5e140d82b9bdd3d3b472ebfae1cc9",
+   "en": "When dissolving supports in water, some parts of the main model may leak in water. To mitigate this risk, please refer to the Reduce the risk of prints leakage guide on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[21]",
+    "near": "6.Post-Processing Safety"
+   },
+   "dict": null
+  },
+  {
+   "h": "318c08461db31f863362036c2d793d83e65307efd114e960edb7a83bc94cecf0",
+   "en": "7.Safety Tips",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[5].line[23]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "9225bbc0d94934a466b9b7375b114e1045309b8438e926b2c110e4c85b3c9536",
+   "en": "Easily dissolved in water",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[6].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "806ef8aa3fc22842bd80e15a070665a36019e5d158b93ab1188499b7463c45b0",
+   "en": "Smooth support interface",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[6].line[2]",
+    "near": "• Easily dissolved in water"
+   },
+   "dict": null
+  },
+  {
+   "h": "3a296b1dd2710fac346fbac9c44cf1d80d5b6a4c76d507f3da4037ed376ee31d",
+   "en": "Recommended for all PLA",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[6].line[3]",
+    "near": "• Smooth support interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "695b0c8521dd9ec615945da6a3dd12420cfe54520aa0da880d2e26c610b5bfef",
+   "en": "ONLY used for support",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[6].line[5]",
+    "near": "• Comes with High Temperature Reusable Spool"
+   },
+   "dict": null
+  },
+  {
+   "h": "d3b1f71f3d3b9e4ce35facf3f655535a84484cf023b839e99438ab188a872f11",
+   "en": "Not to be used for standalone models",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[6].line[6]",
+    "near": "• ONLY used for support"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d15e84a0478b12feb251d9e77bae6226f4738d83425cc4a1c86462232110afe",
+   "en": "Note: Before printing, please kindly refer to the Printing Tips for optimal results.",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "pva",
+    "title": "PVA",
+    "field": "blocks[6].line[9]",
+    "near": "• Cautions for Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "2bce0daa7c6deef9f32216e750de8ed82ab4afe80162493bd865eca1b6d22599",
+   "en": "Built to Last",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[0].line[1]",
+    "near": "PA6-GF"
+   },
+   "dict": null
+  },
+  {
+   "h": "ad3db6ae9843334a5909ccb0bfa4f38d38216823610b87509fb5d4c323d413f2",
+   "en": "Dimensional Stability",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[0].line[2]",
+    "near": "· Built to Last"
+   },
+   "dict": null
+  },
+  {
+   "h": "8cf3e524e81944584a4b0c7188f1246b1f67db237f1254f067b9ae29375700c2",
+   "en": "Exceptional Thermal Properties",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[0].line[3]",
+    "near": "· Dimensional Stability"
+   },
+   "dict": null
+  },
+  {
+   "h": "128f12c4e716a6d0ac3849ff4a9263533ba1a1ca4661c515d59c4b563e983b9a",
+   "en": "Chemical Resistance",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[0].line[4]",
+    "near": "· Exceptional Thermal Properties"
+   },
+   "dict": null
+  },
+  {
+   "h": "57071fdb41fd74913de00653c676ddb8a7573e676e79fbf62ca81e4d0fe63665",
+   "en": "Smooth Surface and More Colors",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[0].line[5]",
+    "near": "· Chemical Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "a035ccf264c4e9c1cdc6b062dc35011d5403a4b204d247fc913f292350c8d781",
+   "en": "Bambu PA6-GF is exceptionally strong and durable due to reinforced glass fibers, making it the perfect choice for prints that need to withstand heavy use and resist bending or breaking.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[1].line[1]",
+    "near": "Built to Last"
+   },
+   "dict": null
+  },
+  {
+   "h": "b86b5980f6fe257737d8563e9158e3f770210b9d4be8d18e404cd7e63a3ffd83",
+   "en": "Note: The printed part achieves better toughness after exposure to moisture.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[1].line[2]",
+    "near": "Bambu PA6-GF is exceptionally strong and durable due to reinforced glass fibers, making it the perfect choice for prints that need to withstand heavy use and re"
+   },
+   "dict": null
+  },
+  {
+   "h": "953cc5bc3f77a9aad0bffe5d9a814e2103b1e01b2db95dd5068f1de78c8108f9",
+   "en": "PA6-GF boasts unparalleled dimensional stability thanks to its glass fiber reinforcement, minimizing warping in comparison to standard PA filaments. Print with precise dimensions, even in the most intricate geometries.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[2].line[1]",
+    "near": "Dimensional Stability"
+   },
+   "dict": null
+  },
+  {
+   "h": "e491ecd313b4fc9e581eade5a9c8d49f95ce9366dd8533955e6008ed3767ef03",
+   "en": "PA6-GF boasts a high heat deflection temperature and superior dimensional stability, enabling it to retain its mechanical properties even under elevated temperatures. This makes it ideal for demanding industrial and automotive applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[3].line[1]",
+    "near": "Exceptional Thermal Properties"
+   },
+   "dict": null
+  },
+  {
+   "h": "f8e1428fd0c9cbf84ec8810bdb3df4a2a69a2bd056dde1b635f18efee9f4d2be",
+   "en": "PA6-GF offers excellent resistance to chemicals, oils, and many kinds of solvents, ensuring long-term performance in challenging environments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[4].line[1]",
+    "near": "Chemical Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "2df175ecb8761d788edeb60059bb7beab63da35edc0d0ae1af55feaf227d661c",
+   "en": "Bambu PA6-GF filaments are compatible with the Bambu AMS system, ready to print in multi-color. The special surface texture also blurs the layer lines, providing a smooth surface quality.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[5].line[1]",
+    "near": "Smooth Surface and More Colors"
+   },
+   "dict": null
+  },
+  {
+   "h": "c846035f3d74333b9243655c8deaed1ae3989703aa786beae749595ffbd0916a",
+   "en": "Not compatible with Cool Plate SuperTack, Hotend with Stainless Steel Nozzle 0.2 mm, Liquid Glue, and AMS lite.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[7].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "5a4d9f7cfd9b9e93729e408aa722d5910415c3e47db4f63cc0fc5d22c8b3815e",
+   "en": "As this filament is highly moisture-absorbent, please place any unused filament in a sealed container with desiccant immediately, and dry thoroughly before printing. For more details, please refer to: Printing tips for Engineering materials on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[7].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "ca1d896d99e041dcccf910f5c04a62332cb15d87d2ad6132755686e7fefa8410",
+   "en": "3.Warping Prevention Tips",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[7].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e03a173096c352dedf7da8628177ab3832ec694c9e539f1059357d75bfabe8f2",
+   "en": "To minimize warping, avoid printing large-sized high-infill-density models. Use enclosed printers and ensure the build plate is properly applied with glue for better print adhesion before printing.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[7].line[8]",
+    "near": "3.Warping Prevention Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b90de1cc8a1a4e6d8c61d153f1fa57e99c5b4a0834d2249831662d053a01e17",
+   "en": "4.Post-processing Tips",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[7].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cd61bb75c38797c7111e65c22364ab0704ebf3919ef8f4a0ad5bae1ec54316bb",
+   "en": "We recommend removing the support structures within 2 hours after printing to prevent them from sticking after absorbing moisture. If sticking occurs, dry the model to ease the removal.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[7].line[11]",
+    "near": "4.Post-processing Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "bf5f1ab4ee583b68eb210bfac43708fce196915c586ab1825ad010006c1de6cc",
+   "en": "Placing the printed part in a convection oven set between 80 to 130 degrees Celsius for 5 to 12 hours can further enhance the strength and rigidity of the print. Note: The effectiveness of this process depends on the structure, size, and conditions of the printed model. Some models may warp or deform after annealing. For more details, please refer to: Work after Printing Finished on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[7].line[12]",
+    "near": "We recommend removing the support structures within 2 hours after printing to prevent them from sticking after absorbing moisture. If sticking occurs, dry the m"
+   },
+   "dict": null
+  },
+  {
+   "h": "a2ecc6ccdba4b40067573e43e9d1a2ccf78477c790a3fd513c11605f0684cea0",
+   "en": "This product is a glass fiber reinforced filament that may produce fine fiber debris during use, post-processing, or contact with rough or fractured surfaces, posing a risk of mechanical skin punctures or foreign body irritation. To ensure safety, please avoid rubbing or touching rough edges and cross-sections with bare hands; it is highly recommended to wear gloves when loading or unloading the filament, as well as during cutting, sanding, or other post-processing operations, while using additional protective equipment as required by your specific working conditions.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[7].line[15]",
+    "near": "5.Safety Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "430fdc7c42a3f4c1e1330fca7f517c1b048f8f2d163b94ca2429905e16c855ef",
+   "en": "Note: PA6-GF Yellow, Lime and Brown have been discontinued.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "pa6-gf",
+    "title": "PA6-GF",
+    "field": "blocks[8].line[9]",
+    "near": "• Cautions for Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "37cad77333db0b27d5fc249b07ea63d74d65be7704bcabf7439718ddfb3893e5",
+   "en": "Ultra-lightweight & Low Density",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[0].line[2]",
+    "near": "· Tough with Good Impact Resistance"
+   },
+   "dict": null
+  },
+  {
+   "h": "8aef98db384b448dc6188865819bd8088371068038e70d570ced4dbbb15cb7ee",
+   "en": "Water & UV Resistance",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[0].line[3]",
+    "near": "· Ultra-lightweight & Low Density"
+   },
+   "dict": null
+  },
+  {
+   "h": "63640c244ddb5cf7ce741082dd12b40502d2dd1359581b0073249d340f2c5ea1",
+   "en": "Impact Resistance & Built to Last",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[1].line[0]",
+    "near": "Compared with other foaming filament, ASA Aero is tougher with higher layer strength, making it more resistant to impact, collision, and falling, perfect for hi"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e5ed3c70c863885ba19465fffcac56ddf5957149766eeb1e825776fd7007048",
+   "en": "Compared with other foaming filament, ASA Aero is tougher with higher layer strength, making it more resistant to impact, collision, and falling, perfect for high-stress demanding applications.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[1].line[1]",
+    "near": "Impact Resistance & Built to Last"
+   },
+   "dict": null
+  },
+  {
+   "h": "b5dd11818e363b43637f1513403267d939142ffd53ca0bcd29f8f3c41c7a7c62",
+   "en": "Ultra-lightweight, Controllable Density",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[2].line[0]",
+    "near": "Only 50%-75% the density of regular ASA prints, ASA Aero is as light as feather, designed for weight-sensitive objects, such as RC planes and unmanned aerial ve"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb06d42bba0737e2b58cdb58f43f2e9906a77f0d750bdb74693374e72b541a54",
+   "en": "Only 50%-75% the density of regular ASA prints, ASA Aero is as light as feather, designed for weight-sensitive objects, such as RC planes and unmanned aerial vehicles (UAVs). With controllable foaming characteristic, ASA Aero achieves lower density of prints by increasing printing temperature or lowering flow rate.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[2].line[1]",
+    "near": "Ultra-lightweight, Controllable Density"
+   },
+   "dict": null
+  },
+  {
+   "h": "38cc57f0f6c13171712f5bddd8b987aac8bf45333fafa18f1c3f6bd0cd1249c5",
+   "en": "Content Block-9",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[3].line[0]",
+    "near": "The average density of prints will vary with changes in parameters such as actual printing temperature, flow rate ratio, printing speed, model size, wall thickn"
+   },
+   "dict": null
+  },
+  {
+   "h": "05eef21965662d164d90a0e7e7aadefe50fff8348d38b18a21beda41100fdc6e",
+   "en": "The relationship between the maximum foaming rate, minimum print density, and printing temperature of ASA Aero.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[4].line[1]",
+    "near": "Content Block-5"
+   },
+   "dict": null
+  },
+  {
+   "h": "9937b013ec904e1b0a7782b650e7d2b1713abedab19fe59ff9200bec2ae157fd",
+   "en": "Ready for Harsh Environment & Outdoor",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[5].line[0]",
+    "near": "Compared with PLA Aero, the overwhelming performance in temperature, water, and UV resistance makes ASA Aero stand out for long-lasting outdoor use and harsh en"
+   },
+   "dict": null
+  },
+  {
+   "h": "55fba23dc6090501df69258c5237ac1fcd898cdd2a9d7c977e857053b6188d66",
+   "en": "Compared with PLA Aero, the overwhelming performance in temperature, water, and UV resistance makes ASA Aero stand out for long-lasting outdoor use and harsh environments.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[5].line[1]",
+    "near": "Ready for Harsh Environment & Outdoor"
+   },
+   "dict": null
+  },
+  {
+   "h": "a5a5cb650b29fbd332a7d67876899000635dc0c38495c36adb5e2c3f939f0ef6",
+   "en": "Bambu ASA Aero provides an easy-to-color matte surface texture with better dyeing results as compared with regular ASA.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[6].line[1]",
+    "near": "Matte Finish For Easy Coloring"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4660cc16fea227b088117daf6f79760da157089e15120adfe72948ecb075ab8",
+   "en": "Not compatible with Cool Plate SuperTack, Hotend with Hardened Steel Nozzle 0.6 mm / 0.8 mm, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[8].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b5e9d3ff0ce8137106f82dd39776c2e02f84d1cca99026b91713ad2b23a3f65",
+   "en": "ASA Aero is highly sensitive to humidity. To achieve optimal printing performance, it is recommended further drying before use and after storage. For more details, please refer to the filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[8].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "d11febff086e8e7621d71eaabed85f7695c91ec3a495a7b37ee4d8a52f322ca7",
+   "en": "To minimize warping, avoid printing large-sized high infill density models. Use enclosed printers and ensure the build plate is properly applied with glue for better print adhesion before printing. Set lower printing speed and higher heatbed temperature. For more details, please refer to: Common print quality problems and solutions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[8].line[8]",
+    "near": "3.Warping Prevention Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "e2b98f66600e4c1b0ecc63aa28d611dc79f9f16737d7f733315e6589e8d418aa",
+   "en": "4.Ventilation & Odor Notice",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[8].line[10]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "81700466ed4a1f9f2fd7e42c6ad6d4c791dfa40b45ed0ceb90c364ab3c74674b",
+   "en": "Pungent and unpleasant odors may be released during printing. Make sure your printer is placed in a well-ventilated area and use enclosed printers.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[8].line[11]",
+    "near": "4.Ventilation & Odor Notice"
+   },
+   "dict": null
+  },
+  {
+   "h": "10490cef0de59b8f5110869f49475ad7e777f42c2af5f3442d19377169035cf4",
+   "en": "5.Usage Tips",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[8].line[13]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3d4ebee3b8c2094376b7a15a15cecac5f75109160cf94399d6b8bfc9d0276de1",
+   "en": "Foaming ASA materials (ASA Aero) have high requirements for material drying and parameter settings. Please carefully read the ASA Aero Printing Guide before starting the printing process.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "asa-aero",
+    "title": "ASA Aero",
+    "field": "blocks[8].line[14]",
+    "near": "5.Usage Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e78a4128fbe362bbd15055fc861befe38a2c5b5dd8ef627b6eb06a11d583b3a",
+   "en": "Greater Dimensional Stability",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[0].line[2]",
+    "near": "· Enhanced Strength and Stiffness"
+   },
+   "dict": null
+  },
+  {
+   "h": "d3e9c54444bc77bd560cfa8bc3540403d76ddcc8232938d1f60f59fd6e175c9f",
+   "en": "Fine Matte Finish",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[0].line[3]",
+    "near": "· Greater Dimensional Stability"
+   },
+   "dict": null
+  },
+  {
+   "h": "5c13d2b734c68c3e241bbd466392650b2ee50ec0491d298502711a1706b44f70",
+   "en": "ABS-GF outclasses regular ABS in strength and stiffness, making it perfect for load-bearing and bending-resistance parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[1].line[1]",
+    "near": "Enhanced Strength and Stiffness"
+   },
+   "dict": null
+  },
+  {
+   "h": "3f6029edbd13b69c3525a6468d310933a4e3bc1f795a8e8f714b99c0bb1bcdb2",
+   "en": "Glass fiber reinforcement gives ABS-GF better dimensional stability than regular ABS, minimizing warping and deformation during printing. This makes it ideal for intricate mechanical assembly parts or geometric components.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[2].line[1]",
+    "near": "Greater Dimensional Stability"
+   },
+   "dict": null
+  },
+  {
+   "h": "5ff7a8b9876139f60557980e38f5894b11b5f9fb048d026effb82b1738ba18a7",
+   "en": "*Specimen Test: Model size (L*W*H): 240*50*20 mm³ (the XY direction); Infill Density: 25%",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[2].line[2]",
+    "near": "Glass fiber reinforcement gives ABS-GF better dimensional stability than regular ABS, minimizing warping and deformation during printing. This makes it ideal fo"
+   },
+   "dict": null
+  },
+  {
+   "h": "5db39007c27a3a2db8567154382321888134065a298107afd1919b65b79ff1e6",
+   "en": "The seamless matte finish, coupled with nearly invisible layer lines, gives ABS-GF a smooth appearance, making it ideal for decorative and fine-grained parts.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[3].line[1]",
+    "near": "Fine Matte Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "2389c456ea1f8ce46ddabbe095af9175be6e16ad16d4b3df3c5c45066b775369",
+   "en": "Water Resistance & Built to Last",
+   "kind": "block_title",
+   "freq": 1,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[4].line[0]",
+    "near": "With improved water resistance and durability, Bambu ABS-GF is ideal for printing long-lasting production and household items, like mechanical casings, connecto"
+   },
+   "dict": null
+  },
+  {
+   "h": "e97430b720a9ea51ff41b12ff98d09ce4c5d75599659d5cf72ef18cbd13155cc",
+   "en": "With improved water resistance and durability, Bambu ABS-GF is ideal for printing long-lasting production and household items, like mechanical casings, connectors and molds.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[4].line[1]",
+    "near": "Water Resistance & Built to Last"
+   },
+   "dict": null
+  },
+  {
+   "h": "4c27921122bf753157398ccde2f5a32d1ec67e7edfaaaccda121052dc4dc0b27",
+   "en": "Not compatible with Cool Plate SuperTack, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+   "kind": "faq_a",
+   "freq": 2,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[6].line[2]",
+    "near": "1.Accessory Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6cfbc1d1c29d007cde6879d8b136032869932ae6723b2ae307b3fe677c0b893",
+   "en": "To minimize warping, avoid printing large-sized high infill density models. Use enclosed printers and ensure the build plate is properly applied with glue for better print adhesion before printing. Set lower printing speed and higher heatbed temperature. For more details please refer to: Common print quality problems and solutions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[6].line[12]",
+    "near": "4.Warping Prevention Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "309531542bd70f79a6b2dc9f3fd412ff2802f06e273ed182cd791221f3d742f7",
+   "en": "Durability and Water Resistance",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "abs-gf",
+    "title": "ABS-GF",
+    "field": "blocks[7].line[4]",
+    "near": "• Fine Matte Finish"
+   },
+   "dict": null
+  },
+  {
+   "h": "5305847d613676613d41e70182d997fa98addc6f8d489925ab592050d39fc507",
+   "en": "Easy, Tool-free Removal",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[0].line[1]",
+    "near": "Support for PLA/PETG"
+   },
+   "dict": null
+  },
+  {
+   "h": "314b0fdb8ddbc9e48570dc7f54c1f12c0a479640374ac27c91754736e970178d",
+   "en": "Smooth Support Interface",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[0].line[2]",
+    "near": "· Easy, Tool-free Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "7b467ec89e39ef62c92b5052ea9373f7777c90ae43a8e9de87081567e0956208",
+   "en": "Recommended for All PLA & PETG",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[0].line[3]",
+    "near": "· Smooth Support Interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "cbf229b046870f33722abe6bd1a4287730cc71ecedecd157740e4d7d9e2e9004",
+   "en": "Transparent Appearance",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[0].line[4]",
+    "near": "· Recommended for All PLA & PETG"
+   },
+   "dict": null
+  },
+  {
+   "h": "a08ccfb81f861dfaf5d6941651c03840ce4c9d47bc8786d3e58eeec613f6a9e1",
+   "en": "Support PLA/PETG is specially formulated to minimize fusion with PLA and PETG, thanks to differences in polarity. This unique characteristic ensures hassle-free removal of the support interface, reducing the risk of damage to your printed object.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[1].line[1]",
+    "near": "Easy, Tool-free Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "caa5a6508c9bfcff668002f3ee4e0c480b2c1231bd86bd7191ba5313375d2783",
+   "en": "Support PLA/PETG offers consistently smooth surface quality at the contact area, ensuring optimal support for intricate details. With zero top interface spacing & Z distance, our support material provides precision and reliability, allowing you to print even the most complex designs with ease.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[2].line[1]",
+    "near": "Smooth Support Interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "6493853f66e48f013d3b53db6261d5466ae807ee8544101efeef859469c8016e",
+   "en": "3.Support Setting",
+   "kind": "faq_q",
+   "freq": 2,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[4].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "86ad08c0c7150984cbea8167d368136b5df3c1b380e5c97ac254d22027a37436",
+   "en": "Recommended for use with PLA or PETG filament only. Select \"Support for PLA/PETG\" in the \"Support/Raft Interface\" settings in your slicer.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[4].line[8]",
+    "near": "3.Support Setting"
+   },
+   "dict": null
+  },
+  {
+   "h": "9acf2c5339b4c6c20a3d5e5b3a804e8bb73a1ba24e527abce0516029015ff5c5",
+   "en": "When using tree supports, please avoid using support filament for the \"Support/raft base\".",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[4].line[9]",
+    "near": "Recommended for use with PLA or PETG filament only. Select \"Support for PLA/PETG\" in the \"Support/Raft Interface\" settings in your slicer."
+   },
+   "dict": null
+  },
+  {
+   "h": "f996addca15dbcd3136590ea3c4592f7341a11e51a43006c5505c5f247be89e7",
+   "en": "For more support-related settings, please refer to the Support on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[4].line[10]",
+    "near": "When using tree supports, please avoid using support filament for the \"Support/raft base\"."
+   },
+   "dict": null
+  },
+  {
+   "h": "eb0894de389441c6846c1464ddce7a45ab86cd1dba5854770fb46338eb7ffdb1",
+   "en": "Easy & Tool-free Removal",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[5].line[1]",
+    "near": "Highlights"
+   },
+   "dict": null
+  },
+  {
+   "h": "b12d4bdcbfc7c4cf826c8806cf5f06aa0d3f25aa01fc40991548ae706d77ce9c",
+   "en": "Only Used for Printing the Support Interface",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[5].line[6]",
+    "near": "• Comes with High Temperature Reusable Spool"
+   },
+   "dict": null
+  },
+  {
+   "h": "def5809f0ef9229a24e45ff2c62c7701e37170e9d903263ba0b6016624045e54",
+   "en": "Avoid Printing Individual Models",
+   "kind": "block_line",
+   "freq": 2,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[5].line[7]",
+    "near": "• Only Used for Printing the Support Interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c7e24e010b2ba6ac1fdf6c22dfe0fec1b317756d41a52adabe2187e34e91495",
+   "en": "Recommended Drying before Use",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-pla-petg",
+    "title": "Support for PLA/PETG",
+    "field": "blocks[5].line[8]",
+    "near": "• Avoid Printing Individual Models"
+   },
+   "dict": null
+  },
+  {
+   "h": "f352e94426de23b1fe3771a7ca5f9c1b9b9cd521b8e24b1c170e31977dd7fbef",
+   "en": "Easy Support Removal",
+   "kind": "block_line",
+   "freq": 4,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[0].line[1]",
+    "near": "Support for ABS"
+   },
+   "dict": null
+  },
+  {
+   "h": "f6594ac261c54355c1d56ea8d335ef0d23cd719d7e9b964e4002158ef2c438cb",
+   "en": "Superior Support Interface Quality",
+   "kind": "block_line",
+   "freq": 3,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[0].line[2]",
+    "near": "· Easy Support Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "0ddddc47553d26e6036266dbd7eb7a8485484cc0b5a30b6d9416788ee45a1e91",
+   "en": "Specially formulated for ABS, our support material adheres precisely to the ABS surface, allowing for easy support removal. This streamlines your post-processing work, ensuring a more efficient workflow.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[1].line[1]",
+    "near": "Easy Support Removal"
+   },
+   "dict": null
+  },
+  {
+   "h": "99ec79f47634d74b5f58ab580471086c69d1b634c74026ae01a3645991b7918c",
+   "en": "Support for ABS enables a 0 Top Z distance and 0 Top interface spacing when printing, ensuring a scar free support surface. This enhances the sharpness of details, improving the overall appearance and integrity of your final prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[2].line[1]",
+    "near": "Superior Support Interface Quality"
+   },
+   "dict": null
+  },
+  {
+   "h": "1d1f31934c736307941b70f3fb0a1207372abe50b816b6643c5c6a11b3039d92",
+   "en": "3.Limonene Dissolution Guidelines",
+   "kind": "faq_q",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[4].line[7]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e48f53df98cbe13fbdb5608c884bcf7b6d7e84561c118950b3a378e9c535ed48",
+   "en": "Support for ABS is soluble in limonene. Please pay attention to the usage norms and safety.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[4].line[8]",
+    "near": "3.Limonene Dissolution Guidelines"
+   },
+   "dict": null
+  },
+  {
+   "h": "f11029cd90d79cf377e395a7f3598abb6a3d8ec30bac0a57d4d6a1bd46fc4338",
+   "en": "Pungent and unpleasant odors may be released during printing. Make sure your printer is enclosed and placed in a well-ventilated area.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[4].line[11]",
+    "near": "4.Ventilation & Odor Notice"
+   },
+   "dict": null
+  },
+  {
+   "h": "49d372f68bffb82269128c9b66d0c2984e6355c4b862f6fbfcc670ba1ccf332e",
+   "en": "When layer strength is required, it is recommended to increase the flushing volume to above 800 mm³. If the flushing is not thorough, it may reduce the layer adhesion of the model at surfaces that are on the same horizontal plane as the support surface.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[4].line[14]",
+    "near": "5.Usage Tips"
+   },
+   "dict": null
+  },
+  {
+   "h": "69979ed5c6903ed64f9abaf977b4fb699feb4fdb924ca51e2280c54ab03a8af5",
+   "en": "By increasing the \"initial layer speed\", a more peelable support can be obtained. However, this will increase the risk of warping.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[4].line[15]",
+    "near": "When layer strength is required, it is recommended to increase the flushing volume to above 800 mm³. If the flushing is not thorough, it may reduce the layer ad"
+   },
+   "dict": null
+  },
+  {
+   "h": "81309b9e922638f501aca64832cf63f94ee80f382984aff1f3ef766b8d1043dc",
+   "en": "For more support-related settings, please refer to Support on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[4].line[16]",
+    "near": "By increasing the \"initial layer speed\", a more peelable support can be obtained. However, this will increase the risk of warping."
+   },
+   "dict": null
+  },
+  {
+   "h": "91acdc5489115600274b36fb3975d1629862d1831b7d49322aedd52a7d7c583a",
+   "en": "Optional to Dry before Use",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "support-for-abs",
+    "title": "Support for ABS",
+    "field": "blocks[5].line[5]",
+    "near": "• ONLY used for support"
+   },
+   "dict": null
+  },
+  {
+   "h": "bce9e5e1ab17026717737727776557524ff11adb7b514abc8f96eccc63de7e9d",
+   "en": "The PETG that prints as effortlessly as PLA",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[0].line[1]",
+    "near": "PETG HF"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd9409c6b6c5035a8499e84e66fde0a56adb63257ea42e4584cffaba9ed3e8fb",
+   "en": "Designed for Speed",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[1].line[0]",
+    "near": "Twice as fast as standard PETG*, PETG HF significantly boosts your productivity without compromising the quality of your prints."
+   },
+   "dict": null
+  },
+  {
+   "h": "b7b79bb1ad4e96bf311b7b903dbed0635a6bc03adb3e107e54e1ba627996abee",
+   "en": "Twice as fast as standard PETG*, PETG HF significantly boosts your productivity without compromising the quality of your prints.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[1].line[1]",
+    "near": "Designed for Speed"
+   },
+   "dict": null
+  },
+  {
+   "h": "470b0d5e33b6f3f7102674b9d9986913ec6f6ef861ea180a6b3cc820be9b79c0",
+   "en": "The speed of PETG HF can be twice as fast compared to regular PETG, but achieving this speed is highly dependent on model size and geometry.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[1].line[2]",
+    "near": "Twice as fast as standard PETG*, PETG HF significantly boosts your productivity without compromising the quality of your prints."
+   },
+   "dict": null
+  },
+  {
+   "h": "7c1313a570d463bace5e143f039f30addce99d2593dffb4d8b0dd373d23f13b8",
+   "en": "Print Flawlessly with Minimal Tuning",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[2].line[0]",
+    "near": "PETG HF excels in printability among PETG filaments with its higher adaptability for printers and printing settings, achieving ideal print results without fine-"
+   },
+   "dict": null
+  },
+  {
+   "h": "25c76cf10f07e3a6e4725c3a028c7ea3ba5ec5e91224bd36d6a558ee3a3d8548",
+   "en": "PETG HF excels in printability among PETG filaments with its higher adaptability for printers and printing settings, achieving ideal print results without fine-tuning parameters. Thanks to advanced formula optimization, PETG HF bids farewell to oozing and clumping, ensuring smoother prints with crisp details.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[2].line[1]",
+    "near": "Print Flawlessly with Minimal Tuning"
+   },
+   "dict": null
+  },
+  {
+   "h": "65323ba6f4c549f693d4369a53c756efee3d153080f7b28a84681e64dfcf42d4",
+   "en": "Smooth, Soft Texture",
+   "kind": "block_title",
+   "freq": 2,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[3].line[0]",
+    "near": "PETG HF provides a smooth texture and consistent gloss at any printing speed, ensuring uniformity and sharp details in every print."
+   },
+   "dict": null
+  },
+  {
+   "h": "5f822dd23eea60dadf13b011b115a17a7847d258328597d3e6d841ead04ce1d0",
+   "en": "PETG HF provides a smooth texture and consistent gloss at any printing speed, ensuring uniformity and sharp details in every print.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[3].line[1]",
+    "near": "Smooth, Soft Texture"
+   },
+   "dict": null
+  },
+  {
+   "h": "216f7997476eada3fd4bc589c4c32c374416828ed54b9d887e86f1e9c376bb9a",
+   "en": "PETG HF maintains the inherent strengths of regular PETG, providing superior resistance to water, UV, and temperatures. Tougher and more durable than PLA, with higher temperature resistance, it's the perfect choice for printing outdoor items such as planter pots, bird cages, watering cans, and automotive parts. Additionally, it's ideal for outdoor toys that require long-term exposure and the ability to withstand impacts, collisions, and falls.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[4].line[1]",
+    "near": "Ready for Outdoor Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "af80654f3a1de958a2960c011c890efb1bd376078b79e7ba5494af9cbc1f874b",
+   "en": "Dry before use to ensure the best print quality and consistent finish. PETG HF must be dried before use and remain moisture-free during the printing process, especially for longer print times (over 6 hours). For more details, please refer to: Filament drying instructions on WIKI.",
+   "kind": "faq_a",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[6].line[5]",
+    "near": "2.Drying Recommendations"
+   },
+   "dict": null
+  },
+  {
+   "h": "3030cdabc2e6fe030a3ebcb260f921065ba136a11c6a6806913ed1f04253b7ec",
+   "en": "PETG HF must be dried before use to achieve optimal print quality.",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[7].line[6]",
+    "near": "• Dry Out Before Use"
+   },
+   "dict": null
+  },
+  {
+   "h": "e99235c60df6b9a06ac911655fecafc59cf2b577d1aab4bd590f66756d4711e1",
+   "en": "A new and improved PETG is available now!",
+   "kind": "block_line",
+   "freq": 1,
+   "context": {
+    "handle": "petg-hf",
+    "title": "PETG HF",
+    "field": "blocks[7].line[7]",
+    "near": "• PETG HF must be dried before use to achieve optimal print quality."
+   },
+   "dict": null
+  }
+ ]
+}

@@ -1,0 +1,868 @@
+{
+  "handle": "refurbished-x1c",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T10:38:42Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*",
+        "compat.*",
+        "identity.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): format legacy_html; the \"X1C Tech Specs\" table (12 rows) and its two footnotes, the description sections, Product Features (Why Official Refurbished Products), What's in the box, and the one version value (X1C Combo)."
+    },
+    {
+      "kind": "store_messages",
+      "url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "title": "[Refurbished] Bambu Lab X1C 3D Printer store page, messages bundle",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "keys": [
+        "electrical.*",
+        "package.*",
+        "shipment.*",
+        "product.*",
+        "physical.*"
+      ],
+      "note": "Searched for X1C 220 V / UK values (§C.6). The bundle's product namespaces are production.H2D, production[\"A1 Description\"], AMSPro and AMSHT; none carries X1C values (\"production.H2D.X1C AND P1S\" is only the label \"X1C\"), so no intl_220v package or weight value comes from it."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/x1/manual/acc-in-the-box",
+      "title": "Supplementary instructions for X1C and X1C combo accessories in the box",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "keys": [
+        "package.contents",
+        "printing.included_build_plate",
+        "extrusion.nozzle_diameter",
+        "extrusion.nozzle_material"
+      ],
+      "note": "Intro sentence, the notice, and the accessories table (16 rows) read in full."
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "256 × 256 × 256 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 1 (Build Volume (W×D×H))",
+      "quote": "Build Volume (W×D×H) 256 × 256 × 256 mm³*",
+      "test_method": "",
+      "test_condition": "W × D × H",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "The asterisk refers to the table footnotes: the default printable height in Bambu Studio is set to 250 mm (the remaining 6 mm per the linked wiki article), and the collapsible filament cutter stopper occupies part of the printing area when popped out. The package row states the same volume."
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 2 (Nozzle)",
+      "quote": "Nozzle 0.4 mm Hardened Steel Included",
+      "test_method": "",
+      "test_condition": "Included nozzle",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "The X1C box wiki says the same for the spare hotend: \"Hotend with hardened steel nozzle (0.4 mm)\" (Accessories table, row 2)."
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 2 (Nozzle)",
+      "quote": "Nozzle 0.4 mm Hardened Steel Included",
+      "test_method": "",
+      "test_condition": "Included nozzle",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "conflict": "The package keeps the whole cell (\"0.4 mm Hardened Steel Included\") as the material; the curated row splits it into the material (Hardened Steel) and extrusion.nozzle_diameter (0.4 mm). Same rank as the page row (official_page), so the merge keeps the page row and records the difference."
+    },
+    {
+      "key": "extrusion.hotend",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "All-Metal",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 3 (Hotend)",
+      "quote": "Hotend All-Metal",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 300,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 4 (Max Hot End Temperature)",
+      "quote": "Max Hot End Temperature 300 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 5 (Filament Diameter)",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "TPU",
+        "ABS",
+        "ASA",
+        "PVA",
+        "PET",
+        "PA",
+        "PC",
+        "Carbon/Glass Fiber Reinforced Polymer"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 6 (Supported Filament)",
+      "quote": "Supported Filament PLA, PETG, TPU, ABS, ASA, PVA, PET Ideal for PA, PC, Carbon/ Glass Fiber Reinforced Polymer",
+      "test_method": "",
+      "test_condition": "PA, PC and carbon/glass fiber reinforced polymers are listed as \"Ideal for\"",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "The description says the same in prose: \"unlocks a wider selection of materials, including PA, PC, PET, and TPU, and specializes in carbon fiber and glass fiber reinforced polymers\".",
+      "conflict": "The package splits the cell on commas and keeps \"Ideal for PA\" as one item; the curated list names PA on its own and records the \"Ideal for\" wording in test_condition. Same rank as the page row (official_page), so the merge keeps the page row and records the difference."
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Bambu Textured PEI Plate / Bambu Cool Plate (Pre-installed, Random)"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/x1/manual/acc-in-the-box",
+      "source_title": "Supplementary instructions for X1C and X1C combo accessories in the box",
+      "locator": "Accessories table › row 1 (Bambu build plate) › Marks",
+      "quote": "Bambu build plate | Placed on the heat bed to hold the model. | Bambu Textured PEI Plate / Bambu Cool Plate (Pre-installed, Random)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "note": "Unverified because the official sources do not agree on which plate ships: this wiki row says one of two plates at random; the wiki intro sentence says \"Textured PEI Plate (pre-installed on the hotbed)\"; the store row 7 \"Build Plate Surface\" names only \"Bambu Textured PEI Plate(Pre-installed, Random, Both compatible with Micro Lidar)\" (the package keeps that row as x.build_plate_surface, a different key)."
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 110,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 8 (Max Build Plate Temperature) › 1st of 2",
+      "quote": "Max Build Plate Temperature 110℃@220V, 120℃@110V",
+      "test_method": "",
+      "test_condition": "220 V",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "The cell gives one value per mains voltage. The registry does not flag this key as region-dependent, so the package writes 110 at region \"\" as unverified; this row carries the 220 V value with its region."
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 120,
+      "unit": "°C",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 8 (Max Build Plate Temperature) › 2nd of 2",
+      "quote": "Max Build Plate Temperature 110℃@220V, 120℃@110V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 500,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 9 (Max Speed of Tool Head)",
+      "quote": "Max Speed of Tool Head 500 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 10 (Max Acceleration of Tool Head)",
+      "quote": "Max Acceleration of Tool Head 20 m/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "20 m/s² written in the registry unit (20,000 mm/s²). The description bullet \"Core XY with 20000 mm/s² acceleration\" says the same (marketing, not used as proof).",
+      "conflict": "The package leaves this row without a number (value \"20 m/s²\", unverified), so the merge sees a difference. Same rank as the page row (official_page), so the merge keeps the page row and records the difference."
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 389,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 11 (Physical Dimensions) › segment 1 (X1C) › 1st of 3",
+      "quote": "X1C：389 × 389 × 457 mm³",
+      "test_method": "",
+      "test_condition": "X1C printer",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 389,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 11 (Physical Dimensions) › segment 1 (X1C) › 2nd of 3",
+      "quote": "X1C：389 × 389 × 457 mm³",
+      "test_method": "",
+      "test_condition": "X1C printer",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 457,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 11 (Physical Dimensions) › segment 1 (X1C) › 3rd of 3",
+      "quote": "X1C：389 × 389 × 457 mm³",
+      "test_method": "",
+      "test_condition": "X1C printer",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 14130,
+      "unit": "g",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 11 (Physical Dimensions) › segment 1 (X1C) › Net weight",
+      "quote": "Net weight 14.13kg,Gross weight 18kg",
+      "test_method": "",
+      "test_condition": "X1C printer, AMS not included",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "14.13 kg written in grams. The cell states the net weight in the X1C segment only; no net weight is given for the X1C Combo (printer with AMS)."
+    },
+    {
+      "key": "package.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "768372815270326273",
+        "value_text": "X1C Combo"
+      },
+      "value": 480,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 11 (Physical Dimensions) › segment 2 (X1C Combo) › Package size (1st of 3)",
+      "quote": "X1C Combo：Package size 480 × 480 × 590 mm³",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "Region us_110v and unverified: the table carries \"350W@110V\" and \"120℃@110V\", the §C.6 US-table marker. No X1C 220 V / UK package value exists in the cached sources (the messages bundle has none for the X1C)."
+    },
+    {
+      "key": "package.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "768372815270326273",
+        "value_text": "X1C Combo"
+      },
+      "value": 480,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 11 (Physical Dimensions) › segment 2 (X1C Combo) › Package size (2nd of 3)",
+      "quote": "X1C Combo：Package size 480 × 480 × 590 mm³",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "package.height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "768372815270326273",
+        "value_text": "X1C Combo"
+      },
+      "value": 590,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 11 (Physical Dimensions) › segment 2 (X1C Combo) › Package size (3rd of 3)",
+      "quote": "X1C Combo：Package size 480 × 480 × 590 mm³",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "shipment.gross_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "768372815270326273",
+        "value_text": "X1C Combo"
+      },
+      "value": 22300,
+      "unit": "g",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 11 (Physical Dimensions) › segment 2 (X1C Combo) › Gross weight",
+      "quote": "X1C Combo：Package size 480 × 480 × 590 mm³ Gross weight(AMS included) 22.3 kg",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "22.3 kg written in grams; the cell says \"AMS included\"."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-240 VAC",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 12 (Electrical Requirements) › segment 1",
+      "quote": "Electrical Requirements 100-240 VAC, 50/60 H, 1000W@220V, 350W@110V",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "One input range for every version (it spans 220 V), so it is written region-free. The package writes the whole cell as electrical.requirements (us_110v) and leaves electrical.voltage not_found; this row fills it."
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 12 (Electrical Requirements) › segment 2",
+      "quote": "Electrical Requirements 100-240 VAC, 50/60 H, 1000W@220V, 350W@110V",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "The cell reads \"50/60 H\" (the z is missing); mains frequency 50/60 Hz."
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 12 (Electrical Requirements) › segment 3",
+      "quote": "Electrical Requirements 100-240 VAC, 50/60 H, 1000W@220V, 350W@110V",
+      "test_method": "",
+      "test_condition": "220 V",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "Unverified: the cell gives the wattage without saying whether it is the maximum or the rated power; written as the maximum. The X1C spec sheet that would label it is not cached."
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 12 (Electrical Requirements) › segment 4",
+      "quote": "Electrical Requirements 100-240 VAC, 50/60 H, 1000W@220V, 350W@110V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "Unverified for the same reason as the 220 V row, and a us_110v value is never verified."
+    },
+    {
+      "key": "printing.multi_color",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Up to 16 colours (with AMS)",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "Description › What to Expect from the X1C Combo 3D Printer (html › 1) › bullet 2; Colors & Beyond (html › 4)",
+      "quote": "Up to 16 multi-color printing",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "Marketing bullet: the number is not proven by it. The \"Colors & Beyond\" section says: \"With Bambu Lab Automatic Material System (AMS)，you can now enjoy printing freely in multiple colors and materials.\""
+    },
+    {
+      "key": "printing.auto_leveling",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual auto bed leveling (lidar and analog force sensors)",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "Description › AI-Powered Evolution (html › 6) › Dual Auto Bed Leveling",
+      "quote": "Dual Auto Bed Leveling system checks for increased reliability.The lidar and analog force sensors crosscheck for an extra layer of redundancy in bed leveling.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    },
+    {
+      "key": "extrusion.extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened drive gear",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "Description › Advanced materials empower advanced projects. (html › 3)",
+      "quote": "Bambu Lab X1C, equipped with extra cooling and a hardened nozzle and drive gear, unlocks a wider selection of materials",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z",
+      "note": "Description prose; it names the gear hardened but not its material."
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "EU RED Article 3.3(d)(e)",
+        "ETSI EN 303 645 V2.1.1:2020"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "Product Features › Why Official Refurbished Products › paragraph 2",
+      "quote": "Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020.",
+      "test_method": "",
+      "test_condition": "Cybersecurity compliance",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:56:24Z"
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "Bambu Lab AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "Description › Colors & Beyond (html › 4)",
+      "quote": "With Bambu Lab Automatic Material System (AMS)，you can now enjoy printing freely in multiple colors and materials.",
+      "condition": "Included with the X1C Combo",
+      "note": "The words \"(AMS)\" link to the ams-multicolor-printing product page; the box list of this page names \"Bambu Lab AMS\" among the X1C AMS Combo add-ons."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://us.store.bambulab.com/products/refurbished-x1c",
+      "source_title": "[Refurbished] Bambu Lab X1C 3D Printer store page",
+      "locator": "X1C Tech Specs › row 7 (Build Plate Surface)",
+      "quote": "Build Plate Surface Bambu Textured PEI Plate(Pre-installed, Random, Both compatible with Micro Lidar)",
+      "condition": "Pre-installed"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/x1/manual/acc-in-the-box",
+      "source_title": "Supplementary instructions for X1C and X1C combo accessories in the box",
+      "locator": "Accessories table › row 1 (Bambu build plate) › Marks",
+      "quote": "Bambu Textured PEI Plate / Bambu Cool Plate (Pre-installed, Random)",
+      "condition": "One of the two plates is pre-installed, at random",
+      "note": "No plain \"Bambu Cool Plate\" product in the manifest (bambu-cool-plate-supertack is a different product), so no target handle."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with hardened steel nozzle (0.4 mm)",
+      "target_source_handle": "bambu-hotend-x1c",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/x1/manual/acc-in-the-box",
+      "source_title": "Supplementary instructions for X1C and X1C combo accessories in the box",
+      "locator": "Accessories table › row 2 (Hotend with hardened steel nozzle (0.4 mm)) › Applications",
+      "quote": "Hotend with hardened steel nozzle (0.4 mm) | X1C spare hotend, replace the original nozzle when it is damaged.",
+      "condition": "Spare hotend",
+      "note": "Target product \"Bambu Hotend - X1C\"; its option \"0.4mm Hardened Steel (Standard Included)\" is this hotend."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "768372815270326273",
+        "value_text": "X1C Combo"
+      },
+      "source_url": "https://wiki.bambulab.com/en/x1/manual/acc-in-the-box",
+      "source_title": "Supplementary instructions for X1C and X1C combo accessories in the box",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "locator": "Accessories table, rows 1–14 and 16 (NO. / Descriptions / Marks); intro sentence",
+      "quote": "The X1C combo package comes with screen, spool holder, filament, spare hotend, 2 nozzle wiping pads, power cord, unclogging pin tool, 4*6PIN cable, PTFE tube, screw pack for scraper",
+      "note": "This is a refurbished unit; its page says every official refurbished product is \"Repackaged with all the original accessories — manual, cables, and box.\" The page sells one version (X1C Combo), so row 15 (X1C: \"PLA Basic 250g\") is left out and rows 3–5 (\"For the X1C combo only\") are kept. Table rows in order, as written. The wiki adds: \"Please note that the products you receive may undergo material changes and version iterations.\" The intro sentence names items with no table row (screen, power cord, PTFE tube, screw packs for the scraper and spool holder, the lidar quick label, quick start guide, disclaimers, warranty leaflet); they are listed last with section \"Intro sentence\". It also gives counts the table does not (\"2 nozzle wiping pads\", \"2 scrapers\", \"5 lubricant grease\"); qty is left empty on those rows. The table does not list the printer, the AMS or the accessory box itself; the store box list does (\"Bambu Lab X1C\", \"Bambu Lab AMS\", \"Accessory Box\", \"Spare Filament Cutter ×2\", \"Bambu Bus Cable-6Pin(510mm)\", \"Bambu Bus Cable-4Pin(260mm)\").",
+      "items": [
+        {
+          "text": "Bambu build plate (Bambu Textured PEI Plate / Bambu Cool Plate, Pre-installed, Random)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Hotend with hardened steel nozzle (0.4 mm)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Bambu bus cable (4PIN)",
+          "qty": null,
+          "section": "For the X1C combo only"
+        },
+        {
+          "text": "Bambu bus cable (6PIN)",
+          "qty": null,
+          "section": "For the X1C combo only"
+        },
+        {
+          "text": "Filament cutter",
+          "qty": null,
+          "section": "For the X1C combo only"
+        },
+        {
+          "text": "Retaining clip & hot end screws",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "H1.5/H2.0 hex keys",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Lubricant grease",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Bambu scraper",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Spool holder",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Spare screws for the extruder",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Unclogging tool for 0.4 mm nozzle",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Thermal grease",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Nozzle wiper",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "One spool of PLA Basic 250g",
+          "qty": null,
+          "section": "X1C combo: Three spools of filament"
+        },
+        {
+          "text": "PLA/PETG support filament 250g or PLA support filament 250g (either, shipped randomly)",
+          "qty": null,
+          "section": "X1C combo: Three spools of filament"
+        },
+        {
+          "text": "One of PLA-CF 250g, PLA Basic Jade White 250g, PA-CF 250g, PAHT-CF 250g (shipped randomly)",
+          "qty": null,
+          "section": "X1C combo: Three spools of filament"
+        },
+        {
+          "text": "Screen",
+          "qty": null,
+          "section": "Intro sentence"
+        },
+        {
+          "text": "Power cord",
+          "qty": null,
+          "section": "Intro sentence"
+        },
+        {
+          "text": "PTFE tube",
+          "qty": null,
+          "section": "Intro sentence"
+        },
+        {
+          "text": "Screw pack for scraper",
+          "qty": null,
+          "section": "Intro sentence"
+        },
+        {
+          "text": "Screw pack for spool holder",
+          "qty": null,
+          "section": "Intro sentence"
+        },
+        {
+          "text": "Micro lidar quick label",
+          "qty": null,
+          "section": "Intro sentence"
+        },
+        {
+          "text": "Quick start guide",
+          "qty": null,
+          "section": "Intro sentence"
+        },
+        {
+          "text": "Disclaimer",
+          "qty": null,
+          "section": "Intro sentence"
+        },
+        {
+          "text": "AMS disclaimer",
+          "qty": null,
+          "section": "Intro sentence"
+        },
+        {
+          "text": "Warranty leaflet",
+          "qty": null,
+          "section": "Intro sentence"
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/x1/manual/acc-in-the-box",
+      "title": "Supplementary instructions for X1C and X1C combo accessories in the box",
+      "retrieved_at": "2026-10-16T08:24:24Z",
+      "sha256": "a01cbdec7c098728a5bb93d4dd069b6331433a97f055e89378a60bb4be86be2c"
+    }
+  ],
+  "not_published": [],
+  "notes": [
+    "The store link \"Download X1C TDS\" points to https://public-cdn.bambulab.com/store/X1-Carbon%20tech%20specs.pdf. It is not cached (the host answered 403 to robots.txt and was not contacted again) and its host is not an allowed document host, so it is not listed under documents. The X1C spec sheet was therefore not read: every spec here rests on the store page (official_page) and the box wiki, and not_published is left empty, because a key missing from the page and the box list is not evidence that the manufacturer does not publish it.",
+    "The page sells one version, X1C Combo. The table's X1C-only segment (\"Package size 480 × 480 × 535 mm³\", \"Gross weight 18kg\") is not written: no version value of this page matches it. The package writes that box at product scope (package.length/width/height 480/480/535, us_110v) and the two gross weights as one string at product scope (shipment.gross_weight \"18000 / 22300 g\", us_110v); the curated file cannot replace those page rows (same rank).",
+    "Page facts with no registry key, not written: \"7μm lidar resolution\", \"Spaghetti failure detection\", \"AI inspected first layer\", \"Vibration Compensation & Extrusion Compensation\", \"extra cooling\".",
+    "The \"Learn more\" link to bambulab.com/en/x1 (\"Full advanced features of X1C 3D printers\") was not read (bambulab.com is behind a bot challenge, §1 row 7). The wiki article linked from the table footnotes (https://wiki.bambulab.com/en/knowledge-sharing/print-volume-limitations) is not cached and was not read; the package already lists it as a document."
+  ]
+}

@@ -1,0 +1,3269 @@
+{
+ "batch": 13,
+ "surface": "page",
+ "handles": [
+  "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+  "150mm-zh1-5-to-sh1-0-conversion-wire",
+  "turntable-kit",
+  "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+  "universal-joint-shaft-coupling-with-screws",
+  "ac-dc-power-adapter",
+  "m3-carbon-steel-full-thread-rod",
+  "m3-aluminum-rod-end-ball-joint",
+  "dc5521-female-to-2pin-solderless-quick-connector",
+  "sh1-0-to-sh1-0-connector-adapter-board",
+  "sh1-0-to-ph2-0-power-adapter-board",
+  "foldable-key-phone-stand",
+  "360-rotating-marble-run-enclosed-with-lights",
+  "white-cct-tunable-cob-led-strip-light-combo-kit",
+  "led-light-strip-256rgb-5050led-815mm",
+  "bike-saddle-rail",
+  "round-shoelace",
+  "0-3mm-transparent-pvc-sheet-5pcs",
+  "plastic-differential-gear-kit-1pcs",
+  "ws2812-rgb-led-with-idc0-8-4pin-2pcs",
+  "ws2812-led-hub-with-3pin-sh1-0-connector-1pcs",
+  "rubber-tire-4pcs",
+  "three-position-rocker-switch-module-with-3pin-sh1-0-connector-1pcs",
+  "cyberbrick-hardware-kit",
+  "7-4v-lithium-battery-charger-with-xh2-54-connector-1pcs",
+  "cyberbrick-timelapse-kit",
+  "sh1-0-to-dual-sh1-0-adapter-2pcs",
+  "multi-function-controller-core-1pcs",
+  "remote-control-receiver-shield-1pcs",
+  "remote-control-transmitter-shield-1pcs",
+  "single-axis-joystick-module-with-3pin-sh1-0-connector-1pcs",
+  "dual-axis-joystick-module-with-3pin-sh1-0-connectors-1pcs",
+  "100mm-wire-with-2pin-xh2-54-connectors-2pcs",
+  "100mm-wire-with-3pin-sh1-0-connectors-2pcs",
+  "200mm-servo-extension-cable-3pin-2pcs",
+  "power-switch-module-with-2pin-xh2-54-connector-1pcs",
+  "momentary-button-module-with-2pin-sh1-0-connector-1pcs",
+  "14500-7-4v-800mah-li-ion-battery-1pcs",
+  "1-4-camera-screw-3pcs",
+  "1-4-camera-quick-release-plate-nut-2pcs",
+  "ams-flipper-for-p1s-x1-series",
+  "adjustable-hand-wrist-strap",
+  "1-4-aluminium-alloy-screw-3pcs-fc011",
+  "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+  "lipo-battery-fireproof-storage-bag",
+  "type-c-female-head-to-ph2-0-power-supply-cable",
+  "20w-dual-port-fast-charger-1pcs",
+  "cyberbrick-tank",
+  "duel-bumper-car-cyberbrick",
+  "cyberbrick-mini-tank",
+  "mini-suv-cyberbrick-rc",
+  "cyberbrick-official-soccerbot",
+  "bulldozer-cyberbrick-rc",
+  "handheld-vacuum-cleaner-kit",
+  "christmas-santa-s-snowcat-cyberbrick-rc",
+  "fcyberbrick-official-forklift-and-truck",
+  "arctic-snowcat-cyberbrick-rc",
+  "200mm-xh2-54-female-to-ph2-0-male-conversion-wire",
+  "easy-grip-jumper-shunt",
+  "4x4-mini-off-roader-cyberbrick-rc",
+  "relic-rush-board-game",
+  "xh2-54-male-to-ph2-0-female-conversion-cable",
+  "50mm-y-type-xh2-54-male-to-dual-xh2-54-female-conversion-cable-2pcs-pd003",
+  "led-mini-spotlight",
+  "the-crazy-factory-cyberbrick-rc",
+  "l-one-desktop-robotic-arm-cyberbrick-rc",
+  "cryptatrope-adventure"
+ ],
+ "strings": [
+  {
+   "h": "4e2335c378a375948d3c4edf0b96c775d262fdd186cc49aaf9ea3a971385a5f7",
+   "en": "This LED remote-controlled waterproof light offers 13 colors, 2 dynamic modes, and 4 brightness levels, perfect for 3D printed models, weddings, parties, and more. It’s waterproof for underwater use, with a long-lasting, replaceable battery that provides up to 16 hours of use. The remote control can manage multiple lights at once, making it easy to create the ideal ambiance for any occasion.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "52984b0b133608d1e0e2916be1f485a38e321bac3937c7375da10fab1cf18f58",
+   "en": "User Instructions",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "37e35650011d8584e0418d8761aa0a8ac38eb1d6242d7df9c3ff2a8607e0ef2c",
+   "en": "Light Installation & Activations",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "usage[0].body.line[0]",
+    "near": "Rotate the base of the light to open it. Remove the white circular insulation sheet and then screw the cap back on. Ensure the spring inside makes contact with "
+   },
+   "dict": null
+  },
+  {
+   "h": "86f61d02aa55878f3b1e935fcc4e4e5c106ff9998d03d344f4abf25009b471c9",
+   "en": "Rotate the base of the light to open it. Remove the white circular insulation sheet and then screw the cap back on. Ensure the spring inside makes contact with the battery. The light will automatically turn on and enter gradient mode (no remote control needed). If the light doesn’t turn on, reseal the cap to ensure proper contact.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "usage[0].body.line[1]",
+    "near": "Light Installation & Activations"
+   },
+   "dict": null
+  },
+  {
+   "h": "9a1f56b9b62b76a6cc02719fe7f33d83cbe0c177149a23964e9dc15be52e8fd2",
+   "en": "Remote Control Operation",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "usage[0].body.line[2]",
+    "near": "Rotate the base of the light to open it. Remove the white circular insulation sheet and then screw the cap back on. Ensure the spring inside makes contact with "
+   },
+   "dict": null
+  },
+  {
+   "h": "be058559af639c4854f37b0e25f53ecc9eb59934b3cf3ddc242c8e0c52d0523a",
+   "en": "Remove the transparent piece at the bottom of the remote control and press the \"OFF\" button to test its functionality. Press \"ON\" and select the desired color/function. Press \"RESET\" to revert the light to red.The remote control can operate multiple lights at once, with a working range of 5-10 meters. Note that the remote control is not waterproof, so keep it away from water.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "usage[0].body.line[3]",
+    "near": "Remote Control Operation"
+   },
+   "dict": null
+  },
+  {
+   "h": "b60949380232a1da0475d3c6115a48be327133bae40d4f05bee87b3818547f44",
+   "en": "Life & Replacement",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "usage[0].body.line[4]",
+    "near": "Remove the transparent piece at the bottom of the remote control and press the \"OFF\" button to test its functionality. Press \"ON\" and select the desired color/f"
+   },
+   "dict": null
+  },
+  {
+   "h": "deca47034e419d7b5c1749ddf514b5eeb917e4c34c7a018481efa656f4c0d8ba",
+   "en": "The battery lasts about 16 hours per use. If the light only shows red and doesn't respond to the remote, the two CR2032 batteries may need replacing. If the remote still doesn't control the light, consider replacing the remote's CR2025 battery. For long-term storage, it's recommended to remove the batteries or replace the insulation sheet.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "usage[0].body.line[5]",
+    "near": "Life & Replacement"
+   },
+   "dict": null
+  },
+  {
+   "h": "9ba76b5e8fda7bffbbe717a46f191d45c75bff4fd1a604f533c5b6042b07858f",
+   "en": "Number of Colors",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.number_of_colors].label",
+    "near": "13"
+   },
+   "dict": null
+  },
+  {
+   "h": "4aa5f0ee3c5106c4e10474f47cccf48e6e11440e8cf5219dd00c3740ef7923c2",
+   "en": "Control Modes",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.control_modes].label",
+    "near": "Static color, Gradient, Flash"
+   },
+   "dict": null
+  },
+  {
+   "h": "05442d15399a01d1481e407e850410286197d77bfc0079d0e753b4b2ceaf4299",
+   "en": "Static color, Gradient, Flash",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.control_modes]",
+    "near": "Control Modes"
+   },
+   "dict": null
+  },
+  {
+   "h": "dd1cd3d60a28bc5624a4a414028d2b67e6c6a62620502e573efb5070701935cd",
+   "en": "PS",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "05a8972744270d5afac0c691e07bc3e24e85b3fa2211db07e8457bc4382a88a3",
+   "en": "Remote Control Type",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.remote_control_type].label",
+    "near": "Infrared"
+   },
+   "dict": null
+  },
+  {
+   "h": "025e0d3c94a1364c923236c25994c43f243364ea0570b3042f7dbf04d6646db0",
+   "en": "Infrared",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.remote_control_type]",
+    "near": "Remote Control Type"
+   },
+   "dict": null
+  },
+  {
+   "h": "8266b65a5d2d097a1aeb628b104a8b75a2c031a4c7464cea68e93f80870d45dc",
+   "en": "10 meters",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.remote_control_distance]",
+    "near": "Remote Control Distance"
+   },
+   "dict": null
+  },
+  {
+   "h": "a03532227a549c46614a94194fbd3c6d5948fd2176eed8bcc466c0b6e99f1518",
+   "en": "LED Efficiency",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.led_efficiency].label",
+    "near": "100 lm/w"
+   },
+   "dict": null
+  },
+  {
+   "h": "880d9837c23b330afe1921d38d2a4f27ede11b5076c45a0167f21f9aa78f48aa",
+   "en": "100 lm/w",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.led_efficiency]",
+    "near": "LED Efficiency"
+   },
+   "dict": null
+  },
+  {
+   "h": "d256dbf1eac222297fde1b1ec271536c963974f57c05b581c5d2ec3d5a607c6a",
+   "en": "Working Hours",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.working_hours].label",
+    "near": "16h"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b06109510291f9fe0cc800e5603fe0c3f9cede610a78f8086992cc696444823",
+   "en": "Waterproof Rating",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.waterproof_rating].label",
+    "near": "IP68"
+   },
+   "dict": null
+  },
+  {
+   "h": "075006071207ff5a33a1504fd9cb2896a1c788c662525b09ed8a1eb5e98cc590",
+   "en": "Remote Control Dimensions",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "specs[x.remote_control_dimensions].label",
+    "near": "3*8.5*0.6 cm"
+   },
+   "dict": null
+  },
+  {
+   "h": "0e4065805f34930d3ea886eccee73d9f968817f93fa31ddcf569a0550c086ce5",
+   "en": "Application instruction",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "mini-waterproof-rgb-led-tea-lights-with-remote-control",
+    "title": "Mini Waterproof RGB LED Tea Lights with Remote Control (6pcs)",
+    "field": "documents[1]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "d612cbe629d6e1d911485b9fdf2a643d8fdac62b2fa5a2898b9c62c2f7c2e610",
+   "en": "150mm ZH1.5 to SH1.0 conversion cable for the Rechargeable Power Supply Kit - ZC003, allowing the connection of COB LED Strip Light - KA007, N20 Dual Shaft Worm Gear Motor - LA009 and many more appliances.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "150mm-zh1-5-to-sh1-0-conversion-wire",
+    "title": "150mm ZH1.5 to SH1.0 Conversion Wire",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3eef0847d9fcff197c77382504036ca8011d160746e52cf88dfeea6b9487e340",
+   "en": "Your PrintMon, Your Stage!Ever dreamed of adding your own twist to a popular animation? With PrintMon Maker, you can turn those ideas into reality and transform them into real, tangible creations! No 3D modeling skills are required—this AI-powered generator helps you hatch your one-of-a-kind PrintMon effortlessly. To showcase your unique creation, pair it with our Turntable Kit—the perfect stage for your PrintMon. Designed with rechargeable components and 608ZZ bearings, this kit ensures smooth, quiet rotations while enhancing load-bearing capacity. The turntable supports 360-degree rotation, bringing your design to life and making every angle shine. Start creating your own PrintMon today with PrintMon Maker, and let the Turntable Kit elevate your creations to the next level!",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "turntable-kit",
+    "title": "Turntable Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "d82008594ffbca1b3764f15920d2bdb23562c916d2fe665041332cd6d742471a",
+   "en": "Documentation Specification 3D Model maker Product ID L (mm) Bolt Length D (mm) Head Diameter H (mm) Head Thickness k (mm) Hexagon Across Flats t (mm) Groove Depth Screwdriver BitSize AA225 35 10 6 5 3 H5 *Compliant with the requirements of GB/T 70.2-2015 standard [Equivalent standards: ISO 7380-1 - 2011, DIN EN ISO 7380 (-1) - 2011] Forgot the screw specs? Just print the Screw Gauge model from MakerWorld to help with sorting. .pct_hardware-tableList-t-icpc { padding: '0 20px' } .pct_hardware-tableList { width: 100%; row-gap: 15px !important; column-gap: 15px !important; } .pct_hardware-tableList .pct_ic-p { overflow: hidden; } .pct_hardware-tableList .pct_st-tbc .pct_tb .pct_td { border-color: #ADADAD; } @media (min-width: 640px) { .pct_hardware-tableList-t-icpc { padding: 0px !important } .pct_hardware-tableList { width: 100%; row-gap: 15px; column-gap: 15px; } .pct_hardware-tableList",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+    "title": "M6 Carbon Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "5130f918d40f43d27e687b529c071fd40ec4e05d0e024c60cd3771750b3e6647",
+   "en": "Black zinc-nickel alloy plated",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+    "title": "M6 Carbon Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "specs[part.surface_treatment]",
+    "near": "Surface treatment"
+   },
+   "dict": null
+  },
+  {
+   "h": "60399027147dcc60bcca5fa1c747afcce48cd42ec5a791039eceded75e792605",
+   "en": "Machine thread",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+    "title": "M6 Carbon Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "specs[part.screw_type]",
+    "near": "Screw type"
+   },
+   "dict": null
+  },
+  {
+   "h": "b625ed64381017ca7000d04f1373fb6487c269bd04dc78eb3d8e53710bec2b42",
+   "en": "Full thread",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m6-carbon-steel-socket-head-cap-machine-screws-shcs",
+    "title": "M6 Carbon Steel Socket Head Cap Machine Screws (SHCS)",
+    "field": "specs[part.thread_type]",
+    "near": "Thread type"
+   },
+   "dict": null
+  },
+  {
+   "h": "53fc8bd33d9ec9bfe68c4358d047c3ea9c9fbf01fb9861bf4a4ff39e48311914",
+   "en": "The Universal Joint Coupling is essential for transmitting power and motion, accommodating misalignments and angular variations. It's an ideal choice for makers and DIY enthusiasts looking to build innovative projects with flexible and reliable motion connections.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "universal-joint-shaft-coupling-with-screws",
+    "title": "Universal Joint Shaft Coupling with Screws",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c947b88330c787f5473344c4cf49b80835074ddd029626d7c3d7b8964f23777c",
+   "en": "The AC to DC Power Adapter universally supports devices requires 12V or 24V with a power output of up to 2A. It includes four interchangeable AC connectors, making it compatible with power outlets in North America, Europe, the United Kingdom, and Australia. This power supply is a good replacement for a lost or damaged power adapter. Having a spare one in hand will ensure that you always have a power source.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "ac-dc-power-adapter",
+    "title": "AC to DC Power Adapter",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f411e505d6a24f886a4123f4c8a90f48be0df58e56a9b5b6297580dee0e8365f",
+   "en": "This fully threaded rod is made from high-quality carbon steel, and is available in M3x16mm and M3x30mm sizes. It's durable and great for various DIY projects. Primarily used to connect nuts and secure components, it serves as an essential fixture in U-bolts, hangers, and other applications. Additionally, it pairs perfectly with&nbsp;M3 Aluminum Rod End Ball Joints, offering an effective solution for connections and flexible movement.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "m3-carbon-steel-full-thread-rod",
+    "title": "M3 Carbon Steel Full-Thread Rod",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "15d6ddec48de12e9db7cf7d02f7fbe7c5ae736419d5044bc01d18f006bd77b45",
+   "en": "Zinc-nickel Alloy Plating",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m3-carbon-steel-full-thread-rod",
+    "title": "M3 Carbon Steel Full-Thread Rod",
+    "field": "specs[part.surface_treatment]",
+    "near": "Surface treatment"
+   },
+   "dict": null
+  },
+  {
+   "h": "d9c9f6d4806f907afe45c3d86ac7c2351246155d77f81deb422b8f0381279905",
+   "en": "Type of Thread",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "m3-carbon-steel-full-thread-rod",
+    "title": "M3 Carbon Steel Full-Thread Rod",
+    "field": "specs[x.type_of_thread].label",
+    "near": "Complete thread"
+   },
+   "dict": null
+  },
+  {
+   "h": "4c657f99e5bf4a2bdfdf5ffa7caf1eec1c6c3270601f55d0d23b2b087e1bcb5c",
+   "en": "Carbon Steel",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m3-carbon-steel-full-thread-rod",
+    "title": "M3 Carbon Steel Full-Thread Rod",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "d3111a86a5cd17c96de6dc23c65c19d258a7e11d3d8adf53a8c00af0690d1533",
+   "en": "This Aluminum Alloy Rod End Ball Joint is a premium-grade component designed for precision and durability. Made from high-strength aluminum alloy, it offers excellent wear resistance, corrosion protection, and lightweight performance. This ball joint is ideal for RC cars, robotics, and 3D printing projects, providing smooth and reliable pivot points for mechanical assemblies. Compatible with Carbon Steel Full-Thread Rod, it can be easily integrated into various designs, offering flexibility and convenience for makers and hobbyists.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8f74ae6ad8db6f2b71016cea98bcfd2367b48623676fd1053428db3cfc64f58c",
+   "en": "Articulation Angle",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "specs[x.articulation_angle].label",
+    "near": "Approximately 20°"
+   },
+   "dict": null
+  },
+  {
+   "h": "ecbc7e9f1a0dde5ab203c529e01b08ef4c10a993c82d6a06b7eca1a029ce070c",
+   "en": "Approximately 20°",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "specs[x.articulation_angle]",
+    "near": "Articulation Angle"
+   },
+   "dict": null
+  },
+  {
+   "h": "d639d8e3610c2f5702f8e904769d8d1b3612d8aa81e5000d22a934da3ebabf33",
+   "en": "Aluminum Alloy (Body), Brass (Ball)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "a26d8dd85c69e3b57cfb5ef7f31437f490fd55bf898a254248e6904b7462ddf1",
+   "en": "Thread Direction",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "specs[x.thread_direction].label",
+    "near": "CW Thred"
+   },
+   "dict": null
+  },
+  {
+   "h": "0aaf9648dbb186dc9263e9e45e3bc6da98d6fe3875eaf8113bfcbb0df601212e",
+   "en": "CW Thred",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "specs[x.thread_direction]",
+    "near": "Thread Direction"
+   },
+   "dict": null
+  },
+  {
+   "h": "b4d1583fd6de64995811330fad1acd0385e209bc47298627a3bcc12dcf8cf949",
+   "en": "Thread Size",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "specs[x.thread_size].label",
+    "near": "M3 Bottom Hole"
+   },
+   "dict": null
+  },
+  {
+   "h": "61b688c2a007c55ce45d26bfef2937e741d78f3d9af43676c9b0902701518624",
+   "en": "M3 Bottom Hole",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "specs[x.thread_size]",
+    "near": "Thread Size"
+   },
+   "dict": null
+  },
+  {
+   "h": "a9be9c3e9ab66e18c71753c1690b29ab565566247df3dd8096bf583fff88f7cd",
+   "en": "Qty",
+   "kind": "spec_label",
+   "freq": 3,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "specs[x.qty].label",
+    "near": "12 PCS"
+   },
+   "dict": null
+  },
+  {
+   "h": "79b6985658aa18e3baa12d1d9efbf9580798a4e6b4bbcbf0eb68b6d17dd45301",
+   "en": "12 PCS",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "m3-aluminum-rod-end-ball-joint",
+    "title": "M3 Aluminum Rod End Ball Joint",
+    "field": "specs[x.qty]",
+    "near": "Qty"
+   },
+   "dict": {
+    "ar": "12 قطعة",
+    "ckb": "12 دانە"
+   }
+  },
+  {
+   "h": "322aa9ae85c2bdf34dd69f7a200a0b72d0669b8ecc9fbacfcda20dee67c1558f",
+   "en": "The DC5521 Female to 2-Pin Solderless Quick Connector offers a simple and efficient power solution for the White CCT Tunable COB LED Strip Light.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "dc5521-female-to-2pin-solderless-quick-connector",
+    "title": "DC5521 Female to 2PIN Solderless Quick Connector",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f5c186cd5b2100c95a87d1a1bdc8f9318facaa398ec1e49faf14087f9b102e8a",
+   "en": "The DC5521 Female to 2-Pin Solderless Quick Connector offers a simple and efficient power solution for the White CCT Tunable COB LED Strip Light. Designed for convenience, it features a solder-free connector on one end for effortless attachment to the LED strip, and a DC plug on the other end for seamless connection to a 24V AC-to-DC power adapter. This connector makes completing your illuminated DIY projects easier and more efficient than ever.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "dc5521-female-to-2pin-solderless-quick-connector",
+    "title": "DC5521 Female to 2PIN Solderless Quick Connector",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f110f152564c5730561aa7532e2093c10cc225c578089cb1a49f899ec093c7bd",
+   "en": "SH1.0 to SH1.0 Connector Adapter Board enables quick SH1.0 aerial docking, ensuring stable signal and power transmission for compact devices and modular systems. Can be paired with Wire Pair with SH1.0 as an extension kit for SH1.0 aerial docking.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-sh1-0-connector-adapter-board",
+    "title": "SH1.0 to SH1.0 Connector Adapter Board",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0e02c56964812ba5d0ddacfc0ddf5b71413332d1fed597bf94f0246d41e4beaf",
+   "en": "SH1.0 to PH2.0 Power Adapter Board enables quick connections between SH1.0 and PH2.0 interfaces, ensuring stable power transmission for embedded devices and modular systems. Can be paired with USB-A Power Cable with PH2.0 Connector to provide power for devices with SH1.0 interfaces, like 030 Micro DC Motor with SH1.0.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "sh1-0-to-ph2-0-power-adapter-board",
+    "title": "SH1.0 to PH2.0 Power Adapter Board",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "60d32fc75182af0eed4f2dab10ac0facd70a520a3174df6637b3638f9abdc64c",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional Foldable Key Phone Stand. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "foldable-key-phone-stand",
+    "title": "Foldable Key Phone Stand",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "383dcb5cf40df84d1ce4ea193021cdbc14d100fcf61cce08ee50b0e69e4b3d66",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional 360˚ Rotating Marble Run - Enclosed with Lights. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "360-rotating-marble-run-enclosed-with-lights",
+    "title": "360˚ Rotating Marble Run - Enclosed with Lights",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "75abf5c4eb7a45a1ddb0e92635e821cd07ed91cf089792ec45a6025fedea9144",
+   "en": "This COB LED Strip Light Combo Kit offers a seamless DIY lighting experiences. The set includes high-quality COB LED Strip Light, Solderless Quick Connector, and a 24V Power Adapter. Simply connect the components to control and switch between various lighting modes. Whether you're a beginner or an experienced maker, you can use this all-in-one kit to create lighting projects effortless.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2cdb90da8a8dc7816bb8e7a24b8a3ce842a46e1ca301ae2dff6839c3aec7767c",
+   "en": "This COB LED Strip Light Combo Kit offers a seamless DIY lighting experience. The set includes high-quality White CCT Tunable COB LED Strip Light, Solderless Quick Connector, and a 24V Power Adapter. Simply connect the components to control and switch between various lighting modes. Whether you're a beginner or an experienced maker, you can use this all-in-one kit to ccreate lighting projects effortlessly.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "white-cct-tunable-cob-led-strip-light-combo-kit",
+    "title": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "2bb50ef33940ba3e7d37dd5680935248c849f580084f3609099a7d249bd9ef4d",
+   "en": "This LED Light Strip features 5050 RGB LEDs, it has 256 light beads in a 815-mm length. This strip delivers vibrant, customizable lighting that is great for DIY electronics, home decor, and creative projects. It can be used with the Motion-Activated Sound and Light Props Kit-01 & 02 to create your unique model projects.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-256rgb-5050led-815mm",
+    "title": "LED light strip 256RGB 5050LED 815MM",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6fdb9b2d6ed0f1b9264f5688e9439b32e4a4c9d9dfa08d766d288a9ee670a4ad",
+   "en": "This LED Light Strip features 5050 RGB LEDs, it has 256 light beads in a 815-mm length. This strip delivers vibrant, customizable lighting that is great for DIY electronics, home decor, and creative projects.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-256rgb-5050led-815mm",
+    "title": "LED light strip 256RGB 5050LED 815MM",
+    "field": "usage[0].body.line[0]",
+    "near": "It can be used with the Motion-Activated Sound and Light Props Kit-01 & 02 to create your unique model projects."
+   },
+   "dict": null
+  },
+  {
+   "h": "6c2a5eb4fc5afad78abc4d366fd78d109fac5850db01ce7cfaa6c1e64dc09611",
+   "en": "It can be used with the Motion-Activated Sound and Light Props Kit-01 & 02 to create your unique model projects.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "led-light-strip-256rgb-5050led-815mm",
+    "title": "LED light strip 256RGB 5050LED 815MM",
+    "field": "usage[0].body.line[1]",
+    "near": "This LED Light Strip features 5050 RGB LEDs, it has 256 light beads in a 815-mm length. This strip delivers vibrant, customizable lighting that is great for DIY"
+   },
+   "dict": null
+  },
+  {
+   "h": "edcb1febb6f9a9e7799a194f5420fd748e7c64887164c6a195e3d0b34aab377c",
+   "en": "This bike saddle rail is specifically designed for 3D-printed saddles, crafted from high-strength Chromoly Steel with a durable rust-resistant coating that withstands rainy rides. Its streamlined design enables tool-free installation, balancing structural integrity and practicality to meet daily commuting and casual cycling needs effortlessly.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "bike-saddle-rail",
+    "title": "Bike Saddle Rail",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7f02ac0bc63dcb1f454da6b3a479c3f9ccaa7515f9eb8483acf1afdefc628e73",
+   "en": "Chromoly Steel",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "bike-saddle-rail",
+    "title": "Bike Saddle Rail",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "82be56d30930ca0bc4e298aa3d0639c55c96c0bfa9853ffa825c730057309abd",
+   "en": "The Round Shoelace, designed for 3D-printed footwear, features a snag-resistant weave. Two styles are available: the Normal version uses 100% abrasion-resistant polyester for daily wear, while the Reflective version incorporates light-reactive strips that create striking flashes under direct lighting, making it ideal for night runs or parties. Both versions thread smoothly through printed eyelets and lock securely.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "round-shoelace",
+    "title": "Round Shoelace",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "077b48a75158d4fa6c687fbb20392532f3b1c6aee5d88babc8b6e664224435f6",
+   "en": "Normal: Black & White / Reflective: Black & White",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "round-shoelace",
+    "title": "Round Shoelace",
+    "field": "specs[contents.pieces]",
+    "near": "Pieces per pack"
+   },
+   "dict": null
+  },
+  {
+   "h": "8d86a0a6650530de79698a3a91e9ffac308013359303c450407d4500ac2eeca5",
+   "en": "2 Pairs per set",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "round-shoelace",
+    "title": "Round Shoelace",
+    "field": "specs[product.net_weight]",
+    "near": "Net weight"
+   },
+   "dict": null
+  },
+  {
+   "h": "2fe4c9284913b767dcfb53afb137673940f85bd4a9494f75db4b9d28cd744554",
+   "en": "Normal: 100% polyester thread / Reflective: 72% polyester thread + 28% reflective thread",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "round-shoelace",
+    "title": "Round Shoelace",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "4c9580b3b0b6fd58d90e3704a19551e8519264c3cd39324f4ce846cab1f48eae",
+   "en": "Bambu Transparent PVC Sheet offers a clear, glass-like finish. Its transparency and durable design make its perfect for transparent sections in your projects such as car windows or photo frames.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "0-3mm-transparent-pvc-sheet-5pcs",
+    "title": "0.3mm Transparent PVC Sheet (5pcs)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b7a777462aaad49c0967084e5ea49dc6f8a457a7dbbcb97bf31fe49c029d55dd",
+   "en": "The Plastic Differential Gear Kit includes all the necessary gears and knurled shafts for assembling a differential. The completed differential can be combined with a gearbox built using the 030 Micro DC Motor and the 1:48 Single-axis Plastic Reduction Gear Kit to form a complete power transmission system.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "plastic-differential-gear-kit-1pcs",
+    "title": "Plastic Differential Gear Kit (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0b7342232f3c06a83cd599dd16bcb148283c8b51f7e74b3a67ebea464fef8de6",
+   "en": "The WS2812 RGB LED is a pre-wired module that supports the WS2812 protocol and emits multiple colors of light. When used with the WS2812 LED Hub, it enables various visual effects and is ideal for models requiring multiple LEDs, such as lights in model vehicles.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812-rgb-led-with-idc0-8-4pin-2pcs",
+    "title": "WS2812 RGB LED with IDC0.8 4PIN (2PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7eacf06ff0ac75954d677b8c7048c7d649fb33c9323dea88aa917e87257b6f99",
+   "en": "User's Manual",
+   "kind": "doc_title",
+   "freq": 14,
+   "context": {
+    "handle": "ws2812-rgb-led-with-idc0-8-4pin-2pcs",
+    "title": "WS2812 RGB LED with IDC0.8 4PIN (2PCS)",
+    "field": "documents[0]",
+    "near": "model_file"
+   },
+   "dict": null
+  },
+  {
+   "h": "3c76ec1ed0cadf28f8020313d7265320f7324a3134b732a9af938d6d3a1ff0e9",
+   "en": "The WS2812 LED Hub is designed to connect WS2812 RGB LEDs to the LED output port of an expansion board. It enables independent control of multiple LEDs through the supported communication protocol. When used with multiple WS2812 LEDs, it delivers a variety of visual effects, making it suitable for models or applications that require multiple LED units.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "ws2812-led-hub-with-3pin-sh1-0-connector-1pcs",
+    "title": "WS2812 LED Hub with 3Pin SH1.0 Connector (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "015b4e0a76e504586ded7886495f58f5aae4e8ddfff25402a59c53771c7e6923",
+   "en": "Specifications",
+   "kind": "doc_title",
+   "freq": 24,
+   "context": {
+    "handle": "ws2812-led-hub-with-3pin-sh1-0-connector-1pcs",
+    "title": "WS2812 LED Hub with 3Pin SH1.0 Connector (1PCS)",
+    "field": "documents[1]",
+    "near": "spec_sheet"
+   },
+   "dict": null
+  },
+  {
+   "h": "faff0b1d7702a8a92974f7ee4fc37e426fe5e568d62a92390ec53f1147f18ef0",
+   "en": "These 33.7mm rubber tires feature a durable, realistic design and a stylish black finish, perfect for various toy models and RC cars. Their compact size allows for precise control, and easy installation makes them an ideal choice for upgrades or repairs.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "rubber-tire-4pcs",
+    "title": "Ø33.7×13.85mm Rubber Tire (4PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6836e2c1df51d6c6f553a93b0039051ef16b6189c66298da30d1dfbf902016fb",
+   "en": "The three-position rocker switch module is a 1CH input device with three fixed positions: left, center, and right, making it suitable as a state switch in various scenarios that require switching the state of lights, mechanical deformation, and more. For example, it can be used to control lighting states in vehicle models, or to switch between different vehicles in one-to-many remote control systems.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "three-position-rocker-switch-module-with-3pin-sh1-0-connector-1pcs",
+    "title": "Three-Position Rocker Switch Module with 3Pin SH1.0 Connector(1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c1dab11a87d62081cfdcc6a0af0f6e20542c998540b2590dcf80308ef9f51422",
+   "en": "CyberBrick offers a series of smart modules that empower anyone to build and enjoy a wide range of 3D-printed projects. From R/C toys to functional productivity tools. Powered by the MakerWorld team, CyberBrick is designed to be user-friendly and supported by an abundant content library, ensuring endless opportunities for creativity and innovation.",
+   "kind": "short_description",
+   "freq": 28,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3b2016cc1602ca6e7f6c6d3783d41c98138a380dc19e9119d7ebb1eaadbf316e",
+   "en": "CyberBrick App Connection Tutorial",
+   "kind": "usage_title",
+   "freq": 22,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7ea101cd0e477b5864555efa81cd642039a44bf0aa2c9f5ee8e34ec8dcd9388d",
+   "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "usage[0].body.line[0]",
+    "near": "Explore the Product Wiki & Documentation"
+   },
+   "dict": null
+  },
+  {
+   "h": "0b909c6744820dcabfb983a45fad6465e413d5a9ce27a2366d29e565fb5ef35d",
+   "en": "Explore the Product Wiki & Documentation",
+   "kind": "usage_body",
+   "freq": 21,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "usage[0].body.line[1]",
+    "near": "*The following is the App connection of CyberBrick Official SoccerBot as an example."
+   },
+   "dict": null
+  },
+  {
+   "h": "522941cac43415d0b52740a547f95f2328486313df837391342cfbf98860d035",
+   "en": "Need in-depth assembly guides, troubleshooting, or technical details for this product?",
+   "kind": "usage_body",
+   "freq": 21,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "usage[0].body.line[2]",
+    "near": "Explore the Product Wiki & Documentation"
+   },
+   "dict": null
+  },
+  {
+   "h": "44694581307769b7cab71aa1165ada5fb629832167579c438b8cb328360ef701",
+   "en": "Visit our official Wiki to discover comprehensive resources and answers to all your questions.",
+   "kind": "usage_body",
+   "freq": 21,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "usage[0].body.line[3]",
+    "near": "Need in-depth assembly guides, troubleshooting, or technical details for this product?"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b06f3426d42c39d2b41dcc13b136c1881b54752c0e4f63116e17092a5ef9616",
+   "en": "Visit Wiki",
+   "kind": "usage_body",
+   "freq": 42,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "usage[0].body.line[4]",
+    "near": "Visit our official Wiki to discover comprehensive resources and answers to all your questions."
+   },
+   "dict": null
+  },
+  {
+   "h": "63225fb4d3fb304b571f7944284cd0453be01de65a844a313a3aed56944b78dd",
+   "en": "Communication Method",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.communication_method].label",
+    "near": "2.4G WiFi / Bluetooth"
+   },
+   "dict": null
+  },
+  {
+   "h": "2e7a8b155890802d7edd9bcea453e6ae95a9959b4e6ee9b4f0f6fa366d4d70ad",
+   "en": "2.4G WiFi / Bluetooth",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.communication_method]",
+    "near": "Communication Method"
+   },
+   "dict": null
+  },
+  {
+   "h": "eecef85793053bd377c596f2dbdd8f1ff52609f925b7f10747cb525b79c9de27",
+   "en": "Support Control Mode",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.support_control_mode].label",
+    "near": "One-to-One / One-to-Many"
+   },
+   "dict": null
+  },
+  {
+   "h": "a266168cd1d0e503c38733c1d66b2f202d57c6c2a5cc598017b3dc8996031060",
+   "en": "One-to-One / One-to-Many",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.support_control_mode]",
+    "near": "Support Control Mode"
+   },
+   "dict": null
+  },
+  {
+   "h": "13dfe66a6a81ce96ffa4fce340366f77eee088d0dc549e127f84f1a7c2d05f94",
+   "en": "Developable Forms",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.developable_forms].label",
+    "near": "Car / Boat / Robot-like"
+   },
+   "dict": null
+  },
+  {
+   "h": "8734b9706c750e659a54c0f236df515d7a5427daad3544e0afb7e5a25a3ff438",
+   "en": "Car / Boat / Robot-like",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.developable_forms]",
+    "near": "Developable Forms"
+   },
+   "dict": null
+  },
+  {
+   "h": "2b019b42e06c1dd70f9d7fb59e357f10c1454690a60838b3ba24ec914fdbee83",
+   "en": "Up to 100 meters",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.remote_control_distance]",
+    "near": "Remote Control Distance"
+   },
+   "dict": null
+  },
+  {
+   "h": "7072890470678a088b355397ea9b736213e5c6f869fb914eb5703b72fe65ccc2",
+   "en": "Configuration Method",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.configuration_method].label",
+    "near": "Mobile / PC"
+   },
+   "dict": null
+  },
+  {
+   "h": "c53531c58ecd5234b27abfe7c8b9b10427e76f0f50a3648d718928bc80e66db9",
+   "en": "Mobile / PC",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.configuration_method]",
+    "near": "Configuration Method"
+   },
+   "dict": null
+  },
+  {
+   "h": "70d82f8b8751050fce7eb49b845322ab80f648f3099bfb39c81293397f867325",
+   "en": "Compatible Development Tool",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.compatible_development_tool].label",
+    "near": "MicroPython"
+   },
+   "dict": null
+  },
+  {
+   "h": "0bcd3fc296d6c4bcf4643e1544d999f0aef93741b53f87c52c1159fe2447c3f6",
+   "en": "MicroPython",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[x.compatible_development_tool]",
+    "near": "Compatible Development Tool"
+   },
+   "dict": null
+  },
+  {
+   "h": "4cb3b18217fc9ed3eb9dd168ea27d3878740c1ba2385d50e24669079d0401326",
+   "en": "User’s Manual",
+   "kind": "box_item",
+   "freq": 5,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "box[0]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "1f54cf8f81ce61f78c691467e8ec47d11af7583c9ea8f0d443029160eced6acb",
+   "en": "Product function and configuration guidelines.",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "box[1]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "88dd8997728b57b8b677301f984c95995c6749fd655e0b9da937f3adbe14feba",
+   "en": "Essential electrical and physical parameters.",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "box[4]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "69b38c46a1e8ebde9419f81f1c2bebfcf580d26a22040d800c73c128662ea01f",
+   "en": "3D model of structure and dimensions.",
+   "kind": "box_item",
+   "freq": 4,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "box[6]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "a4a9498c9e5f6341d3cea834c877861aa9284c61190a1e4c88f2c2aeee45edbc",
+   "en": "Assembly guide for extended application cases.",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "box[8]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ff7e6cf35a9da5f76108d8cbca03323dda4b36cceb812344af16c80224c361c",
+   "en": "The USB charger for this product only supports standard 5V 1-2A input. Please always use the original charger that meets the voltage/current requirements, or charge directly via a computer USB port. D",
+   "kind": "box_item",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "box[10]",
+    "near": "In the box"
+   },
+   "dict": null
+  },
+  {
+   "h": "afb268ae72bf7ba45db3a24d7dfa9c0e54105ae40df82ff26ba1427abbd080fc",
+   "en": "The below models may require additional accessories. Please refer to the \"Bill of Materials\" for details. Please refer to the \"Description\" section on each model page for Remote details. Click here to get the Official Standard Remote.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "fd2051d6f3365de19a080a96db3eef2998aaa25c73443bae2f89d9cb23eac106",
+   "en": "Please refer to the \"Description\" section on each model page for Remote details. Click here to get the Official Standard Remote",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-hardware-kit",
+    "title": "CyberBrick Hardware Kit",
+    "field": "documents[14]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "19fe8a6f4c9d16e95ab474ded4abd0d52dbd81101cbd3d7e9feeb2bad9370e9d",
+   "en": "This charger is equipped with a standard XH2.54 connector and is suitable for charging 14500 7.4V 800mAh Li-ion batteries. It is widely used in battery-powered applications such as model toys, small robots, and DIY projects.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "7-4v-lithium-battery-charger-with-xh2-54-connector-1pcs",
+    "title": "7.4V Lithium Battery Charger with XH2.54 Connector (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "3840796e2f4b4c469055ca32bff473a5498865497f2237e53b1369345d60d78b",
+   "en": "The CyberBrick Time-lapse Kit is specifically developed and designed for Bambu Lab series 3D printers. Easily hook up your own high-end camera to create sharper, smoother time-lapse videos with pro-level detail.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f4157c99ae56a6bc42c258a5c3beb56a04daa59ee8d5c6159a139ab14b916bfd",
+   "en": "1 › 4-Pin interface",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.4_pin_interface].label",
+    "near": "Connect the printer 4pin interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "521c050cc7133232c28213916e1126806876198253ff6f910beb8a752b5e013d",
+   "en": "Connect the printer 4pin interface",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.4_pin_interface]",
+    "near": "1 › 4-Pin interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "1cab6b45c1cad1b2e0c46bf7db3e5b8bb21019ffb6e3959bd0ec889d71bd226a",
+   "en": "2 › 6-Pin interface",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.6_pin_interface].label",
+    "near": "Connect to AMS 6pin interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "dcbcf522874550167a3652ff7ff69224065dbceba1c002e5d48dd93f4b260875",
+   "en": "Connect to AMS 6pin interface",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.6_pin_interface]",
+    "near": "2 › 6-Pin interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "3640818b370f4ed5c1622b0b63d6cd6abbdc9696a560a093281571e41513b98f",
+   "en": "3 › 2.5mm shutter cable interface",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.2_5mm_shutter_cable_interface].label",
+    "near": "Connect the camera shutter cable and control the camera shutter"
+   },
+   "dict": null
+  },
+  {
+   "h": "4196475fdff6a8777f49319ed042cab62024769544327909f5471d16ab0e9cfe",
+   "en": "Connect the camera shutter cable and control the camera shutter",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.2_5mm_shutter_cable_interface]",
+    "near": "3 › 2.5mm shutter cable interface"
+   },
+   "dict": null
+  },
+  {
+   "h": "2ad30017f22d19be4d18036183d3b5e35a40f0b790c27b34f2a28fadb7b5722c",
+   "en": "4 › Multi-function buttons & Indicator lights",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.multi_function_buttons_indicator_lights].label",
+    "near": "Connection, Debugging, Light language"
+   },
+   "dict": null
+  },
+  {
+   "h": "1b3908b2ae8b9e9f24f82e7a6bd857ae4f9903e7d09f1a9bc28469ee3f77ece3",
+   "en": "Connection, Debugging, Light language",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.multi_function_buttons_indicator_lights]",
+    "near": "4 › Multi-function buttons & Indicator lights"
+   },
+   "dict": null
+  },
+  {
+   "h": "0988306f081648f9b678e6830757062ca5d14daaed9ba232cdac4b0e5cb81cef",
+   "en": "5 › Servo connection",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.servo_connection].label",
+    "near": "Connect to the servo to simulate button operation and control shutter release"
+   },
+   "dict": null
+  },
+  {
+   "h": "d8d3af524c3aaf0d858ac0d64bed6352e51d41fc2c4e9028c4ff8e6ff29de81b",
+   "en": "Connect to the servo to simulate button operation and control shutter release",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.servo_connection]",
+    "near": "5 › Servo connection"
+   },
+   "dict": null
+  },
+  {
+   "h": "81d796d4cf397fdd0e7fa7e078cda9dcf2434cee5d330aa7f9186328ef519bdf",
+   "en": "6 › Multi-Function Core Board access",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.multi_function_core_board_access].label",
+    "near": "Plug-in Multi-Function Core Board"
+   },
+   "dict": null
+  },
+  {
+   "h": "35071051cd5e0178feb5b331c6698ebf2e58ffc0fbe9f431429e2b84bc1f33f3",
+   "en": "Plug-in Multi-Function Core Board",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.multi_function_core_board_access]",
+    "near": "6 › Multi-Function Core Board access"
+   },
+   "dict": null
+  },
+  {
+   "h": "a1061849bb447617ff4f33b03e488dea79f5dc52ad0bbe8763ca155121064ec8",
+   "en": "7 › Orientation marks",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.orientation_marks].label",
+    "near": "Ensure proper installation alignment"
+   },
+   "dict": null
+  },
+  {
+   "h": "6759eba4f7b119b8bcd2a68dec13d48e919dafa7cc6bd511295ac96a9d7cbf27",
+   "en": "Ensure proper installation alignment",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[x.orientation_marks]",
+    "near": "7 › Orientation marks"
+   },
+   "dict": null
+  },
+  {
+   "h": "285ee2d4d59a4bfb43eb28b05bfbeb9486c454308e2753e875b30ba01f1d47c3",
+   "en": "*The compatibility list is for reference only. Please verify compatibility with other brands/models yourself.",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "a129ca80dc2f163fa51167ba7541bfca263ea04c5b591934a6debfe6fb184047",
+   "en": "please refer to the wiki to flash the time-lapse photography firmware",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "cyberbrick-timelapse-kit",
+    "title": "CyberBrick Time-lapse Kit",
+    "field": "documents[4]",
+    "near": "wiki"
+   },
+   "dict": null
+  },
+  {
+   "h": "10190d13c8cea4b739f34965a8f228335b4881d977820fa17f7082c3f54753c8",
+   "en": "The SH1.0 to Dual SH1.0 Adapter enables a single signal or power source to be distributed to two separate devices, providing reliable signal or power transmission to both. It can also be used to tap into the signal for testing or monitoring purposes without affecting the original circuit.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "sh1-0-to-dual-sh1-0-adapter-2pcs",
+    "title": "SH1.0 to Dual SH1.0 Adapter (2PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0069f6945af9f58f1182dee6e46d6d926a7df07acf06ee5b04b7947664172377",
+   "en": "The Multi-Function Core Board is designed for various CyberBrick projects, featuring built-in Bluetooth and WiFi connectivity. It can be quickly connected and disconnected via dual-pin headers, allowing easy switching between different expansion boards. The Core works with the Receiver Shield and the Transmitter Shield to create a basic remote control system, and it can also pair with the Time-lapse Trigger Shield to capture customized time-lapse videos.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "433e8d3adfd0ff6bb0b45d7021bd93a9c81e5cc7ad4eb7befe9d29db982ff9d7",
+   "en": "RGB system status indicator",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.ws2812_led]",
+    "near": "1 › WS2812 LED"
+   },
+   "dict": null
+  },
+  {
+   "h": "d66e8868f81ce9ef04fb3cd7f171bd5cc8227f0ed897216f30f177cd957e8506",
+   "en": "2 › Stamp Cut",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.stamp_cut].label",
+    "near": "Solderable pinout"
+   },
+   "dict": null
+  },
+  {
+   "h": "7e3a75d84ce140f35e7fbef2f4a9ca315810c541c05e89d7b7368b62b025a4f2",
+   "en": "Solderable pinout",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.stamp_cut]",
+    "near": "2 › Stamp Cut"
+   },
+   "dict": null
+  },
+  {
+   "h": "575fbbbf4ce3f7a45bc4cbfdd26a9ea9491d0014b289457c76956fc056acd186",
+   "en": "3 › Reset Button",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.reset_button].label",
+    "near": "Press to reset the main program"
+   },
+   "dict": null
+  },
+  {
+   "h": "cad0a0b8fbb207359a47208dd7bdae51603fd09942458002eec5867a569afa16",
+   "en": "Press to reset the main program",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.reset_button]",
+    "near": "3 › Reset Button"
+   },
+   "dict": null
+  },
+  {
+   "h": "0be2222097c4b9b634d1bf402748ec8d3894f34045a21513a476357d7d9522cb",
+   "en": "4 › Type-C Port",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.type_c_port].label",
+    "near": "Burning firmware & programming"
+   },
+   "dict": null
+  },
+  {
+   "h": "bc9b7b47360d157ae34306b2f021eb6c2f8d2471d32f5c3ae1c0b964aad3e511",
+   "en": "Burning firmware & programming",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.type_c_port]",
+    "near": "4 › Type-C Port"
+   },
+   "dict": null
+  },
+  {
+   "h": "cba4118766b51ad4e1709ad36a374a4e1377985193f8a103651e764dd5bf0021",
+   "en": "5 › User Button",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.user_button].label",
+    "near": "Custom function"
+   },
+   "dict": null
+  },
+  {
+   "h": "0d1f23b5902fb4ae21d391d74d87839991ea5935fc5317c93dd06ecc0ed7ca89",
+   "en": "Custom function",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.user_button]",
+    "near": "5 › User Button"
+   },
+   "dict": null
+  },
+  {
+   "h": "996549130ba5fff8ebf5b6cb28bbcec41d84dc106db55ecd31bff36da2c1c61a",
+   "en": "6 › Pin Header",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.pin_header].label",
+    "near": "Connectable with various shields"
+   },
+   "dict": null
+  },
+  {
+   "h": "891debd9d858cba7aadf76fac8f8a77881496763a31b73b7a846623ddc4b734c",
+   "en": "Connectable with various shields",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.pin_header]",
+    "near": "6 › Pin Header"
+   },
+   "dict": null
+  },
+  {
+   "h": "b303c9408c97740f1ba6a23553500118e84bd13565667f1898defcdb229af25a",
+   "en": "7 › Orientation Mark",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "multi-function-controller-core-1pcs",
+    "title": "Multi-Function Core Board (1PCS)",
+    "field": "specs[x.orientation_mark].label",
+    "near": "Ensure proper installation alignment"
+   },
+   "dict": null
+  },
+  {
+   "h": "55368a4ecfad344e0ec52e71f7cbf0215a226a8e74ee6279bb8bb506bba54c34",
+   "en": "The Remote Control Receiver Shield can be combined with the Multi-Function Core Board as the signal receiving end of various CyberBrick projects, integrating 2 DC Motor Ports, 4 DC Motor Ports, and 2 WS2812 RGB LED Ports, achieving coordination of powertrain, steering, and lighting systems without soldering.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "81847b62f76a19f25d0816531e609c8350a284bbe17b9c7352ee4902b632c4b4",
+   "en": "1 › WS2812 Port",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.ws2812_port].label",
+    "near": "Connectable with WS2812 LED hub or WS2812 LED strip"
+   },
+   "dict": null
+  },
+  {
+   "h": "573b845e04dec3e67eea300ae5ae1c164c17896b9847cf3ae3d2b961f7da6836",
+   "en": "Connectable with WS2812 LED hub or WS2812 LED strip",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.ws2812_port]",
+    "near": "1 › WS2812 Port"
+   },
+   "dict": null
+  },
+  {
+   "h": "5601b7eedf226eeb1461b1edb1cc4aa21bf4ac320d168d873b70a8e95c7fe4da",
+   "en": "2 › DC Motor Port",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.dc_motor_port].label",
+    "near": "Connectable with DC motor"
+   },
+   "dict": null
+  },
+  {
+   "h": "64c0748f698f0bdf6cd4d0b781f0e66230278119cb3b929fa0eb35afe226391a",
+   "en": "Connectable with DC motor",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.dc_motor_port]",
+    "near": "2 › DC Motor Port"
+   },
+   "dict": null
+  },
+  {
+   "h": "ab136273acc82700a840efbe35c3e8956286fcb1611347579936a24224d48b1a",
+   "en": "3 › Servo Port",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.servo_port].label",
+    "near": "Connectable with universal 5V servo motors"
+   },
+   "dict": null
+  },
+  {
+   "h": "4d0b65e72a265ef308d3450f0b916b4b01ec4b1a6f739030c1ad551002fb0c24",
+   "en": "Connectable with universal 5V servo motors",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.servo_port]",
+    "near": "3 › Servo Port"
+   },
+   "dict": null
+  },
+  {
+   "h": "664484794e3d39fee8eebbd91edf287b7d8fd60ab24983802b109fcbe56c682e",
+   "en": "4 › Power Input",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.power_input].label",
+    "near": "XH2.54 2Pin DC power input"
+   },
+   "dict": null
+  },
+  {
+   "h": "512d1a520782261308027be901698842fe15026171277a596ed32eaf9be02e8c",
+   "en": "XH2.54 2Pin DC power input",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.power_input]",
+    "near": "4 › Power Input"
+   },
+   "dict": null
+  },
+  {
+   "h": "9305615ef4b1441ac16e83c8ff5813949f28fe0ebe828c941419676023a7c5ba",
+   "en": "5 › Power Indicator",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.power_indicator].label",
+    "near": "White light means power on"
+   },
+   "dict": null
+  },
+  {
+   "h": "c9d79899fb1ecafcf3cdd9fdb952a7af6c6e9a91955fea4aa4b742611410decd",
+   "en": "White light means power on",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.power_indicator]",
+    "near": "5 › Power Indicator"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e3dbc8c77c0e91cde734bfac702f3c04a0a86d97f4ee743a47294b6595f4761",
+   "en": "6 › Core Slot",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.core_slot].label",
+    "near": "Connectable with multi-function controller core"
+   },
+   "dict": null
+  },
+  {
+   "h": "87bffc732d0cf493c14234c4071d73aa7f92b3bd61eaeaa79c2105c593207ab4",
+   "en": "Connectable with multi-function controller core",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "remote-control-receiver-shield-1pcs",
+    "title": "Remote Control Receiver Shield (1PCS)",
+    "field": "specs[x.core_slot]",
+    "near": "6 › Core Slot"
+   },
+   "dict": null
+  },
+  {
+   "h": "6d94ad5bbd010682a6e0889d517edddaa6d0f68e17f3583948f85140b97aac23",
+   "en": "The Remote Control Transmitter Shield can be combined with the Multi-Function Core Board as the signal transmitting end for various CyberBrick projects. It is equipped with equipped with 6 ADC input channels and 4 digital input channels, which can be flexibly configured with joysticks, knobs, and custom buttons to meet diverse needs from basic remote control to advanced command programming.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8280bf48a07b47708560f8379bb31aa20150e436426bd43cd9147b48c72a5025",
+   "en": "1 › Power Input",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "specs[x.power_input].label",
+    "near": "XH2.54 2Pin DC power input"
+   },
+   "dict": null
+  },
+  {
+   "h": "991403533f7f4f5be9e6d20237362f39f801127dd8969475c2991119fddf6ec4",
+   "en": "2 › ADC Input Port",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "specs[x.adc_input_port].label",
+    "near": "Connecting ADC modules such as joystick"
+   },
+   "dict": null
+  },
+  {
+   "h": "336b4eefa3579ba70bd0f34f72dc832b23131175bbcd7514686c6e73150c55b0",
+   "en": "Connecting ADC modules such as joystick",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "specs[x.adc_input_port]",
+    "near": "2 › ADC Input Port"
+   },
+   "dict": null
+  },
+  {
+   "h": "b52c44a5a17ecec7113fe39b432c3771abcfd02371195eac12e997bc0a15ff63",
+   "en": "3 › Digital Input Port",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "specs[x.digital_input_port].label",
+    "near": "Connecting binary-input modules such as momentary button"
+   },
+   "dict": null
+  },
+  {
+   "h": "7f978e869bdb0352b70c3a8095912c73b175d8aed1f5ef3542f8f830a3d33efc",
+   "en": "Connecting binary-input modules such as momentary button",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "specs[x.digital_input_port]",
+    "near": "3 › Digital Input Port"
+   },
+   "dict": null
+  },
+  {
+   "h": "7457e9bcfbae874b7a1e94f8cde4e39248d71dc0fbf51d3a0e6c770399881391",
+   "en": "4 › Core Slot",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "specs[x.core_slot].label",
+    "near": "Connectable with multi-function controller core"
+   },
+   "dict": null
+  },
+  {
+   "h": "9277812d42b9217679101d0f3795558627b4d1ea10aaa5445ea61f17c0da3e79",
+   "en": "5 › Orientation Mark",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "specs[x.orientation_mark].label",
+    "near": "Ensure proper installation alignmen"
+   },
+   "dict": null
+  },
+  {
+   "h": "31bdaa80f0b3d3d3543108d7d9e558686d31c99ee4b0345e20a5de381719180c",
+   "en": "Ensure proper installation alignmen",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "remote-control-transmitter-shield-1pcs",
+    "title": "Remote Control Transmitter Shield (1PCS)",
+    "field": "specs[x.orientation_mark]",
+    "near": "5 › Orientation Mark"
+   },
+   "dict": null
+  },
+  {
+   "h": "130b5d1a2ac9be627a4ebe7bfd5a46015a9b8aaedd2d205406687604fa76ac51",
+   "en": "The Single-Axis Joystick Module is a 1-channel analog input module. It automatically returns to the center position. Compared to a Dual-Axis Joystick Module, the single-axis joystick moves in only one direction and outputs a single analog signal, making it ideal for use as a control lever in various scenarios that require speed control or position control with automatic centering — especially when the control logic of these motions needs to remain independent.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "single-axis-joystick-module-with-3pin-sh1-0-connector-1pcs",
+    "title": "Single-Axis Joystick Module with 3Pin SH1.0 Connector (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "17e4afc88418f6d9630d6cff6bd71c443ab43bb478db7a5fd836329783e2b0de",
+   "en": "The Dual-Axis Joystick Module is a 2-channel analog input module. It automatically returns to the center. The dual-channel joystick is suitable for use as a control lever in various scenarios where control of both movement speed and direction is required, especially when these movements are interrelated.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "dual-axis-joystick-module-with-3pin-sh1-0-connectors-1pcs",
+    "title": "Dual-Axis Joystick Module with 3Pin SH1.0 Connectors (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "f6b40564a543ab97fee7bd64e7e0fb7a871686785bf83af0cefe4f0ed45c0339",
+   "en": "Peripheral connection cable - XH2.54-2PIN is a standard interface used for connecting various electronic modules and expansion boards. It is compatible with 2.54mm pitch pin headers or sockets, making it convenient for quickly building circuit systems.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "100mm-wire-with-2pin-xh2-54-connectors-2pcs",
+    "title": "100mm Wire with 2Pin XH2.54 Connectors (2PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "755f8eb468435112ecd64fd3aa54b86c58cd9a54c1591d165b5420e62750f6c2",
+   "en": "Peripheral connection cable - SH1.0-3PIN is commonly used for signal transmission between miniature modules and control boards that support the SH1.0 interface. It is compatible with 1.0mm pitch sockets, making it suitable for space-constrained electronic projects.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "100mm-wire-with-3pin-sh1-0-connectors-2pcs",
+    "title": "Wire with 3Pin SH1.0 Connectors (2PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "40ce33648cc5f0c6fffbaea357a5bebdcdcb79afb7010d0e2da040b1f9e3f544",
+   "en": "Servo extension cable was used to connect servos to controllers, ideal for extending or distributing servo connections to RC model devices. Maker's Supply offers both straight and Y-type configurations to meet different installation and control needs.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "200mm-servo-extension-cable-3pin-2pcs",
+    "title": "200mm Servo Extension Cable 3Pin (2PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8a48898feb11555b1f1e98d1a5c6294fafe9131598ba054acaff463ab4d7e1fb",
+   "en": "Power switch module is a two-position switch that is often used to control power on/off without removing the battery. There are two 2pinXH2.54 connectors on the switch board, which are usually connected in series between the power supply and the expansion board.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "power-switch-module-with-2pin-xh2-54-connector-1pcs",
+    "title": "Power Switch Module with 2Pin XH2.54 Connector (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "e113a108835c504dcbd3e94113b2eb65721299929e2ec1df6130fd39b5930c5f",
+   "en": "The momentary button module can be used to switch between various modes in a specified order, trigger and stop some actions in real time.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "momentary-button-module-with-2pin-sh1-0-connector-1pcs",
+    "title": "Momentary Button Module with 2Pin SH1.0 Connector (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "31e587161b5d3c00ee69ca7d01a6cd2a02646cbe4db64a0cbb7d0770f12d4b05",
+   "en": "The 14500 7.4V 800mAh Li-ion battery provides high-performance, rechargeable power for portable devices. Similar in size to AA batteries, it offers higher voltage and energy density, suitable for devices requiring more power and longer runtime, such as flashlights and remote controls.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6ab73f4ea22887cb531ec98060479895a9c62cc97f3ed837eaaa94abd758d157",
+   "en": "Nominal Voltage",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "specs[x.nominal_voltage].label",
+    "near": "7.4V"
+   },
+   "dict": null
+  },
+  {
+   "h": "17f1301cddc9b57409f4858af92e7ad8558f08169b38de8f82e248d3dd209c02",
+   "en": "Nominal Capacity",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "specs[x.nominal_capacity].label",
+    "near": "800mAh"
+   },
+   "dict": null
+  },
+  {
+   "h": "cba0b40cd9ceda3e952d490832d206045c729665aca3ca56e82c9f7742b5ac65",
+   "en": "Charging：0℃~45℃ / Discharging：-20℃~60℃",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "specs[physical.operating_temp]",
+    "near": "Operating temperature"
+   },
+   "dict": null
+  },
+  {
+   "h": "b7b77c3ef125e4d72ca3924f1b8fd301dde6240a243155a96c2e8109ce65445a",
+   "en": "Charging Current",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "specs[x.charging_current].label",
+    "near": "Standard Charging 160 mA / Max Charging 800 mA"
+   },
+   "dict": null
+  },
+  {
+   "h": "1161ca13ebae4bc969cb85e7bcd9b22418338ca7e2fd5029c7353b30e9dc82ff",
+   "en": "Standard Charging 160 mA / Max Charging 800 mA",
+   "kind": "spec_value_text",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "specs[x.charging_current]",
+    "near": "Charging Current"
+   },
+   "dict": null
+  },
+  {
+   "h": "bc1e2d4bb1ad46377a30bff57077c49cb345d041cc7834f94d2df0a4761f00fd",
+   "en": "Overcharge Voltage",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "specs[x.overcharge_voltage].label",
+    "near": "8.4V±0.05V"
+   },
+   "dict": null
+  },
+  {
+   "h": "9df0f6925c1ee1750083fe4251fcc0ef778b09ba519843b89dbd1c64094bf350",
+   "en": "Max continuous discharge current",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "specs[x.max_continuous_discharge_current].label",
+    "near": "3A"
+   },
+   "dict": null
+  },
+  {
+   "h": "f5684412105351a08860631fe58b2c0bd091779fbb115170032581d34a889776",
+   "en": "Overdischarge Protection Voltage",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "specs[x.overdischarge_protection_voltage].label",
+    "near": "5.8V±0.08V"
+   },
+   "dict": null
+  },
+  {
+   "h": "2a596296321925a48519c5d4759c49832345dd71bc0c2fda7e95a2c57a7a139b",
+   "en": "OverCurrent Protection",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "14500-7-4v-800mah-li-ion-battery-1pcs",
+    "title": "14500 7.4V 800mAh Li-ion Battery (1PCS)",
+    "field": "specs[x.overcurrent_protection].label",
+    "near": "20A±3A"
+   },
+   "dict": null
+  },
+  {
+   "h": "8c866ed6f10fa5d017e9855ee3500e6d33a2f1a74595503e4a22f8863a2705a9",
+   "en": "Made of corrosion-resistant stainless steel, durable and anti-rust Standard 1/4''-12 UNC coarse thread, suitable for common photography and industrial mounting systems Precision-machined hex socket for easy installation with Allen wrench With bottom groove diameter for positioning or locking structures Ideal for camera tripod plates, rig systems, or quick-release systems",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "65293d4a2d8c25e9257f05e0a0a2b9b47ac2fb7f58c71dfaa6a65f2da300d4d9",
+   "en": "Passivated Stainless Steel",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "specs[part.surface_treatment]",
+    "near": "Surface treatment"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d9725d5f9406dfc6b61d313327bfe8a9e85dda61242ad8029b9f682ec9336d4",
+   "en": "UNC / Coarse Thread",
+   "kind": "spec_value_text",
+   "freq": 3,
+   "context": {
+    "handle": "1-4-camera-screw-3pcs",
+    "title": "1/4'' - Camera screw (3PCS)",
+    "field": "specs[part.thread_type]",
+    "near": "Thread type"
+   },
+   "dict": null
+  },
+  {
+   "h": "8e17ca77a969d98ff0e4bed86dbbc72d211712a82b76949d7edc733f3e838a1a",
+   "en": "The 1/4\" quick release plate nut is a small accessory used to securely attach a camera or other equipment to a tripod, gimbal, or quick release plate.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-camera-quick-release-plate-nut-2pcs",
+    "title": "1/4\" Camera Quick Release Plate Nut (2PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "63ac9b3506d39288a27ec44cfa82523e4b5ed2486899189735b1c2894eeaa76a",
+   "en": "The product contains all the non-3D printed parts for assembling an entirely functional AMS Flipper. To complete the work, you also need to download the model files and 3D print the remaining parts.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "ams-flipper-for-p1s-x1-series",
+    "title": "AMS Flipper - better access to the P1S/X1C/P2S",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "6bb71300dd8e74d0adc724147ae0d594dd02fea22e93fd0554652339acac8c65",
+   "en": "Crafted from premium, rigorously tested polyester, this durable lanyard offers tool-free installation and keeps charging ports accessible.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "adjustable-hand-wrist-strap",
+    "title": "Adjustable Hand Wrist Strap",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "8c9d9f871da87af1497a4a0c6230a18ac3414f8c6038f68087519dbffd059abd",
+   "en": "Crafted from high-strength aluminum alloy, this 1/4-20 UNC screw is lightweight, corrosion-resistant, and built to last. Its tool-free design and 6-hole recessed head ensure easy handling and enhanced grip. Perfect for camera tripods, quick release plates, rigs, and other mounting gear.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-aluminium-alloy-screw-3pcs-fc011",
+    "title": "1/4'' Aluminium Alloy Screw (3PCS) - FC011",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "0877078ef862d6f02677fa830ffc681b4bdf14e2c8730f36974d8f1f66aee3dc",
+   "en": "1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS) 1. Round threaded brass heat-insert nut with vertical knurling 2. High thermal conductivity brass for fast and uniform heat transfer 3. Easy to install in 3D printed parts with a heated soldering iron",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+    "title": "1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "727cd3a64d792ad410e3cb6036da3eb54dbac258e87c554e3b6081c1a5efc0e6",
+   "en": "Vertical",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+    "title": "1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS)",
+    "field": "specs[x.knurling_type]",
+    "near": "Knurling type"
+   },
+   "dict": null
+  },
+  {
+   "h": "a8e7f38999a44b87112730fd977b79ed334ef4983139be2dfeec7e8c4c741ccd",
+   "en": "Whitworth Coarse",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "1-4-8x8-brass-knurled-heat-insert-nut-10pcs",
+    "title": "1/4''- 8x8 Brass Knurled Heat-Insert Nut (10PCS)",
+    "field": "specs[part.thread_type]",
+    "near": "Thread type"
+   },
+   "dict": null
+  },
+  {
+   "h": "6e92f53d68ec08da2a086dd40b8c60ad31add54f08eaea36e00c755d5434d7ca",
+   "en": "This lightweight and portable fireproof bag is designed with heat-resistant materials for the safe storage and transport of LiPo batteries.",
+   "kind": "short_description",
+   "freq": 1,
+   "context": {
+    "handle": "lipo-battery-fireproof-storage-bag",
+    "title": "LiPo Battery Fireproof Storage Bag",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "1a736d6f5ff5ffe1f0c8cb503a93f4e49312f439adecf7a3dbdf472e53205bad",
+   "en": "PVC mesh cloth",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "lipo-battery-fireproof-storage-bag",
+    "title": "LiPo Battery Fireproof Storage Bag",
+    "field": "specs[part.surface_treatment]",
+    "near": "Surface treatment"
+   },
+   "dict": null
+  },
+  {
+   "h": "730e1f42e6d729da42dc8d2c548f68b8a83e35b1e8a39ccbac0470ca9caac97a",
+   "en": "Fiberglass composite fireproof cloth",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "lipo-battery-fireproof-storage-bag",
+    "title": "LiPo Battery Fireproof Storage Bag",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "8b51a53a9c842de68e5946410944e4ce3966f1cc20e31920e0c15dd8305f45c6",
+   "en": "This is a power supply cable that converts a USB Type-C power source to a PH2.0 connector, suitable for powering small electronic devices and development boards.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "type-c-female-head-to-ph2-0-power-supply-cable",
+    "title": "TYPE C Female Head to PH2.0 Power Supply Cable",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b75b42924bb3d22bbc6a5ef2ead5c66e745705c8ad9097884c52ea19caf858c6",
+   "en": "The 20W Dual-Port Fast Charger delivers quick and efficient charging for your devices. Featuring both USB-A and USB-C ports, it allows you to power two devices simultaneously with a combined output of up to 20W. Compact and lightweight, the two adapters and the main body can be used in European, British and American standard usage scenarios, it’s perfect for use at home, in the office, or while traveling. Compatible with a wide range of smartphones, tablets, and other USB-powered devices, this charger ensures your essentials are always powered and ready to go.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "20w-dual-port-fast-charger-1pcs",
+    "title": "20W Dual Port Fast Charger(1PCS)",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c5b5f17d7e4fc2f6a46db69fc80828d9bcf3e2540743f6540a46ff0c5cc39810",
+   "en": "The Mini Tank is designed to work with the CyberBrick Remote. The pre-configured settings have been uploaded for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "7ba2d6ea39149ea0e1471b235b582146ba6caf68a5ecb24d1991a3d09e124eef",
+   "en": "while the CyberBrick App allows full customization of controller functions to match your personal preferences.",
+   "kind": "usage_body",
+   "freq": 20,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "usage[0].body.line[1]",
+    "near": "The Mini Tank is designed to work with the CyberBrick Remote. The pre-configured settings have been uploaded for immediate play,"
+   },
+   "dict": null
+  },
+  {
+   "h": "54c956563a4ae7f18d2f49e5333419c636557916f00697724737561596405908",
+   "en": "Please visit the CyberBrick Official Standard Remote on Makerworld for more details.",
+   "kind": "usage_body",
+   "freq": 19,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "usage[0].body.line[2]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "1ecae200d019d62957667573ced2189519226ea772c7156ad5de618f97f8fc63",
+   "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to this model.",
+   "kind": "usage_body",
+   "freq": 14,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "usage[1].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b625af406d253b3f2d5c6aa8d34e4f1af83964e832ead85dd5e894751faebbc6",
+   "en": "Download Models on MakerWorld ↗",
+   "kind": "doc_title",
+   "freq": 6,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "documents[8]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "093178435e6c24de6728c7245904a14f5008fd6c78d2126d2d6b4fa5d1105764",
+   "en": "CyberBrick Official Standard Remote on Makerworld",
+   "kind": "doc_title",
+   "freq": 19,
+   "context": {
+    "handle": "cyberbrick-tank",
+    "title": "CyberBrick Tank",
+    "field": "documents[9]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "1e024129f76c663fb32fca5199929630aebfbc27b13bcf5158d80e197d0ed12e",
+   "en": "The Bumper Car is designed to work with the CyberBrick Remote. The pre-configured settings have been uploaded for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "duel-bumper-car-cyberbrick",
+    "title": "Duel Bumper Car CyberBrick",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "d4802fd39127f58c3c6fa3eacb0fddc0a76c70f3e00c4f8ca9084dbdb7e68d8f",
+   "en": "The Mini Tank is designed to work with the CyberBrick Official Remote. The creator has uploaded pre-configured settings for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "6fc58cc4167064067d1631859fe16f02b8721725302899622b01a71b48fd37e3",
+   "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Mini Tank.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "usage[1].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "bfe615d9a647a19c74486632999c9656970cb699d544f6e17e2c8e8af939359f",
+   "en": "MakerWorld Page",
+   "kind": "doc_title",
+   "freq": 7,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "documents[4]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "15435b311c9371437109bd5323292504915507b034803118517fee44e9547a3c",
+   "en": "View More",
+   "kind": "doc_title",
+   "freq": 12,
+   "context": {
+    "handle": "cyberbrick-mini-tank",
+    "title": "Mini Tank - CyberBrick RC",
+    "field": "documents[6]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "cdb22aa389af5d7a5727c799e288a4a0cd47cc4fa96883bc2d4fe2a3a666d6eb",
+   "en": "The Mini SUV is designed to work with the CyberBrick Official Remote. The creator has uploaded pre-configured settings for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "782cf47ceb395641b07a861502a706ed0c01cf559424f27a2dd3cc482ff381a5",
+   "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Mini SUV.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "mini-suv-cyberbrick-rc",
+    "title": "Mini SUV - CyberBrick RC",
+    "field": "usage[1].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "271d738bce480ecc917ab80f520efe804d1c3039ac104a5c3ab874f7074e4500",
+   "en": "The SoccerBot is designed to work with the CyberBrick Official Remote. Pre-configured settings have been uploaded for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "cyberbrick-official-soccerbot",
+    "title": "CyberBrick Official SoccerBot",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "f519d0eb33ee68acdf3f13cb4b0240ee0fe687db7984a78cf2126f697e7209d7",
+   "en": "The Bulldozer is designed to work with the CyberBrick Official Remote. The creator has uploaded pre-configured settings for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "119c8e9f56b0bc97aded2ecc784f6e66c94914a28aad032dc70a225189c0172e",
+   "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Bulldozer.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "bulldozer-cyberbrick-rc",
+    "title": "Bulldozer - CyberBrick RC",
+    "field": "usage[1].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7889779f3c9c5bc9b421bf8ea622ca462b0466ac3b21f6a18b9f53348d8e11e1",
+   "en": "Supported Functions",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.supported_functions].label",
+    "near": "Vacuuming / Blowing / 2 in 1 Design"
+   },
+   "dict": null
+  },
+  {
+   "h": "b42de71cc28ebfc45e89ccdd0eab14ce5ec9e199f97e14b3a9a46cf4a6572e96",
+   "en": "Vacuuming / Blowing / 2 in 1 Design",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.supported_functions]",
+    "near": "Supported Functions"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7441dc9d55ef737344ce3ebf0ee6b96a770415585089e6695fb522f03093d49",
+   "en": "Suction Power Options",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.suction_power_options].label",
+    "near": "7K / 13K / 16K Pa"
+   },
+   "dict": null
+  },
+  {
+   "h": "5e626b6d122f22f090581e55deb2c5e0f76fdba7e44ad441c9831f12970553bc",
+   "en": "7K / 13K / 16K Pa",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.suction_power_options]",
+    "near": "Suction Power Options"
+   },
+   "dict": null
+  },
+  {
+   "h": "ce467c260e1d2c86307f39f9fda6040b06bd32e2f016607a7594770a89b378a8",
+   "en": "Charging Voltage",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.charging_voltage].label",
+    "near": "5V – 9V"
+   },
+   "dict": null
+  },
+  {
+   "h": "21c38234bca1ae0499ba6dc994f32c6f078356c70fcfc323c90901378e7eb8ce",
+   "en": "Charging Port",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.charging_port].label",
+    "near": "Type-C Port (Supports QC Protocol)"
+   },
+   "dict": null
+  },
+  {
+   "h": "4e901ec702bbc9899456362d5814ec38f956b6477d8e13869d621c291a2f2d60",
+   "en": "Type-C Port (Supports QC Protocol)",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.charging_port]",
+    "near": "Charging Port"
+   },
+   "dict": null
+  },
+  {
+   "h": "4ee5c5871a431be0d1a6ad77ac534fc4cab3293085849a23748ba873ec17346d",
+   "en": "Max Output Power",
+   "kind": "spec_label",
+   "freq": 2,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.max_output_power].label",
+    "near": "Level 1 (Low Power): 30.3 W / Level 3 (High Power): 110 W"
+   },
+   "dict": null
+  },
+  {
+   "h": "3d336fc220f38ce1b007f3cbf741cd1539facce78459772af812c1243e4c0d94",
+   "en": "Level 1 (Low Power): 30.3 W / Level 3 (High Power): 110 W",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.max_output_power]",
+    "near": "Max Output Power"
+   },
+   "dict": null
+  },
+  {
+   "h": "c7080888d3202cc42f37c750d46656ac1cddf5f5dde705c36b512f859c79af84",
+   "en": "Button Functions",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.button_functions].label",
+    "near": "Long Press to Power Toggle / Short Press to Shift Gears"
+   },
+   "dict": null
+  },
+  {
+   "h": "f2282d43be4b09ae9577b01d6a9bcd3a64e139113c70ac343e116b99b75cb3af",
+   "en": "Long Press to Power Toggle / Short Press to Shift Gears",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.button_functions]",
+    "near": "Button Functions"
+   },
+   "dict": null
+  },
+  {
+   "h": "4599dc84d6e7d28c3821f09e94d3e57bafadb51ce5a774819fdb5f71f7f60bed",
+   "en": "Rated Input Power",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.rated_input_power].label",
+    "near": "15W"
+   },
+   "dict": null
+  },
+  {
+   "h": "3ae7566f8a0704ae2b11d0b51c2fcb2b54b7397144eebfcfa285e258a85dda56",
+   "en": "Full Charge Time",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.full_charge_time].label",
+    "near": "~1.5 hours"
+   },
+   "dict": null
+  },
+  {
+   "h": "ce2b8c21073b7b24a991414743a7bba3fa56d5c22fa3616d44ca0ba8864a1a62",
+   "en": "~1.5 hours",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.full_charge_time]",
+    "near": "Full Charge Time"
+   },
+   "dict": {
+    "ar": "~1.5 ساعة",
+    "ckb": "~1.5 کاتژمێر"
+   }
+  },
+  {
+   "h": "e74b09dc17a76fabc341a9c0e79f261f54296840c1f7dc7fec0ca4fb158de467",
+   "en": "Theoretical Runtime",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.theoretical_runtime].label",
+    "near": "Level 1 (Low Power): ~43 mins / Level 3 (High Power): ~12 mins"
+   },
+   "dict": null
+  },
+  {
+   "h": "1a1dbc6cce2823570ecc6f893caafbcfd8acd73035b2746338a88deaa93d5d0f",
+   "en": "Level 1 (Low Power): ~43 mins / Level 3 (High Power): ~12 mins",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "handheld-vacuum-cleaner-kit",
+    "title": "Handheld Vacuum Cleaner Kit",
+    "field": "specs[x.theoretical_runtime]",
+    "near": "Theoretical Runtime"
+   },
+   "dict": null
+  },
+  {
+   "h": "76f7cd10027ba5ed85fc4fbf632a53ca640368b070a60f3cbe37fcee6f02cd92",
+   "en": "The Snowcat is designed to work with the CyberBrick Official Remote. Pre-configured settings have been uploaded to MakerWorld for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "c48c4699262a1620332d7f403aff77283e2066201f05dd6913b4617f7bd56ed5",
+   "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Snowcat.",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "christmas-santa-s-snowcat-cyberbrick-rc",
+    "title": "Christmas Santa's Snowcat - CyberBrick RC",
+    "field": "usage[1].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "97e772f03551a4ef7f8bc35f885e3ac71b74d2d8317113724b6a6fe1d26dea06",
+   "en": "The Forklift and Truck are designed to work with the CyberBrick Official Remote. Pre-configured settings have been uploaded for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "d722fdef2ce1797382626db1bfecf610a772dbab8acc521cf82ee4f6f727bf31",
+   "en": "Forklift",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "documents[5]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "1195427e2c1c38ef8ff1a6bfeb55c4bc6ad74a41017bc91a0cf0be3c48db2e8e",
+   "en": "Truck",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "documents[6]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "8bd9e3a2b608daf5a8c9ebaae92a5b14515d37d98259b6a04d844d44aedf8434",
+   "en": "Lift & Load Combo",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "fcyberbrick-official-forklift-and-truck",
+    "title": "CyberBrick Official Forklift and Truck",
+    "field": "documents[7]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "f0de5ecd2644649c2c881739e7bdf7db2374fbd6483378b04c3c9ac6cfce00d5",
+   "en": "The Model is designed to work with the CyberBrick Official Remote. Pre-configured settings have been prepared for immediate play,",
+   "kind": "usage_body",
+   "freq": 3,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "ae25d6481fc1741ffee4a95cd05de7b6375f7e1b0c63c006640b366094f2c4a9",
+   "en": "Classic",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "documents[4]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "02620c3e200e864b52bcca9ada0f7c60c77ee70e62fb0bc0a7c7bfa631efc549",
+   "en": "Holiday Edition",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "arctic-snowcat-cyberbrick-rc",
+    "title": "Arctic Snowcat - CyberBrick RC",
+    "field": "documents[5]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "f41ce7f9d4bd34d71b2598a6e82ee43950131517eef4b66a92eff066df3ba995",
+   "en": "This cable enables the connection between the 14500 7.4V 800mAh Li-ion Battery - PC003 and the 4 Channels Power Distribution Board (PDB) - IA005, as well as components such as the 100mm Y-Type PH2.0 to Dual SH1.0 Conversion Wire-XC003, delivering a portable, high-capacity power solution.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "200mm-xh2-54-female-to-ph2-0-male-conversion-wire",
+    "title": "XH2.54 Female to PH2.0 Male Conversion Wire",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "bf43d3893320962b80cff8144fe744772177dcffeab8cb0a450d6808aebd650f",
+   "en": "This Jumper Shunt is a specialized reset tool designed for the CyberBrick programmable hardware core board. It consists of a plastic cap containing an internal metal conductor, which enables hardware-level system recovery and debugging by physically short-circuiting specific pins on the core board. It serves as an essential accessory for in-depth device maintenance and troubleshooting.",
+   "kind": "short_description",
+   "freq": 2,
+   "context": {
+    "handle": "easy-grip-jumper-shunt",
+    "title": "Easy-Grip Jumper Shunt",
+    "field": "description.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "b76c199eeef3bd3e86ab14b4dcebe361096d4e3c41fdbd412e8a81c27348c81b",
+   "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Mini Off-Roader.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "usage[1].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "ea5fcfd397319c3311cdf3630c46e6e6bc8c393d6a97925250eabf773184d3d4",
+   "en": "To help you understand what additional parts are needed based on the kit you own or plan to buy, please refer to the following table:",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "4x4-mini-off-roader-cyberbrick-rc",
+    "title": "4x4 Mini Off-Roader - CyberBrick RC",
+    "field": "specs[compat.statement]",
+    "near": "Compatibility"
+   },
+   "dict": null
+  },
+  {
+   "h": "e180dc566d77a1f3e42b373202916ef845ba8730c28a45fc07f68721c6eac5c1",
+   "en": "Relic Rush Board Game is designed to work with the Remote Control. The creator has uploaded pre-configured settings for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "8939ea17455d2f75158bcd91a8a3cff4f14a89fe20a4870bffcf0c8b557babe1",
+   "en": "*The following is the App connection of CyberBrick Official SoccerBot as an example, which is similar to the Relic Rush Board Game.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "usage[1].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "c5b711985d1118ea666fab0409a872cef7fcb060a512efe0d1a574c63681ee3d",
+   "en": "creator’s page on MakerWorld",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "relic-rush-board-game",
+    "title": "Relic Rush Board Game",
+    "field": "documents[4]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "81f075c89aeeeaed1bb38c901737b947b1c82cdea4ee2dcafae74385f836eba5",
+   "en": "This connector cable is designed for linking 18650 battery packs equipped with PH2.0 terminals, and supplies power to electronic components fitted with XH2.54 connectors—such as CyberBrick RC Shields.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "xh2-54-male-to-ph2-0-female-conversion-cable",
+    "title": "XH2.54 Male to PH2.0 Female Conversion Cable",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "7c635c72ed5ad6201502d5abbf0ffc0a517c544374426084e7b95589df7d36d2",
+   "en": "This cable enables the integration of multiple electronic devices to a single 14500 7.4V 800mAh Li-ion Battery, facilitating a more compact power supply setup.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "50mm-y-type-xh2-54-male-to-dual-xh2-54-female-conversion-cable-2pcs-pd003",
+    "title": "Y Type XH2.54 Male to Dual XH2.54 Female Conversion Cable",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "042cbb65f315a6f422dadcd950bfc9dc91c998a43adff922ad2e9e112ce8606d",
+   "en": "Black Aluminum Alloy",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "led-mini-spotlight",
+    "title": "LED Mini Spotlight",
+    "field": "specs[part.material]",
+    "near": "Materials"
+   },
+   "dict": null
+  },
+  {
+   "h": "fe006b0f7941bc64c4c21cb03548cca72ec85161257f6530887351e4b2ee03eb",
+   "en": "USB Type-A with Switch",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "led-mini-spotlight",
+    "title": "LED Mini Spotlight",
+    "field": "specs[connectivity.interface]",
+    "near": "Interfaces"
+   },
+   "dict": null
+  },
+  {
+   "h": "914182d5e25f69e140a41e919664e5d16d3a9f67414c8cb1494b8ead668cd906",
+   "en": "Dimensions",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "led-mini-spotlight",
+    "title": "LED Mini Spotlight",
+    "field": "specs[x.dimensions].label",
+    "near": "Height: 40.5 mm; Base: &Oslash;30 mm"
+   },
+   "dict": {
+    "ar": "الأبعاد",
+    "ckb": "ڕەهەندەکان"
+   }
+  },
+  {
+   "h": "c3638ebcc3bcb0850c386931ce266a25fe45fb5d4dc5035682e9c2d156e55972",
+   "en": "Height: 40.5 mm; Base: &Oslash;30 mm",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "led-mini-spotlight",
+    "title": "LED Mini Spotlight",
+    "field": "specs[x.dimensions]",
+    "near": "Dimensions"
+   },
+   "dict": null
+  },
+  {
+   "h": "75baea62a3c2ee6397f64a422e6ba5d458001649d1ed2dc26071aae383a5c4d0",
+   "en": "Light Strip Current",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "led-mini-spotlight",
+    "title": "LED Mini Spotlight",
+    "field": "specs[x.light_strip_current].label",
+    "near": "KC026 0.1 A; KC027 0.2 A"
+   },
+   "dict": null
+  },
+  {
+   "h": "a6d04f3c276fa5dba6a4015f3f5db296b220efb507032fb07e00e2fbbbf6e004",
+   "en": "Color Temperature (CCT)",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "led-mini-spotlight",
+    "title": "LED Mini Spotlight",
+    "field": "specs[x.color_temperature_cct].label",
+    "near": "3000K-3200K"
+   },
+   "dict": null
+  },
+  {
+   "h": "34e213ee2fe718fd579d468ffb201a009278000decb4d844d57ae47c610ab8c9",
+   "en": "Circuit Configuration",
+   "kind": "spec_label",
+   "freq": 1,
+   "context": {
+    "handle": "led-mini-spotlight",
+    "title": "LED Mini Spotlight",
+    "field": "specs[x.circuit_configuration].label",
+    "near": "1pcs Resistor"
+   },
+   "dict": null
+  },
+  {
+   "h": "e44714f7156da25b268d9f8e806344a5cb9398e5f62846be87b3ae82e4d2cf44",
+   "en": "1pcs Resistor",
+   "kind": "spec_value_text",
+   "freq": 1,
+   "context": {
+    "handle": "led-mini-spotlight",
+    "title": "LED Mini Spotlight",
+    "field": "specs[x.circuit_configuration]",
+    "near": "Circuit Configuration"
+   },
+   "dict": null
+  },
+  {
+   "h": "cb77c6cfc72226535ad2def31737abba7b6887f20de3d15c90c4ee5cb489aef7",
+   "en": "Detailed Assembly Instructions",
+   "kind": "usage_title",
+   "freq": 1,
+   "context": {
+    "handle": "the-crazy-factory-cyberbrick-rc",
+    "title": "The Crazy Factory - CyberBrick RC",
+    "field": "usage[0].title.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "cbb050edda8266c9a180a871a67b6b883cb63bbff936461d75d3cf1909abcaf4",
+   "en": "Comes with detailed step-by-step assembly instructions designed to make the build as smooth and enjoyable as possible. Despite its many moving parts and mechanisms, every step is clearly explained, well illustrated, and easy to follow.",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "the-crazy-factory-cyberbrick-rc",
+    "title": "The Crazy Factory - CyberBrick RC",
+    "field": "usage[0].body.line[0]",
+    "near": ""
+   },
+   "dict": null
+  },
+  {
+   "h": "207e651ad518a5b0be96cfbe2915d7665b7990dcc23ebf47a27f951f9d136a65",
+   "en": "The Model is designed to work with the CyberBrick Official Remote. Pre-configured settings has been prepared for immediate play,",
+   "kind": "usage_body",
+   "freq": 2,
+   "context": {
+    "handle": "the-crazy-factory-cyberbrick-rc",
+    "title": "The Crazy Factory - CyberBrick RC",
+    "field": "usage[1].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "c80219072ddc3b848ce63af5979cf75c6c6e9e83a4c3a58fc61f90b19c718321",
+   "en": "project’s page on MakerWorld",
+   "kind": "doc_title",
+   "freq": 2,
+   "context": {
+    "handle": "the-crazy-factory-cyberbrick-rc",
+    "title": "The Crazy Factory - CyberBrick RC",
+    "field": "documents[9]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "a296c77b87d654bd715761572966d1bb1bcaf2d30af58bccdcbf1fc2a15fc549",
+   "en": "The Desktop Robotic Arm is designed to work with the CyberBrick Remote. The pre-configured settings have been uploaded for immediate play,",
+   "kind": "usage_body",
+   "freq": 1,
+   "context": {
+    "handle": "l-one-desktop-robotic-arm-cyberbrick-rc",
+    "title": "L-ONE Desktop Robotic Arm - CyberBrick RC",
+    "field": "usage[0].body.line[0]",
+    "near": "while the CyberBrick App allows full customization of controller functions to match your personal preferences."
+   },
+   "dict": null
+  },
+  {
+   "h": "8c0b8c7dca618bc07a836119aeed0333bf94aeab2bc711bfa85c5488f05d0d36",
+   "en": "Purchase & Download Models on MakerWorld↗",
+   "kind": "doc_title",
+   "freq": 6,
+   "context": {
+    "handle": "cryptatrope-adventure",
+    "title": "Cryptatrope Adventure",
+    "field": "documents[4]",
+    "near": "other"
+   },
+   "dict": null
+  },
+  {
+   "h": "3178a647e0f2bcd284eaa96aab1750e61d3211c14aa60f2b45b6bdd27da6a159",
+   "en": "Chapter 1",
+   "kind": "doc_title",
+   "freq": 1,
+   "context": {
+    "handle": "cryptatrope-adventure",
+    "title": "Cryptatrope Adventure",
+    "field": "documents[5]",
+    "near": "other"
+   },
+   "dict": null
+  }
+ ]
+}

@@ -1,0 +1,299 @@
+{
+ "sourceProductId": "8083645300872",
+ "handle": "bambu-3d-effect-plate",
+ "canonicalUrl": "https://us.store.bambulab.com/products/bambu-3d-effect-plate",
+ "title": "Bambu 3D Effect Plate",
+ "seoMetaDescription": "",
+ "route": "552709757765505024>552709757794865152>552709757824225280",
+ "isFilament": false,
+ "groups": [
+  {
+   "propertyKeyId": "10709858451592",
+   "propertyKey": "Compatibility",
+   "type": 1,
+   "title": "",
+   "position": 1,
+   "values": [
+    {
+     "id": "564681864249110541",
+     "value": "X1/P1/A1/P2/X2",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "564681864249110542",
+     "value": "A1 mini",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  },
+  {
+   "propertyKeyId": "10786283782280",
+   "propertyKey": "Texture",
+   "type": 1,
+   "title": "",
+   "position": 2,
+   "values": [
+    {
+     "id": "564681864249110545",
+     "value": "Carbon Fiber",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "564681864249110546",
+     "value": "Diamond",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "607425940781355010",
+     "value": "Galaxy",
+     "selectedDefault": false,
+     "colorUrl": ""
+    },
+    {
+     "id": "618572266122133505",
+     "value": "Starry",
+     "selectedDefault": false,
+     "colorUrl": ""
+    }
+   ]
+  }
+ ],
+ "skus": [
+  {
+   "id": "606963003770429441",
+   "props": [
+    {
+     "propertyKeyId": "10709858451592",
+     "propertyKey": "Compatibility",
+     "value": "X1/P1/A1/P2/X2"
+    },
+    {
+     "propertyKeyId": "10786283782280",
+     "propertyKey": "Texture",
+     "value": "Carbon Fiber"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "41068437799048",
+    "url": "https://store.bblcdn.com/s7/default/c4da2609f2f644f28132a987c21f914d/4a8772f1c05cacb28341f4afcfcfd28c.png"
+   },
+   "description": "<p><strong><span style=\"color: #e03e2d;\">For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings -&gt;Print Options -&gt; Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.</span></strong></p>",
+   "soldOut": false
+  },
+  {
+   "id": "619636336951320576",
+   "props": [
+    {
+     "propertyKeyId": "10709858451592",
+     "propertyKey": "Compatibility",
+     "value": "X1/P1/A1/P2/X2"
+    },
+    {
+     "propertyKeyId": "10786283782280",
+     "propertyKey": "Texture",
+     "value": "Diamond"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "41068437700744",
+    "url": "https://store.bblcdn.com/s7/default/8a2fec4f9a6b47739e607b877324661b/72a48f93f31032373e61bcfeaac13c75.png"
+   },
+   "description": "<p><strong><span style=\"color: #e03e2d;\">For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings -&gt;Print Options -&gt; Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.</span></strong></p>",
+   "soldOut": false
+  },
+  {
+   "id": "638162979091648513",
+   "props": [
+    {
+     "propertyKeyId": "10709858451592",
+     "propertyKey": "Compatibility",
+     "value": "A1 mini"
+    },
+    {
+     "propertyKeyId": "10786283782280",
+     "propertyKey": "Texture",
+     "value": "Carbon Fiber"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "42453324169352",
+    "url": "https://store.bblcdn.com/s7/default/cf9149162c3543c2b3356fb2ee0130cf/mini_4fb205ee-21a9-4142-8053-4daf4082e228.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "640843198155984897",
+   "props": [
+    {
+     "propertyKeyId": "10709858451592",
+     "propertyKey": "Compatibility",
+     "value": "X1/P1/A1/P2/X2"
+    },
+    {
+     "propertyKeyId": "10786283782280",
+     "propertyKey": "Texture",
+     "value": "Galaxy"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "41068437733512",
+    "url": "https://store.bblcdn.com/s7/default/22c482c9b06c47e7a2aed93e33d8b34f/983cf8ea6a9d80945631038827d50c42.png"
+   },
+   "description": "<p><strong><span style=\"color: #e03e2d;\">For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings -&gt;Print Options -&gt; Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.</span></strong></p>",
+   "soldOut": false
+  },
+  {
+   "id": "662038005954371585",
+   "props": [
+    {
+     "propertyKeyId": "10709858451592",
+     "propertyKey": "Compatibility",
+     "value": "A1 mini"
+    },
+    {
+     "propertyKeyId": "10786283782280",
+     "propertyKey": "Texture",
+     "value": "Diamond"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "42453324103816",
+    "url": "https://store.bblcdn.com/s7/default/86b75bf08d1340529b2c5bc672faca68/mini_e341a6bc-6f37-4577-a2fb-38cf2181f7e3.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "672224823419535361",
+   "props": [
+    {
+     "propertyKeyId": "10709858451592",
+     "propertyKey": "Compatibility",
+     "value": "A1 mini"
+    },
+    {
+     "propertyKeyId": "10786283782280",
+     "propertyKey": "Texture",
+     "value": "Galaxy"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "42453334261896",
+    "url": "https://store.bblcdn.com/s7/default/809fcb52428345389226d7c10376e73b/mini_69e256cc-c72f-4910-be0b-974fc01928c4.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "672224823419535366",
+   "props": [
+    {
+     "propertyKeyId": "10709858451592",
+     "propertyKey": "Compatibility",
+     "value": "A1 mini"
+    },
+    {
+     "propertyKeyId": "10786283782280",
+     "propertyKey": "Texture",
+     "value": "Starry"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "42453324136584",
+    "url": "https://store.bblcdn.com/s7/default/f8845177656d4b5299480d5db2bfd1ab/mini_614a70a7-c860-4663-94ca-2ce1c280eb77.png"
+   },
+   "description": "",
+   "soldOut": false
+  },
+  {
+   "id": "672225496420687873",
+   "props": [
+    {
+     "propertyKeyId": "10709858451592",
+     "propertyKey": "Compatibility",
+     "value": "X1/P1/A1/P2/X2"
+    },
+    {
+     "propertyKeyId": "10786283782280",
+     "propertyKey": "Texture",
+     "value": "Starry"
+    }
+   ],
+   "hero": {
+    "resourceFileId": "41068437766280",
+    "url": "https://store.bblcdn.com/s7/default/7c18f022fbc64727850e24e0b896b0eb/3ec03f028bd47651bf37a67e60a7472a.png"
+   },
+   "description": "<p><strong><span style=\"color: #e03e2d;\">For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings -&gt;Print Options -&gt; Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.</span></strong></p>",
+   "soldOut": false
+  }
+ ],
+ "gallery": [
+  {
+   "resourceFileId": "41068437799048",
+   "url": "https://store.bblcdn.com/s7/default/c4da2609f2f644f28132a987c21f914d/4a8772f1c05cacb28341f4afcfcfd28c.png"
+  },
+  {
+   "resourceFileId": "39515898445960",
+   "url": "https://store.bblcdn.com/s7/default/5449d56a7a4b4d4e8ec34dfade34764e/3D_Effect_Surface_1600.png"
+  },
+  {
+   "resourceFileId": "41068437700744",
+   "url": "https://store.bblcdn.com/s7/default/8a2fec4f9a6b47739e607b877324661b/72a48f93f31032373e61bcfeaac13c75.png"
+  },
+  {
+   "resourceFileId": "41068437766280",
+   "url": "https://store.bblcdn.com/s7/default/7c18f022fbc64727850e24e0b896b0eb/3ec03f028bd47651bf37a67e60a7472a.png"
+  },
+  {
+   "resourceFileId": "41068437733512",
+   "url": "https://store.bblcdn.com/s7/default/22c482c9b06c47e7a2aed93e33d8b34f/983cf8ea6a9d80945631038827d50c42.png"
+  },
+  {
+   "resourceFileId": "42453324169352",
+   "url": "https://store.bblcdn.com/s7/default/cf9149162c3543c2b3356fb2ee0130cf/mini_4fb205ee-21a9-4142-8053-4daf4082e228.png"
+  },
+  {
+   "resourceFileId": "42453324103816",
+   "url": "https://store.bblcdn.com/s7/default/86b75bf08d1340529b2c5bc672faca68/mini_e341a6bc-6f37-4577-a2fb-38cf2181f7e3.png"
+  },
+  {
+   "resourceFileId": "42453324136584",
+   "url": "https://store.bblcdn.com/s7/default/f8845177656d4b5299480d5db2bfd1ab/mini_614a70a7-c860-4663-94ca-2ce1c280eb77.png"
+  },
+  {
+   "resourceFileId": "42453334261896",
+   "url": "https://store.bblcdn.com/s7/default/809fcb52428345389226d7c10376e73b/mini_69e256cc-c72f-4910-be0b-974fc01928c4.png"
+  }
+ ],
+ "featuresTitle": "Product Features",
+ "features": [
+  {
+   "title": "Product Features",
+   "html": ""
+  }
+ ],
+ "videos": [],
+ "description": {
+  "kind": "legacy_html",
+  "html": "<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/60083f2084a94483954dd573f475aeab/3D_Effect_Plate_Banner.jpg\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/60083f2084a94483954dd573f475aeab/3D_Effect_Plate_Banner.jpg\" alt=\"silk filament\" /></div>\n</div>\n<br /><!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h2 class=\"pct_t\">Bambu 3D Effect Plate</h2>\n<p class=\"pct_p\" style=\"text-align: left;\">Need some extra pizazz for your prints? Bambu 3D Effect Plate can transfer interesting surface textures to your printed objects. There are 4 exciting textures, ranging from Carbon Fiber all the way to Starry, Galaxy, and Diamond! Want to make your prints stand out? Get Bambu 3D Effect Plate and unlock a world of textural possibilities!</p>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/8438cd598c124228b409c44b6619b810/22.png\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/8438cd598c124228b409c44b6619b810/22.png\" alt=\"silk filament\" /></div>\n</div>\n</div>\n<div class=\"pct_divider\"></div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_t pct_st\">Galaxy Surface</h3>\n<p class=\"pct_p\">The Galaxy Surface transfers a vibrant galaxy rainbow effect on the first layer of the print, which glitters and changes color depending on the angle. It works best with silk or shiny filaments to take advantage of the pattern transfer.</p>\n</div>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-icpc\" style=\"padding: 0;\"><!-- 不同分辨率分栏数量 pct_grad-分栏数量-设备 --> <!-- 替换下一行 -->\n<div class=\"pct_icpc pct_grad-2-pc pct_grad-1-mobile\"><!-- 第一条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/a8e17af1c7114780a489db263cc1b117/33.jpg\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/a8e17af1c7114780a489db263cc1b117/33.jpg\" alt=\"silk filament\" /></div>\n</div>\n<!-- 第二条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/6925be6dff2b482a834edabd5b25d595/4_b151ca6c-c1cd-467c-ab09-7316c13e8fa2.jpg\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/6925be6dff2b482a834edabd5b25d595/4_b151ca6c-c1cd-467c-ab09-7316c13e8fa2.jpg\" alt=\"silk filament\" /></div>\n</div>\n</div>\n</div>\n</div>\n</div>\n<div class=\"pct_divider\"></div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_t pct_st\">Carbon Fiber Surface</h3>\n<p class=\"pct_p\">The Carbon Fiber has a very slight texture similar to real Carbon Fiber. The pattern transfers to the first layer of the 3D printed model, creating a 3D effect with a distinctive texture, especially when used with a gray carbon filament color.</p>\n</div>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-icpc\" style=\"padding: 0;\"><!-- 不同分辨率分栏数量 pct_grad-分栏数量-设备 --> <!-- 替换下一行 -->\n<div class=\"pct_icpc pct_grad-2-pc pct_grad-1-mobile\"><!-- 第一条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/c40b05d944a54f9c85d94a4956485f7a/5_b3a52c65-3ca6-4067-9761-270f0a3f4588.jpg\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/c40b05d944a54f9c85d94a4956485f7a/5_b3a52c65-3ca6-4067-9761-270f0a3f4588.jpg\" alt=\"silk filament\" /></div>\n</div>\n<!-- 第二条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/b76e0ea82b1f41759ae527f450591f19/6_90c11933-049d-406d-b0d2-884a2ee5c948.jpg\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/b76e0ea82b1f41759ae527f450591f19/6_90c11933-049d-406d-b0d2-884a2ee5c948.jpg\" alt=\"silk filament\" /></div>\n</div>\n</div>\n<div class=\"pct_divider\"></div>\n<!-- 标题加文案加大图部分 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_t pct_st\" style=\"margin-top: 30px;\">Starry Surface</h3>\n<p class=\"pct_p\">The Starry Surface transfers a rainbow kaleidoscope starry effect on the first layer of the print, which glitters and changes color depending on the angle. It works best with silk or shiny filaments to take advantage of the pattern transfer.</p>\n</div>\n<br />\n<div class=\"pct_t-p\"></div>\n<p><video style=\"width: 100%; heigth: 100%;\" src=\"https://store.bblcdn.com/s7/default/0b95757807a24347bff0b8c9b702cb43/c53aa9da8c3348879464907845298d2e.mp4\" controls=\"controls\" width=\"300\" height=\"150\" autoplay=\"autoplay\" loop=\"loop\" muted=\"\" playsinline=\"\" poster=\"https://store.bblcdn.com/s7/default/eb60a23f7ce44bd29b933d5369cf08af/20240515-145611.jpg\" data-mce-src=\"https://store.bblcdn.com/s7/default/0b95757807a24347bff0b8c9b702cb43/c53aa9da8c3348879464907845298d2e.mp4\" data-mce-style=\"width: 100%; heigth:100%\"></video></p>\n</div>\n</div>\n<div class=\"pct_divider\"></div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_tpc-ic\">\n<div class=\"pct_t-p\">\n<h3 class=\"pct_t pct_st\">Diamond Surface</h3>\n<p class=\"pct_p\">The Diamond Surface imprints a diamond pattern on the first layer with a mix of glossy and matte shapes applied to the smooth surface. It's best used with silk or shiny filaments, to take advantage of the pattern transfer.</p>\n</div>\n</div>\n</div>\n<div class=\"pct pct_mc\">\n<div class=\"pct_t-icpc\" style=\"padding: 0;\"><!-- 不同分辨率分栏数量 pct_grad-分栏数量-设备 --> <!-- 替换下一行 -->\n<div class=\"pct_icpc pct_grad-2-pc pct_grad-1-mobile\"><!-- 第一条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/ccf92091cbd046bb9eb72bb1091f5243/7.jpg\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/ccf92091cbd046bb9eb72bb1091f5243/7.jpg\" alt=\"silk filament\" /></div>\n</div>\n<!-- 第二条 -->\n<div class=\"pct_ic-p\">\n<div class=\"pct_ic\"><!-- 手机端图片 --> <img class=\"pct_mi\" src=\"https://store.bblcdn.com/s7/default/1f16f1b04801494794bc46b1db43795f/8.jpg\" alt=\"silk filament\" /> <!-- PC端图片 --> <img class=\"pct_i\" src=\"https://store.bblcdn.com/s7/default/1f16f1b04801494794bc46b1db43795f/8.jpg\" alt=\"silk filament\" /></div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n<p>&nbsp;</p>\n<!-- 第二条 -->\n<div class=\"pct_st-p\">\n<div class=\"pct_st-p\"><!-- 第三条 -->\n<div class=\"pct_st-p\">\n<h3 class=\"pct_st\">Considerations</h3>\n<p class=\"pct_p\">1. Please set the plate type to Smooth PEI/High Temp Plate and carefully follow the Heatbed Recommended Settings when using the Bambu 3D Effect Plate. <span style=\"color: #e03e2d;\"><strong>For X1/X2/P2 Series users, please disable the Build Plate Position Detection in 'Settings -&gt;Print Options -&gt; Enable the detection of build plate position' when printing with the 3D Effect Plate to avoid error reports.</strong></span></p>\n<div class=\"pct_st-p\">\n<p class=\"pct_p\">2. The 3D effect patterns require a clean surface to remain visible. Grease can cause the patterns to disappear. It is essential to keep the surface clean. We recommend using hot water and detergent for cleaning, and avoid touching the surface.</p>\n<p class=\"pct_p\"></p>\n</div>\n<p class=\"pct_p\">3. Due to reflections, the LIDAR calibration will not work as expected when using<strong> Effect Plates.</strong> We recommend skipping the LIDAR calibration sequence, or calibrating with a regular plate.</p>\n<p class=\"pct_p\">4. The 3D Effect Plates are considered consumables. To prolong the lifespan of the transfer textures, try placing your print objects on different areas of the sheet.</p>\n<p class=\"pct_p\">5. Do not apply glue to the plate surface.</p>\n<p class=\"pct_p\">6. Pay close attention when using a scraper to remove prints, to avoid damaging the plate surface.</p>\n</div>\n<br /><!-- table布局 --></div>\n<!-- table布局 -->\n<div class=\"pct pct_mc\">\n<div class=\"pct_st-tb\">\n<h3 class=\"pct_st\">Recommended Settings</h3>\n<br />We recommend using PLA and TPU filament for printing. Please note that other slicer settings might need to be adjusted based on the printed model and the filament requirements. Please select Smooth PEI Plate/High Temp Plate for the Plate Type in Bambu Studio.<br />\n<table class=\"pct_tb\" style=\"width: 100%;\"><!-- 表头 -->\n<thead class=\"pct_th\">\n<tr>\n<td class=\"pct_td\" style=\"width: 48.6091%; text-align: center;\"><strong>Filaments</strong></td>\n<td class=\"pct_td\" style=\"width: 51.0981%; text-align: center;\"><strong>Heatbed Temperature</strong></td>\n</tr>\n</thead>\n<tbody>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 48.6091%; text-align: center;\">PLA</td>\n<td class=\"pct_td\" style=\"width: 51.0981%; text-align: center;\">60~65℃</td>\n</tr>\n<tr class=\"pct_tr\">\n<td class=\"pct_td\" style=\"width: 48.6091%; text-align: center;\">TPU</td>\n<td class=\"pct_td\" style=\"width: 51.0981%; text-align: center;\">35~45℃</td>\n</tr>\n</tbody>\n</table>\n</div>\n</div>\n</div>"
+ },
+ "jsonld": {
+  "productGroupId": "8083645300872",
+  "variantSkus": [
+   "606963003770429441",
+   "619636336951320576",
+   "638162979091648513",
+   "640843198155984897",
+   "662038005954371585",
+   "672224823419535361",
+   "672224823419535366",
+   "672225496420687873"
+  ],
+  "brand": "Bambu Lab"
+ }
+}
