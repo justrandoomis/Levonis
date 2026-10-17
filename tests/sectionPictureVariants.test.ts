@@ -374,7 +374,8 @@ test('the renderers pick the theme in script and the screen with <source media>'
     const src = code(file);
     assert.match(src, /themedFiles\(\{ src, lightSrc, mobileSrc, lightMobileSrc \}, theme\)/, `${file}: one resolver for the pair`);
     if (file.endsWith('/CropPhoto.tsx')) {
-      assert.match(src, /<source media=\{PHONE_MEDIA\} srcSet=\{phoneSet \?\? phone\} sizes=\{phoneSet \? sizes : undefined\} \/>/, `${file}: the phone file through <source>, as small copies`);
+      assert.match(src, /<source media=\{PHONE_MEDIA\} srcSet=\{phoneSet \?\? phone\} sizes=\{phoneSet \? fitted : undefined\} \/>/, `${file}: the phone file through <source>, as small copies`);
+      assert.match(src, /sizes=\{largeSet \? fitted : undefined\}/, `${file}: the <img> asks with the same \`sizes\``);
     }
     assert.match(src, /phone !== shown \?/, `${file}: no <source> when the phone draws the same file`);
   }

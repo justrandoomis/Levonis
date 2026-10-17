@@ -47,9 +47,12 @@ export const IMAGE_SIZES = {
   cropBanner: '(min-width: 1024px) 500px, (min-width: 640px) 40vw, (max-width: 375px) 213px, 224px',
   /**
    * The COMPACT category hero's product photograph (a department that is its
-   * own listing): 192–194 CSS px on every phone — its zone follows the hero's
-   * height, not the screen's width. A DPR-3 phone of any width takes the 640
-   * copy (577–583 device px), not 800.
+   * own listing) WHILE ITS TITLE IS ONE LINE: 192–194 CSS px on a phone — its
+   * zone follows the hero's height, not the screen's width — so a DPR-3 phone
+   * takes the 640 copy (577–583 device px), not 800. A title that wraps makes
+   * the hero taller and the photograph wider (249 px at two lines), so the
+   * hero asks with its MEASURED box (`cropHeroCompactSizes`, CropPhoto `fit`);
+   * this is that answer for a one-line hero, and the floor of every other.
    */
   cropHeroCompact: '(min-width: 1024px) 500px, (min-width: 640px) 40vw, 195px',
   /**
@@ -65,6 +68,34 @@ export const IMAGE_SIZES = {
   half: '(min-width: 768px) 50vw, 100vw',
 } as const;
 export type ImageSizesPreset = keyof typeof IMAGE_SIZES;
+
+/**
+ * HOW WIDE THE CROP RULE DRAWS A PHOTOGRAPH IN ITS ZONE (src/index.css
+ * `.lv-promo-photo[data-crop]`): a square of max(height / 0.53, width / 0.86)
+ * CSS px. Where container units are missing the photograph is a plain cover
+ * crop, never wider than this, so this never under-states.
+ */
+export function cropDrawnWidth(zone: { width: number; height: number }): number {
+  return Math.max(zone.height / 0.53, zone.width / 0.86, 0);
+}
+
+/**
+ * THE COMPACT HERO'S `sizes` FROM ITS MEASURED PHOTOGRAPH (review of the
+ * category lane, 2026-10-16). The phone clause is the width the crop square is
+ * drawn at — 192–194 px under a one-line title, 249 px under a wrapped one
+ * (the en and ckb «Printer Accessories» at 320 px, longer department names at
+ * 360–412 px in all three languages) — held between the one-line preset's
+ * 195 px and the 230 px the hero asked with before the lane. So a one-line
+ * title keeps the 640 copy on a DPR-3 phone, and a wrapped one gets exactly
+ * the copy it had: 800 on DPR 3 (1.07 image px per device px), 640 on the
+ * DPR 2.625–2.75 Android screens (0.93–0.98) — not the 800 a truthful 249 px
+ * would take there. From 640 px the preset's clauses stand (they follow the
+ * screen's width).
+ */
+export function cropHeroCompactSizes(drawn: number): string {
+  const phone = Math.min(230, Math.max(195, Math.ceil(Number.isFinite(drawn) ? drawn : 0)));
+  return `(min-width: 1024px) 500px, (min-width: 640px) 40vw, ${phone}px`;
+}
 
 /**
  * Product.tsx's gallery image content width, shared with the document preload.

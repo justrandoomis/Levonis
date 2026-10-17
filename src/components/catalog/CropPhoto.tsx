@@ -2,7 +2,7 @@ import React from 'react';
 import { useTheme } from '../../lib/theme';
 import { PHONE_MEDIA, themedFiles } from '../../lib/catalog/sectionPictures';
 import { variantSrcSet } from '../../../packages/contracts/src/imageSizing';
-import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
+import { IMAGE_SIZES, cropDrawnWidth } from '../../../packages/contracts/src/imageSizes';
 
 /**
  * A photograph in a ZONE of a dark banner — the home bento's `PromoPhoto`
@@ -37,6 +37,14 @@ import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
  *
  * A failed load removes the picture; the banner under it is already a
  * designed surface.
+ *
+ * `fit` — for a zone whose size the screen's width does not decide (the
+ * compact category hero's follows its title, which may wrap): the zone is
+ * measured in a layout effect — the same task as the commit, before paint —
+ * and the `<picture>` goes in only then, with `fit(drawn width)` as its
+ * `sizes`. One request, for the copy the drawn box needs. A later growth (a
+ * font arriving, a rotation) asks again, wider; never narrower, which would
+ * fetch a smaller copy of a picture already on screen.
  */
 export default function CropPhoto({
   src,
@@ -49,6 +57,7 @@ export default function CropPhoto({
   eager = false,
   frame = true,
   sizes = IMAGE_SIZES.cropBanner,
+  fit,
 }: {
   src: string;
   lightSrc?: string;
@@ -66,6 +75,8 @@ export default function CropPhoto({
   frame?: boolean;
   /** How wide the photograph is drawn (`sizes` grammar). */
   sizes?: string;
+  /** `sizes` from the drawn width measured in the zone (crop rule); replaces `sizes`. Must be a stable function. */
+  fit?: (drawn: number) => string;
 }) {
   const { theme } = useTheme();
   const { large: shown, phone } = themedFiles({ src, lightSrc, mobileSrc, lightMobileSrc }, theme);
@@ -73,31 +84,53 @@ export default function CropPhoto({
   // switch (a different pair) gets a fresh attempt.
   const pair = `${shown}|${phone}`;
   const [failed, setFailed] = React.useState('');
-  if (!shown || failed === pair) return null;
+  const present = !!shown && failed !== pair;
+  const zone = React.useRef<HTMLDivElement>(null);
+  // The widest this photograph has been drawn here (CSS px); null until measured.
+  const [drawn, setDrawn] = React.useState<number | null>(null);
+  React.useLayoutEffect(() => {
+    const el = zone.current;
+    if (!fit || !present || !el) return;
+    const measure = () => {
+      const box = el.getBoundingClientRect();
+      // A plain cover crop of a square draws it as wide as the zone's longer side.
+      const next = crop ? cropDrawnWidth(box) : Math.max(box.width, box.height);
+      setDrawn((prev) => (prev !== null && Math.ceil(prev) >= Math.ceil(next) ? prev : next));
+    };
+    measure();
+    if (typeof ResizeObserver !== 'function') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fit, present, crop]);
+  if (!present) return null;
+  const fitted = fit ? (drawn === null ? null : fit(drawn)) : sizes;
   // Only a catalogue photograph is known to be a dark studio shot; an owner's
   // own picture keeps the edge fade it was designed with.
   const ground = frame && crop && theme === 'light' && shown !== lightSrc ? 'dark' : undefined;
   const largeSet = variantSrcSet(shown);
   const phoneSet = variantSrcSet(phone);
   return (
-    <div aria-hidden="true" data-ground={ground} className={`lv-promo-zone absolute ${className}`}>
-      <picture>
-        {phone !== shown ? <source media={PHONE_MEDIA} srcSet={phoneSet ?? phone} sizes={phoneSet ? sizes : undefined} /> : null}
-        <img
-          src={shown}
-          srcSet={largeSet}
-          sizes={largeSet ? sizes : undefined}
-          alt=""
-          width={size}
-          height={size}
-          loading={eager ? 'eager' : 'lazy'}
-          decoding="async"
-          {...(eager ? { fetchPriority: 'high' as const } : {})}
-          data-crop={crop ? '' : undefined}
-          onError={() => setFailed(pair)}
-          className="lv-promo-photo transition-transform duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none"
-        />
-      </picture>
+    <div ref={zone} aria-hidden="true" data-ground={ground} className={`lv-promo-zone absolute ${className}`}>
+      {fitted === null ? null : (
+        <picture>
+          {phone !== shown ? <source media={PHONE_MEDIA} srcSet={phoneSet ?? phone} sizes={phoneSet ? fitted : undefined} /> : null}
+          <img
+            src={shown}
+            srcSet={largeSet}
+            sizes={largeSet ? fitted : undefined}
+            alt=""
+            width={size}
+            height={size}
+            loading={eager ? 'eager' : 'lazy'}
+            decoding="async"
+            {...(eager ? { fetchPriority: 'high' as const } : {})}
+            data-crop={crop ? '' : undefined}
+            onError={() => setFailed(pair)}
+            className="lv-promo-photo transition-transform duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none"
+          />
+        </picture>
+      )}
     </div>
   );
 }
