@@ -1,0 +1,809 @@
+{
+  "handle": "petg-translucent",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T12:46:55Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer, page by page): Basic Info, Specifications, Recommended Printing Settings, Physical, Mechanical and Other Physical and Chemical Properties, Specimen Test, Disclaimer. No filament length and no hardness value is given."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/aaf0e506c3774aed9822643efce9550b/SDS20251127G01_Bambu_PETG_Translucent.pdf",
+      "title": "Bambu PETG Translucent Safety Data Sheet SDS20251127G01",
+      "retrieved_at": "2026-10-16T08:24:17Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read. Section 3 gives the composition; section 9 says \"No data available\" for melting point, density and the other physical data; section 14 classifies it as not hazardous goods."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "retrieved_at": "2026-10-16T08:24:18Z",
+      "keys": [],
+      "note": "One page, 8 colours (text layer, word positions and a rendering): read for the published hex codes (the \"hex\" list), not for spec keys. \"Clear\" is not in the table."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, build plate, glue and storage tables; rows \"PETG Translucent\", \"PETG / PETG-CF / PETG HF / PETG Translucent\", \"PETG / PETG HF / PETG Translucent\" and \"PETG HF / PETG Translucent\" name this material. Used as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petg",
+      "title": "PETG Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:03Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility table (row \"PETG Translucent\"), drying table (row \"PETG Basic / PETG HF / PETG CF / PETG Translucent\"), transparency tips."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PETG, PETG-CF\" (generic PETG; PETG Translucent is not named)."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/petg-translucent",
+      "title": "Bambu Lab US store product page: PETG Translucent",
+      "retrieved_at": "2026-10-16T07:01:32Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections, Printing Tips FAQ, Download block."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PETG",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition PETG",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The SDS (p.4, section 3) gives PETG 99-99.9 % by wt (CAS 25640-14-6, EC 607-767-6) and an additive 0.1-1 % by wt."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\"); the tolerance is the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681962920112152",
+        "value_text": "1 kg"
+      },
+      "value": 1,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "Scoped to the store page's only Size value \"1 kg\". Written as the TDS states it (1 kg), as in the other filament files; mergeCurated stores 1000 g with the text \"1 kg\". Agrees with the store page row (option Size › 1 kg, 1000 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.25,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.25 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept. The store page states no density (its row is not_found)."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 228,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 228 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 70,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 70 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 79,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 79 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (the TDS row reads \"Vicar Softening Temperature\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 68,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 68 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value. The next row gives 74 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z"
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 33,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 33 ± 4 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "Printed-specimen result (± 4 MPa). The Z row gives 29 ± 3 MPa (not stored: one key per scope)."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8.2,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 8.2 ± 1.3 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The Z row gives 5.2 ± 0.9 % (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1610,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 1610 ± 130 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The Z row gives 1520 ± 110 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 68,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 68 ± 3 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The Z row gives 55 ± 4 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 37.4,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 37.4 ± 3.3 kJ/m²; 8.6 ± 2.1 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 255 °C, bed 70 °C, 150 mm/s, 100% infill; annealed and dried at 65 °C for 8 h before testing). First value of the cell (not marked notched); the same cell gives 8.6 ± 2.1 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The Z row gives 7.2 ± 1.8 kJ/m² without saying notched or unnotched (not stored)."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 230,
+        "max": 270
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 230 - 270 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The store page states no nozzle temperature (its row is not_found).",
+      "conflict": "The material-table wiki (2. Nozzle, row \"PETG Translucent\") gives 230 - 260 ℃ (column \"Nozzle temperature /℃ ( ±10 °C)\"). The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 65,
+        "max": 75
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 65 - 75 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate Engineering Plate, High Temperature Plate or Textured PEI Plate, surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "conflict": "The material-table wiki gives 60 - 80 ℃ for \"PETG / PETG HF / PETG Translucent\" on the Engineering, Smooth PEI / High-Temperature and Textured PEI plates (Build Plate Settings › 3) and 60 - 80 °C with glue stick or liquid glue (Build Plate Settings › 1). Its range contains the TDS range; the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 220 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 220 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented. The store page states no print speed for this product. The PETG wiki suggests 20 mm/s for maximum transparency (4. Advanced Learning), a tip, not a specification."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0 - 60%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 60%",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The PETG wiki (Increase the transparency of transparent filament) suggests turning off all fans for maximum transparency, a tip, not a specification."
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The material-table wiki (Build Plate Settings › 3, row \"PETG / PETG HF / PETG Translucent\") agrees on these three plates (60 - 80 ℃) and gives \"Not recommended\" for the Bambu Cool Plate / PLA Plate. The PETG wiki: \"Compatible with all print boards\"."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 65 °C, 8 h X1 Series Printer Heatbed: 75 - 85 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 Series printer heatbed: 75 - 85 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "The material-table wiki (Storage and Material Specifications, row \"PETG HF / PETG Translucent\") agrees: 65 ℃ for 8 h in a blast drying oven. The PETG wiki (Dry the Filament, row \"PETG Basic / PETG HF / PETG CF / PETG Translucent\") gives a convection oven range of 60 - 65 °C, 8 h, and the drying wiki (Appendix I, row \"PETG, PETG-CF\") a forced-air oven range of 60-65 °C, 8 h; both contain 65 °C."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 65 °C, 8 h X1 Series Printer Heatbed: 75 - 85 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 65 °C. The same row gives 12 h on an X1 Series printer heatbed at 75 - 85 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "note": "Every cached source agrees on 8 h in an oven: the material-table wiki (65 ℃ for 8 h), the PETG wiki (60 - 65 °C, 8 h) and the drying wiki (Appendix I, row \"PETG, PETG-CF\": 60-65 °C, 8 h)."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Pink (32200)",
+      "source_value_id": "564681962920112147",
+      "hex": "#F9C1BD",
+      "source_url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Translucent Pink Hex:#F9C1BD",
+      "retrieved_at": "2026-10-16T08:24:18Z"
+    },
+    {
+      "value_text": "Purple (32700)",
+      "source_value_id": "564681962920112146",
+      "hex": "#D6ABFF",
+      "source_url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Translucent Purple Hex:#D6ABFF",
+      "retrieved_at": "2026-10-16T08:24:18Z"
+    },
+    {
+      "value_text": "Orange (32300)",
+      "source_value_id": "564681962920112145",
+      "hex": "#FF911A",
+      "source_url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Translucent Orange Hex:#FF911A",
+      "retrieved_at": "2026-10-16T08:24:18Z"
+    },
+    {
+      "value_text": "Brown (32800)",
+      "source_value_id": "564681962920112148",
+      "hex": "#C9A381",
+      "source_url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Translucent Brown Hex:#C9A381",
+      "retrieved_at": "2026-10-16T08:24:18Z"
+    },
+    {
+      "value_text": "Teal (32501)",
+      "source_value_id": "564681962920112141",
+      "hex": "#77EDD7",
+      "source_url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Translucent Teal Hex:#77EDD7",
+      "retrieved_at": "2026-10-16T08:24:18Z"
+    },
+    {
+      "value_text": "Light Blue (32600)",
+      "source_value_id": "564681962920112142",
+      "hex": "#61B0FF",
+      "source_url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Translucent Light Blue Hex:#61B0FF",
+      "retrieved_at": "2026-10-16T08:24:18Z"
+    },
+    {
+      "value_text": "Olive (32500)",
+      "source_value_id": "564681962920112144",
+      "hex": "#748C45",
+      "source_url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "locator": "p.1, row 4, column 1",
+      "quote": "Translucent Olive Hex:#748C45",
+      "retrieved_at": "2026-10-16T08:24:18Z"
+    },
+    {
+      "value_text": "Gray (32100)",
+      "source_value_id": "564681962920112149",
+      "hex": "#8E8E8E",
+      "source_url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "locator": "p.1, row 4, column 2",
+      "quote": "Translucent Gray Hex:#8E8E8E",
+      "retrieved_at": "2026-10-16T08:24:18Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "AMS series",
+      "target_source_handle": "",
+      "target_family": "ams_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/petg",
+      "source_title": "PETG Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:03Z",
+      "locator": "1.Basic Information on Filament › Hardware compatibility › table › row \"PETG Translucent\" › Part Compatibility",
+      "quote": "PETG Translucent | Compatible with standard nozzles (excluding 0.2 mm) | Compatible with all print boards | Fully compatible with AMS series |",
+      "note": "The store page says the same (Product Features › Cautions for Use › bullet 1: \"All AMS Series Compatible\"); the material-table wiki (3. AMS & AMS lite, row \"PETG Translucent\") gives \"Compatible\" for AMS / AMS lite."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "Open-frame or enclosed printer",
+      "target_source_handle": "",
+      "target_family": "all_bambu_printers",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 3. AMS & AMS lite › table › row \"PETG Translucent\" › Open-frame printer, Enclosed printer",
+      "quote": "PETG Translucent | Compatible | Compatible | Compatible |",
+      "note": "Columns: open-frame printer (A Series, P1P, etc.), enclosed printer (H2 Series, X2D, P2S, X1 Series, P1S, etc.), AMS / AMS lite. The same page (1. Printer) gives \"Open-frame or enclosed printer\" for PLA, PETG, TPU and adds \"For PETG and PETG-CF/GF, an enclosed printer is recommended to prevent low ambient temperatures from reducing the model's interlayer strength.\" The PETG wiki: \"PETG is compatible with the entire Bamboo series of machines.\""
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Stainless Steel Nozzle 0.2 mm",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/petg-translucent",
+      "source_title": "Bambu Lab US store product page: PETG Translucent",
+      "retrieved_at": "2026-10-16T07:01:32Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility",
+      "quote": "Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "note": "The page sets \"Hotend with Stainless Steel Nozzle 0.2 mm\" in bold, without a link. The material-table wiki (2. Nozzle, row \"PETG Translucent\") gives \"Not Compatible\" for the 0.2 mm nozzle and the PETG wiki says \"Compatible with standard nozzles (excluding 0.2 mm)\". The TDS (p.1, Recommended Printing Settings › Nozzle Size) disagrees: \"Nozzle Size 0.2, 0.4, 0.6, 0.8 mm\". Three official sources against one; the relation follows the store page. compat-targets.json lists \"0.2 mm Nozzle\" as reviewed-unresolvable (component concept), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"PETG Translucent\" › 0.4 mm, 0.6 mm, 0.8 mm Nozzle",
+      "quote": "PETG Translucent | Not Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 230 - 260 |",
+      "note": "Hardened steel \"Not Required\". The PETG wiki: \"Compatible with standard nozzles (excluding 0.2 mm)\". The TDS (p.1) lists Nozzle Size \"0.2, 0.4, 0.6, 0.8 mm\" (0.2 mm disputed, see the not_compatible_with relation)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High-flow nozzles (0.4, 0.6, 0.8 mm)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"PETG Translucent\" › 0.4 mm, 0.6 mm, 0.8 mm High flow nozzle",
+      "quote": "PETG Translucent | Not Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 230 - 260 |"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki (Build Plate Settings › 3, row \"PETG / PETG HF / PETG Translucent\") gives 60 - 80 ℃ on the Bambu Engineering Plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (PETG Translucent 60 - 80 ℃), which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Engineering Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681962920112151",
+        "value_text": "Refill"
+      },
+      "target_kind": "spool",
+      "target_label": "spool",
+      "target_source_handle": "bambu-reusable-spool",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/petg-translucent",
+      "source_title": "Bambu Lab US store product page: PETG Translucent",
+      "retrieved_at": "2026-10-16T07:01:32Z",
+      "locator": "Product Features › \"Note:\" › line 2",
+      "quote": "The refill needs to be used with a spool.",
+      "note": "Scoped to the Refill value: the \"Filament with spool\" value comes on a spool. The store FAQ (3.Refill Guidelines): \"The refill filament needs to be used with a spool.\" and points to the wiki guide on the Bambu Reusable Spool."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s1/default/338c9cd853fd44d9b6ed354a49048e72/Bambu_PETG_Translucent_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: PETG Translucent",
+      "retrieved_at": "2026-10-16T08:24:15Z",
+      "sha256": "76246afc09c01b232869072208abbace373650b5b1e661ab222b4605f67a5229"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/aaf0e506c3774aed9822643efce9550b/SDS20251127G01_Bambu_PETG_Translucent.pdf",
+      "title": "Bambu PETG Translucent Safety Data Sheet SDS20251127G01",
+      "retrieved_at": "2026-10-16T08:24:17Z",
+      "sha256": "f17cd99df8d79566a40e6f0909ca83193efe9ba20a2087025c332931d85e67c5"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/5c46875459bc4a27986707f49560a961/PETG_Translucent_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PETG Translucent",
+      "retrieved_at": "2026-10-16T08:24:18Z",
+      "sha256": "cab28126fce4c9d205c9e2098bdf79edb9517bf9a839fdf9ff18c62d9b4e78dc"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petg",
+      "title": "PETG Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:03Z",
+      "sha256": "7b70055c892826fe371741327adc2121e43d7487f57e519e92f713eb3f610279"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 29 ± 3 MPa, elongation 5.2 ± 0.9 %, bending modulus 1520 ± 110 MPa, bending strength 55 ± 4 MPa, impact 7.2 ± 1.8 kJ/m²) are not stored. Density, melting, glass transition, Vicat and HDT are raw-material properties (ISO 1183, DSC, ISO 306, ISO 75) and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows. The registry has no *.printed / *.material key pair, so the split is by key group and test_condition.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 1420 ± 160 MPa, Z 1230 ± 140 MPa), melt index (11.7 ± 1.5 g/10 min at 230 °C, 2.16 kg), crystallization temperature (N/A), saturated water absorption rate (0.30% at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed with desiccant), bed surface preparation (glue), retraction length (0.8 - 1.4 mm) and speed (30 - 60 mm/s), max overhang angle (~ 70°), max bridging length (~ 30 mm), spool material (ABS, temperature resistance 70 °C) and spool size (diameter 200 mm, height 67 mm), annealing of prints (not recommended; if done, 60 to 70 °C for 6 to 12 hours), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows. TDS facts that have a registry key but no row here: the 0.45 MPa heat deflection row (74 °C; one row per key, and the 1.8 MPa row is the one stored, as in every other filament file), the Nozzle Size row and the Chamber Temperature row (see the two notes below).",
+    "The TDS recommended chamber temperature (\"Chamber Temperature 35 - 50 °C\", p.1) is not written to thermal.chamber_temp: that registry key is one number (template field chamber_temp_max, a printer's chamber maximum), so the filament's recommended range would be stored as a maximum.",
+    "The TDS Nozzle Size row (\"Nozzle Size 0.2, 0.4, 0.6, 0.8 mm\", p.1) is not written to extrusion.supported_nozzle_diameters: that is an extrusion-group printer and hotend capability, and the store FAQ, the material-table wiki and the PETG wiki all exclude the 0.2 mm nozzle for this filament. The row is carried by the not_compatible_with 0.2 mm relation and the compatible_with 0.4 / 0.6 / 0.8 mm and high-flow nozzle relations, as in the PETG HF and PVA files.",
+    "material.spool_type is not written: the store page has no spool bullet for this product, and the TDS gives the spool material (ABS) and size, not a spool type name. It is not marked not_published either, since the TDS does describe the spool.",
+    "SDS facts with no registry key are not stored: product name \"Bambu PETG Translucent\", CLP \"Not classified\", no PBT/vPvB substance or endocrine disruptor, and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO-TI) transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "The SDS model \"G01-xx(xx stands for any suffix)\" (p.2, section 1) is not written to identity.model: the builder writes identity.model \"PETG Translucent\" from the reviewed identity map, and a curated official_doc row would outrank and replace it with a code pattern.",
+    "Source disagreements kept for review: nozzle temperature (TDS 230 - 270 °C vs material-table wiki 230 - 260 ℃ ±10 °C); bed temperature (TDS 65 - 75 °C vs material-table wiki 60 - 80 ℃); 0.2 mm nozzle (TDS lists it under Nozzle Size; the store FAQ, the material-table wiki and the PETG wiki exclude it). The product TDS values are kept for the spec keys; the 0.2 mm relation follows the three sources that exclude it.",
+    "AMS drying (no key; oven values are stored): the material-table wiki gives 65 ℃ for 12 h in the AMS 2 Pro and AMS HT, the PETG wiki 65 °C, 8 h (AMS HT / AMS 2 Pro), the drying wiki (generic PETG row) 65 °C, 12 h. The material-table wiki also says drying before use is \"Required\" and desiccant protection during use is \"Required\" for PETG HF / PETG Translucent; the store FAQ says the filament \"must be dried before use\".",
+    "Build plate guidance: the TDS lists glue as the surface preparation and the material-table wiki recommends glue stick or liquid glue; this is a recommendation, not a stated requirement, so no requires relation is written. The Bambu Cool Plate / PLA Plate is \"Not recommended\" (material-table wiki), not \"not compatible\", so no relation is written for it either.",
+    "Marketing prose proves no number: \"Robust Endurance\", \"Durable, Weather-Resistant, and Long-Lasting\", \"exceptional impact resistance\", \"waterproof\", \"resilience under prolonged exposure to UV\", \"Excellent light transmittance\" and \"Minimal Warping\" are not stored as values.",
+    "Hex: 8 of the 9 store colours have exactly one hex cell, matched by the colour name after the table's \"Translucent \" prefix, without the code in parentheses. \"Clear (32101)\" has no hex in the official table, so none is written (no hex is invented). The store page prose still says \"8 vibrant colors\" while its Colour group lists 9 values.",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/45e0bfd4faf34c3db8a0f3a1ed264727.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published.",
+    "The store page also links the wiki pages https://wiki.bambulab.com/en/knowledge-sharing/transparent-petg (\"Printing tips for transparent PETG\") and https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool, which were not cached and not read.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 5); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store FAQ (5.Safety Tips) and the PETG wiki say the filament is not food-grade / not food-contact grade; no registry key holds this.",
+    "Adjudication against the independent second extraction (2026-10-17), every disputed fact checked in the cached documents: the two files agree on every stored value except the heat deflection row (the second took the 0.45 MPa row, 74 °C; this file keeps the 1.8 MPa row, 68 °C, as every other filament file does; both rows are in the TDS, p.2). Not added from the second extraction: thermal.chamber_temp, extrusion.supported_nozzle_diameters and identity.model (see the notes above), and separate AMS and AMS lite relations from the material-table row \"PETG Translucent | Compatible | Compatible | Compatible |\" (the AMS-series family relation covers both and cites that row in its note). Kept from this file after checking the documents: the open-frame-or-enclosed-printer, 0.4 / 0.6 / 0.8 mm nozzle, high-flow nozzle, three build plate and Refill → spool relations. The 0.2 mm nozzle relation keeps the product's own store FAQ as its source; the material-table row the second extraction cited (\"Not Compatible\" under 0.2 mm) states the same. The cooling fan value keeps the TDS spelling \"0 - 60%\". material.net_weight is now written as the TDS's \"1 kg\" (value 1, unit kg).",
+    "Adjudication re-checked (2026-10-17, second pass over all 107 field disagreements, each disputed fact re-read in the cached TDS, SDS, hex table, the three wikis and the store page): 41 are the same fact written differently (locator separators and wording, the hex row/column locators, the hex source_value_id the second omits, the 0.2 mm relation's witness and label, the fan-speed spelling); this file's form is kept. The 66 fields of facts present in one file only or stated differently keep this file's decision: the 1.8 MPa heat deflection row (68 °C); no thermal.chamber_temp, extrusion.supported_nozzle_diameters or identity.model row; no separate AMS and AMS lite rows beside the AMS-series family; the printer, nozzle, high-flow nozzle, three plate and Refill → spool relations, each re-read in its cited document. Every hex scope id and the 1 kg and Refill scope ids equal the store page's value ids. One wording fix outside the diff: the impact-strength test_condition says \"not marked notched\" for the first value, as the TDS cell marks only its second value \"(notched)\"."
+  ]
+}

@@ -1,0 +1,899 @@
+{
+  "handle": "pet-cf",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T12:11:27Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 5 pages read (text layer, page by page): Basic Info, Specifications, Recommended Printing Settings (pp.1-2), Physical Properties, Mechanical Properties (Dry state) (p.2), Other Physical and Chemical Properties, Specimen Test (p.3), test charts without text (p.4), Disclaimer (pp.4-5). No filament length and no hardness value is given."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/e71aee2e21bc43dd9e482fa1d32a6aab/SDS20260701T01_Bambu_PET_CF.pdf",
+      "title": "Bambu PET CF Safety Data Sheet SDS20260701T01",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 19 pages read. Section 3 (p.4) gives the composition; section 8 (pp.8-9) the carbon-fibre handling warning; section 9 (pp.9-10) says \"No data available\" for melting point, density and the other physical data; sections 14-15 classify it as not hazardous goods, SVHC not listed. No certification is named."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Nozzle, AMS / printer, glue, build-plate and storage tables; rows \"PET-CF/GF\" name this material as a class (PET-CF and PET-GF). Used as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:09Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "compat.*"
+      ],
+      "note": "Core Features table (column \"PET-CF\"), Hardware Compatibility table (row \"PET-CF\"), dry vs humid table (row \"PET-CF\"), drying table (row \"PA6 CF / PET-CF\"), sealing with AMS HT, recommended printing speed table (row \"PET-CF\")."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PET-CF\"; Appendix II drying precautions and storage humidity."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pet-cf",
+      "title": "Bambu Lab US store product page: PET-CF",
+      "retrieved_at": "2026-10-16T07:00:04Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, Highlights, page-builder sections, FAQ, documents."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Polyethylene terephthalate, carbon fiber",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polyethylene terephthalate，carbon fiber",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The SDS (p.4, section 3) gives Polyethylene Terephthalate 80-88 % by wt (CAS 25038-59-9) and Carbon Fiber 12-20 % by wt (CAS 7440-44-0). The TDS writes a full-width comma; the value uses a plain one."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "Agrees with the store page (Product Features › bullet 6: \"Diameter: 1.75mm +/- 0.03mm\"). The tolerance stays the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681908733898756",
+        "value_text": "0.5 kg"
+      },
+      "value": 0.5,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 0.5 kg, 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\"; the row lists 0.5 kg and 1 kg)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "Scoped to the store page's Net weight value \"0.5 kg\"; written in the TDS's own unit so the value is the quote's number (the weight rule in mergeCurated stores 500 g with the text \"0.5 kg\"). Agrees with the store page row (option Size › 0.5 kg, 500 g)."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681908733898757",
+        "value_text": "1 kg"
+      },
+      "value": 1,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 0.5 kg, 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\"; the row lists 0.5 kg and 1 kg)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "Scoped to the store page's Net weight value \"1 kg\"; written in the TDS's own unit so the value is the quote's number (the weight rule in mergeCurated stores 1000 g with the text \"1 kg\"). Agrees with the store page row (option Size › 1 kg, 1000 g)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.29,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.29 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept. The store page states no density (its row is not_found)."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 250,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 250 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 75,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 75 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 226,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Physical Properties › Vicat Softening Temperature",
+      "quote": "Vicat Softening Temperature ISO 306, GB/T 1633 226 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 182,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 182 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value (TDS \"Physical Properties\"). The next row gives 205 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The PET-CF wiki (1.2 Core Features, column \"PET-CF\") gives \"Heat Resistance（HDT, 0.45 MPaLoad） 205 ℃\", which agrees with the TDS 0.45 MPa row."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 74,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Mechanical Properties（Dry state） › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 74 ± 6 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 270 °C, bed 80 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "Printed-specimen result (± 6 MPa). The Z row gives 35 ± 5 MPa (not stored: one key per scope)."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 4.5,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Mechanical Properties（Dry state） › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 4.5 ± 1.2 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 270 °C, bed 80 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The Z row gives 2.4 ± 0.8 % (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 5320,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Mechanical Properties（Dry state） › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 5320 ± 270 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 270 °C, bed 80 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The Z row gives 2210 ± 180 MPa (not stored). The PET-CF wiki (2.1, row \"PET-CF\") gives the same 5320 MPa dry and 5240 MPa humid (Flexural Modulus – XY)."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 131,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Mechanical Properties（Dry state） › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 131 ± 6 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 270 °C, bed 80 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The Z row gives 49 ± 5 MPa (not stored). The PET-CF wiki agrees: 131 MPa (1.2 Core Features, Flexural Strength - XY) dry and 127 MPa humid (2.1, row \"PET-CF\")."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 36,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.2, Mechanical Properties（Dry state） › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 36.0 ± 2.7 kJ/m²; 8.6 ± 0.5 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation, dry state (specimen printing: nozzle 270 °C, bed 80 °C, 100 mm/s, 100% infill; annealed and dried at 80 °C for 12 h before testing). First value of the cell (unnotched, 36.0 ± 2.7); the same cell gives 8.6 ± 0.5 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The Z row gives 4.5 ± 0.6 kJ/m² (not stored). The PET-CF wiki (1.2 Core Features) agrees: 36.0 KJ/m² (Impact Strength - XY) and 4.5 KJ/m² (Impact Strength – Z)."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 260,
+        "max": 290
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 260 - 290 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The store page states no nozzle temperature (its row is not_found).",
+      "conflict": "The material-table wiki (2. Nozzle, row \"PET-CF/GF\", a class row for PET-CF and PET-GF) gives 260 - 300 with \"( ±10 °C)\" in the column head. The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 80,
+        "max": 100
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 100 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Engineering Plate, High Temperature Plate or Textured PEI Plate, bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The material-table wiki glue table (Build Plate Settings › 1, row \"PET-CF/GF\") agrees: 80 - 100 °C with the glue stick.",
+      "conflict": "The material-table wiki plate table (Build Plate Settings › 3, row \"PET-CF/GF\") gives 80 - 120 ℃ on the Bambu Engineering Plate and 100 - 120 ℃ on the Smooth PEI / High-Temperature and Textured PEI plates. The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 100 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 100 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented. The PET-CF wiki agrees (5.1: \"The recommended printing speed should not exceed 100 mm/s.\"; speed table row \"PET-CF | ＜100 mm/s | 8 mm³/s\")."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "0 - 60%",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan 0 - 60%",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Engineering Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "The cell wraps over two lines in the PDF. The material-table wiki (Build Plate Settings › 3, row \"PET-CF/GF\") gives values for these three plates and \"Not recommended\" for the Bambu Cool Plate / PLA Plate. The PET-CF wiki (1.3) adds \"not compatible with low-temperature engineering plate\"."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6 (recommended), 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Recommended Printing Settings\"; no test method given). The TDS marks 0.6 mm \"recommended\".",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "Added at adjudication from the TDS (p.1, row \"Nozzle Size\"), which the second extraction also read; the same row is the compatible_with relation \"0.4, 0.6 (recommended), 0.8 mm nozzles\". The nozzle must be hardened steel (PET-CF wiki 1.3, row \"PET-CF\": \"Only suitable for hardened steel and high-flow nozzles; 0.6 mm nozzle recommended, 0.4 mm high-flow nozzle not recommended\"); the 0.2 mm nozzle is not compatible (store page, Cautions for Use › bullet 1)."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 - 12 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 - 12 h. The same row gives X1 Series printer heatbed: 90 - 100 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "Every cached source agrees on 80 °C in an oven: the material-table wiki (Storage and Material Specifications, row \"PET-CF/GF\": \"80 ℃ for 8 - 12 h\"), the PET-CF wiki (2.2, row \"PA6 CF / PET-CF\": convection oven \"80 °C, 8–12 h\") and the drying wiki (Appendix I, row \"PET-CF\": forced-air oven 80, 8-12). AMS HT: 80 °C for 12 h (all three wiki pages); AMS 2 Pro: \"Not compatible\" (drying wiki) / \"Not recommended\" (material-table wiki)."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 8,
+        "max": 12
+      },
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C, 8 - 12 h X1 Series Printer Heatbed: 90 - 100 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 80 °C. The same row gives 12 h on an X1 Series printer heatbed at 90 - 100 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "note": "A range of hours (the TDS gives \"8 - 12 h\"); no single number is picked. Agreed by the material-table wiki (\"80 ℃ for 8 - 12 h\"), the PET-CF wiki (\"80 °C, 8–12 h\") and the drying wiki (forced-air oven 8-12 h)."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681908733898755",
+        "value_text": "Filament with spool"
+      },
+      "value": "High Temperature Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/pet-cf",
+      "source_title": "Bambu Lab US store product page: PET-CF",
+      "locator": "Product Features › bullet 5",
+      "quote": "Comes with High Temperature Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:00:04Z",
+      "note": "Unverified: an unlabelled store-page bullet. Scoped to the only Spool value \"Filament with spool\". The TDS (p.1, Specifications) gives \"Spool Material PC + ABS (Temperature resistance 90 °C)\" and \"Spool Size Diameter: 200 mm; Height: 67 mm\"."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_source_handle": "ams-multicolor-printing",
+      "target_family": "ams_series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pet-cf",
+      "source_title": "Bambu Lab US store product page: PET-CF",
+      "retrieved_at": "2026-10-16T07:00:04Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "All AMS Series NOT Compatible",
+      "note": "The PET-CF wiki (1.3 Hardware Compatibility, row \"PET-CF\", Accessory Compatibility) says \"AMS series not compatible\" and the material-table wiki (3. AMS & AMS lite, row \"PET-CF/GF\") \"Not Compatible\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_source_handle": "ams-lite",
+      "target_family": "ams_series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pet-cf",
+      "source_title": "Bambu Lab US store product page: PET-CF",
+      "retrieved_at": "2026-10-16T07:00:04Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "All AMS Series NOT Compatible",
+      "note": "The PET-CF wiki (1.3 Hardware Compatibility, row \"PET-CF\", Accessory Compatibility) says \"AMS series not compatible\" and the material-table wiki (3. AMS & AMS lite, row \"PET-CF/GF\") \"Not Compatible\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_source_handle": "ams-2-pro",
+      "target_family": "ams_series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pet-cf",
+      "source_title": "Bambu Lab US store product page: PET-CF",
+      "retrieved_at": "2026-10-16T07:00:04Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "All AMS Series NOT Compatible",
+      "note": "The PET-CF wiki (1.3 Hardware Compatibility, row \"PET-CF\", Accessory Compatibility) says \"AMS series not compatible\" and the material-table wiki (3. AMS & AMS lite, row \"PET-CF/GF\") \"Not Compatible\". AMS 2 Pro drying is also \"Not compatible\" (drying wiki, Appendix I, row \"PET-CF\") / \"Not recommended\" (material-table wiki)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_source_handle": "ams-ht",
+      "target_family": "ams_series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pet-cf",
+      "source_title": "Bambu Lab US store product page: PET-CF",
+      "retrieved_at": "2026-10-16T07:00:04Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "All AMS Series NOT Compatible",
+      "note": "The PET-CF wiki (1.3 Hardware Compatibility, row \"PET-CF\", Accessory Compatibility) says \"AMS series not compatible\" and the material-table wiki (3. AMS & AMS lite, row \"PET-CF/GF\") \"Not Compatible\". Feeding only: the PET-CF wiki (2.3) recommends sealing the dried filament in an AMS HT, which \"serves only for filament sealing and drying; its feeding function is not used\" (the filament feeds through the TPU output port of an H2D / H2S), and all three wiki pages give AMS HT drying at 80 °C for 12 h."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pet-cf",
+      "source_title": "Bambu Lab US store product page: PET-CF",
+      "retrieved_at": "2026-10-16T07:00:04Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "0.2 mm Nozzle NOT Compatible",
+      "note": "Agreed by every source read: the store FAQ (1.Accessory Compatibility: \"Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm\"); the material-table wiki (2. Nozzle, row \"PET-CF/GF\": \"Not Compatible\" for 0.2 mm, and \"Do not use a 0.2 mm nozzle. The clogging risk is extremely high.\"); the TDS lists Nozzle Size \"0.4, 0.6 (recommended), 0.8 mm\" only. compat-targets.json lists \"0.2 mm Nozzle\" as reviewed-unresolvable (component concept), so no target handle is named."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "requires",
+      "target_kind": "part",
+      "target_label": "Hardened steel nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"PET-CF/GF\" › Is it necessary to use hardened steel nozzles?",
+      "quote": "PET-CF/GF | Not Compatible | Compatible | Recommended | Compatible | Not Recommended | Compatible | Compatible | Required | 260 - 300 |",
+      "note": "The PET-CF wiki (1.3, row \"PET-CF\", Nozzle Compatibility) says \"Only suitable for hardened steel and high-flow nozzles\"; the material-table wiki guidelines say \"Always use a hardened steel nozzle\" and \"Do not use a stainless steel or brass nozzle\". The store page is weaker: \"Stainless Steel Nozzle NOT Recommended\" (Cautions for Use › bullet 2). No single store product is \"a hardened steel nozzle\", so no target handle is named."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "0.4, 0.6 (recommended), 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6 (recommended), 0.8 mm",
+      "note": "The nozzle must be hardened steel. The 0.6 mm nozzle is the recommended one (TDS; PET-CF wiki 1.3 \"0.6 mm nozzle recommended\" and 5.1). The material-table wiki (2. Nozzle, row \"PET-CF/GF\") gives 0.4 mm \"Compatible\", 0.6 mm \"Recommended\", 0.8 mm \"Compatible\", 0.4 mm high flow \"Not Recommended\", 0.6 and 0.8 mm high flow \"Compatible\"; the PET-CF wiki: \"0.4 mm high-flow nozzle not recommended\"."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki (Build Plate Settings › 3, row \"PET-CF/GF\") gives 80 - 120 ℃ on the Bambu Engineering Plate. The PET-CF wiki (1.3) says the filament is \"not compatible with low-temperature engineering plate\" (see that relation)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (PET-CF/GF 100 - 120 ℃), which names the Smooth PEI plate."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Engineering Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki gives PET-CF/GF on the \"Bambu Textured PEI Plate\" at 100 - 120 ℃."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Low-temperature engineering plate",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "source_title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:09Z",
+      "locator": "1.3 Hardware Compatibility › table › row \"PET-CF\" › Build Plate Compatibility",
+      "quote": "Glue-assisted printing required; not compatible with low-temperature engineering plate",
+      "note": "No store product is named \"low-temperature engineering plate\", so no target handle is named (the TDS lists the Engineering Plate as a recommended bed type)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "requires",
+      "target_kind": "other",
+      "target_label": "Glue",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Surface Preparation",
+      "quote": "Bed Surface Preparation Glue",
+      "note": "The PET-CF wiki: \"Glue-assisted printing required\" (1.3, row \"PET-CF\") and \"It is recommended to use Bambu Lab Glue Stick for Build Plate.\" (2.5). Liquid glue is not compatible (store FAQ; material-table wiki glue table), so the glue meant is the glue stick (see the compatible_with relation); the requirement itself names no product, so no target handle is named."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "part",
+      "target_label": "Bambu Lab Glue Stick",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Build Plate Settings › 1. Recommended Bed Temperatures for Different Filament & Glue Combinations › bullet 1",
+      "quote": "Use Bambu Lab Glue Stick for ASA-CF, PA6-GF/CF, PPA-CF, PPS-CF, PET-CF, and PAHT-CF printing.",
+      "note": "The same page's glue table gives \"PET-CF/GF | 80 - 100 °C | Not Compatible\" (glue stick | liquid glue)."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "not_compatible_with",
+      "target_kind": "part",
+      "target_label": "Bambu Liquid Glue",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pet-cf",
+      "source_title": "Bambu Lab US store product page: PET-CF",
+      "retrieved_at": "2026-10-16T07:00:04Z",
+      "locator": "FAQ › \"1.Accessory Compatibility\"",
+      "quote": "Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm, Bambu Liquid Glue.",
+      "note": "The material-table wiki glue table (Build Plate Settings › 1, row \"PET-CF/GF\") agrees: \"Not Compatible\" with liquid glue."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "support-for-pa-pet",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "locator": "p.2, Recommended Printing Settings › Support Material",
+      "quote": "Support Material Support for PA/PET",
+      "note": "The TDS recommended support material."
+    },
+    {
+      "scope": {
+        "kind": "product"
+      },
+      "relation": "compatible_with",
+      "target_kind": "family",
+      "target_label": "All Bambu Lab 3D printers",
+      "target_source_handle": "",
+      "target_family": "all_bambu_printers",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "source_title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:09Z",
+      "locator": "1.3 Hardware Compatibility › table › row \"PET-CF\" › Printer Compatibility",
+      "quote": "Compatible with all Bambu Lab 3D printers",
+      "note": "The material-table wiki (3. AMS & AMS lite, row \"PET-CF/GF\") is weaker for open-frame printers: \"Not Recommended\" on an open-frame printer (A Series, P1P, etc.), \"Recommended\" on an enclosed printer. The PET-CF wiki (2.4) recommends the left hotend of an H2D for PET-CF. Every printer still needs a hardened steel nozzle for this filament (see the requires relation)."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/9690d6226f024acab2ba0dd52dabb654.pdf",
+      "title": "Bambu Filament Technical Data Sheet V3.0: PET-CF",
+      "retrieved_at": "2026-10-16T08:23:36Z",
+      "sha256": "7045c5d57f9bcfab43799a6e3606ff405ae33143b3c44cf8da2520da089c2f02"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/e71aee2e21bc43dd9e482fa1d32a6aab/SDS20260701T01_Bambu_PET_CF.pdf",
+      "title": "Bambu PET CF Safety Data Sheet SDS20260701T01",
+      "retrieved_at": "2026-10-16T08:23:39Z",
+      "sha256": "b3f4d4421f4ca6433863988f7a8142514e76901d8b4a283a5f187d595a34d55d"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petcf_ppacf",
+      "title": "PET-CF / PPA-CF / PPS-CF / PA6 CF Carbon Fibers Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:09Z",
+      "sha256": "eba6962601bdcb436ad127cc0b3c3a039a19736c58559ce7d9aadb481ffe9fbe"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values (Mechanical Properties, dry state); the registry has one key per scope, so the Z values (tensile 35 ± 5 MPa, elongation 2.4 ± 0.8 %, bending modulus 2210 ± 180 MPa, bending strength 49 ± 5 MPa, impact 4.5 ± 0.6 kJ/m²) are not stored. Density, melting, glass transition, Vicat and HDT come from the TDS Physical Properties table and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 4730 ± 260 MPa, Z 2160 ± 170 MPa), melt index (25.3 ± 2.5 g/10 min at 280 °C, 2.16 kg), crystallization temperature (130 °C, DSC 10 °C/min), heat deflection temperature 205 °C at 0.45 MPa, saturated water absorption rate (0.37% at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed with desiccant), retraction length (0.8 - 1.4 mm) and speed (20 - 40 mm/s), chamber temperature (45 - 60 °C), max overhang angle (~ 70°), max bridging length (~ 30 mm), spool material (PC + ABS, temperature resistance 90 °C), spool size (diameter 200 mm, height 67 mm), suggested annealing of prints (80 to 140 °C, 6 to 12 hours), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows.",
+    "The TDS recommended chamber temperature (45 - 60 °C) is not written to thermal.chamber_temp: that key is a printer capability (number, template field chamber_temp_max), not a filament print setting. The PET-CF wiki's suggested maximum volumetric flow (8 mm³/s) is not written to motion.max_flow, a printer key, for the same reason.",
+    "SDS facts with no registry key are not stored: product name \"Bambu PET CF\", model \"T01-xx\", CLP \"Not classified\", the section 8 carbon-fibre handling warning (gloves when loading/unloading, cutting or sanding), and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO-TI / IATA) transport. Its section 8 reads \"carbon fiber-reinforced filament （Glass fiber-reinforced filament)\", a wording slip in the SDS. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Source disagreements kept for review: nozzle temperature (TDS 260 - 290 °C vs material-table wiki 260 - 300 for the PET-CF/GF class); bed temperature (TDS 80 - 100 °C, agreed by the material-table glue table, vs the material-table plate table 80 - 120 ℃ on the Engineering Plate and 100 - 120 ℃ on the Smooth PEI / High-Temperature and Textured PEI plates). The product TDS values are kept.",
+    "Printer guidance: the PET-CF wiki says \"Compatible with all Bambu Lab 3D printers\"; the material-table wiki rates PET-CF/GF \"Not Recommended\" on open-frame printers and \"Recommended\" on enclosed printers. \"Not recommended\" is not \"not compatible\", so only the compatible_with family relation is written. The Bambu Cool Plate / PLA Plate is \"Not recommended\" (material-table wiki), not \"not compatible\", so no relation is written for it.",
+    "AMS: the store page (\"All AMS Series NOT Compatible\"), the PET-CF wiki (\"AMS series not compatible\") and the material-table wiki (\"Not Compatible\") agree for feeding. The AMS HT is still named for drying and sealing only (PET-CF wiki 2.3; AMS HT 80 °C for 12 h); the AMS 2 Pro cannot dry it (\"Not compatible\" in the drying wiki).",
+    "Marketing prose proves no number: \"Very Low Moisture Absorption\", \"Exceptional Mechanical Properties\", \"High Dimensional Stability\", \"Exceptional Thermal Resistance\" and the page-builder sections (\"In saturated water absorption conditions, the strength and stiffness of PET-CF have small losses\"; the 70 °C / 150 °C oven comparison, whose text also mentions PLA deforming near 155 °C) are not stored as values; their charts are images.",
+    "No hex: the store page links no hex-code document for this filament and none is cached, so its only colour value \"Black (71100)\" has no published hex.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/54b1c5ae4f094655b838bb1f45f58453.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published.",
+    "The PET-CF wiki links its own TDS and MSDS copies (\"TDS- PET-CF\", \"MSDS- PET-CF\"); they were not cached and not read. The store-linked TDS V3.0 and SDS SDS20260701T01 were read.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 6); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "The store FAQ (4.Safety Tips) and the PET-CF wiki say the filament is not food-grade / not food-contact grade, is highly moisture-absorbent, and may carry hard microscopic splinters (wear puncture- and cut-resistant gloves and safety goggles); no registry key holds these.",
+    "Adjudication against the second extraction (83 field disagreements): locator wording, the per-AMS-model rows of \"All AMS Series\" with their target handles (the second extraction wrote one AMS-series row), the part / family target kinds, the plate, glue and support target labels and handles, and the store-page / wiki witnesses for the AMS, 0.2 mm, hardened-steel and liquid-glue relations keep this file's form (both witnesses state the same fact). material.type stays the TDS p.3 Composition cell \"Polyethylene terephthalate, carbon fiber\" (the TDS's own words, as in the other filament files), not a reworded product name. thermal.heat_deflection_temp stays the 1.8 MPa row (182 °C), as in every other filament file with an HDT row; the 0.45 MPa row (205 °C, also the PET-CF wiki's \"HDT, 0.45 MPa\" figure) is in its test_condition: both rows are in the TDS, one key holds one load. material.spool_type stays the store bullet \"High Temperature Reusable Spool\" (unverified, scoped to \"Filament with spool\"): the TDS rows \"Spool Material PC + ABS (Temperature resistance 90 °C)\" and \"Spool Size Diameter: 200 mm; Height: 67 mm\" give the spool's material and size, not its type, so no product-scope row is written from them. thermal.chamber_temp (TDS 45 - 60 °C) and motion.max_flow (PET-CF wiki 5.1, \"PET-CF | ＜100 mm/s | 8 mm³/s\") are not added, though both documents state them: the two registry keys describe a printer capability (template fields chamber_temp_max and max_flow_rate; see above), not a filament print setting, and no filament file in this class writes them (the PA6-CF, PPA-CF and PPS-CF files included). extrusion.supported_nozzle_diameters is added from the TDS Nozzle Size row. The AMS HT sealing/drying use (PET-CF wiki 2.3: \"AMS HT serves only for filament sealing and drying; its feeding function is not used\") and the AMS 2 Pro drying row (drying wiki, Appendix I, row \"PET-CF\": \"Not compatible\") are not written as extra relations: the same targets already carry the not_compatible_with feeding rows, and both facts are in those rows' notes. The Glue Stick relation stays compatible_with (the material-table wiki says \"Use\"); the requirement is the separate requires→Glue row from the TDS. material.net_weight is written in kg, the TDS's own figures (0.5 kg, 1 kg): written as 500 g and 1000 g, neither number was in its quote \"Net Filament Weight 0.5 kg, 1 kg\" (mergeCurated still stores 500 g and 1000 g). Every kept, added and corrected value was re-read in the cached document it cites. Tally of the 83 diffed fields: 36 the same fact written differently (kept in this file's form), 42 decided for this file (HDT 182 °C, the store-page spool row, the TDS nozzle-size and wiki glue-stick relations, requires→Glue; the second extraction's product-scope spool row, chamber temperature, max flow and the extra AMS HT / AMS 2 Pro drying relations not added), 5 taken from the second extraction (extrusion.supported_nozzle_diameters, its \"(recommended)\" mark moved to test_condition)."
+  ]
+}

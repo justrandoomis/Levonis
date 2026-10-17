@@ -1,0 +1,555 @@
+{
+  "handle": "support-for-pla-petg",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T13:12:46Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 3 pages read (pdfplumber tables and the text layer, page by page): Basic Info, Specifications, Recommended Printing Settings, Physical Properties, Mechanical Properties (every row \"N/A\"), Other Physical and Chemical Properties, Disclaimer. No filament length and no hardness value is given."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/273bd776882e46518c6341a60ec091fa/SDS20250723S05_Bambu_Support_for_PLA_PETG.pdf",
+      "title": "Bambu Support for PLA/PETG Safety Data Sheet SDS20250723S05",
+      "retrieved_at": "2026-10-16T08:24:40Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read (p.1 is a scanned cover without a text layer, viewed as an image; p.4 viewed as an image to confirm the composition table). Section 3 gives the composition (TPU 74.9-90 %, PETG 9.9-25 %, additive 0.1-15.2 %); section 9 says \"No data available\" for melting point, density and the other physical data; section 2 \"Not classified\"; section 14 \"Not hazardous goods\"."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle (row \"Support for PLA, Support for PLA/PETG\") and AMS (row \"Support for PLA, Support for PLA/PETG\") tables read; the build-plate, glue, chamber and storage/drying tables have no row for this filament."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "compat.*"
+      ],
+      "note": "Filament Overview (row \"Support for PLA/PETG\"), Hardware Compatibility (row \"Support for PLA/PETG\"), 2.1 drying table (row \"Support for PLA/PETG\"). No material, mechanical or thermal numbers for this filament."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"Support for PLA/PETG\": drying before use \"Recommended\", desiccant during use \"Not required but recommended\", heatbed 65-75 ℃ 12 h, forced-air oven 75 ℃ 8 h, AMS 2 Pro 60 ℃ 12 h, AMS HT 60 ℃ 12 h; 1.3: static drying mode not suitable."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/support-for-pla-petg",
+      "title": "Bambu Lab US store product page: Support for PLA/PETG",
+      "retrieved_at": "2026-10-16T07:02:38Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, the page-builder description (banner, three feature blocks, RFID block, Download, Printing Tips). No spec table and no What's in the Box list on this page."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "Agrees with the store page (Product Features › bullet 6: \"Diameter: 1.75mm +/- 0.05mm\"); the tolerance ± 0.05 mm comes from the store page only and is already written by the page layer."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681910902353926",
+        "value_text": "0.5 kg"
+      },
+      "value": 0.5,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 0.5 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "Written as 0.5 kg, the TDS's own figure; the merge stores it in grams (500 g) with the text \"0.5 kg\". Scoped to the store page's only Size value \"0.5 kg\"; agrees with the store page row (option Size › 0.5 kg)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.28,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.28 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\", tested by Bambu Lab on standard samples)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "The SDS (p.9, section 9) says \"Density: No data available\". The store page states no density."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 185,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 185 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\", tested by Bambu Lab on standard samples)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "The SDS (p.9, section 9) says \"Melting Point: No data available\"."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 190,
+        "max": 240
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 190 - 240°C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "The material-table wiki (2. Nozzle, row \"Support for PLA, Support for PLA/PETG\") agrees: 190 - 240 (nozzle temperature /℃, ±10 °C). The store page states no nozzle temperature."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 60
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 60°C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate Cool Plate, High Temperature Plate or Textured PEI Plate; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "The material-table wiki's build-plate tables have no row for this filament; no other source gives a bed temperature."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 100 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 100 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "Kept as text: the TDS gives only an upper bound."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "The support wiki (Hardware Compatibility, row \"Support for PLA/PETG\") says \"Build Plate Compatibility: Compatible with all build plates\"; the store Printing Tips (1.Accessory Compatibility) say \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 75,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 75 °C, 8 h X1 Series Printer Heatbed: 65 - 75 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h, before printing. The same row gives X1 Series printer heatbed: 65 - 75 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "Every cached source agrees for the oven: the support wiki (2.1 Filament Drying, row \"Support for PLA/PETG\": convection oven 75 °C, 8 h) and the drying wiki (Appendix I, row \"Support for PLA/PETG\": forced-air oven 75 ℃, 8 h). Not stored (one value per key): heatbed 65-75 ℃, 12 h (TDS line 2, support wiki, drying wiki) and AMS 2 Pro / AMS HT 60 ℃, 12 h (support wiki 2.1, drying wiki Appendix I)."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 75 °C, 8 h X1 Series Printer Heatbed: 65 - 75 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 75 °C, before printing. The same row gives 12 h on an X1 Series printer heatbed at 65 - 75 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "note": "The support wiki (2.1, convection oven 75 °C, 8 h) and the drying wiki (Appendix I, forced-air oven 75 ℃, 8 h) agree. The heatbed and AMS 2 Pro / AMS HT alternatives take 12 h (not stored)."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "High Temperature Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/support-for-pla-petg",
+      "source_title": "Bambu Lab US store product page: Support for PLA/PETG",
+      "locator": "Product Features › bullet 5",
+      "quote": "Comes with High Temperature Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:02:38Z",
+      "note": "From a feature bullet (prose), so unverified. The TDS (p.1, Specifications) gives the spool material \"PC + ABS (Temperature resistance 90 °C)\" and spool size \"Diameter: 200 mm; Height: 67 mm\" (no registry keys)."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "AMS series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "Hardware Compatibility › Support Filament Compatibility Overview › row \"Support for PLA/PETG\" › Accessory Compatibility",
+      "quote": "Accessory Compatibility: Fully compatible with all AMS series.",
+      "note": "The store page says the same (Product Features › Cautions for Use › bullet 4: \"All AMS Series Compatible\"; Printing Tips › 1.Accessory Compatibility: \"Compatible with all printers, AMS, build plate, and nozzles.\"); the material-table wiki (3. AMS & AMS lite, row \"Support for PLA, Support for PLA/PETG\") gives \"Compatible\" for AMS / AMS lite. The drying wiki (1.3) says the AMS 2 Pro / AMS HT static drying mode is not suitable for this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "all_bambu_printers",
+      "target_label": "All printers",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "Hardware Compatibility › Support Filament Compatibility Overview › row \"Support for PLA/PETG\" › Printer Compatibility",
+      "quote": "Printer Compatibility： Compatible with all printers.",
+      "note": "The store Printing Tips (1.Accessory Compatibility) say \"Compatible with all printers, AMS, build plate, and nozzles.\"; the material-table wiki (3. AMS & AMS lite, row \"Support for PLA, Support for PLA/PETG\") gives \"Compatible\" for both open-frame (A Series, P1P, etc.) and enclosed printers."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2, 0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "note": "A nozzle size list, not a store product: no target handle is named. The material-table wiki (2. Nozzle, row \"Support for PLA, Support for PLA/PETG\") gives \"Compatible\" for the 0.2, 0.4, 0.6 and 0.8 mm nozzles and \"Not Required\" for hardened steel; the support wiki says \"Nozzle Compatibility: Suitable for all nozzle types.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High-flow nozzles (0.4, 0.6, 0.8 mm)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"Support for PLA, Support for PLA/PETG\" › 0.4 mm, 0.6 mm, 0.8 mm High flow nozzle",
+      "quote": "Support for PLA, Support for PLA/PETG | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 240 |",
+      "note": "The row is shared by Support for PLA and Support for PLA/PETG. Hardened steel nozzles \"Not Required\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "No store product is the plain Bambu Cool Plate (bambu-cool-plate-supertack is a different plate), so no target handle is named. Bed surface preparation: glue (TDS p.1)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\", which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The support wiki (Hardware Compatibility, row \"Support for PLA/PETG\") says \"Build Plate Compatibility: Compatible with all build plates\"; the TDS list is the recommendation."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "1. Basic Information of Support Filaments › Filament Overview › row \"Support for PLA/PETG\" › Compatible Model Filament",
+      "quote": "Support for PLA/PETG | PLA & PETG | Moderately moisture-sensitive; recommended to store in a dry environment. |",
+      "condition": "As the support interface material for a model printed in this filament",
+      "note": "A material family, not one store product: no target handle is named. The store page says \"Recommended for All PLA & PETG\" (Product Features › bullet 3) and \"Recommended for use with PLA or PETG filament only.\" (Printing Tips › 3.Support Setting)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "1. Basic Information of Support Filaments › Filament Overview › row \"Support for PLA/PETG\" › Compatible Model Filament",
+      "quote": "Support for PLA/PETG | PLA & PETG | Moderately moisture-sensitive; recommended to store in a dry environment. |",
+      "condition": "As the support interface material for a model printed in this filament",
+      "note": "A material family, not one store product: no target handle is named. The store page says \"Recommended for All PLA & PETG\" (Product Features › bullet 3) and \"Recommended for use with PLA or PETG filament only.\" (Printing Tips › 3.Support Setting)."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/d09d55778d42495db121e28a3b04a4c5.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: Support for PLA/PETG",
+      "retrieved_at": "2026-10-16T08:24:39Z",
+      "sha256": "a2f6e88e520e18592333c35da3fd43b89838d14ee6934b617b326fd017e62d54"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/273bd776882e46518c6341a60ec091fa/SDS20250723S05_Bambu_Support_for_PLA_PETG.pdf",
+      "title": "Bambu Support for PLA/PETG Safety Data Sheet SDS20250723S05",
+      "retrieved_at": "2026-10-16T08:24:40Z",
+      "sha256": "487c0ebad6bbd279df405776eb89cad2242d31b5cb2abbba6ad4e0ba4bb63291"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "sha256": "279858daaace7d8123091b076c9031bb93306f439696bee26e56b53a7dcf5362"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.tensile_strength",
+    "mechanical.elongation_at_break",
+    "mechanical.flexural_strength",
+    "mechanical.flexural_modulus",
+    "mechanical.impact_strength",
+    "mechanical.hardness",
+    "thermal.heat_deflection_temp",
+    "thermal.vicat_softening",
+    "thermal.glass_transition"
+  ],
+  "notes": [
+    "No hex: the store page links no hex-code document for this filament and none is cached, so its colour values \"Nature (65102)\" and \"Black (65103)\" have no published hex.",
+    "not_published: the TDS states \"N/A\" for glass transition, Vicat softening, heat deflection (1.8 and 0.45 MPa) and every mechanical row (Young's modulus, tensile strength, breaking elongation, bending modulus, bending strength, impact strength; X-Y and Z); the SDS section 9 says \"No data available\". Filament length and hardness are stated nowhere.",
+    "Composition conflict, so material.type is not written (neither verified nor not_published; left to review): the TDS (p.3, Other Physical and Chemical Properties) says \"Composition Polylactic acid\", while the SDS SDS20250723S05 (Jul. 23 2025, p.4-5, section 3) lists Thermoplastic Polyurethane 74.9-90 % by wt (CAS 1211-14-9), PETG 9.9-25 % (CAS 25640-14-6) and additive 0.1-15.2 %. Both are official documents of equal rank and they name different polymers, and material.type is the filament card's material, so no value is published until the owner confirms which document is right.",
+    "TDS facts with no registry key are not stored: melt index 14.3 ± 1.2 g/10 min (210 °C, 2.16 kg), crystallization temperature N/A, saturated water absorption rate 1.02 % (25 °C, 55% RH), spool material PC + ABS (temperature resistance 90 °C), spool size 200 × 67 mm, printing and storage humidity < 20% RH (sealed, with desiccant), bed surface preparation glue, retraction length 0.6 - 1.0 mm, retraction speed 20 - 40 mm/s, max overhang angle 55°, max bridging length 30 mm, support \"Turn on\", odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products. TDS facts that have a key but are not stored as spec rows: chamber temperature 25 - 45 °C (thermal.chamber_temp is one number, a printer's chamber maximum, not a filament's recommended range; no filament file stores it) and the Nozzle Size row \"0.2, 0.4, 0.6, 0.8 mm\" (extrusion.supported_nozzle_diameters is a printer and hotend capability; the row is kept as the nozzle compatible_with relation, as in most PLA and PETG files, PVA and Support for PLA (New Version); the Support for ABS, TPU for AMS, PLA Pure, ASA and PA6 files store their TDS Nozzle Size row under that key instead, so the filament class is split on this key).",
+    "SDS facts not stored: the model designation \"S05-xx\" (p.2, section 1: \"Model : S05-xx(xx stands for any suffix)\"), a code pattern rather than this product's model, so identity.model is not written (the builder writes \"Support for PLA/PETG\" from the reviewed identity map, which a curated official_doc row would outrank and replace; as in the other filament files); CLP \"Not classified\", no hazard pictogram, \"Not hazardous goods\" for IMDG, DOT, ADR/RID and ICAO-TI/IATA transport, SVHC \"Not listed\". Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Drying requirement differs between wiki pages (not a stored key): the support wiki 2.1 gives \"Pre-print Drying: Required\" and \"Moisture Protection During Printing: Required\"; the drying wiki Appendix I gives \"Recommended\" and \"Not required but recommended\"; the store page says \"Recommended Drying before Use\".",
+    "Store page copy to review: its Printing Tips › 4.Safety Tips carry a sub-bullet \"As this filament contains highly hygroscopic wood fibers…\", which neither the TDS nor the SDS composition supports (apparent template text from another filament).",
+    "Marketing prose is not used for numbers: \"zero top interface spacing & Z distance\" (feature block 2) is not stored.",
+    "Not cached, so not read: the store page's \"Filament RoHS\" certificate (https://store.bblcdn.com/85b0296f5ef74f0982819b0aabf0af7b.pdf; safety.certifications is left to review) and the wiki page https://wiki.bambulab.com/en/software/bambu-studio/support (slicer support settings) linked from the Printing Tips.",
+    "material.diameter_tolerance (± 0.05 mm) comes from the store page only (Product Features › bullet 6) and is written by the page layer (verified, official_page); it is not repeated here.",
+    "No compat.statement is written: the support wiki row \"Support for PLA/PETG\" (Hardware Compatibility: all printers, all nozzle types, all build plates, all AMS series) is carried as the printer and AMS family relations and as notes on the nozzle and plate relations; a joined statement would not be the source's own words.",
+    "Adjudication against the second extraction (58 field disagreements): locator separators, the combined nozzle relations (TDS Nozzle Size row; material-table wiki high-flow columns), the all-printers and AMS-series family relations (rather than per-column open-frame / enclosed printer and AMS / AMS lite rows) and the TDS Build Plate Type plate relations keep this file's form. material.spool_type stays the store bullet \"High Temperature Reusable Spool\" (unverified): the TDS rows give the spool's material and size, not its type. Not added from the second extraction: thermal.chamber_temp, extrusion.supported_nozzle_diameters, identity.model and compat.statement (see above), and the \"All nozzle types\" / \"All build plates\" relations (target kind other, no product target; the support wiki sentences are quoted in the nozzle and plate relation notes). material.type is removed (the TDS / SDS composition conflict above). material.net_weight is written as 0.5 kg, the TDS's own figure. Second adjudication pass (2026-10-17), every (b) and (c) item re-read in the cached TDS, SDS, the three wiki pages and the store page: the second extraction's material.spool_type text \"PC + ABS spool (temperature resistance 90 °C); diameter 200 mm, height 67 mm\" joins the TDS rows Spool Material and Spool Size into words the TDS does not print, and names no spool type, so the store bullet stays; its identity.model \"S05-xx\" is the SDS designation with a wildcard suffix, which would outrank the page layer's \"Support for PLA/PETG\"; its compat.statement quote joins four wiki sentences with ellipses and would replace the page layer's compatibility text with words the wiki does not print as one statement; its thermal.chamber_temp {25, 45} is a range on a one-number key. The TDS rows themselves (Nozzle Size, Chamber Temperature, Spool Material, Spool Size) are confirmed as quoted in the notes above."
+  ]
+}

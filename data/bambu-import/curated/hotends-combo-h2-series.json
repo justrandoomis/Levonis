@@ -1,0 +1,3077 @@
+{
+  "handle": "hotends-combo-h2-series",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T15:17:26Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "title": "Hotends Combo - H2 Series (store page)",
+      "keys": [
+        "compat.statement",
+        "nozzle.*",
+        "contents.pieces",
+        "thermal.max_nozzle_temp",
+        "motion.max_flow",
+        "printing.layer_height",
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "product.*",
+        "package.*",
+        "part.*",
+        "electrical.*",
+        "extrusion.*",
+        "safety.certifications",
+        "variant.note"
+      ],
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Parsed with the package (extractPage + buildImportPayload, format legacy_html, route-derived productType \"accessory\"). The page has no specification table, no In the Box list and no weight or size: three description tables only. (1) \"Comparison of Different Nozzle Sizes\" (usage prose per size): not a spec. (2) A max-volumetric-speed matrix, nozzle × filament (\"Bambu High Flow Nozzle (0.4mm) | 40 mm³/s | 48 mm³/s | 32 mm³/s\"), one number per filament and including a 0.8 mm High Flow nozzle this combo does not contain: a matrix stays text (§C.6), so no motion.max_flow is stored; its \"up to 62.5% … up to 30%\" sentence is marketing and proves no number. (3) \"Filament Compatibility\" (39 filaments × 6 nozzles): its header gives each nozzle's material (nozzle.material) and its cells become relations. The Type values give the hotend count (contents.pieces) and, for the one single-diameter value, nozzle.diameter; the other 8 values mix diameters (0.6mm*2 + HF 0.4mm*2, 0.2mm*2 + HF 0.4mm*2, 0.8mm*2 + HF 0.6mm*2, 0.2mm*2 + 0.6mm*2, 0.6mm*2 + 0.8mm*2, 0.2mm*2 + 0.4mm*2, 0.2mm + 0.4mm, 0.4mm + 0.6mm), which the single-number key cannot hold, so their diameters stay in the value text. Filament relations: 11 filaments are √ for all six nozzles (product scope); per Type value a relation is written only when every nozzle in the value agrees (all √ or all X); 137 value × filament pairs with mixed cells or \"Not recommended\" get no relation. The safety sentence (\"ensure that the hotend has cooled down before swapping\") is not a spec key."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "compat.statement",
+        "printing.layer_height",
+        "motion.max_flow",
+        "product.*",
+        "package.*",
+        "part.*",
+        "extrusion.*",
+        "electrical.*",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "Read in full from the cached HTML (the cached .txt omits the tab panels). The \"H2 Series/P2S/X2D Nozzle\" panel (\"Max. Printing Temp: 350 ℃ | Size: 0.2mm/ 0.4mm/ 0.6mm/ 0.8mm | Materials: Hardened steel / Stainless steel\") describes the hotend type this combo bundles but does not name the combo; its sizes and materials agree with the store page. Its layer-height table is general guidance per nozzle size for every Bambu nozzle, not a spec of this product; not stored. Its High Flow sentence (\"increases the maximum volume velocity by 62.5%\") is marketing; not stored. It states no dimensions, weight or electrical value."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "nozzle.*",
+        "thermal.max_nozzle_temp",
+        "compat.statement",
+        "printing.layer_height",
+        "motion.max_flow"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "Linked from the store page (\"Learn more about filament compatibility on Bambu Lab Wiki\"). A general guide for every Bambu nozzle (columns 0.2/0.4/0.6/0.8 mm and 0.4/0.6/0.8 mm High flow), so none of its rows is stored as a spec of this product; it is used only to flag disagreements with this page's Filament Compatibility table on the relations written (PC at 0.2 mm; TPU 85A at 0.4 mm; PET-CF, PPA-CF and PPS-CF on the 0.4 mm High Flow nozzle). Its nozzle temperatures are per filament, not the hotend's maximum; its 0.4 mm hardened-steel advice (\"Recommended layer height: 0.15–0.3 mm; maximum speed approx. 100 mm/s\") is for fibre-filled filaments only; not stored."
+    }
+  ],
+  "specs": [
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H2 Series",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Compatibility\" › value 1 (the only value)",
+      "quote": "Compatibility: H2 Series",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Conflict with the parsed store page: the deterministic row for this key holds \"[Note] Learn more about filament compatibility on Bambu Lab Wiki.\" (unverified, official_page), which is a link sentence under the Filament Compatibility table, not a compatibility statement. This row (official_variant) outranks it at merge; mergeCurated records the disagreement (spec_sources_disagree). The wiki nozzles page gives a finer list for the H2 Series hotend type (see the relations), but it does not name this combo, so it is not used for this statement."
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Max. Printing Temp",
+      "quote": "Purchase link: Bambu Hotend - H2/P2S Standard & High Flow | Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D | Max. Printing Temp: 350 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The wiki states 350 ℃ for the H2 Series/P2S/X2D hotend type (Standard and High Flow), which is what this combo bundles (store page: \"Compatibility: H2 Series\"; nozzles \"0.2 mm Stainless Steel\" … \"0.6 mm High Flow Hardened Steel\", matching the panel's \"Size: 0.2mm/ 0.4mm/ 0.6mm/ 0.8mm | Materials: Hardened steel / Stainless steel\"). The wiki does not name this combo product, so the value stays unverified. The store page states no maximum temperature. In range (150–350 °C)."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 1 (0.4mm*2 + HF 0.4mm*2); Filament Compatibility › header row › column 3 and column 6",
+      "quote": "0.4 mm Hardened Steel … 0.4 mm High Flow Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Each nozzle in this value is listed in the page's Filament Compatibility header as Hardened Steel (0.4 mm Hardened Steel; 0.4 mm High Flow Hardened Steel)."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 1 (0.4mm*2 + HF 0.4mm*2)",
+      "quote": "Type: 0.4mm*2 + HF 0.4mm*2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "The value text counts the hotends: \"0.4mm*2\" = 2 × 0.4 mm Hardened Steel, \"HF 0.4mm*2\" = 2 × 0.4 mm High Flow Hardened Steel; 4 hotends in all. The page never prints the total: the count is the sum of the value text's multipliers (2 + 2), not a published number, so it stays unverified."
+    },
+    {
+      "key": "nozzle.diameter",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 1 (0.4mm*2 + HF 0.4mm*2)",
+      "quote": "Type: 0.4mm*2 + HF 0.4mm*2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every hotend in this value is 0.4 mm (standard and High Flow)."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 2 (0.6mm*2 + HF 0.4mm*2); Filament Compatibility › header row › column 4 and column 6",
+      "quote": "0.6 mm Hardened Steel … 0.4 mm High Flow Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Each nozzle in this value is listed in the page's Filament Compatibility header as Hardened Steel (0.6 mm Hardened Steel; 0.4 mm High Flow Hardened Steel)."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 2 (0.6mm*2 + HF 0.4mm*2)",
+      "quote": "Type: 0.6mm*2 + HF 0.4mm*2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "The value text counts the hotends: \"0.6mm*2\" = 2 × 0.6 mm Hardened Steel, \"HF 0.4mm*2\" = 2 × 0.4 mm High Flow Hardened Steel; 4 hotends in all. The page never prints the total: the count is the sum of the value text's multipliers (2 + 2), not a published number, so it stays unverified."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853510",
+        "value_text": "0.2mm*2 + HF 0.4mm*2"
+      },
+      "value": "0.2 mm: Stainless Steel; 0.4 mm High Flow: Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 3 (0.2mm*2 + HF 0.4mm*2); Filament Compatibility › header row › column 2 and column 6",
+      "quote": "0.2 mm Stainless Steel … 0.4 mm High Flow Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "This value mixes materials; each size's material is the page's own Filament Compatibility header (0.2 mm Stainless Steel; 0.4 mm High Flow Hardened Steel)."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853510",
+        "value_text": "0.2mm*2 + HF 0.4mm*2"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 3 (0.2mm*2 + HF 0.4mm*2)",
+      "quote": "Type: 0.2mm*2 + HF 0.4mm*2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "The value text counts the hotends: \"0.2mm*2\" = 2 × 0.2 mm Stainless Steel, \"HF 0.4mm*2\" = 2 × 0.4 mm High Flow Hardened Steel; 4 hotends in all. The page never prints the total: the count is the sum of the value text's multipliers (2 + 2), not a published number, so it stays unverified."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 4 (0.8mm*2 + HF 0.6mm*2); Filament Compatibility › header row › column 5 and column 7",
+      "quote": "0.8 mm Hardened Steel … 0.6 mm High Flow Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Each nozzle in this value is listed in the page's Filament Compatibility header as Hardened Steel (0.8 mm Hardened Steel; 0.6 mm High Flow Hardened Steel)."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 4 (0.8mm*2 + HF 0.6mm*2)",
+      "quote": "Type: 0.8mm*2 + HF 0.6mm*2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "The value text counts the hotends: \"0.8mm*2\" = 2 × 0.8 mm Hardened Steel, \"HF 0.6mm*2\" = 2 × 0.6 mm High Flow Hardened Steel; 4 hotends in all. The page never prints the total: the count is the sum of the value text's multipliers (2 + 2), not a published number, so it stays unverified."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853512",
+        "value_text": "0.2mm*2 + 0.6mm*2"
+      },
+      "value": "0.2 mm: Stainless Steel; 0.6 mm: Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 5 (0.2mm*2 + 0.6mm*2); Filament Compatibility › header row › column 2 and column 4",
+      "quote": "0.2 mm Stainless Steel … 0.6 mm Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "This value mixes materials; each size's material is the page's own Filament Compatibility header (0.2 mm Stainless Steel; 0.6 mm Hardened Steel)."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853512",
+        "value_text": "0.2mm*2 + 0.6mm*2"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 5 (0.2mm*2 + 0.6mm*2)",
+      "quote": "Type: 0.2mm*2 + 0.6mm*2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "The value text counts the hotends: \"0.2mm*2\" = 2 × 0.2 mm Stainless Steel, \"0.6mm*2\" = 2 × 0.6 mm Hardened Steel; 4 hotends in all. The page never prints the total: the count is the sum of the value text's multipliers (2 + 2), not a published number, so it stays unverified."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 6 (0.6mm*2 + 0.8mm*2); Filament Compatibility › header row › column 4 and column 5",
+      "quote": "0.6 mm Hardened Steel … 0.8 mm Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Each nozzle in this value is listed in the page's Filament Compatibility header as Hardened Steel (0.6 mm Hardened Steel; 0.8 mm Hardened Steel)."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 6 (0.6mm*2 + 0.8mm*2)",
+      "quote": "Type: 0.6mm*2 + 0.8mm*2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "The value text counts the hotends: \"0.6mm*2\" = 2 × 0.6 mm Hardened Steel, \"0.8mm*2\" = 2 × 0.8 mm Hardened Steel; 4 hotends in all. The page never prints the total: the count is the sum of the value text's multipliers (2 + 2), not a published number, so it stays unverified."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640399134968127489",
+        "value_text": "0.2mm*2 + 0.4mm*2"
+      },
+      "value": "0.2 mm: Stainless Steel; 0.4 mm: Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 7 (0.2mm*2 + 0.4mm*2); Filament Compatibility › header row › column 2 and column 3",
+      "quote": "0.2 mm Stainless Steel … 0.4 mm Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "This value mixes materials; each size's material is the page's own Filament Compatibility header (0.2 mm Stainless Steel; 0.4 mm Hardened Steel)."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640399134968127489",
+        "value_text": "0.2mm*2 + 0.4mm*2"
+      },
+      "value": 4,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 7 (0.2mm*2 + 0.4mm*2)",
+      "quote": "Type: 0.2mm*2 + 0.4mm*2",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "The value text counts the hotends: \"0.2mm*2\" = 2 × 0.2 mm Stainless Steel, \"0.4mm*2\" = 2 × 0.4 mm Hardened Steel; 4 hotends in all. The page never prints the total: the count is the sum of the value text's multipliers (2 + 2), not a published number, so it stays unverified."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584065",
+        "value_text": "0.2mm + 0.4mm"
+      },
+      "value": "0.2 mm: Stainless Steel; 0.4 mm: Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 8 (0.2mm + 0.4mm); Filament Compatibility › header row › column 2 and column 3",
+      "quote": "0.2 mm Stainless Steel … 0.4 mm Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "This value mixes materials; each size's material is the page's own Filament Compatibility header (0.2 mm Stainless Steel; 0.4 mm Hardened Steel)."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584065",
+        "value_text": "0.2mm + 0.4mm"
+      },
+      "value": 2,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 8 (0.2mm + 0.4mm)",
+      "quote": "Type: 0.2mm + 0.4mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "The value text names one hotend of each size without a multiplier (\"0.2mm\" + \"0.4mm\"), read as 1 + 1 = 2; no \"*1\" is printed, so the count stays unverified."
+    },
+    {
+      "key": "nozzle.material",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 9 (0.4mm + 0.6mm); Filament Compatibility › header row › column 3 and column 4",
+      "quote": "0.4 mm Hardened Steel … 0.6 mm Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Each nozzle in this value is listed in the page's Filament Compatibility header as Hardened Steel (0.4 mm Hardened Steel; 0.6 mm Hardened Steel)."
+    },
+    {
+      "key": "contents.pieces",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "value": 2,
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_variant",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Type\" › value 9 (0.4mm + 0.6mm)",
+      "quote": "Type: 0.4mm + 0.6mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "The value text names one hotend of each size without a multiplier (\"0.4mm\" + \"0.6mm\"), read as 1 + 1 = 2; no \"*1\" is printed, so the count stays unverified."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853506",
+        "value_text": "H2 Series"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2d",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Compatibility\" › value 1",
+      "quote": "Compatibility: H2 Series",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series\" → family h2_series: h2d, h2d-pro, h2s, h2c, refurbished-bambu-lab-h2d-3d-printer). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S and H2C but not H2D Pro; the store page's \"H2 Series\" is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853506",
+        "value_text": "H2 Series"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2d-pro",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Compatibility\" › value 1",
+      "quote": "Compatibility: H2 Series",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series\" → family h2_series: h2d, h2d-pro, h2s, h2c, refurbished-bambu-lab-h2d-3d-printer). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S and H2C but not H2D Pro; the store page's \"H2 Series\" is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853506",
+        "value_text": "H2 Series"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2s",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Compatibility\" › value 1",
+      "quote": "Compatibility: H2 Series",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series\" → family h2_series: h2d, h2d-pro, h2s, h2c, refurbished-bambu-lab-h2d-3d-printer). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S and H2C but not H2D Pro; the store page's \"H2 Series\" is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853506",
+        "value_text": "H2 Series"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2c",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Compatibility\" › value 1",
+      "quote": "Compatibility: H2 Series",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series\" → family h2_series: h2d, h2d-pro, h2s, h2c, refurbished-bambu-lab-h2d-3d-printer). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S and H2C but not H2D Pro; the store page's \"H2 Series\" is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853506",
+        "value_text": "H2 Series"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "refurbished-bambu-lab-h2d-3d-printer",
+      "evidence_kind": "option_value",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Option group \"Compatibility\" › value 1",
+      "quote": "Compatibility: H2 Series",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Same rows as the deterministic parse (compat-targets.json \"H2 Series\" → family h2_series: h2d, h2d-pro, h2s, h2c, refurbished-bambu-lab-h2d-3d-printer). The wiki panel for the H2 Series/P2S/X2D hotend lists H2D, H2S and H2C but not H2D Pro; the store page's \"H2 Series\" is kept as written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C (Left Hotend)",
+      "target_family": "",
+      "target_source_handle": "h2c",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Compatibility",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "Refines the store page's \"H2 Series\" for the H2C: the H2 Series hotend fits only the H2C's left position. compat-targets.json label \"H2C (Left Hotend)\" → h2c with qualifier \"Left Hotend\". The same panel also lists P2S and X2D; this combo's page names only \"H2 Series\", so no P2S or X2D relation is recorded."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C (Right Hotend)",
+      "target_family": "",
+      "target_source_handle": "h2c",
+      "evidence_kind": "description_text",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › Vortek Induction Nozzle panel › paragraph on the H2C",
+      "quote": "the right nozzle of the H2C is an induction nozzle, while the left one is a standard H2 Series nozzle.",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The H2C's right position takes the Vortek induction hotend (\"Compatibility: H2C (right hotend)\" in the induction panel); the standard H2 Series hotends of this combo go on the left only. compat-targets.json label \"H2C (Right Hotend)\" → h2c with qualifier \"Right Hotend\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 1 (PLA Basic) › all six nozzle columns",
+      "quote": "PLA Basic | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 2 (PLA Matte) › all six nozzle columns",
+      "quote": "PLA Matte | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 3 (PLA Basic Gradient) › all six nozzle columns",
+      "quote": "PLA Basic Gradient | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 4 (PLA Silk+) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Silk+ | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853510",
+        "value_text": "0.2mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 4 (PLA Silk+) › 0.2 mm Stainless Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Silk+ | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.2 mm Stainless Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640399134968127489",
+        "value_text": "0.2mm*2 + 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 4 (PLA Silk+) › 0.2 mm Stainless Steel and 0.4 mm Hardened Steel",
+      "quote": "PLA Silk+ | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.2 mm Stainless Steel: √; 0.4 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584065",
+        "value_text": "0.2mm + 0.4mm"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 4 (PLA Silk+) › 0.2 mm Stainless Steel and 0.4 mm Hardened Steel",
+      "quote": "PLA Silk+ | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.2 mm Stainless Steel: √; 0.4 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 5 (PLA Silk Dual Color) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Silk Dual Color | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853510",
+        "value_text": "0.2mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 5 (PLA Silk Dual Color) › 0.2 mm Stainless Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Silk Dual Color | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.2 mm Stainless Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640399134968127489",
+        "value_text": "0.2mm*2 + 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 5 (PLA Silk Dual Color) › 0.2 mm Stainless Steel and 0.4 mm Hardened Steel",
+      "quote": "PLA Silk Dual Color | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.2 mm Stainless Steel: √; 0.4 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584065",
+        "value_text": "0.2mm + 0.4mm"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 5 (PLA Silk Dual Color) › 0.2 mm Stainless Steel and 0.4 mm Hardened Steel",
+      "quote": "PLA Silk Dual Color | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.2 mm Stainless Steel: √; 0.4 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 6 (PLA Silk) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Silk | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853510",
+        "value_text": "0.2mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 6 (PLA Silk) › 0.2 mm Stainless Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Silk | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.2 mm Stainless Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640399134968127489",
+        "value_text": "0.2mm*2 + 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 6 (PLA Silk) › 0.2 mm Stainless Steel and 0.4 mm Hardened Steel",
+      "quote": "PLA Silk | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.2 mm Stainless Steel: √; 0.4 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584065",
+        "value_text": "0.2mm + 0.4mm"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 6 (PLA Silk) › 0.2 mm Stainless Steel and 0.4 mm Hardened Steel",
+      "quote": "PLA Silk | √ | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.2 mm Stainless Steel: √; 0.4 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 7 (PLA Metal) › all six nozzle columns",
+      "quote": "PLA Metal | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 8 (PLA Marble) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Marble | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 8 (PLA Marble) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Marble | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 8 (PLA Marble) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Marble | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 8 (PLA Marble) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA Marble | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 8 (PLA Marble) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PLA Marble | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 9 (PLA Sparkle) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Sparkle | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 9 (PLA Sparkle) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Sparkle | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 9 (PLA Sparkle) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Sparkle | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 9 (PLA Sparkle) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA Sparkle | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 9 (PLA Sparkle) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PLA Sparkle | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 10 (PLA Wood) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Wood | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 10 (PLA Wood) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Wood | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 10 (PLA Wood) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Wood | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 10 (PLA Wood) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA Wood | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 10 (PLA Wood) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PLA Wood | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 11 (PLA Galaxy) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Galaxy | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 11 (PLA Galaxy) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Galaxy | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 11 (PLA Galaxy) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Galaxy | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 11 (PLA Galaxy) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA Galaxy | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 11 (PLA Galaxy) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PLA Galaxy | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 12 (PLA Glow) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Glow | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 12 (PLA Glow) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Glow | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 12 (PLA Glow) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Glow | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 12 (PLA Glow) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA Glow | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 12 (PLA Glow) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PLA Glow | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 13 (PLA-CF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 13 (PLA-CF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PLA-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 13 (PLA-CF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PLA-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 14 (PLA Aero) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Aero | X | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 15 (PETG HF) › all six nozzle columns",
+      "quote": "PETG HF | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 16 (PETG Translucent) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PETG Translucent | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 16 (PETG Translucent) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PETG Translucent | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 16 (PETG Translucent) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PETG Translucent | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 16 (PETG Translucent) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PETG Translucent | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 16 (PETG Translucent) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PETG Translucent | Not recommended | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 17 (PETG-CF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PETG-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 17 (PETG-CF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PETG-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 17 (PETG-CF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PETG-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 18 (ABS) › all six nozzle columns",
+      "quote": "ABS | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 19 (ABS-GF) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "ABS-GF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 19 (ABS-GF) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "ABS-GF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 19 (ABS-GF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "ABS-GF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 19 (ABS-GF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "ABS-GF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 19 (ABS-GF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "ABS-GF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 20 (ASA) › all six nozzle columns",
+      "quote": "ASA | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "ASA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 21 (ASA Aero) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "ASA Aero | X | √ | Not recommended | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 22 (ASA-CF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "ASA-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 22 (ASA-CF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "ASA-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 22 (ASA-CF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "ASA-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 23 (PC) › all six nozzle columns",
+      "quote": "PC | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen.",
+      "conflict": "The general wiki material table disagrees for 0.2 mm Stainless Steel: store \"√\", wiki \"Not Recommended\" (wiki row: \"PC | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 260 - 290\"). The product's own page is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 24 (PC FR) › all six nozzle columns",
+      "quote": "PC FR | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 25 (TPU for AMS) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU for AMS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 25 (TPU for AMS) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU for AMS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 25 (TPU for AMS) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "TPU for AMS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 25 (TPU for AMS) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "TPU for AMS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 25 (TPU for AMS) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "TPU for AMS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 26 (TPU 95A HF) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU 95A HF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 26 (TPU 95A HF) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU 95A HF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 26 (TPU 95A HF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "TPU 95A HF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 26 (TPU 95A HF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "TPU 95A HF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 26 (TPU 95A HF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "TPU 95A HF | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 27 (TPU 85A) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU 85A | X | X | √ | √ | X | X",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked X (0.4 mm Hardened Steel: X; 0.4 mm High Flow Hardened Steel: X).",
+      "conflict": "The general wiki material table disagrees for 0.4 mm Hardened Steel: store \"X\", wiki \"Compatible\" (wiki row: \"TPU 85A | Not Recommended | Compatible | Compatible | Compatible | Not Compatible | Not Recommended | Not Recommended | Not Required | 200 - 250\"). The product's own page is kept."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853510",
+        "value_text": "0.2mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 27 (TPU 85A) › 0.2 mm Stainless Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU 85A | X | X | √ | √ | X | X",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked X (0.2 mm Stainless Steel: X; 0.4 mm High Flow Hardened Steel: X)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 27 (TPU 85A) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "TPU 85A | X | X | √ | √ | X | X",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640399134968127489",
+        "value_text": "0.2mm*2 + 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 27 (TPU 85A) › 0.2 mm Stainless Steel and 0.4 mm Hardened Steel",
+      "quote": "TPU 85A | X | X | √ | √ | X | X",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked X (0.2 mm Stainless Steel: X; 0.4 mm Hardened Steel: X).",
+      "conflict": "The general wiki material table disagrees for 0.4 mm Hardened Steel: store \"X\", wiki \"Compatible\" (wiki row: \"TPU 85A | Not Recommended | Compatible | Compatible | Compatible | Not Compatible | Not Recommended | Not Recommended | Not Required | 200 - 250\"). The product's own page is kept."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584065",
+        "value_text": "0.2mm + 0.4mm"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 27 (TPU 85A) › 0.2 mm Stainless Steel and 0.4 mm Hardened Steel",
+      "quote": "TPU 85A | X | X | √ | √ | X | X",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked X (0.2 mm Stainless Steel: X; 0.4 mm Hardened Steel: X).",
+      "conflict": "The general wiki material table disagrees for 0.4 mm Hardened Steel: store \"X\", wiki \"Compatible\" (wiki row: \"TPU 85A | Not Recommended | Compatible | Compatible | Compatible | Not Compatible | Not Recommended | Not Recommended | Not Required | 200 - 250\"). The product's own page is kept."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853510",
+        "value_text": "0.2mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 90A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 28 (TPU 90A) › 0.2 mm Stainless Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU 90A | X | √ | √ | √ | X | X",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked X (0.2 mm Stainless Steel: X; 0.4 mm High Flow Hardened Steel: X)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 90A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 28 (TPU 90A) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "TPU 90A | X | √ | √ | √ | X | X",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 90A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 28 (TPU 90A) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "TPU 90A | X | √ | √ | √ | X | X",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 29 (PAHT-CF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PAHT-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 29 (PAHT-CF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PAHT-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 29 (PAHT-CF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PAHT-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 30 (PET-CF) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PET-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √(Only for Left Hotend)). The page qualifies the High Flow cell: \"√(Only for Left Hotend)\".",
+      "conflict": "The general wiki material table disagrees for 0.4 mm High Flow Hardened Steel: store \"√(Only for Left Hotend)\", wiki \"Not Recommended\" (wiki row: \"PET-CF/GF | Not Compatible | Compatible | Recommended | Compatible | Not Recommended | Compatible | Compatible | Required | 260 - 300\"). The product's own page is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 30 (PET-CF) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PET-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √(Only for Left Hotend)). The page qualifies the High Flow cell: \"√(Only for Left Hotend)\".",
+      "conflict": "The general wiki material table disagrees for 0.4 mm High Flow Hardened Steel: store \"√(Only for Left Hotend)\", wiki \"Not Recommended\" (wiki row: \"PET-CF/GF | Not Compatible | Compatible | Recommended | Compatible | Not Recommended | Compatible | Compatible | Required | 260 - 300\"). The product's own page is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 30 (PET-CF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PET-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √(Only for Left Hotend)). The page qualifies the High Flow cell: \"√(Only for Left Hotend)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 30 (PET-CF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PET-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 30 (PET-CF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PET-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 31 (PA6-CF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PA6-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 31 (PA6-CF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PA6-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 31 (PA6-CF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PA6-CF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 32 (PPA-CF) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PPA-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √(Only for Left Hotend)). The page qualifies the High Flow cell: \"√(Only for Left Hotend)\".",
+      "conflict": "The general wiki material table disagrees for 0.4 mm High Flow Hardened Steel: store \"√(Only for Left Hotend)\", wiki \"Not Recommended\" (wiki row: \"PPA-CF/GF | Not Compatible | Compatible | Recommended | Compatible | Not Recommended | Compatible | Compatible | Required | 285 - 320\"). The product's own page is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 32 (PPA-CF) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PPA-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √(Only for Left Hotend)). The page qualifies the High Flow cell: \"√(Only for Left Hotend)\".",
+      "conflict": "The general wiki material table disagrees for 0.4 mm High Flow Hardened Steel: store \"√(Only for Left Hotend)\", wiki \"Not Recommended\" (wiki row: \"PPA-CF/GF | Not Compatible | Compatible | Recommended | Compatible | Not Recommended | Compatible | Compatible | Required | 285 - 320\"). The product's own page is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 32 (PPA-CF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PPA-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √(Only for Left Hotend)). The page qualifies the High Flow cell: \"√(Only for Left Hotend)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 32 (PPA-CF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PPA-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 32 (PPA-CF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PPA-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 33 (PPS-CF) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PPS-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √(Only for Left Hotend)). The page qualifies the High Flow cell: \"√(Only for Left Hotend)\".",
+      "conflict": "The general wiki material table disagrees for 0.4 mm High Flow Hardened Steel: store \"√(Only for Left Hotend)\", wiki \"Not Recommended\" (wiki row: \"PPS-CF/GF | Not Compatible | Compatible | Recommended | Compatible | Not Recommended | Compatible | Compatible | Required | 310 - 340\"). The product's own page is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 33 (PPS-CF) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PPS-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √(Only for Left Hotend)). The page qualifies the High Flow cell: \"√(Only for Left Hotend)\".",
+      "conflict": "The general wiki material table disagrees for 0.4 mm High Flow Hardened Steel: store \"√(Only for Left Hotend)\", wiki \"Not Recommended\" (wiki row: \"PPS-CF/GF | Not Compatible | Compatible | Recommended | Compatible | Not Recommended | Compatible | Compatible | Required | 310 - 340\"). The product's own page is kept."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 33 (PPS-CF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PPS-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √(Only for Left Hotend)). The page qualifies the High Flow cell: \"√(Only for Left Hotend)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 33 (PPS-CF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PPS-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 33 (PPS-CF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PPS-CF | X | √ | √ | √ | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 34 (Support for ABS) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "Support for ABS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 34 (Support for ABS) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "Support for ABS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 34 (Support for ABS) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "Support for ABS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 34 (Support for ABS) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "Support for ABS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 34 (Support for ABS) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "Support for ABS | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 35 (Support for PLA/PETG) › all six nozzle columns",
+      "quote": "Support for PLA/PETG | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 36 (Support for PA/PET) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "Support for PA/PET | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 36 (Support for PA/PET) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "Support for PA/PET | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 36 (Support for PA/PET) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "Support for PA/PET | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 36 (Support for PA/PET) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "Support for PA/PET | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 36 (Support for PA/PET) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "Support for PA/PET | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 37 (Support for PLA (New Version)) › all six nozzle columns",
+      "quote": "Support for PLA (New Version) | √ | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Marked √ for every nozzle the combo can contain, so the relation holds whichever Type value is chosen."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853508",
+        "value_text": "0.4mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 38 (PVA) › 0.4 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PVA | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853509",
+        "value_text": "0.6mm*2 + HF 0.4mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 38 (PVA) › 0.6 mm Hardened Steel and 0.4 mm High Flow Hardened Steel",
+      "quote": "PVA | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.4 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 38 (PVA) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PVA | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 38 (PVA) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PVA | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 38 (PVA) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PVA | X | √ | √ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853511",
+        "value_text": "0.8mm*2 + HF 0.6mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 39 (PA6-GF) › 0.8 mm Hardened Steel and 0.6 mm High Flow Hardened Steel",
+      "quote": "PA6-GF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.8 mm Hardened Steel: √; 0.6 mm High Flow Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640048094440853513",
+        "value_text": "0.6mm*2 + 0.8mm*2"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 39 (PA6-GF) › 0.6 mm Hardened Steel and 0.8 mm Hardened Steel",
+      "quote": "PA6-GF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.6 mm Hardened Steel: √; 0.8 mm Hardened Steel: √)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "640404994122584066",
+        "value_text": "0.4mm + 0.6mm"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/hotends-combo-h2-series",
+      "source_title": "Hotends Combo - H2 Series (store page)",
+      "locator": "Filament Compatibility › row 39 (PA6-GF) › 0.4 mm Hardened Steel and 0.6 mm Hardened Steel",
+      "quote": "PA6-GF | X | √ | √ | √ | Not recommended | √",
+      "retrieved_at": "2026-10-16T07:07:35Z",
+      "note": "Every nozzle in this value is marked √ (0.4 mm Hardened Steel: √; 0.6 mm Hardened Steel: √)."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles",
+      "text": "Introduction to Bambu Nozzles",
+      "note": "Not linked from the store page; the §F nozzles page. Its H2 Series/P2S/X2D Nozzle panel describes the hotends this combo bundles."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "note": "Linked from the store page; the builder already records it (same id, so the merge does not add it twice)."
+    }
+  ],
+  "not_published": [
+    "product.length",
+    "product.width",
+    "product.height",
+    "product.net_weight",
+    "package.weight",
+    "package.length",
+    "package.width",
+    "package.height"
+  ]
+}

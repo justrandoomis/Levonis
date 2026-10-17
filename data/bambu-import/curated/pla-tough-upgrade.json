@@ -1,0 +1,860 @@
+{
+  "handle": "pla-tough-upgrade",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T14:08:03Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 5 pages read (text layer page by page, pages 1-3 also checked against the rendered page): Specifications, Recommended Printing Settings, Physical, Mechanical and Other Physical and Chemical Properties, Specimen Test, test drawings, Disclaimer. No filament length, hardness, spool type or certification row."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/30f19d222fad4e9e8a07f4b81b89c05f/SDS20250928A10_Bambu_PLA_Tough.pdf",
+      "title": "Bambu PLA Tough+ Safety Data Sheet SDS20250928A10 (prepared by Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:25:32Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 19 pages read (text layer). The manufacturer's own SDS for \"Bambu PLA Tough+\" (model A10-xx), not a third-party lab report. Section 3: polylactic acid 80-90 % and additive 10-20 % by wt; section 9 \"No data available\" for every property but physical state \"Thread\"; CLP \"Not classified\"; not hazardous goods for sea, road and air. No spec value is stored from it."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Tough+",
+      "retrieved_at": "2026-10-16T08:25:34Z",
+      "keys": [],
+      "note": "One page with a text layer: 7 named colour cells with hex codes, cross-checked against the rendered page. Read for published hex codes, not spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Generic \"PLA*\" / \"PLA\" rows (note ② counts PLA Tough as standard PLA): printer, nozzle, AMS, build plate, glue and storage tables; no row names PLA Tough+. Used for corroboration and relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\"; the drying table (2.1) and the strength tables (4.3) have no Tough+ row; 4.1 gives a generic PLA HDT of 57°C."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I has no PLA Tough row (PLA Basic / PLA Matte, PLA Silk, PLA-CF / GF, PLA Wood, PLA Aero, PLA Galaxy, supports). The store page FAQ (5.Safety Tips) points to the wiki for drying."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-tough-upgrade",
+      "title": "Bambu Lab US store product page: PLA Tough+",
+      "retrieved_at": "2026-10-16T07:05:01Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections (feature blocks, RFID), Download block, FAQ."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Polylactic acid",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polylactic acid",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "The SDS SDS20250928A10 (\"Bambu PLA Tough+\", model A10-xx), p.4, section 3, gives a preparation: polylactic acid 80-90 % by wt (CAS 26023-30-3) and an unnamed \"Additive\" 10-20 % by wt. The TDS names polylactic acid only; the TDS words are stored. The store page states no material row."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "The store page agrees (Product Features › bullet 4: \"Diameter: 1.75mm +/- 0.03mm\"); its tolerance row (± 0.03 mm) stays from the page, the TDS gives none."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "624483921975980043",
+        "value_text": "1kg"
+      },
+      "value": 1,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "Scoped to the only value \"1kg\" of the store's Size group (shared by the Type values \"Filament with Spool\" and \"Refill\"); the store option value agrees. Written as 1 kg, the TDS's own figure; the merge stores 1000 g with the text \"1 kg\"."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.21,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.21 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "The SDS section 9 (p.9) gives \"No data available\" for density; that does not override the TDS value. The store page states no density."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 151,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 151 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 61,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 61 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 62,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Physical Properties › Vicat Softening Temperature",
+      "quote": "Vicat Softening Temperature ISO 306, GB/T 1633 62 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 58,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (row 1 of 2)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 58 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value. The next row gives 61 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "The PLA wiki (4.1) says \"a heat deflection temperature of only 57°C\" for PLA filament in general; the product TDS value is kept."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 34.9,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 34.9 ± 1 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 245 °C, bed 55 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing); ± 1 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 9.4,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 9.4 ± 2.3 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 245 °C, bed 55 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing); ± 2.3 %",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2140,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2140 ± 80 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 245 °C, bed 55 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing); ± 80 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 65 ± 1 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 245 °C, bed 55 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing); ± 1 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80.6,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 80.6 ± 9.5 kJ/m²；72.3 ± 6.1 kJ/m²（notched）",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 245 °C, bed 55 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing); ± 9.5 kJ/m². First value of the cell (no notch mark); the same cell gives 72.3 ± 6.1 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "Z: the TDS cell reads \"25.9 ± 3.3 kJ/m² 18.6 ± 2.3 kJ/m² (Silver)\", not stored. The store page's \"toughness on par with ABS\" and \"up to 2× stronger layer adhesion than standard PLA\" are prose and prove no number."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 220,
+        "max": 250
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 220 - 250 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "The material-table wiki gives \"PLA* … 190 - 240\" (±10 °C) for standard PLA in general (note ② names PLA Tough); the product TDS range is kept. The store page states no nozzle temperature (its FAQ mentions \"the higher printing temperature\" without a number)."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 65
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 65 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (one range for every build plate type the TDS lists; glue recommended)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "The material-table wiki gives PLA 35 - 65 °C with glue stick or liquid glue (Build Plate Settings › 1), and per plate 35 - 45 ℃ on the Cool Plate and 45 - 65 ℃ on the Smooth PEI / High-Temperature and Textured PEI plates (Build Plate Settings › 3)."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 300 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed ＜ 300 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only; the TDS prints a full-width \"＜\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate",
+        "Smooth PEI Plate",
+        "Cool Plate Supertack"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "The store FAQ (1.Accessory Compatibility) agrees in general: \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Recommended Printing Settings\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "Added at adjudication from the TDS (p.1, row \"Nozzle Size\"), which the second extraction also read, as in the PLA Basic, PLA Matte, PLA Metal and PLA Pure files; the same row stays the nozzle relation. The PLA wiki (1.1 Hardware compatibility, row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\") says \"All standard nozzles are compatible (no special restrictions)\"."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven (forced-air), 8 h, before printing. The same row gives X1 Series & H2D Series printer heatbed: 65 - 75 °C, 12 h, and AMS 2 Pro & AMS HT: 55 °C, 8 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "Agrees with the material-table wiki (Storage and Material Specifications › row \"PLA\": blast drying oven 55 ℃ for 8 h). The drying wiki Appendix I and the PLA wiki 2.1 have no PLA Tough row. The store page FAQ says to dry \"according to the wiki\" without numbers."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven (forced-air) at 55 °C, before printing. The same row gives 12 h on an X1 Series & H2D Series printer heatbed at 65 - 75 °C, and 8 h in an AMS 2 Pro & AMS HT at 55 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z"
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "All Bambu 3D printers",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "locator": "p.1, Recommended Printing Settings › Printers Compatibility",
+      "quote": "Printers Compatibility All Bambu 3D printers",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Printers Compatibility\" row)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "note": "The next TDS row (\"AMS Compatibility AMS, AMS 2 PRO, AMS HT, AMS Lite\") is kept as a relation. The store FAQ agrees: \"Compatible with all printers, AMS, build plate, and nozzles.\"; the PLA wiki row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\" says \"Fully compatible with the AMS series\"."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "White (12107)",
+      "source_value_id": "624483921975980033",
+      "hex": "#FFFFFF",
+      "source_url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Tough+",
+      "locator": "p.1, row 1, column 1",
+      "quote": "White Hex:#FFFFFF",
+      "retrieved_at": "2026-10-16T08:25:34Z"
+    },
+    {
+      "value_text": "Gray (12105)",
+      "source_value_id": "624483921975980036",
+      "hex": "#AFB1AE",
+      "source_url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Tough+",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Gray Hex:#AFB1AE",
+      "retrieved_at": "2026-10-16T08:25:34Z"
+    },
+    {
+      "value_text": "Black (12104)",
+      "source_value_id": "624483921975980039",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Tough+",
+      "locator": "p.1, row 1, column 3",
+      "quote": "Black Hex:#000000",
+      "retrieved_at": "2026-10-16T08:25:34Z"
+    },
+    {
+      "value_text": "Silver (12106)",
+      "source_value_id": "624483921975980037",
+      "hex": "#959698",
+      "source_url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Tough+",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Silver Hex:#959698",
+      "retrieved_at": "2026-10-16T08:25:34Z"
+    },
+    {
+      "value_text": "Yellow (12401)",
+      "source_value_id": "624483921975980034",
+      "hex": "#F4D53F",
+      "source_url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Tough+",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Yellow Hex:#F4D53F",
+      "retrieved_at": "2026-10-16T08:25:34Z"
+    },
+    {
+      "value_text": "Cyan (12601)",
+      "source_value_id": "624483921975980038",
+      "hex": "#009BD8",
+      "source_url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Tough+",
+      "locator": "p.1, row 2, column 3",
+      "quote": "Cyan Hex:#009BD8",
+      "retrieved_at": "2026-10-16T08:25:34Z"
+    },
+    {
+      "value_text": "Orange (12301)",
+      "source_value_id": "624483921975980035",
+      "hex": "#DC3A27",
+      "source_url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Tough+",
+      "locator": "p.1, row 3, column 1 (full width)",
+      "quote": "Orange Hex:#DC3A27",
+      "retrieved_at": "2026-10-16T08:25:34Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "AMS, AMS 2 PRO, AMS HT, AMS Lite",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "locator": "p.1, Recommended Printing Settings › AMS Compatibility",
+      "quote": "AMS Compatibility AMS, AMS 2 PRO, AMS HT, AMS Lite",
+      "note": "The PLA wiki names this filament: 1.1 Hardware compatibility › row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\" › Component Compatibility \"Fully compatible with the AMS series\". The store page says \"All AMS Series Compatible\" (Cautions for Use › bullet 1), which the builder already turns into pending ams_series rows."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "all_bambu_printers",
+      "target_label": "All Bambu 3D printers",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "locator": "p.1, Recommended Printing Settings › Printers Compatibility",
+      "quote": "Printers Compatibility All Bambu 3D printers",
+      "note": "The material-table wiki row \"PLA, PETG, TPU …\" recommends an \"Open-frame or enclosed printer\" (note ② counts PLA Tough as standard PLA); the store FAQ says \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate Supertack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "note": "The store sells it as \"Bambu Cool Plate SuperTack Series\"; nothing on the page or in the wiki contradicts it for this filament."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2, 0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "note": "The material-table wiki row \"PLA*\" says Compatible for every listed nozzle (0.2-0.8 mm and 0.4-0.8 mm high flow) and hardened steel \"Not Required\"; the PLA wiki row naming Tough+ says \"All standard nozzles are compatible (no special restrictions)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA",
+      "target_source_handle": "support-for-pla-new",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "locator": "p.1, Recommended Printing Settings › Support Material",
+      "quote": "Support Material Support for PLA",
+      "note": "The store FAQ (4.Support Recommendations) recommends \"Bambu Support for PLA, or Bambu Support for PLA/PETG\" as the support interface material. The handle is the store's current \"Support for PLA (New Version)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Bambu Support for PLA/PETG",
+      "target_source_handle": "support-for-pla-petg",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-tough-upgrade",
+      "source_title": "Bambu Lab US store product page: PLA Tough+",
+      "retrieved_at": "2026-10-16T07:05:01Z",
+      "locator": "Printing Tips (FAQ, components[4]) › 4.Support Recommendations",
+      "quote": "it is recommended to use dedicated support filaments (Bambu Support for PLA, or Bambu Support for PLA/PETG) as the support interface material",
+      "note": "A recommendation for the support interface; the TDS Support Material row names only \"Support for PLA\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Glue Stick",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "locator": "p.1, Recommended Printing Settings › Glue",
+      "quote": "Glue Recommended( Glue Stick/Liquid Glue )",
+      "note": "Recommended, not required. The material-table wiki (Build Plate Settings › 1) gives PLA 35 - 65 °C with glue stick."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Liquid Glue",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "source_title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "locator": "p.1, Recommended Printing Settings › Glue",
+      "quote": "Glue Recommended( Glue Stick/Liquid Glue )",
+      "note": "Recommended, not required. The material-table wiki (Build Plate Settings › 1) gives PLA 35 - 65 °C with liquid glue."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "656734648064118785",
+        "value_text": "Refill"
+      },
+      "target_kind": "spool",
+      "target_label": "spool",
+      "target_source_handle": "bambu-reusable-spool",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-tough-upgrade",
+      "source_title": "Bambu Lab US store product page: PLA Tough+",
+      "retrieved_at": "2026-10-16T07:05:01Z",
+      "locator": "Printing Tips (FAQ, components[4]) › 3.Refill Guidelines",
+      "quote": "The refill filament needs to be used with a spool.",
+      "note": "Scoped to the Spool value \"Refill\": the \"Filament with Spool\" value comes on a spool. The builder already writes this relation at product scope from the same sentence."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/80a85371db2e40bda97069d283fed76c/BambuPLA_Tough_TechnicalData_Sheet_(2).pdf",
+      "title": "Bambu PLA Tough+ Technical Data Sheet (Bambu Filament TDS V3.0)",
+      "retrieved_at": "2026-10-16T08:25:31Z",
+      "sha256": "73fc789bc00aee976c7d70890bada6103fc8fadcbae50cd955872549c7603f61"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/30f19d222fad4e9e8a07f4b81b89c05f/SDS20250928A10_Bambu_PLA_Tough.pdf",
+      "title": "Bambu PLA Tough+ Safety Data Sheet SDS20250928A10 (prepared by Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:25:32Z",
+      "sha256": "fafd842c360e38be18e6baf159e2709f44f8bcf103941b2e6570e15735a96747"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s1/default/3d989ddc07694c378496784834947125/Bambu_PLA_Tough_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Tough+",
+      "retrieved_at": "2026-10-16T08:25:34Z",
+      "sha256": "f3f0685206d5d482584145a3efaa8af9d04aec0a13678af2b239b9f88cea743d"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 20.9 ± 1 MPa, elongation 9.3 ± 3 %, bending modulus 2066 ± 100 MPa, bending strength 54 ± 4 MPa, impact 25.9 ± 3.3 kJ/m² and 18.6 ± 2.3 kJ/m² marked \"(Silver)\") are not stored. Raw-material properties (density, DSC melting and glass transition) sit in material.* / thermal.* keys.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 1860 ± 70 MPa, Z 1920 ± 20 MPa), melt index (18.0 ± 2.5 g/10 min at 210 °C, 2.16 kg), crystallization temperature (\"/\"), saturated water absorption rate (0.27% at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed, with desiccant), retraction length (0.6 - 1.0 mm) and speed (20 - 40 mm/s), chamber temperature (25 – 45 °C), max overhang angle (55 °), max bridging length (30 mm), spool material (ABS, temperature resistance 70 °C) and spool size (diameter 200 mm, height 67 mm), suggested annealing (50 to 60 °C, 6 to 12 hours), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows. The nozzle sizes are stored as extrusion.supported_nozzle_diameters and also kept as a relation; AMS compatibility, support material and glue are kept as relations.",
+    "The TDS recommended chamber temperature (25 – 45 °C) is not written to thermal.chamber_temp: that key is a printer capability (number, template field chamber_temp_max), not a filament print setting.",
+    "The SDS model \"A10-xx\" (p.2, section 1: \"Model : A10-xx(xx stands for any suffix)\") is not stored: identity.model is written from the reviewed identity map (§C.1), which a curated official_doc row would outrank and replace, and \"A10-xx\" is a designation with a wildcard suffix, not this product's model, so it must not become a search alias. SDS facts with no registry key are not stored: composition (polylactic acid 80-90 %, additive 10-20 % by wt), CLP \"Not classified\", and \"Not hazardous goods\" for sea, road and air transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Source disagreements kept for review: nozzle temperature (TDS 220 - 250 °C vs material-table wiki 190 - 240 °C ±10 °C for PLA*); AMS drying (TDS \"AMS 2 Pro & AMS HT : 55 °C，8 h\" vs material-table wiki 45 ℃ for 12 h for PLA); HDT (PLA wiki 57°C for PLA in general vs TDS 58 °C at 1.8 MPa and 61 °C at 0.45 MPa). The product TDS values are kept; only the oven drying values are stored.",
+    "Marketing prose proves no number: \"toughness on par with ABS\", \"up to 2× stronger layer adhesion than standard PLA\", \"outlasts standard PLA\" (store page) are not stored.",
+    "Hex: the hex table names all 7 store colours exactly once (\"White\" ↔ \"White (12107)\", \"Gray\" ↔ \"Gray (12105)\", \"Black\" ↔ \"Black (12104)\", \"Silver\" ↔ \"Silver (12106)\", \"Yellow\" ↔ \"Yellow (12401)\", \"Cyan\" ↔ \"Cyan (12601)\", \"Orange\" ↔ \"Orange (12301)\"); values read from the text layer and checked against the rendered page.",
+    "material.spool_type is neither stored nor marked not_published: no source names the spool (no \"Comes with … Spool\" bullet; the TDS gives only spool material and size), and the Spool option group (\"Filament with Spool\" / \"Refill\") carries the choice.",
+    "The store page links documents that were not cached and not read: Filament RoHS (https://store.bblcdn.com/s1/default/99010e5feaf343c59a358bef3e4c3eea/Bambu_PLA_Tough_RoHS.pdf) and the wiki guide https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool. safety.certifications is therefore neither stored nor marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament.",
+    "Adjudication against the second extraction (212 field disagreements): locator wording (the TDS rows, the 7 hex cells) and the relation forms keep this file's form: compatible_with (not recommended_with) for the TDS Build Plate Type, Support Material and Glue rows, one AMS-series family relation (TDS AMS Compatibility row; the PLA wiki row naming Tough+ and the store bullet \"All AMS Series Compatible\" agree) rather than four per-unit relations, one \"All Bambu 3D printers\" family relation (a class of printers, not one model), one TDS nozzle-size relation rather than the PLA wiki's \"All standard nozzles\", and the refill's requires-spool relation in the page's own word \"spool\"; the two store-page relations now name the page's visible section (\"Printing Tips\"). material.type stays \"Polylactic acid\", the TDS p.2 Composition cell (the second extraction's \"PLA\" is not in its own quote). thermal.heat_deflection_temp stays the TDS 1.8 MPa row (58 °C), as in every other filament file; the 0.45 MPa row (61 °C) is noted in its test_condition. compat.statement stays the TDS Printers Compatibility cell; the AMS row is the AMS-series relation. material.net_weight is written as 1 kg, the TDS's own figure (the quote checker flagged 1000 g against the quote \"1 kg\"). Added from the second extraction: extrusion.supported_nozzle_diameters, the TDS p.1 Nozzle Size row (0.2, 0.4, 0.6, 0.8 mm), as in the PLA Basic, PLA Matte, PLA Metal and PLA Pure files; the same row also stays the nozzle relation. Not added from the second extraction: material.diameter_tolerance (the store bullet \"Diameter: 1.75mm +/- 0.03mm\" is the deterministic page row, same rank), material.spool_type (the TDS spool material and size joined into one paraphrased value: the spool's material and size, not its type), thermal.chamber_temp (see the chamber note), identity.model (see the SDS note), and the store-page relations \"All printers, AMS, build plates and nozzles\" and \"Bambu Support for PLA\" (the same facts are already the printer, AMS, plate, nozzle and Support for PLA relations)."
+  ]
+}

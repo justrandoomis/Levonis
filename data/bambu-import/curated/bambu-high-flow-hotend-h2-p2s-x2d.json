@@ -1,0 +1,2502 @@
+{
+  "handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T14:56:57Z",
+  "searched": [
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "title": "Bambu Lab US store product page: Bambu High Flow Hotend - H2/P2S/X2D",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "extrusion.filament_diameter",
+        "product.*",
+        "package.*",
+        "motion.max_flow",
+        "part.*",
+        "electrical.*",
+        "compat.statement",
+        "variant.note",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The P0 corpus copy, parsed with the package (extractPage + buildImportPayload, manifest row). Its Product Specifications table gives Max. Printing Temp. 350 ℃, Length 49.2 mm, Packaging Weight 0.028 kg and Packaging Size 60*60*30mm (all kept by the deterministic layer); it has no In the Box section, no width, height or net weight, no filament diameter (the 1.75 mm rows in the page data belong to the printers and AMS units it embeds) and no electrical value. Its description carries the volumetric-flow comparison, the Printer Compatability table and the Filament Compatibility table used here."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "keys": [
+        "thermal.max_nozzle_temp",
+        "nozzle.*",
+        "printing.layer_height",
+        "product.*",
+        "package.*",
+        "part.*",
+        "motion.max_flow",
+        "extrusion.*",
+        "electrical.*",
+        "compat.statement",
+        "variant.note",
+        "printing.supported_filament",
+        "printing.unsupported_filament"
+      ],
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "Read in full from the cached HTML (the cached .txt omits the tab panels). The \"H2 Series/P2S/X2D Nozzle\" panel (purchase links \"Bambu Hotend - H2/P2S Standard & High Flow\") and the compatibility row \"H2 Series/P2S High Flow Hotend\" name this product. The panel's \"Size: 0.2mm/ 0.4mm/ 0.6mm/ 0.8mm\" and \"Materials: Hardened steel / Stainless steel\" cover the standard and high-flow hotends together; the store page sells this one as 0.4/0.6/0.8 mm hardened steel only, so the per-option diameter and material stay with the store page's option values (official_variant). Its \"62.5%\" higher maximum volume velocity and \"up to 30%\" time saving are marketing prose and give no value. It states no dimensions, weight, filament diameter, In the Box list or electrical value for this product. The 300°C rating of the \"H2 Series Hotend Silicone Sock\" belongs to that separate product."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "nozzle.*",
+        "extrusion.filament_diameter",
+        "thermal.max_nozzle_temp",
+        "compat.statement",
+        "printing.layer_height"
+      ],
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "A general guide for every Bambu nozzle. Its Nozzle table has \"0.4 / 0.6 / 0.8 mm High flow nozzle\" columns, compared cell by cell with the store page's Filament Compatibility table: they agree except PET-CF/GF, PPA-CF/GF and PPS-CF/GF at 0.4 mm (\"Not Recommended\" on the wiki, \"√(Only for Left Hotend)\" on the store; see those relations' conflict notes). Its nozzle temperatures are per filament, not values of this product, and none of its rows is stored as a spec here. It gives no filament diameter."
+    }
+  ],
+  "specs": [
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Max. Printing Temp",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D | Max. Printing Temp: 350 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The panel's purchase links are \"Bambu Hotend - H2/P2S Standard\" and \"High Flow\" (this product, under its earlier handle bambu-high-flow-hotend-h2-p2s). Agrees with the store page's Product Specifications (\"Max. Printing Temp. | 350 ℃\"). The separate \"H2C Induction Hotend - Standard & High Flow\" panel gives the same 350 ℃, so the value also holds if the H2C (Right Hotend) option is that hotend."
+    },
+    {
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "value": {
+        "min": 0.1,
+        "max": 0.3
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.4 mm\" › Layer heights",
+      "quote": "0.1 mm to 0.3 mm (25-75% of nozzle diameter), with 0.2 mm being standard.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter, not a specification published for this product; kept unverified."
+    },
+    {
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "value": {
+        "min": 0.15,
+        "max": 0.45
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.6 mm\" › Layer heights",
+      "quote": "0.15 mm to 0.45 mm (25-75% of nozzle diameter), with 0.3-0.4 mm being common.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter, not a specification published for this product; kept unverified."
+    },
+    {
+      "key": "printing.layer_height",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "value": {
+        "min": 0.2,
+        "max": 0.6
+      },
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Size › table › row \"0.8 mm\" › Layer heights",
+      "quote": "0.2 mm to 0.6 mm (25-75% of nozzle diameter), with 0.4-0.5 mm being typical.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "General guidance of the wiki's nozzle Size table for every Bambu nozzle of this diameter, not a specification published for this product; kept unverified."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Real High Flow: Save Up to 30% of Your Time\" › table › row \"Bambu High Flow Hotend (0.4mm)\" › column \"PLA Basic\"",
+      "quote": "PLA Basic | PLA Matte | PETG HF … Bambu High Flow Hotend (0.4mm) | 40 …",
+      "test_method": "",
+      "test_condition": "Filament: PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The row's cells read \"40 mm³/s | 48 mm³/s | 32 mm³/s\" under the columns PLA Basic, PLA Matte and PETG HF (the page writes the unit as the HTML entity &sup3;, so the quote stops after the PLA Basic figure); the Standard Flow Hotend (0.4mm) row reads 24 / 28 / 24 mm³/s. The table sits in the page's marketing description and states no test conditions, so the value is kept unverified, with the filament as its condition. The deterministic parse records no motion.max_flow for this page."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Real High Flow: Save Up to 30% of Your Time\" › table › row \"Bambu High Flow Hotend (0.6mm)\" › column \"PLA Basic\"",
+      "quote": "PLA Basic | PLA Matte | PETG HF … Bambu High Flow Hotend (0.6mm) | 40 …",
+      "test_method": "",
+      "test_condition": "Filament: PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The row's cells read \"40 mm³/s | 40 mm³/s | 40 mm³/s\" under the columns PLA Basic, PLA Matte and PETG HF (the page writes the unit as the HTML entity &sup3;, so the quote stops after the PLA Basic figure); the Standard Flow Hotend (0.4mm) row reads 24 / 28 / 24 mm³/s. The table sits in the page's marketing description and states no test conditions, so the value is kept unverified, with the filament as its condition. The deterministic parse records no motion.max_flow for this page."
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Real High Flow: Save Up to 30% of Your Time\" › table › row \"Bambu High Flow Hotend (0.8mm)\" › column \"PLA Basic\"",
+      "quote": "PLA Basic | PLA Matte | PETG HF … Bambu High Flow Hotend (0.8mm) | 40 …",
+      "test_method": "",
+      "test_condition": "Filament: PLA Basic",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The row's cells read \"40 mm³/s | 40 mm³/s | 40 mm³/s\" under the columns PLA Basic, PLA Matte and PETG HF (the page writes the unit as the HTML entity &sup3;, so the quote stops after the PLA Basic figure); the Standard Flow Hotend (0.4mm) row reads 24 / 28 / 24 mm³/s. The table sits in the page's marketing description and states no test conditions, so the value is kept unverified, with the filament as its condition. The deterministic parse records no motion.max_flow for this page."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "H2D",
+      "target_family": "model_h2d",
+      "target_source_handle": "h2d",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Compatibility; Nozzle-Printer Compatibility › row \"H2 Series/P2S High Flow Hotend\"",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D … H2 Series/P2S High Flow Hotend | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The panel says \"both left and right\". compat-targets.json label \"H2D\" (family model_h2d: h2d and its refurbished listing)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "H2D",
+      "target_family": "model_h2d",
+      "target_source_handle": "refurbished-bambu-lab-h2d-3d-printer",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Compatibility; Nozzle-Printer Compatibility › row \"H2 Series/P2S High Flow Hotend\"",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D … H2 Series/P2S High Flow Hotend | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "The panel says \"both left and right\". compat-targets.json label \"H2D\" (family model_h2d: h2d and its refurbished listing)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2S",
+      "target_source_handle": "h2s",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Compatibility; Nozzle-Printer Compatibility › row \"H2 Series/P2S High Flow Hotend\"",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D … H2 Series/P2S High Flow Hotend | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "compat-targets.json label \"H2S\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "X2D",
+      "target_source_handle": "x2d",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Compatibility; Nozzle-Printer Compatibility › row \"H2 Series/P2S High Flow Hotend\"",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D … H2 Series/P2S High Flow Hotend | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "compat-targets.json label \"X2D\". The store page's Printer Compatability table also says \"Supported\" for X2D."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_family": "model_p2s",
+      "target_source_handle": "p2s",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Compatibility; Nozzle-Printer Compatibility › row \"H2 Series/P2S High Flow Hotend\"",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D … H2 Series/P2S High Flow Hotend | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "compat-targets.json label \"P2S\" (family model_p2s). The store page's Printer Compatability table also says \"Supported\" for P2S."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "P2S",
+      "target_family": "model_p2s",
+      "target_source_handle": "refurbished-bambu-lab-p2s-3d-printer",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Compatibility; Nozzle-Printer Compatibility › row \"H2 Series/P2S High Flow Hotend\"",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D … H2 Series/P2S High Flow Hotend | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "note": "compat-targets.json label \"P2S\" (family model_p2s). The store page's Printer Compatability table also says \"Supported\" for P2S."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C (Left Hotend)",
+      "target_source_handle": "h2c",
+      "evidence_kind": "wiki_table",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "source_title": "Introduction to Bambu Nozzles | Bambu Lab Wiki",
+      "locator": "Types › H2 Series/P2S/X2D Nozzle › Compatibility; Nozzle-Printer Compatibility › row \"H2 Series/P2S High Flow Hotend\"",
+      "quote": "Compatibility: H2D (both left and right), H2S, H2C (left hotend), P2S, X2D … H2 Series/P2S High Flow Hotend | H2D, H2S, H2C, P2S, X2D",
+      "retrieved_at": "2026-10-16T08:22:49Z",
+      "conflict": "The wiki names only the H2C's left hotend for this hotend (\"H2C (left hotend)\") and says \"the right nozzle of the H2C is an induction nozzle, while the left one is a standard H2 Series nozzle\" (its separate \"H2C Induction Hotend - Standard & High Flow\"). The store page also sells a \"H2C (Right Hotend)\" printer option of this product (option relation from the builder), shown with its own images (FAH054-FAH056). Left for the owner's review; this file records no spec for that option.",
+      "note": "compat-targets.json label \"H2C (Left Hotend)\" (printer h2c, qualifier Left Hotend), the same words as the page's own printer option."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2d",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"H2 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "compat-targets.json label \"H2 Series\" (family h2_series). The wiki panel does not name the H2D Pro; the store table names the whole H2 Series."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2d-pro",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"H2 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "compat-targets.json label \"H2 Series\" (family h2_series). The wiki panel does not name the H2D Pro; the store table names the whole H2 Series."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2s",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"H2 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "compat-targets.json label \"H2 Series\" (family h2_series). The wiki panel does not name the H2D Pro; the store table names the whole H2 Series."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "h2c",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"H2 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "compat-targets.json label \"H2 Series\" (family h2_series). The wiki panel does not name the H2D Pro; the store table names the whole H2 Series."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "H2 Series",
+      "target_family": "h2_series",
+      "target_source_handle": "refurbished-bambu-lab-h2d-3d-printer",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"H2 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "compat-targets.json label \"H2 Series\" (family h2_series). The wiki panel does not name the H2D Pro; the store table names the whole H2 Series."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "target_family": "a1_series",
+      "target_source_handle": "a1",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"A1/A2 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The table marks it \"Supported*\": \"*Bambu High Flow Hotend is compatible with A1/A2 Series, but it will not improve volumetric speed. In other words, the High Flow Hotend performs the same as a Standard Flow Hotend on the A1/A2 Series.\" The source label \"A1/A2 Series\" is not in compat-targets.json; it is read like the reviewed compound \"A1&A2 Series\" (atoms \"A1 Series\", \"A2 Series\"). \"A1 Series\" members are its default (a1, refurbished-a1; A1 mini only on subject evidence, owner question P0-1); this page has none for the A1 mini.",
+      "conflict": "The wiki's H2 Series/P2S/X2D Nozzle panel and its Nozzle-Printer Compatibility row do not list the A1 Series for this hotend; the store page does (with the volumetric-speed caveat)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "target_family": "a1_series",
+      "target_source_handle": "refurbished-a1",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"A1/A2 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The table marks it \"Supported*\": \"*Bambu High Flow Hotend is compatible with A1/A2 Series, but it will not improve volumetric speed. In other words, the High Flow Hotend performs the same as a Standard Flow Hotend on the A1/A2 Series.\" The source label \"A1/A2 Series\" is not in compat-targets.json; it is read like the reviewed compound \"A1&A2 Series\" (atoms \"A1 Series\", \"A2 Series\"). \"A1 Series\" members are its default (a1, refurbished-a1; A1 mini only on subject evidence, owner question P0-1); this page has none for the A1 mini.",
+      "conflict": "The wiki's H2 Series/P2S/X2D Nozzle panel and its Nozzle-Printer Compatibility row do not list the A1 Series for this hotend; the store page does (with the volumetric-speed caveat)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "A2 Series",
+      "target_family": "a2_series",
+      "target_source_handle": "a2l",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"A1/A2 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The table marks it \"Supported*\": \"*Bambu High Flow Hotend is compatible with A1/A2 Series, but it will not improve volumetric speed. In other words, the High Flow Hotend performs the same as a Standard Flow Hotend on the A1/A2 Series.\" The source label \"A1/A2 Series\" is not in compat-targets.json; it is read like the reviewed compound \"A1&A2 Series\" (atoms \"A1 Series\", \"A2 Series\"). The nozzles wiki adds: \"While the A2L printer supports the quick-release nozzle from Bambu Lab's entire printer lineup, performance improvements cannot be guaranteed.\""
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "X1 Series",
+      "target_family": "x1_series",
+      "target_source_handle": "refurbished-x1c",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"X1/P1 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The table says \"Not Supported\" for \"X1/P1 Series\" (compat-targets.json compound \"X1/P1 Series\": atoms \"X1 Series\", \"P1 Series\")."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "P1 Series",
+      "target_family": "p1_series",
+      "target_source_handle": "p1s",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"X1/P1 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The table says \"Not Supported\" for \"X1/P1 Series\" (compat-targets.json compound \"X1/P1 Series\": atoms \"X1 Series\", \"P1 Series\")."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "P1 Series",
+      "target_family": "p1_series",
+      "target_source_handle": "refurbished-p1s",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Description › \"Printer Compatability\" › table › column \"X1/P1 Series\"",
+      "quote": "H2 Series | X2D | P2S | X1/P1 Series | A1/A2 Series || Supported | Supported | Supported | Not Supported | Supported*",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The table says \"Not Supported\" for \"X1/P1 Series\" (compat-targets.json compound \"X1/P1 Series\": atoms \"X1 Series\", \"P1 Series\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 1 (PLA Basic) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Basic | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 1 (PLA Basic) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Basic | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 1 (PLA Basic) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Basic | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 2 (PLA Matte) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Matte | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 2 (PLA Matte) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Matte | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Matte",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 2 (PLA Matte) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Matte | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 3 (PLA Basic Gradient) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Basic Gradient | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 3 (PLA Basic Gradient) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Basic Gradient | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Basic Gradient",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 3 (PLA Basic Gradient) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Basic Gradient | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 4 (PLA Silk+) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Silk+ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 4 (PLA Silk+) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Silk+ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk+",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 4 (PLA Silk+) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Silk+ | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 5 (PLA Silk Dual Color) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Silk Dual Color | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 5 (PLA Silk Dual Color) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Silk Dual Color | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk Dual Color",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 5 (PLA Silk Dual Color) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Silk Dual Color | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 6 (PLA Silk) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Silk | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 6 (PLA Silk) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Silk | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Silk",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 6 (PLA Silk) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Silk | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 7 (PLA Metal) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Metal | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 7 (PLA Metal) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Metal | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 7 (PLA Metal) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Metal | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 8 (PLA Marble) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Marble | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 8 (PLA Marble) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Marble | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Marble",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 8 (PLA Marble) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Marble | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 9 (PLA Sparkle) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Sparkle | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 9 (PLA Sparkle) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Sparkle | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Sparkle",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 9 (PLA Sparkle) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Sparkle | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 10 (PLA Wood) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Wood | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 10 (PLA Wood) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Wood | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Wood",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 10 (PLA Wood) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Wood | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 11 (PLA Galaxy) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Galaxy | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 11 (PLA Galaxy) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Galaxy | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Galaxy",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 11 (PLA Galaxy) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Galaxy | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 12 (PLA Glow) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Glow | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 12 (PLA Glow) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Glow | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Glow",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 12 (PLA Glow) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Glow | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 13 (PLA-CF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 13 (PLA-CF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 14 (PLA Aero) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PLA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 14 (PLA Aero) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PLA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 14 (PLA Aero) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PLA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 15 (PETG HF) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PETG HF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 15 (PETG HF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PETG HF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 15 (PETG HF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PETG HF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 16 (PETG Translucent) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PETG Translucent | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 16 (PETG Translucent) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PETG Translucent | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG Translucent",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 16 (PETG Translucent) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PETG Translucent | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 17 (PETG-CF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PETG-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 17 (PETG-CF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PETG-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 18 (ABS) › 0.4 mm High Flow Hardened Steel",
+      "quote": "ABS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 18 (ABS) › 0.6 mm High Flow Hardened Steel",
+      "quote": "ABS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 18 (ABS) › 0.8 mm High Flow Hardened Steel",
+      "quote": "ABS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 19 (ABS-GF) › 0.4 mm High Flow Hardened Steel",
+      "quote": "ABS-GF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 19 (ABS-GF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "ABS-GF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ABS-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 19 (ABS-GF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "ABS-GF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 20 (ASA) › 0.4 mm High Flow Hardened Steel",
+      "quote": "ASA | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 20 (ASA) › 0.6 mm High Flow Hardened Steel",
+      "quote": "ASA | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 20 (ASA) › 0.8 mm High Flow Hardened Steel",
+      "quote": "ASA | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 21 (ASA Aero) › 0.4 mm High Flow Hardened Steel",
+      "quote": "ASA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 21 (ASA Aero) › 0.6 mm High Flow Hardened Steel",
+      "quote": "ASA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA Aero",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 21 (ASA Aero) › 0.8 mm High Flow Hardened Steel",
+      "quote": "ASA Aero | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 22 (ASA-CF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "ASA-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "ASA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 22 (ASA-CF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "ASA-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 23 (PC) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PC | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 23 (PC) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PC | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 23 (PC) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PC | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 24 (PC FR) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PC FR | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 24 (PC FR) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PC FR | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PC FR",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 24 (PC FR) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PC FR | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 25 (TPU for AMS) › 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU for AMS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 25 (TPU for AMS) › 0.6 mm High Flow Hardened Steel",
+      "quote": "TPU for AMS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU for AMS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 25 (TPU for AMS) › 0.8 mm High Flow Hardened Steel",
+      "quote": "TPU for AMS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 26 (TPU 95A HF) › 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU 95A HF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 26 (TPU 95A HF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "TPU 95A HF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 95A HF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 26 (TPU 95A HF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "TPU 95A HF | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "TPU 85A",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 27 (TPU 85A) › 0.4 mm High Flow Hardened Steel",
+      "quote": "TPU 85A | X | Not recommended | Not recommended",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"X\". The material-table wiki agrees (row \"TPU 85A\", column \"0.4 mm High flow nozzle\": \"Not Compatible\")."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 29 (PAHT-CF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PAHT-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PAHT-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 29 (PAHT-CF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PAHT-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 30 (PET-CF) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PET-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"√(Only for Left Hotend)\"; the page's note 5 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.\" (dual-nozzle H2D, H2C, X2D).",
+      "conflict": "The material-table wiki (Nozzle table, row \"PET-CF/GF\", column \"0.4 mm High flow nozzle\") says \"Not Recommended\"; the store table marks it compatible on the left hotend."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 30 (PET-CF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PET-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"√(Only for Left Hotend)\"; the page's note 5 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.\" (dual-nozzle H2D, H2C, X2D)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 30 (PET-CF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PET-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"√(Only for Left Hotend)\"; the page's note 5 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.\" (dual-nozzle H2D, H2C, X2D)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 31 (PA6-CF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PA6-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 31 (PA6-CF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PA6-CF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 32 (PPA-CF) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PPA-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"√(Only for Left Hotend)\"; the page's note 5 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.\" (dual-nozzle H2D, H2C, X2D).",
+      "conflict": "The material-table wiki (Nozzle table, row \"PPA-CF/GF\", column \"0.4 mm High flow nozzle\") says \"Not Recommended\"; the store table marks it compatible on the left hotend."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 32 (PPA-CF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PPA-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"√(Only for Left Hotend)\"; the page's note 5 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.\" (dual-nozzle H2D, H2C, X2D)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 32 (PPA-CF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PPA-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"√(Only for Left Hotend)\"; the page's note 5 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.\" (dual-nozzle H2D, H2C, X2D)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 33 (PPS-CF) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PPS-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"√(Only for Left Hotend)\"; the page's note 5 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.\" (dual-nozzle H2D, H2C, X2D).",
+      "conflict": "The material-table wiki (Nozzle table, row \"PPS-CF/GF\", column \"0.4 mm High flow nozzle\") says \"Not Recommended\"; the store table marks it compatible on the left hotend."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 33 (PPS-CF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PPS-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"√(Only for Left Hotend)\"; the page's note 5 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.\" (dual-nozzle H2D, H2C, X2D)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 33 (PPS-CF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PPS-CF | √(Only for Left Hotend) | √(Only for Left Hotend) | √(Only for Left Hotend)",
+      "retrieved_at": "2026-10-16T07:07:02Z",
+      "note": "The cell says \"√(Only for Left Hotend)\"; the page's note 5 adds \"PET-CF / PPA-CF / PPS-CF are supported only on the Liftable Hotend.\" (dual-nozzle H2D, H2C, X2D)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 34 (Support for ABS) › 0.4 mm High Flow Hardened Steel",
+      "quote": "Support for ABS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 34 (Support for ABS) › 0.6 mm High Flow Hardened Steel",
+      "quote": "Support for ABS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for ABS",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 34 (Support for ABS) › 0.8 mm High Flow Hardened Steel",
+      "quote": "Support for ABS | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 35 (Support for PLA/PETG) › 0.4 mm High Flow Hardened Steel",
+      "quote": "Support for PLA/PETG | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 35 (Support for PLA/PETG) › 0.6 mm High Flow Hardened Steel",
+      "quote": "Support for PLA/PETG | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 35 (Support for PLA/PETG) › 0.8 mm High Flow Hardened Steel",
+      "quote": "Support for PLA/PETG | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 36 (Support for PA/PET) › 0.4 mm High Flow Hardened Steel",
+      "quote": "Support for PA/PET | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 36 (Support for PA/PET) › 0.6 mm High Flow Hardened Steel",
+      "quote": "Support for PA/PET | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PA/PET",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 36 (Support for PA/PET) › 0.8 mm High Flow Hardened Steel",
+      "quote": "Support for PA/PET | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 37 (Support for PLA (New Version)) › 0.4 mm High Flow Hardened Steel",
+      "quote": "Support for PLA (New Version) | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 37 (Support for PLA (New Version)) › 0.6 mm High Flow Hardened Steel",
+      "quote": "Support for PLA (New Version) | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA (New Version)",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 37 (Support for PLA (New Version)) › 0.8 mm High Flow Hardened Steel",
+      "quote": "Support for PLA (New Version) | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "591209603043213313",
+        "value_text": "0.4mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 38 (PVA) › 0.4 mm High Flow Hardened Steel",
+      "quote": "PVA | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 38 (PVA) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PVA | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 38 (PVA) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PVA | √ | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506305",
+        "value_text": "0.6mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 39 (PA6-GF) › 0.6 mm High Flow Hardened Steel",
+      "quote": "PA6-GF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "625247104849506306",
+        "value_text": "0.8mm Hardened Steel"
+      },
+      "target_kind": "material",
+      "target_label": "PA6-GF",
+      "target_source_handle": "",
+      "evidence_kind": "compat_section",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "source_title": "Bambu High Flow Hotend - H2/P2S/X2D (store page)",
+      "locator": "Filament Compatibility › row 39 (PA6-GF) › 0.8 mm High Flow Hardened Steel",
+      "quote": "PA6-GF | Not recommended | √ | √",
+      "retrieved_at": "2026-10-16T07:07:02Z"
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/nozzles",
+      "title": "Introduction to Bambu Nozzles",
+      "text": "Introduction to Bambu Nozzles",
+      "note": "Not linked from the store page; the §F nozzles page. Its H2 Series/P2S/X2D Nozzle panel and its Nozzle-Printer Compatibility table name this product."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "note": "Linked from the store page (\"Learn more about filament compatibility on Bambu Lab Wiki.\"); the builder already records it (same id, so the merge does not add it twice)."
+    }
+  ],
+  "not_published": [
+    "product.width",
+    "product.height",
+    "product.net_weight",
+    "package.contents",
+    "extrusion.filament_diameter"
+  ]
+}

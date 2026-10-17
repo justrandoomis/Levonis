@@ -23,18 +23,22 @@
  *     ORDER_TYPE_WORD hold last, no OWNER_HIDDEN hold);
  *   - the compat file names no unresolved snapshot member any more, and the
  *     taxonomy map places every manifest row on its reviewed leaf, its new
- *     nodes as `cat_bi_<key>`.
+ *     nodes as `cat_bi_<key>`;
+ *   - curated/index.json names every committed curated file by the SHA-256 of
+ *     its bytes (the runner's curated gate opens on each), only curated-scope
+ *     manifest rows, and each class's agreement figures (§F gate 3).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT } from './fixtures/d1';
 import { page } from './fixtures/bambu/load';
 import { buildImportPayload, type ImportPayload } from '../packages/catalog/src/bambuImport/payload';
 import type { CompatTargets } from '../packages/catalog/src/bambuImport/relations';
+import { curatedGate } from '../scripts/bambu-import/enrich';
 import {
   catalogIdOf,
   checkReviewedScope,
@@ -93,7 +97,7 @@ test('the committed reviewed files parse with the Worker\'s own parser, byte for
   }
   // Step 9: the reviewed P0 drafts, bundled with only their status line changed — and, in the manifest, the
   // integrator's two queue decisions of 2026-10-16 (no row held; the withdrawn page last; positions renumbered).
-  // No curated file yet (another job).
+  // The curated files (§F) are checked with their index below and in bambuImportCurated.test.ts.
   for (const f of ['identity-map.json', 'media-overrides.json', 'search-synonyms.json']) {
     const strip = (t: string) => {
       const o = JSON.parse(t) as Record<string, unknown>;
@@ -120,7 +124,7 @@ test('the committed reviewed files parse with the Worker\'s own parser, byte for
   assert.equal(b.identity.size, 65);
   assert.equal(b.overrides.length, 0);
   assert.equal(b.synonyms.length, 79);
-  assert.equal(b.curated.size, 0, 'curated/index.json stays the empty index until the curated files land');
+  assert.equal(b.curated.size, 91, 'curated/index.json names the 91 reviewed curated files');
 });
 
 test('§A.8 / §E.1: an entry holds ids, a decision and a reason code; a slug only for a target active at review, the owner\'s approval for merge_publish', () => {
@@ -241,7 +245,7 @@ test("the runner's reader takes the same files: the same SHA-256 per file, the s
   );
   assert.equal(Object.keys(theirs.identity).length, ours.identity.size);
   assert.equal(theirs.overrides.length, ours.overrides.length);
-  assert.equal(Object.keys(theirs.curatedIndex).length, ours.curated.size);
+  assert.deepEqual(theirs.curatedIndex, Object.fromEntries(ours.curated));
   assert.equal(theirs.matches.size, ours.matches.entries.length);
   for (const m of ours.matches.entries) {
     assert.deepEqual(runner.writeModeOf(theirs, m.source_product_id), { mode: 'merge', productId: m.levonis_product_id, publish: m.decision === 'merge_publish' }, m.source_handle);
@@ -249,6 +253,36 @@ test("the runner's reader takes the same files: the same SHA-256 per file, the s
   // Every other manifest source is created.
   const other = ours.manifest.rows.find((r) => !ours.matches.bySourceId.has(r.source_product_id))!;
   assert.deepEqual(runner.writeModeOf(theirs, other.source_product_id), { mode: 'create' });
+});
+
+test('§F item 4: curated/index.json names every committed curated file by the SHA-256 of its bytes, only curated-scope rows, and each class\'s agreement figures', () => {
+  const { curated, manifest } = parseReviewedBundle(committedTexts());
+  const dir = join(DATA, 'curated');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'index.json').map((f) => f.slice(0, -'.json'.length)).sort();
+  assert.deepEqual([...curated.keys()].sort(), files, 'the index names exactly the committed files');
+  const index = Object.fromEntries(curated);
+  for (const h of files) {
+    assert.equal(curated.get(h), createHash('sha256').update(readFileSync(join(dir, `${h}.json`))).digest('hex'), `${h}: the digest of the exact bytes`);
+    // The runner's curated gate opens on the committed file (a handle, its digest, JSON).
+    assert.equal(curatedGate(DATA, h, true, index).kind, 'ok', h);
+  }
+  const scope = manifest.rows.filter((r) => r.curated).map((r) => r.handle);
+  assert.deepEqual(files.filter((h) => !scope.includes(h)), [], 'a curated file only for a curated-scope manifest row');
+  assert.deepEqual(scope.filter((h) => !curated.has(h)), ['halloween-filament-special-combo'], 'the one curated-scope row with no file waits at CURATION_PENDING, then CURATION_MISSING');
+  // Gate 3: the second extraction per class, its disagreement rate, and the adjudication of every file.
+  const { agreement } = JSON.parse(read(DATA, 'curated/index.json')) as {
+    agreement: { classes: Record<string, { products: number; compared: number; disagree: number; rate_pct: number }>; adjudicated: number; skeptic_pass: number; quote_check_residuals: string[] };
+  };
+  const classes = Object.entries(agreement.classes);
+  assert.deepEqual(classes.map(([c]) => c).sort(), ['ams', 'build_plate', 'filament', 'hotend', 'laser_machine', 'printer']);
+  assert.equal(classes.reduce((n, [, c]) => n + c.products, 0), files.length, 'every committed file belongs to one class');
+  for (const [name, c] of classes) {
+    assert.equal(c.rate_pct, Math.round((c.disagree / c.compared) * 1000) / 10, name);
+    assert.ok(c.rate_pct > 2, `${name}: above 2 %, so the second extraction covered the whole class`);
+  }
+  assert.equal(agreement.adjudicated, files.length);
+  assert.ok(agreement.skeptic_pass > 0 && agreement.skeptic_pass <= files.length);
+  assert.equal(agreement.quote_check_residuals.length, 4);
 });
 
 test('compat-targets.json: no member waits for the snapshot any more, and a family names only manifest handles', () => {

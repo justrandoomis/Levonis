@@ -1,0 +1,2424 @@
+{
+  "handle": "h2c",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T10:12:49Z",
+  "searched": [
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "title": "H2C Spec Sheet",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*"
+      ],
+      "note": "Both pages read (text layer, checked against the rendered pages). One spec table; no laser-module section, no footnotes, no package size or gross weight. Linked from the store spec table (link text \"TDS\")."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/h2c",
+      "title": "Bambu Lab H2C store page",
+      "retrieved_at": "2026-10-16T06:55:29Z",
+      "keys": [
+        "printing.*",
+        "motion.*",
+        "extrusion.*",
+        "thermal.*",
+        "electrical.*",
+        "connectivity.*",
+        "physical.*",
+        "product.*",
+        "package.*",
+        "shipment.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): H2C Specs table, Product Features, What's in the box, FAQ, footnotes, variant descriptions and the marketing sections. motion.max_flow_high_flow is not marked not_published: the store page of the H2C Induction Hotend (Right) (handle h2c-induction-hotend-right) publishes an \"H2C Max Volumetric Speed\" table with High Flow induction nozzles (\"High Flow Induction Hardened Steel Nozzle (0.4mm) 40 mm³/s\", \"*Tested with Bambu PLA Basic.\"), a per-nozzle figure under another test than this sheet's Max Flow row, so it is not recorded here either."
+    },
+    {
+      "kind": "store_messages",
+      "url": "https://us.store.bambulab.com/products/h2c",
+      "title": "Bambu Lab H2C store page, messages bundle",
+      "retrieved_at": "2026-10-16T06:55:29Z",
+      "keys": [
+        "electrical.*",
+        "package.*",
+        "shipment.*",
+        "product.*",
+        "physical.*"
+      ],
+      "note": "The bundle carries only the production.H2D and production.A1 Description namespaces (plus AMS Pro / AMS HT tables); no H2C 220 V / UK message exists, so no intl_220v package size or gross weight was taken from it."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2c/acc-in-the-box",
+      "title": "H2C Packing List",
+      "retrieved_at": "2026-10-16T08:23:50Z",
+      "keys": [
+        "package.contents",
+        "printing.included_build_plate"
+      ],
+      "note": "Packing list table (H2C Laser Full Combo and H2C AMS Combo columns; no column for the H2C Vortek Ultimate Bundle) and the accessory list."
+    }
+  ],
+  "specs": [
+    {
+      "key": "printing.technology",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Fused Deposition Modeling",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Printing Technology",
+      "quote": "Printing Technology Fused Deposition Modeling",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "printing.build_volume",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "305 × 320 × 325 mm",
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Body › Build Volume (W*D*H) › Single Nozzle Printing",
+      "quote": "Build Volume (W*D*H) Single Nozzle Printing: 305*320*325 mm³ Dual Nozzle Printing: 300*320*325 mm³ Total Volume for Two Nozzles: 330*320*325 mm³",
+      "test_method": "",
+      "test_condition": "Single nozzle printing (W × D × H). Dual nozzle printing: 300 × 320 × 325 mm; total volume for two nozzles: 330 × 320 × 325 mm",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "The store table row \"Build Volume (W*D*H)\" gives two single-nozzle volumes, \"325*320*320 mm³ (Left)\" and \"305*320*325 mm³ (Right)\"; the package takes the first (Left) as an unverified row \"325 × 320 × 320 mm\". The spec sheet gives one single-nozzle volume, 305*320*325 mm³ (the store's Right figure), and does not state a Left volume. The sheet is kept (higher source rank); the store's Left figure stays as the recorded disagreement. Dual-nozzle (300*320*325) and total (330*320*325) volumes agree in both sources."
+    },
+    {
+      "key": "physical.chassis",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Aluminum and Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Body › Chassis",
+      "quote": "Chassis Aluminum and Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "physical.outer_frame",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Plastic and Glass",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Body › Outer Frame",
+      "quote": "Outer Frame Plastic and Glass",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 492,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (1st of 3)",
+      "quote": "Physical Dimensions 492*514*626 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The store table states the same printer size (492*514*626 mm³)."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 514,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (2nd of 3)",
+      "quote": "Physical Dimensions 492*514*626 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The store table states the same printer size (492*514*626 mm³)."
+    },
+    {
+      "key": "product.height",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 626,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Physical Dimensions (3rd of 3)",
+      "quote": "Physical Dimensions 492*514*626 mm³",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The store table states the same printer size (492*514*626 mm³)."
+    },
+    {
+      "key": "product.net_weight",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 32.5,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Physical Dimensions › Net Weight",
+      "quote": "Net Weight 32.5 kg",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The store table states the same net weight (32.5 kg)."
+    },
+    {
+      "key": "extrusion.extruder_gear",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Gear",
+      "quote": "Extruder Gear Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "extrusion.nozzle_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Hardened Steel",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Toolhead › Nozzle",
+      "quote": "Nozzle Hardened Steel",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "thermal.max_nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 350,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Toolhead › Max Nozzle Temperature",
+      "quote": "Max Nozzle Temperature 350 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Toolhead › Supported Nozzle Diameter",
+      "quote": "Supported Nozzle Diameter 0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "printing.filament_cutter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Cutter",
+      "quote": "Filament Cutter Built-in",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "extrusion.filament_diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Toolhead › Filament Diameter",
+      "quote": "Filament Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "extrusion.extruder_motor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Toolhead › Extruder Motor",
+      "quote": "Extruder Motor Bambu Lab High-precision Permanent Magnet Synchronous Motor",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "printing.build_plate_material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Flexible Steel Plate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Heatbed › Build Plate Material",
+      "quote": "Build Plate Material Flexible Steel Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "printing.included_build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Heatbed › Included Build Plate Type",
+      "quote": "Included Build Plate Type Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "printing.build_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI plate",
+        "Engineering Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Engineering Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "Store FAQ 6: build plates are not interchangeable between H2C and H2D (the H2C print bed is slightly smaller)."
+    },
+    {
+      "key": "thermal.max_bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 120,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Heatbed › Max Heatbed Temperature",
+      "quote": "Max Heatbed Temperature 120 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "motion.max_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1000,
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Speed › Max Speed of Toolhead",
+      "quote": "Max Speed of Toolhead 1000 mm/s",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "motion.max_acceleration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20000,
+      "unit": "mm/s²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Speed › Max Acceleration of Toolhead",
+      "quote": "Max Acceleration of Toolhead 20,000 mm/s²",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "motion.max_flow",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 40,
+      "unit": "mm³/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Speed › Max Flow for Hotend",
+      "quote": "Max Flow for Hotend 40 mm³/s (Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 °C printing temperature)",
+      "test_method": "250 mm round model with a single outer wall",
+      "test_condition": "Bambu Lab ABS; 280 °C printing temperature",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "thermal.chamber_heating",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Chamber Temperature Control › Active Chamber Heating",
+      "quote": "Active Chamber Heating Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "thermal.chamber_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Chamber Temperature Control › Max Temperature",
+      "quote": "Max Temperature 65 ℃",
+      "test_method": "",
+      "test_condition": "Maximum chamber temperature with active chamber heating",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "safety.prefilter_grade",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "G3",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Air Purification › Pre-filter Grade",
+      "quote": "Pre-filter Grade G3",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "safety.hepa_grade",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "H12",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Air Purification › HEPA Filter Grade",
+      "quote": "HEPA Filter Grade H12",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "safety.carbon_filter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Granulated Coconut Shell",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Air Purification › Activated Carbon Filter Type",
+      "quote": "Activated Carbon Filter Type Granulated Coconut Shell",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "safety.voc_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Superior",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Air Purification › VOC Filtration",
+      "quote": "VOC Filtration Superior",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "safety.particulate_filtration",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Supported",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Air Purification › Particulate Matter Filtration",
+      "quote": "Particulate Matter Filtration Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "thermal.part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Cooling › Part Cooling Fan",
+      "quote": "Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "thermal.hotend_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Cooling › Cooling Fan for Hotend",
+      "quote": "Cooling Fan for Hotend Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "thermal.control_board_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Cooling › Main Control Board Fan",
+      "quote": "Main Control Board Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "thermal.chamber_exhaust_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Cooling › Chamber Exhaust Fan",
+      "quote": "Chamber Exhaust Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "thermal.chamber_circulation_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Cooling › Chamber Heat Circulation Fan",
+      "quote": "Chamber Heat Circulation Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "thermal.aux_part_cooling_fan",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Closed Loop Control",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Cooling › Auxiliary Part Cooling Fan",
+      "quote": "Auxiliary Part Cooling Fan Closed Loop Control",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PETG",
+        "TPU",
+        "PVA",
+        "BVOH",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "PET",
+        "PPS",
+        "Carbon/Glass Fiber Reinforced PLA",
+        "Carbon/Glass Fiber Reinforced PETG",
+        "Carbon/Glass Fiber Reinforced PA",
+        "Carbon/Glass Fiber Reinforced PET",
+        "Carbon/Glass Fiber Reinforced PC",
+        "Carbon/Glass Fiber Reinforced ABS",
+        "Carbon/Glass Fiber Reinforced ASA",
+        "Carbon/Glass Fiber Reinforced PPA",
+        "Carbon/Glass Fiber Reinforced PPS"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Supported Filament Type (two parts, split at \";\")",
+      "quote": "Supported Filament Type PLA, PETG, TPU, PVA, BVOH, ABS, ASA, PC, PA, PET, PPS;Carbon/Glass Fiber Reinforced PLA, PETG, PA, PET, PC, ABS, ASA, PPA, PPS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Same text as the store table row \"Supported Filament Type\", but the package splits the reinforced part at every comma, so its list repeats PETG, PA, PET, PC, ABS, ASA and PPS as plain items and adds a plain \"PPA\", which the sheet lists only as a carbon/glass fibre reinforced grade. Here each reinforced grade is its own item.",
+      "note": "The part after \";\" names the carbon/glass fibre reinforced grades of nine bases (\"Carbon/Glass Fiber Reinforced PLA, PETG, PA, PET, PC, ABS, ASA, PPA, PPS\"); each is written out as one list item."
+    },
+    {
+      "key": "printing.camera",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Sensor › Live View Camera",
+      "quote": "Live View Camera Built-in; 1920*1080",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "printing.camera_nozzle",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Sensor › Nozzle Camera",
+      "quote": "Nozzle Camera Built-in; 1920*1080",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "printing.camera_birdseye",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667505441262432258",
+        "value_text": "H2C Laser Full Combo"
+      },
+      "value": "Built-in; 3264*2448",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Sensor › BirdsEye Camera",
+      "quote": "BirdsEye Camera Built-in; 3264*2448",
+      "test_method": "",
+      "test_condition": "H2C Laser Edition (H2C Laser Full Combo)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "Adjudicated scope. The sheet states the camera without a scope; the store table row reads \"Built-in; 3264*2448 (Equipped with Laser Edition)\" and the store footnote counts the BirdsEye camera only on the \"fully equipped H2C Laser Edition\". The sheet value is therefore recorded on the Laser Full Combo value only; the store's product-level row, with its qualifier, is left as it is."
+    },
+    {
+      "key": "printing.camera_toolhead",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in; 1920*1080",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Sensor › Toolhead Camera",
+      "quote": "Toolhead Camera Built-in; 1920*1080",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "The store table row \"Toolhead Camera\" reads \"Built-in; 1600*1200\"; the H2C spec sheet reads \"Built-in; 1920*1080\". Two official sources disagree on the resolution. The sheet is kept (higher source rank); the store value stays as the recorded disagreement. Needs owner/reviewer adjudication."
+    },
+    {
+      "key": "printing.door_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Sensor › Door Sensor",
+      "quote": "Door Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "printing.filament_runout_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Sensor › Filament Run Out Sensor",
+      "quote": "Filament Run Out Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "printing.filament_tangle_sensor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Sensor › Filament Tangle Sensor",
+      "quote": "Filament Tangle Sensor Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "printing.filament_odometry",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Sensor › Filament Odometry",
+      "quote": "Filament Odometry Supported with AMS",
+      "test_method": "",
+      "test_condition": "With AMS",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported with AMS\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported with AMS\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "printing.power_loss_recovery",
+      "scope": {
+        "kind": "product"
+      },
+      "value": true,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Sensor › Power Loss Recovery",
+      "quote": "Power Loss Recovery Supported",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Supported\" for the same boolean (the package stores value_bool 1, as here). The merge compares the text of a non-numeric value (\"Supported\" vs \"Yes\"), so it records a difference."
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "200-240 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage (2nd of 2)",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "220 V version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "electrical.voltage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "100-120 VAC, 50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage (1st of 2)",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The store table (US store) states the same: \"100-120 VAC, 50/60 Hz\"."
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "220 V version",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "electrical.frequency",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "50/60 Hz",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Voltage",
+      "quote": "Voltage 100-120 VAC / 200-240 VAC, 50/60 Hz",
+      "test_method": "",
+      "test_condition": "US version (100–120 V)",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1800,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Max Power* (1st of 2)",
+      "quote": "Max Power* 1800 W@220 V/1250 W@110 V",
+      "test_method": "",
+      "test_condition": "@220 V",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The row label carries an asterisk; the two-page sheet prints no footnote for it."
+    },
+    {
+      "key": "electrical.max_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1250,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Max Power* (2nd of 2)",
+      "quote": "Max Power* 1800 W@220 V/1250 W@110 V",
+      "test_method": "",
+      "test_condition": "US version (100–120 V), @110 V",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The store table states the same US value (\"1250 W@110 V\")."
+    },
+    {
+      "key": "electrical.rated_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 200,
+      "unit": "W",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Typical Power (1st of 2)",
+      "quote": "Typical Power 200 W@220 V/200 W@110 V (Single Nozzle Printing PLA)",
+      "test_method": "",
+      "test_condition": "Typical power @220 V, single nozzle printing PLA",
+      "region": "intl_220v",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The sheet's row is \"Typical Power\"; the package files the store table's same row under electrical.rated_power, so the same key is used."
+    },
+    {
+      "key": "electrical.rated_power",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 200,
+      "unit": "W",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electrical Requirements › Typical Power (2nd of 2)",
+      "quote": "Typical Power 200 W@220 V/200 W@110 V (Single Nozzle Printing PLA)",
+      "test_method": "",
+      "test_condition": "US version (100–120 V); typical power @110 V, single nozzle printing PLA",
+      "region": "us_110v",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The store table states the same US value (\"200 W@110 V (Single Nozzle Printing PLA)\")."
+    },
+    {
+      "key": "physical.operating_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "10 °C-30 °C",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Working Temperature",
+      "quote": "Working Temperature 10 ℃-30 ℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "Value written as the store table writes it (\"10 °C-30 °C\"); the sheet uses the ℃ sign. The package does not parse that store row."
+    },
+    {
+      "key": "connectivity.display",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "5-inch 720*1280 Touchscreen",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electronics › Touchscreen",
+      "quote": "Touchscreen 5-inch 720*1280 Touchscreen",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "connectivity.storage",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Built-in 8 GB EMMC and USB Port",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electronics › Storage",
+      "quote": "Storage Built-in 8 GB EMMC and USB Port",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "connectivity.control_interface",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Touchscreen",
+        "mobile App",
+        "PC App"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electronics › Control Interface",
+      "quote": "Control Interface Touchscreen, mobile App, PC App",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "connectivity.motion_controller",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Dual-core Cortex-M4 and Single-core Cortex-M7",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electronics › Motion Controller",
+      "quote": "Motion Controller Dual-core Cortex-M4 and Single-core Cortex-M7",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "connectivity.application_processor",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Quad-core 1.5 GHz ARM A7",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electronics › Application Processor",
+      "quote": "Application Processor Quad-core 1.5 GHz ARM A7",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "The store table row \"Application Processor\" reads \"Quad-core ARM with NPU\"; the H2C spec sheet reads \"Quad-core 1.5 GHz ARM A7\" and lists the NPU on its own row (\"Neural Processing Unit 2 TOPS\"). The sheet is kept (higher source rank, more specific); the store wording stays as the recorded disagreement."
+    },
+    {
+      "key": "connectivity.npu",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "2 TOPS",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Electronics › Neural Processing Unit",
+      "quote": "Neural Processing Unit 2 TOPS",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "connectivity.software",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Bambu Studio / Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Software › Slicer",
+      "quote": "Bambu Studio … Supports third-party slicers which export … standard G-code, such as Super Slicer, PrusaSlicer and Cura, … but certain advanced features may not be supported.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The sheet puts \"Bambu Studio\" and the third-party sentence on two lines; written with the store table's \" / \" line separator. The text layer runs \"Bambu Studio\" into \"Supports\" and splits the cell around the \"Slicer\" and \"Software\" labels; the quote keeps the cell's words in order with \"…\" at those breaks."
+    },
+    {
+      "key": "connectivity.operating_systems",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "MacOS",
+        "Windows",
+        "Linux"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Software › Supported Operating System",
+      "quote": "Supported Operating System MacOS, Windows, Linux",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "connectivity.ethernet",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Not Available",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Network Control › Ethernet",
+      "quote": "Ethernet Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "connectivity.wireless_network",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Wi-Fi",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Network Control › Wireless Network",
+      "quote": "Wireless Network Wi-Fi",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z"
+    },
+    {
+      "key": "connectivity.network_kill_switch",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Network Control › Network Kill Switch",
+      "quote": "Network Kill Switch Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Not Available\" for the same boolean (the package stores value_bool 0, as here). The merge compares the text of a non-numeric value (\"Not Available\" vs \"No\"), so it records a difference."
+    },
+    {
+      "key": "connectivity.removable_network_module",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Network Control › Removable Network Module",
+      "quote": "Removable Network Module Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Not Available\" for the same boolean (the package stores value_bool 0, as here). The merge compares the text of a non-numeric value (\"Not Available\" vs \"No\"), so it records a difference."
+    },
+    {
+      "key": "connectivity.network_access_control",
+      "scope": {
+        "kind": "product"
+      },
+      "value": false,
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Network Control › 802.1X Network Access Control",
+      "quote": "802.1X Network Access Control Not Available",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "conflict": "Wording only, not a different fact: the store table writes \"Not Available\" for the same boolean (the package stores value_bool 0, as here). The merge compares the text of a non-numeric value (\"Not Available\" vs \"No\"), so it records a difference."
+    },
+    {
+      "key": "connectivity.wifi",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Operating Frequency — 2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE) 2400 - 2483.5 MHz, 5150 - 5850 MHz (SRRC)\nWi-Fi Transmitter Power (EIRP) — 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) 5 GHz Band1/2: <23 dBm (FCC/CE/SRRC/MIC) 5 GHz Band3: <30 dBm (CE); <24 dBm (FCC) 5 GHz Band4: <23 dBm (FCC/SRRC); <14 dBm (CE)\nWi-Fi Protocol — IEEE 802.11 a/b/g/n",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "store_doc",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.2, Wi-Fi › Operating Frequency; Wi-Fi Transmitter Power (EIRP); Wi-Fi Protocol",
+      "quote": "2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE)2400 - 2483.5 MHz, … 5150 - 5850 MHz (SRRC) … 2.4 GHz: <23 dBm (FCC); <20 dBm (CE/SRRC/MIC) … Band3: <30 dBm … <14 dBm (CE) … IEEE 802.11 a/b/g/n",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "note": "The three Wi-Fi rows in the store table's layout (label — value per line); same content as the sheet. The excerpt is abridged to the 200-character limit: the full Wi-Fi Transmitter Power (EIRP) cell is on p.2 of the sheet and in the store table row."
+    },
+    {
+      "key": "extrusion.hotend",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Right: induction hotends; left: standard hotends",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 1",
+      "quote": "Right hotends (Induction hotends) : 4 × 0.4 mm hardened steel induction hotends … Left hotends (Standard hotends): 2 × 0.4 mm hardened steel standard hotends",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:29Z",
+      "note": "FAQ prose, so unverified; neither the H2C spec sheet nor the store table has a \"Hotend\" row. The value keeps the side names of FAQ 1: \"Right hotends (Induction hotends)\", \"Left hotends (Standard hotends)\". Skeptic: was \"Right: induction hotends (hardened steel); left: standard hotends (hardened steel)\" with the condition \"Hotends included with the H2C AMS Combo and Laser Full Combo\". FAQ 1 states hardened steel only for the 4 × 0.4 mm induction and 2 × 0.4 mm standard hotends (the 0.2 mm and 0.6 mm induction hotends have no material there), and the Vortek Ultimate Bundle adds a 0.2 mm stainless steel left nozzle, so the material is dropped; the side layout holds for every version (the bundle description also puts the induction nozzle on the RHS and the others on the LHS)."
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667505441262432257",
+        "value_text": "H2C AMS Combo"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 1",
+      "quote": "Right hotends (Induction hotends) : 4 × 0.4 mm hardened steel induction hotends , of which 1 is pre-installed on the printer",
+      "test_method": "",
+      "test_condition": "Pre-installed hotends: one 0.4 mm induction hotend (right) and one 0.4 mm standard hotend (left)",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:29Z",
+      "note": "FAQ prose, so unverified; the H2C spec sheet has no \"Included Nozzle Diameter\" row. The same answer: \"Left hotends (Standard hotends): 2 × 0.4 mm hardened steel standard hotends , of which 1 is pre-installed\". Skeptic: was product scope; FAQ 1 answers for \"The H2C AMS Combo/Laser Full Combo\" only and no source states the pre-installed hotends of the H2C Vortek Ultimate Bundle, so the value is recorded on the two combo values."
+    },
+    {
+      "key": "extrusion.nozzle_diameter",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667505441262432258",
+        "value_text": "H2C Laser Full Combo"
+      },
+      "value": 0.4,
+      "unit": "mm",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 1",
+      "quote": "Right hotends (Induction hotends) : 4 × 0.4 mm hardened steel induction hotends , of which 1 is pre-installed on the printer",
+      "test_method": "",
+      "test_condition": "Pre-installed hotends: one 0.4 mm induction hotend (right) and one 0.4 mm standard hotend (left)",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:29Z",
+      "note": "FAQ prose, so unverified; the H2C spec sheet has no \"Included Nozzle Diameter\" row. The same answer: \"Left hotends (Standard hotends): 2 × 0.4 mm hardened steel standard hotends , of which 1 is pre-installed\". Skeptic: was product scope; FAQ 1 answers for \"The H2C AMS Combo/Laser Full Combo\" only and no source states the pre-installed hotends of the H2C Vortek Ultimate Bundle, so the value is recorded on the two combo values."
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "EU RED Article 3.3(d)(e)",
+        "ETSI EN 303 645 V2.1.1:2020"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "Product Features › footnote 2",
+      "quote": "* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020.",
+      "test_method": "",
+      "test_condition": "Cybersecurity compliance",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:55:29Z"
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Engineering Plate",
+      "condition": "The plate in its H2C size (store FAQ 6: build plates are not interchangeable between H2C and H2D)",
+      "note": "Included in the AMS Combo and Laser Full Combo (sheet: \"Included Build Plate Type Textured PEI Plate\"). The target page has an \"H2C\" Printer Model value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "source_title": "H2C Spec Sheet",
+      "locator": "p.1, Heatbed › Supported Build Plate Type",
+      "quote": "Supported Build Plate Type Textured PEI plate, Engineering Plate",
+      "condition": "The plate in its H2C size (store FAQ 6: build plates are not interchangeable between H2C and H2D)",
+      "note": "The target page has an \"H2C\" Printer Model value and gives \"H2C/A2L - 330*320mm\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "H2D build plates",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 6",
+      "quote": "Because the Vortek hotend rack occupies additional space, the H2C print bed is slightly smaller than the H2D. Therefore, buildplates are not interchangeable between H2C and H2D.",
+      "condition": "Build plates sized for the H2D",
+      "note": "No single target product: the plate products carry the H2D and H2C sizes as separate Printer Model values."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "StrongGrip Cutting Mat",
+      "target_source_handle": "stronggrip-cutting-mat",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 6",
+      "quote": "However, the vision calibration plates, laser platform, and blade-cutting mats are fully compatible across all H2 series models.",
+      "condition": "Blade cutting (cutting module)",
+      "note": "The target page's Compatibility value is \"H2 Series (Cutting)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "LightGrip Cutting Mat",
+      "target_source_handle": "lightgrip-cutting-mat",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 6",
+      "quote": "However, the vision calibration plates, laser platform, and blade-cutting mats are fully compatible across all H2 series models.",
+      "condition": "Blade cutting (cutting module)",
+      "note": "The target page's Compatibility value is \"H2 Series (Cutting)\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cutting Module",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 3",
+      "quote": "The H2C Laser Edition supports both 10W and 40W laser modules and is also compatible with the blade-cutting module. The non-laser H2C supports blade-cutting by default",
+      "condition": "Blade cutting. The Laser Full Combo box includes the Cutting Module (wiki packing list); for the non-laser H2C the FAQ says it \"supports blade-cutting by default\", and its packing list (H2C AMS Combo column) has no cutting module",
+      "note": "The FAQ names the module generically (\"blade-cutting module\"), not a store product, so no target handle; the wiki packing list puts \"Cutting Module\" in the Laser Full Combo accessory box. To map or mark unresolvable in review. Skeptic: the condition said the non-laser H2C \"supports blade-cutting without an upgrade\"; the FAQ says \"by default\", the AMS Combo column of the wiki packing list has no Cutting Module, and the store sells a \"Cutting Upgrade Kit - H2 Series/A2L\" (handle cutting-upgrade-kit-h2-series-a2l: \"contains all items required for cutting and drawing\", \"When paired with the H2C\"), a mapping candidate for review. The condition now keeps the FAQ words."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667505441262432258",
+        "value_text": "H2C Laser Full Combo"
+      },
+      "target_kind": "laser_module",
+      "target_label": "10W laser module",
+      "target_source_handle": "laser-module",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 3",
+      "quote": "The H2C Laser Edition supports both 10W and 40W laser modules and is also compatible with the blade-cutting module.",
+      "condition": "H2C Laser Edition",
+      "note": "The Laser Module page FAQ: \"H2D/H2C supports both 10W and 40W\" lasers."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667505441262432258",
+        "value_text": "H2C Laser Full Combo"
+      },
+      "target_kind": "laser_module",
+      "target_label": "40W laser module",
+      "target_source_handle": "laser-module",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 3",
+      "quote": "The H2C Laser Edition supports both 10W and 40W laser modules and is also compatible with the blade-cutting module.",
+      "condition": "H2C Laser Edition",
+      "note": "The Laser Module page FAQ: \"H2D/H2C supports both 10W and 40W\" lasers."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667505441262432257",
+        "value_text": "H2C AMS Combo"
+      },
+      "target_kind": "part",
+      "target_label": "Laser Upgrade Kit",
+      "target_source_handle": "laser-upgrade-kit",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 3",
+      "quote": "The non-laser H2C supports blade-cutting by default, but can be upgraded to support laser functions via an upgrade kit.",
+      "condition": "Non-laser H2C: adds laser functions",
+      "note": "The FAQ does not name the kit; the Laser Upgrade Kit page has a \"For H2D/H2C\" Compatibility value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761030943904460801",
+        "value_text": "H2C Vortek Ultimate Bundle"
+      },
+      "target_kind": "part",
+      "target_label": "Laser Upgrade Kit",
+      "target_source_handle": "laser-upgrade-kit",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 3",
+      "quote": "The non-laser H2C supports blade-cutting by default, but can be upgraded to support laser functions via an upgrade kit.",
+      "condition": "Non-laser H2C: adds laser functions",
+      "note": "The FAQ does not name the kit; the Laser Upgrade Kit page has a \"For H2D/H2C\" Compatibility value. The bundle's printer is the non-laser \"H2C 3D Printer\" (variant description)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 2",
+      "quote": "To setup: Two AMS 2 Pro feed the right induction hotends; AMS HT feeds the left hotends.",
+      "condition": "One AMS 2 Pro is included in the AMS Combo and the Laser Full Combo, two in the Vortek Ultimate Bundle",
+      "note": "The target page has an \"H2D/H2C\" printer value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 2",
+      "quote": "To setup: Two AMS 2 Pro feed the right induction hotends; AMS HT feeds the left hotends.",
+      "condition": "Optional; in the FAQ's suggested setup an AMS HT feeds the left hotends",
+      "note": "The target page has an \"H2D/H2C\" printer value."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "4-in-1 PTFE Adapter (FAZ013-N)",
+      "target_source_handle": "bambu-4-in-1-ptfe-adapter",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "Product Features › footnote 1",
+      "quote": "* To connect more than two AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed.",
+      "condition": "Only to connect more than two AMS units (AMS 2 Pro, AMS HT)",
+      "note": "Both combos' box lists include a 4-in-1 PTFE adapter (store: \"4-in-1 PTFE Adapter II\"; wiki: \"4-In-1 PTFE Adapter\"). Whether that is the FAZ013-N part is not stated."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Vision Encoder",
+      "target_source_handle": "vision-encoder",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "Footnote (Note)",
+      "quote": "* The optional Vision Encoder is required for Motion Accuracy Enhancement.",
+      "condition": "Optional equipment; needed only for Motion Accuracy Enhancement",
+      "note": "Target: the store product \"Vision Encoder\" (Compatibility \"X2D, H2 Series\"), not \"Vision Encoder - R1\". Skeptic: was \"requires\"; the footnote calls the encoder \"optional\" (the printer does not require it; only the Motion Accuracy Enhancement feature does), so it is an optional compatible accessory, as on the H2D page's identical footnote."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High-flow Hotends",
+      "target_source_handle": "bambu-high-flow-hotend-h2-p2s-x2d",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "Footnote (Note)",
+      "quote": "* High-flow Hotends are optional equipments, buy at official store.",
+      "condition": "Optional equipment",
+      "note": "The target page has \"H2C (Left Hotend)\" and \"H2C (Right Hotend)\" Printer Model values. Store FAQ 5: standard and high flow hotends of the same size can be mixed; different nozzle sizes cannot (firmware)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "H2C Induction Hotend (Right)",
+      "target_source_handle": "h2c-induction-hotend-right",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/h2c/acc-in-the-box",
+      "source_title": "H2C Packing List",
+      "locator": "Accessory List › table › row 5",
+      "quote": "0.2 mm Induction Hotend * 1、0.4 mm Induction Hotend * 3、0.6 mm Induction Hotend * 1",
+      "condition": "Right (induction) hotend position; these induction hotends are in the AMS Combo and Laser Full Combo tool box",
+      "note": "The target page's Compatibility section reads \"H2C and H2C Laser\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Hotend - H2/P2S/X2D",
+      "target_source_handle": "bambu-hotend-h2-p2s",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 1",
+      "quote": "Left hotends (Standard hotends): 2 × 0.4 mm hardened steel standard hotends , of which 1 is pre-installed and 1 is included in the accessory box.",
+      "condition": "Left (standard) hotend position",
+      "note": "The target page has an \"H2C (Left)\" Printer Model value."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Vortek Utility Hotends Bundle",
+      "target_source_handle": "vortek-utility-hotends-bundle",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "Variant 761030943904460802 (H2C Vortek Ultimate Bundle / Standard) › description",
+      "quote": "(2) AMS 2 Pro *2 … Vortek Utility Hotends Bundle … includes: 0.4 mm Induction hardened Steel Nozzle (RHS) … 0.2 mm stainless steel nozzle (LHS) … 0.6 mm hardened steel nozzle (LHS)",
+      "condition": "Included in the H2C Vortek Ultimate Bundle; sold separately for the other versions",
+      "note": "The target page's Printer Model value is \"H2C\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Filament Track Switch",
+      "target_source_handle": "filament-track-switch",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "locator": "FAQ › 2",
+      "quote": "A Filament Track Switch Module will be released, allowing full 7-hotend support with only 2 AMS units, enabling free filament switching between left & right filament paths.",
+      "condition": "Lets two AMS units feed both the left and the right filament paths; included in the H2C Vortek Ultimate Bundle",
+      "note": "The Vortek Ultimate Bundle description lists \"(4) Filament Track Switch *1\"; the target page's Compatibility value is \"X2D, H2D, H2C\"."
+    }
+  ],
+  "in_the_box": [
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667505441262432258",
+        "value_text": "H2C Laser Full Combo"
+      },
+      "source_url": "https://wiki.bambulab.com/en/h2c/acc-in-the-box",
+      "source_title": "H2C Packing List",
+      "retrieved_at": "2026-10-16T08:23:50Z",
+      "locator": "Packing list › table › column \"H2C Laser Full Combo\" (rows 2–11)",
+      "quote": "Safety Key*2（one attached to the rear board, one in the Emergency Stop Button.）",
+      "note": "Rows of the wiki column, in order, as written; the wiki notes that \"the type and quantity of accessories may change from time to time\". The column does not list the 10W/40W laser module; the store box list names it per Option value (\"depending on option\"). \"PTFE Tube\" appears both in the Accessory Box list and in its own row; both are kept. The store box list writes the two standard hotends as \"0.4mm Hardened Steel Hotend ×2\" (one pre-installed, store FAQ 1) and adds \"4-in-1 PTFE Adapter II\".",
+      "items": [
+        {
+          "text": "H2C",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Build Plate (Pre-installed on heatbed)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Safety Key (one attached to the rear board, one in the Emergency Stop Button)",
+          "qty": 2,
+          "section": ""
+        },
+        {
+          "text": "Power Cord",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "6-pin Cable",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Spool Holder and Base",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Emergency Stop Button",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "H2C Sensing Hotend Box",
+          "qty": null,
+          "section": "Accessory Box"
+        },
+        {
+          "text": "Cutting Module",
+          "qty": null,
+          "section": "Accessory Box › Cutting Module"
+        },
+        {
+          "text": "Pen Adapter",
+          "qty": null,
+          "section": "Accessory Box › Cutting Module"
+        },
+        {
+          "text": "Pen Height Calibration Block",
+          "qty": null,
+          "section": "Accessory Box › Cutting Module"
+        },
+        {
+          "text": "Pen Locker",
+          "qty": null,
+          "section": "Accessory Box › Cutting Module"
+        },
+        {
+          "text": "Marker Pen",
+          "qty": null,
+          "section": "Accessory Box › Cutting Module"
+        },
+        {
+          "text": "0.4 mm Normal hotend",
+          "qty": 1,
+          "section": "Tool Box"
+        },
+        {
+          "text": "0.2 mm Induction Hotend",
+          "qty": 1,
+          "section": "Tool Box"
+        },
+        {
+          "text": "0.4 mm Induction Hotend",
+          "qty": 3,
+          "section": "Tool Box"
+        },
+        {
+          "text": "0.6 mm Induction Hotend",
+          "qty": 1,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Silicone Sock for Hotend",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "45° Fine-point Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Blocker",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Weeding Tool",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Scraper",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Spool Holder",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Laser Homing Area XY & Z Marker",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Rubber Screws for Chamber Exhaust Fan",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Camera Privacy Cover",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Desiccant",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Disclaimer and safety guidelines",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Induction Hotend Latch",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "4-In-1 PTFE Adapter",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "4-in-1 PTFE Adapter Filament Cleaning Pad",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Nozzle Cleaning Sponge",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Laser Platform",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Cutting Platform",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "StrongGrip Cutting Mat (Pre-installed on Cutting Platform)",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "LightGrip Cutting Mat (Pre-installed on Cutting Platform)",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Laser Slats Pack",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Material Pins",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Basswood Plywood",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Cork Sheet",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Heat Transfer Vinyl",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Pearlescent White Greeting Card Set",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Rectangular PU Iron-on Patch",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Round Stainless Steel Tag (Large & Small)",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Brush",
+          "qty": null,
+          "section": "Supply Box"
+        },
+        {
+          "text": "Smoke Ventilation Pipe",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        },
+        {
+          "text": "Ventilation Pipe Adapter",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        },
+        {
+          "text": "Pipe Clamp",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        },
+        {
+          "text": "Screws for Ventilation Pipe Adapter",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        },
+        {
+          "text": "Air Pump Intake",
+          "qty": null,
+          "section": "Packaged inside AMS 2 Pro"
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "667505441262432257",
+        "value_text": "H2C AMS Combo"
+      },
+      "source_url": "https://wiki.bambulab.com/en/h2c/acc-in-the-box",
+      "source_title": "H2C Packing List",
+      "retrieved_at": "2026-10-16T08:23:50Z",
+      "locator": "Packing list › table › column \"H2C AMS Combo\" (rows 2–9)",
+      "quote": "Safety Key (attached to the rear board) | Spool Holder and Base Power Cord (inside AMS) 6-pin Cable (inside AMS)",
+      "note": "Rows of the wiki column, in order, as written. The store box list writes the two standard hotends as \"0.4mm Hardened Steel Hotend ×2\" (one pre-installed, store FAQ 1) and adds \"4-in-1 PTFE Adapter II\". The column gives no quantity for the safety key, so none is written.",
+      "items": [
+        {
+          "text": "H2C",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Build Plate (Pre-installed on heatbed)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Safety Key (attached to the rear board)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Spool Holder and Base",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Power Cord (inside AMS)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "6-pin Cable (inside AMS)",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "0.4 mm Normal hotend",
+          "qty": 1,
+          "section": "Tool Box"
+        },
+        {
+          "text": "0.2 mm Induction Hotend",
+          "qty": 1,
+          "section": "Tool Box"
+        },
+        {
+          "text": "0.4 mm Induction Hotend",
+          "qty": 3,
+          "section": "Tool Box"
+        },
+        {
+          "text": "0.6 mm Induction Hotend",
+          "qty": 1,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Silicone Sock for Hotend",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Filament Cutter",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Unclogging Pin",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Wiping Pad",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Blocker",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Scraper Blade",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Induction Hotend Latch",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "4-In-1 PTFE Adapter",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "4-in-1 PTFE Adapter Filament Cleaning Pad",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Nozzle Cleaning Sponge",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Scraper",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Screws for Spool Holder",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Allen Key (H1.5 & H2.0)",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Camera Privacy Cover",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Oil",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "Lubricant Grease",
+          "qty": null,
+          "section": "Tool Box"
+        },
+        {
+          "text": "PTFE Tube",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Desiccant",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Quick Start Guide",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Warranty Leaflet",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "Disclaimer and safety guidelines",
+          "qty": null,
+          "section": ""
+        }
+      ]
+    },
+    {
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "761030943904460801",
+        "value_text": "H2C Vortek Ultimate Bundle"
+      },
+      "source_url": "https://us.store.bambulab.com/products/h2c",
+      "source_title": "Bambu Lab H2C store page",
+      "retrieved_at": "2026-10-16T06:55:29Z",
+      "locator": "Variant 761030943904460802 (H2C Vortek Ultimate Bundle / Standard) › description",
+      "quote": "H2C 3D Printer *1…AMS 2 Pro *2…Vortek Utility Hotends Bundle…0.4 mm Induction hardened Steel Nozzle (RHS)…0.2 mm stainless steel nozzle (LHS)…0.6 mm hardened steel nozzle (LHS)…Filament Track Switch",
+      "note": "Bundle composition from the store's own variant description; the wiki packing list has no column for this bundle, so the contents of the \"H2C 3D Printer\" box are not itemised by an official list. The nozzle quantities (×2, ×1, ×1) are as the description states them; the excerpt leaves them out because the page data encodes \"×\" as \"&times;\".",
+      "items": [
+        {
+          "text": "H2C 3D Printer",
+          "qty": 1,
+          "section": ""
+        },
+        {
+          "text": "AMS 2 Pro",
+          "qty": 2,
+          "section": ""
+        },
+        {
+          "text": "Vortek Utility Hotends Bundle",
+          "qty": null,
+          "section": ""
+        },
+        {
+          "text": "0.4 mm Induction hardened Steel Nozzle (RHS)",
+          "qty": 2,
+          "section": "Vortek Utility Hotends Bundle"
+        },
+        {
+          "text": "0.2 mm stainless steel nozzle (LHS)",
+          "qty": 1,
+          "section": "Vortek Utility Hotends Bundle"
+        },
+        {
+          "text": "0.6 mm hardened steel nozzle (LHS)",
+          "qty": 1,
+          "section": "Vortek Utility Hotends Bundle"
+        },
+        {
+          "text": "Filament Track Switch",
+          "qty": 1,
+          "section": ""
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "kind": "spec_sheet",
+      "url": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+      "title": "H2C Spec Sheet",
+      "retrieved_at": "2026-10-16T08:21:33Z",
+      "sha256": "753948f563faf9459f7da6db08fadaa0b3f8105f32d8564f3eb95014cec80c92",
+      "note": "Linked from the store spec table as \"TDS\" (the package files the link as kind \"tds\"); the document is the H2C spec sheet, 2 pages."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/h2c/acc-in-the-box",
+      "title": "H2C Packing List",
+      "retrieved_at": "2026-10-16T08:23:50Z",
+      "sha256": "530dc7cc1d0eb635d945572e7e92224d67a0893a605f339f925887f7818121f3",
+      "note": "Official packing list."
+    }
+  ],
+  "not_published": [
+    "printing.layer_height",
+    "printing.unsupported_filament",
+    "printing.auto_leveling",
+    "printing.working_area",
+    "electrical.current",
+    "electrical.standby_power",
+    "electrical.steady_state_power",
+    "connectivity.bluetooth",
+    "physical.noise",
+    "package.weight",
+    "package.length",
+    "package.width",
+    "package.height"
+  ]
+}

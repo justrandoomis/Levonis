@@ -1,0 +1,854 @@
+{
+  "handle": "pla-cf",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T11:54:29Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 5 pages read (text layer, page by page): Basic Info, Specifications, Recommended Printing Settings, Physical, Mechanical and Other Physical and Chemical Properties, Specimen Test, Disclaimer. No filament length and no hardness value is given."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/19e99252c17a4812aed4a206e1308618/SDS20260701A50_Bambu_PLA_CF.pdf",
+      "title": "Bambu PLA CF Safety Data Sheet SDS20260701A50",
+      "retrieved_at": "2026-10-16T08:23:22Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 19 pages read. Section 3 gives the composition; section 8 the carbon-fibre handling warning; section 9 says \"No data available\" for melting point, density and the other physical data; section 14 classifies it as not hazardous goods."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA-CF",
+      "retrieved_at": "2026-10-16T08:23:23Z",
+      "keys": [],
+      "note": "One page, 7 colours: read (text and word positions) for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, build plate, glue and storage tables; rows \"PLA-CF/GF\", \"PLA / PLA-CF\" and \"PLA-CF\" name this material. Used as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility table (row \"PLA-CF\"), drying table (row \"PLA CF / Translucent\"), PLA-CF operation tips, HDT remark for PLA in general."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PLA-CF / GF\"."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-cf",
+      "title": "Bambu Lab US store product page: PLA-CF",
+      "retrieved_at": "2026-10-16T06:59:20Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections, FAQ, Download block."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Polylactic acid, carbon fiber",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polylactic acid, carbon fiber",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "The SDS (p.4, section 3) gives the composition as Polylactic acid 90-95 % by wt (CAS 26100-51-6) and carbon fiber 5-10 % by wt (CAS 7440-44-0)."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\"); the tolerance is the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681978921381909",
+        "value_text": "1 kg"
+      },
+      "value": 1,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "Written as 1 kg, the TDS's own figure; the merge stores it as 1000 g with the text \"1 kg\". Scoped to the store page's only Size value \"1 kg\"; agrees with the store page row (option Size › 1 kg)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.22,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.22 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 165,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 165 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 63,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 63 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 69,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 69 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (the TDS row reads \"Vicar Softening Temperature\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 54,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 54 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value. The next row gives 55 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "The PLA wiki (4.1) gives \"a heat deflection temperature of only 57°C\" for PLA filament in general, with no load stated; it is not a PLA-CF value, so the product TDS row is kept."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 38,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 38 ± 4 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 180 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8.4,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 8.4 ± 3.2 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 180 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z"
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 3950,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 3950 ± 190 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 180 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "The store page prose (\"Stiff Enough to Resist Bending\": \"With a stiffness of 3950 MPa\") says the same number; prose proves nothing, the value is the TDS row."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 89,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 89 ± 4 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 180 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z"
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 23.2,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y) (1st row)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 23.2 ± 3.7 kJ/m²; 7.6 ± 2.6 kJ/m²(notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 180 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing). First value of the cell (unnotched); the same cell gives 7.6 ± 2.6 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "The TDS prints a second row also labelled \"Impact Strength (X-Y)\" with 7.8 ± 0.7 kJ/m², where every other property has a (Z) row; it is not stored (see notes)."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 210,
+        "max": 240
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 210 - 240 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "The material-table wiki (2. Nozzle, row \"PLA-CF/GF\") agrees: 210 - 240 °C (±10 °C)."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Cool Plate, High Temperature Plate or Textured PEI Plate, bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "conflict": "The material-table wiki (Build Plate Settings › 3, row \"PLA-CF\") gives 45 - 65 ℃ on every plate, Cool Plate included, and its glue table (row \"PLA / PLA-CF\") 35 - 65 °C. The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 200 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 200 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented. The store page states no print speed for this product."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z"
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Recommended Printing Settings\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "Every other source read agrees and excludes the 0.2 mm nozzle: the material-table wiki (2. Nozzle, row \"PLA-CF/GF\": 0.2 mm \"Not Compatible\", 0.4 mm \"Bambu PLA-CF： Recommended\", 0.6 and 0.8 mm \"Compatible\") and the store page (Cautions for Use: \"0.2 mm Nozzle NOT Compatible\"). The row names no nozzle material; a hardened steel nozzle is required (see the requires relation). The same row is also the compatible_with relation \"0.4, 0.6, 0.8 mm nozzles\"."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h X1 Series Printer Heatbed: 65 - 75 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 Series printer heatbed: 65 - 75 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "The material-table wiki (Storage and Material Specifications, row \"PLA-CF\") agrees: 55 ℃ for 8 h (blast drying oven); AMS 2 Pro and AMS HT 45 ℃ for 12 h. The drying wiki (Appendix I, row \"PLA-CF / GF\") gives a forced-air oven range of 50-60 °C, 8 h, which contains 55 °C.",
+      "conflict": "The PLA wiki (2.1 Drying the Filament, row \"PLA CF / Translucent\") gives 50℃, 8 h in a convection oven (and 70℃, 12 h on a hot bed; 55℃, 8 h in the AMS HT / AMS 2 Pro). The product TDS value is kept."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 55 °C，8 h X1 Series Printer Heatbed: 65 - 75 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 55 °C. The same row gives 12 h on an X1 Series printer heatbed at 65 - 75 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "note": "Every cached source agrees on 8 h in an oven: the material-table wiki (55 ℃ for 8 h), the drying wiki (Appendix I, row \"PLA-CF / GF\": 50-60 °C, 8 h) and the PLA wiki (50℃, 8 h)."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681978921381907",
+        "value_text": "Filament with spool"
+      },
+      "value": "Basic Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/pla-cf",
+      "source_title": "Bambu Lab US store product page: PLA-CF",
+      "locator": "Product Features › bullet 4",
+      "quote": "Comes with Basic Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:59:20Z",
+      "note": "Unverified: an unlabelled store-page bullet. Scoped to the Spool value \"Filament with spool\" (the Refill value has no spool). The TDS (p.1, Specifications) gives the spool as \"ABS (Temperature resistance 70 °C)\", 200 mm diameter, 67 mm height."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Burgundy Red (14200)",
+      "source_value_id": "564681978921381900",
+      "hex": "#951E23",
+      "source_url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA-CF",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Burgundy Red Hex:#951e23",
+      "retrieved_at": "2026-10-16T08:23:23Z"
+    },
+    {
+      "value_text": "Iris Purple (14700)",
+      "source_value_id": "564681978921381906",
+      "hex": "#69398E",
+      "source_url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA-CF",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Iris Purple Hex:#69398E",
+      "retrieved_at": "2026-10-16T08:23:23Z"
+    },
+    {
+      "value_text": "Matcha Green (14500)",
+      "source_value_id": "564681978921381901",
+      "hex": "#5C9748",
+      "source_url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA-CF",
+      "locator": "p.1, row 1, column 3",
+      "quote": "Matcha Green Hex:#5c9748",
+      "retrieved_at": "2026-10-16T08:23:23Z"
+    },
+    {
+      "value_text": "Jeans Blue (14600)",
+      "source_value_id": "564681978921381903",
+      "hex": "#6E88BC",
+      "source_url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA-CF",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Jeans Blue Hex:#6e88bc",
+      "retrieved_at": "2026-10-16T08:23:23Z"
+    },
+    {
+      "value_text": "Royal Blue (14601)",
+      "source_value_id": "564681978921381905",
+      "hex": "#2842AD",
+      "source_url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA-CF",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Royal Blue Hex:#2842AD",
+      "retrieved_at": "2026-10-16T08:23:23Z"
+    },
+    {
+      "value_text": "Lava Gray (14101)",
+      "source_value_id": "564681978921381902",
+      "hex": "#4D5054",
+      "source_url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA-CF",
+      "locator": "p.1, row 2, column 3",
+      "quote": "Lava Gray Hex:#4d5054",
+      "retrieved_at": "2026-10-16T08:23:23Z"
+    },
+    {
+      "value_text": "Black (14100)",
+      "source_value_id": "564681978921381904",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA-CF",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Black Hex:#000000",
+      "retrieved_at": "2026-10-16T08:23:23Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "AMS series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA-CF\" › Component Compatibility",
+      "quote": "PLA-CF | Compatible with hardened steel nozzles; use of 0.4 mm high-flow nozzles is not recommended. | All printers compatible | Only Bambu PLA-CF is compatible with the AMS full series",
+      "note": "The store page says the same (Product Features › Cautions for Use › bullet 3: \"All AMS Series Compatible\"); the material-table wiki (3. AMS & AMS lite) gives \"PLA-CF/GF | Compatible | Compatible | Bambu PLA-CF: Compatible\". The same wiki warns that hard, rough filaments such as PLA-CF/GF \"can easily wear down the internal feed channel of the AMS / AMS lite\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "all_bambu_printers",
+      "target_label": "Open-frame or enclosed printer",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › table › row \"PLA, PETG, TPU …\" › Recommended Printer",
+      "quote": "PLA, PETG, TPU, and their CF/GF reinforced materials (e.g., PLA-CF/GF, PETG-CF/GF, etc.) | Not prone to warping; no mandatory temperature requirements | Open-frame or enclosed printer",
+      "note": "The same page's AMS table gives \"PLA-CF/GF | Compatible | Compatible\" for open-frame (A Series, P1P, etc.) and enclosed (H2 Series, X2D, P2S, X1 Series, P1S, etc.) printers; the PLA wiki row says \"All printers compatible\". Every printer still needs a hardened steel nozzle for this filament (see the requires relation)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-cf",
+      "source_title": "Bambu Lab US store product page: PLA-CF",
+      "retrieved_at": "2026-10-16T06:59:20Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "0.2 mm Nozzle NOT Compatible",
+      "note": "Agreed by every source read: the store FAQ (1.Accessory Compatibility) \"Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm.\"; the material-table wiki (2. Nozzle, row \"PLA-CF/GF\") \"Not Compatible\" for 0.2 mm and \"Do not use a 0.2 mm nozzle. The clogging risk is extremely high.\"; the TDS (p.1) lists Nozzle Size \"0.4, 0.6, 0.8 mm\" only. compat-targets.json lists \"0.2 mm Nozzle\" as reviewed-unresolvable (component concept), so no target handle is named."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hardened steel nozzle",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"PLA-CF/GF\" › Is it necessary to use hardened steel nozzles?",
+      "quote": "PLA-CF/GF | Not Compatible | Bambu PLA-CF： Recommended | Compatible | Compatible | Not Recommended | Compatible | Compatible | Required | 210 - 240 |",
+      "note": "The PLA wiki (PLA-CF › Operation Tips) says \"It is necessary to use a hardened steel nozzle.\" and the material-table wiki's guidelines say \"Always use a hardened steel nozzle\" and \"Do not use a stainless steel or brass nozzle\". The store page is weaker: \"Stainless Steel Nozzle NOT Recommended\" (Cautions for Use › bullet 2). No single store product is \"a hardened steel nozzle\", so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "note": "The material-table wiki (2. Nozzle, row \"PLA-CF/GF\") gives 0.4 mm \"Bambu PLA-CF： Recommended\", 0.6 and 0.8 mm \"Compatible\", 0.4 mm high flow \"Not Recommended\", 0.6 and 0.8 mm high flow \"Compatible\"; the PLA wiki: \"use of 0.4 mm high-flow nozzles is not recommended\". The nozzle must be hardened steel."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "No store product is the plain Bambu Cool Plate (bambu-cool-plate-supertack is a different plate), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (PLA-CF 45 - 65 ℃), which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control Based on Filament Softening Temperature › table › row \"PLA-CF\" › Bambu Engineering Plate",
+      "quote": "PLA-CF | 45 - 65 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃ | 45 - 65 ℃ | If bed > 45 ℃, Recommended",
+      "note": "Conditional: glue required, bed 45 - 65 ℃. The table \"shows the compatible build plates and bed temperatures for different filaments\"; columns: Cool Plate / PLA Plate, Engineering Plate, Smooth PEI / High-Temperature Plate, Textured PEI Plate, upper glass cover removal. The same page: \"The old Engineering Plates are not recommended for printing PLA. All engineering plates currently sold are the new version and can be used with glue.\" The product TDS Bed Type row does not list this plate."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681978921381908",
+        "value_text": "Refill"
+      },
+      "target_kind": "spool",
+      "target_label": "spool",
+      "target_source_handle": "bambu-reusable-spool",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-cf",
+      "source_title": "Bambu Lab US store product page: PLA-CF",
+      "retrieved_at": "2026-10-16T06:59:20Z",
+      "locator": "Printing Tips (FAQ) › 3.Refill Guidelines",
+      "quote": "The refill filament needs to be used with a spool.",
+      "note": "Scoped to the Refill value: the \"Filament with spool\" value comes on a spool. The same FAQ points to the wiki guide on swapping the new filament with the Bambu Reusable Spool."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+      "title": "Bambu Filament Technical Data Sheet V2.0: PLA-CF",
+      "retrieved_at": "2026-10-16T08:23:20Z",
+      "sha256": "1939edfb494813529cd5324854975b0248e662af8adc11045599257f08bffae3"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/19e99252c17a4812aed4a206e1308618/SDS20260701A50_Bambu_PLA_CF.pdf",
+      "title": "Bambu PLA CF Safety Data Sheet SDS20260701A50",
+      "retrieved_at": "2026-10-16T08:23:22Z",
+      "sha256": "df8992d07e5badc4142d6f3820da0d0b62d641f1f89632b9e0f04ddcfdf76bcd"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/98df744e02e04d8599956b4fe8b19ff4/PLA-CF_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA-CF",
+      "retrieved_at": "2026-10-16T08:23:23Z",
+      "sha256": "3796d754585074ce853ff7c0731247b0462d75117d15a0ae32ea2d70d189cb97"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values (Mechanical Properties; \"All the specimens were printed at the following settings\", annealed and dried at 55 °C for 8 h before testing); the registry has one key per scope, so the Z values (tensile 26 ± 2 MPa, elongation 3.6 ± 0.7 %, bending modulus 2260 ± 180 MPa, bending strength 49 ± 3 MPa) are not stored. Density, melting and glass transition are material properties (ISO 1183, DSC) under material.* / thermal.*. Vicat (ISO 306) and HDT (ISO 75) are TDS \"Physical Properties\" rows under thermal.*; the TDS does not say whether its specimen note covers them, so they are labelled neither raw-material nor printed. No printed-specimen value shares a key with a material property.",
+    "TDS anomaly left to review: the Mechanical Properties table has two rows labelled \"Impact Strength (X-Y)\": the first \"23.2 ± 3.7 kJ/m²; 7.6 ± 2.6 kJ/m²(notched)\", the second \"7.8 ± 0.7 kJ/m²\". By the table's pattern the second is probably the Z row, but the TDS does not say so; it is not stored.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 2790 ± 120 MPa, Z 2160 ± 90 MPa), melt index (3.7 ± 0.6 g/10 min at 210 °C, 2.16 kg), crystallization temperature (N/A), heat deflection temperature 55 °C at 0.45 MPa, saturated water absorption rate (0.42% at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed with desiccant), bed surface preparation (glue), retraction length (0.6 - 1.0 mm) and speed (20 - 40 mm/s), chamber temperature (25 - 45 °C), max overhang angle (55°), max bridging length (30 mm), support material (Support for PLA), spool material (ABS, temperature resistance 70 °C) and spool size (diameter 200 mm, height 67 mm), suggested annealing (55 to 60 °C, 6 to 12 hours), odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows.",
+    "The TDS recommended chamber temperature (25 - 45 °C) is not written to thermal.chamber_temp: that key is a printer capability (number, template field chamber_temp_max), not a filament print setting.",
+    "SDS facts not stored: product name \"Bambu PLA CF\"; the model designation \"A50-xx (xx stands for any suffix)\" (p.2, section 1), a code pattern rather than one model, so identity.model is not written (the builder writes it from the reviewed identity map, and a curated official_doc row would replace that); CLP \"Not classified\", the section 8 carbon-fibre handling warning (gloves when loading, cutting or sanding), and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO/IATA) transport. Its section 8 also reads \"carbon fiber-reinforced filament （Glass fiber-reinforced filament)\", a wording slip in the SDS. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Source disagreements kept for review: bed temperature (TDS 35 - 45 °C on all three bed types vs material-table wiki 45 - 65 ℃ on every plate for PLA-CF, and 35 - 65 °C in its glue table); oven drying temperature (TDS and material-table wiki 55 °C, drying wiki 50-60 °C, PLA wiki 50℃). The product TDS values are kept.",
+    "Nozzle guidance: the store page says \"Stainless Steel Nozzle NOT Recommended\"; both wiki pages say a hardened steel nozzle is required, and the material-table wiki recommends the 0.4 mm hardened steel nozzle first for Bambu PLA-CF. The 0.4 mm high-flow nozzle is \"Not Recommended\" (material-table wiki; PLA wiki: \"use of 0.4 mm high-flow nozzles is not recommended\"); \"not recommended\" is not \"not compatible\", so no relation is written for it.",
+    "The TDS \"Support Material: Support for PLA\" is a recommended setting, not a stated requirement, so no relation is written; the store has no product with handle support-for-pla (support-for-pla-petg is a different product).",
+    "Marketing prose proves no number: \"With a stiffness of 3950 MPa\" (store page) matches the TDS bending modulus but is not the source of the value; \"Improved Mechanical Properties\", \"Stabilized Printing Dimension\" and \"low shrinkage and excellent warping resistance\" are not stored as values.",
+    "Hex: all 7 store colours have exactly one hex cell, matched by the colour name without the code in parentheses. The table prints four codes in lower case (#951e23, #5c9748, #6e88bc, #4d5054); they are stored upper-case for the published_hex CHECK, and each quote keeps the table's own spelling.",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/927b92a153514ded9e49b6c40ab85d79.pdf) that was not cached and not read (a compliance test report), so safety.certifications is neither curated nor marked not_published.",
+    "The store page also links the wiki guide https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool, which was not cached and not read.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 5); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "The store FAQ (5.Safety Tips) says the filament \"is not food-grade\" and warns of hard microscopic splinters; no registry key holds these.",
+    "Adjudication against the second extraction (45 field disagreements), each disputed fact re-read in the cached document it cites. Same fact, this file's form kept: locator wording (impact strength, the 7 hex cells, the hardened-steel nozzle cell), the plate target labels (the TDS's own words), the printer-class relation (target_kind family: a class of printers, same wiki row), the refill relation's target label \"spool\" (handle bambu-reusable-spool) and its locator, which names the page's visible section \"Printing Tips\" (the FAQ block). Kept: material.type \"Polylactic acid, carbon fiber\" (TDS p.3 Composition), not \"PLA-CF\" from the Basic Info prose; thermal.heat_deflection_temp the 1.8 MPa row (54 °C), as in every other filament file, the 0.45 MPa row (55 °C) noted; material.spool_type the store bullet \"Basic Reusable Spool\" (unverified), since the TDS row \"Spool Material ABS (Temperature resistance 70 °C)\" gives the spool's material, not its type; the 0.2 mm nozzle relation on the product's own store page (Cautions for Use › bullet 1; the material-table wiki row and the store FAQ say the same); AMS compatibility as one AMS-series family relation (PLA wiki: \"Only Bambu PLA-CF is compatible with the AMS full series\"; the material-table wiki's AMS / AMS lite column and the store page's \"All AMS Series Compatible\" agree; the page builder already writes one relation per AMS unit from that bullet) rather than four curated ones; the TDS Nozzle Size row also as the compatible_with relation. Not added: thermal.chamber_temp (see above: a printer key typed as one number, the TDS gives a 25 - 45 °C range) and identity.model \"A50-xx\" from the SDS (a code pattern, see above; no filament file stores it). Taken from the second extraction after reading the documents: extrusion.supported_nozzle_diameters [0.4, 0.6, 0.8 mm] (TDS p.1 \"Nozzle Size 0.4, 0.6, 0.8 mm\"; the registry key applies to every product type) and compatible_with Engineering Plate (material-table wiki, Build Plate Settings › 3, row \"PLA-CF\": \"45 - 65 ℃ Glue Required\"). material.net_weight is written as 1 kg, the TDS's own figure (the merge stores 1000 g, text \"1 kg\", as the second extraction's 1000 g would)."
+  ]
+}

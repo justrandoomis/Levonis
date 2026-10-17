@@ -1,0 +1,708 @@
+{
+  "handle": "bambu-smooth-pei-plate",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T15:45:22Z",
+  "searched": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "keys": [
+        "product.*",
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "package.contents",
+        "compat.statement"
+      ],
+      "note": "Cached copy read in full from the HTML (the text extract drops the tabbed \"Build Plate Types\" panels): Build Plate (dimensions table, Important Notice on 256x256 plate generations), the Smooth PEI Plate tab and its Features, Appendix. The Smooth PEI tab has no size table of its own and states no weight, thickness table or package contents."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "printing.supported_filament",
+        "printing.unsupported_filament",
+        "part.max_temperature",
+        "compat.statement"
+      ],
+      "note": "Cached copy read in full; the plate facts are in \"Build Plate Settings\" (glue/bed-temperature table, and the build plate / bed temperature table with the \"Bambu Smooth PEI / High-Temperature Plate\" column)."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "title": "Bambu Smooth PEI Plate (store page)",
+      "retrieved_at": "2026-10-16T07:08:52Z",
+      "keys": [
+        "part.*",
+        "physical.*",
+        "printing.*",
+        "product.*",
+        "package.*",
+        "compat.statement"
+      ],
+      "note": "Corpus copy parsed with extractPage/buildImportPayload (legacy_html): Product Specifications (6 rows), description incl. Recommended Settings and Considerations, the Product Features update, one option value (Compatibility: A1 mini). No net weight and no in-the-box list."
+    }
+  ],
+  "specs": [
+    {
+      "key": "part.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Smooth PEI Plate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › \"Build Plate Types\" list › item 2",
+      "quote": "Currently, Bambu Lab build plates mainly include the following types: … Smooth PEI Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plate type as the wiki names it in its list of build plate types (item 2); its own tab carries the same name. The tab's first paragraph gives the construction (\"a carefully selected PEI sheet to a spring steel using a highly heat-resistant 3M adhesive\"), which agrees with the store's Material row, written below as part.material."
+    },
+    {
+      "key": "part.material",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Smooth PEI Sheet + Magnetic Spring Steel Plate",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Product Specifications › row 1 (Material)",
+      "quote": "Material | Smooth PEI Sheet + Magnetic Spring Steel Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:52Z",
+      "note": "The store table row, as published; the deterministic page row carries the same value (same rank, so the merge keeps it unchanged). The wiki states the same construction (PEI sheet adhered to spring steel)."
+    },
+    {
+      "key": "part.surface_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Smooth PEI",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Product Specifications › row 1 (Material) › first component",
+      "quote": "Material | Smooth PEI Sheet + Magnetic Spring Steel Plate",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:52Z",
+      "note": "The surface layer the store table row names (the Smooth PEI sheet over the spring steel). The wiki says the same: \"The PEI sheet on the surface of the Smooth PEI Plate allows for printing with various filaments.\""
+    },
+    {
+      "key": "product.length",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "value": 180,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 4",
+      "quote": "180*180 mm | A1 mini",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (the Smooth PEI Plate is one of the listed types). The store page sells only the A1 mini option, and its \"Usable Print Size\" row lists the same 180*180mm among its three sizes. First number of the cell."
+    },
+    {
+      "key": "product.width",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "value": 180,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 4",
+      "quote": "180*180 mm | A1 mini",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:23:03Z",
+      "note": "The plates wiki gives one build-plate size per printer model for every Bambu build plate (the Smooth PEI Plate is one of the listed types). The store page sells only the A1 mini option, and its \"Usable Print Size\" row lists the same 180*180mm among its three sizes. Second number of the cell."
+    },
+    {
+      "key": "part.max_temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 120,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Product Specifications › row 2 (Surface Temperature Resistance)",
+      "quote": "Surface Temperature Resistance | Up to 120℃",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:52Z",
+      "note": "The store table row the deterministic parser keeps as x.surface_temperature_resistance (\"Up to 120℃\", unverified): same figure, mapped to the registry key. The wiki material table agrees: its highest Smooth PEI bed temperature is 120 ℃ (PC, PA, PPS rows)."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "PLA",
+        "PLA Metal / Wood / Marble",
+        "PLA-CF",
+        "PVA",
+        "TPU",
+        "PETG / PETG HF / PETG Translucent",
+        "PETG-CF",
+        "ABS",
+        "ASA",
+        "PC",
+        "PA",
+        "PA-CF/GF",
+        "PA6-CF/GF",
+        "PAHT-CF/GF",
+        "PET-CF/GF",
+        "PPA-CF/GF",
+        "PPS",
+        "PPS-CF/GF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › column \"Bambu Smooth PEI / High-Temperature Plate\" (all 16 rows give a temperature)",
+      "quote": "The table below shows the compatible build plates and bed temperatures for different filaments … Bambu Smooth PEI / High-Temperature Plate … PA-CF/GF, PA6-CF/GF PAHT-CF/GF",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "note": "Every material row of \"the compatible build plates and bed temperatures for different filaments\" table has a bed temperature in the Smooth PEI column (none says \"Not recommended\"). Row labels kept as written; the \"PA-CF/GF, PA6-CF/GF / PAHT-CF/GF\" cell is split at its comma and line break. The store page's Recommended Settings table (not a spec row of the parsed page) also names PLA-GF and PC-CF and omits PPA and PPS; those two extra materials are kept as relations with store evidence."
+    },
+    {
+      "key": "printing.supported_filament",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "value": [
+        "PLA/PLA-CF/PLA-GF",
+        "PETG/PETG-CF",
+        "TPU",
+        "PVA"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Description › Recommended Settings table › Materials column › rows 1, 2, 5, 6",
+      "quote": "PLA/PLA-CF/PLA-GF … PETG/PETG-CF … TPU … PVA",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:52Z",
+      "note": "The store's own plate table lists these four material rows without \"(not for A1 mini)\"; the A1 mini is the only option the page sells. The five marked rows are printing.unsupported_filament for the same option. Row labels kept as written."
+    },
+    {
+      "key": "printing.unsupported_filament",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "value": [
+        "ABS",
+        "ASA",
+        "PC/PC-CF",
+        "PA/PA-CF/PAHT-CF",
+        "PET-CF"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Description › Recommended Settings table › Materials column › rows 3, 4, 7, 8, 9",
+      "quote": "ABS (not for A1 mini) … ASA (not for A1 mini) … PC/PC-CF (not for A1 mini) … PA/PA-CF/PAHT-CF (not for A1 mini) … PET-CF (not for A1 mini)",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:08:52Z",
+      "note": "The store's own plate table marks these five material rows \"(not for A1 mini)\"; the A1 mini is the only option the page sells."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "printer",
+      "target_label": "A1 mini",
+      "target_source_handle": "a1-mini",
+      "note": "The plates wiki gives the 180*180 mm plate for the A1 mini. The store page states the same through its only option value (next relation); the deterministic layer also writes that one from the option value.",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate › Build Plate Dimensions table (Dimensions | Compatible Models) › row 4",
+      "quote": "180*180 mm | A1 mini",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "printer",
+      "target_label": "A1 mini",
+      "target_source_handle": "a1-mini",
+      "note": "The page's only option value (Compatibility: A1 mini); its \"Installation Steps for A1 mini\" section names the same printer.",
+      "evidence_kind": "option_value",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Product options › Compatibility › value 1 of 1",
+      "quote": "Compatibility A1 mini",
+      "retrieved_at": "2026-10-16T07:08:52Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 1, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PLA | 35 - 45 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA Metal / Wood / Marble",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 2, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PLA Metal / Wood / Marble | 35 - 45 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-CF",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 3, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PLA-CF | 45 - 65 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PVA",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 4, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PVA | 35 - 45 ℃ | 45 - 65 ℃ Glue Required | 45 - 65 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "TPU",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 5, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "TPU | Not recommended | 30 - 35 ℃ | 35 - 45 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG / PETG HF / PETG Translucent",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 6, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PETG / PETG HF / PETG Translucent | Not recommended | 60 - 80 ℃ | 60 - 80 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PETG-CF",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 7, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PETG-CF | Not recommended | 60 - 80 ℃ | 60 - 80 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 8, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "ABS | Not recommended | 90 - 100 ℃ | 90 - 100 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 9, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "ASA | Not recommended | 90 - 100 ℃ | 90 - 100 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PC",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 10, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PC | Not recommended | 100 - 120 ℃ | 100 - 120 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PA",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 11, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PA | Not recommended | 100 - 120 ℃ | 100 - 120 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PA-CF/GF, PA6-CF/GF, PAHT-CF/GF",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 12, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PA-CF/GF, PA6-CF/GF PAHT-CF/GF | Not recommended | 100 - 120 ℃ | 100 - 120 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF/GF",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 13, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PET-CF/GF | Not recommended | 80 - 120 ℃ | 100 - 120 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PPA-CF/GF",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 14, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PPA-CF/GF | Not recommended | 100 - 120 ℃ | 100 - 120 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PPS",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 15, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PPS | Not recommended | 100 - 120 ℃ | 100 - 120 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PPS-CF/GF",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters | Bambu Lab Wiki",
+      "locator": "Build Plate Settings › 3. Chamber Temperature Control › build plate / bed temperature table › row 16, column \"Bambu Smooth PEI / High-Temperature Plate\"",
+      "quote": "PPS-CF/GF | Not recommended | 100 - 120 ℃ | 100 - 120 ℃",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PLA-GF",
+      "note": "Named only by the store page; the wiki table has no PLA-GF row.",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Description › Recommended Settings table (Materials | Heatbed Temperature | Glue Stick Required?) › row 1",
+      "quote": "PLA/PLA-CF/PLA-GF | 45~60℃ | No",
+      "retrieved_at": "2026-10-16T07:08:52Z"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "PC-CF",
+      "note": "Named only by the store page (the wiki table has PC only); the same row excludes the A1 mini (see not_compatible_with).",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Description › Recommended Settings table (Materials | Heatbed Temperature | Glue Stick Required?) › row 7",
+      "quote": "PC/PC-CF (not for A1 mini) | 90~110℃ | Glue Stick",
+      "retrieved_at": "2026-10-16T07:08:52Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Description › Recommended Settings table (Materials | Heatbed Temperature | Glue Stick Required?) › row 3",
+      "quote": "ABS (not for A1 mini) | 90~100℃ | Glue Stick/Liquid Glue",
+      "retrieved_at": "2026-10-16T07:08:52Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "ASA",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Description › Recommended Settings table (Materials | Heatbed Temperature | Glue Stick Required?) › row 4",
+      "quote": "ASA (not for A1 mini) | 90~100℃ | Glue Stick/Liquid Glue",
+      "retrieved_at": "2026-10-16T07:08:52Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "PC/PC-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Description › Recommended Settings table (Materials | Heatbed Temperature | Glue Stick Required?) › row 7",
+      "quote": "PC/PC-CF (not for A1 mini) | 90~110℃ | Glue Stick",
+      "retrieved_at": "2026-10-16T07:08:52Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "PA/PA-CF/PAHT-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Description › Recommended Settings table (Materials | Heatbed Temperature | Glue Stick Required?) › row 8",
+      "quote": "PA/PA-CF/PAHT-CF (not for A1 mini) | 90~110℃ | Glue Stick",
+      "retrieved_at": "2026-10-16T07:08:52Z"
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681849522909185",
+        "value_text": "A1 mini"
+      },
+      "target_kind": "material",
+      "target_label": "PET-CF",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Description › Recommended Settings table (Materials | Heatbed Temperature | Glue Stick Required?) › row 9",
+      "quote": "PET-CF (not for A1 mini) | 80~100℃ | Glue Stick/Liquid Glue",
+      "retrieved_at": "2026-10-16T07:08:52Z"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "Glue Stick/Liquid Glue",
+      "condition": "only when printing filaments other than PLA",
+      "note": "Conditional requirement, not an unconditional accessory. The store page says the same (\"Note: Please apply glue to prevent the sheet from tearing if printing with filaments other than PLA.\") and its Recommended Settings table names \"Glue Stick/Liquid Glue\" (PETG, ABS, ASA, TPU, PVA, PET-CF) or \"Glue Stick\" (PC, PA). Candidate targets glue-stick-for-build-plate / liquid-glue-for-build-plate are not in compat-targets.json, so the label stays unresolved.",
+      "evidence_kind": "curated",
+      "source_url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "source_title": "Introduction to Bambu Lab Build Plates | Bambu Lab Wiki",
+      "locator": "Build Plate Types › Smooth PEI Plate tab › paragraph 3 (bold)",
+      "quote": "Only PLA filament does not require glue, while printing with other filaments requires the use of gluing to prevent the PEI sheet from tearing.",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "relation": "related",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Bambu Engineering Plate",
+      "target_source_handle": "bambu-engineering-plate",
+      "note": "The store names the Engineering Plate as the recommended replacement for the discontinued X1/P1/A1/P2S/X2D/H2 sizes; the notice links to the bambu-engineering-plate page.",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/bambu-smooth-pei-plate",
+      "source_title": "Bambu Smooth PEI Plate (store page)",
+      "locator": "Product features › \"Important Product Update\" › paragraph 1",
+      "quote": "Smooth PEI Plate for X1/P1/A1/P2S/X2D/H2 Series is no longer available. The new Bambu Engineering Plate is our recommended replacement.",
+      "retrieved_at": "2026-10-16T07:08:52Z"
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/acc/plates",
+      "title": "Introduction to Bambu Lab Build Plates",
+      "text": "Introduction to Bambu Lab Build Plates",
+      "retrieved_at": "2026-10-16T08:23:03Z"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "text": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z"
+    }
+  ],
+  "not_published": [
+    "product.net_weight",
+    "package.contents"
+  ],
+  "notes": [
+    "The store page now sells one option only, Compatibility: A1 mini. Its Product Features update says the Smooth PEI Plate for X1/P1/A1/P2S/X2D/H2 Series is no longer available and names the Bambu Engineering Plate as the replacement; option-scoped values are therefore given for the A1 mini value only.",
+    "Store \"Usable Print Size\" (350*320mm / 256*256mm / 180*180mm), \"Packaging Size\" (408*388*17mm / 300*270*17mm / 220*190*15mm) and \"Packaging Weight\" (0.822kg / 0.45kg / 0.23kg) list three sizes with no option labels. The packaging values are not mapped to the A1 mini option (that would rest on row order only); they stay the page's product-scope unverified rows.",
+    "Thickness: the store table gives \"Smooth PEI Sheet - 0.125mm / Spring Steel Plate - 0.5mm/0.4mm\" without saying which size has which steel; the store description and the wiki say 0.5 mm spring steel. No curated physical.thickness: the A1 mini value is not stated. The page row (unverified) keeps the composite text; its value_num 0.125 is the PEI sheet only.",
+    "Material: the wiki (\"a carefully selected PEI sheet ... spring steel ... 3M adhesive\") agrees with the store's Material row (\"Smooth PEI Sheet + Magnetic Spring Steel Plate\"), written as part.material with the same value as the page row; the surface layer it names is part.surface_type \"Smooth PEI\".",
+    "Plates wiki Important Notice (two generations, QR code recognition) concerns the 256x256 mm plates only, not the A1 mini size.",
+    "Store Considerations: higher curling risk \"with the Smooth PEI Plate on the A1\" (not the A1 mini; the A1 option is not sold); maintenance advice (bubbles: heat at no less than 80 degrees; no acetone; 600-grit sanding) is prose, not a spec.",
+    "Bed temperatures per filament on this plate (wiki 35-120 ℃ by material; store 35~110℃) have no plate-type registry key (print_settings.bed_temp is filament-only); they are kept as the quotes of the material relations.",
+    "Adjudication (second extraction): taken — compatible_with A1 mini with the store's option value as evidence (beside the wiki row). Not taken — physical.thickness as the composite store text (a string on a number key would make a false conflict with the page row's 0.125); printing.usable_print_size at product scope (the page row already carries the same text); printing.usable_print_size \"180*180 mm\" for A1 mini cited to the wiki (the wiki calls it the build plate dimensions, kept as product.length/width; the store row names no option); package.length/width/height/weight for A1 mini (the store rows name no option, so only row order would tie them to it)."
+  ]
+}

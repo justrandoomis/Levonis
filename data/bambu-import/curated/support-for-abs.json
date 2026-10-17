@@ -1,0 +1,699 @@
+{
+  "handle": "support-for-abs",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T13:19:34Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 3 pages read (the text layer page by page; p.1 viewed as an image): Basic Info, Specifications, Recommended Printing Settings, Physical Properties, Mechanical Properties (every row \"N/A\"), Other Physical and Chemical Properties, Disclaimer. No filament length, no hardness and no certification is given."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/3de1308c7f99453d827115f85da3ec3f/SDS20250723S06_Bambu_Support_for_ABS.pdf",
+      "title": "Bambu Support for ABS Safety Data Sheet SDS20250723S06",
+      "retrieved_at": "2026-10-16T08:24:44Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read (p.1 is a scanned cover without a text layer, viewed as an image; p.4 viewed as an image to confirm the composition table). Section 3 gives the composition (high impact polystyrene 95-99 %, additive 1-5 %); section 9 says \"No data available\" for melting point, density and the other physical data; section 2 \"Not classified\"; section 14 \"Not hazardous goods\" (IMDG, DOT, ADR/RID, ICAO-TI/IATA)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Every table read (printer, nozzle, AMS, build plate and glue, chamber, storage and material specifications): none has a Support for ABS (or HIPS) row; the ABS rows describe the ABS filament, not this product, and are not used."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Filament Overview (row \"Support for ABS\"), Hardware Compatibility (row \"Support for ABS\"), 2.1 drying table (row \"Support for ABS\"), 3.1 Support for ABS parameter notes, 4.1.3 removal with d-limonene, 4.2 storage. No material, mechanical or thermal numbers for this filament."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"Support for ABS\": drying before use and desiccant during use \"Not required but recommended\", heatbed 85-95 ℃ 6 h (flip every 3 hours), forced-air oven 80 ℃ 4 h, AMS 2 Pro \"Not compatible\", AMS HT 80 ℃ 4 h."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/support-for-abs",
+      "title": "Support for ABS Printing Guide",
+      "retrieved_at": "2026-10-16T08:26:33Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Whole guide read (Important notes, Preset Profiles, Preparation, Setting support parameters, H2D notes, Solubility). It gives the main component (HIPS), the 800 flushing volume, the H2D settings for the ABS filament and the d-limonene solubility; no material, mechanical, thermal, print-temperature or drying numbers."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/support-for-abs",
+      "title": "Bambu Lab US store product page: Support for ABS",
+      "retrieved_at": "2026-10-16T07:02:49Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, the page-builder description (banner, two feature blocks, RFID block, Download, Printing Tips). No spec table and no What's in the Box list on this page."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "HIPS",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.2, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition HIPS",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "The SDS agrees (SDS20250723S06 p.4, section 3 Composition: \"High impact polystyrene\" 95-99 % by wt, CAS 9003-53-6, EINECS 202-851-5; additive 1-5 %), and both wiki guides say \"The main component of Support for ABS is High Impact Polystyrene (HIPS)\". The product is a support material for ABS models; it is not ABS."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "Agrees with the store page (Product Features › bullet 4: \"Diameter: 1.75mm +/- 0.05mm\"); the tolerance ± 0.05 mm comes from the store page only and is already written by the page layer."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681958767751172",
+        "value_text": "0.5 kg"
+      },
+      "value": 0.5,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 0.5 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "Scoped to the store page's only Size value \"0.5 kg\"; agrees with the store page row (option Size › 0.5 kg, 500 g). Written as 0.5 kg, the TDS's own figure: mergeCurated stores 500 g with the text \"0.5 kg\"."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.16,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.16 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\", tested by Bambu Lab on standard samples)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "The SDS (p.9, section 9) says \"Density : No data available.\" The store page states no density."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 195,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 195 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\", tested by Bambu Lab on standard samples)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "The SDS (p.9, section 9) says \"Melting Point : No data available.\" No other source states a melting temperature."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 240,
+        "max": 270
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 240 - 270 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; nozzle size 0.4, 0.6, 0.8 mm",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "The store page states no nozzle temperature, and the material-table wiki has no row for Support for ABS. (The 240-250 °C in the support wiki 2.2.1 belongs to the PVA notes, not to this filament.)"
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 80,
+        "max": 100
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 80 - 100°C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Cool Plate, High Temperature Plate or Textured PEI Plate; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "No other cached source gives a bed temperature for this filament (the material-table wiki's build-plate tables have no Support for ABS row)."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 100 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 100 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "Kept as text: the TDS gives only an upper bound."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "For the ABS model filament printed with it on an H2D, the support wiki (3.1) and the Support for ABS guide say to raise the ABS min fan speed threshold to 50%; that is an ABS setting, not this filament's."
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "The plain Cool Plate, not the Cool Plate SuperTack, which the store page's Printing Tips mark not compatible. The support wiki (Hardware Compatibility, row \"Support for ABS\") says \"Build Plate Compatibility: Compatible with all build plates.\""
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Recommended Printing Settings\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "Added at adjudication from the TDS (p.1, row \"Nozzle Size\"), which the second extraction also read; the same row stays the nozzle relation. It agrees with the support wiki (Hardware Compatibility, row \"Support for ABS\": \"Nozzle Compatibility: 0.2 mm nozzles not recommended.\") and the store Printing Tips (not compatible with the Hotend with Stainless Steel Nozzle 0.2 mm)."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 80,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C，4 h X1 Series Printer Heatbed: 85 - 95 °C, 6 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 4 h, before printing. The same row gives X1 Series printer heatbed: 85 - 95 °C, 6 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "Every cached source agrees for the oven: the support wiki (2.1 Filament Drying, row \"Support for ABS\": convection oven 80 °C, 4 h) and the drying wiki (Appendix I, row \"Support for ABS\": forced-air oven 80 ℃, 4 h). Not stored (one value per key): heatbed 85 - 95 °C, 6 h (TDS line 2, support wiki, drying wiki) and AMS HT 80 ℃, 4 h (support wiki 2.1, drying wiki Appendix I)."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 4,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 80 °C，4 h X1 Series Printer Heatbed: 85 - 95 °C, 6 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 80 °C, before printing. The same row gives 6 h on an X1 Series printer heatbed at 85 - 95 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "note": "The support wiki (2.1, convection oven 80 °C, 4 h) and the drying wiki (Appendix I, forced-air oven 80 ℃, 4 h) agree. The heatbed alternative takes 6 h (not stored)."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "High Temperature Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/support-for-abs",
+      "source_title": "Bambu Lab US store product page: Support for ABS",
+      "locator": "Product Features › bullet 3",
+      "quote": "Comes with High Temperature Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:02:49Z",
+      "note": "From a feature bullet (prose), so unverified. The TDS (p.1, Specifications) gives the spool material \"PC + ABS (Temperature resistance 90 °C)\" and spool size \"Diameter: 200 mm; Height: 67 mm\" (no registry keys)."
+    }
+  ],
+  "hex": [],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-abs",
+      "source_title": "Bambu Lab US store product page: Support for ABS",
+      "retrieved_at": "2026-10-16T07:02:49Z",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "For feeding. Drying in the AMS 2 Pro disagrees between the wiki pages: the support wiki (2.1) gives \"AMS 2Pro: 65°, 4h\", the drying wiki (Appendix I, row \"Support for ABS\") gives \"Not compatible\" in both AMS 2 Pro columns; the support wiki adds that AMS 2 Pro \"cannot completely dry the filament\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-abs",
+      "source_title": "Bambu Lab US store product page: Support for ABS",
+      "retrieved_at": "2026-10-16T07:02:49Z",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "The support wiki (2.1) and the drying wiki (Appendix I) give AMS HT drying at 80 ℃, 4 h."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-abs",
+      "source_title": "Bambu Lab US store product page: Support for ABS",
+      "retrieved_at": "2026-10-16T07:02:49Z",
+      "locator": "Product Features › Cautions for Use › bullet 4",
+      "quote": "AMS 2 Pro, AMS HT & AMS Compatible",
+      "note": "The TDS Basic Info says \"Fully compatible with the AMS systems\" (prose)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-abs",
+      "source_title": "Bambu Lab US store product page: Support for ABS",
+      "retrieved_at": "2026-10-16T07:02:49Z",
+      "locator": "Product Features › Cautions for Use › bullet 5",
+      "quote": "AMS lite NOT Compatible",
+      "note": "The support wiki agrees (Hardware Compatibility, row \"Support for ABS\": \"Accessory Compatibility: AMS Lite not compatible.\")."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "A1 Series",
+      "target_family": "a1_series",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "Hardware Compatibility › Support Filament Compatibility Overview › row \"Support for ABS\"",
+      "quote": "Printer Compatibility: Same as above (not compatible with A1 series or P1P).",
+      "note": "The store page says \"Enclosure Printers Required\" (Cautions for Use › bullet 3)."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "printer",
+      "target_label": "P1P",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "Hardware Compatibility › Support Filament Compatibility Overview › row \"Support for ABS\"",
+      "quote": "Printer Compatibility: Same as above (not compatible with A1 series or P1P).",
+      "note": "P1P is not on the US store, and the reviewed data/bambu-import/compat-targets.json gives the label \"P1P\" no target (reason no_target_in_levonis_or_source; levonis_existing_printers: not_in_levonis), so it stays text with no target handle."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "Enclosed printer",
+      "target_family": "",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/support-for-abs",
+      "source_title": "Bambu Lab US store product page: Support for ABS",
+      "retrieved_at": "2026-10-16T07:02:49Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "Enclosure Printers Required",
+      "note": "No reviewed family id exists for enclosed printers. The Support for ABS guide says \"Print on a printer with an enclosed chamber.\" and the store Printing Tips (4.Ventilation & Odor Notice) say \"Make sure your printer is enclosed\"; the TDS gives a chamber temperature of 25 - 45 °C."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate SuperTack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/support-for-abs",
+      "source_title": "Bambu Lab US store product page: Support for ABS",
+      "retrieved_at": "2026-10-16T07:02:49Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "conflict": "The support wiki (Hardware Compatibility, row \"Support for ABS\") says \"Build Plate Compatibility: Compatible with all build plates.\"; the product page's specific exclusion is kept and left to review."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Stainless Steel Nozzle 0.2 mm",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/support-for-abs",
+      "source_title": "Bambu Lab US store product page: Support for ABS",
+      "retrieved_at": "2026-10-16T07:02:49Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility",
+      "quote": "Not compatible with Cool Plate SuperTack, and Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "note": "The support wiki (row \"Support for ABS\") words it more softly: \"Nozzle Compatibility: 0.2 mm nozzles not recommended.\"; the TDS Nozzle Size row lists 0.4, 0.6, 0.8 mm only. compat-targets.json reviews \"0.2 mm Nozzle\" as unresolvable (component concept), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "note": "Nozzle sizes are option values of several hotend products, so no single target handle is named. The TDS names no nozzle material. The same row is stored as extrusion.supported_nozzle_diameters."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "Not the Cool Plate SuperTack, which the store page marks not compatible; no manifest handle is the plain Cool Plate. Bed surface preparation: glue (TDS p.1)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads its plate column \"Bambu Smooth PEI / High-Temperature Plate\", which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "ABS",
+      "target_source_handle": "abs-filament",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/support",
+      "source_title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "locator": "1. Basic Information of Support Filaments › Filament Overview › row \"Support for ABS\"",
+      "quote": "Support for ABS | ABS | Insoluble in water but soluble in limonene; suitable for cases where manual support removal is inconvenient. |",
+      "condition": "As the support interface material for a model printed in this filament",
+      "note": "The support wiki (3.1) and the Support for ABS guide recommend a flushing volume of 800 when switching from Support for ABS to ABS; the store Printing Tips say \"above 800 mm³\" when layer strength is required."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/4ea7b59ca78c485f828115735ed35050.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: Support for ABS",
+      "retrieved_at": "2026-10-16T08:24:42Z",
+      "sha256": "35f3f69ae2f5097c2d9ef0d7a928a48dc25b478fb01d8b5cf0ac2a9d9904e655"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/3de1308c7f99453d827115f85da3ec3f/SDS20250723S06_Bambu_Support_for_ABS.pdf",
+      "title": "Bambu Support for ABS Safety Data Sheet SDS20250723S06",
+      "retrieved_at": "2026-10-16T08:24:44Z",
+      "sha256": "eca77c1bcd030e2fedde63c1842091c7079cf12855567b77c1fd58e79aec3ed4"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/support",
+      "title": "Support Filament Usage Guide",
+      "retrieved_at": "2026-10-16T08:25:40Z",
+      "sha256": "279858daaace7d8123091b076c9031bb93306f439696bee26e56b53a7dcf5362"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/support-for-abs",
+      "title": "Support for ABS Printing Guide",
+      "retrieved_at": "2026-10-16T08:26:33Z",
+      "sha256": "08972ba5bdd85149bd5cb019cb00a32a8d09d7fbe9139f60e0810f9fc1aa95f4"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.tensile_strength",
+    "mechanical.elongation_at_break",
+    "mechanical.flexural_strength",
+    "mechanical.flexural_modulus",
+    "mechanical.impact_strength",
+    "mechanical.hardness",
+    "thermal.heat_deflection_temp",
+    "thermal.vicat_softening",
+    "thermal.glass_transition"
+  ],
+  "notes": [
+    "No hex: the store page links no hex-code document for this filament and none is cached, so its only colour value \"White (66100)\" has no published hex.",
+    "No in_the_box: the store page has no What's in the Box list and no official document lists the box contents.",
+    "not_published: the TDS states \"N/A\" for glass transition, Vicat softening (printed \"Vicar Softening Temperature\", ISO 306), heat deflection (ISO 75, 1.8 and 0.45 MPa) and every mechanical row (Young's modulus, tensile strength, breaking elongation, bending modulus, bending strength, impact strength; X-Y and Z); the SDS section 9 says \"No data available\". Filament length and hardness are stated nowhere.",
+    "TDS facts with no registry key are not stored: melt index 11.6 ± 0.7 g/10 min (210 °C, 2.16 kg), crystallization temperature N/A, saturated water absorption rate 0.14% (25 °C, 55% RH), spool material PC + ABS (temperature resistance 90 °C), spool size 200 × 67 mm, printing and storage humidity < 20% RH (sealed, with desiccant), bed surface preparation glue, retraction length 0.6 - 1.0 mm, retraction speed 20 - 40 mm/s, max overhang angle 55°, max bridging length 30 mm, support \"Turn On\", odor (odorless), skin hazards, chemical stability, solubility (insoluble in water), resistance to acid, alkali, organic solvent, oil and grease, flammability (flammable), combustion products and their odor. TDS facts that have a key but are not stored as spec rows, as in the other filament files: chamber temperature 25 - 45 °C (thermal.chamber_temp is one number, a printer's chamber maximum with template field chamber_temp_max, not a filament's recommended range). The Nozzle Size row (0.4, 0.6, 0.8 mm) is stored as extrusion.supported_nozzle_diameters and kept as a relation.",
+    "SDS facts with no registry key are not stored: model \"S06-xx\", CLP \"Not classified\", no hazard pictogram, \"Not hazardous goods\" for IMDG, DOT, ADR/RID and ICAO-TI/IATA transport, SVHC \"Not listed\". To review: the section 3 table prints a CLP column (\"Flam. Liq. 3, Skin Irrit. 2, Eye Irrit. 2, Acute Tox.4\") against the HIPS component while section 2 says the mixture is \"Not classified\"; section 5 gives combustion products \"No data available\" while the TDS names water, carbon oxides and nitrogen oxides.",
+    "Drying requirement differs between official sources (not a stored key): the store page says \"Optional to Dry before Use\" (Cautions for Use) and \"Dry before use to ensure the best print quality\" (Printing Tips › 2.Drying Recommendations); the drying wiki gives \"Not required but recommended\"; the Support for ABS guide and the support wiki 3.1 say it \"usually\" / \"in most cases\" needs no pre-drying, while the support wiki 2.1 lists Support for ABS among filaments with \"strict drying requirements\". The numeric drying values agree everywhere.",
+    "Safety text (no registry key): the Support for ABS guide, the support wiki and the store Printing Tips say that at printing temperatures it may release harmful gases such as styrene, recommend an enclosed printer, ventilation and a vapour-filter mask for long prints, and say it is not food-contact grade. It dissolves in d-limonene (flash point about 48 °C per the support wiki 4.1.3).",
+    "Marketing prose is not used for numbers: \"0 Top Z distance and 0 Top interface spacing\" (feature block 2) is not stored. Variable layer height is \"not recommended\" (Support for ABS guide; support wiki 3.1): not a registry key.",
+    "Not cached, so not read: the store page's \"Filament RoHS\" certificate (https://store.bblcdn.com/9479a16b0736487386ab500723e6c6cb.pdf; safety.certifications is left to review) and the wiki page https://wiki.bambulab.com/en/software/bambu-studio/support (slicer support settings) linked from the Printing Tips.",
+    "The material-table wiki was searched but has no Support for ABS row, so it is listed under searched and left out of documents. The Support for ABS guide (wiki) is linked from the store page's Cautions for Use note (\"Note: Before printing, please kindly refer to the Printing Tips\"), but the page layer does not write that link as a document, so it is listed here; the support wiki (filament/support) is not linked by the store page and is added from the curated read.",
+    "material.diameter_tolerance (± 0.05 mm) comes from the store page only (Product Features › bullet 4) and is written by the page layer (verified, official_page); it is not repeated here.",
+    "motion.max_flow is neither curated nor marked not_published: it is a printer / hotend key, as in the other filament files, and no cached document gives a volumetric flow for this filament (the TDS has no such row; the material-table wiki has no Support for ABS row).",
+    "Adjudication against the second extraction (21 field disagreements of 181 compared fields), each checked against the cached TDS, support wiki, Support for ABS guide and store page: the same facts written differently keep this file's form: locator wording (TDS Physical Properties and drying rows, store Printing Tips, support wiki Hardware Compatibility and Filament Overview rows), the family id a1_series (compat-targets.json) rather than the label \"A1 Series\", and the enclosed-printer requirement as \"Enclosed printer\" (kind family, as in the other filament files) rather than \"Enclosure Printers\" (kind printer). Kept from this file after reading the documents: material.spool_type (store bullet 3 \"Comes with High Temperature Reusable Spool\", unverified; the TDS rows give the spool's material and size, not its type), the nozzle and plate relations (TDS p.1 Nozzle Size and Bed Type rows) and the ABS target handle abs-filament (the store product titled \"ABS\"; the support wiki's Compatible Model Filament is ABS). Not added from the second extraction: thermal.chamber_temp (TDS 25 - 45 °C is a recommended range; the key is one number, a printer's chamber maximum), material.diameter_tolerance (the store page's own bullet 4 \"Diameter: 1.75mm +/- 0.05mm\" is written by the page layer, verified official_page; a curated row from the same page would change nothing) and the motion.max_flow not_published entry (see above). material.net_weight is written as 0.5 kg, the TDS's own figure (mergeCurated stores 500 g, the same as the page's option row). The P1P relation note now follows the reviewed compat-targets.json (no target)."
+  ]
+}

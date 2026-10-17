@@ -1,0 +1,851 @@
+{
+  "handle": "petg-matte",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T14:37:05Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 3 pages read (text layer page by page, each checked against the rendered page): Recommended Printing Settings (p.1), Physical and Thermal Properties with the moisture-absorption and deformation charts (p.2), Mechanical Properties with specimen drawings and the test note, Other Physical and Chemical Properties (p.3). No Specifications section: no diameter, tolerance, net weight, filament length, spool or hardness row. Linked by the store page (Download › \"Filament TDS\") on host store.bblcdn.eu."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/7cc6d511d4284684855d15c59c824cca/SDS20260701G03_Bambu_PETG_Matte.pdf",
+      "title": "Bambu PETG Matte Safety Data Sheet SDS20260701G03 (prepared by Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read (text layer). The manufacturer's own SDS for \"Bambu PETG Matte\", model \"G03-xx(xx stands for any suffix)\". Section 3: PETG 70-80 % and additive 20-30 % by wt; section 9 \"No data available\" for every property but physical state \"Thread\"; CLP \"Not classified\"; not hazardous goods for IMDG, DOT, ADR/RID and ICAO-TI transport. No spec value is stored from it."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "keys": [],
+      "note": "One page with a text layer: 8 named colour tiles in a 2 × 4 grid, each hex read from the text layer and checked against the sampled colour of its rendered tile (all 8 identical). Read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, build plate, glue and storage tables. Rows \"PETG\" (generic), \"PETG / PETG-CF / PETG HF / PETG Translucent\" and \"PETG / PETG HF / PETG Translucent\"; no row or note names PETG Matte. Not applied to this product; no value stored from it."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petg",
+      "title": "PETG Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:03Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility table (rows \"PETG Basic / PETG HF\", \"PETG CF\", \"PETG Translucent\"), drying table (row \"PETG Basic / PETG HF / PETG CF / PETG Translucent\"), flow ratio for PETG Basic and PETG-CF. PETG Matte is not named; no value stored from it. The store FAQ (4. Important Notice) points to this guide."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I has no PETG Matte row (generic \"PETG, PETG-CF\" row); storage humidity guidance in Appendix II. The store FAQ (2. Drying Recommendations) links this page. No value stored from it."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/petg-matte",
+      "title": "Bambu Lab US store product page: PETG Matte",
+      "retrieved_at": "2026-10-16T07:05:56Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features and Cautions for Use, page-builder sections (banner, feature blocks, RFID, Download, Printing Tips FAQ, Highlights). Gives diameter 1.75 mm ± 0.03 mm and net weight 1kg (rows the builder writes) and the UL GREENGUARD 2904 claim."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PETG",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition PETG",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The SDS (p.4, section 3) gives PETG 70-80 % by wt (CAS 25640-14-6, EC 607-767-6) and an additive 20-30 % by wt (CAS N/A)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.37,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.37 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept. The store page states no density (the builder wrote a not_found row, which this value replaces)."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 160,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.2, Thermal Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 160 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Thermal Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "Stored as published. The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 71,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.2, Thermal Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 71 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Thermal Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 75.7,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.2, Thermal Properties › Vicat Softening Temperature",
+      "quote": "Vicat Softening Temperature ISO 306, GB/T 1633 75.7 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (TDS \"Thermal Properties\"); specimen preparation and load not stated",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 71.2,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.2, Thermal Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 71.2 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value; specimen preparation not stated. The next row gives 72.3 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The 1.8 MPa row is stored (the key holds one value). The deformation chart beside the table agrees (≈ 71℃ at 1.8 MPa, ≈ 72℃ at 0.45 MPa)."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 42.9,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.3, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 42.9 ± 1 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PETG Matte Violet dried in a forced-air oven at 60 °C for 8 h before printing; Tuozhu (Bambu Lab) H2D, 0.4 mm hardened steel nozzle, nozzle 245 °C, bed 70 °C, 221 mm/s, 100% infill)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The Z row gives 30.1 ± 1 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 13.8,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.3, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 13.8 ± 2.6 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PETG Matte Violet dried in a forced-air oven at 60 °C for 8 h before printing; Tuozhu (Bambu Lab) H2D, 0.4 mm hardened steel nozzle, nozzle 245 °C, bed 70 °C, 221 mm/s, 100% infill)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The Z row gives 6.5 ± 0.5 % (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1995,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.3, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 1995 ± 20 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PETG Matte Violet dried in a forced-air oven at 60 °C for 8 h before printing; Tuozhu (Bambu Lab) H2D, 0.4 mm hardened steel nozzle, nozzle 245 °C, bed 70 °C, 221 mm/s, 100% infill)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The Z row gives 1750 ± 46 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.3, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 65 ± 2.5 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PETG Matte Violet dried in a forced-air oven at 60 °C for 8 h before printing; Tuozhu (Bambu Lab) H2D, 0.4 mm hardened steel nozzle, nozzle 245 °C, bed 70 °C, 221 mm/s, 100% infill)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The Z row gives 47 ± 2.3 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 32.6,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.3, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 32.6 ± 4.1 kJ/m²",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PETG Matte Violet dried in a forced-air oven at 60 °C for 8 h before printing; Tuozhu (Bambu Lab) H2D, 0.4 mm hardened steel nozzle, nozzle 245 °C, bed 70 °C, 221 mm/s, 100% infill)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The row does not say notched or un-notched; the p.3 impact specimen drawing shows a 45° V-notch. The Z row gives 10.0 ± 1.5 kJ/m² (not stored)."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 230,
+        "max": 260
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 230 - 260 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The store page states no nozzle temperature (the builder wrote a not_found row, which this value replaces). No wiki row names PETG Matte; the material-table wiki's generic \"PETG\" row (240 - 270 °C, ± 10 °C) is not applied."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 65,
+        "max": 75
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 65 - 75 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; glue recommended (Glue Stick / Liquid Glue, TDS p.1)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The material-table wiki's generic PETG rows (60 - 80 °C) do not name PETG Matte and are not applied."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 250 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 250 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate",
+        "Smooth PEI Plate",
+        "Cool Plate Supertack"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; glue recommended (Glue Stick / Liquid Glue, TDS p.1)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The store FAQ (4. Important Notice) says \"Bambu PETG Matte adheres strongly to PEI build plates\" and to let the plate cool fully before removing the print."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Recommended Printing Settings\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "Added at adjudication from the TDS (p.1, row \"Nozzle Size\"), which the second extraction also read; the same row stays the nozzle relation. The store FAQ (1. Accessory Compatibility) says \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 65,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 65 °C, 8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h, before printing. The same row gives X Series & P Series & H2 Series printer heatbed 80 °C, 12 h; AMS 2 Pro & AMS HT 60 °C, 12 h (filament inserted) or 65 °C, 8 h (not inserted).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "No wiki row names PETG Matte, so no wiki value is compared as a product disagreement: the PETG wiki (row \"PETG Basic / PETG HF / PETG CF / PETG Translucent\") gives a convection oven at 60 - 65 °C for 8 h, the drying wiki (row \"PETG, PETG-CF\") a forced-air oven at 60-65 °C for 8 h, the material-table wiki (generic \"PETG\") a blast drying oven at 70 ℃ for 8 h."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing (line 1)",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 65 °C, 8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 65 °C. The same row gives 12 h on an X Series & P Series & H2 Series printer heatbed at 80 °C, and 12 h (filament inserted, 60 °C) or 8 h (not inserted, 65 °C) in the AMS 2 Pro & AMS HT.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "The store FAQ (2. Drying Recommendations) says to dry the filament before printing if it has been exposed to humidity above 50% RH for more than 72 hours."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "All Bambu 3D printers",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "locator": "p.1, Recommended Printing Settings › Printers Compatibility",
+      "quote": "Printers Compatibility All Bambu 3D printers",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Printers Compatibility\" row)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "note": "Also kept as a relation. The store FAQ (1. Accessory Compatibility) agrees: \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "UL GREENGUARD 2904"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/petg-matte",
+      "source_title": "Bambu Lab US store product page: PETG Matte",
+      "locator": "Product Features › bullet 5",
+      "quote": "Low indoor printing emissions, certified to UL GREENGUARD 2904",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:05:56Z",
+      "note": "Unverified: a store-page feature-bullet claim (repeated in the Highlights block) with no certificate document linked or read; the TDS and SDS name no certification. The page links a \"Filament RoHS\" PDF that was not cached and not read."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Black(35101)",
+      "source_value_id": "773790146574200834",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Black Hex:#000000",
+      "retrieved_at": "2026-10-16T08:25:51Z"
+    },
+    {
+      "value_text": "White(35100)",
+      "source_value_id": "773790146574200833",
+      "hex": "#FFFFFF",
+      "source_url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "locator": "p.1, row 1, column 2",
+      "quote": "White Hex:#FFFFFF",
+      "retrieved_at": "2026-10-16T08:25:51Z"
+    },
+    {
+      "value_text": "Pink(35700)",
+      "source_value_id": "773790146574200837",
+      "hex": "#FABBCB",
+      "source_url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Pink Hex:#FABBCB",
+      "retrieved_at": "2026-10-16T08:25:51Z"
+    },
+    {
+      "value_text": "Violet(35702)",
+      "source_value_id": "773790146574200839",
+      "hex": "#A7A4E0",
+      "source_url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Violet Hex:#A7A4E0",
+      "retrieved_at": "2026-10-16T08:25:51Z"
+    },
+    {
+      "value_text": "Baby Blue(35600)",
+      "source_value_id": "773790146574200838",
+      "hex": "#B9D9EB",
+      "source_url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Baby Blue Hex:#B9D9EB",
+      "retrieved_at": "2026-10-16T08:25:51Z"
+    },
+    {
+      "value_text": "Avocado Green(35501)",
+      "source_value_id": "773790146574200840",
+      "hex": "#BCE194",
+      "source_url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Avocado Green Hex:#BCE194",
+      "retrieved_at": "2026-10-16T08:25:51Z"
+    },
+    {
+      "value_text": "Lime(35500)",
+      "source_value_id": "773790146574200835",
+      "hex": "#C0DF16",
+      "source_url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "locator": "p.1, row 4, column 1",
+      "quote": "Lime Hex:#C0DF16",
+      "retrieved_at": "2026-10-16T08:25:51Z"
+    },
+    {
+      "value_text": "Gray(35102)",
+      "source_value_id": "773790146574200836",
+      "hex": "#7F7E83",
+      "source_url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "locator": "p.1, row 4, column 2",
+      "quote": "Gray Hex:#7F7E83",
+      "retrieved_at": "2026-10-16T08:25:51Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "AMS, AMS 2 PRO, AMS HT, AMS Lite",
+      "target_source_handle": "",
+      "target_family": "ams_series",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "locator": "p.1, Recommended Printing Settings › AMS Compatibility",
+      "quote": "AMS Compatibility AMS, AMS 2 PRO, AMS HT, AMS Lite",
+      "note": "The store page agrees: \"All AMS Series Compatible\" (Cautions for Use › bullet 1), from which the builder already writes AMS relations, and the FAQ \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "All Bambu 3D printers",
+      "target_source_handle": "",
+      "target_family": "all_bambu_printers",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "locator": "p.1, Recommended Printing Settings › Printers Compatibility",
+      "quote": "Printers Compatibility All Bambu 3D printers",
+      "note": "The store FAQ (1. Accessory Compatibility): \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2, 0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "note": "A nozzle size list, not a store product: no target handle. The TDS test note (p.3) used a 0.4 mm hardened steel nozzle; no document says a hardened steel nozzle is required."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "note": "The store FAQ (4. Important Notice): \"Bambu PETG Matte adheres strongly to PEI build plates.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "note": "The store FAQ (4. Important Notice): \"Bambu PETG Matte adheres strongly to PEI build plates.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate Supertack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "note": "The store sells it as \"Bambu Cool Plate SuperTack\". The material-table wiki says \"Not recommended\" for the \"Bambu Cool Plate / PLA Plate\" with generic PETG, a different plate and a row that does not name PETG Matte; to review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA/PETG",
+      "target_source_handle": "support-for-pla-petg",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "locator": "p.1, Recommended Printing Settings › Support",
+      "quote": "Support Support for PLA/PETG",
+      "note": "The TDS recommended support material. The store FAQ (4. Important Notice) adds that PETG Matte improves same-material support peel and \"is not recommended as a support for PLA\"; for multi-material support it points to Bambu PETG Basic."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Glue Stick",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "locator": "p.1, Recommended Printing Settings › Glue",
+      "quote": "Glue Recommended( Glue Stick/Liquid Glue )",
+      "note": "Recommended, not required."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Liquid Glue",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "source_title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "locator": "p.1, Recommended Printing Settings › Glue",
+      "quote": "Glue Recommended( Glue Stick/Liquid Glue )",
+      "note": "Recommended, not required."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "773790146574200842",
+        "value_text": "Refill"
+      },
+      "target_kind": "spool",
+      "target_label": "spool",
+      "target_source_handle": "bambu-reusable-spool",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/petg-matte",
+      "source_title": "Bambu Lab US store product page: PETG Matte",
+      "retrieved_at": "2026-10-16T07:05:56Z",
+      "locator": "Printing Tips (FAQ, components[4]) › 3. Refill Guidelines",
+      "quote": "The refill filament needs to be used with a spool.",
+      "note": "Scoped to the Type value \"Refill\": the \"Filament with spool\" value comes on a spool. The Product Features block says the same (\"Note: The refill needs to be used with a spool.\"); the builder already writes this relation at product scope. The FAQ links a wiki guide on the Bambu Reusable Spool (not cached, not read)."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.eu/s8/default/240fb0c791fb4903a9d72934895e9a16/PETG_Matte.pdf",
+      "title": "TDS of Bambu PETG Matte V1.0",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "sha256": "de3f989980fc583a7b2e0a287bb8972e03b503199189ef792dfed224320ece01"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/7cc6d511d4284684855d15c59c824cca/SDS20260701G03_Bambu_PETG_Matte.pdf",
+      "title": "Bambu PETG Matte Safety Data Sheet SDS20260701G03 (prepared by Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:25:49Z",
+      "sha256": "a54fce4e1b2d1a3cab41e562730bfc32910f18016887772063757f4b51d190ec"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/9b109944ad61471eb35d46e6263a28ff/Bambu_PETG_Matte_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PETG Matte",
+      "retrieved_at": "2026-10-16T08:25:51Z",
+      "sha256": "e14f90437fbf7346e71c2b34b37e520c99e0963fa623a78a1babe41b2697d2f9"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/petg",
+      "title": "PETG Usage Guide",
+      "retrieved_at": "2026-10-16T08:26:03Z",
+      "sha256": "7b70055c892826fe371741327adc2121e43d7487f57e519e92f713eb3f610279"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 30.1 ± 1 MPa, elongation 6.5 ± 0.5 %, bending modulus 1750 ± 46 MPa, bending strength 47 ± 2.3 MPa, impact 10.0 ± 1.5 kJ/m²) are not stored. Density (ISO 1183) and the DSC melting and glass transition temperatures are raw-material properties and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows; the registry has no *.printed / *.material key pair, so the split is by key group and test_condition. The Vicat and HDT rows do not state their specimen form.",
+    "The TDS V1.0 has no Specifications section: material.diameter (1.75 mm), material.diameter_tolerance (± 0.03 mm) and material.net_weight (1kg) stay the store page's own rows (Product Features › bullet 6; option Size › 1kg). They are not restated here and not marked not_published.",
+    "not_published: filament length and hardness are stated in none of the documents searched (TDS, SDS, the three wiki pages, the store page).",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 3349 ± 130 MPa, Z 3174 ± 50 MPa), melt index (13.9 ± 1.5 g/10 min at 235 °C, 2.16 kg), crystallization temperature (\"/\"), saturated water absorption rate (0.29% at 25 °C, 55% RH) and its moisture-absorption chart (25~30°C, 55~70% RH), printing and storage humidity (< 20% RH, sealed, with desiccant), retraction length (0.4 - 0.8 mm) and speed (30 - 60 mm/s), max overhang angle (~ 70 °), max bridging length (~ 30 mm), suggested annealing (60 to 70 °C, 6 to 12 hours), colour and state, odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows. Not stored although a registry key exists: heat deflection temperature 72.3 °C at 0.45 MPa (thermal.heat_deflection_temp keeps the 1.8 MPa row, as in every other filament file) and the chamber temperature (35 - 50 °C; see the chamber note). Printer and AMS compatibility, build plates, nozzle sizes, support material and glue are kept as relations; the nozzle sizes are also extrusion.supported_nozzle_diameters.",
+    "The TDS p.1 footnote (\"*Maximum exposure time for filaments in ambient air before noticeable degradation in print quality occurs ...\") has no starred row on the page; no exposure-time value is published in the TDS. The store page gives 72 hours above 50% RH as the point at which to dry (feature block footnote and FAQ 2); no registry key holds it.",
+    "The TDS recommended chamber temperature (35 - 50 °C) is not written to thermal.chamber_temp: that key is a printer capability, not a filament print setting.",
+    "SDS facts with no registry key are not stored: identified use \"3D printing filament\", composition (PETG 70-80 %, additive 20-30 % by wt), CLP \"Not classified\", no PBT/vPvB substance or endocrine disruptor, \"Not hazardous goods\" for IMDG, DOT, ADR/RID and ICAO-TI transport, SVHC and the other REACH lists \"Not listed\". Its section 9 \"No data available\" for melting point and density does not override the TDS values. Its section 5 says \"No data available\" for combustion products, while the TDS says \"Water, carbon oxides\". The SDS model \"G03-xx\" (p.2, section 1: \"Model : G03-xx(xx stands for any suffix)\") is not written to identity.model: identity rows come from the reviewed identity map (§C.1; the builder writes \"PETG Matte\"), and a curated official_doc row would outrank it with a designation carrying a wildcard suffix.",
+    "No wiki page names PETG Matte, and the store FAQ says it \"uses a specially modified formula\", so the generic PETG wiki rows (material-table nozzle 240 - 270 °C ± 10 °C, bed 60 - 80 °C, oven drying 70 ℃ for 8 h, AMS 2 Pro / AMS HT 65 ℃ for 12 h; PETG wiki and drying wiki 60 - 65 °C for 8 h in an oven, 80 °C or 75-85 °C for 12 h on a heatbed) are not applied and not recorded as conflicts. The TDS values are kept.",
+    "Consistency with the parsed store page: the store page states none of the values this file holds as numbers (its diameter, tolerance and net weight rows are not restated), so there is nothing to disagree with. Its density and nozzle-temperature rows are not_found and are replaced by the TDS values.",
+    "Marketing prose proves no number and is not stored: \"Prints like PLA. Lasts like PETG.\", \"handles moisture better than most PETG filaments\", \"Tough enough to earn the name\", \"high strength and toughness, excellent layer adhesion\" (store page and TDS p.1).",
+    "The store FAQ (4. Important Notice) says \"PETG Matte is not recommended as a support for PLA\" and points to Bambu PETG Basic for multi-material support. \"Not recommended\" is neither compatible nor incompatible, so no not_compatible_with relation is written; the note sits on the Support for PLA/PETG relation.",
+    "material.spool_type is neither stored nor marked not_published: no source names the spool (the TDS has no spool row, the store page only offers Type \"Filament with spool\" / \"Refill\"), and the Type option group carries the choice (same treatment as pla-pure and the other PETG files).",
+    "Hex: all 8 store colours have exactly one hex tile, matched by the colour name without the code in parentheses; values read from the text layer and identical to the sampled colour of each rendered tile.",
+    "The store FAQ (5.Safety Tips) says the filament is not food-grade; no registry key holds this.",
+    "No in-the-box list: no official packing list exists for this filament (the gallery has an \"In_the_Box_3.jpg\" image but the page has no What's in the Box section or list).",
+    "The store page links documents that were not cached and not read: Filament RoHS (https://store.bblcdn.com/s7/default/0f611d04e95043a1ba4fbcb6db22a287/2601Q46345A_G03-xx_Rohs.pdf) and the wiki guide https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool. safety.certifications therefore stays unverified.",
+    "The TDS is served from store.bblcdn.eu, the host the store page itself links (Download › \"Filament TDS\"). That host is not in the package DOCUMENT_HOSTS, so the builder drops the page's TDS link and mergeCurated's documentRow drops this file's TDS document entry; the TDS values themselves merge (their provenance is source_title, locator and quote). To review: add store.bblcdn.eu to the document hosts, or keep the TDS link off the Documents tab.",
+    "Adjudication against the second extraction (55 field disagreements): locator wording (17 spec locators and the \"All Bambu 3D printers\" relation: \"p.N, Section › Row\" kept over \"p.N › Section › Row\"; the 8 hex cells; the refill relation's \"Printing Tips (FAQ, components[4])\") keeps this file's form, the form of every other filament file. thermal.heat_deflection_temp stays the TDS 1.8 MPa row (71.2 °C), as in every other filament file; the 0.45 MPa row (72.3 °C) the second extraction took is noted. compat.statement stays the TDS Printers Compatibility cell; the AMS Compatibility row stays one ams_series family relation with the TDS's own label rather than four per-unit relations (the builder already writes the four store-page \"All AMS Series\" relations). safety.certifications stays unverified (§C.6: a store-page feature-bullet claim; the RoHS PDF was not read). Build plates, support and glue stay compatible_with (not recommended_with), as in petg-basic, pla-pure and pla-tough-upgrade. extrusion.supported_nozzle_diameters is added from the TDS Nozzle Size row; the nozzle relation stays. Not added from the second extraction: thermal.chamber_temp (see the chamber note), identity.model (see the SDS note) and material.spool_type \"Refill\" / \"Filament with spool\" (option names, not a spool type; see the spool note). The TDS p.3 note names the test printer \"Tuozhu H2D\" on the rendered page (the text layer drops the \"D\"), so the mechanical test_condition keeps H2D."
+  ]
+}

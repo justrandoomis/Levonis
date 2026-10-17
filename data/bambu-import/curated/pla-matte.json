@@ -1,0 +1,1005 @@
+{
+  "handle": "pla-matte",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T11:41:00Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 5 pages read (text layer, page by page): Basic Info, Specifications, Recommended Printing Settings, Physical, Mechanical and Other Properties, Specimen Test, Disclaimer."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/5697d821ae3a4020a89530d4d3162de7/SDS20250724A01_Bambu_PLA_Matte.pdf",
+      "title": "Bambu PLA Matte Safety Data Sheet SDS20250724A01",
+      "retrieved_at": "2026-10-16T08:23:00Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read. Section 3 gives the composition; section 9 says \"No data available\" for melting point, density and the other physical data; section 14 classifies it as not hazardous goods."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "retrieved_at": "2026-10-16T08:23:02Z",
+      "keys": [],
+      "note": "One page, 25 colours: read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, build plate and storage tables; values are for standard PLA in general (\"PLA*\", note ② names PLA Matte), used as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility table (row \"PLA Basic / Matte / …\"), drying table (special PLAs only, not Matte), HDT remark for PLA in general."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"PLA Basic / PLA Matte\"."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-matte",
+      "title": "Bambu Lab US store product page: PLA Matte",
+      "retrieved_at": "2026-10-16T06:58:36Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Highlights, page-builder sections, FAQ, documents."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "PLA",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition PLA",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "The SDS (p.4, section 3) gives the composition as Polylactic acid 85-92 % by wt and calcium carbonate 8-15 % by wt."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "Agrees with the store page (Product Features › bullet 5: \"Diameter: 1.75mm +/- 0.03mm\"); the tolerance is the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681956150505499",
+        "value_text": "1kg"
+      },
+      "value": 1,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "Written as published (1 kg): mergeCurated (curatedWeight) stores it as 1000 g with the text \"1 kg\". Scoped to the store page's only Size value \"1kg\"; agrees with that option value."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.31,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.31 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 163,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 163 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 61,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 61 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 63,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Vicar Softening Temperature",
+      "quote": "Vicar Softening Temperature ISO 306, GB/T 1633 63 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (the TDS row reads \"Vicar Softening Temperature\"); the TDS does not state how the specimen was made.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 52,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 52 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value; the TDS does not state how the specimen was made (its Specimen Test section covers tensile, bending and impact only). The next row gives 58 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "conflict": "The PLA wiki says \"heat deflection temperature of only 57°C\" for PLA in general (no load stated); it matches neither PLA Matte TDS row (52 °C at 1.8 MPa, 58 °C at 0.45 MPa). The product TDS value is kept.",
+      "note": "The TDS gives two HDT rows (52 °C at 1.8 MPa, 58 °C at 0.45 MPa: \"Heat Deflection Temperature ISO 75 0.45 MPa 58 °C\") and the key holds one value: the 1.8 MPa row is kept, the load every other filament file of this class stores."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 30,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 30 ± 5 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 14.8,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 14.8 ± 4.2 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z"
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2360,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2360 ± 250 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z"
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 53,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.3, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 53 ± 6 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z"
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 19.2,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.3, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 19.2 ± 3.7 kJ/m²; 6.3 ± 1.5 (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 200 mm/s, 100% infill; annealed and dried at 55 °C for 8 h before testing). First value of the cell; the same cell gives 6.3 ± 1.5 (notched), unit not printed.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z"
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 190,
+        "max": 230
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 190 - 230 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "conflict": "The material-table wiki gives 190 - 240 °C (±10 °C) for standard PLA (\"PLA*\", its note ② naming PLA Matte); the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 45
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 45 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed type Cool Plate, High Temperature Plate or Textured PEI Plate, bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "The material-table wiki gives 35 - 45 ℃ for PLA on the Cool Plate and 45 - 65 ℃ on the Engineering, Smooth PEI / High-Temperature and Textured PEI plates; its glue table gives 35 - 65 °C. The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 300 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.2, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 300 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "Kept as text: the TDS gives only an upper bound. The prose speeds (\"up to 250-300 mm/s\" in the TDS Basic Info, \"up to 270 mm/s*\" on the store page) are marketing and prove no number."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Cool Plate",
+        "High Temperature Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z"
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Recommended Printing Settings\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "Added at adjudication from the TDS Nozzle Size row, which the second extraction also read; the same row stays the compatible_with relation for the standard nozzles. The material-table wiki row \"PLA*\" (its note ② naming PLA Matte) marks the 0.2, 0.4, 0.6 and 0.8 mm nozzles and the 0.4 / 0.6 / 0.8 mm high flow nozzles \"Compatible\", hardened steel \"Not Required\"."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 50,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 50 °C，8 h X1 Series Printer Heatbed: 60 - 70 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 Series printer heatbed: 60 - 70 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "The drying wiki (Appendix I, row \"PLA Basic / PLA Matte\") agrees: forced-air oven 50 °C, 8 h; AMS 2 Pro and AMS HT 45 °C, 12 h; printer heatbed 60-70 °C, 12 h.",
+      "conflict": "The material-table wiki gives 55 ℃ for 8 h (blast drying oven) for PLA in general; the product TDS and the drying wiki row for PLA Matte say 50 °C."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 50 °C，8 h X1 Series Printer Heatbed: 60 - 70 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 50 °C. The same row gives 12 h on an X1 Series printer heatbed at 60 - 70 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "note": "The drying wiki (Appendix I, row \"PLA Basic / PLA Matte\") agrees: forced-air oven 8 h."
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "UL GREENGUARD 2904"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/pla-matte",
+      "source_title": "Bambu Lab US store product page: PLA Matte",
+      "locator": "Product Features › bullet 3",
+      "quote": "Low indoor printing emissions, certified to UL GREENGUARD 2904",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T06:58:36Z",
+      "note": "Unverified: a store-page claim with no certificate document linked or cached. The page's GREENGUARD section says \"PLA Matte is certified to UL GREENGUARD (UL 2904), the recognized standard for 3D printer emissions.\""
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Ivory White (11100)",
+      "source_value_id": "564681956150505475",
+      "hex": "#FFFFFF",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Ivory White Hex:#FFFFFF",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Bone White (11103)",
+      "source_value_id": "564681956150505489",
+      "hex": "#CBC6B8",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Bone White Hex:#CBC6B8",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Lemon Yellow (11400)",
+      "source_value_id": "564681956150505473",
+      "hex": "#F7D959",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 3, column 4",
+      "quote": "Lemon Yellow Hex:#F7D959",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Mandarin Orange (11300)",
+      "source_value_id": "564681956150505472",
+      "hex": "#F99963",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 3, column 3",
+      "quote": "Mandarin Orange Hex:#F99963",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Sakura Pink (11201)",
+      "source_value_id": "564681956150505474",
+      "hex": "#E8AFCF",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Sakura Pink Hex:#E8AFCF",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Lilac purple (11700)",
+      "source_value_id": "564681956150505478",
+      "hex": "#AE96D4",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Lilac Purple Hex:#AE96D4",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Plum (11204)",
+      "source_value_id": "564681956150505490",
+      "hex": "#950051",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 4, column 1",
+      "quote": "Plum Hex:#950051",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Scarlet Red (11200)",
+      "source_value_id": "564681956150505479",
+      "hex": "#DE4343",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 4, column 2",
+      "quote": "Scarlet Red Hex:#DE4343",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Dark Red (11202)",
+      "source_value_id": "564681956150505480",
+      "hex": "#BB3D43",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 4, column 3",
+      "quote": "Dark Red Hex:#BB3D43",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Apple Green (11502)",
+      "source_value_id": "564681956150505492",
+      "hex": "#C2E189",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 5, column 2",
+      "quote": "Apple Green Hex:#C2E189",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Grass Green (11500)",
+      "source_value_id": "564681956150505482",
+      "hex": "#61C680",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 5, column 1",
+      "quote": "Grass Green Hex:#61C680",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Dark Green (11501)",
+      "source_value_id": "564681956150505481",
+      "hex": "#68724D",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 4, column 4",
+      "quote": "Dark Green Hex:#68724D",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Ice Blue (11601)",
+      "source_value_id": "564681956150505483",
+      "hex": "#A3D8E1",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 5, column 3",
+      "quote": "Ice Blue Hex:#A3D8E1",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Sky Blue (11603)",
+      "source_value_id": "564681956150505491",
+      "hex": "#56B7E6",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 5, column 4",
+      "quote": "Sky Blue Hex:#56B7E6",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Marine Blue (11600)",
+      "source_value_id": "564681956150505484",
+      "hex": "#0078BF",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 6, column 1",
+      "quote": "Marine Blue Hex:#0078BF",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Dark Blue (11602)",
+      "source_value_id": "564681956150505488",
+      "hex": "#042F56",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 6, column 2",
+      "quote": "Dark Blue Hex:#042F56",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Desert Tan (11401)",
+      "source_value_id": "564681956150505486",
+      "hex": "#E8DBB7",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 1, column 3",
+      "quote": "Desert Tan Hex:#E8DBB7",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Latte Brown (11800)",
+      "source_value_id": "564681956150505476",
+      "hex": "#D3B7A7",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 1, column 4",
+      "quote": "Latte Brown Hex:#D3B7A7",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Caramel (11803)",
+      "source_value_id": "564681956150505494",
+      "hex": "#AE835B",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Caramel Hex:#AE835B",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Terracotta (11203)",
+      "source_value_id": "564681956150505495",
+      "hex": "#B15533",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Terracotta Hex:#B15533",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Dark Brown (11801)",
+      "source_value_id": "564681956150505487",
+      "hex": "#7D6556",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 2, column 3",
+      "quote": "Dark Brown Hex:#7D6556",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Dark Chocolate (11802)",
+      "source_value_id": "564681956150505493",
+      "hex": "#4D3324",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 2, column 4",
+      "quote": "Dark Chocolate Hex:#4D3324",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Ash Gray (11102)",
+      "source_value_id": "564681956150505477",
+      "hex": "#9B9EA0",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 6, column 3",
+      "quote": "Ash Gray Hex:#9B9EA0",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Nardo Gray (11104)",
+      "source_value_id": "564681956150505496",
+      "hex": "#757575",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 6, column 4",
+      "quote": "Nardo Gray Hex:#757575",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    },
+    {
+      "value_text": "Charcoal (11101)",
+      "source_value_id": "564681956150505485",
+      "hex": "#000000",
+      "source_url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "locator": "p.1, row 7, column 1",
+      "quote": "Charcoal Hex:#000000",
+      "retrieved_at": "2026-10-16T08:23:02Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "AMS series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\" › Component Compatibility",
+      "quote": "PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal | All standard nozzles are compatible (no special restrictions) | All printers compatible | Fully compatible with the AMS series",
+      "note": "The store page says the same (\"All AMS Series Compatible\", Product Features › Cautions for Use); the material-table wiki gives \"PLA* | Compatible\" in its \"AMS / AMS lite Compatibility\" column, its note ② naming PLA Matte."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "all_bambu_printers",
+      "target_label": "Open-frame or enclosed printer",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › table › row \"PLA, PETG, TPU …\" › Recommended Printer",
+      "quote": "PLA, PETG, TPU, and their CF/GF reinforced materials (e.g., PLA-CF/GF, PETG-CF/GF, etc.) | Not prone to warping; no mandatory temperature requirements | Open-frame or enclosed printer",
+      "note": "The same page's AMS table gives \"PLA* | Compatible | Compatible | Compatible\" for open-frame (A Series, P1P, etc.) and enclosed (H2 Series, X2D, P2S, X1 Series, P1S, etc.) printers; the store FAQ says \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High Temperature Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (PLA 45 - 65 ℃), which names the Smooth PEI plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Type",
+      "quote": "Bed Type Cool Plate, High Temperature Plate or Textured PEI Plate",
+      "note": "No store product is the plain Bambu Cool Plate (bambu-cool-plate-supertack is a different plate), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2, 0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "note": "The material-table wiki row \"PLA*\" says Compatible for the 0.2, 0.4, 0.6 and 0.8 mm nozzles and hardened steel \"Not Required\"; the PLA wiki says \"All standard nozzles are compatible (no special restrictions)\". The high-flow nozzles are the next relation."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High-flow nozzles (0.4, 0.6, 0.8 mm)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"PLA*\" › 0.4 mm, 0.6 mm, 0.8 mm High flow nozzle",
+      "quote": "PLA* | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 190 - 240 |",
+      "note": "Columns 0.2 / 0.4 / 0.6 / 0.8 mm nozzle, 0.4 / 0.6 / 0.8 mm high flow nozzle, hardened steel required?, nozzle temperature (± 10 °C): cells 5 to 7 read \"Compatible\". \"PLA*\" is standard PLA, which the page's note ② says includes PLA Matte. The TDS Nozzle Size row names no flow type. Added at adjudication (the second extraction gave one relation per high-flow size)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "locator": "p.2, Recommended Printing Settings › Support Material",
+      "quote": "Support Material Support for PLA",
+      "note": "The TDS recommended support material. No store product is titled exactly \"Support for PLA\"; the candidate is \"Support for PLA (New Version)\" (manifest handle support-for-pla-new), left unlinked because a name match alone does not resolve a target; to confirm at review. Added at adjudication from the second extraction."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681956150505497",
+        "value_text": "Refill"
+      },
+      "target_kind": "spool",
+      "target_label": "spool",
+      "target_source_handle": "bambu-reusable-spool",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-matte",
+      "source_title": "Bambu Lab US store product page: PLA Matte",
+      "locator": "Product Features › \"Note: The refill needs to be used with a spool.\"",
+      "quote": "Note: The refill needs to be used with a spool.",
+      "note": "Scoped to the Refill value: the \"Filament with spool\" value comes on a spool. The store FAQ (3.Refill Guidelines) says \"The refill filament needs to be used with a spool. For detailed instructions on how to swap in the new filament using the Bambu Reusable Spool, …\", which names the target (manifest handle bambu-reusable-spool)."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/5b061f2feeac4ba88f355a33248bbda7/Bambu_PLA_Matte_Technical_Data_Sheet.pdf",
+      "title": "Bambu PLA Matte Technical Data Sheet V3.0",
+      "retrieved_at": "2026-10-16T08:22:59Z",
+      "sha256": "544f98056f3a142969983a97dcd75140b447bca397f99e17edeb260cd2d0d3f5"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/5697d821ae3a4020a89530d4d3162de7/SDS20250724A01_Bambu_PLA_Matte.pdf",
+      "title": "Bambu PLA Matte Safety Data Sheet SDS20250724A01",
+      "retrieved_at": "2026-10-16T08:23:00Z",
+      "sha256": "68206ae495bdd67d9b4f868b8716896b0023b31114e17b84bcca523ac657cc1e"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://cdn.shopify.com/s/files/1/0584/7236/6216/files/Bambu_PLA_Matte_Hex_Code.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Matte",
+      "retrieved_at": "2026-10-16T08:23:02Z",
+      "sha256": "a5672a09e2c1ef76a9a9f4e4ef5987b2720b2885c911d1a390d82a57d64e55b6"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 22 ± 4 MPa, elongation 4.8 ± 1.7 %, bending modulus 1770 ± 210 MPa, bending strength 29 ± 5 MPa, impact 6.6 ± 1.1 kJ/m²) are not stored.",
+    "Printed-specimen results and raw-material properties stay apart: mechanical.* holds only printed-specimen values (with the specimen printing conditions in test_condition); material.density, thermal.melting_temp and thermal.glass_transition are material properties (ISO 1183, DSC). The TDS does not say how the Vicat (ISO 306) and HDT (ISO 75) specimens were made (its Specimen Test drawings cover tensile, bending and impact only); their test_condition says so. The registry has no separate *.printed / *.material keys.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 1960 ± 180 MPa, Z 1670 ± 140 MPa), melt index (18.0 ± 3.2 g/10 min at 210 °C, 2.16 kg), crystallization temperature (N/A), saturated water absorption rate (0.40 % at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed with desiccant), bed surface preparation (glue), retraction length (0.6 - 1.0 mm) and speed (20 - 40 mm/s), chamber temperature (25 - 45 °C), max overhang angle (55°), max bridging length (30 mm), spool material (ABS, temperature resistance 70 °C) and spool size (diameter 200 mm, height 67 mm), suggested annealing (50 - 60 °C, 6 - 12 h), odor, chemical resistance, flammability and combustion products rows.",
+    "The TDS recommended chamber temperature (p.2: \"Chamber Temperature 25 - 45 °C\") is not written to thermal.chamber_temp: that key is a single number whose template field is chamber_temp_max (a printer's maximum chamber temperature, the form the printer files store), and no filament file of this class stores the TDS recommendation there.",
+    "The SDS model \"A01-xx\" (p.2, section 1: \"Model : A01-xx(xx stands for any suffix)\") is not stored: identity.model is written from the reviewed identity map (\"PLA Matte\", §C.1), which a curated official_doc row would outrank and replace, and \"A01-xx\" is a designation with a wildcard suffix, not this product's model, so it must not become a search alias. SDS facts with no registry key are not stored: CLP \"Not classified\", and \"Not hazardous goods\" for sea, road and air transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Source disagreements kept for review: nozzle temperature (TDS 190 - 230 °C vs material-table wiki 190 - 240 °C ±10 °C for PLA*); bed temperature on the High Temperature and Textured PEI plates (TDS 35 - 45 °C for all three bed types vs material-table wiki 45 - 65 ℃); oven drying temperature (TDS and drying wiki 50 °C vs material-table wiki 55 ℃ for PLA); HDT (PLA wiki 57°C for PLA in general vs TDS 52 °C at 1.8 MPa and 58 °C at 0.45 MPa). The product TDS values are kept.",
+    "Marketing prose proves no number: \"up to 250-300 mm/s\" (TDS Basic Info and store meta description) and \"up to 270 mm/s*\" (store page) are not stored.",
+    "Hex: the hex table writes \"Lilac Purple\"; the store value is \"Lilac purple (11700)\". Matched case-insensitively; every one of the 25 store colours has exactly one hex cell.",
+    "The store page links certificate PDFs that were not cached and not read: Filament RoHS (https://store.bblcdn.com/0d30076831474a6c9bfc8fe96e0df8d1.pdf), SVHC, PAHs, TSCA, POPs, CP65 and EN71-3. They are lab test reports, so safety.certifications holds only the store page's own UL GREENGUARD claim (unverified) and is not marked not_published.",
+    "The store page also links the wiki guide https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool, which was not cached and not read.",
+    "No in-the-box list: no official packing list exists for this filament.",
+    "material.spool_type is not curated: the store page has no spool bullet (its Type values \"Refill\" / \"Filament with spool\" are the deterministic layer's), and the TDS Spool Material (ABS, temperature resistance 70 °C) and Spool Size (diameter 200 mm, height 67 mm) rows give the spool's material and size, not its type; no registry key holds them.",
+    "Adjudication against the second extraction (147 field disagreements; every cited cached document re-read): the locator wording of the TDS rows, the 25 hex cells and the relations keeps this file's form (\"p.N, Section › Row\"), and every hex cell was re-checked against the hex table (name, row, column and code). thermal.heat_deflection_temp stays the TDS 1.8 MPa row (52 °C), the load every other filament file stores; the 0.45 MPa row (58 °C, the second extraction's value) is in its note. safety.certifications keeps the bullet's own words \"UL GREENGUARD 2904\" (the second extraction's \"UL GREENGUARD (UL 2904)\" is the page's description block making the same claim). material.net_weight is written as 1 kg, the TDS's own figure (the quote checker flagged 1000 g against the quote \"1 kg\"); the merge stores 1000 g either way. Added from the second extraction: extrusion.supported_nozzle_diameters (the TDS Nozzle Size row, as in the PLA Metal, PLA Pure and ABS files). Not added: material.spool_type (see above), thermal.chamber_temp (see above), identity.model (see above) and compat.statement (a join of the PLA wiki row's three cells, whose \"All printers compatible\" sits under the \"Print Bed Compatibility (Description)\" column; the row's AMS and nozzle facts and the material table's printer row are relations here). Relations keep this file's form, as in the PLA Basic and PLA Metal files: one AMS-series family relation (PLA wiki) for the second extraction's AMS and AMS lite relations (material-table wiki \"PLA* | Compatible\"), one \"Open-frame or enclosed printer\" family relation for its two printer-class relations, one standard-nozzle relation (TDS) and one high-flow-nozzle relation (material-table wiki) for its seven per-nozzle relations, and the refill's requires-spool relation in the page's own word \"spool\" with the Bambu Reusable Spool as its target, the form the package itself writes. Added after reading the material-table wiki and the TDS: compatible_with high-flow nozzles (0.4, 0.6, 0.8 mm) and compatible_with Support for PLA."
+  ]
+}

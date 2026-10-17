@@ -144,7 +144,10 @@ test('the dry run: arguments, no Cloudflare credential, the fixture bundle, the 
 
   // --bundle repo: data/bambu-import/ byte for byte, the manifest in queue order, the canary first.
   const repo = repoBundle() as { rows: Array<{ handle: string; queue_position: number }>; text: Record<string, string> };
-  assert.deepEqual(Object.keys(repo.text).sort(), ['compat-targets.json', 'curated/index.json', 'existing-matches.json', 'identity-map.json', 'manifest.json', 'media-overrides.json', 'search-synonyms.json', 'taxonomy-map.json', 'translations/index.json']);
+  // The bundled files, the translation memory's index, and every reviewed curated file the index names (the stand-in serves them to the runner).
+  const curatedFiles = Object.keys((JSON.parse(repo.text['curated/index.json']) as { files: Record<string, string> }).files).map((h) => `curated/${h}.json`);
+  assert.ok(curatedFiles.length > 0);
+  assert.deepEqual(Object.keys(repo.text).sort(), ['compat-targets.json', 'curated/index.json', 'existing-matches.json', 'identity-map.json', 'manifest.json', 'media-overrides.json', 'search-synonyms.json', 'taxonomy-map.json', 'translations/index.json', ...curatedFiles].sort());
   // The translation memory's index is not a reviewed file, but the Worker imports it: both trees carry it (I18N-DESIGN §A.3).
   assert.equal(text['translations/index.json'], readFileSync(join(ROOT, 'data', 'bambu-import', 'translations', 'index.json'), 'utf8'));
   for (const [file, body] of Object.entries(repo.text)) assert.equal(body, readFileSync(join(ROOT, 'data', 'bambu-import', file), 'utf8'), file);

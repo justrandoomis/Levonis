@@ -1,0 +1,731 @@
+{
+  "handle": "tpu-for-ams",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T13:37:36Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 5 pages read (text layer, per page): Basic Info, Specifications, Recommended Printing Settings (p.1); Physical and Mechanical Properties (p.2); Other Physical and Chemical Properties, Specimen Test (p.3); test images (p.4); Disclaimer (p.5). Glass transition, crystallization, Vicat softening, both heat deflection rows and all four bending rows read \"N/A\"; no filament length is given; hardness appears only in the Basic Info prose."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/7bd498c436d3479ba3160d9271fbd911/SDS20250723SU02_Bambu_TPU_for_AMS.pdf",
+      "title": "Bambu TPU for AMS Safety Data Sheet SDS20250723U02",
+      "retrieved_at": "2026-10-16T08:25:00Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read (p.1 is an image-only cover, viewed as an image). Section 3 gives the composition; section 9 says \"No data available\" for melting point, density and the other physical data; section 2 \"Not classified.\"; section 14 \"Not hazardous goods\" (IMDG, DOT, ADR/RID, ICAO-TI/IATA)."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: TPU For AMS",
+      "retrieved_at": "2026-10-16T08:25:02Z",
+      "keys": [],
+      "note": "One page, 7 colours: read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer (row \"PLA, PETG, TPU …\"), nozzle (row \"TPU for AMS\"), AMS (generic row \"TPU\"), build plate and glue (generic rows \"TPU\") and storage (generic row \"TPU\") tables; used as corroboration and for relations. Its HDT, impact and tensile columns are star ratings, not numbers."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"TPU for AMS\": heatbed 80-90 °C 12 h, forced-air oven 70 °C 8 h, AMS 2 Pro 65 °C 12 h (may not fully dry TPU), AMS HT 75 °C 18 h. Section 1.3: static drying mode not suitable for TPU."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/tpu-for-ams",
+      "title": "Bambu Lab US store product page: TPU for AMS",
+      "retrieved_at": "2026-10-16T07:03:44Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features and Cautions for Use, the page-builder banner and content blocks, RFID block, Download block, Printing Tips FAQ. No spec table (format C)."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Thermoplastic polyurethane",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Thermoplastic polyurethane",
+      "test_method": "",
+      "test_condition": "Composition as stated by the TDS",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "The SDS (p.4, 3 - Composition / Information on Ingredients) gives \"TPU\" 65-80 % by wt (CAS printed as \"1211-14-9\") and \"Additive\" 20-35 % by wt. The value keeps the TDS words, as the other curated filaments do."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "Agrees with the store page (Product Features › bullet 6: \"Diameter: 1.75mm +/- 0.05mm\"). The tolerance stays the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681968863440904",
+        "value_text": "1 kg"
+      },
+      "value": 1,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "Scoped to the store page's only Size value \"1 kg\" (both Type values, \"Filament with spool\" and \"Refill\", come in it); agrees with the store page row (option Size › 1 kg). Written in kg, the TDS's own figure; the merge stores 1000 g with the text \"1 kg\"."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.26,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.26 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 183,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 183 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 22.4,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 22.4 ± 0.6 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 130 mm/s, 100% infill; annealed and dried at 70 °C for 12 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "> 650%",
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 > 650%",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 130 mm/s, 100% infill; annealed and dried at 70 °C for 12 h before testing). The TDS gives a lower bound only.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "Kept as text: the TDS states only a lower bound (\"> 650%\"), so no number is claimed (as in the TPU 95A HF file)."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 124.3,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 124.3 kJ/m²",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 230 °C, bed 35 °C, 130 mm/s, 100% infill; annealed and dried at 70 °C for 12 h before testing). The TDS does not say notched or unnotched.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z"
+    },
+    {
+      "key": "mechanical.hardness",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Shore 68D",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Basic Info (prose paragraph)",
+      "quote": "With a Shore hardness of 68D, Bambu TPU for AMS offers impressive toughness while minimizing stringing",
+      "test_method": "",
+      "test_condition": "Stated in the TDS Basic Info prose only; no test method, standard or specimen condition is given",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "Unverified: the hardness appears only in descriptive prose (TDS Basic Info, and the store page Content Block-2 \"Tough Yet Flexible\": \"With a Shore hardness of 68D, Bambu TPU for AMS combines exceptional toughness ...\"), never in a property table with a method, so it is not marked verified (prose proves no number, §6). Both sources agree on 68D; written \"Shore 68D\" so the scale is named. For review."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 220,
+        "max": 240
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 220 - 240 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "conflict": "The material-table wiki (2. Nozzle, row \"TPU for AMS\") gives 200 - 250 °C (±10 °C); the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 30,
+        "max": 35
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 30 - 35 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate Textured PEI Plate / Smooth PEI Plate, bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "conflict": "The material-table wiki gives, for generic \"TPU\", 30 - 45 °C with glue stick or liquid glue (Build Plate Settings 1) and 35 - 45 ℃ on the Smooth PEI / High-Temperature and Textured PEI plates (Build Plate Settings 3); the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 250 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 250 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "Kept as text: the TDS gives only an upper bound. The TDS prints a full-width \"＜\"; the quote uses \"<\", as the other curated filament files do. The store page's \"up to 60% faster print speeds compared to Bambu TPU 95A HF\" is marketing and proves no number."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate",
+        "Smooth PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; bed surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "The material-table wiki (Build Plate Settings 3, generic row \"TPU\") also gives the Bambu Engineering Plate (30 - 35 ℃) and rates the Bambu Cool Plate / PLA Plate \"Not recommended\"; neither is in this product's TDS list, so the TDS list is kept as published."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "Added at adjudication from the TDS (p.1, row \"Nozzle Size\"), which the second extraction also read, as in the TPU 95A HF and ASA files; the same row stays the nozzle relation. The material-table wiki (2. Nozzle, row \"TPU for AMS\") agrees: 0.4, 0.6 and 0.8 mm nozzles and high flow nozzles \"Compatible\", 0.2 mm \"Not Recommended\"."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 70,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 70 °C, 8 h X1 Series Printer Heatbed: 80 - 90 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 Series printer heatbed: 80 - 90 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "The drying wiki (Appendix I, row \"TPU for AMS\": forced-air oven 70 °C, 8 h) and the material-table wiki (Storage, row \"TPU\": \"70 ℃ for 8 h\", blast drying oven) agree. In the TDS layout the row label sits between its two value lines; the quote joins them in reading order."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 70 °C, 8 h X1 Series Printer Heatbed: 80 - 90 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 70 °C. The same row gives 12 h on an X1 Series printer heatbed at 80 - 90 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "note": "The drying wiki (Appendix I, row \"TPU for AMS\") and the material-table wiki (Storage, row \"TPU\") agree: oven 8 h."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "564681968863440903",
+        "value_text": "Filament with spool"
+      },
+      "value": "High Temperature Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tpu-for-ams",
+      "source_title": "Bambu Lab US store product page: TPU for AMS",
+      "locator": "Product Features › bullet 5",
+      "quote": "Comes with High Temperature Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:03:44Z",
+      "note": "Unverified: an unlabelled store-page bullet. Scoped to the Type value \"Filament with spool\" (the \"Refill\" value has no spool). The TDS (p.1, Specifications) gives \"Spool Material PC + ABS (Temperature resistance 90 °C)\" and \"Spool Size Diameter: 200 mm; Height: 67 mm\"."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "White (53100)",
+      "source_value_id": "564681968863440900",
+      "hex": "#FFFFFF",
+      "source_url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU For AMS",
+      "locator": "p.1, row 1, column 1",
+      "quote": "White Hex:#FFFFFF",
+      "retrieved_at": "2026-10-16T08:25:02Z"
+    },
+    {
+      "value_text": "Gray (53102)",
+      "source_value_id": "564681968863440901",
+      "hex": "#939393",
+      "source_url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU For AMS",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Gray Hex:#939393",
+      "retrieved_at": "2026-10-16T08:25:02Z"
+    },
+    {
+      "value_text": "Yellow (53400)",
+      "source_value_id": "564681968863440898",
+      "hex": "#F9EF41",
+      "source_url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU For AMS",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Yellow Hex:#F9EF41",
+      "retrieved_at": "2026-10-16T08:25:02Z"
+    },
+    {
+      "value_text": "Neon Green (53500)",
+      "source_value_id": "564681968863440899",
+      "hex": "#90FF1A",
+      "source_url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU For AMS",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Neon Green Hex:#90FF1A",
+      "retrieved_at": "2026-10-16T08:25:02Z"
+    },
+    {
+      "value_text": "Red (53200)",
+      "source_value_id": "564681968863440897",
+      "hex": "#ED0000",
+      "source_url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU For AMS",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Red Hex:#ED0000",
+      "retrieved_at": "2026-10-16T08:25:02Z"
+    },
+    {
+      "value_text": "Blue (53600)",
+      "source_value_id": "564681968863440896",
+      "hex": "#5898DD",
+      "source_url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU For AMS",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Blue Hex:#5898DD",
+      "retrieved_at": "2026-10-16T08:25:02Z"
+    },
+    {
+      "value_text": "Black (53101)",
+      "source_value_id": "564681968863440902",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU For AMS",
+      "locator": "p.1, row 4, column 1",
+      "quote": "Black Hex:#000000",
+      "retrieved_at": "2026-10-16T08:25:02Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "All AMS Series",
+      "target_source_handle": "",
+      "target_family": "ams_series",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/tpu-for-ams",
+      "source_title": "Bambu Lab US store product page: TPU for AMS",
+      "retrieved_at": "2026-10-16T07:03:44Z",
+      "locator": "Product Features › Cautions for Use › bullet 1",
+      "quote": "All AMS Series Compatible",
+      "note": "For feeding: AMS, AMS lite, AMS 2 Pro and AMS HT (compat-targets \"All AMS Series\" → ams_series; the builder resolves it to ams-multicolor-printing, ams-lite, ams-2-pro and ams-ht). The page's Content Block-1 (\"Seamless AMS & AMS lite Integration\") and the TDS Basic Info (\"seamless AMS integration\") say the same in prose. Drying is a different use: the drying wiki (Appendix I, row \"TPU for AMS\") lists AMS 2 Pro 65 °C for 12 h (\"AMS 2 Pro may not be able to fully dry TPU — use heatbed or AMS HT instead.\") and AMS HT 75 °C for 18 h; the material-table wiki (Storage, row \"TPU\") gives AMS 2 Pro \"Not recommended\" and AMS HT 75 ℃ for 12 h.",
+      "conflict": "The material-table wiki's AMS table (3. AMS & AMS lite) has one generic row \"TPU | Compatible | Compatible | Not Compatible\"; its \"Too soft\" list names TPU 95A/85A/83A/80A, not TPU for AMS (Shore 68D per the TDS prose). The product's own store page is kept; for review."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Stainless Steel Nozzle 0.2 mm",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-for-ams",
+      "source_title": "Bambu Lab US store product page: TPU for AMS",
+      "retrieved_at": "2026-10-16T07:03:44Z",
+      "locator": "Printing Tips (FAQ, components[4]) › 1.Accessory Compatibility",
+      "quote": "Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm",
+      "note": "Product Features › Cautions for Use › bullet 2 says \"0.2 mm Nozzle NOT Compatible\". Several store hotends offer a 0.2 mm stainless steel option, so no single target handle is named. The material-table wiki (2. Nozzle, row \"TPU for AMS\") rates the 0.2 mm nozzle \"Not Recommended\"; the TDS lists nozzle sizes 0.4, 0.6, 0.8 mm only."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "note": "The material-table wiki (2. Nozzle, row \"TPU for AMS\") says Compatible for the 0.4, 0.6 and 0.8 mm nozzles and the 0.4, 0.6 and 0.8 mm high flow nozzles, \"Not Recommended\" for 0.2 mm, and hardened steel \"Not Required\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "High-flow nozzles (0.4, 0.6, 0.8 mm)",
+      "target_source_handle": "",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 2. Nozzle › table › row \"TPU for AMS\" › 0.4 mm, 0.6 mm, 0.8 mm High flow nozzle",
+      "quote": "TPU for AMS | Not Recommended | Compatible | Compatible | Compatible | Compatible | Compatible | Compatible | Not Required | 200 - 250 |",
+      "note": "Columns in order: 0.2 mm Nozzle, 0.4 / 0.6 / 0.8 mm Nozzle, 0.4 / 0.6 / 0.8 mm High flow nozzle, hardened steel, nozzle temperature. The TDS Nozzle Size row names no flow type. Several store hotends offer a High Flow option, so no single target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate",
+      "note": "Bed surface preparation: glue (TDS p.1). The material-table wiki (Build Plate Settings 3, generic row \"TPU\") gives 35 - 45 ℃ on the Bambu Textured PEI Plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate",
+      "note": "Bed surface preparation: glue (TDS p.1). The material-table wiki heads the column \"Bambu Smooth PEI / High-Temperature Plate\" (generic row \"TPU\": 35 - 45 ℃)."
+    },
+    {
+      "relation": "recommended_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "other",
+      "target_label": "Glue",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "locator": "p.1, Recommended Printing Settings › Bed Surface Preparation",
+      "quote": "Bed Surface Preparation Glue",
+      "note": "Recommended, not required: the TDS lists it under \"Recommended Printing Settings\", and the material-table wiki (Build Plate Settings 1) says \"We recommend applying glue stick or liquid glue to the build plate\" and gives 30 - 45 °C for TPU with both Glue Stick and Liquid Glue; no cached document says glue is required. Two store products fit (glue-stick-for-build-plate, liquid-glue-for-build-plate), so no single target handle is named."
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "669699943569420289",
+        "value_text": "Refill"
+      },
+      "target_kind": "spool",
+      "target_label": "spool",
+      "target_source_handle": "bambu-reusable-spool",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-for-ams",
+      "source_title": "Bambu Lab US store product page: TPU for AMS",
+      "retrieved_at": "2026-10-16T07:03:44Z",
+      "locator": "Printing Tips (FAQ, components[4]) › 4.Refill Guidelines",
+      "quote": "The refill filament needs to be used with a spool.",
+      "note": "Scoped to the Type value \"Refill\" (offered in Black (53101) only); the \"Filament with spool\" value comes on a spool. The same FAQ points to the wiki guide on swapping filament onto the Bambu Reusable Spool (not cached, not read)."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s5/default/0a98353dce6d486ca848b21d2b19a207.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: TPU for AMS",
+      "retrieved_at": "2026-10-16T08:24:59Z",
+      "sha256": "587ca053a17fdeb1b40d5e639b178c5d980f4c440789d8c2842d67057a0b9b8c"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/7bd498c436d3479ba3160d9271fbd911/SDS20250723SU02_Bambu_TPU_for_AMS.pdf",
+      "title": "Bambu TPU for AMS Safety Data Sheet SDS20250723U02",
+      "retrieved_at": "2026-10-16T08:25:00Z",
+      "sha256": "431cd2635a2127a76b512f315ede27219cddfc1d1da7df444f44a7ee330deb20"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/ac3ca83e470c4e39873463ae1f8ac7bb/TPU_for_AMS_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: TPU For AMS",
+      "retrieved_at": "2026-10-16T08:25:02Z",
+      "sha256": "a6fbe35587d5e4d17ea628699ddb697e08ac787a66a97d33f4cdbdcabd64aa04"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.flexural_strength",
+    "mechanical.flexural_modulus",
+    "thermal.glass_transition",
+    "thermal.vicat_softening",
+    "thermal.heat_deflection_temp"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 11.2 ± 0.5 MPa, elongation 31%, impact 9.6 ± 0.3 kJ/m²) are not stored. Density and melting temperature are raw-material properties from the TDS Physical Properties table and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 1190 ± 0.4 MPa, Z 600 ± 0.5 MPa), melt index 21.8 ± 0.3 g/10 min (210 °C, 2.16 kg), saturated water absorption rate 1.20% (25 °C, 55% RH), crystallization temperature N/A, spool material PC + ABS (temperature resistance 90 °C), spool size 200 × 67 mm, printing and storage humidity < 20% RH (sealed, with desiccant), retraction length 0.8 - 1.4 mm, retraction speed 20 - 40 mm/s, max overhang angle ~ 70°, max bridging length 20 mm, support \"Turn on\", X1 Series heatbed drying 80 - 90 °C 12 h, the advice not to anneal TPU prints, odor, skin hazards, chemical stability, solubility, acid / alkali / organic solvent / oil and grease resistance, flammability and combustion products.",
+    "The TDS recommended chamber temperature (25 - 45 °C) is not written to thermal.chamber_temp: that key is a printer capability (registry type number, template field chamber_temp_max), not a filament print setting, as in the other filament files. The TDS nozzle sizes (0.4, 0.6, 0.8 mm) are written to extrusion.supported_nozzle_diameters, as in the TPU 95A HF and ASA files, and also kept as a compatible_with relation.",
+    "Elongation at break is kept as the text \"> 650%\" (data type number, no value_num): the TDS gives only a lower bound, and storing 650 would claim an equality the document does not make.",
+    "mechanical.hardness \"Shore 68D\" is stored unverified: it is stated only in prose (TDS p.1 Basic Info, and the store page Content Block-2), never in a property table with a test method. Unlike the other curated filaments it is therefore not listed as not_published. For review.",
+    "SDS facts with no registry key are not stored: product name \"Bambu TPU for AMS\", model \"U02-xx\", composition TPU 65-80 % / additive 20-35 % by wt, CLP \"Not classified.\", conditions to avoid (\"Avoid fire, elevated temperatures. direct sunlight.\") and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO-TI/IATA) transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values. The SDS prints its number as \"SDS20250723U02\"; the file name says \"SDS20250723SU02\".",
+    "Source disagreements kept for review: nozzle temperature (TDS 220 - 240 °C vs material-table wiki 200 - 250 °C ±10 °C); bed temperature (TDS 30 - 35 °C vs material-table wiki generic TPU 30 - 45 °C with glue, 35 - 45 ℃ on Smooth PEI / Textured PEI); AMS compatibility (store page \"All AMS Series Compatible\" vs the material-table wiki's generic AMS row \"TPU … Not Compatible\"); AMS HT drying time (drying wiki 18 h vs material-table wiki 12 h, both 75 °C). The product's own TDS and store page are kept.",
+    "Marketing prose proves no number: \"up to 60% faster print speeds compared to Bambu TPU 95A HF\" (store page Content Block-4), \"greatly minimizes the common stringing problems\" and the Highlights (\"Seamless AMS & AMS lite Integration\", \"Tough Yet Flexible\", \"Less TPU Stringing\", \"Blazing Fast TPU Printing\") are not stored as values.",
+    "not_published: the TDS states \"N/A\" for the glass transition temperature, the Vicat softening temperature, the heat deflection temperature (both 1.8 MPa and 0.45 MPa rows), and the bending strength and bending modulus; filament length is stated in none of the documents searched.",
+    "Hex: all 7 colours of the hex table match a store Colour value by name (White, Gray, Yellow, Neon Green, Red, Blue, Black); the table names colours without codes. Its title reads \"TPU For AMS\".",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "material.diameter_tolerance (± 0.05 mm) is the store page's own row (Product Features › bullet 6); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/s5/default/b6cbfa38f55a4094ba59a66ff9577c07.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published. The FAQ's wiki guide on swapping filament onto the Bambu Reusable Spool (https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool) was not cached and not read. No /en/filament/<family> wiki page for TPU was cached.",
+    "The store FAQ (5.Safety Tips) says the filament \"is not food-grade\"; the same list also says it \"contains highly hygroscopic wood fibers\", which contradicts the TDS and SDS composition (thermoplastic polyurethane plus an additive) and reads as a copied sentence. No registry key holds either, and neither is stored.",
+    "The store offers the \"Refill\" Type value in Black (53101) only; the other six colours are \"Filament with spool\" only.",
+    "Adjudication against the second extraction (83 field disagreements in the current diff; every fact present in one file only or stated differently was re-read in the cached TDS, SDS, hex table, both wiki pages and the store page). Same fact written differently (62), this file's form kept: the TDS locators (17; \"p.1, Section › Row\", the hardness prose locator included), the hex locators (7; each row and column re-read in the hex table, every hex matching), the relation locators (5), material.type (the TDS p.3 Composition cell \"Thermoplastic polyurethane\", the document's own words, not the abbreviation \"TPU\", as in the TPU 95A HF and TPU 85A/90A files), and the nozzle relations (32 fields): this file's TDS Nozzle Size row (0.4, 0.6, 0.8 mm nozzles) plus one wiki row for the 0.4, 0.6 and 0.8 mm high flow nozzles state the same facts as the second's six per-column rows from the material-table wiki row \"TPU for AMS\", in the form the TPU 95A HF, PLA Basic and PETG HF files use. Present in one file only or stated differently (21), each kept as this file has it after checking the documents: material.spool_type stays the unverified store bullet \"Comes with High Temperature Reusable Spool\" (the TDS rows \"Spool Material PC + ABS (Temperature resistance 90 °C)\" and \"Spool Size Diameter: 200 mm; Height: 67 mm\" give the spool's material and size, not its type; both stay in that row's note); material.diameter_tolerance is not restated (the store bullet \"Diameter: 1.75mm +/- 0.05mm\" is written by the deterministic layer as its own verified store-page row; the TDS gives no tolerance); thermal.chamber_temp is not written (see the chamber note: no curated filament file writes it, and the second's 25 - 45 °C range does not fit the key's number type); the second's AMS lite row, taken from the highlight \"Seamless AMS & AMS lite Integration\", is already covered by the \"All AMS Series\" family row (compat-targets ams_series, whose members include ams-lite); the target handles bambu-textured-pei-plate, bambu-smooth-pei-plate and bambu-reusable-spool stay (each a manifest row; compat-targets maps \"spool\" to bambu-reusable-spool). Nothing was taken from the second, corrected, added or removed in this pass. An earlier pass had taken from the second extraction extrusion.supported_nozzle_diameters (TDS Nozzle Size row), the high flow nozzle row (material-table wiki), Glue as recommended_with with target_kind \"other\", and the hardness text \"Shore 68D\", and had written material.net_weight in kg (1 kg; stored as 1000 g). Quote check: 13 TDS quotes (density, melting temperature, X-Y tensile strength, nozzle and bed temperature, printing speed, cooling fan, build plate type, nozzle size, and the nozzle, two plate and glue relations) are reported not_found only because the checker strips everything between a \"<\" and the next \">\" as an HTML tag: in this TDS text that removes 2,714 characters, from \"< 20% RH\" (p.1, Printing and Storage Humidity) to the \">\" of \"> 650%\" (p.2). Each of the 13 quotes occurs verbatim in the TDS text under the checker's own normalisation."
+  ]
+}

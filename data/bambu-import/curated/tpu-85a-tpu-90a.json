@@ -1,0 +1,1495 @@
+{
+  "handle": "tpu-85a-tpu-90a",
+  "schema": 2,
+  "curated_by": "agent",
+  "reviewed_by": "",
+  "curated_at": "2026-10-16T14:00:48Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 5 pages read (text layer, per page): Basic Info, Specifications, Recommended Printing Settings, Physical Properties, Mechanical Properties, Other Physical and Chemical Properties, Specimen Test, Disclaimer. Glass transition, crystallization, Vicat softening (\"Vicar\" in the TDS), both heat deflection rows and all four bending rows read \"N/A\"; no hardness and no filament length are given."
+    },
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_85A_Technical_Data_Sheet_a7233668-497b-487f-af8a-3adb49fafaa1.pdf",
+      "title": "Bambu Filament Technical Data Sheet V1.0: TPU 85A",
+      "retrieved_at": "2026-10-16T08:25:20Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 5 pages read; same layout and same \"N/A\" rows as the TPU 90A TDS. Nozzle Size \"0.6, 0.8 mm\" (TPU 90A: \"0.4, 0.6, 0.8 mm\"); every other print setting equals the TPU 90A TDS."
+    },
+    {
+      "kind": "sds",
+      "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_Filament_TPU_90A_MSDS.pdf",
+      "title": "Bambu TPU 90A Material Safety Data Sheet (report ESZ2411110058C00102RM1)",
+      "retrieved_at": "2026-10-16T08:25:18Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 12 pages read (bilingual Chinese/English, prepared for Bambu Lab by EMTEK (Suzhou)). Section 3: Thermoplastic Polyurethane ≥98 % by wt, additive ≤2; section 9: \"No data available\" for melting point, density and every other physical datum; section 14: no UN number or transport class. Model \"U03-xx\"."
+    },
+    {
+      "kind": "sds",
+      "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_Filament_TPU_85A_MSDS.pdf",
+      "title": "Bambu TPU 85A Material Safety Data Sheet (report ESZ2411110058C00101RM1)",
+      "retrieved_at": "2026-10-16T08:25:21Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 12 pages read; identical to the TPU 90A SDS except the report number and model (\"U04-xx\")."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: TPU 90A",
+      "retrieved_at": "2026-10-16T08:25:18Z",
+      "keys": [],
+      "note": "One page, 8 colours (Blaze and Frozen as two-stop vertical gradients, checked on a rendering of the page): read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/c910d98d275f470ba1a3eb5639d7c81f/Bambu_TPU_85A_Hex_Code.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: TPU 85A",
+      "retrieved_at": "2026-10-16T08:25:22Z",
+      "keys": [],
+      "note": "One page, 5 colours: read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer (row \"PLA, PETG, TPU …\"), nozzle (rows \"TPU 85A\" and \"TPU 90A\"), AMS (row \"TPU\" and the \"Too soft\" list), build plate and glue (rows \"TPU\") and storage (row \"TPU\") tables; corroboration and relations only. Its HDT, impact and tensile columns are star ratings, not numbers."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I row \"TPU 85A、TPU 90A\": heatbed 90 °C 16 h, forced-air oven 70 °C 8 h, AMS 2 Pro 65 °C 12 h (may not fully dry TPU), AMS HT 75 °C 18 h. Section 1.3: static drying mode not suitable for TPU."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/tpu-85a-90a",
+      "title": "TPU Printing",
+      "retrieved_at": "2026-10-16T08:26:39Z",
+      "keys": [],
+      "note": "An index page only: it links six printing guides (A series, P series, X series, H2D, X2D, A2L), none of which was cached or read."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload): Product Features and Cautions bullets, the page-builder content blocks, the Download block (8 documents) and the Printing Tips FAQ (6 answers)."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Thermoplastic polyurethane",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Thermoplastic polyurethane",
+      "test_method": "",
+      "test_condition": "Composition as stated by the TDS",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The TPU 85A TDS states the same (p.3, Other Physical and Chemical Properties › Composition). Both SDSs agree (section 3: \"Thermoplastic Polyurethane\" ≥98 % by wt, CAS 9009-54-5, EC 210-898-8; additive ≤2 % by wt)."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The TPU 85A TDS states the same (p.1, Specifications › Diameter). Agrees with the store page (Product Features › bullet 6: \"Diameter: 1.75mm +/- 0.05mm\"); the ± 0.05 mm tolerance stays the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371659",
+        "value_text": "1 kg"
+      },
+      "value": 1,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "Scoped to the store page's only Size value \"1 kg\"; agrees with the store page row (option Size › 1 kg). The TPU 85A TDS states the same (p.1, Specifications › Net Filament Weight). Written in kg, the TDS's own figure; mergeCurated stores it as 1000 g with the text \"1 kg\"."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "value": 1.24,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.2, Properties › Physical Properties › Density",
+      "quote": "Density ISO 1183 1.24 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Raw-material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The SDS (section 9) says \"No data available\" for density; the TDS value is kept."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "value": 1.18,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_85A_Technical_Data_Sheet_a7233668-497b-487f-af8a-3adb49fafaa1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 85A",
+      "locator": "p.2, Properties › Physical Properties › Density",
+      "quote": "Density ISO 1183 1.18 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Raw-material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:20Z",
+      "note": "The SDS (section 9) says \"No data available\" for density; the TDS value is kept."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "value": 180,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.2, Properties › Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 180 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Raw-material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The SDS (section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "value": 177,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_85A_Technical_Data_Sheet_a7233668-497b-487f-af8a-3adb49fafaa1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 85A",
+      "locator": "p.2, Properties › Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 177 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Raw-material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:20Z",
+      "note": "The SDS (section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "value": 12.5,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.2, Properties › Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 12.5 ± 0.8 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 35 °C, 34 mm/s, 100% infill; all specimens dried at 70 °C for 12 h before testing); typical value ± 0.8 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The Z value (10.1 ± 0.6 MPa, same page) has no key of its own and is not stored."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "value": 12,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_85A_Technical_Data_Sheet_a7233668-497b-487f-af8a-3adb49fafaa1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 85A",
+      "locator": "p.2, Properties › Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 12.0 ± 0.8 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 35 °C, 34 mm/s, 100% infill; all specimens dried at 70 °C for 12 h before testing); typical value ± 0.8 MPa",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:20Z",
+      "note": "The Z value (10.5 ± 0.6 MPa, same page) has no key of its own and is not stored."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "value": "> 650%",
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.2, Properties › Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 > 650%",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 35 °C, 34 mm/s, 100% infill; all specimens dried at 70 °C for 12 h before testing). The TDS gives a lower bound only.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "Kept as text: the TDS states only a lower bound, so no number is claimed. The Z value (\"> 350%\") is not stored."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "value": "> 700%",
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_85A_Technical_Data_Sheet_a7233668-497b-487f-af8a-3adb49fafaa1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 85A",
+      "locator": "p.2, Properties › Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 > 700%",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 35 °C, 34 mm/s, 100% infill; all specimens dried at 70 °C for 12 h before testing). The TDS gives a lower bound only.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:20Z",
+      "note": "Kept as text: the TDS states only a lower bound, so no number is claimed. The Z value (\"> 350%\") is not stored."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "value": 124.2,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.2, Properties › Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 124.2 kJ/m²",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 35 °C, 34 mm/s, 100% infill; all specimens dried at 70 °C for 12 h before testing). The TDS does not say notched or unnotched.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The Z value (87.3 kJ/m², same page) is not stored."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "value": 124.3,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_85A_Technical_Data_Sheet_a7233668-497b-487f-af8a-3adb49fafaa1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 85A",
+      "locator": "p.2, Properties › Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 124.3 kJ/m²",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 225 °C, bed 35 °C, 34 mm/s, 100% infill; all specimens dried at 70 °C for 12 h before testing). The TDS does not say notched or unnotched.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:20Z",
+      "note": "The Z value (88.5 kJ/m², same page) is not stored."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 200,
+        "max": 250
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 200 - 250 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The TPU 85A TDS states the same (p.1). The material-table wiki (2. Nozzle, rows \"TPU 85A\" and \"TPU 90A\") agrees: 200 - 250 (±10 °C)."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 30,
+        "max": 35
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 30 - 35 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate Smooth PEI Plate or Textured PEI Plate; glue: Bambu Liquid Glue / Glue Stick",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The TPU 85A TDS states the same (p.1).",
+      "conflict": "The material-table wiki gives 30 - 45 °C for TPU with glue stick or liquid glue (Build Plate Settings 1) and, per plate (Build Plate Settings 3, row \"TPU\"), 35 - 45 ℃ on the Smooth PEI / High-Temperature and Textured PEI plates and 30 - 35 ℃ on the Engineering Plate; the product TDS value is kept."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 200 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 200 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "Kept as text: the TDS gives only an upper bound. The TPU 85A TDS states the same (p.1)."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The TPU 85A TDS states the same (p.1)."
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Smooth PEI Plate",
+        "Textured PEI Plate"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Smooth PEI Plate, Textured PEI Plate",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; glue: Bambu Liquid Glue / Glue Stick",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The TPU 85A TDS states the same (p.1). The store FAQ (1.Accessory Compatibility) agrees: \"Build Plate: Smooth PEI Plate, Textured PEI Plate\". The material-table wiki (Build Plate Settings 3, row \"TPU\") also lists the Engineering Plate (30 - 35 ℃) and rates the Cool Plate / PLA Plate \"Not recommended\"."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 70,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 70 °C, 8 h Printer Heatbed: 90 °C, 16 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives printer heatbed: 90 °C, 16 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "In the TDS layout the row label sits between its two lines; the quote joins them. The TPU 85A TDS states the same (p.1). The drying wiki (Appendix I, row \"TPU 85A、TPU 90A\": forced-air oven 70 °C, 8 h; heatbed 90 °C, 16 h) and the material-table wiki (Storage, row \"TPU\": \"70 ℃ for 8 h\", blast drying oven) agree."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 70 °C, 8 h Printer Heatbed: 90 °C, 16 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 70 °C. The same row gives 16 h on a printer heatbed at 90 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The TPU 85A TDS states the same (p.1). The drying wiki (Appendix I, row \"TPU 85A、TPU 90A\") and the material-table wiki (Storage, row \"TPU\") agree: oven 8 h."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "value": [
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "note": "The store FAQ (1.Accessory Compatibility › Nozzle Compatibility) agrees: \"TPU 90A: Recommended for 0.4 mm, 0.6 mm, and 0.8 mm. Not supported for 0.2 mm and High Flow Nozzle.\" The material-table wiki (2. Nozzle, row \"TPU 90A\") agrees: 0.4, 0.6 and 0.8 mm \"Compatible\", 0.2 mm \"Not Recommended\"."
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "value": [
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_85A_Technical_Data_Sheet_a7233668-497b-487f-af8a-3adb49fafaa1.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 85A",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:20Z",
+      "note": "The store FAQ (1.Accessory Compatibility › Nozzle Compatibility) agrees: \"TPU 85A: Recommended for 0.6 mm and 0.8 mm. Not supported for 0.2 mm, 0.4 mm, and High Flow Nozzle.\"",
+      "conflict": "The material-table wiki (2. Nozzle, row \"TPU 85A\") rates the 0.4 mm nozzle \"Compatible\" (0.2 mm \"Not Recommended\"); the TDS and the store FAQ are kept; for review."
+    },
+    {
+      "key": "material.spool_type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "High Temperature Reusable Spool",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "locator": "Product Features › bullet 5",
+      "quote": "Includes High Temperature Reusable Spool",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "note": "Unverified: an unlabelled store-page bullet. Product scope: the page has no spool / refill group (Size \"1 kg\" only). Both TDSs (p.1, Specifications) give \"Spool Material ABS (Temperature resistance 90 °C)\" and \"Spool Size Diameter: 200 mm; Height: 67 mm\"."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "value": "Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series.",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 85A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "note": "Unverified: store FAQ text. The same answer block says multi-material printing with PLA/PETG is \"Only available on the H2D/H2C when using TPU 90A\". The relations below carry the same statement per printer."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "value": "Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series.",
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "store_page",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 90A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series.",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "note": "Unverified: store FAQ text. The relations below carry the same statement per printer."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Black (51103)",
+      "source_value_id": "573761693833371655",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 90A",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Black Hex:#000000",
+      "retrieved_at": "2026-10-16T08:25:18Z",
+      "note": "The TPU 90A table's \"Black\"; the store pairs Black (51103) with TPU 90A only (Black (51107) is the TPU 85A black)."
+    },
+    {
+      "value_text": "White (51105)",
+      "source_value_id": "573761693833371654",
+      "hex": "#FFFFEE",
+      "source_url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 90A",
+      "locator": "p.1, row 1, column 2",
+      "quote": "White Hex:#FFFFEE",
+      "retrieved_at": "2026-10-16T08:25:18Z",
+      "note": "Published as #FFFFEE (not #FFFFFF); kept as written."
+    },
+    {
+      "value_text": "Grape Jelly (51700)",
+      "source_value_id": "679919133690675201",
+      "hex": "#D6ABFF",
+      "source_url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 90A",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Grape Jelly Hex:#D6ABFF",
+      "retrieved_at": "2026-10-16T08:25:18Z"
+    },
+    {
+      "value_text": "Crystal Blue (51601)",
+      "source_value_id": "679919133690675202",
+      "hex": "#7EB4E1",
+      "source_url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 90A",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Crystal Blue Hex:#7EB4E1",
+      "retrieved_at": "2026-10-16T08:25:18Z"
+    },
+    {
+      "value_text": "Cocoa Brown (51800)",
+      "source_value_id": "679919133690675203",
+      "hex": "#5C4738",
+      "source_url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 90A",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Cocoa Brown Hex:#5C4738",
+      "retrieved_at": "2026-10-16T08:25:18Z"
+    },
+    {
+      "value_text": "Quicksilver(51106)",
+      "source_value_id": "697573986952392705",
+      "hex": "#9EA2A2",
+      "source_url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 90A",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Quicksilver Hex:#9EA2A2",
+      "retrieved_at": "2026-10-16T08:25:18Z",
+      "note": "The store value text has no space before the code (\"Quicksilver(51106)\"); kept exactly."
+    },
+    {
+      "value_text": "Blaze (51901)",
+      "source_value_id": "573761693833371653",
+      "hexes": [
+        "#F1AAA8",
+        "#D21B3C"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 90A",
+      "locator": "p.1, row 4, column 1",
+      "quote": "Blaze Hex:#F1AAA8,#D21B3C",
+      "retrieved_at": "2026-10-16T08:25:18Z",
+      "table_rendering": "vertical gradient, #F1AAA8 at the top to #D21B3C at the bottom",
+      "note": "The store FAQ (5.Gradient Length) says the gradient appears only once per 1 kg spool."
+    },
+    {
+      "value_text": "Frozen (51900)",
+      "source_value_id": "573761693833371652",
+      "hexes": [
+        "#FFFFFF",
+        "#40B6E4"
+      ],
+      "gradient": true,
+      "source_url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 90A",
+      "locator": "p.1, row 4, column 2",
+      "quote": "Frozen Hex:#FFFFFF,#40B6E4",
+      "retrieved_at": "2026-10-16T08:25:18Z",
+      "table_rendering": "vertical gradient, #FFFFFF at the top to #40B6E4 at the bottom",
+      "note": "The store FAQ (5.Gradient Length) says the gradient appears only once per 1 kg spool."
+    },
+    {
+      "value_text": "Black (51107)",
+      "source_value_id": "679919133690675204",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s7/default/c910d98d275f470ba1a3eb5639d7c81f/Bambu_TPU_85A_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 85A",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Black Hex:#000000",
+      "retrieved_at": "2026-10-16T08:25:22Z",
+      "note": "The TPU 85A table's \"Black\"; the store pairs Black (51107) with TPU 85A only."
+    },
+    {
+      "value_text": "Light Cyan (51500)",
+      "source_value_id": "573761693833371657",
+      "hex": "#C3E2D6",
+      "source_url": "https://store.bblcdn.com/s7/default/c910d98d275f470ba1a3eb5639d7c81f/Bambu_TPU_85A_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 85A",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Light Cyan Hex:#C3E2D6",
+      "retrieved_at": "2026-10-16T08:25:22Z"
+    },
+    {
+      "value_text": "Neon Orange (51305)",
+      "source_value_id": "573761693833371656",
+      "hex": "#F68B1B",
+      "source_url": "https://store.bblcdn.com/s7/default/c910d98d275f470ba1a3eb5639d7c81f/Bambu_TPU_85A_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 85A",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Neon Orange Hex:#F68B1B",
+      "retrieved_at": "2026-10-16T08:25:22Z"
+    },
+    {
+      "value_text": "Rose Beige/Flesh (51201)",
+      "source_value_id": "679919133690675205",
+      "hex": "#F3CFB2",
+      "source_url": "https://store.bblcdn.com/s7/default/c910d98d275f470ba1a3eb5639d7c81f/Bambu_TPU_85A_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 85A",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Rose Beige (Flesh) Hex:#F3CFB2",
+      "retrieved_at": "2026-10-16T08:25:22Z",
+      "note": "The table names it \"Rose Beige (Flesh)\"; the store value is \"Rose Beige/Flesh (51201)\"."
+    },
+    {
+      "value_text": "Lime Green (51501)",
+      "source_value_id": "679919133690675206",
+      "hex": "#CDEA80",
+      "source_url": "https://store.bblcdn.com/s7/default/c910d98d275f470ba1a3eb5639d7c81f/Bambu_TPU_85A_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: TPU 85A",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Lime Green Hex:#CDEA80",
+      "retrieved_at": "2026-10-16T08:25:22Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS HT",
+      "target_source_handle": "ams-ht",
+      "target_family": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Product Features › Cautions for Use › bullet 2",
+      "quote": "AMS HT Compatible",
+      "note": "The store FAQ (1.Accessory Compatibility) says \"AMS HT: Compatible. Please read the Wiki carefully for feeding instructions.\" The drying wiki (Appendix I, row \"TPU 85A、TPU 90A\") gives AMS HT drying at 75 °C for 18 h; the material-table wiki (Storage, row \"TPU\") gives 75 ℃ for 12 h."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS 2 Pro",
+      "target_source_handle": "ams-2-pro",
+      "target_family": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS 2 Pro, AMS, AMS lite NOT Compatible",
+      "note": "For feeding. The store FAQ says \"AMS, AMS lite, AMS 2 Pro: Not Compatible\"; the material-table wiki (3. AMS & AMS lite) gives TPU \"Not Compatible\" and lists TPU 85A as \"Too soft\". Drying is a different use: the drying wiki (Appendix I) lists AMS 2 Pro 65 °C for 12 h with \"AMS 2 Pro may not be able to fully dry TPU — use heatbed or AMS HT instead.\""
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS",
+      "target_source_handle": "ams-multicolor-printing",
+      "target_family": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS 2 Pro, AMS, AMS lite NOT Compatible",
+      "note": "For feeding. The store FAQ says \"AMS, AMS lite, AMS 2 Pro: Not Compatible\"; the material-table wiki (3. AMS & AMS lite) gives TPU \"Not Compatible\" and lists TPU 85A as \"Too soft\". Drying is a different use: the drying wiki (Appendix I) lists AMS 2 Pro 65 °C for 12 h with \"AMS 2 Pro may not be able to fully dry TPU — use heatbed or AMS HT instead.\""
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "ams",
+      "target_label": "AMS lite",
+      "target_source_handle": "ams-lite",
+      "target_family": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Product Features › Cautions for Use › bullet 3",
+      "quote": "AMS 2 Pro, AMS, AMS lite NOT Compatible",
+      "note": "For feeding. The store FAQ says \"AMS, AMS lite, AMS 2 Pro: Not Compatible\"; the material-table wiki (3. AMS & AMS lite) gives TPU \"Not Compatible\" and lists TPU 85A as \"Too soft\". Drying is a different use: the drying wiki (Appendix I) lists AMS 2 Pro 65 °C for 12 h with \"AMS 2 Pro may not be able to fully dry TPU — use heatbed or AMS HT instead.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "printer",
+      "target_label": "H2S",
+      "target_source_handle": "h2s",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 85A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "family",
+      "target_label": "H2D",
+      "target_source_handle": "",
+      "target_family": "model_h2d",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 85A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series.",
+      "condition": "right filament inlet only"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C",
+      "target_source_handle": "h2c",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 85A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series.",
+      "condition": "right filament inlet only"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "family",
+      "target_label": "X Series",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 85A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series.",
+      "note": "The FAQ does not say which printers \"X Series\" covers, so no target family is named (for review). The TPU wiki page links separate printing guides for A series, P series, X series, H2D, X2D and A2L."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "family",
+      "target_label": "P Series",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 85A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series.",
+      "note": "The FAQ does not say which printers \"P Series\" covers, so no target family is named (for review). The TPU wiki page links separate printing guides for A series, P series, X series, H2D, X2D and A2L."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "family",
+      "target_label": "A Series",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 85A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, and P Series. Not Compatible with A Series.",
+      "note": "The FAQ does not say which printers \"A Series\" covers, so no target family is named (for review). The TPU wiki page links separate printing guides for A series, P series, X series, H2D, X2D and A2L."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "printer",
+      "target_label": "H2S",
+      "target_source_handle": "h2s",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 90A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "family",
+      "target_label": "H2D",
+      "target_source_handle": "",
+      "target_family": "model_h2d",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 90A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series.",
+      "condition": "right filament inlet only"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "printer",
+      "target_label": "H2C",
+      "target_source_handle": "h2c",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 90A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series.",
+      "condition": "right filament inlet only"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "family",
+      "target_label": "X Series",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 90A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series.",
+      "note": "The FAQ does not say which printers \"X Series\" covers, so no target family is named (for review). The TPU wiki page links separate printing guides for A series, P series, X series, H2D, X2D and A2L."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "family",
+      "target_label": "P Series",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 90A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series.",
+      "note": "The FAQ does not say which printers \"P Series\" covers, so no target family is named (for review). The TPU wiki page links separate printing guides for A series, P series, X series, H2D, X2D and A2L."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "family",
+      "target_label": "A Series",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "TPU 90A: Compatible with H2S, H2D/H2C (right filament inlet only), X Series, P Series, and A Series.",
+      "note": "The FAQ does not say which printers \"A Series\" covers, so no target family is named (for review). The TPU wiki page links separate printing guides for A series, P series, X series, H2D, X2D and A2L."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "part",
+      "target_label": "0.6 mm Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 85A: Recommended for 0.6 mm and 0.8 mm. Not supported for 0.2 mm, 0.4 mm, and High Flow Nozzle.",
+      "note": "The TPU 85A TDS (p.1, Recommended Printing Settings › Nozzle Size) gives \"0.6, 0.8 mm\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "part",
+      "target_label": "0.8 mm Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 85A: Recommended for 0.6 mm and 0.8 mm. Not supported for 0.2 mm, 0.4 mm, and High Flow Nozzle.",
+      "note": "The TPU 85A TDS (p.1, Recommended Printing Settings › Nozzle Size) gives \"0.6, 0.8 mm\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 85A: Recommended for 0.6 mm and 0.8 mm. Not supported for 0.2 mm, 0.4 mm, and High Flow Nozzle.",
+      "note": "The material-table wiki (2. Nozzle, row \"TPU 85A\") rates the 0.2 mm nozzle \"Not Recommended\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "part",
+      "target_label": "0.4 mm Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 85A: Recommended for 0.6 mm and 0.8 mm. Not supported for 0.2 mm, 0.4 mm, and High Flow Nozzle.",
+      "conflict": "The material-table wiki (2. Nozzle, row \"TPU 85A\") rates the 0.4 mm nozzle \"Compatible\"; the TPU 85A TDS lists 0.6 and 0.8 mm only. The store FAQ and the TDS are kept; for review."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371650",
+        "value_text": "TPU 85A"
+      },
+      "target_kind": "part",
+      "target_label": "High Flow Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 85A: Recommended for 0.6 mm and 0.8 mm. Not supported for 0.2 mm, 0.4 mm, and High Flow Nozzle.",
+      "note": "The material-table wiki (row \"TPU 85A\") gives the 0.4 mm high-flow nozzle \"Not Compatible\" and the 0.6 / 0.8 mm high-flow nozzles \"Not Recommended\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "part",
+      "target_label": "0.4 mm Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 90A: Recommended for 0.4 mm, 0.6 mm, and 0.8 mm. Not supported for 0.2 mm and High Flow Nozzle.",
+      "note": "The TPU 90A TDS (p.1, Recommended Printing Settings › Nozzle Size) gives \"0.4, 0.6, 0.8 mm\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "part",
+      "target_label": "0.6 mm Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 90A: Recommended for 0.4 mm, 0.6 mm, and 0.8 mm. Not supported for 0.2 mm and High Flow Nozzle.",
+      "note": "The TPU 90A TDS (p.1, Recommended Printing Settings › Nozzle Size) gives \"0.4, 0.6, 0.8 mm\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "part",
+      "target_label": "0.8 mm Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 90A: Recommended for 0.4 mm, 0.6 mm, and 0.8 mm. Not supported for 0.2 mm and High Flow Nozzle.",
+      "note": "The TPU 90A TDS (p.1, Recommended Printing Settings › Nozzle Size) gives \"0.4, 0.6, 0.8 mm\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "part",
+      "target_label": "0.2 mm Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 90A: Recommended for 0.4 mm, 0.6 mm, and 0.8 mm. Not supported for 0.2 mm and High Flow Nozzle.",
+      "note": "The material-table wiki (2. Nozzle, row \"TPU 90A\") rates the 0.2 mm nozzle \"Not Recommended\"."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "part",
+      "target_label": "High Flow Nozzle",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Nozzle Compatibility",
+      "quote": "TPU 90A: Recommended for 0.4 mm, 0.6 mm, and 0.8 mm. Not supported for 0.2 mm and High Flow Nozzle.",
+      "note": "The material-table wiki (row \"TPU 90A\") rates the 0.4 / 0.6 / 0.8 mm high-flow nozzles \"Not Recommended\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "target_family": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Smooth PEI Plate, Textured PEI Plate",
+      "note": "The TPU 85A TDS (p.1) and the store FAQ (\"Build Plate: Smooth PEI Plate, Textured PEI Plate\") agree."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "target_family": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Smooth PEI Plate, Textured PEI Plate",
+      "note": "The TPU 85A TDS (p.1) and the store FAQ (\"Build Plate: Smooth PEI Plate, Textured PEI Plate\") agree."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Liquid Glue",
+      "target_source_handle": "liquid-glue-for-build-plate",
+      "target_family": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "locator": "p.1, Recommended Printing Settings › Glue",
+      "quote": "Glue Bambu Liquid Glue / Glue Stick",
+      "note": "The TPU 85A TDS (p.1) states the same; the material-table wiki (Build Plate Settings 1, row \"TPU\") gives 30 - 45 °C with either glue.",
+      "conflict": "The store FAQ (1.Accessory Compatibility) says \"Glue: No Glue Required\". Not a contradiction of compatibility, but the TDS recommends glue; for review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Glue Stick",
+      "target_source_handle": "glue-stick-for-build-plate",
+      "target_family": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V1.0: TPU 90A",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "locator": "p.1, Recommended Printing Settings › Glue",
+      "quote": "Glue Bambu Liquid Glue / Glue Stick",
+      "note": "The TPU 85A TDS (p.1) states the same; the material-table wiki (Build Plate Settings 1, row \"TPU\") gives 30 - 45 °C with either glue.",
+      "conflict": "The store FAQ (1.Accessory Compatibility) says \"Glue: No Glue Required\". Not a contradiction of compatibility, but the TDS recommends glue; for review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "573761693833371649",
+        "value_text": "TPU 90A"
+      },
+      "target_kind": "material",
+      "target_label": "PLA/PETG (multi-material printing)",
+      "target_source_handle": "",
+      "target_family": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/tpu-85a-tpu-90a",
+      "source_title": "Bambu Lab US store product page: TPU 85A / TPU 90A",
+      "retrieved_at": "2026-10-16T07:04:28Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility › Printer Compatibility",
+      "quote": "Multi-material printing with PLA/PETG: Not supported on H2S, X Series, P Series, and A Series. Only available on the H2D/H2C when using TPU 90A.",
+      "condition": "H2D / H2C only",
+      "note": "Content block \"Seamless Multi-Material Printing\" says the same (\"exclusive to Bambu TPU 90A and compatible dual-nozzle printers such as Bambu Lab H2C and H2D\"). 3.Printing Tips: \"Bambu TPU 90A does not support printing with filaments other than the PLA and PETG series, and Bambu TPU 85A does not support full multi-material printing.\""
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_90A_Technical_Data_Sheet_582bf8f6-1f0a-474c-aeda-9e72af3689dc.pdf",
+      "title": "TPU 90A Filament TDS",
+      "retrieved_at": "2026-10-16T08:25:16Z",
+      "sha256": "1bd702da7bb1dd6c8b56816d2469f29f5c3d9943524b7d84b779b064203effb0"
+    },
+    {
+      "kind": "sds",
+      "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_Filament_TPU_90A_MSDS.pdf",
+      "title": "TPU 90A Filament MSDS",
+      "retrieved_at": "2026-10-16T08:25:18Z",
+      "sha256": "1bf69416a0a49c3520719d15f6adb2c3c04589a74912495690ad152e28c10148"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s1/default/7e2c8bbbf2ff4c6996778bbb577bae13/Bambu_TPU_90A_Hex_Code_Table.pdf",
+      "title": "TPU 90A Hex Code",
+      "retrieved_at": "2026-10-16T08:25:18Z",
+      "sha256": "d423c7480f6994f1e310e68f1f38a3538f76f52a8b709d9e9b0450fd8a30ccc7"
+    },
+    {
+      "kind": "tds",
+      "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_TPU_85A_Technical_Data_Sheet_a7233668-497b-487f-af8a-3adb49fafaa1.pdf",
+      "title": "TPU 85A Filament TDS",
+      "retrieved_at": "2026-10-16T08:25:20Z",
+      "sha256": "70f480e450f416c4df7a0a0445c4fb356da782382c4308bddcb76ae4b401e4ae"
+    },
+    {
+      "kind": "sds",
+      "url": "https://cdn.shopify.com/s/files/1/0645/5876/0155/files/Bambu_Filament_TPU_85A_MSDS.pdf",
+      "title": "TPU 85A Filament MSDS",
+      "retrieved_at": "2026-10-16T08:25:21Z",
+      "sha256": "6f6b706ee7b66d9aac9c0ee0f543404530d5c6fe760ba6d1cd14083f0aba0342"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/c910d98d275f470ba1a3eb5639d7c81f/Bambu_TPU_85A_Hex_Code.pdf",
+      "title": "TPU 85A Hex Code",
+      "retrieved_at": "2026-10-16T08:25:22Z",
+      "sha256": "21d54a40b077f03c71d387e37b5d04060a376fcd8925ece4c98781a350246f42"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/tpu-85a-90a",
+      "title": "TPU Printing",
+      "retrieved_at": "2026-10-16T08:26:39Z",
+      "sha256": "a408c301e92bbb32e2ec5592acd85d21b204342c5ddb944c0a3db22d0fa1de02"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness",
+    "mechanical.flexural_strength",
+    "mechanical.flexural_modulus",
+    "thermal.glass_transition",
+    "thermal.vicat_softening",
+    "thermal.heat_deflection_temp"
+  ],
+  "notes": [
+    "Option scope: density, melting temperature, the nozzle sizes and the X-Y printed-specimen tensile, elongation and impact values differ between the two TDSs, so each is stored on its Product value (\"TPU 85A\" 573761693833371650, \"TPU 90A\" 573761693833371649). Every other TDS value is identical in both TDSs and is stored once at product scope, citing the TPU 90A TDS with the TPU 85A locator in its note.",
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (TPU 90A: tensile 10.1 ± 0.6 MPa, elongation > 350%, impact 87.3 kJ/m²; TPU 85A: tensile 10.5 ± 0.6 MPa, elongation > 350%, impact 88.5 kJ/m²) are not stored. Density and melting temperature are raw-material properties from the TDS Physical Properties table and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "TDS facts with no registry key are not stored: Young's modulus (TPU 90A X-Y 5.3 ± 0.7 MPa, Z 4.4 ± 0.6 MPa; TPU 85A X-Y 6.8 ± 0.7 MPa, Z 5.2 ± 0.6 MPa), melt index (TPU 90A 9.36 ± 2.6, TPU 85A 8.76 ± 2.6 g/10 min at 210 °C, 2.16 kg), saturated water absorption (TPU 90A 0.61%, TPU 85A 0.67%, 25 °C, 55% RH), crystallization temperature N/A, spool material ABS (temperature resistance 90 °C), spool size 200 × 67 mm, printing and storage humidity < 20% RH (sealed, with desiccant), glue (Bambu Liquid Glue / Glue Stick), retraction length 0.4 - 0.8 mm, retraction speed 10 - 30 mm/s, chamber temperature 25 - 45 °C, max overhang angle ~ 40°, max bridging length 10 mm, support material \"Turn on\", printer heatbed drying 90 °C 16 h, the advice not to anneal TPU prints, odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products.",
+    "The TDS recommended chamber temperature (25 - 45 °C) is not written to thermal.chamber_temp: the key describes a printer capability, not a filament print setting. The TDS nozzle sizes are written to extrusion.supported_nozzle_diameters per Product value (TPU 90A 0.4, 0.6, 0.8 mm; TPU 85A 0.6, 0.8 mm), as in the TPU 95A HF file and the other filament files, and are also carried by the nozzle relations.",
+    "Elongation at break and print speed are kept as text (\"> 650%\", \"> 700%\", \"< 200 mm/s\"): the TDS gives only a bound, and storing the number would claim an equality the document does not make.",
+    "SDS facts with no registry key are not stored: models \"U03-xx\" (TPU 90A) and \"U04-xx\" (TPU 85A), \"No harm to the body\", no hazard symbols, no UN number or transport classification. The SDS section 5 says \"The product itself is not flammable\", the TDS says \"Flammability Flammable\"; neither has a key and neither is stored (for review). The SDS is prepared for Bambu Lab by a testing lab (EMTEK (Suzhou)); no SDS value is stored as a spec.",
+    "Marketing prose proves no number: \"The Softest Bambu TPU\", \"With a higher hardness\", \"Exceptional Wear Resistance\" and the content-block claims are not stored as values.",
+    "not_published: both TDSs state \"N/A\" for the glass transition temperature, the Vicat softening temperature, the heat deflection temperature (1.8 MPa and 0.45 MPa rows), and the bending strength and bending modulus; filament length and hardness are stated in none of the documents searched. The product names carry \"85A\" and \"90A\", the usual Shore A hardness grades, but no document states a hardness value or a test method, so mechanical.hardness is not inferred from the names (for review, as for TPU 95A HF).",
+    "Hex: all 13 store Colour values have a published hex: 8 from the TPU 90A table, 5 from the TPU 85A table. The two blacks are matched by the store's own variant pairing (Black (51103) only with TPU 90A, Black (51107) only with TPU 85A). Blaze and Frozen carry two stops each (\"hexes\", gradient).",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "material.diameter_tolerance (± 0.05 mm) is the store page's own row (Product Features › bullet 6); the TDSs give no tolerance, so it is not restated here and not marked not_published.",
+    "The store Download block links \"TPU 90A Filament RoHS\" and \"TPU 85A Filament RoHS\" certificates that were not cached and not read, so safety.certifications is neither curated nor marked not_published. The store page also links the wiki guides /en/h2/h2d-tpu-printing-guide and /en/h2/manual/soft-and-hard-filament-multi-material-printing-guide, and the TPU wiki page links six printing guides; none was cached or read.",
+    "Store FAQ (6.Safety Tips) says the filament \"is not food-grade\"; the same list also says it \"contains highly hygroscopic wood fibers\", which contradicts both TDSs (composition: thermoplastic polyurethane) and both SDSs (thermoplastic polyurethane ≥98 % by wt) and reads as a copied sentence. No registry key holds either, and neither is stored.",
+    "Merge check: the store page gives a product-scope not_found row for material.density (an expected key); the curated density is option-scoped, and mergeCurated keeps that product-scope not_found row beside the two option rows (the package builder drops such a row when another row supplies the key, mergeCurated does not). For the integrator.",
+    "Adjudication against the second extraction (170 field disagreements; every fact present in one file only or stated differently was re-read in the cached TDSs, SDSs, hex tables, wiki pages and store page). Same fact written differently (56), this file's form kept unless said: the TDS locators (10; \"p.2, Properties › Physical / Mechanical Properties › row\"), the hex locators (13; row and column checked in both hex tables), the FAQ relation locators (15), the relation target encoding (8; H2D as family model_h2d per compat-targets, \"X Series\", \"P Series\", \"A Series\" as family rows with no family id since the FAQ does not say which printers they cover), the resolved target handles of the AMS HT, AMS 2 Pro, AMS, AMS lite, H2S and H2C relations (8; each the compat-targets resolution and a manifest row), and material.type, which stays the TDS p.3 Composition cell \"Thermoplastic polyurethane\" (the document's own words, not the abbreviation \"TPU\"). The PLA/PETG multi-material relation's label is rewritten to the quote's own words, \"PLA/PETG (multi-material printing)\" (neither file's label: \"Bambu … series\" is not in the FAQ bullet; the second's \"on H2D / H2C\" is this row's condition). Present in one file only or stated differently (114), each kept as this file has it after checking the documents: material.spool_type stays the unverified store bullet \"Includes High Temperature Reusable Spool\" (the TDS rows \"Spool Material ABS (Temperature resistance 90 °C)\" and \"Spool Size Diameter: 200 mm; Height: 67 mm\" give the spool's material and size, not its type, and the second extraction's verified value paraphrases them); the two compat.statement rows and the nozzle relations (the store FAQ's Printer Compatibility and Nozzle Compatibility bullets, verbatim); the build plate and glue relations (TDS p.1, Build Plate Type and Glue rows); material.diameter_tolerance is not restated (the store page's own verified row, Product Features › bullet 6, already carries ± 0.05 mm at the same rank, and no TDS states a tolerance); mechanical.hardness stays not_published: \"85A\" and \"90A\" are only in the product names and TDS titles, and no cached document states a hardness value or method, so the second extraction's unverified \"85A\" / \"90A\" are not written. Taken from the second extraction in an earlier pass, after checking the documents: extrusion.supported_nozzle_diameters per Product value (each TDS's Nozzle Size row) and target_kind \"material\" for the PLA/PETG relation (\"filament\" is not a product_relations target_kind). Also corrected: the six mechanical test_condition strings no longer say the specimens were \"not annealed\" (the TDS only advises against annealing TPU prints). material.net_weight is written in kg, the TDS's own figure (1 kg; stored as 1000 g). Quote checker: its 17 not_found lines (the TDS quotes for density, melting temperature, tensile strength, nozzle and bed temperature, printing speed, cooling fan, build plate, nozzle size and the plate and glue relations) are verbatim in the cached TDS text; its HTML tag stripper reads the TDS's \"< 20% RH\" … \"> 650%\" (TPU 85A: \"> 700%\") as one tag and deletes the text between them."
+  ]
+}

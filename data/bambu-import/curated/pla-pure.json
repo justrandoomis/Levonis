@@ -1,0 +1,807 @@
+{
+  "handle": "pla-pure",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T14:27:49Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "title": "TDS of Bambu PLA Pure V1.0",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*",
+        "extrusion.supported_nozzle_diameters"
+      ],
+      "note": "All 4 pages read (text layer page by page, each checked against the rendered page): Recommended Printing Settings, Physical, Thermal, Mechanical and Other Physical and Chemical Properties, Certificate Reports (images only), Mechanical Properties Comparison, Disclaimer. No Specifications section: no diameter, net weight, filament length, spool or hardness row."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/be522eeca49c4bbb8824a89b9f9bf872/SDS20260206A19_Bambu_PLA_Pure.pdf",
+      "title": "Bambu PLA Pure Safety Data Sheet SDS20260206A19 (prepared by Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:25:43Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read (text layer; the composition table also checked against the rendered page). The manufacturer's own SDS for \"Bambu PLA Pure\" (model A19-xx). Section 3: polylactic acid 95-99 % and additive \"5-1\" % by wt; section 9 \"No data available\" for every property but physical state \"Thread\"; CLP \"Not classified\"; not hazardous goods for sea, road and air. No spec value is stored from it."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/cb680ec8a366477b9379e2fe1eba98e9/Bambu_PLA_Pure_Hex_Code.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Pure",
+      "retrieved_at": "2026-10-16T08:25:44Z",
+      "keys": [],
+      "note": "One page with a text layer: 5 named colour cells with hex codes, positions from the word boxes and checked against the rendered page. Read for published hex codes, not spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla-pure",
+      "title": "PLA Pure Advanced Printing Guide",
+      "retrieved_at": "2026-10-16T08:26:45Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "The product's own guide: five ingredients, the three safety standards, advanced safety suggestions, storage (≤ 20% RH), drying table (oven 55°C, 8 hours; AMS 2 Pro / AMS HT 45°C 12 h inserted, 55°C 8 h not inserted; heatbed 60°C-70°C, 12 hours). No mechanical, density or nozzle-temperature values."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Generic \"PLA*\" / \"PLA\" rows; no row or note names PLA Pure (note ② lists PLA Basic, Matte, Tough, Metal, Silk, Aero, Dynamic). Not applied to this product."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Names PLA Pure once (\"Except for PLA Pure, PLA filaments are NOT food-contact grade.\"); the hardware compatibility and drying tables have no PLA Pure row; 4.1 gives a generic PLA HDT of 57°C."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I has no PLA Pure row (PLA Basic / PLA Matte, PLA Silk, PLA-CF / GF, PLA Wood, PLA Aero, PLA Galaxy, supports). The store FAQ (3. Drying Recommendations) points to this page."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-pure",
+      "title": "Bambu Lab US store product page: PLA Pure",
+      "retrieved_at": "2026-10-16T07:05:34Z",
+      "keys": [
+        "material.*",
+        "print_settings.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, page-builder sections (banner, feature blocks, RFID), Download block, FAQ. Gives diameter 1.75 mm ± 0.03 mm and net weight 1kg (rows the builder writes)."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Polylactic acid",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polylactic acid",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The SDS (p.4, section 3) gives Polylactic acid 95-99 % by wt (CAS 26100-51-6) and an Additive printed as \"5-1\" % by wt; the PLA Pure wiki (Filament Introduction) names five ingredients: PLA, acrylate copolymer, colorants, ethylene bis stearamide (EBS) and asbestos-free talc."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.24,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.24 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The TDS comparison table (p.4, Mechanical Properties Comparison › density › PLA Pure) agrees: 1.24. The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 160,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.2, Thermal Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 160 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Thermal Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.2, Thermal Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 55 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Thermal Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 63,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.2, Thermal Properties › Vicat Softening Temperature",
+      "quote": "Vicat Softening Temperature ISO 306, GB/T 1633 63 °C",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (TDS \"Thermal Properties\"); specimen preparation not stated",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 56,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.2, Thermal Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 56 °C",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value; specimen preparation not stated. The next row gives 60 °C at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The deformation chart beside the table agrees (≈ 56℃ at 1.8 MPa, ≈ 60.0℃ at 0.45 MPa). Not a product disagreement: the PLA wiki (4.1) says \"heat deflection temperature of only 57°C\" for PLA in general (no load stated). The store FAQ (1. Printing Tips) says \"do not expose printed parts to temperatures above 60°C\" (usage guidance, not stored)."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 51.5,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.3, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 51.5 ± 2 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PLA Pure Milky Pink dried in a 50 °C blast drying oven for 8 h before printing; Bambu H2D, 0.4 mm hardened steel nozzle, nozzle 220 °C, bed 55 °C, 147 mm/s, 100% infill)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z"
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 5.6,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.3, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 5.6 ± 1.0 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PLA Pure Milky Pink dried in a 50 °C blast drying oven for 8 h before printing; Bambu H2D, 0.4 mm hardened steel nozzle, nozzle 220 °C, bed 55 °C, 147 mm/s, 100% infill)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z"
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 2880,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.3, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 2880 ± 100 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PLA Pure Milky Pink dried in a 50 °C blast drying oven for 8 h before printing; Bambu H2D, 0.4 mm hardened steel nozzle, nozzle 220 °C, bed 55 °C, 147 mm/s, 100% infill)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The TDS comparison table (p.4, Bending Modulus (X-Y) › PLA Pure) agrees: 2880±100."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 75,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.3, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 75 ± 2 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PLA Pure Milky Pink dried in a 50 °C blast drying oven for 8 h before printing; Bambu H2D, 0.4 mm hardened steel nozzle, nozzle 220 °C, bed 55 °C, 147 mm/s, 100% infill)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The TDS comparison table (p.4, Bending Strength (X-Y) › PLA Pure) agrees: 75±2."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 20.6,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.3, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 20.6 ± 0.7 kJ/m²",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (TDS p.3 note: PLA Pure Milky Pink dried in a 50 °C blast drying oven for 8 h before printing; Bambu H2D, 0.4 mm hardened steel nozzle, nozzle 220 °C, bed 55 °C, 147 mm/s, 100% infill); un-notched per the TDS comparison table (p.4)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The TDS comparison table (p.4, \"Impact Strength (X-Y, un-notched)\" › PLA Pure) agrees: 20.6±0.7."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 190,
+        "max": 230
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 190 - 230 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "No wiki row names PLA Pure with a nozzle temperature (the material-table wiki's \"PLA*\" row, 190 - 240 °C ±10 °C, is standard PLA by its note ②, which does not name PLA Pure), so no wiki value is compared."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 65
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 65 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate Textured PEI Plate / Smooth PEI Plate / Cool Plate Supertack; glue not recommended",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The PLA Pure wiki (Common Printing Issues › 2. Model Warping) suggests lowering the bed to 50°C against warping, inside this range. The material-table wiki's generic \"PLA\" bed rows do not name PLA Pure and are not compared."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 200 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed < 200 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z"
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate",
+        "Smooth PEI Plate",
+        "Cool Plate Supertack"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; glue not recommended",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The store FAQ (2. Accessory Compatibility) says \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "key": "extrusion.supported_nozzle_diameters",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "0.2 mm",
+        "0.4 mm",
+        "0.6 mm",
+        "0.8 mm"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Recommended Printing Settings\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "Added at adjudication from the TDS (p.1, row \"Nozzle Size\"), which the second extraction also read; the same row stays the nozzle relation. The store FAQ (2. Accessory Compatibility) says \"Compatible with all printers, AMS, build plate, and nozzles.\" For food-contact parts the PLA Pure wiki (Advanced Safety Suggestions) advises a brand-new, non-brass nozzle kept for PLA Pure: guidance, not a size limit."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 50,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing › Blast Drying Oven",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 50 °C, 8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 / P / H2 Series printer heatbed 60 - 70 °C, 12 h; AMS 2 Pro & AMS HT 45 °C, 12 h (filament inserted) or 55 °C, 8 h (not inserted).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "conflict": "Official sources disagree: the PLA Pure wiki (Common Printing Issues › 3. Model Stringing › drying table) gives \"Blast Drying Oven | 55°C, 8 hours\"; the TDS gives 50 °C. The TDS value (official_doc) is kept; left to review.",
+      "note": "The PLA Pure wiki agrees with the TDS on the heatbed (60°C-70°C, 12 hours) and on the AMS 2 Pro / AMS HT settings. The drying wiki (Appendix I) has no PLA Pure row; the material-table wiki gives 55 ℃ for 8 h for generic PLA, not naming PLA Pure."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing › Blast Drying Oven",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 50 °C, 8 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 50 °C. The same row gives 12 h on an X1 / P / H2 Series printer heatbed at 60 - 70 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The PLA Pure wiki agrees on the oven time (\"Blast Drying Oven | 55°C, 8 hours\"); its temperature differs (see drying.temperature)."
+    },
+    {
+      "key": "compat.statement",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "All Bambu 3D printers",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "locator": "p.1, Recommended Printing Settings › Printers Compatibility",
+      "quote": "Printers Compatibility All Bambu 3D printers",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (TDS \"Printers Compatibility\" row)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "note": "The next TDS row (\"AMS Compatibility AMS, AMS 2 PRO, AMS HT, AMS Lite\") is kept as a relation. The store FAQ agrees: \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "key": "safety.certifications",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "UL GREENGUARD Certification",
+        "EU Regulation No. 10/2011",
+        "EN 71-3"
+      ],
+      "unit": "",
+      "status": "unverified",
+      "confidence": "official_page",
+      "source_kind": "wiki",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla-pure",
+      "source_title": "PLA Pure Advanced Printing Guide",
+      "locator": "Filament Introduction › list \"PLA Pure has passed three international safety standards\"",
+      "quote": "PLA Pure has passed three international safety standards: … UL GREENGUARD Certification … EU Regulation No. 10/2011 … EN 71-3, under the EU Toy Safety Directive 2009/48/EC",
+      "test_method": "",
+      "test_condition": "",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:26:45Z",
+      "note": "Unverified: manufacturer prose, and the certificates and test reports themselves were not read (the store page's \"EU 10/2011 Food Contact Report\", \"EN 71-3 Toy Safety Report\" and \"Filament RoHS\" PDFs were not cached). The store page agrees (Product Features: \"certified to UL GREENGUARD 2904\", \"Passed testing under EU toy-safety standard EN 71-3\", \"each has passed EU food-contact testing\"). The TDS p.4 \"Certificate Reports\" shows images only; the UL certificate image names \"A1 PF002-A 3D Printer with Bambu PLA Pure\". No third-party lab value is stored."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Pure White (17100)",
+      "source_value_id": "738885389516173316",
+      "hex": "#FFFFFF",
+      "source_url": "https://store.bblcdn.com/s7/default/cb680ec8a366477b9379e2fe1eba98e9/Bambu_PLA_Pure_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Pure",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Pure White Hex:#FFFFFF",
+      "retrieved_at": "2026-10-16T08:25:44Z"
+    },
+    {
+      "value_text": "Absolute Black (17101)",
+      "source_value_id": "738885389516173317",
+      "hex": "#000000",
+      "source_url": "https://store.bblcdn.com/s7/default/cb680ec8a366477b9379e2fe1eba98e9/Bambu_PLA_Pure_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Pure",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Absolute Balck Hex:#000000",
+      "retrieved_at": "2026-10-16T08:25:44Z",
+      "note": "The hex table misspells the name \"Absolute Balck\"; it is the only black cell and the store value is \"Absolute Black (17101)\"."
+    },
+    {
+      "value_text": "Baby Blue (17600)",
+      "source_value_id": "738885389516173314",
+      "hex": "#A4DBE8",
+      "source_url": "https://store.bblcdn.com/s7/default/cb680ec8a366477b9379e2fe1eba98e9/Bambu_PLA_Pure_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Pure",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Baby Blue Hex:#A4DBE8",
+      "retrieved_at": "2026-10-16T08:25:44Z"
+    },
+    {
+      "value_text": "Milky Pink (17200)",
+      "source_value_id": "738885389516173313",
+      "hex": "#F7CED7",
+      "source_url": "https://store.bblcdn.com/s7/default/cb680ec8a366477b9379e2fe1eba98e9/Bambu_PLA_Pure_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Pure",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Milky Pink Hex:#F7CED7",
+      "retrieved_at": "2026-10-16T08:25:44Z"
+    },
+    {
+      "value_text": "Apricot (17300)",
+      "source_value_id": "738885389516173315",
+      "hex": "#FFB673",
+      "source_url": "https://store.bblcdn.com/s7/default/cb680ec8a366477b9379e2fe1eba98e9/Bambu_PLA_Pure_Hex_Code.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Pure",
+      "locator": "p.1, row 3 (full-width tile)",
+      "quote": "Apricot Hex:#FFB673",
+      "retrieved_at": "2026-10-16T08:25:44Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "ams_series",
+      "target_label": "AMS, AMS 2 PRO, AMS HT, AMS Lite",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "locator": "p.1, Recommended Printing Settings › AMS Compatibility",
+      "quote": "AMS Compatibility AMS, AMS 2 PRO, AMS HT, AMS Lite",
+      "note": "The store page says \"All AMS Series Compatible\" (Product Features), which the builder already turns into pending ams_series rows; the store FAQ says \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_family": "all_bambu_printers",
+      "target_label": "All Bambu 3D printers",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "locator": "p.1, Recommended Printing Settings › Printers Compatibility",
+      "quote": "Printers Compatibility All Bambu 3D printers",
+      "note": "The store FAQ (2. Accessory Compatibility) agrees: \"Compatible with all printers, AMS, build plate, and nozzles.\""
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate Supertack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack"
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2, 0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "note": "Nozzle sizes, not store products: no target handle is named. The same TDS row is also stored as extrusion.supported_nozzle_diameters. For food-contact parts the PLA Pure wiki (Advanced Safety Suggestions › 3) advises a brand-new, non-brass nozzle kept for PLA Pure; that is guidance, not an incompatibility, so no relation is written."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA",
+      "target_source_handle": "support-for-pla-new",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "source_title": "TDS of Bambu PLA Pure V1.0",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "locator": "p.1, Recommended Printing Settings › Support",
+      "quote": "Support Support for PLA"
+    },
+    {
+      "relation": "requires",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "738885389516173319",
+        "value_text": "Refill"
+      },
+      "target_kind": "spool",
+      "target_label": "spool",
+      "target_source_handle": "bambu-reusable-spool",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-pure",
+      "source_title": "Bambu Lab US store product page: PLA Pure",
+      "retrieved_at": "2026-10-16T07:05:34Z",
+      "locator": "FAQ (components[4]) › 4. Refill Guidelines",
+      "quote": "The refill filament needs to be used with a spool.",
+      "note": "Scoped to the Type value \"Refill\": \"Filament with spool\" comes on a spool. The FAQ names the Bambu Reusable Spool for the swap; Product Features say the same (\"Note: The refill needs to be used with a spool.\"), which the builder already writes at product scope."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/18f44e818d5f41ed8876364ecbb7af8d/PLA_Pure-TDS.pdf",
+      "title": "TDS of Bambu PLA Pure V1.0",
+      "retrieved_at": "2026-10-16T08:25:41Z",
+      "sha256": "e3aecef282b9c25ccdc4d506ad42bbecd44608396bfed5c3802ba8059b4f2b61"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/be522eeca49c4bbb8824a89b9f9bf872/SDS20260206A19_Bambu_PLA_Pure.pdf",
+      "title": "Bambu PLA Pure Safety Data Sheet SDS20260206A19 (prepared by Shenzhen Tuozhu Technology Co., Ltd.)",
+      "retrieved_at": "2026-10-16T08:25:43Z",
+      "sha256": "fedb44c595efc41e47e7442fbe6586e507797fd05cdcbdde6aaf9ac9a1414aad"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/cb680ec8a366477b9379e2fe1eba98e9/Bambu_PLA_Pure_Hex_Code.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Pure",
+      "retrieved_at": "2026-10-16T08:25:44Z",
+      "sha256": "9f01ce91d967d47910ee0f961ed9b2a4e3aad3020c95c6ff6da65a5e2d8aa325"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla-pure",
+      "title": "PLA Pure Advanced Printing Guide",
+      "retrieved_at": "2026-10-16T08:26:45Z",
+      "sha256": "900b61dc68d83bc863c68eb4115d4b6cb1f4aa472337e9e64c198fddf54f58ec"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 30.0 ± 3 MPa, elongation 2.8 ± 0.5 %, bending modulus 2599 ± 71 MPa, bending strength 55 ± 5 MPa, impact 10.0 ± 0.7 kJ/m² un-notched) are not stored. Density (ISO 1183) and the DSC melting and glass transition temperatures are raw-material properties and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows.",
+    "The TDS V1.0 has no Specifications section: material.diameter (1.75 mm), material.diameter_tolerance (± 0.03 mm) and material.net_weight (1kg) stay the store page's own rows (Product Features › bullet 4; option Size › 1kg). They are not restated here and not marked not_published.",
+    "TDS facts with no registry key are not stored: Young's modulus (X-Y 2481 ± 20 MPa, Z 2196 ± 25 MPa), melt index (11.76 ± 1.6 g/10 min at 210 °C, 2.16 kg), crystallization temperature (\"/\"), saturated water absorption rate (0.28% at 25 °C, 55% RH) and its moisture chart, recommended re-drying interval (18 days), printing and storage humidity (< 20% RH, sealed, with desiccant), retraction length (0.4 - 0.8 mm) and speed (20 - 40 mm/s), max overhang angle (55 °), max bridging length (30 mm), suggested annealing (50 to 60 °C, 6 to 12 hours), colour and state, odor, skin hazards, chemical stability, solubility, chemical resistance, flammability and combustion products rows. AMS and printer compatibility, build plates, nozzle sizes and support material are kept as relations; the nozzle sizes are also extrusion.supported_nozzle_diameters.",
+    "Not stored although a registry key exists: heat deflection temperature 60 °C at 0.45 MPa (thermal.heat_deflection_temp keeps the 1.8 MPa row, as in every other filament file) and the TDS recommended chamber temperature (p.1, \"Chamber Temperature 25 - 40 °C\"): thermal.chamber_temp is one number used for a printer's chamber capability (registry type number, template field chamber_temp_max), and this is a recommended range for printing the filament; no other filament file stores it.",
+    "Glue: the TDS (\"Glue Not Recommended (Adhesive residue may compromise the contact safety of finished parts ...)\"), the store FAQ (\"the use of Bambu Liquid Glue or Solid Glue is not recommended\") and the PLA Pure wiki (3.1 Glue Is Not Recommended) say not recommended, which is neither compatible nor incompatible, so no glue relation is written.",
+    "SDS facts with no registry key are not stored: composition (polylactic acid 95-99 %, additive printed as \"5-1\" % by wt), CLP \"Not classified\", and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO/IATA) transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values. The SDS model \"A19-xx\" (p.2, section 1: \"Model : A19-xx(xx stands for any suffix)\") is not written to identity.model: identity rows come from the reviewed identity map only (§C.1; the map gives \"PLA Pure\"), and a curated official_doc row would outrank it with a designation carrying a wildcard suffix.",
+    "Source disagreement left to review: blast-oven drying temperature, TDS 50 °C vs the PLA Pure wiki 55°C (both 8 h). The TDS value is kept with a conflict note on drying.temperature.",
+    "The material-table wiki does not name PLA Pure. Its note ② defines \"PLA\" as standard PLA without hard, large-particle or inorganic non-metallic fillers and names neither PLA Pure (whose wiki lists asbestos-free talc among its five ingredients) among the included nor among the excluded types, so its generic \"PLA\" values (nozzle 190 - 240 °C, bed 35 - 45 ℃ Cool Plate / 45 - 65 ℃ other plates, oven drying 55 ℃ for 8 h, AMS 2 Pro / AMS HT 45 ℃ for 12 h) are not applied.",
+    "Third-party results are not stored as manufacturer specs: the store page's emission comparison (\"In a 4-hour continuous print test conducted by an accredited international laboratory, PLA Pure produced lower PM2.5 and PM10 emissions than a third-party PLA\") and the UL, SGS and BACL certificates and test reports reproduced as images on TDS p.4.",
+    "Marketing prose proves no number: \"PLA Pure matches Bambu PLA Basic in mechanical performance\", \"noticeably less stringing\", \"Reduced residue helps minimize nozzle clogs\" (store page) and \"noticeably lower emissions\" (TDS p.1) are not stored as values.",
+    "Hex: all 5 store colours have exactly one hex cell, matched by the colour name without the code in parentheses; values read from the text layer and checked against the rendered page. The table writes \"Absolute Balck\" for \"Absolute Black (17101)\".",
+    "material.spool_type is neither stored nor marked not_published: no source names the spool (the TDS has no spool row, the store page only offers Type \"Filament with spool\" / \"Refill\"), and the Type option group carries the choice.",
+    "The store page links documents that were not cached and not read: Filament RoHS (https://store.bblcdn.com/s7/default/82789b66d501474797af593274bc97cd/Bambu_PLA_Pure_ROHS_REACH_PAHS_POPS_TSCA_CP65.pdf), EU 10/2011 Food Contact Report (https://store.bblcdn.com/s7/default/660378233c314fe2bd9981d35c5ed1ad/Bambu_PLA_Pure_EU_Food_Contact_EN.pdf), EN 71-3 Toy Safety Report (https://store.bblcdn.com/s7/default/079ff4b0c05446ba80fc4aa9923653f2/Bambu_PLA_Pure_EU_Toy_Safety_EN.pdf) and the wiki guide https://wiki.bambulab.com/en/general/swaping-new-filament-with-bambu-reusable-spool. safety.certifications therefore stays unverified.",
+    "Wiki facts with no registry key are not stored: storage at ≤ 20% RH, the food-contact limits (not above 60°C or below 0°C), the expected service life of printed parts, and the slicer suggestions for higher contact safety (max volumetric speed 6 mm³/s, sparse infill 20-40%, 3-4 wall loops).",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section).",
+    "Adjudication against the independent second extraction (final diff: 102 disagreements in 204 compared fields; every field present in one file only or valued differently was re-checked in the cached TDS, SDS, hex table, PLA Pure wiki or store page). Same fact, this file's form kept (63): locator wording (\"p.N, Section › Row\"); the hex locators (tile row and column; Apricot is the full-width third row, checked on the rendered page); the relation forms of the sibling filament files: one ams_series family relation for the TDS AMS Compatibility row rather than four per-unit relations, one all_bambu_printers family relation (a class of printers, not one model), compatible_with (not recommended_with) for the TDS Support row, the plate relations with their manifest handles, and the refill's requires-spool relation with the cached store page as its source and the bambu-reusable-spool handle its FAQ names. Kept against the second (39): material.type \"Polylactic acid\" (the TDS p.3 Composition cell; the second's \"PLA\" is not in its own quote); thermal.heat_deflection_temp 56 °C, the ISO 75 1.8 MPa row, as in every other filament file (the 0.45 MPa row, 60 °C, is in the TDS too and is noted); safety.certifications unverified, official_page, with the wiki's own item name \"UL GREENGUARD Certification\" (manufacturer prose; the run-time wiki reader also writes wiki rows unverified; the reports were not read); compat.statement and the nozzle-size relation (both stated on TDS p.1). Not added from the second: material.diameter 1.75 mm, material.diameter_tolerance 0.03 mm and material.net_weight 1kg (the store page does state them, Product Features › bullet 4 \"Diameter: 1.75mm +/- 0.03mm\" and option Size › 1kg, and the builder writes those rows at the same rank, so restating them changes nothing; the second gave them no source URL and named the option group \"Net weight\", which is \"Size\" on the page), thermal.chamber_temp 25 - 40 °C (stated on TDS p.1 but a printer key; see the chamber note) and identity.model \"A19-xx\" (stated on SDS p.2; see the SDS note). The earlier pass added extrusion.supported_nozzle_diameters (TDS p.1 Nozzle Size) and narrowed the drying quotes to the Blast Drying Oven entry. The test note's printer was checked on the rendered TDS p.3: \"Bambu H2D model\" (the text layer drops the D)."
+  ]
+}

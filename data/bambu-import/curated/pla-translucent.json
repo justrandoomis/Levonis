@@ -1,0 +1,828 @@
+{
+  "handle": "pla-translucent",
+  "schema": 2,
+  "curated_by": "agent",
+  "curated_at": "2026-10-16T14:08:38Z",
+  "searched": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*"
+      ],
+      "note": "All 5 pages read (text layer page by page; pages 1 and 2 also as images): Basic Info, Specifications, Recommended Printing Settings, Physical, Mechanical and Other Physical and Chemical Properties, Specimen Test, test drawings, Disclaimer. No filament length and no hardness value is given."
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/8a9bc9278da74ee4bd5490bae9fb634d/SDS20250928A17_Bambu_PLA_Translucent.pdf",
+      "title": "Bambu PLA Translucent Safety Data Sheet SDS20250928A17",
+      "retrieved_at": "2026-10-16T08:25:28Z",
+      "keys": [
+        "material.*",
+        "thermal.*",
+        "safety.*"
+      ],
+      "note": "All 18 pages read. Section 3 gives the composition; section 9 says \"No data available\" for melting point, density and the other physical data; section 14 classifies it as not hazardous goods."
+    },
+    {
+      "kind": "store_doc",
+      "url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "retrieved_at": "2026-10-16T08:25:29Z",
+      "keys": [],
+      "note": "One page, 10 colours in 5 rows of 2 (text layer and word positions): read for the published hex codes (the \"hex\" list), not for spec keys."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Printer, nozzle, AMS, build plate, glue and storage tables. No row names PLA Translucent; the generic \"PLA*\", \"PLA\", \"PLA / PLA-CF\" and \"PLA, PETG, TPU, …\" rows were read as corroboration and for relations."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "keys": [
+        "print_settings.*",
+        "drying.*",
+        "thermal.*",
+        "mechanical.*",
+        "compat.*"
+      ],
+      "note": "Hardware compatibility table (row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\") and its 0.2 mm tip, drying table (row \"PLA CF / Translucent\"), transparency tips (5.2)."
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "keys": [
+        "drying.*"
+      ],
+      "note": "Appendix I and II read; no row names PLA Translucent (rows \"PLA Basic / PLA Matte\", \"PLA Silk\", \"PLA-CF / GF\" and others)."
+    },
+    {
+      "kind": "store_page",
+      "url": "https://us.store.bambulab.com/products/pla-translucent",
+      "title": "Bambu Lab US store product page: PLA Translucent",
+      "retrieved_at": "2026-10-16T07:04:50Z",
+      "keys": [
+        "material.*",
+        "mechanical.*",
+        "thermal.*",
+        "print_settings.*",
+        "drying.*",
+        "safety.*",
+        "compat.*"
+      ],
+      "note": "Parsed with the package (extractPage + buildImportPayload with the manifest row): Product Features, Cautions for Use, page-builder sections, Printing Tips FAQ, Download block."
+    }
+  ],
+  "specs": [
+    {
+      "key": "material.type",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Polylactic acid",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.3, Other Physical and Chemical Properties › Composition",
+      "quote": "Composition Polylactic acid",
+      "test_method": "",
+      "test_condition": "Composition (TDS \"Other Physical and Chemical Properties\"; no test method given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The SDS (p.4, section 3) gives Polylactic acid 85-95 % by wt (CAS 26023-30-3) and an additive 5-15 % by wt."
+    },
+    {
+      "key": "material.diameter",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.75,
+      "unit": "mm",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.1, Specifications › Diameter",
+      "quote": "Diameter 1.75 mm",
+      "test_method": "",
+      "test_condition": "Nominal value (TDS \"Specifications\"; no test method or tolerance given)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "Agrees with the store page (Product Features › bullet 4: \"Diameter: 1.75mm +/- 0.03mm\"); the tolerance is the store page's own row."
+    },
+    {
+      "key": "material.net_weight",
+      "scope": {
+        "kind": "option_value",
+        "source_value_id": "593999615827689486",
+        "value_text": "1 kg"
+      },
+      "value": 1,
+      "unit": "kg",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.1, Specifications › Net Filament Weight",
+      "quote": "Net Filament Weight 1 kg",
+      "test_method": "",
+      "test_condition": "Nominal net filament weight (TDS \"Specifications\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "Written as published (1 kg); the merge stores 1000 g with the text \"1 kg\". Scoped to the store page's only Net weight value \"1 kg\"; agrees with the store page row (option Size › 1 kg)."
+    },
+    {
+      "key": "material.density",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 1.22,
+      "unit": "g/cm³",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Physical Properties › Density",
+      "quote": "Density ISO 1183 1.22 g/cm³",
+      "test_method": "ISO 1183",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for density; the TDS value is kept. The store page states no density (its row is not_found)."
+    },
+    {
+      "key": "thermal.melting_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 156,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Physical Properties › Melting Temperature",
+      "quote": "Melting Temperature DSC, 10 °C/min 156 °C",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The SDS (p.9, section 9) says \"No data available\" for the melting point; the TDS value is kept."
+    },
+    {
+      "key": "thermal.glass_transition",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 54,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Physical Properties › Glass Transition Temperature",
+      "quote": "Glass Transition Temperature DSC, 10 °C/min 54 ℃",
+      "test_method": "DSC, 10 °C/min",
+      "test_condition": "Material property, typical value (TDS \"Physical Properties\")",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z"
+    },
+    {
+      "key": "thermal.vicat_softening",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 61,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Physical Properties › Vicat Softening Temperature",
+      "quote": "Vicat Softening Temperature ISO 306, GB/T 1633 61 ℃",
+      "test_method": "ISO 306, GB/T 1633",
+      "test_condition": "Typical value (TDS \"Physical Properties\"; the specimen form is not stated)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z"
+    },
+    {
+      "key": "thermal.heat_deflection_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Physical Properties › Heat Deflection Temperature (1st row)",
+      "quote": "Heat Deflection Temperature ISO 75 1.8 MPa 55 ℃",
+      "test_method": "ISO 75",
+      "test_condition": "Load 1.8 MPa, typical value (TDS \"Physical Properties\"; the specimen form is not stated). The next row gives 60 ℃ at 0.45 MPa.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "One row per key: the 1.8 MPa row is stored, as for the other filaments; the 0.45 MPa row (\"Heat Deflection Temperature ISO 75 0.45 MPa 60 ℃\") is recorded here. The PLA wiki (4.1 Hot Extruder Clogging Due to Thermal Creep) says generic PLA has \"a heat deflection temperature of only 57°C\"; that is a family statement without a load, not this product's value."
+    },
+    {
+      "key": "mechanical.tensile_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 55.4,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Mechanical Properties › Tensile Strength (X-Y)",
+      "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 55.4 ± 5 MPa",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "Printed-specimen result (± 5 MPa). The Z row gives 28.9 ± 4 MPa (not stored: one key per scope)."
+    },
+    {
+      "key": "mechanical.elongation_at_break",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 11,
+      "unit": "%",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Mechanical Properties › Breaking Elongation Rate (X-Y)",
+      "quote": "Breaking Elongation Rate (X-Y) ISO 527, GB/T 1040 11 ± 3.1 %",
+      "test_method": "ISO 527, GB/T 1040",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The Z row gives 9.6 ± 1.7 % (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_modulus",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 3000,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Mechanical Properties › Bending Modulus (X-Y)",
+      "quote": "Bending Modulus (X-Y) ISO 178, GB/T 9341 3000 ± 120 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The Z row gives 2650 ± 140 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.flexural_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 85,
+      "unit": "MPa",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Mechanical Properties › Bending Strength (X-Y)",
+      "quote": "Bending Strength (X-Y) ISO 178, GB/T 9341 85 ± 3 MPa",
+      "test_method": "ISO 178, GB/T 9341",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The Z row gives 42 ± 4 MPa (not stored)."
+    },
+    {
+      "key": "mechanical.impact_strength",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 18.5,
+      "unit": "kJ/m²",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.2, Mechanical Properties › Impact Strength (X-Y)",
+      "quote": "Impact Strength (X-Y) ISO 179, GB/T 1043 18.5 ± 3.7 kJ/m²； 6.7 ± 2.2 kJ/m² (notched)",
+      "test_method": "ISO 179, GB/T 1043",
+      "test_condition": "Printed specimens, X-Y orientation (specimen printing: nozzle 220 °C, bed 35 °C, 150 mm/s, 100% infill; annealed and dried at 50 °C for 8 h before testing). First value of the cell, not marked notched (the TDS does not say unnotched); the same cell gives 6.7 ± 2.2 kJ/m² (notched).",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The Z row gives 8.5 ± 1.2 kJ/m² without saying notched or unnotched (not stored)."
+    },
+    {
+      "key": "print_settings.nozzle_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 200,
+        "max": 240
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Temperature",
+      "quote": "Nozzle Temperature 200 - 240 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The store page states no nozzle temperature (its row is not_found).",
+      "conflict": "The material-table wiki (2. Nozzle, generic row \"PLA*\") gives 190 - 240 (column \"Nozzle temperature /℃ ( ±10 °C)\"); PLA Translucent is not named there. The product TDS value is kept."
+    },
+    {
+      "key": "print_settings.bed_temp",
+      "scope": {
+        "kind": "product"
+      },
+      "value": {
+        "min": 35,
+        "max": 65
+      },
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.1, Recommended Printing Settings › Bed Temperature",
+      "quote": "Bed Temperature 35 - 65 °C",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate Textured PEI Plate, Smooth PEI Plate or Cool Plate Supertack, surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The material-table wiki (Build Plate Settings › 1, generic row \"PLA / PLA-CF\") agrees: 35 - 65 °C with glue stick or liquid glue. Its plate table (Build Plate Settings › 3, row \"PLA\") gives 35 - 45 ℃ on the Cool Plate / PLA Plate and 45 - 65 ℃ on the Engineering (\"Glue Required\"), Smooth PEI / High-Temperature and Textured PEI plates, all inside the TDS range."
+    },
+    {
+      "key": "print_settings.print_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "< 150 mm/s",
+      "unit": "mm/s",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.1, Recommended Printing Settings › Printing Speed",
+      "quote": "Printing Speed ＜ 150 mm/s",
+      "test_method": "",
+      "test_condition": "Recommended printing setting (an upper bound only)",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "Kept as text: the TDS gives only an upper bound, so no lower bound is invented. The PLA wiki (5.2 Improve the Transparency of Transparent Filaments) suggests 20 mm/s for maximum transparency, a tip, not a specification."
+    },
+    {
+      "key": "print_settings.fan_speed",
+      "scope": {
+        "kind": "product"
+      },
+      "value": "Turn on",
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.1, Recommended Printing Settings › Cooling Fan",
+      "quote": "Cooling Fan Turn on",
+      "test_method": "",
+      "test_condition": "Recommended printing setting",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The PLA wiki (5.2 Improve the Transparency of Transparent Filaments) suggests turning off all fans for maximum transparency, a tip, not a specification."
+    },
+    {
+      "key": "print_settings.recommended_plate",
+      "scope": {
+        "kind": "product"
+      },
+      "value": [
+        "Textured PEI Plate",
+        "Smooth PEI Plate",
+        "Cool Plate Supertack"
+      ],
+      "unit": "",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "test_method": "",
+      "test_condition": "Recommended printing setting; build plate surface preparation: glue",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The cell wraps over two lines in the PDF (\"Textured PEI Plate / Smooth PEI\" / \"Plate/Cool Plate Supertack\"). The PLA wiki (1.1 Hardware compatibility, row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\") says \"All printers compatible\" under its \"Print Bed Compatibility (Description)\" column."
+    },
+    {
+      "key": "drying.temperature",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 50,
+      "unit": "°C",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 50 °C，8 h X1 Series Printer Heatbed: 60 - 70 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven, 8 h. The same row gives X1 Series printer heatbed: 60 - 70 °C, 12 h.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "The PLA wiki (2.1 Drying the Filament, row \"PLA CF / Translucent\") agrees: convection oven 50℃，8 h (hot bed 70℃，12 h; AMS HT / AMS 2 Pro 55℃，8 h).",
+      "conflict": "The material-table wiki (Storage and Material Specifications, generic row \"PLA\") gives 55 ℃ for 8 h in a blast drying oven; PLA Translucent is not named there. The product TDS value, which the product-named PLA wiki row confirms, is kept."
+    },
+    {
+      "key": "drying.time",
+      "scope": {
+        "kind": "product"
+      },
+      "value": 8,
+      "unit": "h",
+      "status": "verified",
+      "confidence": "official_doc",
+      "source_kind": "tds",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "locator": "p.1, Recommended Printing Settings › Drying Settings before Printing",
+      "quote": "Drying Settings before Printing Blast Drying Oven: 50 °C，8 h X1 Series Printer Heatbed: 60 - 70 °C, 12 h",
+      "test_method": "",
+      "test_condition": "Blast drying oven at 50 °C. The same row gives 12 h on an X1 Series printer heatbed at 60 - 70 °C.",
+      "region": "",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "note": "Every cached source agrees on 8 h in an oven: the PLA wiki (row \"PLA CF / Translucent\": 50℃，8 h) and the material-table wiki (generic \"PLA\" row: 55 ℃ for 8 h)."
+    }
+  ],
+  "hex": [
+    {
+      "value_text": "Teal (13612)",
+      "source_value_id": "593999615827689473",
+      "hex": "#009FA1",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 1, column 1",
+      "quote": "Teal Hex:#009FA1",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    },
+    {
+      "value_text": "Light Jade (13510)",
+      "source_value_id": "593999615827689478",
+      "hex": "#96D8AF",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 1, column 2",
+      "quote": "Light Jade Hex:#96D8AF",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    },
+    {
+      "value_text": "Blue (13611)",
+      "source_value_id": "593999615827689474",
+      "hex": "#0047BB",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 2, column 1",
+      "quote": "Blue Hex:#0047BB",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    },
+    {
+      "value_text": "Mellow Yellow (13410)",
+      "source_value_id": "593999615827689479",
+      "hex": "#F5DBAB",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 2, column 2",
+      "quote": "Mellow Yellow Hex:#F5DBAB",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    },
+    {
+      "value_text": "Purple (13710)",
+      "source_value_id": "593999615827689475",
+      "hex": "#8344B0",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 3, column 1",
+      "quote": "Purple Hex:#8344B0",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    },
+    {
+      "value_text": "Cherry Pink (13211)",
+      "source_value_id": "593999615827689480",
+      "hex": "#F5B6CD",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 3, column 2",
+      "quote": "Cherry Pink Hex:#F5B6CD",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    },
+    {
+      "value_text": "Orange (13301)",
+      "source_value_id": "593999615827689476",
+      "hex": "#F74E02",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 4, column 1",
+      "quote": "Orange Hex:#F74E02",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    },
+    {
+      "value_text": "Ice Blue (13610)",
+      "source_value_id": "593999615827689481",
+      "hex": "#B8CDE9",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 4, column 2",
+      "quote": "Ice Blue Hex:#B8CDE9",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    },
+    {
+      "value_text": "Red (13210)",
+      "source_value_id": "593999615827689477",
+      "hex": "#B50011",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 5, column 1",
+      "quote": "Red Hex:#B50011",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    },
+    {
+      "value_text": "Lavender (13711)",
+      "source_value_id": "593999615827689482",
+      "hex": "#B8ACD6",
+      "source_url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "source_title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "locator": "p.1, row 5, column 2",
+      "quote": "Lavender Hex:#B8ACD6",
+      "retrieved_at": "2026-10-16T08:25:29Z"
+    }
+  ],
+  "relations": [
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "AMS series",
+      "target_source_handle": "",
+      "target_family": "ams_series",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/filament/pla",
+      "source_title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "locator": "1.1 Hardware compatibility › table › row \"PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal\" › Component Compatibility",
+      "quote": "PLA Basic / Matte / Translucent / Tough+ / Lite/ Metal | All standard nozzles are compatible (no special restrictions) | All printers compatible | Fully compatible with the AMS series |",
+      "note": "The store page says the same (Product Features › Cautions for Use › bullet 1: \"All AMS Series Compatible\"), and its feature text says the printing parameters in the RFID tag \"can be read through our AMS\". The material-table wiki (3. AMS & AMS lite, generic row \"PLA*\") gives \"Compatible\" for AMS / AMS lite."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "family",
+      "target_label": "Open-frame or enclosed printer",
+      "target_source_handle": "",
+      "target_family": "all_bambu_printers",
+      "evidence_kind": "wiki_table",
+      "source_url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "source_title": "Filament guide - Printer, Nozzle, AMS, Build Plate, Glue Compatibility and Required Parameters",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "locator": "Printer, Nozzle and AMS Compatibility › 1. Printer › table › row \"PLA, PETG, TPU, …\" › Recommended Printer",
+      "quote": "PLA, PETG, TPU, and their CF/GF reinforced materials (e.g., PLA-CF/GF, PETG-CF/GF, etc.) | Not prone to warping; no mandatory temperature requirements | Open-frame or enclosed printer |",
+      "note": "Generic PLA row; PLA Translucent is not named in it. The same page (3. AMS & AMS lite, row \"PLA*\") gives \"Compatible\" for open-frame printers (A Series, P1P, etc.) and enclosed printers (H2 Series, X2D, P2S, X1 Series, P1S, etc.). The PLA wiki row naming Translucent says \"All printers compatible\" (under a column headed \"Print Bed Compatibility (Description)\")."
+    },
+    {
+      "relation": "not_compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Hotend with Stainless Steel Nozzle 0.2 mm",
+      "target_source_handle": "",
+      "evidence_kind": "description_text",
+      "source_url": "https://us.store.bambulab.com/products/pla-translucent",
+      "source_title": "Bambu Lab US store product page: PLA Translucent",
+      "retrieved_at": "2026-10-16T07:04:50Z",
+      "locator": "Printing Tips (FAQ) › 1.Accessory Compatibility",
+      "quote": "Not compatible with Hotend with Stainless Steel Nozzle 0.2 mm.",
+      "note": "The page sets \"Hotend with Stainless Steel Nozzle 0.2 mm\" in bold, without a link. The PLA wiki agrees (1.1 Hardware compatibility, tip: \"PLA Glow, PLA Translucent⚠️, PLA Galaxy⚠️, PLA Marble⚠️, PLA Sparkle⚠️ are not compatible with 0.2 mm stainless steel nozzles.\"). Disagreeing: the TDS (p.1, Recommended Printing Settings › Nozzle Size: \"0.2, 0.4, 0.6, 0.8 mm\"), the PLA wiki row \"All standard nozzles are compatible (no special restrictions)\" and the material-table wiki generic \"PLA*\" row (\"Compatible\" for the 0.2 mm nozzle). Both are kept: the TDS row is the compatible_with relation \"0.2, 0.4, 0.6, 0.8 mm nozzles\", and this relation records the product-specific exclusion of the stainless steel 0.2 mm nozzle. compat-targets.json lists \"0.2 mm Nozzle\" as reviewed-unresolvable (component concept), so no target handle is named."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "0.2, 0.4, 0.6, 0.8 mm nozzles",
+      "target_source_handle": "",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "locator": "p.1, Recommended Printing Settings › Nozzle Size",
+      "quote": "Nozzle Size 0.2, 0.4, 0.6, 0.8 mm",
+      "note": "The TDS Nozzle Size row as written. The store FAQ and the PLA wiki tip exclude the 0.2 mm stainless steel nozzle; that exclusion is the not_compatible_with relation \"Hotend with Stainless Steel Nozzle 0.2 mm\" (the sources disagree on 0.2 mm; both statements are kept). The PLA wiki row naming Translucent: \"All standard nozzles are compatible (no special restrictions)\". Hardened steel is \"Not Required\" for generic PLA (material-table wiki, 2. Nozzle, row \"PLA*\"). The TDS row is recorded as this relation only, not as the customer-facing spec extrusion.supported_nozzle_diameters: the official sources disagree on 0.2 mm, and a verified \"0.2 mm\" row would contradict the store FAQ."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Textured PEI Plate",
+      "target_source_handle": "bambu-textured-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "note": "The material-table wiki (Build Plate Settings › 3, generic row \"PLA\") gives 45 - 65 ℃ on the Bambu Textured PEI Plate."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Smooth PEI Plate",
+      "target_source_handle": "bambu-smooth-pei-plate",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "note": "The material-table wiki (Build Plate Settings › 3, generic row \"PLA\") gives 45 - 65 ℃ on the \"Bambu Smooth PEI / High-Temperature Plate\"."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "part",
+      "target_label": "Cool Plate Supertack",
+      "target_source_handle": "bambu-cool-plate-supertack",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "locator": "p.1, Recommended Printing Settings › Build Plate Type",
+      "quote": "Build Plate Type Textured PEI Plate / Smooth PEI Plate/Cool Plate Supertack",
+      "note": "The TDS spells it \"Cool Plate Supertack\"; the store product is \"Bambu Cool Plate SuperTack Series\" (manifest handle bambu-cool-plate-supertack)."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "Support for PLA",
+      "target_source_handle": "support-for-pla-new",
+      "evidence_kind": "spec_row",
+      "source_url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "source_title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "locator": "p.1, Recommended Printing Settings › Support Material",
+      "quote": "Support Material Support for PLA",
+      "note": "The TDS names the support material \"Support for PLA\"; the only store product of that name is \"Support for PLA (New Version)\" (manifest handle support-for-pla-new). The handle match is by name and should be confirmed at review."
+    },
+    {
+      "relation": "compatible_with",
+      "scope": {
+        "kind": "product"
+      },
+      "target_kind": "material",
+      "target_label": "All PLA Filaments",
+      "target_source_handle": "",
+      "evidence_kind": "feature_bullet",
+      "source_url": "https://us.store.bambulab.com/products/pla-translucent",
+      "source_title": "Bambu Lab US store product page: PLA Translucent",
+      "retrieved_at": "2026-10-16T07:04:50Z",
+      "locator": "Product Features › bullet 2",
+      "quote": "Bonds with All PLA Filaments",
+      "note": "A multi-material statement, not a number: the page's description repeats it (\"PLA Translucent seamlessly bonds with any PLA filament, making adding a translucent accent to your prints as effortless as swapping colors mid‑print\"). No single target product: the label is a material family."
+    }
+  ],
+  "in_the_box": [],
+  "documents": [
+    {
+      "kind": "tds",
+      "url": "https://store.bblcdn.com/s7/default/729a8bf233e9474db25c8d5be1e64a00/Bambu_PLA_Translucent_Technical_Data_Sheet.pdf",
+      "title": "Bambu Filament Technical Data Sheet V3.0: PLA Translucent",
+      "retrieved_at": "2026-10-16T08:25:26Z",
+      "sha256": "9a0d6356bb2c0839e1586c256e8b38b2f69dd60b86ae044607af19a72e3e379b"
+    },
+    {
+      "kind": "sds",
+      "url": "https://store.bblcdn.com/s7/default/8a9bc9278da74ee4bd5490bae9fb634d/SDS20250928A17_Bambu_PLA_Translucent.pdf",
+      "title": "Bambu PLA Translucent Safety Data Sheet SDS20250928A17",
+      "retrieved_at": "2026-10-16T08:25:28Z",
+      "sha256": "a28647f2a987acee798aa8a52142c2c871badb81a333475f0735331828cc9175"
+    },
+    {
+      "kind": "hex_codes",
+      "url": "https://store.bblcdn.com/s7/default/6ca923cd4e3242448324c63505e91dad/PLA_Translucent_Hex_Code_Table.pdf",
+      "title": "Bambu Lab Filament Hex Code Table: PLA Translucent",
+      "retrieved_at": "2026-10-16T08:25:29Z",
+      "sha256": "97134b70ae878b1acd6c3c10330c6896d9f69d7be671da69fd4d02e761d232dd"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/general/filament-guide-material-table",
+      "title": "Filament guide: printer, nozzle, AMS, build plate and glue compatibility",
+      "retrieved_at": "2026-10-16T08:18:29Z",
+      "sha256": "9cea0d52673e596888907a6021b91aa7fa15f0e82505817089ce01caac739af1"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament/pla",
+      "title": "PLA Usage Guide",
+      "retrieved_at": "2026-10-16T08:22:37Z",
+      "sha256": "6228afdf1426553a17f382ebdac299f1664613530e3a3a213787efe8253e76df"
+    },
+    {
+      "kind": "wiki",
+      "url": "https://wiki.bambulab.com/en/filament-acc/filament/dry-filament",
+      "title": "Filament Drying Recommendations",
+      "retrieved_at": "2026-10-16T08:22:43Z",
+      "sha256": "69d9260b1750821f12621db580ffc1ca4412ce902b0cf4efd4707ef091b59c6a"
+    }
+  ],
+  "not_published": [
+    "material.length",
+    "mechanical.hardness"
+  ],
+  "notes": [
+    "Mechanical keys hold the TDS X-Y printed-specimen values; the registry has one key per scope, so the Z values (tensile 28.9 ± 4 MPa, elongation 9.6 ± 1.7 %, bending modulus 2650 ± 140 MPa, bending strength 42 ± 4 MPa, impact 8.5 ± 1.2 kJ/m²) are not stored. Density, melting, glass transition, Vicat and HDT come from the TDS \"Physical Properties\" table (ISO 1183, DSC, ISO 306, ISO 75; the specimen form is not stated) and sit under material.* / thermal.*, apart from the printed-specimen mechanical.* rows. The registry has no *.printed / *.material key pair, so the split is by key group and test_condition.",
+    "TDS facts not stored as spec rows (no registry key, or one row per key): Young's modulus (X-Y 2880 ± 190 MPa, Z 2550 ± 150 MPa), melt index (4.08 ± 1.5 g/10 min at 210 °C, 2.16 kg), crystallization temperature (\"/\"), the second heat deflection row (60 ℃ at 0.45 MPa; the 1.8 MPa row is stored, as for the other filaments), saturated water absorption rate (0.34% at 25 °C, 55% RH), printing and storage humidity (< 20% RH, sealed, with desiccant), nozzle size (0.2, 0.4, 0.6, 0.8 mm; recorded as a compatible_with relation only, since the sources disagree on 0.2 mm), bed surface preparation (glue), retraction length (0.6 - 1.0 mm) and speed (20 - 40 mm/s), chamber temperature (25 - 45°C), max overhang angle (55 °), max bridging length (30 mm), spool material (ABS, temperature resistance 70 °C), spool size (diameter 200 mm, height 67 mm), annealing of prints (50 to 60 °C for 6 to 12 hours), and the odor, skin hazard, chemical stability, solubility, chemical resistance, flammability and combustion product rows.",
+    "The TDS recommended chamber temperature (25 - 45°C) is not written to thermal.chamber_temp: that key is a printer capability, not a filament print setting.",
+    "material.spool_type is not written: the store page's Type group has one value (\"Filament with spool\") and no spool bullet, and the TDS gives the spool material (ABS) and size, not a spool type name; a text composed from those two rows would not be a spool type and would feed the spool_type facet mirror. It is not marked not_published either, since the TDS does describe the spool.",
+    "SDS facts not stored: product name \"Bambu PLA Translucent\"; the model designation \"A17-xx\" (\"xx stands for any suffix\"), a code pattern rather than one model, so identity.model is not written (as for the other filaments; the store page's own identity.model row is \"PLA Translucent\", which an official_doc value would replace); CLP \"Not classified\", no PBT/vPvB substance or endocrine disruptor, and \"Not hazardous goods\" for sea (IMDG), DOT, road (ADR/RID) and air (ICAO-TI) transport. Its section 9 \"No data available\" for melting point and density does not override the TDS values.",
+    "Source disagreements kept for review: nozzle temperature (TDS 200 - 240 °C vs material-table wiki generic PLA* row 190 - 240 ±10 °C); oven drying temperature (TDS and the PLA wiki row \"PLA CF / Translucent\" 50 °C vs material-table wiki generic PLA row 55 ℃); 0.2 mm nozzle (the TDS lists it under Nozzle Size and the generic wiki rows allow it; the store FAQ and the PLA wiki tip exclude the 0.2 mm stainless steel nozzle). The product TDS values are kept for the spec keys; for the 0.2 mm nozzle both statements are kept as relations (compatible_with the TDS list \"0.2, 0.4, 0.6, 0.8 mm nozzles\"; not_compatible_with \"Hotend with Stainless Steel Nozzle 0.2 mm\").",
+    "Heatbed and AMS drying (no key; oven values are stored): TDS X1 Series printer heatbed 60 - 70 °C, 12 h; PLA wiki hot bed 70℃，12 h and AMS HT / AMS 2 Pro 55℃，8 h; material-table wiki generic PLA row 45 ℃ for 12 h in the AMS 2 Pro and AMS HT, drying before use \"Recommended\", desiccant during use \"Optional\". The store FAQ says \"Dry before use to ensure the best print quality and consistent finish.\"",
+    "Build plate guidance: the TDS lists glue as the bed surface preparation and the material-table wiki recommends glue stick or liquid glue (and marks the Engineering Plate \"Glue Required\" for generic PLA); this is a recommendation, and the Engineering Plate is not in the TDS plate list, so no requires relation and no Engineering Plate relation is written. The store page bullet \"Clean Build Plates Before Printing\" is a usage instruction, not a relation.",
+    "Marketing prose proves no number: \"enhanced durability\", \"Durable for Long-Term Use\", \"greater impact and aging resistance compared to generic translucent PLA\", \"frosted finish diffuses light beautifully\" and \"more beginner-friendly than PETG Translucent\" are not stored as values or relations. \"Bonds with All PLA Filaments\" (Product Features › bullet 2) is a compatibility statement and is stored as the relation compatible_with \"All PLA Filaments\".",
+    "Hex: all 10 store colours have exactly one hex cell, matched by the colour name without the code in parentheses. The TDS and the store page both say \"available in 10 vibrant colors\", which matches the 10 Colour values.",
+    "The store page links a \"Filament RoHS\" certificate (https://store.bblcdn.com/s7/default/369b7d0c17804f9d8a4402a121dd8d1d/Bambu_PLA_Translucent_RoHS.pdf) that was not cached and not read, so safety.certifications is neither curated nor marked not_published.",
+    "The store page links its \"printing tips on WIKI\" to https://wiki.bambulab.com/en/knowledge-sharing/transparent-petg (a PETG page), which was not cached and not read. The PLA wiki's own transparency section (5.2) was read instead.",
+    "material.diameter_tolerance (± 0.03 mm) is the store page's own row (Product Features › bullet 4); the TDS gives no tolerance, so it is not restated here and not marked not_published.",
+    "No in-the-box list: no official packing list exists for this filament (the store page has no What's in the Box section). No requires relation for a spool: the only Type value is \"Filament with spool\".",
+    "The store FAQ (5.Safety Tips) says the filament is not food-grade and the PLA wiki says PLA filaments other than PLA Pure are not food-contact grade; no registry key holds this.",
+    "not_published lists only filament keys (registry appliesTo includes \"filament\"); the generic logistics and printer keys with an empty appliesTo are not marked for a filament."
+  ]
+}
