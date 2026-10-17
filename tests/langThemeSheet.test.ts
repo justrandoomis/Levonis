@@ -363,25 +363,76 @@ test('the currency captions: a rate the shop sets by hand is never credited to I
   assert.doesNotMatch(none, /≈|1,400|1400/);
 });
 
-test('dollars chosen before the shop has a rate: prices read in dinars and the menu says why, in all three languages (owner decision 9)', async () => {
+test('no shop rate: prices read in dinars and the menu says so, whatever was picked, in all three languages (owner decision 9, DECISIONS row 246)', async () => {
   const want = {
-    ar: 'القراءة بالدولار متاحة بعد اعتماد سعر المتجر؛ الأسعار تُعرض بالدينار الآن.',
-    en: 'The dollar reading is available once the shop&#x27;s rate is approved; prices show in dinars for now.',
-    ckb: 'خوێندنەوە بە دۆلار دوای پەسەندکردنی نرخی فرۆشگاکە بەردەست دەبێت؛ ئێستا نرخەکان بە دینار پیشان دەدرێن.',
+    ar: 'الأسعار بالدينار حاليًا — القراءة بالدولار غير متاحة الآن.',
+    en: 'Prices are in dinars for now — the dollar reading isn&#x27;t available yet.',
+    ckb: 'نرخەکان ئێستا بە دینارن — خوێندنەوە بە دۆلار هێشتا بەردەست نییە.',
   } as const;
   for (const lang of ['ar', 'en', 'ckb'] as const) {
-    const pending = await captions(lang, 'USD', null);
-    assert.match(pending, /data-currency-usd-pending/, lang);
-    assert.ok(pending.includes(want[lang]), `${lang}: «${want[lang]}» missing in ${pending}`);
-    assert.doesNotMatch(pending, /data-currency-rate=/, lang);
-    // With a shop rate, or with dinars chosen, the note is not shown.
+    for (const pick of ['USD', 'IQD'] as const) {
+      const pending = await captions(lang, pick, null);
+      assert.match(pending, /data-currency-usd-pending/, `${lang} ${pick}`);
+      assert.ok(pending.includes(want[lang]), `${lang}: «${want[lang]}» missing in ${pending}`);
+      assert.doesNotMatch(pending, /data-currency-rate=/, lang);
+    }
+    // With a shop rate the note is not shown.
     assert.doesNotMatch(await captions(lang, 'USD', { text: '1680', source: 'shop' }), /data-currency-usd-pending/, lang);
-    assert.doesNotMatch(await captions(lang, 'IQD', null), /data-currency-usd-pending/, lang);
+    assert.doesNotMatch(await captions(lang, 'IQD', { text: '1680', source: 'shop' }), /data-currency-usd-pending/, lang);
     // Nor while the settings are still loading (no cached rate yet): no rate then means "not known
-    // yet", and «not approved» would be false for a shop whose rate is approved (FX-1A review #5).
+    // yet", and the note would be false for a shop that has a rate (FX-1A review #5).
     const loading = await captions(lang, 'USD', null, false);
     assert.doesNotMatch(loading, /data-currency-usd-pending/, `${lang}: no note before the settings arrive`);
     assert.ok(!loading.includes(want[lang]), lang);
   }
   assert.notEqual(want.ckb, want.ar);
+});
+
+/** The menu's currency choice (the segmented control and its captions), as the sheet renders it. */
+async function currencyChoice(lang: 'ar' | 'en' | 'ckb', pick: 'IQD' | 'USD', rate: { text: string; source: 'shop' | 'cache'; attributed?: boolean } | null, settingsLoaded = true) {
+  const { createElement } = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { LanguageProvider } = await import('../src/LanguageContext');
+  const { CurrencyValueProvider, currencyValue } = await import('../src/CurrencyContext');
+  const { CurrencyChoice } = await import('../src/components/LangThemePanel');
+  return inLanguage(lang, () =>
+    renderToStaticMarkup(
+      createElement(LanguageProvider, {
+        children: createElement(CurrencyValueProvider, {
+          value: currencyValue(pick, () => {}, rate, settingsLoaded),
+          children: createElement(CurrencyChoice, { label: 'currency', pick, onChange: () => {} }),
+        }),
+      })
+    )
+  );
+}
+
+/** The `<button>` of one currency option. */
+const optionOf = (html: string, code: 'IQD' | 'USD'): string => {
+  const tag = [...html.matchAll(/<button[^>]*>/g)].map((m) => m[0]).find((t) => t.includes(`data-currency-choice="${code}"`));
+  assert.ok(tag, `no ${code} option in ${html}`);
+  return tag;
+};
+
+test('no shop rate: the menu never lets a customer pick dollars and read dinars — USD is disabled, dinars shown, the reason under it (DECISIONS row 246)', async () => {
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    // A device that chose dollars before, on a shop with no rate: the switch shows what is on screen.
+    for (const pick of ['USD', 'IQD'] as const) {
+      const html = await currencyChoice(lang, pick, null);
+      assert.match(optionOf(html, 'USD'), / disabled=""/, `${lang} ${pick}: USD disabled`);
+      assert.match(optionOf(html, 'USD'), /aria-checked="false"/, `${lang} ${pick}`);
+      assert.match(optionOf(html, 'IQD'), /aria-checked="true"/, `${lang} ${pick}: dinars, as on screen`);
+      assert.doesNotMatch(optionOf(html, 'IQD'), / disabled=""/, lang);
+      assert.match(html, /data-currency-usd-pending/, lang);
+    }
+    // With the shop's rate (the provider's, or the one the owner typed), dollars are offered.
+    for (const rate of [{ text: '1660', source: 'shop' as const }, { text: '1660', source: 'shop' as const, attributed: false }]) {
+      const html = await currencyChoice(lang, 'USD', rate);
+      assert.doesNotMatch(optionOf(html, 'USD'), / disabled=""/, lang);
+      assert.match(optionOf(html, 'USD'), /aria-checked="true"/, lang);
+      assert.doesNotMatch(html, /data-currency-usd-pending/, lang);
+    }
+    // Before the settings arrive nothing is known yet: dollars stay offered.
+    assert.doesNotMatch(optionOf(await currencyChoice(lang, 'USD', null, false), 'USD'), / disabled=""/, lang);
+  }
 });

@@ -76,23 +76,29 @@ function RowLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) 
   );
 }
 
+/** «الأسعار بالدينار حاليًا» — why dollars are not offered (DECISIONS row 246); Settings words it the same. */
+export const USD_UNAVAILABLE = {
+  ar: 'الأسعار بالدينار حاليًا — القراءة بالدولار غير متاحة الآن.',
+  en: "Prices are in dinars for now — the dollar reading isn't available yet.",
+  ckb: 'نرخەکان ئێستا بە دینارن — خوێندنەوە بە دۆلار هێشتا بەردەست نییە.',
+} as const;
+
 /**
  * Under the currency row: what the choice does («للعرض فقط»), and — while
  * dollars are chosen and a rate is known — the rate itself, named as THE
- * SHOP'S rate (critique L8); since DECISIONS row 220 it is the market sell the
- * shop's rate was last built from, never the owner's adjustment on top of it
- * nor a rate he typed. The
+ * SHOP'S rate (critique L8): the market sell the shop's rate was last built
+ * from (DECISIONS row 220, never the owner's adjustment on top of it), or,
+ * with no market figure, the rate the owner typed (row 246). The
  * IQWealth attribution is given only when the rate really is the provider's
  * figure (`displayUsdRateAttributed`); a rate the owner typed, and the shop
  * rate this device remembered from its last visit, are «a rate set by the
  * shop» (FX-1 review #10). The rate reads in whole dinars after «≈» — four
  * decimals there were false precision (UX review #15); the conversion itself
  * uses the exact text. The wallet's rate is never shown here (owner decision
- * 9): with dollars chosen and no shop rate yet, prices read in dinars and the
- * caption says the dollar reading comes once the shop's rate is approved —
- * only once the settings are in: before they arrive, no rate means "not known
- * yet", and the note would be false for a shop whose rate is approved
- * (FX-1A review #5).
+ * 9): with no shop rate, dollars are not offered (the choice is disabled) and
+ * the caption says prices are in dinars for now, whatever was picked — only
+ * once the settings are in: before they arrive, no rate means "not known
+ * yet" (FX-1A review #5).
  */
 export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
   const { lang, loc } = useLanguage();
@@ -135,16 +141,40 @@ export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
           {loc('سعر يحدده المتجر', 'a rate set by the shop', 'نرخێک کە فرۆشگا دایناوە')}
         </p>
       )}
-      {pick === 'USD' && !rate && money?.settingsLoaded !== false && (
-        <p data-currency-usd-pending>
-          {loc(
-            'القراءة بالدولار متاحة بعد اعتماد سعر المتجر؛ الأسعار تُعرض بالدينار الآن.',
-            "The dollar reading is available once the shop's rate is approved; prices show in dinars for now.",
-            'خوێندنەوە بە دۆلار دوای پەسەندکردنی نرخی فرۆشگاکە بەردەست دەبێت؛ ئێستا نرخەکان بە دینار پیشان دەدرێن.'
-          )}
+      {money?.usdUnavailable && (
+        <p data-currency-usd-pending className="text-amber-300/90">
+          {loc(USD_UNAVAILABLE.ar, USD_UNAVAILABLE.en, USD_UNAVAILABLE.ckb)}
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The currency choice and its captions. With no shop rate (`usdUnavailable`)
+ * it shows what is on screen — dinars — and USD is disabled, the reason right
+ * under it: a customer can no longer pick dollars and read dinars.
+ */
+export function CurrencyChoice({ label, pick, onChange }: { label: string; pick: DisplayCurrency; onChange: (id: string) => void }) {
+  const { lang } = useLanguage();
+  const usdUnavailable = useOptionalMoney()?.usdUnavailable === true;
+  const shown: DisplayCurrency = usdUnavailable ? 'IQD' : pick;
+  return (
+    <>
+      <Segmented
+        group="sheet-currency"
+        label={label}
+        value={shown}
+        onChange={onChange}
+        dataAttr="data-currency-choice"
+        items={(['IQD', 'USD'] as const).map((code) => ({
+          id: code,
+          label: <CurrencyLabel code={code} lang={lang} />,
+          disabled: code === 'USD' && usdUnavailable,
+        }))}
+      />
+      <CurrencyCaptions pick={shown} />
+    </>
   );
 }
 
@@ -154,10 +184,11 @@ export default function LangThemePanel({
   langPick, themePick, chooseLang, chooseTheme, commit,
   onRowKeyDownCapture, onRowPointerDownCapture,
 }: LangThemePanelProps) {
-  const { lang, loc } = useLanguage();
+  const { loc } = useLanguage();
   // THE DISPLAY CURRENCY. Outside a CurrencyProvider the row is not offered.
   const money = useOptionalMoney();
-  const currency = money?.currency ?? 'IQD';
+  // The currency on screen: dinars while dollars cannot be read (DECISIONS row 246).
+  const currency: DisplayCurrency = money && !money.usdUnavailable ? money.currency : 'IQD';
   const [currencyPick, setCurrencyPick] = useState<DisplayCurrency>(currency);
   // Each opening starts from the currency in use, as the other rows do.
   useEffect(() => {
@@ -165,7 +196,7 @@ export default function LangThemePanel({
   }, [open, currency]);
   const currencyLabel = withCurrency && money ? loc('عملة العرض', 'Display currency', 'دراوی پیشاندان') : null;
   const chooseCurrency = (id: string) => {
-    const next: DisplayCurrency = id === 'USD' ? 'USD' : 'IQD';
+    const next: DisplayCurrency = id === 'USD' && !money?.usdUnavailable ? 'USD' : 'IQD';
     setCurrencyPick(next);
     // The same path as the other two rows: the sheet leaves, then the prices
     // re-render from memory (setCurrency is synchronous). No request is made.
@@ -230,18 +261,7 @@ export default function LangThemePanel({
             {currencyLabel !== null && (
               <div onKeyDownCapture={onRowKeyDownCapture} onPointerDownCapture={onRowPointerDownCapture} data-lang-theme-row="currency">
                 <RowLabel icon={<Coins className="h-4 w-4" aria-hidden="true" />}>{currencyLabel}</RowLabel>
-                <Segmented
-                  group="sheet-currency"
-                  label={currencyLabel}
-                  value={currencyPick}
-                  onChange={chooseCurrency}
-                  dataAttr="data-currency-choice"
-                  items={(['IQD', 'USD'] as const).map((code) => ({
-                    id: code,
-                    label: <CurrencyLabel code={code} lang={lang} />,
-                  }))}
-                />
-                <CurrencyCaptions pick={currencyPick} />
+                <CurrencyChoice label={currencyLabel} pick={currencyPick} onChange={chooseCurrency} />
               </div>
             )}
           </div>

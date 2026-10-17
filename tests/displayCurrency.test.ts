@@ -128,6 +128,11 @@ test('no usable rate → dinars, never $0.00', () => {
   assert.equal(usableRate(1400), null, 'a number is not decimal text');
   const none = currencyValue('USD', noop, null);
   assert.equal(none.converted, false);
+  // …and the switchers know it: dollars are not offered (DECISIONS row 246) — but only once the settings
+  // are in; before that, no rate is only "not known yet".
+  assert.equal(none.usdUnavailable, true);
+  assert.equal(currencyValue('USD', noop, null, false).usdUnavailable, false);
+  assert.equal(currencyValue('USD', noop, shop('1660')).usdUnavailable, false);
   assert.equal(none.money(1_750_000), formatIqd(1_750_000));
   assert.equal(none.moneyBoth(1_750_000), formatIqd(1_750_000));
   assert.doesNotMatch(none.money(5000), /\$/);
@@ -371,6 +376,11 @@ test('the settings row is a real switch and states the rate it converts at', () 
   assert.match(src, /\(\['IQD', 'USD'\] as const\)\.map\(\(code\) => \(/);
   assert.match(src, /onClick=\{\(\) => setCurrency\(code\)\}/);
   assert.match(src, /aria-pressed=\{currency === code\}/);
+  // No shop rate: USD is disabled, described by the reason under it, and the row shows dinars — the
+  // currency on screen — never a pressed USD reading dinars (DECISIONS row 246).
+  assert.match(src, /disabled=\{code === 'USD' && usdUnavailable\}/);
+  assert.match(src, /aria-describedby=\{code === 'USD' && usdUnavailable \? 'settings-usd-unavailable' : undefined\}/);
+  assert.match(src, /const currency = usdUnavailable \? 'IQD' : chosenCurrency;/);
   // A conversion whose rate is not on screen is a number the reader cannot
   // check, and the disclosure only appears while a conversion is being shown.
   // The shop's rate once the owner approved one (named as the shop's, critique
@@ -382,9 +392,11 @@ test('the settings row is a real switch and states the rate it converts at', () 
   assert.match(src, /\{s\.currencyRateShop\(wholeRateText\(rate\.text\)\)\}\{' '\}\s*<a\s+href=\{IQWEALTH_URL\}\s+target="_blank"\s+rel="noopener noreferrer"/);
   assert.match(src, /s\.currencyRateSet\(wholeRateText\(rate\.text\)\)/);
   assert.doesNotMatch(src, /s\.currencyRate\(|groupRateText/, 'the old sentence at the wallet rate is gone');
-  // The note waits for the settings: before they arrive, no rate is only "not known yet" (FX-1A review #5).
-  assert.match(src, /\) : currency === 'USD' && settingsLoaded \? \(\s*<p[^>]*data-currency-usd-pending>\s*\{s\.usdPending\}/);
-  assert.match(src, /const \{ currency, setCurrency, rate, converted, settingsLoaded \} = useMoney\(\);/);
+  // The note waits for the settings (`usdUnavailable` is false before they arrive: no rate is only "not
+  // known yet", FX-1A review #5), and shows whatever was picked: it is why USD is disabled.
+  assert.match(src, /\) : usdUnavailable \? \(\s*<p id="settings-usd-unavailable"[^>]*data-currency-usd-pending>\s*\{s\.usdPending\}/);
+  assert.match(src, /const \{ currency: chosenCurrency, setCurrency, rate, converted, usdUnavailable \} = useMoney\(\);/);
+  for (const lang of ['ar', 'en', 'ckb']) assert.ok(src.includes(`usdPending: USD_UNAVAILABLE.${lang},`), lang);
   assert.ok(src.includes('سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر للعرض فقط، بناءً على بيانات'));
   assert.ok(src.includes("Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate, display only, based on"));
   assert.ok(src.includes('نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا، تەنها بۆ پیشاندان، لەسەر بنەمای زانیاریی'));

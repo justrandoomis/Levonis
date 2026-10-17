@@ -53,8 +53,8 @@ interface WalletContextType {
   /**
    * THE SHOP'S EFFECTIVE USD/IQD, as decimal text — the display currency's
    * rate (FX programme plan §13). `undefined` until the settings arrive;
-   * `null` when the server sends none (the owner has not approved a first
-   * value, or an older server), and prices then read in dinars — never at
+   * `null` when the server sends none (no shop rate yet, or an older server),
+   * and prices then read in dinars, the switchers saying so — never at
    * `exchangeRate` (owner decision 9: the wallet's 1,400 is not a market
    * rate). Never used for money: the wallet keeps `exchangeRate`.
    */

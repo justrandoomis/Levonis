@@ -53,13 +53,16 @@ import { iqdToUsdCentsExact, readCachedDisplayRate, rememberDisplayRate, usableR
  *
  * `money()` divides by `settings.displayUsdRate`: the shop's display USD/IQD —
  * the Iraqi parallel-market sell the shop's rate was last built from, once
- * approved (never the owner's private adjustment on top of it nor a rate he
- * typed, DECISIONS row 220) — as decimal text, converted exactly
- * (src/lib/displayRate.ts). The wallet's
+ * approved (never the owner's private adjustment on top of it, DECISIONS row
+ * 220), or, while no market figure exists and the shop's rate is on MANUAL,
+ * the rate the owner typed (DECISIONS row 246, `displayUsdRateAttributed`
+ * false: the shop's own, never credited to IQWealth) — as decimal text,
+ * converted exactly (src/lib/displayRate.ts). The wallet's
  * `exchangeRate` (1 USD = 1,400 IQD) is a different rate with a different
- * job and is NEVER a fallback here: until the owner approves the first value
- * the server sends null and a dollar reader sees DINARS, with a note that the
- * dollar reading comes once the shop's rate is approved. Before the settings
+ * job and is NEVER a fallback here: with no shop rate (a fresh shop, an older
+ * server) the server sends null, prices read in DINARS and the switchers say
+ * so and offer dinars only (`usdUnavailable`) — never a USD choice that
+ * silently shows dinars. Before the settings
  * arrive, the last SHOP rate this device showed prices at is used
  * (`levonis.displayRate.v1`); with none, dinars — never «$0.00», never 1,400.
  *
@@ -144,7 +147,7 @@ export interface DisplayRate {
   /** IQD per 1 USD, exact decimal text. */
   text: string;
   source: DisplayRateSource;
-  /** The shop's rate is the provider's figure (credited to IQWealth) — always so since DECISIONS row 220; false is kept for an older server's typed rate. */
+  /** True: the provider's market figure (credited to IQWealth). False: the rate the owner typed, published while no market figure exists (DECISIONS row 246) — «a rate set by the shop». */
   attributed?: boolean;
 }
 
@@ -191,6 +194,13 @@ interface CurrencyContextValue {
    * rate is not approved waits for this (FX-1A review #5).
    */
   settingsLoaded: boolean;
+  /**
+   * DOLLARS CANNOT BE READ (DECISIONS row 246): the settings are in and carry
+   * no shop rate (a fresh shop, an older server). The switchers then show
+   * dinars, offer dinars only and say why — never a USD choice that silently
+   * shows dinars. The stored choice is kept: dollars return with the rate.
+   */
+  usdUnavailable: boolean;
   /** An IQD amount, formatted in the currency the customer chose. */
   money: (iqd: number) => string;
   /**
@@ -232,6 +242,7 @@ export function currencyValue(
     rate,
     converted,
     settingsLoaded,
+    usdUnavailable: settingsLoaded && rate === null,
     money,
     // «1,750,000 د.ع · ‎$1,250.00» — the charge first, the reading after it.
     moneyBoth: (iqd: number) => {

@@ -71,7 +71,7 @@ import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldChe
 import { useAuth } from '../AuthContext';
 import { useMoney } from '../CurrencyContext';
 import { wholeRateText } from '../lib/rateText';
-import { IQWEALTH_URL } from '../components/LangThemePanel';
+import { IQWEALTH_URL, USD_UNAVAILABLE } from '../components/LangThemePanel';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, listSessions, revokeSession, revokeOtherSessions, type ApiSession } from '../lib/api';
 import { apiRefusal, refusalText } from '../lib/refusalStrings';
@@ -161,7 +161,7 @@ const STRINGS = {
     langSaved: 'حُفظت اللغة في حسابك.', langSaveFailed: 'تعذر حفظ اللغة على الخادم — التغيير مطبّق في هذا المتصفح فقط.',
     currency: 'العملة',
     currencyNote: 'اختر العملة التي تقرأ بها الأسعار. الدفاتر والطلبات تبقى بالدينار العراقي، ولن تُعاد تسعير طلبات مؤكدة.',
-    usdPending: 'القراءة بالدولار متاحة بعد اعتماد سعر المتجر؛ الأسعار تُعرض بالدينار الآن.',
+    usdPending: USD_UNAVAILABLE.ar,
     currencyRateShop: (rate: string) => `سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر للعرض فقط، بناءً على بيانات`,
     currencyRateSet: (rate: string) => `سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر يحدده المتجر، للعرض فقط.`,
     currencyRateLink: 'IQWealth',
@@ -247,7 +247,7 @@ const STRINGS = {
     langSaved: 'Language saved to your account.', langSaveFailed: 'Could not save the language on the server — it applies to this browser only.',
     currency: 'Currency',
     currencyNote: 'Choose the currency you read prices in. The ledgers and your orders stay in Iraqi dinar, and no confirmed order is ever re-priced.',
-    usdPending: "The dollar reading is available once the shop's rate is approved; prices show in dinars for now.",
+    usdPending: USD_UNAVAILABLE.en,
     currencyRateShop: (rate: string) => `Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate, display only, based on`,
     currencyRateSet: (rate: string) => `Exchange rate: 1 dollar ≈ ${rate} dinars — a rate set by the shop, display only.`,
     currencyRateLink: 'IQWealth data',
@@ -336,7 +336,7 @@ const STRINGS = {
     langSaved: 'زمان لە هەژمارەکەت پاشەکەوتکرا.', langSaveFailed: 'نەتوانرا زمان لەسەر ڕاژەکار پاشەکەوت بکرێت — تەنها بۆ ئەم وێبگەڕە جێبەجێ دەبێت.',
     currency: 'دراو',
     currencyNote: 'ئەو دراوە هەڵبژێرە کە نرخەکانی پێ دەخوێنیتەوە. دەفتەر و داواکارییەکانت بە دیناری عێراقی دەمێننەوە، و هیچ داواکارییەکی پەسەندکراو دووبارە نرخ نادرێت.',
-    usdPending: 'خوێندنەوە بە دۆلار دوای پەسەندکردنی نرخی فرۆشگاکە بەردەست دەبێت؛ ئێستا نرخەکان بە دینار پیشان دەدرێن.',
+    usdPending: USD_UNAVAILABLE.ckb,
     currencyRateShop: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا، تەنها بۆ پیشاندان، لەسەر بنەمای زانیاریی`,
     currencyRateSet: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخێک کە فرۆشگا دایناوە، تەنها بۆ پیشاندان.`,
     currencyRateLink: 'IQWealth',
@@ -691,7 +691,9 @@ function Field({
 export default function Settings() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
-  const { currency, setCurrency, rate, converted, settingsLoaded } = useMoney();
+  const { currency: chosenCurrency, setCurrency, rate, converted, usdUnavailable } = useMoney();
+  // The currency on screen: dinars while dollars cannot be read — USD is then disabled, the reason under it (DECISIONS row 246).
+  const currency = usdUnavailable ? 'IQD' : chosenCurrency;
   const { lang, setLang, dir, t, loc } = useLanguage();
   const { preference: themePref, theme } = useTheme();
   const s = STRINGS[lang];
@@ -1142,9 +1144,11 @@ export default function Settings() {
                       key={code}
                       type="button"
                       onClick={() => setCurrency(code)}
+                      disabled={code === 'USD' && usdUnavailable}
+                      aria-describedby={code === 'USD' && usdUnavailable ? 'settings-usd-unavailable' : undefined}
                       aria-pressed={currency === code}
                       data-selected={currency === code}
-                      className="lv-choice min-h-11 px-4 text-sm font-bold"
+                      className="lv-choice min-h-11 px-4 text-sm font-bold disabled:opacity-40"
                       dir="ltr"
                     >
                       {code === 'IQD' ? 'IQD · د.ع' : 'USD · $'}
@@ -1165,7 +1169,10 @@ export default function Settings() {
                     until the owner approves a rate, dollars are not offered —
                     prices read in dinars and a dollar reader is told why, once
                     the settings are in (before that, no rate is only "not
-                    known yet" — FX-1A review #5). */}
+                    known yet" — FX-1A review #5). With no market figure the
+                    rate is the one the owner typed, «a rate set by the shop»
+                    (DECISIONS row 246); with no shop rate at all, USD is
+                    disabled and the row says prices are in dinars for now. */}
                 {rate ? (
                   <p className="mt-1 text-[12px] text-text-muted leading-relaxed" data-currency-rate-source={rate.source}>
                     {rate.source === 'shop' && rate.attributed !== false ? (
@@ -1186,8 +1193,8 @@ export default function Settings() {
                       s.currencyRateSet(wholeRateText(rate.text))
                     )}
                   </p>
-                ) : currency === 'USD' && settingsLoaded ? (
-                  <p className="mt-1 text-[12px] text-text-muted leading-relaxed" data-currency-usd-pending>
+                ) : usdUnavailable ? (
+                  <p id="settings-usd-unavailable" className="mt-1 text-[12px] text-amber-300/90 leading-relaxed" data-currency-usd-pending>
                     {s.usdPending}
                   </p>
                 ) : null}
