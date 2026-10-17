@@ -2248,7 +2248,8 @@ out of the explorer's static closure: an intermediate build of this lane had put
 
 ### Review fixes (2026-10-17)
 
-The lane's review raised three findings, each upheld by two skeptics:
+The lane's review raised three findings. The hero and slug findings were upheld by both of their skeptics. The map
+finding was upheld by one: the other found it already answered by `b3d5f57e`, which landed after the probe was written.
 
 | Finding | Fix | Measured |
 |---|---|---|
@@ -2259,3 +2260,13 @@ The lane's review raised three findings, each upheld by two skeptics:
 Bytes of code (gzip −9, the lab's method): entry 64,481 → 64,516 B; `CategoryPage` beyond the initial payload
 66,929 → 67,250; `CategoryListing` 60,918 → 61,227; `CategoriesExplorer` 25,387 → 25,705 (CropPhoto's measuring is
 shared by all three); `Products` 27,321 → 27,314.
+
+One wave stays on purpose. Past the cap, a miss of the map's edge entry costs 2 D1 waves where the bare map cost 1
+(the review's probe at 150 ms per round trip: 1 wave / ~164 ms in base, 2 waves / ~350–366 ms now). The second wave reads
+the short list's cards, because a section's photograph is read off the card, after the relational image overlay
+(`worker/lib/cardPhoto.ts`). That wave buys one photograph per section, so the explorer no longer sends its own
+`/api/products?sort=available&limit=50` request from the phone. On such a miss, the explorer's banners appear one round
+trip later, with their photographs, and no second request follows. A category page asks for the map and its list
+together, so it does not wait longer. The review's other options were not taken. Picking the photograph from the row in SQL would duplicate the card's
+image overlay. A stale-while-revalidate map would keep «متوفرة الآن» stale for longer than its 300 s. The ceilings in
+`tests/d1Waves.test.ts` hold the cost at 2 waves past the cap and 3 waves under it.
