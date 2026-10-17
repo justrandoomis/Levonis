@@ -12,11 +12,14 @@
  * the per-SKU «سعر خاص $» and «خصم $» — an SKU's own price and discount.
  */
 import { useState, type ReactNode } from 'react';
-import { channelsOf, inheritedSkuDiscount, iqdText, modelBlocks, nameIn, usdText, type PriceDraft, type SkuLine, type V2Channel, type V2Names, type V2TableRow } from './v2Model';
+import { channelsOf, inheritedSkuDiscount, iqdText, modelBlocks, nameIn, shelfOf, usdText, type PriceDraft, type SkuLine, type V2Channel, type V2Names, type V2TableRow } from './v2Model';
 import { channelName, UsdInput, useV2Lang, useV2Strings, V2Field } from './v2Ui';
 import type { V2Strings } from './v2Strings';
 
 function sourceText(line: SkuLine, s: V2Strings, modelName: string): string {
+  // DECISIONS row 244 (the owner's answer only): the direct price is read from the costliest batch on the shelf.
+  const shelf = shelfOf(line);
+  if (shelf) return s.sourceStock(iqdText(shelf.cost_iqd), shelf.units);
   switch (line.source) {
     case 'model_fixed':
       return s.sourceModelFixed;
@@ -45,8 +48,16 @@ export function inheritedUsd(line: SkuLine, ownFixed: string): string | null {
 
 function cell(row: V2TableRow | undefined, s: V2Strings, owner: boolean): string {
   if (!row) return '—';
-  if (row.blocked) return owner ? s.routeBlocked : '—';
+  if (row.blocked) return owner ? blockedText(row, s) : '—';
   return iqdText(row.price_iqd);
+}
+
+/** Why the owner's channel is not sold: the floor, a route waiting for its supplier price, a sold-out model (row 244). */
+export function blockedText(row: Pick<V2TableRow, 'v2_blocked'>, s: Pick<V2Strings, 'routeBlocked' | 'routeNoSupplier' | 'routeShelfCheaper' | 'stockSoldOut'>): string {
+  if (row.v2_blocked === 'V2_ROUTE_NO_SUPPLIER') return s.routeNoSupplier;
+  if (row.v2_blocked === 'V2_ROUTE_SHELF_CHEAPER') return s.routeShelfCheaper;
+  if (row.v2_blocked === 'V2_STOCK_SOLD_OUT') return s.stockSoldOut;
+  return s.routeBlocked;
 }
 
 export default function FinalPricesTable({

@@ -16,6 +16,8 @@ import type { Language } from '../../../../translations';
 
 type Fill = (v: string) => string;
 type Fill2 = (a: string, b: string) => string;
+/** A dinar figure (already grouped) and a whole count of units. */
+type FillUnits = (iqd: string, units: number) => string;
 
 export interface V2Strings {
   section: string;
@@ -163,6 +165,17 @@ export interface V2Strings {
   unsaved: string;
   saved: string;
   leaveUnsaved: string;
+  /** DECISIONS row 244 — the owner only: the direct price is read from the costliest batch on the shelf. */
+  sourceStock: FillUnits;
+  /** A route that waits for its supplier price while the shelf sells (the owner's cell). */
+  routeNoSupplier: string;
+  /** A route stopped while the shelf sells below its supplier cost (the owner's cell). */
+  routeShelfCheaper: string;
+  /** A sold-out SKU with no supplier price: not sold (the owner's cell). */
+  stockSoldOut: string;
+  routeNoSupplierNote: string;
+  routeShelfCheaperNote: string;
+  stockSoldOutNote: string;
 }
 
 const AR: V2Strings = {
@@ -306,6 +319,13 @@ const AR: V2Strings = {
   unsaved: 'تعديلات غير محفوظة',
   saved: 'محفوظ',
   leaveUnsaved: 'لديك أسعار لم تُحفظ بعد. هل تغادر وتفقدها؟',
+  sourceStock: (iqd, n) => `من المخزون: أعلى تكلفة على الرف ${iqd} د.ع (${n === 1 ? 'قطعة واحدة' : n === 2 ? 'قطعتان' : n <= 10 ? `${n} قطع` : `${n} قطعة`})`,
+  routeNoSupplier: 'غير متاح: لا سعر مورّد',
+  routeShelfCheaper: 'متوقف: المخزون أرخص',
+  routeShelfCheaperNote: 'الطلب المسبق لهذا الموديل متوقف: سعره من المخزون أقل من تكلفة الطلب المسبق من المورّد.',
+  stockSoldOut: 'يحتاج تسعيرًا: نفد المخزون',
+  routeNoSupplierNote: 'الطلب المسبق غير متاح لهذا الموديل حتى يُدخَل سعر المورّد؛ البيع المباشر من المخزون.',
+  stockSoldOutNote: 'نفد مخزون هذا الموديل ولا يوجد سعر مورّد — لا يُباع حتى تُسعّره.',
 };
 
 const EN: V2Strings = {
@@ -448,6 +468,13 @@ const EN: V2Strings = {
   unsaved: 'Unsaved changes',
   saved: 'Saved',
   leaveUnsaved: 'You have prices that are not saved yet. Leave and lose them?',
+  sourceStock: (iqd, n) => `From stock: highest cost on the shelf ${iqd} IQD (${n === 1 ? '1 unit' : `${n} units`})`,
+  routeNoSupplier: 'Unavailable: no supplier price',
+  routeShelfCheaper: 'Stopped: stock is cheaper',
+  routeShelfCheaperNote: "Pre-order is stopped for this model: its stock price is below the supplier's pre-order cost.",
+  stockSoldOut: 'Needs pricing: sold out',
+  routeNoSupplierNote: 'Pre-order is unavailable for this model until a supplier price is entered; the direct sale is priced from stock.',
+  stockSoldOutNote: 'This model is sold out and has no supplier price — it is not sold until you price it.',
 };
 
 const CKB: V2Strings = {
@@ -590,6 +617,13 @@ const CKB: V2Strings = {
   unsaved: 'گۆڕانکاریی پاشەکەوتنەکراو',
   saved: 'پاشەکەوتکراوە',
   leaveUnsaved: 'نرخی پاشەکەوتنەکراوت هەیە. دەڕۆیت و لەدەستیان دەدەیت؟',
+  sourceStock: (iqd, n) => `لە کۆگاوە: بەرزترین تێچوو لەسەر ڕەفەکە ${iqd} دینار (${n} دانە)`,
+  routeNoSupplier: 'بەردەست نییە: نرخی دابینکەر نییە',
+  routeShelfCheaper: 'وەستاوە: کۆگا هەرزانترە',
+  routeShelfCheaperNote: 'پێشداواکردن بۆ ئەم مۆدێلە ڕاگیراوە: نرخەکەی لە کۆگاوە لە تێچووی پێشداواکردن لە دابینکەرەوە کەمترە.',
+  stockSoldOut: 'پێویستی بە نرخدانانە: کۆگا نەماوە',
+  routeNoSupplierNote: 'تا نرخی دابینکەر نەنووسرێت پێشداواکردن بۆ ئەم مۆدێلە بەردەست نییە؛ فرۆشتنی ڕاستەوخۆ لە کۆگاوە نرخی بۆ دادەنرێت.',
+  stockSoldOutNote: 'کۆگای ئەم مۆدێلە نەماوە و نرخی دابینکەری نییە — تا نرخی بۆ دانەنێیت نافرۆشرێت.',
 };
 
 export const V2_STRINGS: Readonly<Record<'ar' | 'en' | 'ckb', V2Strings>> = { ar: AR, en: EN, ckb: CKB };

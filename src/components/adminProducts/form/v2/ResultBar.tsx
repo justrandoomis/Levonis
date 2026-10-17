@@ -6,11 +6,14 @@
  *     مسبق: $ → د.ع» — from the owner's private row of the server's answer;
  *   - a price editor: the direct and the pre-order dinars (and, price-first,
  *     the dollars they typed behind them) — never a cost or a profit.
+ * A model priced from the shelf (DECISIONS row 244) says so to the owner under
+ * the bar: «من المخزون: أعلى تكلفة على الرف 690,062 د.ع (6 قطع)», its cost cell
+ * being that batch.
  * Desktop: four cells in a row; a phone: the 2×2 grid. The owner's warnings
  * (the discount withdrawn on a route, below cost, below cost + the minimum
  * profit) sit under it, codes turned into words — never a figure to anyone else.
  */
-import { firstPreorder, iqdText, nameIn, usdText, type SkuLine, type V2Names } from './v2Model';
+import { firstPreorder, iqdText, nameIn, shelfOf, usdText, type SkuLine, type V2Names } from './v2Model';
 import { channelName, Readout, useV2Lang, useV2Strings } from './v2Ui';
 import type { V2Strings } from './v2Strings';
 
@@ -28,10 +31,15 @@ export default function ResultBar({ line, owner, title }: { line: SkuLine | null
   const pre = firstPreorder(line);
   const o = direct?.owner ?? null;
   const priceFirst = direct?.editor_usd_price !== undefined;
+  const shelf = owner ? shelfOf(line) : null;
+  const blockedBy = (code: string | undefined) => Object.values(line.channels).some((r) => r?.blocked && (r.v2_blocked ?? 'V2_ROUTE_BELOW_COST') === code);
   const warnings = owner
     ? [
         ...Object.values(line.channels).some((r) => r?.owner?.v2_floor === 'discount_withdrawn') ? [s.discountTooBig] : [],
-        ...Object.values(line.channels).some((r) => r?.blocked) ? [s.routeBlocked] : [],
+        ...blockedBy('V2_ROUTE_BELOW_COST') ? [s.routeBlocked] : [],
+        ...blockedBy('V2_ROUTE_NO_SUPPLIER') ? [s.routeNoSupplierNote] : [],
+        ...blockedBy('V2_ROUTE_SHELF_CHEAPER') ? [s.routeShelfCheaperNote] : [],
+        ...blockedBy('V2_STOCK_SOLD_OUT') ? [s.stockSoldOutNote] : [],
         ...Object.values(line.channels).some((r) => r?.owner?.v2_below_min_profit) ? [s.belowMinProfit] : [],
         ...Object.values(line.channels).some((r) => r?.owner?.v2_below_cost) ? [s.belowCost] : [],
         ...Object.values(line.channels).some((r) => r?.owner?.v2_floor === 'direct_min_profit') ? [s.floorMinProfit] : [],
@@ -63,6 +71,11 @@ export default function ResultBar({ line, owner, title }: { line: SkuLine | null
           </>
         )}
       </div>
+      {shelf ? (
+        <p className="mt-1.5 text-[11px] font-bold text-text-secondary" dir="auto" data-v2-stock-line>
+          {s.sourceStock(iqdText(shelf.cost_iqd), shelf.units)}
+        </p>
+      ) : null}
       {owner && pre ? (
         <p className="mt-1.5 text-[11px] text-text-secondary" dir="auto" data-v2-preorder-line>
           {s.preorderLine(priceFirst ? usdText(pre.editor_usd_price) : usdText(pre.owner?.v2_usd_ceil6), iqdText(pre.price_iqd))}

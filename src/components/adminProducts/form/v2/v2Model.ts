@@ -77,7 +77,10 @@ export interface V2DraftWire {
   cost?: { inputs?: WireInput[]; minimum_profit?: string | null };
 }
 
-export type V2Source = 'product' | 'model_fixed' | 'model_delta' | 'model_cost' | 'colour_delta' | 'sku_fixed';
+/** `stock` (the owner's alone, DECISIONS row 244): the direct price is read from the costliest batch on the shelf. */
+export type V2Source = 'product' | 'model_fixed' | 'model_delta' | 'model_cost' | 'colour_delta' | 'sku_fixed' | 'stock';
+/** Why a channel is not sold (the owner's alone): the floor, or the shelf's (row 244). */
+export type V2BlockCode = 'V2_ROUTE_BELOW_COST' | 'V2_ROUTE_NO_SUPPLIER' | 'V2_ROUTE_SHELF_CHEAPER' | 'V2_STOCK_SOLD_OUT';
 export type V2DiscountFrom = 'product' | 'model' | 'colour' | 'sku' | 'none' | 'preorder_only';
 
 /** The owner's private figures of one row (every key `v2_*`; FINANCIAL_FIELDS — never on a price editor's answer). */
@@ -93,6 +96,8 @@ export interface V2OwnerExtras {
   v2_below_cost: boolean;
   /** Q3 (owner only): the direct price is below cost + the minimum profit (absent until the server states it). */
   v2_below_min_profit?: boolean;
+  /** Row 244 (owner only): the direct price is read from the shelf — its costliest batch (dinars) and its units. */
+  v2_shelf?: { cost_iqd: number; units: number } | null;
 }
 
 export interface V2Names {
@@ -112,6 +117,8 @@ export interface V2TableRow {
   source: V2Source;
   discount_from?: V2DiscountFrom;
   blocked?: true;
+  /** The owner only: why the channel is not sold. */
+  v2_blocked?: V2BlockCode;
   /** Price-first: this channel's exact dollars (owner and price editors — typed figures, never a cost). */
   editor_usd_price?: string;
   owner?: V2OwnerExtras | null;
@@ -688,6 +695,9 @@ export const nameIn = (n: V2Names | null | undefined, lang: V2Lang): string => (
 
 /** Whole dinars, grouped («1,500,000»). */
 export const iqdText = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : new Intl.NumberFormat('en-US').format(n));
+
+/** Row 244 (the owner's answer only): the shelf an SKU's direct price is read from, or null. */
+export const shelfOf = (line: SkuLine | null | undefined): { cost_iqd: number; units: number } | null => line?.channels.direct_sale?.owner?.v2_shelf ?? null;
 
 /** A dollar figure as the server stated it, at most 2 decimals shown («$1,000.00»). Display only. */
 /**
