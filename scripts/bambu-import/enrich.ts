@@ -197,6 +197,11 @@ export function mergeCurated(payload: ImportPayload, file: Rec, sha256: string):
     const status = typeof raw.status === 'string' && STATUSES.has(raw.status) ? raw.status : 'unverified';
     const confidence = typeof raw.confidence === 'string' && raw.confidence in RANK ? raw.confidence : 'official_doc';
     const sourceKind = typeof raw.source_kind === 'string' && SOURCE_KINDS.has(raw.source_kind) ? raw.source_kind : 'curated';
+    // The document the curator read the value in (./curated.ts validates it: https, on its kind's hosts). The writer
+    // stores it as the row's source_ref (writer.ts specSourceRef reads the first checked source of a document kind):
+    // without it every verified store_doc / tds / sds / manual / wiki row breaks 0194's CHECK (status <> 'verified'
+    // OR source_ref <> '') and, with it, the product's whole write batch (h2d's first live merge, 2026-10-17).
+    const sourceUrl = typeof raw.source_url === 'string' && /^https:\/\//.test(raw.source_url) ? raw.source_url.slice(0, 1000) : '';
     if (!scope || !values) {
       report.skipped++;
       continue;
@@ -224,7 +229,7 @@ export function mergeCurated(payload: ImportPayload, file: Rec, sha256: string):
       test_condition: cut(String(raw.test_condition ?? ''), 300),
       derived_from: '',
       missing_reason: '',
-      checked_sources: [],
+      checked_sources: sourceUrl ? [{ kind: sourceKind, url: sourceUrl, title: cut(String(raw.source_title ?? ''), 200) }] : [],
       visibility: reg?.ownerOnly ? 'owner' : 'public',
       conflict: '',
       sort: sort++,

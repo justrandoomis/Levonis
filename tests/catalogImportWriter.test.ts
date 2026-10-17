@@ -32,10 +32,17 @@
  *     probe are recorded by the batch itself, and the readback target it commits
  *     lets /readback verify what the write could not (every post-commit statement
  *     failed, or the batch's answer was lost), exactly as the plan would.
+ *   - the first live merge (h2d, 2026-10-17): its write batch fits production D1
+ *     statement by statement (no function over 32 arguments, ≤ 100 parameters,
+ *     ≤ 100 KB) and its curated rows carry their sources (0194's CHECK).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { maxParams, violations } from './fixtures/d1Limits';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { D1_LIMITS, limitD1, maxParams, violations, type StatementShape } from './fixtures/d1Limits';
+import { ROOT } from './fixtures/d1';
 import { asD1, dbThrough, get, stubApp } from './fixtures/app';
 import { mountCustomer } from './fixtures/catalogOnly';
 import {
@@ -46,12 +53,14 @@ import {
   newWorld,
   plan,
   postCommitFaultD1,
+  rebundle,
   RUN_ID,
   setWriting,
   stage,
   write,
   type World,
 } from './fixtures/catalogImportWorld';
+import { mergeCurated } from '../scripts/bambu-import/enrich';
 import { fixtureJson, sample } from './fixtures/bambu/load';
 import type { CompatTargets } from '../packages/catalog/src/bambuImport/relations';
 import { recomputeD1Checks } from '../worker/lib/catalogImport/verifyD1';
@@ -907,6 +916,72 @@ test('pla-basic-filament: the whole invocation under 900 with margin, every pack
   assert.ok(maxParams <= 100);
   assert.deepEqual(violations, []);
   assert.equal(staged.plan.statements.length > 0 && count(w.raw, 'SELECT COUNT(*) AS n FROM products'), 1, 'stage wrote nothing; the write wrote one product');
+});
+
+test('the h2d merge — the first live merge, the manifest\'s most specs with its curated file — fits production D1 statement by statement and commits', async () => {
+  // The live run's queue item #2 answered 500 IMPORT_INTERNAL at /write, and node:sqlite ran the same batch: production
+  // D1 refuses a function call over 32 arguments (the merge's fingerprint of pricing_v2_sku_results, 36 columns, in the
+  // fp_before UPDATE and the checkpoint), and 0194's CHECK refuses a verified spec without a source_ref (the curated
+  // file's source_url was dropped). LimitD1 enforces D1's limits; this reads the shape of every statement of the batch.
+  const w = newWorld();
+  const batches: StatementShape[][] = [];
+  w.db = limitD1(w.raw, batches);
+  const data = join(ROOT, 'data', 'bambu-import');
+  const matches = JSON.parse(readFileSync(join(data, 'existing-matches.json'), 'utf8')) as { entries: Array<Record<string, unknown>> };
+  const entry = matches.entries.find((e) => e.source_handle === 'h2d')!;
+  const pid = String(entry.levonis_product_id);
+  const mapped = Object.values(entry.value_map as Record<string, { option_value_ids: string[] }>).flatMap((v) => v.option_value_ids);
+  // The reviewed merge target: catalogue-only, the value the reviewed match maps to and a variant of it.
+  w.raw.exec("INSERT OR IGNORE INTO users (id, name, email, password_hash, role) VALUES ('usr_owner', 'O', 'o@x.co', 'h', 'admin')");
+  const doc = validateProductDoc({ id: pid, slug: String(entry.levonis_slug), name_en: 'Bambu Lab H2D', name_ar: 'بامبو H2D', name_ckb: 'بامبو H2D (کوردی)', price_iqd: 0, status: 'active', category_id: 'cat_printers', brand_id: 'brd_bambu', description_en: 'Our own description.' });
+  await saveProductAtomic(
+    asD1(w.raw),
+    await planProductSave(asD1(w.raw), {
+      mode: 'create',
+      doc,
+      prev: null,
+      relations: {
+        inventory_mode: 'VARIANT_COMBINATION',
+        groups: [{ id: 'g_h2d_model', name_en: 'Model', sort: 0, values: mapped.map((id, i) => ({ id, name_en: id.toUpperCase(), sort: i })) }],
+        colors: [],
+        variants: mapped.map((id) => ({ id: `x_${id}`, option_value_ids: [id], stock: 0 })),
+        images: [],
+      },
+      catalogIds: ['cat_printers'],
+      actor: { adminId: 'usr_owner', money: true },
+    })
+  );
+  // The payload as the runner builds it: the page, then the reviewed curated file merged (scripts/bambu-import/enrich.ts).
+  const curated = readFileSync(join(data, 'curated', 'h2d.json'));
+  const s = stage(w, 'h2d', { writeMode: 'merge', mergeProductId: pid, mutate: (p) => void mergeCurated(p, JSON.parse(new TextDecoder().decode(curated)), createHash('sha256').update(curated).digest('hex')) });
+  w.manifestRows.find((r) => r.handle === 'h2d')!.curated = true;
+  w.matches.push(entry);
+  rebundle(w, { curatedIndex: readFileSync(join(data, 'curated', 'index.json'), 'utf8') });
+  const verifiedFromDocuments = s.payload.specs.filter((x) => x.status === 'verified' && !['store_page', 'store_messages', 'derived'].includes(x.source_kind));
+  assert.ok(s.payload.specs.length >= 130 && verifiedFromDocuments.length >= 50, `${s.payload.specs.length} specs, ${verifiedFromDocuments.length} verified from a document`);
+  for (const x of verifiedFromDocuments) assert.match(x.checked_sources[0]?.url ?? '', /^https:\/\//, `${x.key}: the document the curated value was read in`);
+
+  const { plan: p, result } = await write(w, s);
+  assert.equal(result.created, false);
+  assert.equal(result.product_id, pid);
+  assert.equal(result.before_fp_equal, true, 'the batch\'s own protected-fields record');
+  const batch = batches.find((b) => b.some((x) => x.sql.includes('INSERT INTO ops_guards')))!;
+  assert.equal(batch.length, p.statements.length, 'the write batch was recorded whole');
+  assert.ok(batch.some((x) => x.sql.includes("'$.fp_before'")), 'the merge\'s fingerprint texts are in it');
+  for (const x of batch) {
+    const at = x.sql.replace(/\s+/g, ' ').slice(0, 100);
+    assert.ok(x.functionArgs <= D1_LIMITS.functionArgs, `${x.functionArgs} arguments to one function: ${at}`);
+    assert.ok(x.params <= D1_LIMITS.params, `${x.params} parameters: ${at}`);
+    assert.ok(x.bytes <= D1_LIMITS.sqlBytes, `${x.bytes} bytes: ${at}`);
+    assert.ok(x.terms <= D1_LIMITS.compoundTerms, `${x.terms} compound terms: ${at}`);
+  }
+  assert.ok(p.estimate.total <= IMPORT_INVOCATION_LIMIT);
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM product_spec_values WHERE product_id = ?', pid), p.counts.specs);
+  const fromDocuments = "product_id = ? AND status = 'verified' AND source_kind NOT IN ('store_page', 'store_messages', 'derived')";
+  const written = count(w.raw, `SELECT COUNT(*) AS n FROM product_spec_values WHERE ${fromDocuments}`, pid);
+  assert.ok(written >= 50, `${written} verified rows from a document written`);
+  assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM product_spec_values WHERE ${fromDocuments} AND source_ref LIKE 'https://%'`, pid), written, 'each names its document');
+  assert.deepEqual(violations, []);
 });
 
 test('with the event bus on, the counted binding is still the binding: ProductAdded in the batch, the audits dual-written, the estimate covering it', async () => {

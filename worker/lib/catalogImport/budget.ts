@@ -43,6 +43,12 @@ export const IMPORT_INVOCATION_LIMIT = D1_INVOCATION_STATEMENT_LIMIT - IMPORT_RE
 /** D1 binds at most 100 parameters a statement; a packed insert stays at or under this. */
 export const IMPORT_PACKED_PARAMS_MAX = 100;
 
+/**
+ * D1 refuses a call of any SQL function with more than 32 arguments ("too many arguments on function …"). Neither
+ * workerd's local D1 (127) nor node:sqlite (1000) enforces it: tests/fixtures/d1Limits.ts `LimitD1` does.
+ */
+export const D1_FUNCTION_ARGS_MAX = 32;
+
 /** How many statements an invocation has sent so far. */
 export interface InvocationCounter {
   readonly count: number;

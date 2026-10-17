@@ -105,7 +105,7 @@ import { hashSource, TRANSLATION_VERSION } from '../translate';
 import { fieldsFor, flatFields } from '../templateFamilies';
 import type { Env } from '../types';
 import { GUARDED_ROW_TABLES, IMPORT_GUARD_ID, IMPORT_GUARD_REFUSAL, jsonElementMoneySql, nonDefaultSql, type GuardedColumn } from './protectedTables';
-import { countingD1, IMPORT_INVOCATION_LIMIT, IMPORT_RESERVE, packedInserts, type InvocationCounter } from './budget';
+import { countingD1, D1_FUNCTION_ARGS_MAX, IMPORT_INVOCATION_LIMIT, IMPORT_RESERVE, packedInserts, type InvocationCounter } from './budget';
 import { newImportProductDoc } from './doc';
 import { importObjectHead } from './media';
 import {
@@ -450,8 +450,20 @@ export const FINGERPRINT_QUERIES: ReadonlyArray<{ table: string; sql: string; co
 export function fingerprintTextSql(q: { table: string; sql: string }, columns: readonly string[]): string {
   if (q.sql.split('?').length !== 2) throw new Error(`fingerprint query of ${q.table}: one parameter expected`);
   if (!columns.length) return "'absent'";
-  const cols = columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ');
-  return `((SELECT json_group_array(json_array(${cols})) FROM (${q.sql.replace('?', '?1')})) || '')`;
+  const cols = columns.map((c) => `"${c.replace(/"/g, '""')}"`);
+  return `((SELECT json_group_array(${jsonArraySql(cols)}) FROM (${q.sql.replace('?', '?1')})) || '')`;
+}
+
+/**
+ * `json_array(…)` of `items` within D1's 32 arguments a function call (D1_FUNCTION_ARGS_MAX): a longer list is
+ * nested in arrays of at most 32 (`pricing_v2_sku_results` has 36 columns, and its `SELECT *` fingerprint failed
+ * the first live merge's write batch with "too many arguments on function json_array").
+ */
+function jsonArraySql(items: readonly string[]): string {
+  if (items.length <= D1_FUNCTION_ARGS_MAX) return `json_array(${items.join(', ')})`;
+  const chunks: string[] = [];
+  for (let i = 0; i < items.length; i += D1_FUNCTION_ARGS_MAX) chunks.push(jsonArraySql(items.slice(i, i + D1_FUNCTION_ARGS_MAX)));
+  return jsonArraySql(chunks);
 }
 
 /** The live columns of every `SELECT *` fingerprint table (PRAGMA table_info, one read each: a merge only). */
