@@ -2,15 +2,19 @@
  * PRICING V2 — THE MATHS (docs/PRICING-V2.md §1; owner decisions A1, B1, C1,
  * DECISIONS row 221; implementation spec V2-1 §1.5).
  *
- *     D = ceil_1000(anchor × U + Σ differences × U)       (cost-first: never below R_stock + T × U)
- *     P_route = ceil_1000((D_usd − Δ) × U)                 (B1: one Δ for every route; P ≤ D)
+ *     D = round(anchor × U + Σ differences × U)           (cost-first: never below R_stock + T × U)
+ *     P_route = round((D_usd − Δ) × U)                     (B1: one Δ for every route; P ≤ D)
+ *
+ * `round` is the one rounding rule (DECISIONS row 245, `roundPriceIqd`): above 1,000 IQD up to
+ * the next 250, else up to whole dinars. The §1.6 cells below are that rule's (they were the
+ * 1,000 step's until 2026-10-17: Combo's land route 1,778,000 is now 1,777,500).
  *
  * Proven here:
  *   1. every fixed cell of PRICING-V2.md §1.6 and of the decision examples (§8);
  *   2. a property over 4,000 SKUs against an independent BigInt oracle (anchor and
  *      discount precedence, the floor — a floored route sells at D, owner answer Q1 —,
  *      blocked routes, the errors, the price-first below-cost and below-minimum-profit
- *      warnings, Q3), plus P ≤ D, the step, D − R ≥ T, monotone discounts and colour
+ *      warnings, Q3), plus P ≤ D, the rounding rule, D − R ≥ T, monotone discounts and colour
  *      differences;
  *   3. the owner's answers of 2026-10-14 (DECISIONS row 222): Q1 a floored route sells at
  *      the direct price (never at its cost), Q3 a typed price below cost + minimum profit
@@ -128,13 +132,13 @@ const COMBO_RED = 'o:combo|c:red';
 
 /* ------------------------------------------------ 1. the fixed cells -- */
 
-test('§1.6 start (U 1,500, E 1.08): Standard 1,500,000 / 1,425,000, Combo 1,815,000 / 1,778,000, Red +$2 on both models', () => {
+test('§1.6 start (U 1,500, E 1.08): Standard 1,500,000 / 1,425,000, Combo 1,815,000 / 1,777,500, Red +$2 on both models', () => {
   const r = worked('1500', '1.08');
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.deepEqual(dp(r, STD), [1_500_000, 1_425_000]);
-  assert.deepEqual(dp(r, COMBO), [1_815_000, 1_778_000]);
+  assert.deepEqual(dp(r, COMBO), [1_815_000, 1_777_500], 'E_P 1,777,500 is on the rule: no rounding added');
   assert.deepEqual(dp(r, STD_RED), [1_503_000, 1_428_000]);
-  assert.deepEqual(dp(r, COMBO_RED), [1_818_000, 1_781_000]);
+  assert.deepEqual(dp(r, COMBO_RED), [1_818_000, 1_780_500]);
 
   // The private figures behind the cells (owner-only).
   const d = ch(r, STD, 'direct_sale');
@@ -158,21 +162,21 @@ test('§1.6 start (U 1,500, E 1.08): Standard 1,500,000 / 1,425,000, Combo 1,815
   assert.equal(ch(r, COMBO_RED, 'direct_sale').deltas_usd, '2', 'the colour difference is the same USD on every model (C1)');
 });
 
-test('§1.6 U 1,500 → 1,530: Standard 1,526,000 / 1,450,000, Combo 1,846,000 / 1,808,000 (freight and extras stay IQD)', () => {
+test('§1.6 U 1,500 → 1,530: Standard 1,525,750 / 1,449,250, Combo 1,845,750 / 1,807,500 (freight and extras stay IQD)', () => {
   const r = worked('1530', '1.08');
-  assert.deepEqual(dp(r, STD), [1_526_000, 1_450_000]);
-  assert.deepEqual(dp(r, COMBO), [1_846_000, 1_808_000]);
+  assert.deepEqual(dp(r, STD), [1_525_750, 1_449_250], '1,525,740 → 1,525,750; 1,449,240 → 1,449,250');
+  assert.deepEqual(dp(r, COMBO), [1_845_750, 1_807_500], '1,845,600 → 1,845,750; 1,807,350 → 1,807,500');
   assert.equal(ch(r, STD, 'direct_sale').exact_iqd, '1525740');
   assert.equal(ch(r, COMBO, 'pre_order_land').exact_iqd, '1807350');
 });
 
-test('§1.6 E 1.08 → 1.12 at U 1,500: Standard 1,530,000 / 1,455,000, Combo 1,854,000 / 1,817,000', () => {
+test('§1.6 E 1.08 → 1.12 at U 1,500: Standard 1,530,000 / 1,455,000, Combo 1,854,000 / 1,816,500', () => {
   const r = worked('1500', '1.12');
   assert.deepEqual(dp(r, STD), [1_530_000, 1_455_000]);
-  assert.deepEqual(dp(r, COMBO), [1_854_000, 1_817_000]);
+  assert.deepEqual(dp(r, COMBO), [1_854_000, 1_816_500]);
 });
 
-test('§1.6 price-first «$1,000» at U 1,530: 1,530,000 / 1,454,000, with the exact USD carried', () => {
+test('§1.6 price-first «$1,000» at U 1,530: 1,530,000 / 1,453,500, with the exact USD carried', () => {
   const r = worked('1530', '1.08', {
     method: 'usd',
     points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd: '1000' }],
@@ -180,7 +184,7 @@ test('§1.6 price-first «$1,000» at U 1,530: 1,530,000 / 1,454,000, with the e
     skus: [{ ...workedSku('std', null), chain: undefined, target: undefined }],
   });
   assert.equal(r.ok, true, JSON.stringify(r));
-  assert.deepEqual(dp(r, STD), [1_530_000, 1_454_000]);
+  assert.deepEqual(dp(r, STD), [1_530_000, 1_453_500], '$950 × 1,530 = 1,453,500, on the rule');
   const p = ch(r, STD, 'pre_order_land');
   assert.equal(p.anchor, 'product_fixed');
   assert.equal(p.usd_exact, '950');
@@ -219,26 +223,36 @@ test('B1 floor, owner answer Q1: air freight above the discounted price → the 
   // Q1: the price is never the cost rounded up (that would publish the cost) — whatever R_air is.
   const odd = worked('1500', '1.08', { skus }, { CHINA_AIR: '29999.5' });
   assert.equal(ch(odd, STD, 'pre_order_air').replacement?.replacement_exact, '1484989');
-  assert.equal(ch(odd, STD, 'pre_order_air').price_iqd, 1_500_000, 'D, not ceil_1000(R_air) = 1,485,000');
+  assert.equal(ch(odd, STD, 'pre_order_air').price_iqd, 1_500_000, 'D, not round(R_air) = 1,485,000');
   assert.equal(ch(odd, STD, 'pre_order_air').floor, 'discount_withdrawn');
   // The retired `cost` floor mode is a programming error, never a price.
   assert.throws(() => priceProductV2({ ...inputOfWorked(), floorMode: 'cost' } as V2Input), /PRICING_INVARIANT/);
 });
 
-test('Q1 (review 2026-10-14): a cost-first route never sells AT its own cost, even rounded up to the step', () => {
+test('Q1 (review 2026-10-14): a cost-first route never sells AT its own cost, even rounded up by the rule', () => {
   const skus = [workedSku('std', null, ['direct_sale', 'pre_order_land', 'pre_order_air'])];
-  // 27,250/kg × 22 kg = 599,500 → R_air = 1,424,500, under E_P = 1,425,000 but on its step: the discount would
-  // sell the route at ceil_1000(R_air) — the cost published. Withdrawn: the route sells at D.
-  const at = worked('1500', '1.08', { skus }, { CHINA_AIR: '27250' });
+  // 27,265/kg × 22 kg = 599,830 → R_air = 1,424,830, under E_P = 1,425,000 but rounding to it: the discount would
+  // sell the route at round(R_air) — the cost published. Withdrawn: the route sells at D.
+  const at = worked('1500', '1.08', { skus }, { CHINA_AIR: '27265' });
   const air = ch(at, STD, 'pre_order_air');
-  assert.equal(air.replacement?.replacement_exact, '1424500');
+  assert.equal(air.replacement?.replacement_exact, '1424830');
   assert.equal(air.price_iqd, 1_500_000);
   assert.equal(air.floor, 'discount_withdrawn');
   assert.equal(ch(at, STD, 'pre_order_land').price_iqd, 1_425_000, 'land keeps its discount');
-  // 30,650/kg × 22 kg = 674,300 → R_air = 1,499,300: on D's own step (ceil = D) — blocked, never sold at D = its cost rounded up.
-  const edge = worked('1500', '1.08', { skus }, { CHINA_AIR: '30650' });
+  // 27,250/kg → R_air = 1,424,500, on the rule and below P = 1,425,000: the 250 grid leaves the discount on (the
+  // 1,000 step withdrew it) — the route still sells above its cost.
+  const under = worked('1500', '1.08', { skus }, { CHINA_AIR: '27250' });
+  assert.equal(ch(under, STD, 'pre_order_air').price_iqd, 1_425_000);
+  assert.equal(ch(under, STD, 'pre_order_air').floor, 'none');
+  // 30,671/kg × 22 kg = 674,762 → R_air = 1,499,762: round(R_air) = D — blocked, never sold at D = its cost rounded up.
+  const edge = worked('1500', '1.08', { skus }, { CHINA_AIR: '30671' });
   assert.deepEqual(codes(edge, STD, 'error', 'pre_order_air'), ['V2_ROUTE_BELOW_COST']);
-  for (const c of skuOf(at, STD).channels) if (c.channel !== 'direct_sale' && c.replacement) assert.ok(c.price_iqd > c.replacement.replacement_cost_iqd);
+  // 30,650/kg → R_air = 1,499,300 rounds to 1,499,500 < D: not blocked; its discount is withdrawn (P ≤ round(R)).
+  const near = worked('1500', '1.08', { skus }, { CHINA_AIR: '30650' });
+  assert.equal(ch(near, STD, 'pre_order_air').price_iqd, 1_500_000);
+  assert.equal(ch(near, STD, 'pre_order_air').floor, 'discount_withdrawn');
+  for (const r of [at, under, near])
+    for (const c of skuOf(r, STD).channels) if (c.channel !== 'direct_sale' && c.replacement) assert.ok(c.price_iqd > c.replacement.replacement_cost_iqd);
 });
 
 test('B1 block: R_air above D blocks air only; land and direct stay priced', () => {
@@ -253,9 +267,9 @@ test('B1 block: R_air above D blocks air only; land and direct stay priced', () 
   assert.deepEqual(dp(r, STD), [1_500_000, 1_425_000]);
 });
 
-test('decision examples: D1 a purchase at €520 → 1,533,000 / 1,458,000; C1 Gold +$2 on $20 / $16 models → 33,000 / 27,000', () => {
+test('decision examples: D1 a purchase at €520 → 1,532,500 / 1,457,500; C1 Gold +$2 on $20 / $16 models → 33,000 / 27,000', () => {
   const r = worked('1500', '1.08', { skus: [workedSku('std', null, CHANNELS_LAND, { ...STANDARD_INPUTS, supplier_cost: '520' })] });
-  assert.deepEqual(dp(r, STD), [1_533_000, 1_458_000]);
+  assert.deepEqual(dp(r, STD), [1_532_500, 1_457_500], '1,532,400 → 1,532,500; 1,457,400 → 1,457,500');
 
   const filament = (model: string, colour: string | null): V2Sku => ({
     combo_key: skuComboKey({ option_value_ids: [model], color_id: colour }), model_id: model, option_value_ids: [model], color_id: colour, channels: ['direct_sale'],
@@ -284,7 +298,7 @@ test('a SKU «سعر خاص $» replaces D for that SKU: no colour or model diff
   assert.equal(c.anchor, 'sku_fixed');
   assert.equal(c.deltas_usd, '0');
   assert.equal(c.price_iqd, 1_950_000);
-  assert.equal(ch(r, COMBO_RED, 'pre_order_land').price_iqd, 1_912_500 + 500, '(1,300 − 25) × 1,500 = 1,912,500 → 1,913,000');
+  assert.equal(ch(r, COMBO_RED, 'pre_order_land').price_iqd, 1_912_500, '(1,300 − 25) × 1,500 = 1,912,500, on the rule');
   assert.deepEqual(dp(r, STD_RED), [1_503_000, 1_428_000], 'other SKUs unchanged');
 });
 
@@ -301,7 +315,7 @@ test('cost-first: D never below R_stock + T (C-9) — a low fixed price or a neg
   assert.equal(ch(minus, STD_RED, 'direct_sale').price_iqd, 1_500_000);
   assert.equal(ch(minus, STD_RED, 'direct_sale').floor, 'direct_min_profit');
   const above = worked('1500', '1.08', { points: [{ scope: 'option', scope_id: 'std', kind: 'fixed', usd: '1100.01' }], skus: [workedSku('std', null)] });
-  assert.equal(ch(above, STD, 'direct_sale').price_iqd, 1_651_000, '1,100.01 × 1,500 = 1,650,015 → 1,651,000');
+  assert.equal(ch(above, STD, 'direct_sale').price_iqd, 1_650_250, '1,100.01 × 1,500 = 1,650,015 → 1,650,250');
   assert.equal(ch(above, STD, 'direct_sale').floor, 'none');
 });
 
@@ -580,10 +594,12 @@ const qCmp = (a: Q, b: Q) => {
   const r = b[0] * a[1];
   return l < r ? -1 : l > r ? 1 : 0;
 };
+/** The rounding rule (row 245), independently: above 1,000 up to the next 250, else up to whole dinars. */
 const qCeilStep = (a: Q): number => {
-  const d = a[1] * 1000n;
+  const step = a[0] > 1000n * a[1] ? 250n : 1n;
+  const d = a[1] * step;
   const fl = a[0] / d;
-  return Number((a[0] % d === 0n ? fl : fl + 1n) * 1000n);
+  return Number((a[0] % d === 0n ? fl : fl + 1n) * step);
 };
 
 interface Gen {
@@ -799,7 +815,7 @@ function oracle(gen: Gen, input: V2Input): Map<string, Map<SkuChannel, Expected>
       let floor = dFloor;
       if (gen.method === 'cost') {
         const r = rR as Q;
-        // Q1 (review 2026-10-14): the cost on the step is the line — a route never sells AT its cost rounded up.
+        // Q1 (review 2026-10-14): the cost rounded by the rule is the line — a route never sells AT its cost rounded up.
         const rStep = qCeilStep(r);
         if (rStep >= D) {
           rows.set(c, { error: 'V2_ROUTE_BELOW_COST' });
@@ -827,7 +843,7 @@ const qText = ([n, d]: Q): string => {
 };
 const usdText = (t: string) => qText(q(t));
 
-test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R ≥ T; a floored route sells at D (Q1); the Q3 warning; monotone discounts; colour moves every model alike', () => {
+test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the rounding rule; D − R ≥ T; a floored route sells at D (Q1); the Q3 warning; monotone discounts; colour moves every model alike', () => {
   const g = lcg(20261013n);
   let skuCount = 0;
   const seen = { anchor: new Map<string, number>(), floor: new Map<string, number>(), error: new Map<string, number>(), below: 0, belowMin: 0, monotone: 0, colour: 0, products: 0 };
@@ -865,8 +881,7 @@ test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R �
 
         // The owner's rules, checked from the outside.
         assert.ok(got.price_iqd <= got.direct_iqd, `${where}: P ≤ D`);
-        assert.equal(got.price_iqd % 1000, 0);
-        assert.ok(got.price_iqd >= 1000);
+        assert.ok(got.price_iqd >= 1 && (got.price_iqd <= 1000 || got.price_iqd % 250 === 0), `${where}: on the rounding rule`);
         const exact = q(got.exact_iqd);
         assert.equal(qCeilStep(exact), got.price_iqd, `${where}: price = ceil(exact)`);
         if (gen.method === 'cost') {
@@ -905,7 +920,7 @@ test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R �
       }
     }
 
-    // A colour difference moves every model's D by the same USD (C1): within one step of γ × U.
+    // A colour difference moves every model's D by the same USD (C1): within one rounding (< 250) of γ × U.
     const colourPoints = gen.points.filter((p) => p.scope === 'color');
     if (colourPoints.length) {
       const r3 = priceProductV2(inputOf(gen, { points: gen.points.filter((p) => p.scope !== 'color') }));
@@ -919,7 +934,7 @@ test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R �
         if (!gamma || !a || !b || a.anchor === 'sku_fixed' || a.floor === 'direct_min_profit' || b.floor === 'direct_min_profit') continue;
         const moved = qSub(qi(a.direct_iqd), qi(b.direct_iqd));
         const gu = qMul(q(gamma.usd), q(gen.U));
-        assert.ok(qCmp(qSub(moved, gu), qi(-1000)) > 0 && qCmp(qSub(moved, gu), qi(1000)) < 0, `colour ${gamma.usd}: D moved ${a.direct_iqd - b.direct_iqd}`);
+        assert.ok(qCmp(qSub(moved, gu), qi(-250)) > 0 && qCmp(qSub(moved, gu), qi(250)) < 0, `colour ${gamma.usd}: D moved ${a.direct_iqd - b.direct_iqd}`);
         seen.colour++;
       }
     }
@@ -946,8 +961,6 @@ test('no float: a fractional JS number anywhere in the input is a RangeError, ne
     ['U', (i) => (i.rates = { ...i.rates, fx: { ...i.rates.fx, USD: { rate: 1500.5 as unknown as string, version: 1, confirmed: true } } })],
     ['a shipping rate', (i) => (i.rates = { ...i.rates, shipping: { ...i.rates.shipping, GERMANY_LAND: { rate: 9000.5 as unknown as string, version: 1, confirmed: true } } })],
     ['a weight', (i) => ((i.skus as V2Sku[])[0] = { ...i.skus[0], chain: { base: { override: { ...STANDARD_INPUTS, shipping_weight_g: 22000.5 } } } })],
-    ['the step', (i) => (i.step = 1000.5)],
-    ['NaN', (i) => (i.step = Number.NaN)],
   ];
   for (const [what, spoil] of cases) {
     const input = ok();
@@ -973,4 +986,6 @@ test('programming errors throw: a combo key that is not its selection, a SKU lis
   assert.throws(() => priceProductV2({ ...base, skus: [{ ...base.skus[0], model_id: 'nope' }] }), /PRICING_INVARIANT/);
   const extra: RuleResolution = { status: 'active', kind: 'direct_sale_extra', amount_iqd: 0, rule: ref('x'), tie: false, candidates: [ref('x')] };
   assert.throws(() => priceProductV2({ ...base, skus: [{ ...base.skus[0], target: extra }] }), /PRICING_INVARIANT/);
+  // One rounding rule (row 245): a caller passing its own step is a programming error, never a second rule.
+  assert.throws(() => priceProductV2({ ...base, step: 1000 } as V2Input), /PRICING_INVARIANT/);
 });

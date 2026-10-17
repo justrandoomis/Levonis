@@ -43,7 +43,8 @@ const OL = 'p_v2_ol';
 const fixed = (usd: string) => ({ scope: 'product' as const, scope_id: '', kind: 'fixed' as const, usd });
 const off = (usd: string) => ({ scope: 'product' as const, scope_id: '', usd });
 const envOf = (raw: DatabaseSync): Env => ({ ...fxEnv(raw), STORE_ROOT_DOMAIN: 'levonis-iq.com' }) as Env;
-const ceil1000 = (n: number) => Math.ceil(n / 1000) * 1000;
+/** The rounding rule (DECISIONS row 245), independently: above 1,000 up to the next 250, else whole dinars. */
+const ceilRule = (n: number) => (n > 1000 ? Math.ceil(n / 250) * 250 : Math.ceil(n));
 
 function trapPurges() {
   const g = globalThis as { caches?: unknown };
@@ -103,10 +104,10 @@ test('U moves past the dead band: every V2 product (both methods) reprices, pric
   // A price-first product follows U: its dollars re-read at 1,632.
   const ams = await cartGrid(w.db, AMS);
   assert.equal(ams[`o:${AMS}_o0@direct_sale`]!.prepaid, 1_632_000);
-  assert.equal(ams[`o:${AMS}_o0@pre_order_land`]!.prepaid, ceil1000(950 * 1632));
-  assert.equal((await cartGrid(w.db, OL))['@pre_order_land']!.prepaid, ceil1000(475 * 1632));
+  assert.equal(ams[`o:${AMS}_o0@pre_order_land`]!.prepaid, ceilRule(950 * 1632));
+  assert.equal((await cartGrid(w.db, OL))['@pre_order_land']!.prepaid, ceilRule(475 * 1632));
   // A cost-first product: EUR 450 × 1.1 × U + 8,000 freight + $120 × U, never below the minimum profit.
-  const d = ceil1000(450 * 1.1 * 1632 + 8000 + 120 * 1632);
+  const d = ceilRule(450 * 1.1 * 1632 + 8000 + 120 * 1632);
   assert.equal((await cartGrid(w.db, AMS2))[`o:${AMS2}_o0@direct_sale`]!.prepaid, d);
   for (const r of all<{ final_price_iqd: number; replacement_cost_iqd: number; channel: string; usd_iqd_rate: string }>(w.raw, "SELECT final_price_iqd, replacement_cost_iqd, channel, usd_iqd_rate FROM pricing_v2_sku_results WHERE product_id = ? AND channel = 'direct_sale'", AMS2)) {
     assert.equal(r.usd_iqd_rate, '1632');
@@ -151,7 +152,7 @@ test('a tight budget defers in deficit order and a later run finishes; EUR moves
   assert.deepEqual(eur.report.repriced, [AMS2]);
   assert.deepEqual(await cartGrid(w.db, AMS), before.ams, 'a price-first product never moves with EUR');
   assert.deepEqual(await cartGrid(w.db, OL), before.ol);
-  assert.equal((await cartGrid(w.db, AMS2))[`o:${AMS2}_o0@direct_sale`]!.prepaid, ceil1000(450 * 1.12 * 1632 + 8000 + 120 * 1632));
+  assert.equal((await cartGrid(w.db, AMS2))[`o:${AMS2}_o0@direct_sale`]!.prepaid, ceilRule(450 * 1.12 * 1632 + 8000 + 120 * 1632));
 });
 
 test('a shipping rate reprices the cost-first product whose route uses it (engine_owner); a route cost above D is held, never written silently', async () => {

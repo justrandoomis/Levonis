@@ -37,6 +37,7 @@
  * Run: node --import tsx --test tests/importStockDecision.test.ts
  */
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, dbThrough, freshDb, get, json, post, put, stubApp } from './fixtures/app';
@@ -252,7 +253,11 @@ test('a merged product keeps its own stock setup and is never gated; it has noth
 });
 
 test('a database without 0194 publishes exactly as before and has nothing to decide (CLAUDE.md rule 2)', async () => {
-  const w = await catalogOnlyWorld({ raw: dbThrough('0193') });
+  // Through 0193 — no 0194 — with 0200 on top: the rounding rule's prices (row 245) need its wider CHECK, and
+  // what this test pins is the catalogue knowledge's absence.
+  const raw = dbThrough('0193');
+  raw.exec(readFileSync('migrations/0200_price_rounding_250.sql', 'utf8'));
+  const w = await catalogOnlyWorld({ raw });
   assert.equal(await catalogKnowledgeInstalled(asD1(w.raw)), false);
   await publishV2(w.raw, CAT.id);
   assert.equal(isV2Published(w.raw, CAT.id), true);

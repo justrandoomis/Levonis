@@ -32,6 +32,7 @@
 
 import { clampMemberLadder, TIER_RANK, type ResolvedPrice, type SkuPriceRow, type Tier } from './pricing';
 import { fixedUsdLine, loadOfferUsdPrices, usdTextOfCents, type FixedUsdAnswer, type OfferUsdPrice } from './offerUsd';
+import { roundPriceIqd } from '@levonis/pricing/priceRounding';
 import { benefits, tierInherits, TIER_INHERITANCE, type TierStatus } from './entitlements';
 import { safeParse } from './types';
 import { newId } from './crypto';
@@ -234,18 +235,24 @@ export function resolveOfferPrice(input: {
     regular = usd.regular_iqd;
   } else if (mode === 'fixed') regular = Math.max(0, Math.trunc(w.offer_price_iqd ?? base.regular_iqd));
   else if (mode === 'discount_percent') {
+    // THE ONE ROUNDING RULE (DECISIONS row 245): the exact regular × (100 − p) / 100, rounded UP — above
+    // 1,000 IQD to the next 250, else to whole dinars — never floored to a number the rule cannot give.
     const p = Math.min(90, Math.max(1, Math.trunc(w.discount_percent ?? 0)));
-    regular = Math.max(0, Math.floor((base.regular_iqd * (100 - p)) / 100));
+    const before = Number.isFinite(base.regular_iqd) ? Math.trunc(base.regular_iqd) : 0;
+    regular = before > 0 ? roundPriceIqd({ num: BigInt(before) * BigInt(100 - p), den: 100n }) : 0;
   } else if (mode === 'discount_iqd') {
-    regular = base.regular_iqd - Math.max(0, Math.trunc(w.discount_iqd ?? 0));
+    // An amount off is an after-price too: on the rule when it is a price at all (below 1 the floor refuses it).
+    const raw = Math.trunc(base.regular_iqd) - Math.max(0, Math.trunc(w.discount_iqd ?? 0));
+    regular = Number.isSafeInteger(raw) && raw >= 1 ? roundPriceIqd(raw) : raw;
   }
 
   /**
    * NEVER ≥ BEFORE (docs/ux/PRODUCT-DISCOUNT.md D4). A window whose price for this line is not
    * strictly below the line's regular price contributes no price: no strike, no badge, no error —
-   * the line sells at its regular price. The strikethrough is always honest. In practice only a
-   * dollar price reaches this (a percent and an amount off always lower; a typed dinar `fixed` price
-   * on an ordinary product is refused since the clean start).
+   * the line sells at its regular price. The strikethrough is always honest. A dollar price reaches
+   * this, and since the rounding rule (row 245) a small percent or amount off can too: 1% of 1,250 is
+   * 1,237.5, which rounds back up to 1,250 — no sale, never a struck price equal to the price paid.
+   * A typed dinar `fixed` price on an ordinary product is refused since the clean start.
    */
   if (regular >= base.regular_iqd) return ladder([]);
 

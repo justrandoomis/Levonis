@@ -10,7 +10,7 @@ A new DECISIONS row (the next free number, 243 at the time of writing) records �
 - السعر الحالي المنشور لكل موديل ولون هو «السعر قبل الخصم» تلقائيًا؛ لا خانة لسعر «قبل» يُكتب باليد.
 - في القسم ٣ «الأسعار» بطاقة جديدة «تخفيض السعر»: يكتب المالك **السعر بعد الخصم بالدولار** (سعر واحد للمنتج، أو سعر لكل موديل) أو **نسبة الخصم**، مع بداية ونهاية اختياريتين، ويرى قبل الحفظ «قبل ← بعد» لكل موديل ولون بالدولار والدينار.
 - الحفظ يكتب **صف العرض نفسه** الذي يكتبه تبويب «العروض الخاصة» (`offer_windows`) عبر الباب نفسه وتحققه نفسه؛ لا طريق خصم ثانٍ.
-- الدولار يُحوَّل **بسعر الصرف نفسه** الذي نُشر به سعر ذلك الموديل، ويُقرَّب لأعلى ألف دينار كما يقرّب التسعير V2؛ فإذا تغيّر سعر الصرف تحرّك السعران معًا.
+- الدولار يُحوَّل **بسعر الصرف نفسه** الذي نُشر به سعر ذلك الموديل، ويُقرَّب لأعلى بقاعدة التقريب نفسها التي يقرّب بها التسعير V2 (الصف 245: فوق 1,000 د.ع إلى أقرب 250، و1,000 فأقل بلا تقريب)؛ فإذا تغيّر سعر الصرف تحرّك السعران معًا.
 - الشطب صادق دائمًا: المشطوب هو السعر المنشور الفعلي في تلك اللحظة، وبجانبه «−17٪»؛ وإذا لم يكن السعر بعد الخصم أقل فلا شطب ولا شارة.
 - السلة والطلب والفاتورة تحترم العرض وتعرض «قبل/بعد» بالعربية والإنجليزية والسورانية وبالدينار.
 
@@ -48,12 +48,12 @@ Not in scope: price protection, trade-in «today's price», coupons, bundles and
 |---|---|---|
 | D1 | **One model, one row, one door.** The card reads and writes the same `offer_windows` + `offer_limits` row for the subject `('product', id)` that the «العروض الخاصة» tab writes, through `PUT /api/admin/offers/:productId` and its validation. The card adds no table of its own, and no product-save path touches offers. | worker/lib/offers.ts header: "no second discount code path". `MembershipDiscountSection.tsx` sets the same precedent for benefit rules. |
 | D2 | **A new price mode `fixed_usd`.** Its dollar prices live in a new child table `offer_usd_prices` (0197): either one row for the whole product (`model_id = ''`) or one row per model. A model with no row is not on sale. | Products with Standard and Combo models are common, and one dollar price cannot fit both. Keeping the prices in a child table means `offer_windows` gets no ALTER, and older code keeps writing it unchanged. |
-| D3 | **Conversion.** The after price on direct sale is `ceil₁₀₀₀(usd × U_sku)`. `U_sku` is the `usd_iqd_rate` of **that SKU's own published V2 row**. The rounding is the same `ceilStep` and the same 1,000 step that Pricing V2 uses for the published price (§4.4). Each pre-order channel keeps the **same IQD saving** as direct. | Before and after use one rate from one write, so they always move together. The pre-order rule is docs/PRICING-V2.md §5.5 ("offers move D and P together … P stays Δ below it"), expressed in published figures only. |
+| D3 | **Conversion.** The after price on direct sale is `round(usd × U_sku)`. `U_sku` is the `usd_iqd_rate` of **that SKU's own published V2 row**. The rounding is the same function Pricing V2 publishes with, `roundPriceIqd` (DECISIONS row 245, 2026-10-17: above 1,000 IQD up to the next 250, else whole dinars; it was ceil₁₀₀₀ until then) (§4.4). Each pre-order channel keeps the **same IQD saving** as direct. | Before and after use one rate from one write, so they always move together. The pre-order rule is docs/PRICING-V2.md §5.5 ("offers move D and P together … P stays Δ below it"), expressed in published figures only. |
 | D4 | **Never ≥ before.** If a window's price for a line is not strictly below that line's regular price, the window contributes no price. There is no strike, no badge and no error, and the line sells at its regular price. | O4. |
 | D5 | **Floors are the existing ones.** At save, a route that would fall to ≤ 0 is refused. At read time, a line below the floor does not sell (`DERIVED_PRICE_BELOW_FLOOR` + `OFFER_INACTIVE`, unchanged). | offers.ts `resolveOfferPrice` §4.3 rule. No new floor. |
 | D6 | **Below cost: warn the owner, never refuse, never move, never lift.** The owner's preview flags «تحت التكلفة». An editor's save rings the owner's bell with the product name only and no figure. The editor's own answer says nothing. | DECISIONS row 222 Q3 says a typed dollar price below cost + minimum profit saves with a warning. Q1 says never lift a price to cost, because that reveals the cost. A refusal shown to an editor would work as a cost oracle (worker/lib/pricingEngine/v2/bell.ts). |
 | D7 | **Roles.** On a cost-first product, `fixed_usd` is owner-only (`403 PRICING_V2_OWNER_ONLY {section: 3}`), as it is for every V2 price write there. A percent offer is open to whoever may use the offers tab today. | worker/lib/pricingEngine/v2/api.ts role rules. The editor never sees dollars on a cost-first product (dto.ts). |
-| D8 | **Percent maths is unchanged.** It stays `floor(regular × (100 − p) / 100)` on each line's published price. | Live percent offers keep their exact numbers. The published price already follows the rate. |
+| D8 | **Percent maths follows the rounding rule (DECISIONS row 245, 2026-10-17).** The after price is `roundPriceIqd(regular × (100 − p) / 100)` on each line's published price — rounded UP (above 1,000 IQD to the next 250, else whole dinars); it was `floor(…)` to the dinar until then. An amount off (`discount_iqd`) is rounded the same way. If the rounding brings the result back to the price before (1% of 1,250 = 1,237.5 → 1,250), the line shows **no sale** (D4): never a struck price equal to the price paid. The badge is computed from the two real prices (D9), so 24,000 −10% = 21,600 → 21,750 reads «−9٪» — honest. | One rule for every price the customer reads. Rounding up keeps the struck price honest (the badge never claims more than was taken off) and the floors untouched. |
 | D9 | **Badge = `round((before − applied) × 100 / before)`.** It is computed on the server, for the viewer, from the two IQD numbers printed beside it, and shown only when ≥ 1. | This is the house rounding of `BundleSavingLine`. The owner's example ($600 → $500) reads «−17٪». |
 | D10 | **Precedence is unchanged.** A live offer replaces the regular price. Member rungs are clamped to ≤ the offer price, so a member pays the lower of the two and the discounts never stack. A coupon applies afterwards, as today. One label fix: see §9. | offers.ts `resolveOfferPrice`, and row 223 decision 5 ("one discount per line"). |
 | D11 | **Times are Baghdad time.** That is the zone `normalizeUtc` reads a zone-less `datetime-local` value in. | The same rule the server already applies (offers.ts `normalizeUtc`). |
@@ -219,31 +219,32 @@ export function fixedUsdLine(i: {
 The steps:
 
 1. If `cents`, `rate` or `directIqd` is null, the answer is `none`. This covers four cases: a model with no row, a SKU that does not sell direct, a V1 or missing rate, and a missing 0197.
-2. Compute `afterDirect = ceilStep(mulProcurementExact({ num: BigInt(cents), den: 100n }, procurementExact(rate)), ROUNDING_STEP_IQD)`.
+2. Compute `afterDirect = roundPriceIqd(mulProcurementExact({ num: BigInt(cents), den: 100n }, procurementExact(rate)))`.
    - This is exact BigInt rational arithmetic.
-   - It uses the same `ceilStep` and `ROUNDING_STEP_IQD` from `packages/pricing/src/costToPrice.ts` that `priceProductV2` publishes D with.
+   - It uses the same `roundPriceIqd` (`packages/pricing/src/priceRounding.ts`, DECISIONS row 245) that `priceProductV2` publishes D with; until 2026-10-17 it was `ceilStep` with the 1,000 step.
    - No JS float is ever produced: cents are an integer and the rate is decimal text.
 3. If `afterDirect >= directIqd`, the answer is `none` (D4).
-4. Compute `saving = directIqd − afterDirect`. It is a positive multiple of 1,000, because both prices are multiples of the step.
+4. Compute `saving = directIqd − afterDirect`. It is positive and whole; above 1,000 IQD both prices are multiples of 250, so the route price below keeps to the rounding rule.
 5. Compute `regular = channelIqd − saving`.
    - For a direct line or a COD pre-order priced as direct, this is `afterDirect`.
    - For a prepaid pre-order route it is the same saving off P.
    - If `regular < 1`, the answer is `below_floor`.
 6. Otherwise return `{ kind: 'price', regular_iqd: regular }`.
 
-**Worked numbers.** Price-first P1S $600 and Combo $750. Pre-order discount Δ = $50 on land.
+**Worked numbers.** Price-first P1S $600 and Combo $750. Pre-order discount Δ = $50 on land. `round` is the rounding rule of DECISIONS row 245 (above 1,000 IQD up to the next 250, else whole dinars); the cells were ceil₁₀₀₀ until 2026-10-17.
 
 | U | Line | Before | Offer typed | After | Badge |
 |---|---|---|---|---|---|
-| 1,500 | P1S direct | 900,000 | $500 | ceil(750,000) = **750,000** | −17٪ (16.67) |
+| 1,500 | P1S direct | 900,000 | $500 | round(750,000) = **750,000** | −17٪ (16.67) |
 | 1,500 | P1S land prepaid | 825,000 | — | 825,000 − 150,000 = **675,000** | −18٪ |
 | 1,500 | Combo direct | 1,125,000 | $640 | **960,000** | −15٪ (14.67) |
 | 1,500 | Combo land | 1,050,000 | — | 1,050,000 − 165,000 = **885,000** | −16٪ |
-| 1,530 after the real reprice | P1S direct | 918,000 | $500 | ceil(765,000) = **765,000** | −17٪ |
-| 1,530 after the real reprice | P1S land | 842,000 | — | 842,000 − 153,000 = **689,000** | −18٪ |
-| 1,530 after the real reprice | Combo direct | 1,148,000 | $640 | ceil(979,200) = **980,000** | −15٪ |
-| 1,527.5 | P1S direct | 917,000 | $500 | ceil(763,750) = **764,000** | −17٪ |
-| 1,500 | P1S direct | 900,000 | $599.50 | ceil(899,250) = 900,000 ≥ before → **no sale** | — |
+| 1,530 after the real reprice | P1S direct | 918,000 | $500 | round(765,000) = **765,000** | −17٪ |
+| 1,530 after the real reprice | P1S land | 841,500 | — | 841,500 − 153,000 = **688,500** | −18٪ |
+| 1,530 after the real reprice | Combo direct | 1,147,500 | $640 | round(979,200) = **979,250** | −15٪ |
+| 1,527.5 | P1S direct | 916,500 | $500 | round(763,750) = **763,750** | −17٪ |
+| 1,500 | P1S direct | 900,000 | $599.50 | round(899,250) = **899,250** (below before: a sale) | — (0.08: no badge) |
+| 1,500 | P1S direct | 900,000 | $599.90 | round(899,850) = 900,000 ≥ before → **no sale** | — |
 | 1,500, mid-wave (central rate 1,530 approved, P1S not yet repriced) | P1S direct | 900,000 | $500 | **750,000**, using its own row's 1,500 | −17٪ |
 
 ### 4.5 `resolveOfferPrice`
@@ -624,7 +625,7 @@ The real page is right-to-left. The ASCII shows reading order.
 | endsAt | ينتهي في (اختياري) | Ends (optional) | کۆتایی دێت لە (ئارەزوومەندانە) |
 | tz | بتوقيت بغداد | Baghdad time | بە کاتی بەغدا |
 | active | مفعّل | Active | چالاک |
-| rateNote | يُحوَّل الدولار إلى الدينار بسعر الصرف نفسه الذي سُعِّر به المنتج، ويُقرَّب لأعلى إلى ألف دينار؛ فإذا تغيّر سعر الصرف تغيّر السعران قبل الخصم وبعده معًا. | Dollars convert to dinars at the same exchange rate the product is priced at, rounded up to the next 1,000 IQD; when the rate moves, the before and after prices move together. | دۆلار بە هەمان نرخی ئاڵوگۆڕ کە بەرهەمەکەی پێ نرخ دانراوە دەکرێتە دینار و بۆ سەرەوە دەگەیەنرێتە هەزار دینار؛ کاتێک نرخی ئاڵوگۆڕ دەگۆڕێت، نرخی پێش و دوای داشکاندن پێکەوە دەگۆڕێن. |
+| rateNote | يُحوَّل الدولار إلى الدينار بسعر الصرف نفسه الذي سُعِّر به المنتج، ويُقرَّب لأعلى إلى أقرب 250 دينارًا فوق 1,000 د.ع؛ فإذا تغيّر سعر الصرف تغيّر السعران قبل الخصم وبعده معًا. | Dollars convert to dinars at the same exchange rate the product is priced at, rounded up to the next 250 IQD above 1,000 IQD; when the rate moves, the before and after prices move together. | دۆلار بە هەمان نرخی ئاڵوگۆڕ کە بەرهەمەکەی پێ نرخ دانراوە دەکرێتە دینار و لە سەرووی 1,000 د.ع بۆ سەرەوە دەگەیەنرێتە نزیکترین 250 دینار؛ کاتێک نرخی ئاڵوگۆڕ دەگۆڕێت، نرخی پێش و دوای داشکاندن پێکەوە دەگۆڕێن. |
 | percentNote | تُحسب النسبة من السعر المنشور لكل موديل ولون، وتتبع سعر الصرف معه. | The percent is taken off each model and colour's published price, and follows the exchange rate with it. | ڕێژەکە لە نرخی بڵاوکراوەی هەر مۆدێل و ڕەنگێک دەبڕدرێت، و لەگەڵیدا شوێن نرخی ئاڵوگۆڕ دەکەوێت. |
 | otherSettings(list) | إعدادات أخرى لهذا العرض من «العروض الخاصة»: {list} | More settings of this offer, from Special offers: {list} | ڕێکخستنی تری ئەم ئۆفەرە لە «ئۆفەرە تایبەتەکان»: {list} |
 | membersOnly(tiers) | للمشتركين فقط: {tiers} | Members only: {tiers} | تەنها بۆ ئەندامان: {tiers} |
@@ -877,7 +878,7 @@ New files will fail `tests/rootShardBalance.test.ts` only because they are new. 
 
 - **`fixedUsdLine`:**
   - every row of §4.4's table, plus fractional rates (`"1527.5"`, `"1530.25"`);
-  - the result is always a multiple of 1,000;
+  - the result is always on the rounding rule (above 1,000 IQD a multiple of 250; row 245);
   - `none` for: a missing model row, a missing rate, a missing direct row, `after ≥ before`, and a V1 row;
   - `below_floor` when a route's saving ≥ its price;
   - cents 1 and 10,000,000;
@@ -899,7 +900,7 @@ New files will fail `tests/rootShardBalance.test.ts` only because they are new. 
 1. A price-first product is priced by the real V2 writer at U 1,500 (P1S $600, Combo $750, land Δ $50).
 2. A `fixed_usd` window is saved through the route.
 3. Card, quote, cart and checkout quote all show 900,000 → 750,000, −17٪.
-4. Approve U 1,530 and run the real `autoReprice`. Everything reads 918,000 → 765,000, and the land route 842,000 → 689,000.
+4. Approve U 1,530 and run the real `autoReprice`. Everything reads 918,000 → 765,000, and the land route 841,500 → 688,500.
 5. **Mid-wave:** two products, rate approved, only one repriced. Each uses its own row's rate. The not-yet-repriced one still reads 900,000 → 750,000, never 765,000 against 900,000.
 6. A product whose owner lowers D to $480 by a V2 apply: the $500 sale shows no strike and no badge, and the line sells at 720,000.
 
@@ -1065,7 +1066,7 @@ Chromium comes from `/opt/pw-browsers`, and Playwright from `PLAYWRIGHT_MODULE=/
 None of these blocks the build. The default is stated for each.
 
 1. **Price protection** (row 223 decision 8) reads the published V2 price and ignores offers today. A customer who bought at $600 a week before a $500 sale gets no automatic credit. *Default: unchanged.* Raise it with the owner separately.
-2. **Percent rounding** stays at 1 IQD (D8), so 825,000 × 90% = 742,500. *Default: unchanged.* The owner may later prefer the 1,000 step.
+2. **Percent rounding** — answered by the owner on 2026-10-17 (DECISIONS row 245): the percent result is rounded UP by the same rule as every price (D8), so 825,000 × 90% = 742,500 stays 742,500 (on the 250 grid) and 24,000 × 90% = 21,600 becomes 21,750.
 3. **Badge rounding** is to the nearest whole percent (D9: $600 → $500 reads «−17٪», as the owner wrote). *Default: as stated.*
 4. **Pre-order during a USD sale** keeps the same IQD saving as direct (D3). *Default: as stated.* That is PRICING-V2 §5.5.
 5. **The V2 review sheet** does not yet warn when a new direct price cancels a live USD sale. The discount card shows it after the apply (row state `not_lower`). *Possible follow-up.*

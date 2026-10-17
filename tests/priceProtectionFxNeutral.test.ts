@@ -143,13 +143,13 @@ test('a mixed move pays the USD part only, never more than the actual dinar drop
   applyRate(w.raw, 'USD_IQD', '1500');
   await save(w, '100');
   const now = directPrice(w);
-  // EUR 450 × 1.1 × 1,500 + 8,000 + $100 × 1,500 = 900,500 → 901,000.
-  assert.equal(now, 901_000);
+  // EUR 450 × 1.1 × 1,500 + 8,000 + $100 × 1,500 = 900,500 — on the rounding rule (row 245), nothing added.
+  assert.equal(now, 900_500);
   const r = await claim(w, bought.itemId);
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  const covered = 992_000 - restate(901_000, '1500', '1600');
+  const covered = 992_000 - restate(900_500, '1500', '1600');
   assert.equal(r.body.claim.eligible_unit_iqd, covered);
-  assert.ok(covered < 992_000 - 901_000, 'the rest came from the exchange rate');
+  assert.ok(covered < 992_000 - 900_500, 'the rest came from the exchange rate');
 
   // Approval credits what is covered (the wallet stays the order's wallet rate, decision 9).
   w.raw.exec(`INSERT OR IGNORE INTO users (id,name,email,password_hash,role) VALUES ('boss','Admin','a@x.co','h','admin')`);

@@ -89,7 +89,7 @@ const AR: DiscountStrings = {
   tz: 'بتوقيت بغداد',
   active: 'مفعّل',
   rateNote:
-    'يُحوَّل الدولار إلى الدينار بسعر الصرف نفسه الذي سُعِّر به المنتج، ويُقرَّب لأعلى إلى ألف دينار؛ فإذا تغيّر سعر الصرف تغيّر السعران قبل الخصم وبعده معًا.',
+    'يُحوَّل الدولار إلى الدينار بسعر الصرف نفسه الذي سُعِّر به المنتج، ويُقرَّب لأعلى إلى أقرب 250 دينارًا فوق 1,000 د.ع؛ فإذا تغيّر سعر الصرف تغيّر السعران قبل الخصم وبعده معًا.',
   percentNote: 'تُحسب النسبة من السعر المنشور لكل موديل ولون، وتتبع سعر الصرف معه.',
   otherSettings: (list) => `إعدادات أخرى لهذا العرض من «العروض الخاصة»: ${list}`,
   membersOnly: (tiers) => `للمشتركين فقط: ${tiers}`,
@@ -147,7 +147,7 @@ const EN: DiscountStrings = {
   tz: 'Baghdad time',
   active: 'Active',
   rateNote:
-    'Dollars convert to dinars at the same exchange rate the product is priced at, rounded up to the next 1,000 IQD; when the rate moves, the before and after prices move together.',
+    'Dollars convert to dinars at the same exchange rate the product is priced at, rounded up to the next 250 IQD above 1,000 IQD; when the rate moves, the before and after prices move together.',
   percentNote: "The percent is taken off each model and colour's published price, and follows the exchange rate with it.",
   otherSettings: (list) => `More settings of this offer, from Special offers: ${list}`,
   membersOnly: (tiers) => `Members only: ${tiers}`,
@@ -205,7 +205,7 @@ const CKB: DiscountStrings = {
   tz: 'بە کاتی بەغدا',
   active: 'چالاک',
   rateNote:
-    'دۆلار بە هەمان نرخی ئاڵوگۆڕ کە بەرهەمەکەی پێ نرخ دانراوە دەکرێتە دینار و بۆ سەرەوە دەگەیەنرێتە هەزار دینار؛ کاتێک نرخی ئاڵوگۆڕ دەگۆڕێت، نرخی پێش و دوای داشکاندن پێکەوە دەگۆڕێن.',
+    'دۆلار بە هەمان نرخی ئاڵوگۆڕ کە بەرهەمەکەی پێ نرخ دانراوە دەکرێتە دینار و لە سەرووی 1,000 د.ع بۆ سەرەوە دەگەیەنرێتە نزیکترین 250 دینار؛ کاتێک نرخی ئاڵوگۆڕ دەگۆڕێت، نرخی پێش و دوای داشکاندن پێکەوە دەگۆڕێن.',
   percentNote: 'ڕێژەکە لە نرخی بڵاوکراوەی هەر مۆدێل و ڕەنگێک دەبڕدرێت، و لەگەڵیدا شوێن نرخی ئاڵوگۆڕ دەکەوێت.',
   otherSettings: (list) => `ڕێکخستنی تری ئەم ئۆفەرە لە «ئۆفەرە تایبەتەکان»: ${list}`,
   membersOnly: (tiers) => `تەنها بۆ ئەندامان: ${tiers}`,

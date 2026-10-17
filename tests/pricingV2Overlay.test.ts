@@ -153,7 +153,7 @@ test('the role projections are allow-lists: a price editor reads final dinars on
   const editor = JSON.stringify(v2EditorAnswer(ev));
   // The method's LABEL is every editor's (§4.4); no USD figure, no rate, no cost-derived key.
   assert.doesNotMatch(editor, /"v2_|"owner"|usd_|_usd|exact|floor|replacement|1600|987\.65|61\.73/i, 'no private key, no rate, no dollar figure');
-  assert.match(editor, /"price_iqd":1581000/, 'the final dinars are there');
+  assert.match(editor, /"price_iqd":1580250/, 'the final dinars are there (987.65 × 1,600 = 1,580,240 → 1,580,250)');
   const owner = v2OwnerAnswer(ev);
   assert.equal(owner.v2_rate?.usd_iqd, '1600');
   assert.deepEqual(owner.v2_points, [{ scope: 'product', id: '', kind: 'fixed', usd: '987.65' }]);
@@ -161,7 +161,7 @@ test('the role projections are allow-lists: a price editor reads final dinars on
 
   await writeV2(w.db, AMS, { method: 'usd', points: [fixed('987.65')], discounts: [off('61.73')] });
   const doc = (await loadProducts(w.db, [AMS])).get(AMS)!.doc;
-  assert.deepEqual(v2Offerable(doc, { optionValueIds: [`${AMS}_o0`], colorId: null }), { direct_iqd: 1_581_000, preorder: { land: 1_482_000 } });
+  assert.deepEqual(v2Offerable(doc, { optionValueIds: [`${AMS}_o0`], colorId: null }), { direct_iqd: 1_580_250, preorder: { land: 1_481_500 } });
   const v1 = (await loadProducts(w.db, [PID])).get(PID)!.doc;
   assert.equal(v2Offerable(v1, { optionValueIds: [`${PID}_o0`], colorId: C(0) }), null, 'a V1 product is not offerable this way');
 });
@@ -179,7 +179,7 @@ test('the public product page of a V2 product carries its final prices only: no 
       const body = JSON.parse(text) as unknown;
       assert.deepEqual(leaks(body, { decimals: ['987.65', '61.73', '1600'] }), [], `${user?.role ?? 'guest'} ${path}`);
       for (const key of ['sku_strict', '"v2":', 'usd_ceil6', 'exact_iqd', 'discount_usd', 'deltas_usd', '"anchor"', 'pricing_method']) assert.ok(!text.includes(key), `${path} carries no ${key}`);
-      if (path.includes(slug)) assert.match(text, /1581000/, 'the final price is published');
+      if (path.includes(slug)) assert.match(text, /1580250/, 'the final price is published');
     }
   }
 });

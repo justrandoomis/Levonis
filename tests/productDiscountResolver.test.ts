@@ -1,8 +1,9 @@
 /**
  * PRODUCT DISCOUNT — THE PURE RESOLVER (docs/ux/PRODUCT-DISCOUNT.md §4, §9, §12 "Server: pure").
  *
- * A dollar sale price (`fixed_usd`, 0197) is converted at the SKU's OWN V2 rate, rounded UP to the
- * 1,000 IQD step Pricing V2 publishes with, and a pre-order route keeps the same IQD saving. It is
+ * A dollar sale price (`fixed_usd`, 0197) is converted at the SKU's OWN V2 rate, rounded UP by the
+ * rule Pricing V2 publishes with (`roundPriceIqd`, DECISIONS row 245: above 1,000 IQD to the next 250,
+ * else whole dinars), and a pre-order route keeps the same IQD saving. It is
  * never ≥ before (D4): no strike, no badge, no error. `offer_before_iqd` (the struck price) is set only
  * when a window lowered the line, a member label names a rung only below the offer (F5), the bundle
  * mirror ignores `fixed_usd`, and every call site of `applyOfferToResolved` passes its document.
@@ -94,7 +95,7 @@ const apply = (r: ResolvedPrice, w: OfferWindow, doc: Doc | null, tier: Tier = '
 
 /* ------------------------------------------------------- fixedUsdLine -- */
 
-test('§4.4 worked numbers: rate, rounding up to 1,000, the same IQD saving on a route, D4', () => {
+test('§4.4 worked numbers: rate, rounding up by the rule (row 245), the same IQD saving on a route, D4', () => {
   const cases: Array<[string, number, number, number, number, number | null, number | null]> = [
     // [U, cents, directIqd, channelIqd, expected regular | null (none), expected badge on that channel]
     ['1500', 50_000, 900_000, 900_000, 750_000, 17, null],
@@ -102,10 +103,16 @@ test('§4.4 worked numbers: rate, rounding up to 1,000, the same IQD saving on a
     ['1500', 64_000, 1_125_000, 1_125_000, 960_000, 15, null],
     ['1500', 64_000, 1_125_000, 1_050_000, 885_000, 16, null],
     ['1530', 50_000, 918_000, 918_000, 765_000, 17, null],
-    ['1530', 50_000, 918_000, 842_000, 689_000, 18, null],
-    ['1530', 64_000, 1_148_000, 1_148_000, 980_000, 15, null],
-    ['1527.5', 50_000, 917_000, 917_000, 764_000, 17, null],
-    ['1500', 59_950, 900_000, 900_000, null, null, null],
+    // $550 × 1,530 = 841,500 (the land price, on the rule); $500 → 765,000; the saving 153,000 off it.
+    ['1530', 50_000, 918_000, 841_500, 688_500, 18, null],
+    // Combo $750 × 1,530 = 1,147,500; $640 × 1,530 = 979,200 → 979,250.
+    ['1530', 64_000, 1_147_500, 1_147_500, 979_250, 15, null],
+    // $600 × 1,527.5 = 916,500; $500 × 1,527.5 = 763,750 — both already on the rule.
+    ['1527.5', 50_000, 916_500, 916_500, 763_750, 17, null],
+    // $599.50 × 1,500 = 899,250: below 900,000 by the rule (ceil₁₀₀₀ made it 900,000 = no sale) …
+    ['1500', 59_950, 900_000, 900_000, 899_250, null, null],
+    // … $599.90 = 899,850 → 900,000: not below the before price — no sale (D4).
+    ['1500', 59_990, 900_000, 900_000, null, null, null],
   ].map(([u, c, d, ch, exp, badge]) => [u, c, d, ch, exp, badge, null] as never);
   for (const [u, cents, direct, channel, expected, badge] of cases) {
     const out = fixedUsdLine({ cents, rate: u, directIqd: direct, channelIqd: channel });
@@ -123,10 +130,10 @@ test('§4.4 worked numbers: rate, rounding up to 1,000, the same IQD saving on a
   assert.equal(offerSavingPercent(null, 750_000), null);
 });
 
-test('fractional rates convert exactly, and every answer is a multiple of 1,000', () => {
-  assert.equal(usdToIqdCeil(50_000, '1527.5'), 764_000);
-  assert.equal(usdToIqdCeil(50_000, '1530.25'), 766_000); // 765,125 → 766,000
-  assert.equal(usdToIqdCeil(1, '1530.25'), 1_000, 'one cent is still at least one step');
+test('fractional rates convert exactly, and every answer is on the rounding rule (row 245)', () => {
+  assert.equal(usdToIqdCeil(50_000, '1527.5'), 763_750);
+  assert.equal(usdToIqdCeil(50_000, '1530.25'), 765_250); // 765,125 → 765,250
+  assert.equal(usdToIqdCeil(1, '1530.25'), 16, 'one cent is 15.3025 IQD: at or below 1,000, whole dinars, never 0');
   assert.equal(usdToIqdCeil(10_000_000, '1500'), 150_000_000, '$100,000.00 — the 0189 ceiling');
   assert.equal(usdToIqdCeil(50_000, '0'), null, 'a zero rate is no rate');
   assert.equal(usdToIqdCeil(50_000, '1e3'), null, 'an exponent is not a stored rate');
@@ -134,7 +141,7 @@ test('fractional rates convert exactly, and every answer is a multiple of 1,000'
   for (const cents of [1, 99, 12_345, 59_999, 10_000_000]) {
     for (const rate of ['1500', '1527.5', '1530.25', '1309.123456']) {
       const v = usdToIqdCeil(cents, rate)!;
-      assert.equal(v % 1000, 0, `${cents} × ${rate} is on the 1,000 step`);
+      assert.ok(v >= 1 && (v <= 1000 || v % 250 === 0), `${cents} × ${rate} is on the rounding rule`);
     }
   }
 });
@@ -167,14 +174,15 @@ test('no float anywhere: random cents × random decimal rates agree with a BigIn
     const whole = 1000 + Math.floor(rand() * 2000);
     const frac = Math.floor(rand() * 10_000);
     const rate = frac === 0 ? String(whole) : `${whole}.${String(frac).padStart(4, '0').replace(/0+$/, '')}`;
-    // Reference: cents × rate × 10^4 / (100 × 10^4), ceil to 1,000 — all BigInt.
+    // Reference: cents × rate × 10^4 / (100 × 10^4), up to the next 250 above 1,000 IQD, else to the dinar — all BigInt.
     const [ri, rf = ''] = rate.split('.');
     const scale = 10n ** BigInt(rf.length);
     const rateScaled = BigInt(ri) * scale + BigInt(rf || '0');
     const num = BigInt(cents) * rateScaled;
-    const den = 100n * scale * 1000n;
+    const step = num > 1000n * 100n * scale ? 250n : 1n;
+    const den = 100n * scale * step;
     const steps = num / den + (num % den > 0n ? 1n : 0n);
-    assert.equal(usdToIqdCeil(cents, rate), Number(steps * 1000n), `${cents} × ${rate}`);
+    assert.equal(usdToIqdCeil(cents, rate), Number(steps * step), `${cents} × ${rate}`);
   }
 });
 
@@ -286,11 +294,11 @@ test('the rate is the SKU row’s own: a product not yet repriced keeps its old 
   const old = printer('1500');
   assert.equal(apply(line(old, 'm1'), perModel(50_000, null), old).resolved.regular_iqd, 750_000);
   // Repriced: its rows say 1,530 and the new published prices.
-  const repriced = printer('1530', { p1s: 918_000, p1sLand: 842_000, combo: 1_148_000, comboLand: 1_071_000 });
+  const repriced = printer('1530', { p1s: 918_000, p1sLand: 841_500, combo: 1_147_500, comboLand: 1_071_000 });
   const w = perModel(50_000, 64_000);
   assert.equal(apply(line(repriced, 'm1'), w, repriced).resolved.regular_iqd, 765_000);
-  assert.equal(apply(line(repriced, 'm1', 'land'), w, repriced).resolved.regular_iqd, 689_000);
-  assert.equal(apply(line(repriced, 'm2'), w, repriced).resolved.regular_iqd, 980_000);
+  assert.equal(apply(line(repriced, 'm1', 'land'), w, repriced).resolved.regular_iqd, 688_500);
+  assert.equal(apply(line(repriced, 'm2'), w, repriced).resolved.regular_iqd, 979_250);
 });
 
 test('a caller without the document gets no sale for fixed_usd — never a guessed price', () => {
@@ -315,7 +323,9 @@ test('D4 for every mode: a window price not strictly below the regular contribut
   const modes: Array<Partial<OfferWindow>> = [
     { offer_price_mode: 'fixed', offer_price_iqd: 900_000 },
     { offer_price_mode: 'fixed', offer_price_iqd: 950_000 },
-    { offer_price_mode: 'fixed_usd', usd_prices: [{ model_id: 'm1', cents: 59_950 }] },
+    { offer_price_mode: 'fixed_usd', usd_prices: [{ model_id: 'm1', cents: 59_990 }] },
+    // A percent the rounding brings back to the price before (row 245): 0.1% is not expressible — 1% of
+    // 900,000 is 891,000 and lowers — so the D4 case for percent is pinned in tests/pricingRounding.test.ts.
     { offer_price_mode: 'discount_iqd', discount_iqd: 0 },
   ];
   for (const m of modes) {

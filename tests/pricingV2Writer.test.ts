@@ -143,8 +143,8 @@ test('every shape made V2 is charged exactly its V2 prices: prepaid, COD = D, fe
   assert.equal(pla.plan.prices.length, 2 * 30 * 2, '60 SKUs × 2 channels');
   const plaPrice = (m: number, c: number, ch: string) => pla.plan.prices.find((p) => p.combo_key === `o:${legacyOptionId('bambu-lab-pla-basic-filament', m)}|c:${PLA}_c${c}` && p.channel === ch)!.price.computed_price_iqd;
   assert.equal(plaPrice(0, 5, 'direct_sale'), 32_000);
-  assert.equal(plaPrice(0, 5, 'pre_order_sea'), 31_000 - 1_000 + 1_000, '$19 = 30,400 → 31,000');
-  assert.equal(plaPrice(1, 0, 'direct_sale'), 41_600 + 400, '$26 = 41,600 → 42,000');
+  assert.equal(plaPrice(0, 5, 'pre_order_sea'), 30_500, '$19 = 30,400 → 30,500 (the rule of row 245)');
+  assert.equal(plaPrice(1, 0, 'direct_sale'), 41_750, '$26 = 41,600 → 41,750');
   assert.equal(plaPrice(0, 1, 'pre_order_sea'), plaPrice(0, 1, 'direct_sale'), 'an explicit $0 exception overrides the product discount');
   // Cost-first, one model sold direct + air + land: EUR 450 by Germany land (R = 800,000), $120 minimum (192,000) → D 992,000.
   const ams2 = await writeV2(w.db, AMS2, {

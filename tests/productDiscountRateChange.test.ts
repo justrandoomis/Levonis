@@ -6,7 +6,7 @@
  *   1. priced by the real V2 writer at U 1,500 (P1S $600, Combo $750, land Δ $50), a per-model sale
  *      ($500 / $640) saved through the door: card, product quote, cart and checkout quote all read
  *      900,000 → 750,000, «−17٪»;
- *   2. U 1,530 approved and the REAL `autoReprice` run: 918,000 → 765,000; land 842,000 → 689,000;
+ *   2. U 1,530 approved and the REAL `autoReprice` run: 918,000 → 765,000; land 841,500 → 688,500 (row 245);
  *   3. mid-wave (the rate approved, one product repriced, the other not): each uses its own row's
  *      rate — the one not yet repriced still reads 900,000 → 750,000, never 765,000 against 900,000;
  *   4. the owner lowers D to $480 by a V2 apply: the $500 sale strikes nothing and sells at 720,000.
@@ -81,11 +81,11 @@ test('before and after move together: card, quote, cart and checkout at U 1,500,
   const report = await reprice(w.raw);
   assert.ok(report.repriced.includes(PID), JSON.stringify(report));
   const c1 = await card(w);
-  assert.deepEqual([c1.display_price_iqd, c1.display_offer_before_iqd, c1.display_offer_saving_percent], [689_000, 842_000, 18]);
+  assert.deepEqual([c1.display_price_iqd, c1.display_offer_before_iqd, c1.display_offer_saving_percent], [688_500, 841_500, 18]);
   const land1 = await productQuote(w, SLUG, M1, 'land');
-  assert.deepEqual([land1.unit_subtotal_iqd, land1.offer_before_iqd], [689_000, 842_000]);
+  assert.deepEqual([land1.unit_subtotal_iqd, land1.offer_before_iqd], [688_500, 841_500]);
   const combo1 = await productQuote(w, SLUG, M2, 'direct');
-  assert.deepEqual([combo1.unit_subtotal_iqd, combo1.offer_before_iqd], [980_000, 1_148_000]);
+  assert.deepEqual([combo1.unit_subtotal_iqd, combo1.offer_before_iqd], [979_250, 1_147_500]);
   const cart1 = (await w.cart()).body.items[0];
   assert.deepEqual([cart1.unit_price_iqd, cart1.breakdown.offer_before_iqd], [765_000, 918_000]);
   const door1 = (await w.quote('cash')).body.quote.lines[0];
@@ -113,7 +113,7 @@ test('mid-wave: the rate is approved, one product repriced and one not — each 
   applyRate(w.raw, 'USD_IQD', '1530');
   await writeV2(w.db, PID, { method: 'usd', points: [option(M1, '600'), option(M2, '750')], discounts: [off('50')] });
   const repriced = await card(w, PID);
-  assert.deepEqual([repriced.display_price_iqd, repriced.display_offer_before_iqd], [689_000, 842_000]);
+  assert.deepEqual([repriced.display_price_iqd, repriced.display_offer_before_iqd], [688_500, 841_500]);
   const waiting = await card(w, 'p_twin');
   assert.deepEqual(
     [waiting.display_price_iqd, waiting.display_offer_before_iqd, waiting.display_offer_saving_percent],

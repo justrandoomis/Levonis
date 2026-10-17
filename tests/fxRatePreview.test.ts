@@ -91,9 +91,10 @@ function snapshot(raw: DatabaseSync): Map<string, string> {
 }
 const changed = (a: Map<string, string>, b: Map<string, string>) => [...a.keys()].filter((k) => a.get(k) !== b.get(k));
 
-const ceil1000 = (n: number) => Math.ceil(n / 1000) * 1000;
-/** The brief's product at U and the Germany-land rate: ceil_1000(EUR 450 × 1.1 × U + 2.5 kg × rate + $120 × U), in whole dinars (no float). */
-const amsLand = (u: number, ship = 3200) => ceil1000(495 * u + (5 * ship) / 2 + 120 * u);
+/** The rounding rule (DECISIONS row 245), independently: above 1,000 up to the next 250, else whole dinars. */
+const ceilRule = (n: number) => (n > 1000 ? Math.ceil(n / 250) * 250 : Math.ceil(n));
+/** The brief's product at U and the Germany-land rate: round(EUR 450 × 1.1 × U + 2.5 kg × rate + $120 × U), in whole dinars (no float). */
+const amsLand = (u: number, ship = 3200) => ceilRule(495 * u + (5 * ship) / 2 + 120 * u);
 const ownerVersion = (w: World, pair = 'USD_IQD') => Number(pairOf(w.raw, pair as 'USD_IQD').owner_version);
 const shipVersion = (w: World, profile = 'GERMANY_LAND') => row<{ v: number }>(w.raw, 'SELECT version AS v FROM pricing_shipping_rates WHERE profile = ?', profile)!.v;
 
@@ -250,7 +251,7 @@ test('a central shipping rate: the preview lists the products on that route; the
   assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
   const { preview } = await json(res);
   assert.deepEqual(preview.act, { kind: 'shipping', pair: null, profile: 'GERMANY_LAND', effective_before: '3200', effective_after: '3400' });
-  assert.equal((preview.rows as PreviewRow[]).find((r) => r.channel === 'pre_order_land')!.computed_price_iqd, 993_000);
+  assert.equal((preview.rows as PreviewRow[]).find((r) => r.channel === 'pre_order_land')!.computed_price_iqd, 992_500, '992,000 + 2.5 kg × 200 = 992,500, on the rule');
   const air = (await json(await post(w.app, '/api/admin/pricing/rates/shipping/CHINA_AIR/preview', { rate_iqd: '21000' }))).preview;
   assert.deepEqual(air.affected, { products: 0, models: 0 }, 'no engine product ships by China air');
 
@@ -259,7 +260,7 @@ test('a central shipping rate: the preview lists the products on that route; the
   assert.equal(row<{ r: string }>(w.raw, "SELECT rate_iqd AS r FROM pricing_shipping_rates WHERE profile = 'GERMANY_LAND'")!.r, '3200');
   const ok = await put(w.app, '/api/admin/pricing/rates/shipping/GERMANY_LAND', { version: shipVersion(w), rate_iqd: '3400', preview_hash: preview.preview_hash });
   assert.equal(ok.status, 200, JSON.stringify(await json(ok.clone())));
-  assert.equal((await cartPrices(w))[LAND], 993_000);
+  assert.equal((await cartPrices(w))[LAND], 992_500);
   // China air: no engine product on it, but one is engine-priced — the hash is still asked for (§8).
   const airAct = await put(w.app, '/api/admin/pricing/rates/shipping/CHINA_AIR', { version: shipVersion(w, 'CHINA_AIR'), rate_iqd: '21000' });
   assert.equal((await json(airAct)).code, 'PRICING_PREVIEW_REQUIRED');

@@ -126,14 +126,14 @@ test('Q2: a price editor’s dollars round-trip — typed, stored, charged at U,
   assert.equal(pre.status, 200, JSON.stringify(pre.body).slice(0, 300));
   assert.deepEqual(privateKeys(pre.body), []);
   const at = (ch: string) => pre.body.table.find((r: { channel: string }) => r.channel === ch);
-  assert.equal(at('direct_sale').price_iqd, 1_814_000, 'the model’s dollars × U, rounded up once (1133.13 × 1,600)');
+  assert.equal(at('direct_sale').price_iqd, 1_813_250, 'the model’s dollars × U, rounded up once (1133.13 × 1,600 = 1,813,008 → 1,813,250)');
   assert.equal(at('direct_sale').editor_usd_price, '1133.13');
   assert.equal(at('pre_order_land').editor_usd_price, '1062.5');
   assert.equal(at('pre_order_land').price_iqd, 1_700_000);
   const put1 = await answer(await put(editor, `/api/admin/products-v2/${AMS}/pricing`, { seq: pre.body.seq, pricing, preview_hash: pre.body.review_hash }));
   assert.equal(put1.status, 200, JSON.stringify(put1.body).slice(0, 300));
   const grid = await cartGrid(w.db, AMS);
-  assert.equal(grid[`o:${MODEL}@direct_sale`]!.prepaid, 1_814_000);
+  assert.equal(grid[`o:${MODEL}@direct_sale`]!.prepaid, 1_813_250);
   assert.equal(grid[`o:${MODEL}@pre_order_land`]!.prepaid, 1_700_000);
   const back = await answer(await get(editor, `/api/admin/products-v2/${AMS}/pricing`));
   const sorted = (rows: Array<Record<string, string>>) => [...rows].sort((a, b) => `${a.scope}${a.id}`.localeCompare(`${b.scope}${b.id}`));

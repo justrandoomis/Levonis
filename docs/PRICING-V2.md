@@ -18,7 +18,8 @@ procurement brief, the owner's decisions of 2026-10-09 and the FX programme plan
 
 - **سعر واحد أساسي: سعر البيع المباشر بالدولار.** يُحسب من التكلفة (تكلفة المورد + الشحن +
   الإضافات + الحد الأدنى للربح)، أو يكتبه المالك بالدولار. ثم يُضرب في سعر الصرف المعتمد
-  ويُقرَّب لأعلى لأقرب 1,000 د.ع مرة واحدة.
+  ويُقرَّب لأعلى مرة واحدة بقاعدة التقريب (قرار المالك 2026-10-17، الصف 245): فوق 1,000 د.ع
+  إلى أقرب مضاعف لـ250، و1,000 د.ع فأقل بلا تقريب (دينار كامل). كانت الخطوة 1,000 د.ع قبل ذلك.
 - **الطلب المسبق = البيع المباشر − خصم بالدولار.** للخصم قيمة على مستوى المنتج، ويمكن وضع
   استثناء لموديل أو لون. بهذا لا يصبح الطلب المسبق أغلى من البيع المباشر أبدًا.
 - **الموديل يرث من المنتج، واللون يرث من موديله.** الاستثناء سطر واحد في بطاقته، والقيمة
@@ -128,8 +129,19 @@ are always both shown (fixes P4/P15).
 ### 1.5 Rounding (one rule, one place)
 
 1. Compute D_usd **exactly** (no intermediate rounding, as E1 does today).
-2. D_iqd = ceil₁₀₀₀(D_usd × U).
-3. P_r,iqd = ceil₁₀₀₀((D_usd − Δ) × U).
+2. D_iqd = round(D_usd × U).
+3. P_r,iqd = round((D_usd − Δ) × U).
+
+**`round` is the price rounding rule (owner decision 2026-10-17, DECISIONS row 245)**, one
+function, `roundPriceIqd` (`packages/pricing/src/priceRounding.ts`): an amount **above 1,000 IQD
+rounds UP to the next multiple of 250** (13,120 → 13,250; 1,120 → 1,250; 24,000 stays); an amount
+of **1,000 IQD or less is not stepped**, only rounded up to whole dinars (999 stays 999). Until
+then it was ceil₁₀₀₀. The route floor of Q1 compares the price with the route's cost rounded by the
+same rule; the product discount's after-price (dollar and percent) uses the same function. Prices
+published under ceil₁₀₀₀ keep selling as they are until the product is re-published through the
+review sheet («راجع الأسعار التي ستتغيّر»), which shows each old → new price first; the owner's
+queue filter «بانتظار التقريب الجديد» lists them (migration 0199 widens the two price CHECKs; no
+stored price is rewritten by it).
 
 **One USD definition (fixes D6).** The owner's «السعر النهائي بالدولار» is the exact USD before
 rounding. Price protection's base USD (row 191) is that same number for the line's channel.
@@ -146,24 +158,27 @@ extras 15,000; minimum profit $318; discount $50.
 **Combo model** («تكلفة مختلفة»: €650, 30 kg; discount exception $25).
 - R = 1,053,000 + 270,000 + 15,000 = 1,338,000.
 - D = $1,210 → **1,815,000**.
-- P = $1,185 → 1,777,500 → **1,778,000**.
+- P = $1,185 → **1,777,500** (on the rule: nothing added; ceil₁₀₀₀ gave 1,778,000).
 
 **Red colour** (+$2):
 - Standard·Red: 1,503,000 / 1,428,000.
-- Combo·Red: 1,818,000 / 1,780,500 → 1,781,000.
+- Combo·Red: 1,818,000 / **1,780,500**.
 
 | Event | Standard D / P | Combo D / P | Why |
 |---|---|---|---|
-| Start | 1,500,000 / 1,425,000 | 1,815,000 / 1,778,000 | — |
-| USD/IQD 1,500 → 1,530 (approved) | 1,526,000 / 1,450,000 | 1,846,000 / 1,808,000 | Supplier and profit scale with U. Freight and extras stay IQD |
-| EUR/USD 1.08 → 1.12 (at U 1,500) | 1,530,000 / 1,455,000 | 1,854,000 / 1,817,000 | Supplier +$20 / +$26 |
-| Same product, price-first «$1,000» and USD/IQD 1,500 → 1,530 | 1,530,000 / 1,454,000 | (model's own $) | Everything scales with U |
+| Start | 1,500,000 / 1,425,000 | 1,815,000 / 1,777,500 | — |
+| USD/IQD 1,500 → 1,530 (approved) | 1,525,750 / 1,449,250 | 1,845,750 / 1,807,500 | Supplier and profit scale with U. Freight and extras stay IQD |
+| EUR/USD 1.08 → 1.12 (at U 1,500) | 1,530,000 / 1,455,000 | 1,854,000 / 1,816,500 | Supplier +$20 / +$26 |
+| Same product, price-first «$1,000» and USD/IQD 1,500 → 1,530 | 1,530,000 / 1,453,500 | (model's own $) | Everything scales with U |
 
 Arithmetic for the second row:
-- Standard: 540×1,530 + 198,000 + 15,000 + 318×1,530 = 1,525,740 → 1,526,000. Minus 50×1,530
-  gives 1,449,240 → 1,450,000.
-- Combo: 702×1,530 + 270,000 + 15,000 + 318×1,530 = 1,845,600 → 1,846,000. Minus 25×1,530
-  gives 1,807,350 → 1,808,000.
+- Standard: 540×1,530 + 198,000 + 15,000 + 318×1,530 = 1,525,740 → 1,525,750. Minus 50×1,530
+  gives 1,449,240 → 1,449,250.
+- Combo: 702×1,530 + 270,000 + 15,000 + 318×1,530 = 1,845,600 → 1,845,750. Minus 25×1,530
+  gives 1,807,350 → 1,807,500.
+
+(The cells are the rule of row 245; under ceil₁₀₀₀ they were 1,778,000, 1,526,000 / 1,450,000,
+1,846,000 / 1,808,000, 1,817,000 and 1,454,000.)
 
 The build fixes these cells in a property test.
 
@@ -263,8 +278,8 @@ Two schema changes:
 │  الموديل · اللون      مباشر        طلب مسبق (بري)   من أين جاء السعر
 │  Standard             1,500,000    1,425,000        المنتج
 │  Standard · Red       1,503,000    1,428,000        اللون +$2                    [عدّل ↘]
-│  Combo                1,815,000    1,778,000        تكلفة Combo · خصم 25$         [عدّل ↘]
-│  Combo · Red          1,818,000    1,781,000        اللون +$2
+│  Combo                1,815,000    1,777,500        تكلفة Combo · خصم 25$         [عدّل ↘]
+│  Combo · Red          1,818,000    1,780,500        اللون +$2
 │  ▸ 4 صفوف أخرى تتبع موديلها
 ╰───────────────────────────────────────────────────────────────────────────────────────
 ```
@@ -822,12 +837,13 @@ price it is «يحتاج تسعيرًا» — not sold — and the owner's bell 
 re-expressed through a rate:
 
     E_D = R_shelf + T × U + (Σ option ± + colour ±) × U      never below R_shelf + T × U
-    D   = ceil_step(E_D)   (the engine's one rounding, ceilStep)  so D − R_shelf ≥ T × U at publication
+    D   = round(E_D)   (the engine's one rounding, roundPriceIqd, row 245)  so D − R_shelf ≥ T × U at publication
 
 A fixed price (SKU or model) on a cost-first product is floored at R_shelf + T × U as at §1.3. A
 change of U moves the profit and the differences only (the `USD` reason, as today). The owner's
 example: A1 Combo's batches at 685,831 / 689,581 / 690,062 IQD, T = $40, U = 1,500 → D =
-ceil_step(690,062 + 60,000) = 751,000 at today's step; when the 690,062 batch sells out, 750,000.
+round(690,062 + 60,000) = 750,250 (row 245: above 1,000 up to the next 250); when the 690,062 batch
+sells out, 749,750.
 
 **Which batches are a SKU's shelf** — the cart's own stock rule (`resolveStock`) under the product's
 CURRENT inventory mode: BASE the product's batches; OPTION the batches of each option value the SKU
@@ -835,7 +851,7 @@ selects (its model — two stocked options add their costs, the units are the fe
 colour's; VARIANT_COMBINATION the variant's. A batch with no known cost never sets the price (the
 highest KNOWN cost does); a shelf of unknown costs only is priced from the supplier.
 
-**Pre-order is not the shelf.** A route keeps the supplier calculation: P_r = ceil_step(E_D,sup −
+**Pre-order is not the shelf.** A route keeps the supplier calculation: P_r = round(E_D,sup −
 Δ × U), E_D,sup being the direct price the supplier cost would give, with the route floors of §1.3
 measured against it — so the shelf never moves a pre-order price. It is capped at the direct price on
 sale (P ≤ D); it is stopped while the shelf sells below the route's own cost

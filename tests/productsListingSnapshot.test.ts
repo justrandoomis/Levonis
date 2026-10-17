@@ -22,6 +22,8 @@ import { ROOT } from './fixtures/d1';
 import { asD1, freshDb, get, json, proOnSale, stubApp } from './fixtures/app';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { productRoutes } from '../worker/routes/products';
+import { roundPriceIqd } from '../packages/pricing/src/priceRounding';
+import { FIXTURE_U, usdReproducing } from './fixtures/v2Publish';
 
 // `price_status` (DECISIONS row 240): every card says whether it is priced; the snapshot predates it.
 // `section_name` and `key_specs` (the Bambu import spec §G.5): the card's knowledge line, from the row and the
@@ -80,7 +82,8 @@ function withoutPremiumTeasers(body: any): any {
 /**
  * THE CLEAN START (DECISIONS row 222, addendum A.12.1), also applied to the baseline rather than regenerated
  * over it: every product is priced in dollars, so each dinar price is its old one reproduced at the fixture
- * rate — an off-step price moves up to the next 1,000 — and no typed PRO rung survives the first V2 price
+ * rate (the seed's `usdReproducing` cents) and priced by the engine's one rounding rule (DECISIONS row 245:
+ * above 1,000 up to the next 250, at or below it whole dinars) — and no typed PRO rung survives the first V2 price
  * (the live catalogue has no PRO rule, so no card carries a PRO teaser). Order, paging and every other field
  * are still held to the captured answer.
  */
@@ -88,7 +91,13 @@ function withoutPremiumTeasers(body: any): any {
 function asCleanStart(body: any): any {
   if (!body || typeof body !== 'object') return body;
   const out = { ...body };
-  const step = (v: unknown) => (typeof v === 'number' && v > 0 ? Math.ceil(v / 1000) * 1000 : v);
+  // The seed's dollars (`usdReproducing` at FIXTURE_U), priced by the engine's one rule.
+  const step = (v: unknown) => {
+    if (typeof v !== 'number' || v <= 0) return v;
+    const [whole, frac = ''] = usdReproducing(v, FIXTURE_U).split('.');
+    const cents = BigInt(whole) * 100n + BigInt((frac + '00').slice(0, 2));
+    return roundPriceIqd({ num: cents * BigInt(FIXTURE_U), den: 100n });
+  };
   if (Array.isArray(out.products)) {
     out.products = out.products.map((p: Record<string, unknown>) => ({
       ...p,

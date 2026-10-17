@@ -12,8 +12,9 @@
  * never read here.
  *
  * NO FLOAT EVER. Cents are a whole number, the rate is decimal text, and the
- * product is exact BigInt rational arithmetic, rounded UP to the 1,000 IQD step
- * with the very `ceilStep` Pricing V2 publishes its prices with.
+ * product is exact BigInt rational arithmetic, rounded UP by the very rule
+ * Pricing V2 publishes its prices with (`roundPriceIqd`, DECISIONS row 245:
+ * above 1,000 IQD to the next 250, else whole dinars).
  *
  * THIS FILE ALSO OWNS 0197's PRESENCE PROBE, its reads and its writes, so every
  * reader asks once whether the table is there (CLAUDE.md rule 2: a newer Worker
@@ -23,7 +24,7 @@
  * PRIVATE: no price, rate or cent value is ever logged from here.
  */
 import { mulProcurementExact, procurementExact, type ProcurementExact } from '@levonis/contracts/procurementCost';
-import { ceilStep, ROUNDING_STEP_IQD } from '@levonis/pricing/costToPrice';
+import { roundPriceIqd } from '@levonis/pricing/priceRounding';
 import { parseV2Usd } from '@levonis/pricing/priceV2';
 
 /* ------------------------------------------------------------ the maths -- */
@@ -49,11 +50,11 @@ function rateOf(rate: string | null): ProcurementExact | null {
   }
 }
 
-/** The after price on direct sale: ceil₁₀₀₀(cents ÷ 100 × U), exact. Null for an unusable input. */
+/** The after price on direct sale: round(cents ÷ 100 × U), exact (`roundPriceIqd`). Null for an unusable input. */
 export function usdToIqdCeil(cents: number, rate: string | null): number | null {
   const u = rateOf(rate);
   if (!u || !Number.isSafeInteger(cents) || cents < 1) return null;
-  return ceilStep(mulProcurementExact({ num: BigInt(cents), den: 100n }, u), ROUNDING_STEP_IQD);
+  return roundPriceIqd(mulProcurementExact({ num: BigInt(cents), den: 100n }, u));
 }
 
 /**
@@ -61,10 +62,10 @@ export function usdToIqdCeil(cents: number, rate: string | null): number | null 
  *
  *  1. No cents, no rate or no direct price: `none` (a model with no row, a SKU
  *     that does not sell direct, a V1 or missing rate, a database without 0197).
- *  2. afterDirect = ceil₁₀₀₀(cents/100 × U), exact.
+ *  2. afterDirect = round(cents/100 × U), exact, by the one rounding rule.
  *  3. afterDirect ≥ the direct price: `none` (D4 — a sale that lowers nothing is
  *     never shown).
- *  4. The saving (a positive multiple of 1,000) comes off the line's own channel:
+ *  4. The saving (positive, whole dinars) comes off the line's own channel:
  *     a direct line (or a COD pre-order priced as direct) pays afterDirect; a
  *     prepaid route pays its published P minus the same saving (PRICING-V2 §5.5).
  *  5. A route at 0 or below: `below_floor`.

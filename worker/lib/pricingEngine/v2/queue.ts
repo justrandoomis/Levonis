@@ -62,13 +62,38 @@ export async function v2PublicationCounts(db: D1Database): Promise<{ published: 
 
 /* ----------------------------------------------------------- the queue -- */
 
+/** How many published products still carry a price of the old 1,000 step (row 245); 0 before 0189. One statement. */
+export async function roundingPendingCount(db: D1Database): Promise<number> {
+  const rows = await softAll(() =>
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM products p
+          WHERE EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = p.id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL)
+            AND ${ROUNDING_PENDING_SQL}`
+      )
+      .all<{ n: number }>()
+  );
+  return Number(rows?.[0]?.n ?? 0);
+}
+
 /** The queue reads at most this many products per request (the statement budget: one load per kind, chunked). */
 export const QUEUE_LIST_MAX = 200;
 export const QUEUE_PAGE_SIZE = 20;
-export const QUEUE_FILTERS = ['all', 'ready', 'saved', 'usd', 'cost', 'below_min_profit', 'purchase_review', 'most_requested'] as const;
+export const QUEUE_FILTERS = ['all', 'ready', 'saved', 'usd', 'cost', 'below_min_profit', 'purchase_review', 'most_requested', 'rounding'] as const;
 export type QueueFilter = (typeof QUEUE_FILTERS)[number];
-/** Filters only the owner may ask for (they name cost-derived facts). */
-const OWNER_FILTERS: ReadonlySet<QueueFilter> = new Set(['cost', 'below_min_profit', 'purchase_review']);
+/** Filters only the owner may ask for (they name cost-derived facts, or prices only the owner moves). */
+const OWNER_FILTERS: ReadonlySet<QueueFilter> = new Set(['cost', 'below_min_profit', 'purchase_review', 'rounding']);
+
+/**
+ * «بانتظار التقريب الجديد» (DECISIONS row 245): a PUBLISHED product with a stored result that is not the
+ * rounding rule's (`roundPriceIqd`) rounding of its own exact figure — a price published under the 1,000
+ * step. Its customers still see that price; re-publishing it through the review sheet («راجع الأسعار التي
+ * ستتغيّر») moves it, old → new, after the owner sees it. A FILTER, not a figure: the comparison is in SQL
+ * over the stored text (REAL is exact enough to tell a gap of ≥ 250 or ≥ 1 from none), and nothing is
+ * written. `p` is the products alias.
+ */
+export const ROUNDING_PENDING_SQL = `EXISTS (SELECT 1 FROM pricing_v2_sku_results rr WHERE rr.product_id = p.id
+  AND rr.final_price_iqd - CAST(rr.exact_iqd AS REAL) >= CASE WHEN CAST(rr.exact_iqd AS REAL) > 1000 THEN 250 ELSE 1 END)`;
 
 /** `published`: only on the owner's below-minimum-profit and purchase-review filters (a listed product). */
 export type QueueState = 'needs_pricing' | 'saved' | 'ready' | 'composition_pending' | 'published';
@@ -104,6 +129,8 @@ interface Candidate {
   published: boolean;
   below_min_profit: boolean;
   purchase_review: boolean;
+  /** Published under the old 1,000 step (row 245); only read on the owner's «rounding» filter. */
+  rounding_pending: boolean;
   /** Distinct people with an open «طلب السعر» (migration 0193); null without the table. */
   requesters: number | null;
   last_request_at: string | null;
@@ -128,14 +155,15 @@ const softAll = async <T>(run: () => Promise<{ results?: T[] }>): Promise<T[] | 
 async function queueCandidates(
   db: D1Database,
   owner: boolean,
-  mostRequested = false
+  mostRequested = false,
+  rounding = false
 ): Promise<{ rows: Candidate[]; truncated: boolean; requestsInstalled: boolean }> {
   const published = `EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = p.id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
                        AND EXISTS (SELECT 1 FROM pricing_v2_sku_results r WHERE r.product_id = p.id))`;
   const below = `EXISTS (SELECT 1 FROM pricing_v2_sku_results b WHERE b.product_id = p.id AND b.below_min_profit = 1)`;
   const head = `SELECT p.id, p.slug, p.status, COALESCE(p.composition, '') AS composition,
                        COALESCE(p.name_ar, '') AS name_ar, COALESCE(p.name, '') AS name_en, COALESCE(p.name_ku, '') AS name_ckb`;
-  type Row = Omit<Candidate, 'method' | 'published' | 'below_min_profit' | 'purchase_review' | 'requesters' | 'last_request_at'> & {
+  type Row = Omit<Candidate, 'method' | 'published' | 'below_min_profit' | 'purchase_review' | 'rounding_pending' | 'requesters' | 'last_request_at'> & {
     method: string | null;
     published: number;
     below: number;
@@ -159,6 +187,44 @@ async function queueCandidates(
       ORDER BY ${withRequests ? `COALESCE(${requesters}, 0) DESC, COALESCE(${lastRequest}, '') DESC, ` : ''}p.updated_at DESC, p.id
       LIMIT ${QUEUE_LIST_MAX + 1}`;
   let requestsInstalled = true;
+  // Row 245: the owner's «rounding» list is published products only — its own short read, so the
+  // needs-pricing order and its 200-row cap never meet it.
+  if (rounding) {
+    const list =
+      (await softAll(() =>
+        db
+          .prepare(
+            `${head},
+                    (SELECT s.pricing_method FROM product_pricing_state s WHERE s.product_id = p.id AND s.mode = 'engine') AS method,
+                    1 AS published, ${below} AS below, 0 AS review, NULL AS requesters, NULL AS last_request_at
+               FROM products p
+              WHERE ${published} AND ${ROUNDING_PENDING_SQL}
+              ORDER BY p.updated_at DESC, p.id
+              LIMIT ${QUEUE_LIST_MAX + 1}`
+          )
+          .all<Row>()
+      )) ?? [];
+    return {
+      truncated: list.length > QUEUE_LIST_MAX,
+      requestsInstalled: false,
+      rows: list.slice(0, QUEUE_LIST_MAX).map((r) => ({
+        id: String(r.id),
+        slug: String(r.slug ?? ''),
+        status: String(r.status ?? ''),
+        composition: String(r.composition ?? ''),
+        name_ar: String(r.name_ar ?? ''),
+        name_en: String(r.name_en ?? ''),
+        name_ckb: String(r.name_ckb ?? ''),
+        method: r.method === 'cost' || r.method === 'usd' ? r.method : null,
+        published: true,
+        below_min_profit: Number(r.below) === 1,
+        purchase_review: false,
+        rounding_pending: true,
+        requesters: null,
+        last_request_at: null,
+      })),
+    };
+  }
   let rows = await softAll(() => db.prepare(sql(true, true)).all<Row>());
   // A database before 0193 has no request stats: today's order (and no most-requested list).
   if (rows === null) {
@@ -188,6 +254,7 @@ async function queueCandidates(
       published: Number(r.published) === 1,
       below_min_profit: Number(r.below) === 1,
       purchase_review: Number(r.review) === 1,
+      rounding_pending: false,
       requesters: requestsInstalled ? Number(r.requesters ?? 0) : null,
       last_request_at: requestsInstalled && r.last_request_at ? String(r.last_request_at) : null,
     })),
@@ -226,6 +293,8 @@ export interface QueueRow {
   missing: QueueMissing[];
   below_min_profit?: boolean;
   purchase_review?: boolean;
+  /** Owner only: published under the old 1,000 step, waiting for the review sheet (row 245). */
+  rounding_pending?: boolean;
   /** «طلب السعر» (DECISIONS row 240): counts only, never who. Null without 0193. */
   requests: QueueRequests | null;
   link: string;
@@ -247,7 +316,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
   const filter: QueueFilter = !owner && OWNER_FILTERS.has(q.filter) ? 'all' : q.filter;
   const requestsOf = (cand: Candidate): QueueRequests | null =>
     cand.requesters === null ? null : { people: cand.requesters, last_at: cand.last_request_at, selections: [] };
-  const { rows: candidates, truncated, requestsInstalled } = await queueCandidates(db, owner, filter === 'most_requested');
+  const { rows: candidates, truncated, requestsInstalled } = await queueCandidates(db, owner, filter === 'most_requested', filter === 'rounding');
   const reads = await loadQueueReads(db, candidates.filter((r) => r.composition === '').map((r) => r.id));
   const rates = reads.values().next().value?.rates ?? (await loadPricingRates(db));
   const now = new Date().toISOString();
@@ -297,7 +366,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
       sellable_skus: new Set(ev.rows.map((r) => r.combo_key)).size,
       channels: [...new Set(ev.rows.map((r) => r.channel))],
       missing,
-      ...(owner ? { below_min_profit: cand.below_min_profit, purchase_review: cand.purchase_review } : {}),
+      ...(owner ? { below_min_profit: cand.below_min_profit, purchase_review: cand.purchase_review, rounding_pending: cand.rounding_pending } : {}),
       requests: requestsOf(cand),
       link,
     });
@@ -314,9 +383,13 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
   if (owner) {
     counts.below_min_profit = rows.filter((r) => r.below_min_profit).length;
     counts.purchase_review = rows.filter((r) => r.purchase_review).length;
+    counts.rounding = await roundingPendingCount(db);
   }
   // Unpublished products with an open «طلب السعر» (not owner-only: counts, never who).
   counts.most_requested = hiddenRows.filter((r) => (r.requests?.people ?? 0) > 0).length;
+  // The «rounding» list read published products only: the other counts were not read, so none is said
+  // (never a «0» beside «الكل» that only means «not counted here»).
+  if (filter === 'rounding') for (const k of Object.keys(counts)) if (k !== 'rounding') delete counts[k];
 
   const published = new Set(candidates.filter((cand) => cand.published).map((cand) => cand.id));
   const pick = (r: QueueRow): boolean => {
@@ -337,6 +410,8 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
         return r.purchase_review === true;
       case 'most_requested':
         return !published.has(r.id) && (r.requests?.people ?? 0) > 0;
+      case 'rounding':
+        return r.rounding_pending === true;
     }
   };
   const listed = rows.filter(pick);

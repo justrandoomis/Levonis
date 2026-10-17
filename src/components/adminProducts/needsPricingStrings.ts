@@ -89,6 +89,14 @@ export const NEEDS_PRICING = {
     cost: { ar: 'من التكلفة', en: 'From cost', ckb: 'لە تێچووەوە' },
     below_min_profit: { ar: 'تحت الحد الأدنى للربح', en: 'Below minimum profit', ckb: 'لە خوار کەمترین قازانجەوە' },
     purchase_review: { ar: 'تكلفة شراء بانتظار المراجعة', en: 'Purchase cost to review', ckb: 'تێچووی کڕین بۆ پێداچوونەوە' },
+    // DECISIONS row 245: a published price still on the old 1,000 step.
+    rounding: { ar: 'بانتظار التقريب الجديد', en: 'Awaiting the new rounding', ckb: 'چاوەڕێی خڕکردنەوەی نوێ' },
+  },
+  /** The «rounding» filter's note (row 245): what the list is and the one way its prices move. */
+  roundingNote: {
+    ar: 'منتجات منشورة ما زالت أسعارها مقرّبة بالقاعدة القديمة (لأعلى إلى 1,000 د.ع). القاعدة الجديدة: فوق 1,000 د.ع لأعلى إلى أقرب 250، و1,000 فأقل بلا تقريب. افتح المنتج واحفظه: تعرض ورقة المراجعة كل سعر قديم ← جديد، ولا يرى الزبائن السعر الجديد إلا بعد تأكيدك.',
+    en: 'Published products whose prices are still rounded the old way (up to 1,000 IQD). The new rule: above 1,000 IQD, up to the next 250; 1,000 or less, not rounded. Open a product and save it: the review sheet shows every old → new price, and customers see the new price only after you confirm.',
+    ckb: 'بەرهەمی بڵاوکراوە کە نرخەکانیان هێشتا بە یاسای کۆن خڕ کراونەتەوە (بۆ سەرەوە بۆ 1,000 د.ع). یاسای نوێ: سەرووی 1,000 د.ع بۆ سەرەوە بۆ نزیکترین 250، و 1,000 و کەمتر خڕ ناکرێتەوە. بەرهەمەکە بکەرەوە و پاشەکەوتی بکە: پەڕەی پێداچوونەوە هەموو نرخێکی کۆن ← نوێ پیشان دەدات، و کڕیاران نرخە نوێیەکە تەنها دوای دڵنیاکردنەوەی تۆ دەبینن.',
   },
 } as const satisfies Record<string, Tri | Record<string, Tri>>;
 

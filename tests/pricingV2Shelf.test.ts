@@ -32,7 +32,7 @@ import { all, asD1, count, freshDb, get, json, row, stubApp, type StubUser } fro
 import { applyRate, fxEnv, OWNER_ROW_SQL } from './fixtures/fx';
 import { cartGrid, v2App, writeV2 } from './fixtures/pricingV2';
 import { priceProductV2, type V2Sku } from '@levonis/pricing/priceV2';
-import { ceilStep } from '@levonis/pricing/costToPrice';
+import { roundPriceIqd } from '../packages/pricing/src/priceRounding';
 import { PRICING_ISSUES } from '@levonis/contracts/pricingIssues';
 import { loadShelves, shelfOfSku } from '../worker/lib/pricingEngine/v2/shelf';
 import { sweepStaleEnginePrices } from '../worker/lib/fx/reprice';
@@ -51,10 +51,10 @@ const EDITOR: StubUser = { id: 'usr_editor', role: 'admin', email: 'editor@x.co'
 /** U = 1,500 and a minimum profit of $40: T × U = 60,000 IQD. */
 const TU = 60_000;
 /** The engine's own rounding (never a step written here): every expected price goes through it. */
-const D = (iqd: number) => ceilStep(iqd);
+const D = (iqd: number) => roundPriceIqd(iqd);
 /** The owner's figures: A1 Combo from its costliest batch, A1 from its one. */
-const COMBO_D = D(690_062 + TU); // 751,000 at today's step
-const A1_D = D(500_346 + TU); // 561,000
+const COMBO_D = D(690_062 + TU); // 750,250 (row 245: above 1,000 up to the next 250)
+const A1_D = D(500_346 + TU); // 560,500
 const sql = (v: unknown): string => (v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 
 let lotSeq = 0;
@@ -243,7 +243,7 @@ test('the shelf moves: a sale leaving the costliest batch moves nothing; its sel
   assert.equal(quiet.skipped, 'NOTHING_STALE');
   assert.equal((await directOf(w, COMBO)).prepaid, COMBO_D);
 
-  // The costliest batch sells out: down to the next max (689,581 + 60,000 → 750,000), through the sweep.
+  // The costliest batch sells out: down to the next max (689,581 + 60,000 → 749,750), through the sweep.
   take(w.raw, w.lots.c3, 2);
   const down = await sweep(w);
   assert.deepEqual(down.repriced, [PID], JSON.stringify(down));
@@ -276,13 +276,13 @@ test('the shelf moves: a sale leaving the costliest batch moves nothing; its sel
 
 test('a rise from the shelf is never held (no unit below cost + minimum profit); a large fall waits for the owner with the bell', async () => {
   const w = await world();
-  // A1 at 500,346 → 561,000; a batch at 700,000 arrives: +35%, published on the next tick, never held.
+  // A1 at 500,346 → 560,500; a batch at 700,000 arrives: +35%, published on the next tick, never held.
   const dear = lot(w.raw, A1, 1, 700_000);
   const up = await sweep(w);
   assert.deepEqual(up.repriced, [PID], JSON.stringify(up));
   assert.deepEqual(up.blocked, []);
   assert.equal((await directOf(w, A1)).prepaid, D(700_000 + TU));
-  // It sells out: back to 500,346 → 561,000, a 26% fall — held (the higher price meanwhile is safe), the bell rings.
+  // It sells out: back to 500,346 → 560,500, a 26% fall — held (the higher price meanwhile is safe), the bell rings.
   take(w.raw, dear, 1);
   const down = await sweep(w);
   assert.deepEqual(down.blocked, [{ product_id: PID, code: 'PRICING_V2_LARGE_CHANGE' }]);
@@ -296,7 +296,7 @@ test('pre-order keeps the supplier calculation: with a supplier price its land p
   const supDirect = D(683_000 + TU); // 743,000
   assert.equal((await directOf(w, COMBO)).prepaid, COMBO_D, 'the shelf prices the direct sale');
   assert.equal((await landOf(w, COMBO)).prepaid, supDirect, 'the land route: the supplier calculation');
-  // A1's shelf sells at 561,000, below the land route's own cost (683,000): its pre-order is stopped while it sells.
+  // A1's shelf sells at 560,500, below the land route's own cost (683,000): its pre-order is stopped while it sells.
   assert.equal((await landOf(w, A1)).ok, false);
   assert.equal(w.ev.rows.find((r) => r.combo_key === `o:${A1}` && r.channel === 'pre_order_land')!.blocked_code, 'V2_ROUTE_SHELF_CHEAPER');
   take(w.raw, w.lots.c3, 2);
@@ -360,7 +360,7 @@ test('every model sold out with no supplier price: the product is held (V2_STOCK
   lot(w.raw, COMBO, 1, 720_000);
   const back = await sweep(w);
   assert.deepEqual(back.repriced, [PID], JSON.stringify(back));
-  assert.equal((await directOf(w, COMBO)).prepaid, D(720_000 + TU), 'never the old 751,000 under a 720,000 batch');
+  assert.equal((await directOf(w, COMBO)).prepaid, D(720_000 + TU), 'never the old 750,250 under a 720,000 batch');
   assert.equal(row<{ c: string | null }>(w.raw, 'SELECT reprice_blocked_code AS c FROM product_pricing_state WHERE product_id = ?', PID)!.c, null);
 });
 

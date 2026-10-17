@@ -21,7 +21,7 @@ import { requestersText } from '../../../packages/contracts/src/priceRequests';
 import { missingLabel } from './form/v2/missingLabel';
 import { v2Strings } from './form/v2/v2Strings';
 
-type Filter = 'all' | 'most_requested' | 'ready' | 'saved' | 'usd' | 'cost' | 'below_min_profit' | 'purchase_review';
+type Filter = 'all' | 'most_requested' | 'ready' | 'saved' | 'usd' | 'cost' | 'below_min_profit' | 'purchase_review' | 'rounding';
 type State = 'needs_pricing' | 'saved' | 'ready' | 'composition_pending' | 'published';
 
 interface Names {
@@ -54,6 +54,8 @@ interface QueueProduct {
   missing: Missing[];
   below_min_profit?: boolean;
   purchase_review?: boolean;
+  /** Owner only: published under the old 1,000 rounding step (DECISIONS row 245). */
+  rounding_pending?: boolean;
   link: string;
   /**
    * «طلب السعر» (DECISIONS row 240): distinct signed-in requesters, the latest
@@ -78,8 +80,8 @@ interface QueueAnswer {
   requests_unavailable?: boolean;
 }
 
-const OWNER_FILTERS: ReadonlySet<Filter> = new Set(['cost', 'below_min_profit', 'purchase_review']);
-const FILTERS: readonly Filter[] = ['all', 'most_requested', 'ready', 'saved', 'usd', 'cost', 'below_min_profit', 'purchase_review'];
+const OWNER_FILTERS: ReadonlySet<Filter> = new Set(['cost', 'below_min_profit', 'purchase_review', 'rounding']);
+const FILTERS: readonly Filter[] = ['all', 'most_requested', 'ready', 'saved', 'usd', 'cost', 'below_min_profit', 'purchase_review', 'rounding'];
 const COUNT_OF: Record<Filter, string> = {
   all: 'hidden',
   most_requested: 'most_requested',
@@ -89,6 +91,7 @@ const COUNT_OF: Record<Filter, string> = {
   cost: 'owner_only',
   below_min_profit: 'below_min_profit',
   purchase_review: 'purchase_review',
+  rounding: 'rounding',
 };
 
 const nameIn = (n: Names, lang: QueueLang) => (lang === 'en' ? n.en || n.ar : lang === 'ckb' ? n.ckb || n.ar || n.en : n.ar || n.en) || '—';
@@ -224,6 +227,11 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
         <p className={`max-w-[68ch] text-[14px] leading-relaxed ${T.text2}`}>{tri(S.intro, lang)}</p>
       </header>
 
+      {/* Row 245: published prices still on the old 1,000 step move only through the review sheet. */}
+      {filter === 'rounding' && (
+        <p className={`${T.surface} p-3 text-[13px] leading-relaxed ${T.text2}`} data-queue-rounding-note>{tri(S.roundingNote, lang)}</p>
+      )}
+
       {data?.requests_unavailable && filter === 'most_requested' && (
         <p className={`${T.surface} p-3 text-[13px] ${T.text2}`} data-queue-requests-unavailable>{tri(S.requestsUnavailable, lang)}</p>
       )}
@@ -289,6 +297,9 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
                       )}
                       {p.purchase_review && (
                         <span className="lv-chip [--chip:var(--color-info)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">{tri(S.purchaseReview, lang)}</span>
+                      )}
+                      {p.rounding_pending && (
+                        <span className="lv-chip [--chip:var(--color-info)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold" data-queue-rounding-chip>{tri(S.filters.rounding, lang)}</span>
                       )}
                     </div>
                     {p.composition !== '' ? (

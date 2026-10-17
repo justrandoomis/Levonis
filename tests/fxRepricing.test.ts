@@ -144,7 +144,8 @@ function usdOnlyMarket(sell: number, now: Date) {
 const cronTick = (w: World, m: ReturnType<typeof market>, now: Date) =>
   runFxScheduler(envOf(w.raw), { now, scheduledTime: now }, { trigger: 'cron', fetchImpl: m.f.fetch });
 
-const ceil1000 = (n: number) => Math.ceil(n / 1000) * 1000;
+/** The rounding rule (DECISIONS row 245), independently: above 1,000 up to the next 250, else whole dinars. */
+const ceilRule = (n: number) => (n > 1000 ? Math.ceil(n / 250) * 250 : Math.ceil(n));
 
 // ------------------------------------------------------------- the same tick
 
@@ -171,8 +172,8 @@ test('a USD/IQD move above the dead band reprices the engine product within the 
   assert.deepEqual(report.repricing?.blocked, []);
 
   // ceil_1000(EUR 450 × 1.1 × 1,632 + 2.5 kg × 3,200 + $120 × 1,632) = ceil_1000(1,011,680)
-  const land = ceil1000(450 * 1.1 * 1632 + 2.5 * 3200 + 120 * 1632);
-  assert.equal(land, 1_012_000);
+  const land = ceilRule(495 * 1632 + 2.5 * 3200 + 120 * 1632);
+  assert.equal(land, 1_011_750, '1,011,680 → 1,011,750 (row 245)');
   const cart = await cartPrices(w);
   assert.deepEqual(cart[LAND], { prepaid: land, cod: land });
   assert.deepEqual(cart[DIRECT], { prepaid: land, cod: land });
@@ -205,7 +206,7 @@ test('a USD/IQD move above the dead band reprices the engine product within the 
   )!;
   assert.equal(entry.action, 'reprice_auto');
   assert.match(entry.idempotency_key, /^auto:lp_08:/);
-  assert.match(entry.pricing_after_json, /1012000/);
+  assert.match(entry.pricing_after_json, /1011750/);
   assert.equal(entry.actor_id, 'system:fx');
   const log = row<{ actor_id: string | null; detail: string }>(w.raw, "SELECT actor_id, detail FROM audit_log WHERE action LIKE 'pricing.%repriced_auto'")!;
   assert.equal(log.actor_id, null, 'the cron is the system');
@@ -299,7 +300,7 @@ test('REVIEW_REQUIRED reprices nothing until the owner approves; the approval re
     const pair = pairOf(w.raw, 'USD_IQD');
     assert.equal(pair.effective_rate, '1680');
     assert.equal(pair.drift_anchor_rate, '1680');
-    const land = ceil1000(450 * 1.1 * 1680 + 2.5 * 3200 + 120 * 1680);
+    const land = ceilRule(495 * 1680 + 2.5 * 3200 + 120 * 1680);
     assert.equal((await cartPrices(w))[LAND]!.prepaid, land);
     const entry = row<{ action: string; actor_id: string }>(w.raw, "SELECT action, actor_id FROM pricing_audit WHERE entity = 'sku_price' ORDER BY created_at DESC, rowid DESC LIMIT 1")!;
     assert.deepEqual(entry, { action: 'reprice_auto', actor_id: 'usr_owner' });
@@ -477,8 +478,8 @@ test("a central shipping rate the owner changes reprices the products on that ro
   const res = await put(w.app, '/api/admin/pricing/rates/shipping/GERMANY_LAND', { version, rate_iqd: '3400', preview_hash: preview.preview_hash });
   assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
   // ceil_1000(EUR 450 × 1.1 × 1,600 + 2.5 kg × 3,400 + $120 × 1,600) = ceil_1000(992,500)
-  assert.equal((await cartPrices(w))[LAND]!.prepaid, 993_000);
-  assert.equal(ceil1000(450 * 1.1 * 1600 + 2.5 * 3400 + 120 * 1600), 993_000);
+  assert.equal((await cartPrices(w))[LAND]!.prepaid, 992_500);
+  assert.equal(ceilRule(495 * 1600 + 2.5 * 3400 + 120 * 1600), 992_500);
   const sources = all<{ s: string }>(w.raw, "SELECT DISTINCT price_source AS s FROM price_history WHERE product_id = ? AND price_source LIKE 'engine_%'", AMS).map((r) => r.s);
   assert.deepEqual(sources, ['engine_owner']);
   const log = row<{ detail: string }>(w.raw, "SELECT detail FROM audit_log WHERE action LIKE 'pricing.%repriced_auto'")!;
@@ -517,7 +518,7 @@ test('the multi-product price image reads exactly the single image every engine 
   });
   const r = await sweepStaleEnginePrices(envOf(w.raw, refusing), { trigger: 'sweep', budget: statementBudget(200) });
   assert.deepEqual(r.repriced, [AMS]);
-  assert.equal((await cartPrices(w))[LAND]!.prepaid, ceil1000(450 * 1.1 * 1700 + 2.5 * 3200 + 120 * 1700));
+  assert.equal((await cartPrices(w))[LAND]!.prepaid, ceilRule(495 * 1700 + 2.5 * 3200 + 120 * 1700));
 });
 
 function tsFiles(dir: string, out: string[] = []): string[] {

@@ -46,6 +46,7 @@
 import { resolveUnitPrice, SKU_STRICT_ERROR } from '../pricing';
 import type { ChannelPrice } from '@levonis/pricing/costToPrice';
 import { PREORDER_ROUTES, routeOfChannel, type SkuChannel } from '@levonis/pricing/skuChannel';
+import { isOnPriceRule } from '@levonis/pricing/priceRounding';
 import { applyRelations, type ProductRelationsView } from '../productOverlay';
 import { parseProductRow } from '../productModel';
 import { memberFallbackFor, type PricingContext } from '../../routes/cart';
@@ -562,7 +563,9 @@ export function verifyPlan<C extends PlanPriceCore>(loaded: LoadedProduct, legac
       if ((c.item_iqd ?? 0) + directExtra !== engine || c.prepaid_iqd !== engine || (c.fee_iqd ?? 0) !== directExtra) mismatches.push(`${key}:prepaid`);
       const codExpected = c.route !== null && directCell ? direct : engine;
       if (codExpected === null || c.cod_iqd !== codExpected) mismatches.push(`${key}:cod`);
-      if (engine < 1000) mismatches.push(`${key}:floor`);
+      // The floor: E1 prices are whole thousands; a V2 price is on the one rounding rule (row 245), so
+      // 999 is a price and 13,120 is not.
+      if (v2 ? !isOnPriceRule(engine) : engine < 1000) mismatches.push(`${key}:floor`);
       // V2 (spec §3.8): no fee on any channel, and a pre-order never above its SKU's direct price.
       if (v2 && (c.fee_iqd ?? 0) !== 0) mismatches.push(`${key}:fee`);
       if (v2 && direct !== null && engine > direct) mismatches.push(`${key}:above_direct`);

@@ -12,9 +12,10 @@
  *                               («مسار شحن المخزون») plus the minimum profit (anchor `cost`)
  *     E_D    = E_base + (Σ option ± + colour ±) × U        (C1: the same USD on every model)
  *     E_D    = max(E_D, R_stock + T × U)                    cost-first only (C-9, row 187)
- *     D      = ceil_1000(E_D)
+ *     D      = round(E_D)      the ONE rounding rule (`roundPriceIqd`, DECISIONS row 245):
+ *                               above 1,000 IQD up to the next 250, else up to whole dinars
  *     E_P,r  = E_D − Δ × U      Δ: sku > colour > model > product (B1, one Δ for every route)
- *     P_r    = ceil_1000(E_P,r)
+ *     P_r    = round(E_P,r)
  *
  * THE ROUTE FLOOR (cost-first only, B1 with spec C-5 and the owner's answer Q1,
  * DECISIONS row 222). With R_r the replacement cost of route r (its own shipping
@@ -42,10 +43,10 @@
  * are dollars at U:
  *
  *     E_D = R_shelf + T × U + (Σ option ± + colour ±) × U,  never below R_shelf + T × U
- *     D   = ceil_step(E_D)  (the engine's one rounding, `ceilStep`)   so D − R_shelf ≥ T × U at publication
+ *     D   = round(E_D)  (the engine's one rounding, `roundPriceIqd`, DECISIONS row 245)   so D − R_shelf ≥ T × U at publication
  *
  * Its pre-order routes are not the shelf: they keep the supplier calculation
- * — P_r = ceil_step(E_D,sup − Δ × U) with E_D,sup the direct price the supplier
+ * — P_r = round(E_D,sup − Δ × U) with E_D,sup the direct price the supplier
  * cost would give (the same anchor, differences and floors), so the shelf never
  * moves a pre-order price; it only caps one above the direct price on sale
  * today (P ≤ D), and stops it while the shelf sells below the route's own
@@ -54,8 +55,8 @@
  * goes back to the supplier calculation; without one, every channel of it is
  * unsold (V2_STOCK_SOLD_OUT) — never priced from a guess.
  *
- * So P ≤ D on every channel, every price is a positive multiple of the step, the
- * rounding adds less than one step, cost-first D − R_stock ≥ T × U, and a
+ * So P ≤ D on every channel, every price is on the rounding rule and is round(its
+ * exact figure) — the rounding adds less than 250 —, cost-first D − R_stock ≥ T × U, and a
  * cost-first route is never below its own replacement cost. These are asserted on
  * every channel (PRICING_INVARIANT, thrown, never caught).
  *
@@ -83,9 +84,7 @@ import {
 import type { PricingIssueCode } from '@levonis/contracts/pricingIssues';
 import {
   MAX_FINAL_PRICE_IQD,
-  ROUNDING_STEP_IQD,
   USD_DISPLAY_PLACES,
-  ceilStep,
   replacementCost,
   resolveSkuInputs,
   type CentralRates,
@@ -96,6 +95,7 @@ import {
   type SkuInputChain,
 } from './costToPrice';
 import { isValidRuleAmount, parseUsdRuleAmount, targetProfitExactIqd, type RuleResolution } from './ruleResolution';
+import { PRICE_ROUNDING_STEP_IQD, isOnPriceRule, roundPriceIqd } from './priceRounding';
 import { ROUTE_PROFILE, SKU_CHANNELS, routeOfChannel, skuComboKey, type ShippingProfile, type SkuChannel } from './skuChannel';
 
 /* ----------------------------------------------------------------- shapes -- */
@@ -154,8 +154,6 @@ export interface V2Input {
   points: readonly V2PricePoint[];
   discounts: readonly V2Discount[];
   skus: readonly V2Sku[];
-  /** Default ROUNDING_STEP_IQD (1,000). */
-  step?: number;
   /** Previews only: an unconfirmed central rate is a warning instead of an error (as E1). */
   allowUnconfirmedRates?: boolean;
 }
@@ -165,9 +163,9 @@ export type V2Floor = 'none' | 'discount_withdrawn' | 'direct_min_profit';
 
 export interface V2Channel {
   channel: SkuChannel;
-  /** Final IQD; a multiple of the step; ≥ step; ≤ direct_iqd. */
+  /** Final IQD; on the rounding rule (`roundPriceIqd`); ≥ 1; ≤ direct_iqd. */
   price_iqd: number;
-  /** The exact figure `price_iqd` is the ceil_step of: E_P (a route), or E_D (direct, or a
+  /** The exact figure `price_iqd` is the rounding of: E_P (a route), or E_D (direct, or a
    * route whose discount was withdrawn). */
   exact_iqd: string;
   /** This SKU's D. */
@@ -382,15 +380,8 @@ function invariant(condition: boolean, what: string): void {
   if (!condition) throw new Error(`PRICING_INVARIANT: ${what}`);
 }
 
-function stepOf(step: number | undefined): number {
-  const s = step ?? ROUNDING_STEP_IQD;
-  if (!Number.isSafeInteger(s) || s < 1) throw new RangeError('The rounding step must be a positive whole number of IQD');
-  return s;
-}
-
 interface Context {
   method: V2Method;
-  step: number;
   rates: CentralRates;
   allowUnconfirmed: boolean;
   u: ProcurementExact | null;
@@ -464,7 +455,7 @@ function shelfOf(raw: V2Shelf | null | undefined): V2Shelf | null {
 }
 
 function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
-  const { method, step } = ctx;
+  const { method } = ctx;
   const wanted = SKU_CHANNELS.filter((c) => s.channels.includes(c));
   const issues: PricingIssue[] = [];
   const seen = new Set<string>();
@@ -590,7 +581,7 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
     for (const channel of wanted) fail(channel, [p, ...(routeCost.get(channel)?.errors ?? [])]);
     return done([]);
   }
-  const D = ceilStep(eD, step);
+  const D = roundPriceIqd(eD);
   // The owner's rule on direct sale (row 187): rounding, the rate or freight never take profit below T.
   if (method === 'cost') invariant(cmp(sub(procurementExact(D), rStock!), T!) >= 0, 'cost-first: D − R_stock ≥ T');
 
@@ -622,7 +613,7 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
         eSup = supMin;
         supFloor = 'direct_min_profit';
       }
-      if (eSup.num > 0n && cmp(eSup, procurementExact(MAX_FINAL_PRICE_IQD)) <= 0) routeAnchor = { eD: eSup, D: ceilStep(eSup, step), floor: supFloor };
+      if (eSup.num > 0n && cmp(eSup, procurementExact(MAX_FINAL_PRICE_IQD)) <= 0) routeAnchor = { eD: eSup, D: roundPriceIqd(eSup), floor: supFloor };
     }
   }
 
@@ -675,16 +666,16 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
       fail(channel, [deltaFrom ? problem('V2_DISCOUNT_TOO_LARGE', deltaFrom.scope, deltaFrom.scope_id) : { code: 'V2_DISCOUNT_TOO_LARGE' }]);
       continue;
     }
-    let price = ceilStep(eP, step);
+    let price = roundPriceIqd(eP);
     let exact = eP;
     let floor: V2Floor = routeAnchor.floor;
     const rR = own.cost;
     if (method === 'cost') {
       const rExact = rR!.exact;
       // Q1 (DECISIONS row 222): a route never sells AT its own replacement cost — not even the cost rounded up
-      // to the step, which would publish it. The cost on the step is the line: the route is blocked when even
+      // by the rule, which would publish it. The cost so rounded is the line: the route is blocked when even
       // the direct price does not clear it, and its discount is withdrawn when the discounted price does not.
-      const rStep = ceilStep(rExact, step);
+      const rStep = roundPriceIqd(rExact);
       if (rStep >= A) {
         fail(channel, [{ code: 'V2_ROUTE_BELOW_COST', profile: ROUTE_PROFILE[route] }]);
         continue;
@@ -731,10 +722,10 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
   for (const c of channels) {
     const exact = procurementExact(c.exact_iqd);
     invariant(c.price_iqd <= D, 'P ≤ D');
-    invariant(c.price_iqd % step === 0 && c.price_iqd >= step && c.price_iqd <= MAX_FINAL_PRICE_IQD, 'price is a positive multiple of the step');
-    invariant(c.price_iqd === ceilStep(exact, step), 'price = ceil_step(exact)');
+    invariant(isOnPriceRule(c.price_iqd) && c.price_iqd <= MAX_FINAL_PRICE_IQD, 'price is on the rounding rule');
+    invariant(c.price_iqd === roundPriceIqd(exact), 'price = round(exact)');
     const added = sub(procurementExact(c.price_iqd), exact);
-    invariant(added.num >= 0n && cmp(added, procurementExact(step)) < 0, 'rounding adds less than one step');
+    invariant(added.num >= 0n && cmp(added, procurementExact(PRICE_ROUNDING_STEP_IQD)) < 0, 'rounding adds less than one step');
     if (method === 'usd' && c.usd_exact !== null) invariant(cmp(mulProcurementExact(procurementExact(c.usd_exact), u), exact) === 0, 'price-first: exact = USD × U');
   }
   return done(channels);
@@ -748,9 +739,9 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
  */
 export function priceProductV2(input: V2Input): V2Result {
   assertNoFloat(input, 'V2Input');
-  const step = stepOf(input.step);
   invariant((V2_METHODS as readonly string[]).includes(input.method), 'method is cost or usd');
   invariant(!('floorMode' in input), 'the cost floor mode is retired (owner answer Q1): a floored route sells at D');
+  invariant(!('step' in input), 'one rounding rule (DECISIONS row 245, roundPriceIqd): no step is passed');
   const allowUnconfirmed = input.allowUnconfirmedRates === true;
 
   /* 1. U: present and confirmed (an unconfirmed U is a warning in previews only). */
@@ -763,7 +754,6 @@ export function priceProductV2(input: V2Input): V2Result {
 
   const ctx: Context = {
     method: input.method,
-    step,
     rates: input.rates,
     allowUnconfirmed,
     u,

@@ -74,6 +74,8 @@ const PURE_PACKAGE_IMPORTS: Record<string, readonly string[]> = {
   // readiness-code list. (The reproduce-at-migration helpers left the package with the
   // clean start, DECISIONS row 222: the test fixture v2Publish.ts is their only user.)
   'packages/pricing/src/priceV2.ts': ['@levonis/contracts/procurementCost', '@levonis/contracts/pricingIssues'],
+  // The one price rounding rule (DECISIONS row 245): the same exact arithmetic, nothing else.
+  'packages/pricing/src/priceRounding.ts': ['@levonis/contracts/procurementCost'],
 };
 
 test('the pricing engine maths declares its one contracts dependency', () => {
