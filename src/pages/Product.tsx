@@ -5261,7 +5261,8 @@ export default function Product() {
                               <div key={r.id || ri} className="flex justify-between gap-3 py-2 border-b border-border-subtle last:border-0">
                                 <dt className="text-text-muted">{pick(lang as Lang, r.label_ar, r.label_en, r.label_ckb)}</dt>
                                 <dd className="text-text-primary text-end">
-                                  {pick(lang as Lang, r.value_ar, r.value_en, r.value_ckb)}
+                                  {/* Imported values may mix Arabic or Sorani with codes and units (I18N-DESIGN §B). */}
+                                  <BidiText as="bdi" text={pick(lang as Lang, r.value_ar, r.value_en, r.value_ckb)} />
                                   {r.unit ? ` ${r.unit}` : ''}
                                 </dd>
                               </div>
@@ -5275,7 +5276,9 @@ export default function Product() {
                       {legacySpecs.map((spec, i) => (
                         <div key={i} className="flex justify-between gap-3 py-2 border-b border-border-subtle last:border-0">
                           <dt className="text-text-muted">{spec.key}</dt>
-                          <dd className="text-text-primary text-end">{spec.value}</dd>
+                          <dd className="text-text-primary text-end">
+                            <BidiText as="bdi" text={spec.value} />
+                          </dd>
                         </div>
                       ))}
                     </dl>
@@ -5455,7 +5458,8 @@ export default function Product() {
                 heard them there; only the store link is real here, because
                 the left one is display:none at this width. */}
             <div className="px-1" data-product-buy-identity>
-              <p aria-hidden="true" className="text-xl font-bold text-text-primary leading-snug">{name}</p>
+              {/* The name a desktop reader sees (the h1 above is screen-reader-only there): rule 7 as well. */}
+              <p aria-hidden="true" dir={scriptDir(name)} className="text-xl font-bold text-text-primary leading-snug text-start rtl:text-right">{name}</p>
               <p className="mt-1 text-[12px] text-text-muted flex items-center gap-1.5">
                 <Store aria-hidden="true" className="w-3.5 h-3.5" />
                 <span aria-hidden="true">

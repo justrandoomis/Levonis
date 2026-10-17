@@ -213,14 +213,28 @@ export function TabBody({
     return (
       <div className="space-y-4" data-knowledge-tab="compatibility">
         {tabs.compatibility.map((b) => {
-          const linked = b.items.filter((item) => item.product);
           const plain = b.items.filter((item) => !item.product);
+          // One chip per product in a bucket: a compound's two labels may link the same product («H2D and H2D
+          // Laser»: the H2D family and the H2D Laser printer both reach /product/h2d). An item whose products were
+          // all drawn already adds nothing.
+          const drawn = new Set<string>();
+          const linked = b.items
+            .filter((item) => item.product)
+            .map((item) => ({
+              item,
+              targets: [item.product!, ...(item.more ?? [])].filter((p) => {
+                const key = p.id || p.slug;
+                if (drawn.has(key)) return false;
+                drawn.add(key);
+                return true;
+              }),
+            }))
+            .filter((x) => x.targets.length > 0);
           return (
             <div key={b.bucket}>
               <h4 className="text-text-primary font-bold text-[13px] mb-2">{w(b.label, lang)}</h4>
               <ul className="flex flex-wrap items-center gap-2">
-                {linked.map((item, i) => {
-                  const targets = [item.product!, ...(item.more ?? [])];
+                {linked.map(({ item, targets }, i) => {
                   return item.target_kind === 'family' ? (
                     <li key={`${item.label}-${i}`} className="flex flex-wrap items-center gap-2" data-knowledge-family>
                       <span className="text-sm text-text-secondary">
@@ -469,7 +483,8 @@ function PackagingBody({
                 ) : (
                   <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-gold shrink-0 mx-1" />
                 )}
-                <BidiText className="min-w-0 flex-1" text={boxItemText(item, lang)} />
+                {/* A name stays English among translated items: aligned to the RTL column's start, beside its bullet. */}
+                <BidiText className="min-w-0 flex-1 text-start rtl:text-right" text={boxItemText(item, lang)} />
                 {item.qty && item.qty > 1 ? (
                   <bdi className="tabular-nums text-text-muted" aria-label={`${w(KNOWLEDGE_WORDS.qty, lang)} ${item.qty}`}>
                     ×{item.qty}

@@ -17,8 +17,8 @@
  *    otherwise reorder inside an RTL paragraph («× 389 × 458 مم 389»). A run
  *      - starts at a Latin letter, a digit, or one of ≤ ≥ < > ± ~ # + - − (mirrored
  *        or weak marks that must stay inside it, or ≤ would read as ≥);
- *      - continues through Latin letters, digits, spaces and . , : / \ × * + - – _ ' ’ " % ° ³ ² µ Ω & ( );
- *      - ends at a Latin letter, a digit, % ° ³ ² µ Ω ) or ";
+ *      - continues through Latin letters, digits, spaces and . , : / \ × * + - – _ ' ’ " % ° ³ ² µ Ω ™ ® © ℃ ℉ & ( );
+ *      - ends at a Latin letter, a digit, % ° ³ ² µ Ω ™ ® © ℃ ℉ ) " or + (a name «PLA Silk+», a count «2M+»);
  *      - leaves the Arabic sentence's trailing punctuation (. ، ؛ :) outside;
  *      - drops an unbalanced bracket: a ")" closing Arabic text stays in the RTL context.
  * 3. Numbers stay Western digits and units Latin (the translations' validator,
@@ -38,8 +38,10 @@ export function scriptDir(s: string | null | undefined): Dir {
 
 const LATIN = 'A-Za-z\\u00C0-\\u024F';
 const START = new RegExp(`[${LATIN}0-9\\u2264\\u2265<>\\u00B1~#+\\-\\u2212]`);
-const CONTINUE = new RegExp(`[${LATIN}0-9 \\u00A0.,:/\\\\\\u00D7*+\\-\\u2013_'\\u2019"%\\u00B0\\u00B3\\u00B2\\u00B5\\u03A9&()\\u2264\\u2265<>\\u00B1~#\\u2212]`);
-const END = new RegExp(`[${LATIN}0-9%\\u00B0\\u00B3\\u00B2\\u00B5\\u03A9)"]`);
+/** Marks a name or a measurement ends with: ™ ® © and the one-character units ℃ ℉. */
+const MARKS = '\\u2122\\u00AE\\u00A9\\u2103\\u2109';
+const CONTINUE = new RegExp(`[${LATIN}0-9 \\u00A0.,:/\\\\\\u00D7*+\\-\\u2013_'\\u2019"%\\u00B0\\u00B3\\u00B2\\u00B5\\u03A9${MARKS}&()\\u2264\\u2265<>\\u00B1~#\\u2212]`);
+const END = new RegExp(`[${LATIN}0-9%\\u00B0\\u00B3\\u00B2\\u00B5\\u03A9${MARKS})"+]`);
 
 /** The run `s.slice(0, k)` cut back to its last end character, its brackets balanced; 0 when nothing is left. */
 function runLength(s: string): number {

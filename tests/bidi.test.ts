@@ -49,6 +49,17 @@ test('ltrRuns: every Latin and number run isolated, the Arabic punctuation and a
   for (const s of ['الموصل (SA011)', 'برغي M3*21.5 (x2)، و4-Pin.', 'a - b']) assert.equal(ltrRuns(s).map((r) => r.text).join(''), s, 'nothing lost');
 });
 
+test('ltrRuns keeps a trailing «+», «™», «®» and a one-character unit («℃», «℉») inside its run (review: «2M+» drawn «+2M»)', () => {
+  assert.equal(runs('أكثر من 2M+ نموذج مجاني.'), 'أكثر من [2M+] نموذج مجاني.');
+  assert.equal(runs('حتى 180℃'), 'حتى [180℃]');
+  assert.equal(runs('من -20℉ إلى 120℉'), 'من [-20℉] إلى [120℉]');
+  assert.equal(runs('خيط PLA Silk+ اللامع'), 'خيط [PLA Silk+] اللامع');
+  assert.equal(runs('رأس E3D High Flow ObXidian™ Hotend للطابعة'), 'رأس [E3D High Flow ObXidian™ Hotend] للطابعة');
+  assert.equal(runs('شعار Bambu Lab® الرسمي'), 'شعار [Bambu Lab®] الرسمي');
+  assert.equal(runs('300 °C كحد أقصى'), '[300 °C] كحد أقصى', 'the control case is unchanged');
+  for (const s of ['أكثر من 2M+ نموذج', 'حتى 180℃', 'رأس E3D High Flow ObXidian™ Hotend']) assert.equal(ltrRuns(s).map((r) => r.text).join(''), s, 'nothing lost');
+});
+
 test('BidiText: one block line each with its own dir; runs in <bdi dir="ltr">; English plain LTR; empty lines kept', () => {
   const one = renderToStaticMarkup(createElement(BidiText, { text: 'أقل من 10mA' }));
   assert.equal(one, '<span dir="rtl">أقل من <bdi dir="ltr">10mA</bdi></span>');
@@ -68,6 +79,13 @@ test('the page, the tabs and the comparison draw imported text through BidiText;
   assert.equal((page.match(/<ChipLabel text=\{(label|m\.label)\} className="block truncate/g) ?? []).length, 4, 'every truncated chooser label ellipsizes at its own end');
   assert.match(page, /<span dir=\{scriptDir\(text\)\} className=\{`\$\{className\} text-start rtl:text-right`\}>/);
   assert.match(page, /<h1 className="[^"]*text-start rtl:text-right" dir=\{scriptDir\(name\)\}>/);
+  // The name a desktop reader sees (the h1 is screen-reader-only there): rule 7 too (review: «[Refurbished] …» drawn
+  // «… [Refurbished]»).
+  assert.match(page, /<p aria-hidden="true" dir=\{scriptDir\(name\)\} className="[^"]*text-start rtl:text-right">\{name\}<\/p>/);
+  // The page body's own spec table (the fallback while the knowledge answer is absent): values in reading order.
+  const specs = page.slice(page.indexOf('!knowledgeCovers.specs ? ('), page.indexOf('!knowledgeCovers.specs ? (') + 2600);
+  assert.match(specs, /<BidiText as="bdi" text=\{pick\(lang as Lang, r\.value_ar, r\.value_en, r\.value_ckb\)\} \/>/);
+  assert.match(specs, /<BidiText as="bdi" text=\{spec\.value\} \/>/);
   const description = page.slice(page.indexOf('title={s.description}'), page.indexOf('title={s.description}') + 600);
   assert.doesNotMatch(description, /whitespace-pre-line|dir="auto"/);
   const tabs = readFileSync(join(ROOT, 'src/components/product/ProductKnowledgeTabs.tsx'), 'utf8');

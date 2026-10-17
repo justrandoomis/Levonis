@@ -525,3 +525,41 @@ test('mixed scripts: «أقل من 10mA» is RTL with 10mA isolated LTR; an Engl
   assert.equal(valueText(list, 'ar').text, 'رمادي، PLA');
   assert.equal(valueText(list, 'en').text, 'Gray, PLA');
 });
+
+test('one chip per product in a bucket: a compound whose two labels link the same product draws it once (review: «H2D and H2D Laser»)', () => {
+  const h2d = { id: 'p_h2d', slug: 'h2d', name: { ar: 'Bambu Lab H2D', en: 'Bambu Lab H2D', ckb: 'Bambu Lab H2D' }, image: '' };
+  const refurb = { id: 'p_rh2d', slug: 'refurbished-bambu-lab-h2d-3d-printer', name: { ar: '[Refurbished] Bambu Lab H2D 3D Printer', en: '[Refurbished] Bambu Lab H2D 3D Printer', ckb: '[Refurbished] Bambu Lab H2D 3D Printer' }, image: '' };
+  const k = canary(false);
+  // compat-targets.json: «H2D» is a family {h2d, refurbished H2D}; «H2D Laser» a printer pointing to h2d.
+  k.compatibility.compatible = [
+    { relation: 'compatible_with', label: 'H2D', target_kind: 'family', scope: { kind: 'product', id: '' }, product: h2d, more: [refurb] },
+    { relation: 'compatible_with', label: 'H2D Laser', target_kind: 'printer', scope: { kind: 'product', id: '' }, product: h2d },
+  ];
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const html = render(createElement(TabBody, { id: 'compatibility', tabs: knowledgeTabs(k, SEL), lang, selection: SEL, scopeNames: {} }));
+    assert.equal((html.match(/href="\/product\/h2d"/g) ?? []).length, 1, `${lang}: the H2D once`);
+    assert.equal((html.match(/href="\/product\/refurbished-bambu-lab-h2d-3d-printer"/g) ?? []).length, 1, `${lang}: the refurbished H2D once`);
+  }
+  // The other order (a printer label first, then a family that holds it): still once each, the family keeps its other member.
+  k.compatibility.compatible = [...k.compatibility.compatible].reverse();
+  const html = render(createElement(TabBody, { id: 'compatibility', tabs: knowledgeTabs(k, SEL), lang: 'ar', selection: SEL, scopeNames: {} }));
+  assert.equal((html.match(/href="\/product\/h2d"/g) ?? []).length, 1);
+  assert.equal((html.match(/href="\/product\/refurbished-bambu-lab-h2d-3d-printer"/g) ?? []).length, 1);
+  // Two buckets are separate facts: the same product may be compatible in one and required in another.
+  const both = canary(false);
+  both.compatibility.compatible = [{ relation: 'compatible_with', label: 'H2D', target_kind: 'printer', scope: { kind: 'product', id: '' }, product: h2d }];
+  both.compatibility.requires = [{ relation: 'requires', label: 'H2D', target_kind: 'printer', scope: { kind: 'product', id: '' }, product: h2d }];
+  const two = render(createElement(TabBody, { id: 'compatibility', tabs: knowledgeTabs(both, SEL), lang: 'en', selection: SEL, scopeNames: {} }));
+  assert.equal((two.match(/href="\/product\/h2d"/g) ?? []).length, 2);
+});
+
+test('«محتويات العلبة»: an English item sits beside its bullet on an RTL page, like a translated one (review: the box list zigzagged)', () => {
+  const k = canary(false);
+  k.in_the_box = [
+    { text: 'H2D Laser Full Combo', qty: null, scope: { kind: 'product', id: '' } },
+    { text: 'Quick start guide', qty: 2, scope: { kind: 'product', id: '' }, text_i18n: { ar: 'دليل البدء السريع', ckb: 'ڕێبەری دەستپێکی خێرا' } },
+  ];
+  const html = render(createElement(TabBody, { id: 'packaging', tabs: knowledgeTabs(k, SEL), lang: 'ar', selection: SEL, scopeNames: {} }));
+  assert.match(html, /<span dir="ltr" class="min-w-0 flex-1 text-start rtl:text-right">H2D Laser Full Combo<\/span>/, 'the start of the RTL column, not the far edge');
+  assert.match(html, /<span dir="rtl" class="min-w-0 flex-1 text-start rtl:text-right">دليل البدء السريع<\/span>/);
+});
