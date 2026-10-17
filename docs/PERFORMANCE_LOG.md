@@ -2245,3 +2245,17 @@ category routes) still finish at ~3 s on Slow-4G. The document head start (inlin
 
 A new guard in tests/bundleBudget.test.ts keeps the listing grammar (`discovery`), `ListingView` and `listingQuery`
 out of the explorer's static closure: an intermediate build of this lane had put the grammar there (+3.1 KB).
+
+### Review fixes (2026-10-17)
+
+The lane's review raised three findings, each upheld by two skeptics:
+
+| Finding | Fix | Measured |
+|---|---|---|
+| Past `TREE_AVAILABILITY_CAP` (the Bambu import's ~1,142 products) an uncached `/api/catalog/tree` took 4 dependent D1 waves (base: 1) | `b3d5f57e`: the photographs' short list is one statement in the first wave | real router at 150 ms per round trip: 4 waves / ~650 ms → 2 waves / ~345 ms (base 1 / ~165 ms; the category page fetches the map and its list together, so a cold page no longer waits longer than base). Ceilings under and past the cap in `tests/d1Waves.test.ts` |
+| The compact hero's `195px` assumed a one-line title. A wrapped title is drawn at 249 px and took the 640 copy for 747 device px (0.86): the en/ckb «Printer Accessories» at 320 px, and longer department names at 360–430 px in all three languages | the hero measures its photograph's zone before it inserts the picture (CropPhoto `fit`, a layout effect: same task, before paint, one request). It asks for that width, held between 195 px and the 230 px it asked for before the lane (`cropHeroCompactSizes`) | lab, three arms (base, lane, fix) × three languages × seven phones, with the real titles and with longer names: every one-line title (19 runs) keeps the lane's copy (640 on DPR 3); every wrapped title (23 runs) takes exactly the base's copy (800 on DPR 3 and 2.8125, 640 on 2.625–2.75, 480 on 2). A truthful 249 px would take 800 on the DPR 2.625–2.75 Android screens, where base took 640 (0.93–0.98). Throttled A/B on `/categories/printer-accessories` (360×800 DPR 3, CPU ×4, Slow-4G, 6 pairs): LCP 3,712 → 3,692 ms, first picture 3,073 → 3,102 ms, 67 KB in both (noise) |
+| A section whose slug is longer than 60 characters (the admin's slugs reach 63 through uniqueSlug and 127 through quick-create) got 400 from `/api/products` by slug, where by id it had listed | above 60 characters the storefront asks by id and starts nothing early by slug; `X-Catalog-Listing` names the id; `/api/products` accepts 80 characters, as `/api/catalog/:slug` does | the review's probe: by slug 400 → 200; the header now carries `cat_pacc` |
+
+Bytes of code (gzip −9, the lab's method): entry 64,481 → 64,516 B; `CategoryPage` beyond the initial payload
+66,929 → 67,250; `CategoryListing` 60,918 → 61,227; `CategoriesExplorer` 25,387 → 25,705 (CropPhoto's measuring is
+shared by all three); `Products` 27,321 → 27,314.
