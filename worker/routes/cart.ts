@@ -1128,6 +1128,10 @@ async function loadCart(c: Context<AppContext>) {
         optionValueIds: sel.optionValueIds ?? [],
         colorId: sel.colorId || null,
       }, view),
+      // docs/ux/COLOUR-QUANTITIES.md §5.2: a colour group's header shows the PRODUCT's own main photo — no
+      // selection — and each colour line its own colour once. `image` above is the selection's picture
+      // (the colour's photo), which made the group's header the first colour a third time. Additive.
+      product_image: productImageForSelection(doc, { optionValueIds: [], colorId: null }, view),
       qty: row.qty,
       option_id: row.option_id,
       color_id: row.color_id,

@@ -64,3 +64,37 @@ export function groupCartLines<L extends GroupableLine>(items: readonly L[]): Ca
   }
   return out;
 }
+
+/** What a group's pictures are read from: the server's cart line (`product_image` is absent from an older Worker). */
+export interface PicturedLine {
+  id: string;
+  image?: string;
+  product_image?: string;
+  color_tag?: { image?: string | null; hex?: string | null } | null;
+}
+
+/**
+ * EACH PICTURE ONCE IN A GROUP (docs/ux/COLOUR-QUANTITIES.md §5.2, the note of 2026-10-17).
+ *
+ * The header drew `lines[0].image` — the FIRST LINE's selection picture, which
+ * is that colour's own photo — and every line drew its colour's photo in its
+ * picture slot AND again as the swatch dot of its name: for a Black first line,
+ * the same black spool three times. Now:
+ *
+ *   · the header shows the product's own main photo (`product_image`; an older
+ *     Worker without it falls back to the first line's picture);
+ *   · each line shows its colour ONCE, in its picture slot: its own photo, or
+ *     its hex circle — and the hex circle too when its photo IS the header's
+ *     picture (a product whose main photo is its black spool), so no picture is
+ *     drawn twice. The name beside it carries no second dot.
+ */
+export function groupPictures(lines: readonly PicturedLine[]): { header: string; rows: Map<string, { image: string; hex: string }> } {
+  const first = lines[0];
+  const header = (first?.product_image ?? first?.image ?? '').trim();
+  const rows = new Map<string, { image: string; hex: string }>();
+  for (const l of lines) {
+    const own = (l.color_tag?.image ?? '').trim();
+    rows.set(l.id, { image: own && own !== header ? own : '', hex: (l.color_tag?.hex ?? '').trim() });
+  }
+  return { header, rows };
+}

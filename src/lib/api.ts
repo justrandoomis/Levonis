@@ -601,7 +601,11 @@ export interface CartItem {
   slug: string;
   name: string;
   name_ar: string;
+  /** The SELECTION's picture: the colour's (or the option's) own photo when one is bound. */
   image: string;
+  /** The product's own main photo, no selection — a colour group's header (COLOUR-QUANTITIES §5.2). Absent
+   *  from an older Worker. */
+  product_image?: string;
   qty: number;
   option_id: string;
   /** Complete canonical relational selection; option_id remains its stable

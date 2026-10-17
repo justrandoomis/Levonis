@@ -33,6 +33,9 @@ export interface ColourTagProps {
   className?: string;
   /** Classes for the name (weight, size, colour); defaults suit body text. */
   nameClassName?: string;
+  /** False where the colour is already drawn beside the name — a grouped cart line's picture slot
+   *  (COLOUR-QUANTITIES §5.2): the colour is shown once, never as a photo and again as a dot. */
+  swatch?: boolean;
 }
 
 const SAFE_HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -64,11 +67,11 @@ export function ColourSwatch({
   );
 }
 
-export function ColourTag({ name, hex, image, size = 'md', a11yPrefix, qty, className = '', nameClassName }: ColourTagProps) {
+export function ColourTag({ name, hex, image, size = 'md', a11yPrefix, qty, className = '', nameClassName, swatch = true }: ColourTagProps) {
   const text = size === 'sm' ? 'text-[11px] font-semibold' : 'text-[13px] font-semibold';
   return (
     <span data-colour-tag className={`inline-flex min-w-0 max-w-full items-center gap-1.5 ${className}`}>
-      <ColourSwatch hex={hex} image={image} size={size} />
+      {swatch ? <ColourSwatch hex={hex} image={image} size={size} /> : null}
       {a11yPrefix ? <span className="sr-only">{a11yPrefix} </span> : null}
       <bdi className={`min-w-0 truncate ${nameClassName ?? `${text} text-text-primary`}`}>{name}</bdi>
       {typeof qty === 'number' ? (

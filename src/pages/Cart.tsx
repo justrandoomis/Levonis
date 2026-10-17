@@ -40,7 +40,7 @@ import { useMoney } from '../CurrencyContext';
 import OfferBadge, { StruckMoney, offerPercentSr, offerPercentText } from '../components/ui/OfferBadge';
 import VariantImg from '../components/ui/VariantImg';
 import { cartEmptyText } from '../lib/cartEmptyText';
-import { groupCartLines } from '../lib/cartGroups';
+import { groupCartLines, groupPictures } from '../lib/cartGroups';
 import { colourLang, colourStrings, groupSummaryText, isolate } from '../lib/colourQuantities';
 import { ColourSwatch, ColourTag } from '../components/product/ColourTag';
 import VariantChoices from '../components/cart/VariantChoices';
@@ -1477,7 +1477,7 @@ export default function Cart() {
    * swatch, since the product photo would be the same picture three times
    * (docs/ux/COLOUR-QUANTITIES.md §5.2).
    */
-  const renderLine = (item: CartItem, inGroup = false) => {
+  const renderLine = (item: CartItem, inGroup = false, picture?: { image: string; hex: string }) => {
     // The server alone marks a gift line (`kind: 'gift'`, locked, priced 0).
     if (item.kind === 'gift') return giftRow(item, item.gift ?? { level: 0, value_iqd: 0 });
     const hasVariants = (item.options ?? []).length > 0 || (item.colors ?? []).length > 0;
@@ -1545,10 +1545,11 @@ export default function Cart() {
           </span>
         </button>
 
-        {/* Product Image — in a colour group, the colour's own picture or its swatch (§5.2). */}
+        {/* Product Image — in a colour group, the colour ONCE: its own picture or its swatch, never the
+            header's picture again (§5.2, `groupPictures`). */}
         {inGroup && item.color_tag ? (
-          <div data-cart-item-image className="w-10 h-10 shrink-0 mt-2 flex items-center justify-center">
-            <ColourSwatch hex={item.color_tag.hex} image={item.color_tag.image} px={40} />
+          <div data-cart-item-image data-cart-colour-picture={picture?.image ? 'photo' : 'swatch'} className="w-10 h-10 shrink-0 mt-2 flex items-center justify-center">
+            <ColourSwatch hex={picture ? picture.hex : item.color_tag.hex} image={picture ? picture.image : item.color_tag.image} px={40} />
           </div>
         ) : (
         <div
@@ -1580,10 +1581,12 @@ export default function Cart() {
               // The product is named once, on the group; the colour is this line's name.
               <h3 data-cart-item-title className="mb-1">
                 <span className="sr-only">{itemName(item)} — </span>
+                {/* No second dot: the picture slot beside it already shows this colour (§5.2). */}
                 <ColourTag
                   name={item.color_tag.name}
                   hex={item.color_tag.hex}
                   image={item.color_tag.image}
+                  swatch={false}
                   a11yPrefix={colourWords.colourA11y('').trim()}
                   nameClassName="text-[15px] font-bold text-text-primary"
                 />
@@ -2022,6 +2025,8 @@ export default function Cart() {
     const chosen = lines.filter((l) => selectedIds.has(l.id)).length;
     const state: boolean | 'mixed' = chosen === 0 ? false : chosen === lines.length ? true : 'mixed';
     const name = itemName(first);
+    // Each picture once: the product's own photo here, each colour once on its line (§5.2).
+    const pictures = groupPictures(lines);
     return (
       <div key={`group-${productId}`} role="group" aria-label={name} data-cart-colour-group={productId} className="border-b border-border-subtle last:border-b-0">
         <div className="flex items-center gap-1.5 sm:gap-3 px-2.5 sm:px-4 pt-3.5">
@@ -2042,8 +2047,8 @@ export default function Cart() {
               {state === true ? <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} /> : state === 'mixed' ? <span className="h-0.5 w-2.5 rounded bg-gold" /> : null}
             </span>
           </button>
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-raised cursor-pointer" onClick={() => navigate(`/product/${first.slug}`)}>
-            <SafeImage sizes="40px" src={first.image} alt="" aspect="auto" className="w-full h-full" bgClassName="bg-surface-raised" fallbackClassName="text-text-muted" />
+          <div data-cart-group-picture className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-raised cursor-pointer" onClick={() => navigate(`/product/${first.slug}`)}>
+            <SafeImage sizes="40px" src={pictures.header} alt="" aspect="auto" className="w-full h-full" bgClassName="bg-surface-raised" fallbackClassName="text-text-muted" />
           </div>
           <div className="min-w-0">
             <h3 data-cart-group-title className="text-text-primary text-[14px] font-medium leading-snug line-clamp-2">{name}</h3>
@@ -2051,7 +2056,7 @@ export default function Cart() {
             <p className="text-[12px] tabular-nums text-text-secondary">{groupSummaryText(colourLang(lang), lines.map((l) => ({ colourId: l.color_tag?.id ?? l.color_id ?? '', qty: l.qty })))}</p>
           </div>
         </div>
-        <div>{lines.map((l) => renderLine(l, true))}</div>
+        <div>{lines.map((l) => renderLine(l, true, pictures.rows.get(l.id)))}</div>
       </div>
     );
   };
