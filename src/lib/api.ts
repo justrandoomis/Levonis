@@ -1,5 +1,6 @@
 import { beginRequestFeedback, type MascotFeedback } from './mascotRequest';
 import { noteCartResponse } from './cartCount';
+import { requestErrorText } from './requestErrorText';
 import type { OrderSerials } from '../components/adminOrders/serials/types';
 /**
  * Typed API client. All requests go to the Worker backend with cookie
@@ -187,11 +188,11 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, opts?
       // never a malformed payload. Rethrow it so the classification below —
       // which is the one place that can tell those two apart — decides.
       if (controller.signal.aborted) throw err;
-      throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
+      throw new ApiError(res.status, res.ok ? requestErrorText('invalid') : requestErrorText('server', res.status));
     }
     // A response belongs to the credentials used when it started. In
     // particular, a late owner cost read must not repaint a different account.
-    if (requestEpoch !== apiSessionEpoch) throw new ApiError(0, 'Request cancelled', 'ABORTED');
+    if (requestEpoch !== apiSessionEpoch) throw new ApiError(0, requestErrorText('cancelled'), 'ABORTED');
     if (!res.ok || data.success === false) {
       // BLOCKED BY THE DECEPTION LAYER (DECISIONS row 206): every screen hears
       // it at once, and the full-screen notice (components/security/
@@ -199,7 +200,9 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, opts?
       if (data.code === 'ACCESS_BLOCKED') noteAccessBlocked(data.details);
       throw new ApiError(
         res.status,
-        data.error || `Server error (${res.status})`,
+        // The Worker's unhandled-error answer is one English sentence with no code: the reader gets the
+        // client's own, in their language. A coded refusal keeps the server's words (refusalStrings).
+        (res.status >= 500 && !data.code ? '' : data.error) || requestErrorText('server', res.status),
         data.code,
         data.details,
         data as unknown as Record<string, unknown>
@@ -215,10 +218,15 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, opts?
     if (err instanceof ApiError) throw err;
     // A caller-cancelled request is not a failure to report: the effect that
     // started it has already moved on, and its own cleanup owns the state.
-    // A DEADLINE, though, is a real failure the customer must be able to see
-    // and retry — so it travels as the ordinary network error.
-    if (opts?.signal?.aborted && !timedOut) throw new ApiError(0, 'Request cancelled', 'ABORTED');
-    throw new ApiError(0, 'Network error — check your connection and try again');
+    // A DEADLINE is a real failure the reader must be able to see and retry,
+    // but it is NOT the network: the client stopped waiting, and the server may
+    // still be finishing the request. It says so (`TIMEOUT`), so a WRITE's
+    // caller can find out what landed before it says anything
+    // (src/components/adminProducts/saveOutcome.ts). Both in the reader's
+    // language (src/lib/requestErrorText.ts).
+    if (opts?.signal?.aborted && !timedOut) throw new ApiError(0, requestErrorText('cancelled'), 'ABORTED');
+    if (timedOut) throw new ApiError(0, requestErrorText('timeout'), 'TIMEOUT');
+    throw new ApiError(0, requestErrorText('network'), 'NETWORK');
   } finally {
     if (timer) clearTimeout(timer);
     opts?.signal?.removeEventListener('abort', onCallerAbort);

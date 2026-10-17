@@ -41,6 +41,7 @@
  */
 import { api, ApiError, DEFAULT_TIMEOUT_MS } from './api';
 import { beginRequestFeedback } from './mascotRequest';
+import { requestErrorText } from './requestErrorText';
 
 export const RESOLVE_PATH = '/api/storefront/resolve';
 export const HOME_PATH = '/api/home';
@@ -160,18 +161,18 @@ export async function settleJson<T>(path: string, response: Promise<Response>): 
     try {
       res = await response;
     } catch {
-      throw new ApiError(0, 'Network error — check your connection and try again');
+      throw new ApiError(0, requestErrorText('network'), 'NETWORK');
     }
     let data: { success?: boolean; error?: string; code?: string; details?: Record<string, unknown> } & T;
     try {
       data = await res.json();
     } catch {
-      throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
+      throw new ApiError(res.status, res.ok ? requestErrorText('invalid') : requestErrorText('server', res.status));
     }
     if (!res.ok || data.success === false) {
       throw new ApiError(
         res.status,
-        data.error || `Server error (${res.status})`,
+        data.error || requestErrorText('server', res.status),
         data.code,
         data.details,
         data as unknown as Record<string, unknown>

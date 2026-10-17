@@ -30,6 +30,7 @@ export default function ReviewSheetV2({
   preview,
   busy,
   error,
+  progress = null,
   reauth,
   onConfirm,
   onCancel,
@@ -38,6 +39,8 @@ export default function ReviewSheetV2({
   preview: V2Answer;
   busy: boolean;
   error: string;
+  /** While the confirmed save is still on its way (src/components/adminProducts/saveOutcome.ts): said, not an error. */
+  progress?: string | null;
   reauth: boolean;
   onConfirm: (confirmLarge: boolean) => void;
   onCancel: () => void;
@@ -116,6 +119,11 @@ export default function ReviewSheetV2({
             </label>
             <span className="text-[12px] text-text-secondary">{s.largeNote}</span>
           </div>
+        ) : null}
+        {progress && !error ? (
+          <p role="status" className="text-[13px] text-amber-300" data-v2-review-progress>
+            {progress}
+          </p>
         ) : null}
         {error ? (
           <p role="alert" className="text-[13px] text-red-400" data-v2-review-error>

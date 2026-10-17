@@ -23,6 +23,7 @@
  * FormData. Refusals still become `ApiError`, so `apiRefusal` translates them.
  */
 import { ApiError } from './api';
+import { requestErrorText } from './requestErrorText';
 import { sha256OfBlob } from '../components/upload/sha256core';
 import type { HashWorkerMessage } from '../components/upload/sha256.worker';
 
@@ -136,7 +137,7 @@ export function isRetryable(error: unknown): boolean {
 
 // ------------------------------------------------------------- hashing
 
-const abortedError = () => new ApiError(0, 'Request cancelled', 'ABORTED');
+const abortedError = () => new ApiError(0, requestErrorText('cancelled'), 'ABORTED');
 
 function hashInWorker(file: Blob, onProgress: ((loaded: number) => void) | undefined, signal: AbortSignal | undefined): Promise<string> {
   return new Promise<string>((resolve, reject) => {
@@ -264,10 +265,10 @@ async function readJson<T>(res: Response): Promise<T> {
   try {
     data = (await res.json()) as typeof data;
   } catch {
-    throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
+    throw new ApiError(res.status, res.ok ? requestErrorText('invalid') : requestErrorText('server', res.status));
   }
   if (!res.ok || data.success === false) {
-    throw new ApiError(res.status, data.error || `Server error (${res.status})`, data.code, data.details, data as unknown as Record<string, unknown>);
+    throw new ApiError(res.status, data.error || requestErrorText('server', res.status), data.code, data.details, data as unknown as Record<string, unknown>);
   }
   return data;
 }
@@ -277,7 +278,7 @@ async function send(fetchImpl: FetchLike, path: string, init: RequestInit, signa
     return await fetchImpl(path, { credentials: 'same-origin', ...init, signal });
   } catch {
     if (signal?.aborted) throw abortedError();
-    throw new ApiError(0, 'Network error — check your connection and try again');
+    throw new ApiError(0, requestErrorText('network'), 'NETWORK');
   }
 }
 

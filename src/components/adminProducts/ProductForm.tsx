@@ -40,6 +40,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus, FileUp } from 'lucide-react';
 import { api, ApiError, failureText } from '../../lib/api';
+import { PRODUCT_WRITE_TIMEOUT_MS, STILL_SAVING_AFTER_MS, confirmSaveOutcome, saveOutcomeText, writeOutcomeUnknown } from './saveOutcome';
 import { refusalIssues } from './applyResult';
 import { contractRefusal, refusalLang, refusalText } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
@@ -299,6 +300,8 @@ export default function ProductForm({
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saveNote, setSaveNote] = useState<string | null>(null);
+  /** «ما زال الحفظ جارياً» / «نتحقّق…» while a slow save is on its way (saveOutcome.ts); null otherwise. */
+  const [saveProgress, setSaveProgress] = useState<string | null>(null);
   const [reviewNeeded, setReviewNeeded] = useState<string[]>([]);
   /**
    * The same fields WITH the reason each one could not be translated, and the
@@ -813,13 +816,16 @@ export default function ProductForm({
       delivery_options: next.delivery_options,
     });
     if (Object.keys(check).length > 0) {
-      setSaveErr('راجع الحقول المعلّمة بالأحمر قبل الحفظ.');
+      setSaveErr(saveOutcomeText('checkFields', lang));
       return;
     }
 
     setSaving(true);
     setSaveErr(null);
     setSaveNote(null);
+    setSaveProgress(null);
+    // A slow save is SAID, not left to look stuck (saveOutcome.ts): the deadline is the write's own.
+    const stillSaving = window.setTimeout(() => setSaveProgress(saveOutcomeText('stillSaving', lang)), STILL_SAVING_AFTER_MS);
     // The prices as typed now (and the review sheet's answer): they travel with the product. A content save of
     // a visible, unpriced product sends none (`isContentOnlySave`): it stays visible and unpriced.
     const pricingBlock = isContentOnlySave({ status, storedStatus, needsMethod: v2.needsMethod, touched: v2.touched, confirming: !!confirm })
@@ -857,7 +863,9 @@ export default function ProductForm({
         pricing_v2?: { priced: boolean };
       }>(
         '/api/admin/products-v2',
-        body
+        body,
+        // The product write's own deadline: its measured worst case with room, never the 20 s of a page read.
+        { timeoutMs: PRODUCT_WRITE_TIMEOUT_MS }
       );
       const savedId = res.product?.id ?? next.id ?? draftId;
       setReviewNeeded(res.translation_review_needed ?? []);
@@ -911,7 +919,28 @@ export default function ProductForm({
         setSaveErr(null);
         return;
       }
-      const text = contractRefusal(e, refusalLang(lang), failureText(e, 'فشل الحفظ / save failed'));
+      // NO ANSWER IS NOT «NOT SAVED» (saveOutcome.ts): the deadline fired or the answer was lost, and the
+      // server may have written. Read the product again and say what is true — never a blind «try again».
+      if (writeOutcomeUnknown(e)) {
+        const savedId = next.id || draftId;
+        setSaveProgress(saveOutcomeText('checking', lang));
+        const { outcome } = await confirmSaveOutcome(savedId, next.id ? loadedUpdatedAt || '' : '');
+        setSaveProgress(null);
+        if (outcome === 'saved') {
+          setOverrides({});
+          setShowErrors(false);
+          v2.afterSave();
+          onListChanged();
+          await loadProduct(savedId);
+          setSaveNote(saveOutcomeText('saved', lang));
+          return;
+        }
+        const said = saveOutcomeText(outcome, lang);
+        setSaveErr(said);
+        if (v2.review) v2.reviewError(said);
+        return;
+      }
+      const text = contractRefusal(e, refusalLang(lang), failureText(e, saveOutcomeText('failed', lang)));
       // THE ONE SHEET: prices move — the server's preview of exactly what this save writes.
       const preview = e instanceof ApiError ? previewOf(e.details) : null;
       if (
@@ -940,6 +969,8 @@ export default function ProductForm({
       setSaveErr(lines.length ? `${text}: ${lines.join(' · ')}` : text);
       if (v2.review) v2.reviewError(text);
     } finally {
+      window.clearTimeout(stillSaving);
+      setSaveProgress(null);
       setSaving(false);
     }
   };
@@ -2060,7 +2091,11 @@ export default function ProductForm({
       >
         <div className="min-w-0 px-3 py-2 flex items-center gap-2">
           <span className="min-w-0 flex-1 text-[11px] truncate">
-            {showErrors && errorList.length > 0 ? (
+            {saving && saveProgress ? (
+              <span className="text-amber-300" role="status" data-save-progress>
+                {saveProgress}
+              </span>
+            ) : showErrors && errorList.length > 0 ? (
               <span className="text-red-400 inline-flex items-center gap-1">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 {errorList[0]}
@@ -2143,6 +2178,7 @@ export default function ProductForm({
           preview={v2.review.preview}
           busy={saving}
           error={v2.review.error}
+          progress={saveProgress}
           reauth={v2.review.reauth}
           onConfirm={confirmReview}
           onCancel={v2.closeReview}
