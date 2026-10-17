@@ -17,7 +17,9 @@
  *   - ?w=1600 of a 1254 px picture is its ?w=1280 copy (`clampRung`), read from
  *     R2 when kept, cut once when not;
  *   - when no copy can be had the original goes out as before, and this data
- *     centre keeps it under the copy's address for an hour: one failed cut, not one per request;
+ *     centre keeps it under the copy's address for an hour: one failed cut, not
+ *     one per request — but never for a picture rewritten in place, which keeps
+ *     its own short policy and nothing at the copy's address;
  *   - the upload warm-up and the sweep make the top rung the same way, and no
  *     large photo is marked unreadable for it;
  *   - a browser that takes no WebP never gets a WebP from the AVIF place.
@@ -152,6 +154,36 @@ test('when no copy can be had, the original goes out as before — and this data
   assert.equal(second.headers.get('X-Variant-Source'), 'edge');
   assert.deepEqual(new Uint8Array(await second.arrayBuffer()), ORIGINAL);
   assert.equal(images.calls.length, callsAfterFirst, 'the binding is not asked again for every request');
+});
+
+test('A FIXED-NAME PICTURE WHOSE CUT FAILS keeps its own short policy and no copy at the edge: the owner\'s replacement shows as soon as it would have (speed lane review)', async () => {
+  const LOGO = 'brands/acme/logo.webp';
+  const cache = new MemCache();
+  const images = imagesDouble('http500');
+  const { bucket, fetchIt } = setup({ images, cache });
+  const OLD = webpBytes(1254, 1254, { pad: 4000 });
+  const NEW = webpBytes(1254, 1254, { pad: 4321 });
+  bucket.seed(LOGO, OLD, { contentType: 'image/webp', cacheControl: 'public, max-age=300, must-revalidate' });
+  const plain = await fetchIt(`/files/${LOGO}`);
+  const own = plain.headers.get('Cache-Control');
+  assert.equal(own, 'public, max-age=300, must-revalidate');
+  const failed = await fetchIt(`/files/${LOGO}?w=640`, AVIF);
+  assert.equal(failed.status, 200);
+  assert.equal(failed.headers.get('X-Variant-Source'), 'original');
+  assert.equal(failed.headers.get('Cache-Control'), own, 'never longer than the picture itself may be kept');
+  assert.deepEqual(new Uint8Array(await failed.arrayBuffer()), OLD);
+  assert.deepEqual([...cache.store.keys()].filter((u) => /[?&]w=640/.test(u)), [], 'nothing kept under the copy\'s address');
+  // The owner replaces the picture under the same name; the binding works again.
+  bucket.seed(LOGO, NEW, { contentType: 'image/webp', cacheControl: 'public, max-age=300, must-revalidate' });
+  for (const u of [...cache.store.keys()]) cache.store.delete(u);
+  images.state.mode = 'ok';
+  const after = await fetchIt(`/files/${LOGO}?w=640`, AVIF);
+  assert.equal(after.headers.get('X-Variant-Source'), 'render', 'the new picture, cut — never the old one from the edge');
+  // An immutable picture still keeps its failed cut an hour (one failed cut per colo, not per request).
+  images.state.mode = 'http500';
+  const immutable = await fetchIt(`/files/${KEY}?w=640`, AVIF);
+  assert.equal(immutable.headers.get('Cache-Control'), 'public, max-age=3600');
+  assert.equal((await fetchIt(`/files/${KEY}?w=640`, AVIF)).headers.get('X-Variant-Source'), 'edge');
 });
 
 test('a browser that takes no WebP never gets the WebP kept in the AVIF place', async () => {

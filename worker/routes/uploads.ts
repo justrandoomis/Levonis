@@ -962,7 +962,8 @@ async function cutAndKeepCopy(
  * anything but a verified copy no wider than asked, the original is served
  * exactly as `/files/<key>` would have — nothing is stored in R2, and this data
  * centre keeps that answer under the copy's address for an hour
- * (X-Variant-Source: original), instead of asking the binding again.
+ * (X-Variant-Source: original), instead of asking the binding again; a key
+ * rewritten in place keeps its own short policy and nothing at that address.
  */
 async function serveImageVariant(
   c: Context<AppContext>,
@@ -987,11 +988,16 @@ async function serveImageVariant(
    * and kept in this data centre under this copy's address for an hour, so
    * the next request is an edge hit instead of another failed cut (it used to
    * ask the binding again, and fetch the original twice, on every request).
+   * NOT a key rewritten in place (the owner's fixed names, a link card): it
+   * leaves with its own short policy and is kept nowhere, as before — nothing
+   * purges a copy's address on a rewrite, so an hour there would show the old
+   * picture for an hour.
    */
   const keepOriginalAsCopy = (whole: Response): Response => {
     const kept = new Response(whole.body, whole);
-    kept.headers.set('Cache-Control', LEGACY_COPY_CACHE);
     kept.headers.set('X-Variant-Source', 'original');
+    if (isRewritableMediaKey(key)) return kept;
+    kept.headers.set('Cache-Control', LEGACY_COPY_CACHE);
     cachePut(kept);
     return kept;
   };
