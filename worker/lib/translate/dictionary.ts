@@ -627,9 +627,13 @@ export const PHRASES: Record<string, TermEntry> = {
   // NOTHING BELOW WAS MACHINE-TRANSLATED, which is this file's whole premise.
   // Where a confident Sorani technical term exists it is used; where one does
   // not, a plain descriptive phrase built from words this file already records
-  // is used instead of a guess — «دوگمەی وەستانی خێرا» for an emergency stop,
-  // «شیاوی هەڵکۆڵین» for engravable. Those are listed for a native speaker to
-  // review; they are not inventions dressed as terminology.
+  // is used instead of a guess — «شیاوی هەڵکۆڵین» for engravable. Those are
+  // listed for a native speaker to review; they are not inventions dressed as
+  // terminology. The emergency stop's stand-in «دوگمەی وەستانی خێرا» read
+  // «quick-stop button» and lost the emergency (the import's landing review):
+  // it is now the spec label's own «دوگمەی وەستاندنی فریاکەوتن»
+  // (specFieldLabelsCkb.ts `emergency_stop`), «فریاکەوتن» being the word the
+  // translation memory gives «emergency».
   //
   // WHERE THE ENGLISH TOKEN IS THE ANSWER the word is in IDENTITY_TERMS rather
   // than transliterated here — «MDF» joined «PETG» and «HEPA» above.
@@ -666,7 +670,7 @@ export const PHRASES: Record<string, TermEntry> = {
   'built-in filter': { ar: 'فلتر مدمج', ckb: 'فلتەری ناوەکی' },
   'exhaust fan + duct': { ar: 'مروحة شفط + خرطوم', ckb: 'پەنکەی دەرکردن + لوولە' },
   'external filter unit': { ar: 'وحدة فلترة خارجية', ckb: 'یەکەی پاڵاوتنی دەرەکی' },
-  'emergency stop': { ar: 'زر الإيقاف الطارئ', ckb: 'دوگمەی وەستانی خێرا' },
+  'emergency stop': { ar: 'زر الإيقاف الطارئ', ckb: 'دوگمەی وەستاندنی فریاکەوتن' },
   'flame detection': { ar: 'كشف اللهب', ckb: 'دۆزینەوەی گڕ' },
   'tilt detection': { ar: 'كشف الإمالة', ckb: 'دۆزینەوەی لارکردن' },
   'lid safety interlock': { ar: 'قفل أمان الغطاء', ckb: 'قفڵی سەلامەتی داپۆشەر' },

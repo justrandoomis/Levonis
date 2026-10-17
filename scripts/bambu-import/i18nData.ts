@@ -11,8 +11,14 @@
  *   - `translationNames`: the names a translation keeps verbatim — the
  *     manifest's titles of two words or more (a one-word title such as
  *     «Brush» is an ordinary word in a sentence; a one-word material code is
- *     kept by the code and identity rules), the compat-targets labels,
- *     compounds and requirement targets, the registry's models and «Bambu Lab»;
+ *     kept by the code and identity rules), the compat-targets labels, the
+ *     names inside each compound (its `atoms`: «AMS 2 Pro» and «AMS HT», never
+ *     «AMS 2 Pro and AMS HT» — the joining word is the sentence's, so «و»
+ *     may replace it; landing review; a one-word atom only when it is a label
+ *     or a compound of its own), the requirement targets, the registry's
+ *     models and «Bambu Lab». `compoundLabels` are the compound keys
+ *     themselves: the extraction's exact names (a string that IS a compound
+ *     label is a name, never offered);
  *   - `manifestProductIds`: the product ids a ref may name — a create's
  *     deterministic `p_…` and a merge's reviewed id;
  *   - `checkTranslationsDir`: the index lists exactly the part files present,
@@ -53,12 +59,32 @@ export function translationNames(bundle: Pick<ReviewedBundle, 'rows' | 'targets'
     if (t && t.split(/\s+/).length >= 2) out.add(t);
   }
   const targets = (bundle.targets ?? {}) as unknown as Record<string, unknown>;
-  for (const key of ['labels', 'compounds', 'requirement_targets']) {
+  for (const key of ['labels', 'requirement_targets']) {
     const v = targets[key];
     if (v && typeof v === 'object' && !Array.isArray(v)) for (const k of Object.keys(v)) if (k.trim()) out.add(k.trim());
   }
+  // A compound's atoms; one of one word only when it is a label or a compound of its own («Ventilation» is a word).
+  const compounds = targets.compounds;
+  if (compounds && typeof compounds === 'object' && !Array.isArray(compounds)) {
+    const own = new Set(compoundLabels(bundle));
+    for (const c of Object.values(compounds as Record<string, unknown>)) {
+      const atoms = (c as { atoms?: unknown } | null)?.atoms;
+      if (!Array.isArray(atoms)) continue;
+      for (const raw of atoms) {
+        const a = typeof raw === 'string' ? raw.trim() : '';
+        if (a && (a.split(/\s+/).length >= 2 || out.has(a) || own.has(a))) out.add(a);
+      }
+    }
+  }
   for (const m of MODELS) out.add(m.token);
   return out;
+}
+
+/** The compat-targets compound labels as written («AMS 2 Pro and AMS HT»): the extraction's exact names (see the header). */
+export function compoundLabels(bundle: Pick<ReviewedBundle, 'targets'>): string[] {
+  const compounds = ((bundle.targets ?? {}) as unknown as Record<string, unknown>).compounds;
+  if (!compounds || typeof compounds !== 'object' || Array.isArray(compounds)) return [];
+  return Object.keys(compounds).map((k) => k.trim()).filter(Boolean);
 }
 
 /** Every product id a ref may name: a create's deterministic id, a merge's reviewed id. */

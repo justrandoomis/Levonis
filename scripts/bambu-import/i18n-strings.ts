@@ -74,7 +74,7 @@ import { GROUP_LABELS } from '../../worker/lib/knowledge/labels';
 import { isOwnerOnlyKey, publicDocumentUrl } from '../../worker/lib/knowledge/answer';
 import { bundleDigest, loadReviewedBundle, writeModeOf, type ManifestRow, type ReviewedBundle } from './discover';
 import { curatedGate, mergeCurated } from './enrich';
-import { translationNames } from './i18nData';
+import { compoundLabels, translationNames } from './i18nData';
 
 // ------------------------------------------------------------------ the shapes
 
@@ -437,7 +437,7 @@ export interface CollectContext {
 }
 
 export function collectContext(bundle: ReviewedBundle, existing: ReadonlyMap<string, string> = new Map()): CollectContext {
-  const names = new Set<string>(translationNames(bundle));
+  const names = new Set<string>([...translationNames(bundle), ...compoundLabels(bundle)]);
   for (const r of bundle.rows) if (r.title) names.add(String(r.title));
   for (const m of MODELS) for (const f of m.forms) names.add(f);
   return { nameKeys: new Set([...names].map((n) => labelKey(n)).filter(Boolean)), nameForms: nameForms(names), existing };

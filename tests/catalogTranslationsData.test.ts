@@ -30,8 +30,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { loadReviewedBundle } from '../scripts/bambu-import/discover';
-import { checkTranslationsDir, indexOf, manifestProductIds, serializeIndex, TRANSLATIONS_DIR, translationNames } from '../scripts/bambu-import/i18nData';
-import { normalizeSource, serializeTranslationPart, sourceHash, type TranslationRow } from '../packages/catalog/src/bambuImport/i18n';
+import { checkTranslationsDir, IDENTITY, indexOf, manifestProductIds, serializeIndex, TRANSLATIONS_DIR, translationNames } from '../scripts/bambu-import/i18nData';
+import { collectContext, exclusionOf } from '../scripts/bambu-import/i18n-strings';
+import { normalizeSource, serializeTranslationPart, sourceHash, validateTranslationRow, type TranslationRow } from '../packages/catalog/src/bambuImport/i18n';
 import { newProductIdOf } from '../worker/lib/catalogImport/reviewed';
 
 const bundle = loadReviewedBundle(join(ROOT, 'data', 'bambu-import'));
@@ -49,6 +50,24 @@ test('the names and the product ids come from the reviewed files', () => {
   for (const m of bundle.matches.values()) if (m.levonis_product_id) assert.ok(ctx.productIds.has(String(m.levonis_product_id)), 'a merge\'s reviewed id');
   for (const n of ['Filament Buffer', 'X1 Series', 'P1 Series', 'AMS Hub', 'Bambu Lab']) assert.ok(ctx.names.has(n), n);
   assert.ok(!ctx.names.has('Brush'), 'a one-word title is an ordinary word');
+});
+
+test('a compound label protects the names inside it, not its joining word: «AMS 2 Pro وAMS HT» is a translation (landing review: «and» left in Arabic and Sorani)', () => {
+  // compat-targets.json: «AMS 2 Pro and AMS HT» is a compound of the atoms «AMS 2 Pro» and «AMS HT».
+  assert.ok(ctx.names.has('AMS 2 Pro') && ctx.names.has('AMS HT') && ctx.names.has('H2D') && ctx.names.has('H2C'), 'the atoms are names');
+  for (const k of ['AMS 2 Pro and AMS HT', 'H2D and H2C', 'P1 Series and X1 Series', 'X1 Series and P1 Series']) assert.ok(!ctx.names.has(k), `${k}: the joining word is not a name`);
+  assert.ok(!ctx.names.has('Ventilation'), 'a one-word atom that is no label is an ordinary word');
+  const fb = newProductIdOf(bundle.rows.find((r) => r.handle === 'filament-buffer')!.source_product_id);
+  const check = (en: string, ar: string, ckb: string) => validateTranslationRow({ h: sourceHash(en), en, ar, ckb, kind: 'faq_q', status: 'reviewed', products: [fb] }, { names: ctx.names, identity: IDENTITY });
+  const faq = '5. How many AMS 2 Pro and AMS HT units can the H2S support, and how many colors can it print?';
+  assert.equal(check(faq, '5. كم عدد وحدات AMS 2 Pro وAMS HT التي يمكن أن تدعمها طابعة H2S، وكم لونًا يمكنها أن تطبع؟', '5. چاپکەری H2S پشتگیری لە چەند یەکەی AMS 2 Pro و AMS HT دەکات، و دەتوانێت بە چەند ڕەنگ چاپ بکات؟').ok, true);
+  const wiki = 'Learn more about H2D and H2C Front Cover on Bambu Lab Wiki.';
+  assert.equal(check(wiki, 'تعرّف أكثر على الغطاء الأمامي لطابعتي H2D وH2C في ويكي Bambu Lab.', 'زیاتر دەربارەی قەپاغی پێشەوە بۆ H2D و H2C لە ویکی Bambu Lab بزانە.').ok, true);
+  // A name inside the compound is still kept verbatim.
+  assert.deepEqual(check(faq, '5. كم عدد وحدات AMS 2 برو وAMS HT التي يمكن أن تدعمها طابعة H2S، وكم لونًا يمكنها أن تطبع؟', '5. چاپکەری H2S پشتگیری لە چەند یەکەی AMS 2 Pro و AMS HT دەکات، و دەتوانێت بە چەند ڕەنگ چاپ بکات؟'), { ok: false, code: 'NAME_TRANSLATED' });
+  // The extraction is unchanged: a string that IS a compound label is a name, never offered.
+  const strings = collectContext(bundle);
+  for (const k of ['AMS 2 Pro and AMS HT', 'H2D and H2C', 'X1 Series Exclusive']) assert.equal(exclusionOf(k, 'spec_value_text', strings), 'name', k);
 });
 
 test('the check names every fault of a scratch copy', () => {
@@ -133,7 +152,8 @@ test('the schema of every committed row, re-proved without the validator: key, n
     });
   }
   // The committed memory (the reviewed translations of the imported text, 2026-10-17): every string of the
-  // extraction has its row — reviewed, kept English, or stored for review — save the four the validator refused.
-  assert.equal(rows, 8653);
-  assert.deepEqual(statuses, { reviewed: 8254, keep: 378, needs_review: 21 });
+  // extraction has its row — reviewed, kept English, or stored for review — save the three the validator refused
+  // (the landing review's name rule admits a fourth, «AMS 2 Pro وAMS HT», which the whole compound had refused).
+  assert.equal(rows, 8654);
+  assert.deepEqual(statuses, { reviewed: 8255, keep: 378, needs_review: 21 });
 });
