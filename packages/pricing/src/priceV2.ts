@@ -50,8 +50,11 @@
  * supplier cost R_r — so a costlier or cheaper batch moves the direct price and
  * the pre-order together, and the discount between them stays Δ. While the shelf
  * sells, a route whose own cost is at or above D is stopped (V2_ROUTE_SHELF_CHEAPER)
- * and a route with no supplier calculation is unavailable (V2_ROUTE_NO_SUPPLIER,
- * on that channel only). A SKU whose shelf is SOLD OUT goes back to the supplier
+ * — weighed before the discount, so a discount at or above the shelf's D is
+ * withdrawn (P = D, V2_DISCOUNT_WITHDRAWN), never V2_DISCOUNT_TOO_LARGE — and a
+ * route with no supplier calculation is unavailable (V2_ROUTE_NO_SUPPLIER, on
+ * that channel only). A SKU with NO direct sale sells nothing from the shelf:
+ * its shelf is ignored and its routes keep the supplier calculation (C-8). A SKU whose shelf is SOLD OUT goes back to the supplier
  * calculation; without one, every channel of it is unsold (V2_STOCK_SOLD_OUT) —
  * never priced from a guess.
  *
@@ -490,7 +493,9 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
   const anchorUsd = pick.anchor !== null && pick.anchor !== 'cost' ? parseV2Usd(pick.point.usd) : null;
 
   // Row 244: cost-first, the shelf prices the direct sale; a sold-out shelf goes back to the supplier.
-  const shelf = method === 'cost' ? shelfOf(s.shelf) : null;
+  // A SKU with no direct sale sells nothing from the shelf: its routes keep the supplier calculation
+  // (C-8: the pre-order price is its anchor; row 247 (a)).
+  const shelf = method === 'cost' && wanted.includes('direct_sale') ? shelfOf(s.shelf) : null;
   const onShelf = shelf?.state === 'on_shelf' ? shelf : null;
   // Cost inputs: required cost-first, optional price-first (owner warnings only).
   const resolved = method === 'cost' || s.chain ? resolveSkuInputs(s.chain ?? {}) : null;
@@ -641,34 +646,43 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
     // Row 247 (B1 on the shelf too): every route is priced from the D the SKU actually sells at — the
     // shelf's or the supplier's —, so P ≤ D by construction and D − P is Δ. Only the Q1 floors below
     // look at the route's own supplier cost.
-    const eP = sub(eD, mulProcurementExact(delta, u));
-    if (eP.num <= 0n) {
+    const eOff = sub(eD, mulProcurementExact(delta, u));
+    const rR = own.cost;
+    // Q1 (DECISIONS row 222): a route never sells AT its own replacement cost — not even the cost rounded up
+    // by the rule, which would publish it. The cost so rounded is the line: the route is blocked when even
+    // the direct price does not clear it, and its discount is withdrawn when the discounted price does not.
+    const rStep = method === 'cost' ? roundPriceIqd(rR!.exact) : null;
+    // On the shelf the discount was set against the supplier's figures and D is now the shelf's, so the route's
+    // own cost is weighed first (§10's three outcomes): a discount at or above the shelf's D is withdrawn, never
+    // an error that would stop the whole product (and its direct price) from being written.
+    if (onShelf && rStep !== null && rStep >= D) {
+      fail(channel, [{ code: 'V2_ROUTE_SHELF_CHEAPER', profile: ROUTE_PROFILE[route] }]);
+      continue;
+    }
+    if (eOff.num <= 0n && !onShelf) {
       fail(channel, [deltaFrom ? problem('V2_DISCOUNT_TOO_LARGE', deltaFrom.scope, deltaFrom.scope_id) : { code: 'V2_DISCOUNT_TOO_LARGE' }]);
       continue;
     }
+    // On the shelf a discount that leaves nothing is held at one dinar: below any route cost, so Q1 withdraws it.
+    const eP = eOff.num > 0n ? eOff : procurementExact(1);
     let price = roundPriceIqd(eP);
     let exact = eP;
     let floor: V2Floor = directFloor;
-    const rR = own.cost;
     if (method === 'cost') {
       const rExact = rR!.exact;
-      // Q1 (DECISIONS row 222): a route never sells AT its own replacement cost — not even the cost rounded up
-      // by the rule, which would publish it. The cost so rounded is the line: the route is blocked when even
-      // the direct price does not clear it, and its discount is withdrawn when the discounted price does not.
-      const rStep = roundPriceIqd(rExact);
-      if (rStep >= D) {
-        // Row 244: on the shelf, the shelf sells below this route's cost — stopped while it does.
-        fail(channel, [{ code: onShelf ? 'V2_ROUTE_SHELF_CHEAPER' : 'V2_ROUTE_BELOW_COST', profile: ROUTE_PROFILE[route] }]);
+      if (rStep! >= D) {
+        // Off the shelf (on it, stopped above): even the direct price does not clear this route's cost.
+        fail(channel, [{ code: 'V2_ROUTE_BELOW_COST', profile: ROUTE_PROFILE[route] }]);
         continue;
       }
-      if (price <= rStep) {
+      if (price <= rStep!) {
         // Q1: the direct price, no discount on this route — never lifted to the cost.
         price = D;
         exact = eD;
         floor = 'discount_withdrawn';
         warn({ code: 'V2_DISCOUNT_WITHDRAWN', profile: ROUTE_PROFILE[route] }, channel);
       }
-      invariant(price > rStep && cmp(procurementExact(price), rExact) > 0, 'a cost-first route always sells above its own cost');
+      invariant(price > rStep! && cmp(procurementExact(price), rExact) > 0, 'a cost-first route always sells above its own cost');
     }
     const below = method === 'usd' && rR !== null && cmp(eP, rR.exact) < 0;
     if (below) warn({ code: 'V2_BELOW_COST', profile: ROUTE_PROFILE[route] }, channel);

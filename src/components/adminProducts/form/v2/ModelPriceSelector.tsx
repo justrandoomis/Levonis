@@ -72,8 +72,10 @@ function ModelBoxInputs({ fid, model, stored, onBox }: { fid: string; model: str
   const s = useV2Strings();
   const [axes, setAxes] = useState<Array<number | null>>(() => [...(stored ?? [null, null, null])]);
   const key = stored ? stored.join(',') : '';
+  // The box changed from outside (the option's dimensions, or emptied): the three axes follow it — an emptied box
+  // empties them, so a stale axis is never written back. A partly typed box never changes `stored` (onBox waits).
   useEffect(() => {
-    if (stored) setAxes([...stored]);
+    setAxes(stored ? [...stored] : [null, null, null]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   const setAxis = (i: 0 | 1 | 2, v: number | null) => {
@@ -99,6 +101,8 @@ const cmBoxText = (box: [number, number, number] | null) => (box ? box.map((mm) 
 export interface ModelMeasure {
   dims: ProductDimensionsV2 | null;
   onDims: (dimensions: ProductDimensionsV2) => void;
+  /** The heading of that dimensions block as the form shows it (`optionDimsHeading`): the hints quote it. */
+  heading: string;
 }
 
 export default function ModelPriceSelector({ id, isModel, line, measure }: { id: string; isModel: boolean; line: SkuLine | null; measure: ModelMeasure }) {
@@ -151,8 +155,14 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
           ))}
         </ul>
       ) : null}
-      {/* The card's own state: its figures may be the last answer while the next one is computed, or failed. */}
-      <p className="text-[10px] text-text-muted" aria-live="polite" data-v2-model-status={id}>
+      {owner && v2.measurePending.has(id) && m.price === 'own_cost' ? (
+        <p className="text-[11px] text-amber-300" dir="auto" data-v2-model-measure-pending={id}>
+          {s.measurePending(measure.heading)}
+        </p>
+      ) : null}
+      {/* The card's own state: its figures may be the last answer while the next one is computed, or failed. Not a
+          live region: section ٣'s status line announces the preview once, not once per card. */}
+      <p className="text-[10px] text-text-muted" data-v2-model-status={id}>
         {v2.previewing ? s.computing : v2.error ? s.previewFailed(v2.error) : ''}
       </p>
     </div>
@@ -177,6 +187,11 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
   const price = modes.some((x) => x.value === m.price) ? m.price : 'follow';
 
   const productDiscount = d.discount_usd ? usdText(d.discount_usd) : s.discountNone;
+  // The stored rule as it is (the stored draft's, so switching away and back finds it again).
+  const storedModel = v2.storedDraft?.models[id];
+  const keptProfit = storedModel?.profit === 'kept' ? (storedModel.profit_iqd !== null ? s.profitKeptIqd(iqdText(storedModel.profit_iqd)) : s.profitBlocked) : null;
+  // A follow / difference model whose option has its own package: those dimensions do not price it (row 247 (و)).
+  const dimsUnused = owner && d.method === 'cost' && m.price !== 'own_cost' && (optionPackageWeight(measure.dims) !== null || optionPackageBox(measure.dims) !== null);
   // «تكلفة مختلفة»: the product's values every empty field inherits, shown in grey (§2.1 rule 2).
   const productCost = d.cost.supplier_amount ? `${d.cost.supplier_amount} ${d.cost.supplier_currency || ''}`.trim() : null;
   const inheritedT = v2.inheritedMinimumProfit;
@@ -191,8 +206,10 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
   const dims = measure.dims ?? emptyDimensions();
   const ownWeight = optionPackageWeight(measure.dims);
   const ownBox = optionPackageBox(measure.dims);
-  const weightHint = ownWeight !== null ? s.optionMeasureFrom : m.weight_g !== null ? s.savedPricingOnly : s.inheritsProductMeasure(kgText(d.cost.weight_g) ?? '—');
-  const boxHint = ownBox !== null ? s.optionMeasureFrom : m.box !== null ? s.savedPricingOnly : s.inheritsProductMeasure(cmBoxText(d.cost.box) ?? '—');
+  const weightHint = ownWeight !== null ? s.optionMeasureFrom(measure.heading) : m.weight_g !== null ? s.savedPricingOnly(measure.heading) : s.inheritsProductMeasure(kgText(d.cost.weight_g) ?? '—');
+  const boxHint = ownBox !== null ? s.optionMeasureFrom(measure.heading) : m.box !== null ? s.savedPricingOnly(measure.heading) : s.inheritsProductMeasure(cmBoxText(d.cost.box) ?? '—');
+  // An amount typed with no currency to price it in (the product has none to follow): said at the field.
+  const currencyMissing = !m.supplier_currency && !d.cost.supplier_currency && m.supplier_amount.trim() !== '';
   // Emptied here, the field inherits: the option's own value goes, and so does a value saved in pricing only.
   const onWeight = (package_weight_g: number | null) => {
     measure.onDims({ ...dims, package_weight_g });
@@ -225,7 +242,7 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
         ) : null}
       </div>
       {price === 'own_cost' ? (
-        <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)_6rem_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
           <V2Field label={s.supplier} hint={productCost ? s.inheritedProduct(productCost) : undefined}>
             {(fid) => (
               <TextInput
@@ -238,11 +255,12 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
               />
             )}
           </V2Field>
-          <V2Field label={s.supplierCurrency}>
+          <V2Field label={s.supplierCurrency} hint={currencyMissing ? s.currencyRequired : undefined}>
             {(fid) => (
               <Select id={fid} value={m.supplier_currency} onChange={(e) => set({ supplier_currency: e.target.value as SupplierCurrency | '' })} data-v2-field={`model-currency:${id}`}>
-                {/* Empty: the product's currency, which the request then names (an amount never travels without one). */}
-                <option value="">{`${s.followsProduct}: ${d.cost.supplier_currency || '—'}`}</option>
+                {/* Empty: the product's currency, which the request then names (an amount never travels without one);
+                    a product with none offers no «يتبع المنتج» — the owner chooses. */}
+                <option value="">{d.cost.supplier_currency ? `${s.followsProduct}: ${d.cost.supplier_currency}` : s.currencyChoose}</option>
                 {SUPPLIER_CURRENCIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -264,11 +282,18 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
           </div>
           {/* Row 247: the model's own minimum profit — the product's by default, shown beside it. */}
           <div className="[grid-column:1/-1] grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
-            <V2Field label={s.minProfit}>
+            <V2Field label={s.minProfitFrom}>
               {(fid) => (
-                <Select id={fid} value={m.profit} onChange={(e) => set({ profit: e.target.value === 'exception' ? 'exception' : 'follow' })} data-v2-field={`model-profit:${id}`}>
+                <Select
+                  id={fid}
+                  value={m.profit}
+                  onChange={(e) => set({ profit: e.target.value === 'exception' ? 'exception' : e.target.value === 'kept' ? 'kept' : 'follow' })}
+                  data-v2-field={`model-profit:${id}`}
+                >
                   <option value="follow">{`${s.followsProduct}: ${productT}`}</option>
                   <option value="exception">{s.exception}</option>
+                  {/* A stored rule this dollar field cannot draw (dinars, or blocked) — shown, never «يتبع المنتج». */}
+                  {keptProfit ? <option value="kept">{keptProfit}</option> : null}
                 </Select>
               )}
             </V2Field>
@@ -281,6 +306,11 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
             ) : null}
           </div>
         </div>
+      ) : null}
+      {dimsUnused && isModel ? (
+        <p className="text-[11px] text-text-muted" dir="auto" data-v2-model-dims-unused={id}>
+          {s.optionDimsNotPricing(measure.heading)}
+        </p>
       ) : null}
       {isModel ? (
         <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">

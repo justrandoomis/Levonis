@@ -206,7 +206,7 @@ export interface V2Answer {
   v2_discounts?: WireDiscount[];
   v2_cost_inputs?: {
     inputs: V2CostInputRow[];
-    minimum_profit: Array<{ scope: string; scope_id: string | null; state: string | null; amount_usd: string | null }>;
+    minimum_profit: Array<{ scope: string; scope_id: string | null; state: string | null; amount_usd: string | null; amount_iqd?: number | null }>;
     /** §2.1 rule 2: what the product's minimum profit inherits (a category or the store-wide rule), or null. */
     inherited_minimum_profit?: { amount_usd: string | null; amount_iqd: number | null } | null;
     /** D1: a needs-pricing product's prefill carries this pending purchase review; its first complete write applies it. */
@@ -283,9 +283,14 @@ export interface ModelDraft {
   weight_g: number | null;
   /** L × W × H in mm — one unit (a model shipped by sea is priced per CBM). */
   box: [number, number, number] | null;
-  /** «تكلفة مختلفة» only (DECISIONS row 247): the model's own minimum profit, or the product's. */
-  profit: 'follow' | 'exception';
+  /**
+   * «تكلفة مختلفة» only (DECISIONS row 247): the model's own minimum profit, or the product's. `kept`: a stored
+   * option rule this field cannot draw in dollars — ACTIVE in dinars (`profit_iqd`) or BLOCKED (`profit_iqd`
+   * null). It is shown as it is, and stays untouched until the owner picks another choice.
+   */
+  profit: 'follow' | 'exception' | 'kept';
   profit_usd: string;
+  profit_iqd: number | null;
 }
 export interface ColourDraft {
   price: 'follow' | 'delta';
@@ -327,6 +332,7 @@ export const FOLLOW_MODEL: ModelDraft = {
   box: null,
   profit: 'follow',
   profit_usd: '',
+  profit_iqd: null,
 };
 export const FOLLOW_COLOUR: ColourDraft = { price: 'follow', usd: '' };
 export const NO_SKU: SkuDraft = { fixed_usd: '', discount_usd: '' };
@@ -359,9 +365,13 @@ export function draftOf(answer: V2Answer | null, fallbackMethod: V2Method = 'cos
     });
   }
   // Row 247: a model's own minimum profit is an «تكلفة مختلفة» choice (a point below still decides the price mode).
+  // A rule the dollar field cannot draw (dinars, or BLOCKED) still decides the model's T: shown as kept, never
+  // as «يتبع المنتج».
   for (const r of answer?.v2_cost_inputs?.minimum_profit ?? []) {
-    if (r.scope !== 'option' || !r.scope_id || r.state !== 'ACTIVE' || !r.amount_usd) continue;
-    Object.assign(model(r.scope_id), { price: 'own_cost', profit: 'exception', profit_usd: r.amount_usd });
+    if (r.scope !== 'option' || !r.scope_id) continue;
+    if (r.state === 'ACTIVE' && r.amount_usd) Object.assign(model(r.scope_id), { price: 'own_cost', profit: 'exception', profit_usd: r.amount_usd });
+    else if (r.state === 'ACTIVE' && typeof r.amount_iqd === 'number') Object.assign(model(r.scope_id), { price: 'own_cost', profit: 'kept', profit_iqd: r.amount_iqd });
+    else if (r.state === 'BLOCKED') Object.assign(model(r.scope_id), { price: 'own_cost', profit: 'kept', profit_iqd: null });
   }
   for (const p of points) if (p.scope === 'option') Object.assign(model(p.id), { price: p.kind, usd: p.usd });
   for (const d of discounts) if (d.scope === 'option') Object.assign(model(d.id), { discount: 'exception', discount_usd: d.usd });
@@ -422,24 +432,53 @@ export function optionPackageBox(dims: ProductDimensionsV2 | null | undefined): 
  * «تكلفة مختلفة»'s weight and box ARE the option's packaged dimensions («أبعاد الخيار», DECISIONS row 247):
  * one source. For each own-cost model whose option has its own package weight, that weight replaces the
  * draft's; whose option has its own full box, that box replaces the draft's — so the pricing row
- * (`pricing_inputs`, scope option) is a mirror the save writes in the same batch as the dimensions. An
- * option that inherits its package leaves the model's measure as it is: null (the engine inherits the
- * product's pricing measure), or a legacy value stored in pricing only — never cleared silently. Net
- * weight is never used. The same object comes back when nothing changes.
+ * (`pricing_inputs`, scope option) is a mirror the save writes in the same batch as the dimensions.
+ *
+ * An option that has no package of its own: a stored pricing value equal to the option's SAVED package
+ * (`saved`, the form's baseline) is that mirror, and it follows the dimensions — cleared with them (the save
+ * clears the pricing row, so «مسح التخصيص» reaches pricing). Any other stored value (one saved in pricing
+ * only, never the option's) stays as it is — never cleared silently. Net weight is never used. The same
+ * object comes back when nothing changes.
  */
-export function withOptionMeasure(models: Record<string, ModelDraft>, optionPackages: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>): Record<string, ModelDraft> {
+export function withOptionMeasure(
+  models: Record<string, ModelDraft>,
+  optionPackages: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>,
+  saved: Readonly<Record<string, ProductDimensionsV2 | null | undefined>> = {}
+): Record<string, ModelDraft> {
   let out: Record<string, ModelDraft> | null = null;
   for (const [id, m] of Object.entries(models)) {
     if (m.price !== 'own_cost') continue;
-    const weight = optionPackageWeight(optionPackages[id]) ?? m.weight_g;
-    const own = optionPackageBox(optionPackages[id]);
-    const box = own && !same(own, m.box) ? own : m.box;
+    const nowWeight = optionPackageWeight(optionPackages[id]);
+    const wasWeight = optionPackageWeight(saved[id]);
+    const weight = nowWeight ?? (wasWeight !== null && m.weight_g === wasWeight ? null : m.weight_g);
+    const nowBox = optionPackageBox(optionPackages[id]);
+    const wasBox = optionPackageBox(saved[id]);
+    const box = nowBox ? (same(nowBox, m.box) ? m.box : nowBox) : wasBox && same(wasBox, m.box) ? null : m.box;
     if (weight === m.weight_g && box === m.box) continue;
     out ??= { ...models };
     out[id] = { ...m, weight_g: weight, box };
   }
   return out ?? models;
 }
+
+/**
+ * The own-cost models whose measure on screen (the option's dimensions, `withOptionMeasure`) is not what the
+ * pricing row stores (`base`, the stored draft before the fill): the preview prices them on it, and only a save
+ * writes it — so the form counts them as unsaved (row 247).
+ */
+export function measurePendingOf(base: PriceDraft | null, shown: PriceDraft | null): Set<string> {
+  const out = new Set<string>();
+  if (!base || !shown || shown.method !== 'cost') return out;
+  for (const [id, m] of Object.entries(shown.models)) {
+    if (m.price !== 'own_cost') continue;
+    const b = base.models[id] ?? FOLLOW_MODEL;
+    if (m.weight_g !== b.weight_g || !same(m.box, b.box)) out.add(id);
+  }
+  return out;
+}
+
+/** The heading of an option's dimensions block as the form shows it (OptionsSection): hints quote it exactly. */
+export const optionDimsHeading = (nameEn: string | null | undefined): string => `أبعاد ${nameEn || 'الخيار'} / Option dimensions`;
 
 /** The ids each scope may name on the product as the form holds it (the server's `scopeIdsOf`). */
 export interface V2LiveIds {
@@ -555,9 +594,11 @@ export const modelCostFields = (m: ModelDraft | undefined, productCurrency: Supp
       }
     : { supplier_cost_amount: null, shipping_weight_g: null, shipping_length_mm: null, shipping_width_mm: null, shipping_height_mm: null };
 
+/** A stored option rule the form keeps as it is (`profit: 'kept'`): never sent, compared only. */
+const PROFIT_KEPT = 'kept';
 /** A model's own minimum profit as the request states it (row 247): its exception, from «تكلفة مختلفة» only; else null. */
 export const modelProfitRule = (m: ModelDraft | undefined): string | null =>
-  m && m.price === 'own_cost' && m.profit === 'exception' ? cleanUsd(m.profit_usd) : null;
+  m && m.price === 'own_cost' ? (m.profit === 'exception' ? cleanUsd(m.profit_usd) : m.profit === 'kept' ? PROFIT_KEPT : null) : null;
 
 /**
  * The request block: what differs from the stored draft (`base`), the stored
@@ -630,7 +671,7 @@ export function draftWire(
     const entry = costEntry('option', id, now, modelCostFields(base.models[id], base.cost.supplier_currency));
     if (entry) inputs.push(entry);
     const profit = modelProfitRule(mine);
-    if (profit !== modelProfitRule(base.models[id])) profitRows.push({ kind: 'target_profit', scope: 'option', scope_id: id, amount_usd: profit ?? '' });
+    if (profit !== PROFIT_KEPT && profit !== modelProfitRule(base.models[id])) profitRows.push({ kind: 'target_profit', scope: 'option', scope_id: id, amount_usd: profit ?? '' });
   }
   const minimum = draft.min_profit_usd !== base.min_profit_usd;
   if (inputs.length || minimum || profitRows.length) {

@@ -105,6 +105,22 @@ test('v2AutoHoldCode: unattended runs hold a large change; an owner rate act (pr
   assert.equal(v2AutoHoldCode({ inputs_seq: 5, priced_inputs_seq: null }, small, 'fx'), 'PRICING_V2_UNREVIEWED');
 });
 
+test('v2AutoHoldCode on the shelf (STOCK): a direct rise is never held — whatever the pre-order does; without one, a large move either way waits', () => {
+  const state = { inputs_seq: 4, priced_inputs_seq: 4 };
+  const r = (channel: string, old_iqd: number, new_iqd: number, large: boolean) => ({ channel, old_iqd, new_iqd, large }) as never;
+  const ev = (...rows: never[]) => ({ large_change: rows.some((x) => (x as { large: boolean }).large), drop_flag: false, rows });
+  // Row 244 with row 247: D rises (a costlier batch) and the land pre-order FALLS > 15% (its withdrawn discount returns).
+  assert.equal(v2AutoHoldCode(state, ev(r('direct_sale', 820_000, 890_000, false), r('pre_order_land', 820_000, 695_000, true)), 'sweep', ['STOCK']), null);
+  // D rises and the land pre-order rises > 15% with it: published (holding D would sell shelf units below cost + T).
+  assert.equal(v2AutoHoldCode(state, ev(r('direct_sale', 906_000, 936_000, false), r('pre_order_land', 732_000, 883_500, true)), 'sweep', ['STOCK']), null);
+  // D does not rise and a pre-order rises > 15% (row 247's one-time move off the supplier anchor): held for the owner.
+  assert.equal(v2AutoHoldCode(state, ev(r('direct_sale', 906_000, 905_500, false), r('pre_order_land', 732_000, 853_000, true)), 'sweep', ['STOCK']), 'PRICING_V2_LARGE_CHANGE');
+  // A large fall of D: held, as before (the higher price meanwhile is safe).
+  assert.equal(v2AutoHoldCode(state, ev(r('direct_sale', 760_000, 560_500, true)), 'sweep', ['STOCK']), 'PRICING_V2_LARGE_CHANGE');
+  // Small moves pass.
+  assert.equal(v2AutoHoldCode(state, ev(r('direct_sale', 906_000, 905_500, false), r('pre_order_land', 853_500, 853_000, false)), 'sweep', ['STOCK']), null);
+});
+
 test('FX-5 (the FX fetch) holds a V2 product whose new price moves more than 15%', async () => {
   const w = pricingWorld();
   await writeV2(w.db, AMS, { method: 'usd', points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd: '1000' }], discounts: [] });

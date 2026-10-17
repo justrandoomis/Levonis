@@ -53,7 +53,7 @@ import StatusChipV2 from './form/v2/StatusChipV2';
 import ReviewSheetV2 from './form/v2/ReviewSheetV2';
 import ModelPriceSelector from './form/v2/ModelPriceSelector';
 import ColourPriceSelector, { ColourBulkBar } from './form/v2/ColourPriceSelector';
-import { comboKeyOf, docWithoutLegacyMoney, iqdText, isContentOnlySave, lineWithOption, lowestPrice, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
+import { comboKeyOf, docWithoutLegacyMoney, iqdText, isContentOnlySave, lineWithOption, lowestPrice, optionDimsHeading, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
 import { headerStatusText, v2Strings } from './form/v2/v2Strings';
 import { emptyDimensions } from '../../lib/productTypes';
 import type { BrandV2, CatalogV2, ProductDimensionsV2 } from '../../lib/productTypes';
@@ -683,6 +683,19 @@ export default function ProductForm({
     () => Object.fromEntries((JSON.parse(optionPackagesKey) as Array<[string, ProductDimensionsV2 | null]>).map(([id, d]) => [id, d])),
     [optionPackagesKey]
   );
+  // The same as last saved (the baseline): a pricing value equal to it is a mirror that follows the dimensions.
+  const savedOptionPackagesKey = useMemo(() => {
+    try {
+      const b = baseline ? (JSON.parse(baseline) as { rs: RelationsState }) : null;
+      return JSON.stringify((b?.rs.groups[0]?.values ?? []).map((v) => [v.id, v.dimensions ?? null]));
+    } catch {
+      return '[]';
+    }
+  }, [baseline]);
+  const savedOptionPackages = useMemo(
+    () => Object.fromEntries((JSON.parse(savedOptionPackagesKey) as Array<[string, ProductDimensionsV2 | null]>).map(([id, d]) => [id, d])),
+    [savedOptionPackagesKey]
+  );
   const v2 = useV2Pricing({
     // Every product this form edits is priced by V2 (a bundle never opens here: its editor is the bundles panel).
     enabled: true,
@@ -695,6 +708,7 @@ export default function ProductForm({
     live,
     packageDims: doc.dimensions ?? null,
     optionPackages,
+    savedOptionPackages,
   });
   const modelNames = useCallback(
     (id: string) => {
@@ -1816,7 +1830,7 @@ export default function ProductForm({
                       id={v.id}
                       isModel={isModel}
                       line={lineWithOption(v2.answer?.table ?? [], v.id, v2.draft?.colours)}
-                      measure={{ dims: v.dimensions ?? null, onDims }}
+                      measure={{ dims: v.dimensions ?? null, onDims, heading: optionDimsHeading(v.name_en) }}
                     />
                   ),
                   colour: (c) => <ColourPriceSelector id={c.id} table={v2.answer?.table ?? []} />,

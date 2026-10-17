@@ -48,15 +48,26 @@ test('the own-cost weight and box ARE the option dimensions: written through mea
   assert.match(m, /package_depth_mm: box\?\.\[0\] \?\? null, package_width_mm: box\?\.\[1\] \?\? null, package_height_mm: box\?\.\[2\] \?\? null/);
   assert.doesNotMatch(m, /set\(\{ weight_g \}\)/);
   assert.doesNotMatch(m, /set\(\{ box \}\)/);
-  for (const hint of ['s.optionMeasureFrom', 's.savedPricingOnly', 's.inheritsProductMeasure(']) assert.ok(m.includes(hint), hint);
-  // The currency «يتبع المنتج: EUR», and the product's supplier price in grey.
-  assert.match(m, /<option value="">\{`\$\{s\.followsProduct\}: \$\{d\.cost\.supplier_currency \|\| '—'\}`\}<\/option>/);
+  // The hints quote the dimensions heading as the form shows it (a Sorani reader finds the block).
+  for (const hint of ['s.optionMeasureFrom(measure.heading)', 's.savedPricingOnly(measure.heading)', 's.inheritsProductMeasure(']) assert.ok(m.includes(hint), hint);
+  // The currency «يتبع المنتج: EUR» — or «اختر العملة» when the product has none (never «يتبع المنتج: —»), said at the field.
+  assert.match(m, /<option value="">\{d\.cost\.supplier_currency \? `\$\{s\.followsProduct\}: \$\{d\.cost\.supplier_currency\}` : s\.currencyChoose\}<\/option>/);
+  assert.match(m, /hint=\{currencyMissing \? s\.currencyRequired : undefined\}/);
+  // The currency has room: no fixed 6rem column.
+  assert.ok(!m.includes('_6rem_'));
+  // An emptied box empties the three axes (no stale axis written back).
+  assert.match(m, /setAxes\(stored \? \[\.\.\.stored\] : \[null, null, null\]\)/);
   assert.match(m, /s\.inheritedProduct\(productCost\)/);
   // The option's «أبعاد الخيار» patcher reaches the card, and the form mirrors the dimensions into the pricing draft.
   assert.match(src('src/components/adminProducts/form/OptionsSection.tsx'), /pricingV2\?\.model\(v, groupIndex === 0, \(dimensions\) => patchValue\(g\.id, v\.id, \{ dimensions \}\)\)/);
-  assert.match(src('src/components/adminProducts/ProductForm.tsx'), /measure=\{\{ dims: v\.dimensions \?\? null, onDims \}\}/);
-  assert.match(src('src/components/adminProducts/ProductForm.tsx'), /optionPackages,/);
-  assert.match(src('src/components/adminProducts/form/v2/useV2Pricing.ts'), /models: withOptionMeasure\(d\.models, optionPackages\)/);
+  assert.match(src('src/components/adminProducts/ProductForm.tsx'), /measure=\{\{ dims: v\.dimensions \?\? null, onDims, heading: optionDimsHeading\(v\.name_en\) \}\}/);
+  assert.match(src('src/components/adminProducts/ProductForm.tsx'), /optionPackages,\n\s+savedOptionPackages,/);
+  assert.match(src('src/components/adminProducts/form/OptionsSection.tsx'), /label=\{optionDimsHeading\(v\.name_en\)\}/);
+  // The saved dimensions tell the mirror from a pricing-only value; a mirror not yet saved counts as unsaved.
+  const hook = src('src/components/adminProducts/form/v2/useV2Pricing.ts');
+  assert.match(hook, /models: withOptionMeasure\(d\.models, optionPackages, savedOptionPackages\)/);
+  assert.match(hook, /touched: typed \|\| measurePending\.size > 0/);
+  assert.match(m, /v2\.measurePending\.has\(id\)/);
 });
 
 test('the model card shows the discount taken, the shelf, the owner’s reasons and its own preview state', () => {
@@ -70,7 +81,8 @@ test('the model card shows the discount taken, the shelf, the owner’s reasons 
   assert.match(m, /s\.sourceStock\(/);
   assert.match(m, /shelf && m\.price === 'own_cost' \?/);
   assert.match(m, /s\.shelfOwnCostNote/);
-  assert.match(m, /aria-live="polite"/);
+  // One live region (section ٣'s), not one per model card.
+  assert.doesNotMatch(m, /aria-live/);
   assert.match(m, /v2\.previewing \? s\.computing : v2\.error \? s\.previewFailed\(v2\.error\) : ''/);
   // The result bar uses the one helper, unchanged in what it says.
   const bar = v2('ResultBar');

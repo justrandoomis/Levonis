@@ -63,6 +63,7 @@ import {
 } from './model';
 import { emptyDimensions, type ProductDimensionsV2 } from '../../../lib/productTypes';
 import { DimensionsSection } from './DimensionsSection';
+import { optionDimsHeading } from './v2/v2Model';
 
 /**
  * The dollar price selectors the form mounts in section ٥ (Pricing V2, spec
@@ -548,7 +549,7 @@ export function OptionsSection({
                     dimensions={v.dimensions ?? emptyDimensions()}
                     inherited={baseDimensions}
                     collapsible
-                    label={`أبعاد ${v.name_en || 'الخيار'} / Option dimensions`}
+                    label={optionDimsHeading(v.name_en)}
                     onChange={(dimensions) => patchValue(g.id, v.id, { dimensions })}
                   />
                 </div>

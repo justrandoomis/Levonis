@@ -176,12 +176,26 @@ export interface V2Strings {
   routeNoSupplierNote: string;
   routeShelfCheaperNote: string;
   stockSoldOutNote: string;
-  /** DECISIONS row 247 — «تكلفة مختلفة»: the weight and the box ARE the option's packaged dimensions (one source). */
-  optionMeasureFrom: string;
+  /** DECISIONS row 247 — «تكلفة مختلفة»: the weight and the box ARE the option's packaged dimensions (one source), quoting their heading. */
+  optionMeasureFrom: Fill;
   /** An own-cost model whose option inherits its package: the product's pricing measure it falls back to. */
   inheritsProductMeasure: Fill;
   /** A legacy own-cost measure stored in pricing only (the option's dimensions empty): kept, never cleared silently. */
-  savedPricingOnly: string;
+  savedPricingOnly: Fill;
+  /** The option's measure the preview prices on, not in the pricing row yet: written by the next save (quotes the heading). */
+  measurePending: Fill;
+  /** A follow / difference model whose option has its own package: those dimensions do not price it (quotes the heading). */
+  optionDimsNotPricing: Fill;
+  /** The label of the model's minimum-profit choice (the amount beside it keeps «الحد الأدنى للربح ($)»). */
+  minProfitFrom: string;
+  /** A stored model minimum profit in dinars (legacy), kept as it is. */
+  profitKeptIqd: Fill;
+  /** A stored model minimum profit that is BLOCKED: it stops the model's pricing. */
+  profitBlocked: string;
+  /** The model's currency when the product has none to follow. */
+  currencyChoose: string;
+  /** An amount typed with no currency to price it in. */
+  currencyRequired: string;
   /** The pre-order's discount beside its price on a model or colour card (the owner's): «بعد خصم $35.00». */
   preorderAfterOff: Fill;
   /** «تكلفة مختلفة» on a model with stock: the shelf prices the direct sale; this cost prices it once the shelf is empty. */
@@ -336,9 +350,16 @@ const AR: V2Strings = {
   stockSoldOut: 'يحتاج تسعيرًا: نفد المخزون',
   routeNoSupplierNote: 'الطلب المسبق غير متاح لهذا الموديل حتى يُدخَل سعر المورّد؛ البيع المباشر من المخزون.',
   stockSoldOutNote: 'نفد مخزون هذا الموديل ولا يوجد سعر مورّد — لا يُباع حتى تُسعّره.',
-  optionMeasureFrom: 'الوزن والصندوق من «أبعاد الخيار» (الوزن مع الصندوق) — تعديلهما هنا يعدّل تلك الأبعاد',
+  optionMeasureFrom: (h) => `الوزن والصندوق من «${h}» (الوزن مع الصندوق) — تعديلهما هنا يعدّل تلك الأبعاد`,
   inheritsProductMeasure: (v) => `يرث من المنتج: ${v}`,
-  savedPricingOnly: 'محفوظ في التسعير فقط — اكتبه في أبعاد الخيار',
+  savedPricingOnly: (h) => `محفوظ في التسعير فقط — اكتبه في «${h}»`,
+  measurePending: (h) => `السعر المعروض محسوب بوزن «${h}» وصندوقها — يُحفظ في التسعير مع الحفظ التالي`,
+  optionDimsNotPricing: (h) => `«${h}» لا تدخل في تسعير هذا الموديل: يُسعَّر بوزن المنتج وصندوقه ما لم تختر «تكلفة مختلفة»`,
+  minProfitFrom: 'مصدر الحد الأدنى للربح',
+  profitKeptIqd: (v) => `استثناء محفوظ: ${v} د.ع`,
+  profitBlocked: 'محجوز — يوقف تسعير هذا الموديل',
+  currencyChoose: 'اختر العملة',
+  currencyRequired: 'اختر عملة سعر المورّد — لا عملة للمنتج يتبعها، ولا يُحسب السعر بدونها',
   preorderAfterOff: (usd) => `بعد خصم ${usd}`,
   shelfOwnCostNote: 'ما دام للموديل قطع على الرف فسعر البيع المباشر من المخزون؛ تكلفة المورّد هنا تُسعّره حين ينفد الرف، وتحدّد هل يغطي الطلب المسبق بعد الخصم تكلفته',
 };
@@ -490,9 +511,16 @@ const EN: V2Strings = {
   stockSoldOut: 'Needs pricing: sold out',
   routeNoSupplierNote: 'Pre-order is unavailable for this model until a supplier price is entered; the direct sale is priced from stock.',
   stockSoldOutNote: 'This model is sold out and has no supplier price — it is not sold until you price it.',
-  optionMeasureFrom: "Weight and box are the option's packaged dimensions («Option dimensions») — editing them here edits those",
+  optionMeasureFrom: (h) => `Weight and box come from «${h}» (packaged) — editing them here edits those`,
   inheritsProductMeasure: (v) => `Inherits the product: ${v}`,
-  savedPricingOnly: "Saved in pricing only — enter it in the option's dimensions",
+  savedPricingOnly: (h) => `Saved in pricing only — enter it in «${h}»`,
+  measurePending: (h) => `The price shown uses the weight and box of «${h}» — written to pricing by the next save`,
+  optionDimsNotPricing: (h) => `«${h}» do not price this model: it is priced on the product's weight and box unless you choose «Different cost»`,
+  minProfitFrom: 'Minimum profit from',
+  profitKeptIqd: (v) => `Saved exception: ${v} IQD`,
+  profitBlocked: "Blocked — stops this model's pricing",
+  currencyChoose: 'Choose a currency',
+  currencyRequired: 'Choose the supplier currency — the product has none to follow, and no price is computed without one',
   preorderAfterOff: (usd) => `after ${usd} off`,
   shelfOwnCostNote:
     'While this model has units on the shelf its direct price comes from stock; this supplier cost prices it once the shelf is empty, and decides whether the discounted pre-order clears its cost',
@@ -645,9 +673,16 @@ const CKB: V2Strings = {
   stockSoldOut: 'پێویستی بە نرخدانانە: کۆگا نەماوە',
   routeNoSupplierNote: 'تا نرخی دابینکەر نەنووسرێت پێشداواکردن بۆ ئەم مۆدێلە بەردەست نییە؛ فرۆشتنی ڕاستەوخۆ لە کۆگاوە نرخی بۆ دادەنرێت.',
   stockSoldOutNote: 'کۆگای ئەم مۆدێلە نەماوە و نرخی دابینکەری نییە — تا نرخی بۆ دانەنێیت نافرۆشرێت.',
-  optionMeasureFrom: 'کێش و سندوق ڕەهەندە پاکێجکراوەکانی هەڵبژاردەکەن («ڕەهەندەکانی هەڵبژاردە») — گۆڕینیان لێرە ئەوانیش دەگۆڕێت',
+  optionMeasureFrom: (h) => `کێش و سندوق لە «${h}»ەوە دێن (پاکێجکراو) — گۆڕینیان لێرە ئەوانیش دەگۆڕێت`,
   inheritsProductMeasure: (v) => `لە بەرهەمەکەوە وەردەگیرێت: ${v}`,
-  savedPricingOnly: 'تەنها لە نرخداناندا پاشەکەوت کراوە — لە ڕەهەندەکانی هەڵبژاردەدا بینووسە',
+  savedPricingOnly: (h) => `تەنها لە نرخداناندا پاشەکەوت کراوە — لە «${h}»دا بینووسە`,
+  measurePending: (h) => `نرخی پیشاندراو بە کێش و سندوقی «${h}» هەژمار کراوە — لە پاشەکەوتکردنی داهاتوودا لە نرخداناندا پاشەکەوت دەکرێت`,
+  optionDimsNotPricing: (h) => `«${h}» بەشداری لە نرخدانانی ئەم مۆدێلەدا ناکات: بە کێش و سندوقی بەرهەمەکە نرخی بۆ دادەنرێت مەگەر «تێچووی جیاواز» هەڵبژێریت`,
+  minProfitFrom: 'سەرچاوەی کەمترین قازانج',
+  profitKeptIqd: (v) => `حاڵەتی تایبەتی پاشەکەوتکراو: ${v} دینار`,
+  profitBlocked: 'ڕاگیراوە — نرخدانانی ئەم مۆدێلە ڕادەگرێت',
+  currencyChoose: 'دراوێک هەڵبژێرە',
+  currencyRequired: 'دراوی نرخی دابینکەر هەڵبژێرە — بەرهەمەکە دراوێکی نییە تا شوێنی بکەویت، و بەبێ دراو نرخ هەژمار ناکرێت',
   preorderAfterOff: (usd) => `دوای کەمکردنەوەی ${usd}`,
   shelfOwnCostNote:
     'تا ئەم مۆدێلە دانەی لەسەر ڕەفە هەبێت نرخی فرۆشتنی ڕاستەوخۆ لە کۆگاوە دێت؛ ئەم تێچووی دابینکەرە کاتێک ڕەفەکە بەتاڵ بوو نرخی بۆ دادەنێت، و دیاری دەکات ئایا پێشداواکردن دوای داشکاندن تێچووەکەی دادەپۆشێت',

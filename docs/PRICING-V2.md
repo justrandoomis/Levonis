@@ -130,9 +130,17 @@ are always both shown (fixes P4/P15).
   product's currency); its weight and box, which ARE the option's packaged dimensions of
   «أبعاد الخيار» (one source: the panel edits those same fields; the `pricing_inputs` option row is
   a mirror the save writes in the same batch; net weight is never used; an option that inherits its
-  package leaves the product's pricing measure); and its minimum profit «يتبع المنتج: $X | استثناء»,
-  an option-scope `target_profit` rule (migration 0181, no new column). «رجوع للموروث» clears the
-  own cost and sends the model's minimum profit back to INHERIT.
+  package leaves the product's pricing measure). The mirror follows the dimensions: a pricing value
+  equal to the option's SAVED package is cleared when that package is cleared («مسح التخصيص»); a value
+  saved in pricing only is kept, never cleared silently. A preview priced on option dimensions the
+  pricing row does not hold yet counts as unsaved (the leave warning, «تعديلات غير محفوظة», a line on
+  the card) until a save writes it. And its minimum profit «يتبع المنتج: $X | استثناء», an
+  option-scope `target_profit` rule (migration 0181, no new column); a stored option rule in dinars
+  or BLOCKED is shown as it is, never as «يتبع المنتج». «رجوع للموروث» clears the own cost and sends
+  the model's minimum profit back to INHERIT.
+- **The option's dimensions price «تكلفة مختلفة» only.** A model on «يتبع المنتج» or «فرق في السعر»
+  is freighted on the product's pricing measure even when its option has its own package (the card
+  says so); making the option's package the pricing measure in every mode awaits the owner (row 247).
 
 ### 1.5 Rounding (one rule, one place)
 
@@ -890,9 +898,18 @@ cost R_r (the model's own cost if typed, else the product's), with three outcome
   warning (`V2_DISCOUNT_WITHDRAWN`);
 - roundPriceIqd(R_r) ≥ D: stopped while the shelf sells below the route's own cost
   (`V2_ROUTE_SHELF_CHEAPER`).
+The route's cost is weighed BEFORE the discount: a discount at or above the shelf's D is withdrawn
+(P = D) or the route stopped, as above — never `V2_DISCOUNT_TOO_LARGE`, which would stop the whole
+product, its direct price included, from being written (off the shelf that error stays as in §1.3).
 With no supplier price the route is unavailable while the shelf sells (`V2_ROUTE_NO_SUPPLIER`) — no
 error on the direct price. There is no silent cap: P ≤ D holds by construction, and a pre-order equal
-to the direct price always carries its reason. While the shelf sells, a model's own supplier cost no
+to the direct price carries its reason — with one exception: a discount worth less than one rounding
+step (Δ × U < 250 IQD, under about $0.17) can round away, P = D with floor `none`.
+
+**A SKU with no direct sale takes nothing from the shelf.** E_D is the direct price the SKU actually
+sells at; a pre-order-only SKU has none (C-8: its pre-order price is its anchor), and its pre-order
+units come from the supplier, not the shelf. Its routes keep the supplier calculation and its shelf is
+ignored (the engine reads `shelf` only when the SKU sells direct). While the shelf sells, a model's own supplier cost no
 longer moves either price — it decides only whether a route's discount is withdrawn or the route is
 stopped, and prices the model once the shelf is empty. The blocks are temporary: the route row stays
 on, the SKU simply has no row on it, and nothing needs the owner's preview.
@@ -903,10 +920,12 @@ on, the SKU simply has no row on it, and nothing needs the owner's preview.
 shelves of the cost-first products in one statement; a signature that differs makes the product stale
 with the reason `STOCK` — a batch received, FIFO consumption on order confirmation, an adjustment, a
 return or a cost correction. It is evaluated and written exactly as an FX move, `engine_owner` in the
-price history — with one difference in the hold: a price the shelf RAISES is published on that tick
-and never held (holding it would sell units below cost + the minimum profit); a large fall (above
-15%) waits for the owner with the bell «انخفضت أعلى تكلفة على الرف», the higher price meanwhile
-being safe. A sale that leaves the costliest batch changes nothing; a shelf that moved without moving
+price history — with one difference in the hold: a DIRECT price the shelf RAISES is published on that
+tick and never held (holding it would sell units below cost + the minimum profit), together with the
+pre-orders that follow it — even one that falls because a withdrawn discount comes back at the higher
+D. With no direct rise, any large change (above 15%) waits for the owner with the bell
+«انخفضت أعلى تكلفة على الرف»: a fall, or a pre-order rise (row 247's one-time move off the supplier
+anchor, or a discount withdrawn as D falls), the price meanwhile being safe. A sale that leaves the costliest batch changes nothing; a shelf that moved without moving
 a price records its new signature only. A sold-out model with no supplier price is written as unsold
 (`V2_STOCK_SOLD_OUT`) and the bell «نفد مخزون موديل ولا يوجد سعر مورّد» rings; every model sold out
 holds the product with that code and the bell, and the tick after stock returns prices it from the

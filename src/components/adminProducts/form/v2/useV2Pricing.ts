@@ -23,7 +23,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '../../../../lib/api';
 import type { ProductDimensionsV2 } from '../../../../lib/productTypes';
-import { dollarsOf, draftOf, draftWire, withOptionMeasure, withPackageMeasure, wireIsEmpty, type PriceDraft, type V2Answer, type V2DraftWire, type V2LiveIds } from './v2Model';
+import { dollarsOf, draftOf, draftWire, measurePendingOf, withOptionMeasure, withPackageMeasure, wireIsEmpty, type PriceDraft, type V2Answer, type V2DraftWire, type V2LiveIds } from './v2Model';
 
 export interface V2FormInput {
   /** The form edits an ordinary product (a bundle is never V2-priced). */
@@ -46,6 +46,8 @@ export interface V2FormInput {
   packageDims: ProductDimensionsV2 | null;
   /** Each model's own «أبعاد الخيار» (by option value id): an own-cost model's weight and box ARE its packaged ones (row 247). */
   optionPackages: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>;
+  /** The same as last SAVED (the form's baseline): tells a pricing mirror of them from a pricing-only value. */
+  savedOptionPackages?: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>;
 }
 
 export interface V2Review {
@@ -76,8 +78,12 @@ export interface V2PricingState {
   setDraft: (fn: (d: PriceDraft) => PriceDraft) => void;
   /** What the save sends as `pricing`. */
   wire: V2DraftWire;
-  /** The reader typed something not saved yet. */
+  /** The reader typed something not saved yet — or the preview prices a measure only a save writes. */
   touched: boolean;
+  /** Own-cost models priced on the option's dimensions that the pricing row does not hold yet (row 247). */
+  measurePending: ReadonlySet<string>;
+  /** The draft as stored (before any edit or fill): what a «kept» choice shows. */
+  storedDraft: PriceDraft | null;
   /** The answer on screen prices the draft (not the stored product). */
   drafting: boolean;
   discard: () => void;
@@ -106,10 +112,13 @@ const V2Context = createContext<V2PricingState | null>(null);
 export const V2PricingProvider = V2Context.Provider;
 export const useV2 = (): V2PricingState | null => useContext(V2Context);
 
+/** No saved option dimensions (add-product, or before the first load). */
+const NO_PACKAGES: Readonly<Record<string, ProductDimensionsV2 | null | undefined>> = {};
 const failure = (e: unknown): string => (e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e));
 
 export function useV2Pricing(input: V2FormInput): V2PricingState {
   const { enabled, productId, draftId, ownerHint, structureOf, structureKey, structureDirty, live, packageDims, optionPackages } = input;
+  const savedOptionPackages = input.savedOptionPackages ?? NO_PACKAGES;
   const mode: V2PricingState['mode'] = !enabled ? null : productId ? 'stored' : 'new';
   const [stored, setStored] = useState<V2Answer | null>(null);
   const [answer, setAnswer] = useState<V2Answer | null>(null);
@@ -184,8 +193,10 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
   // Applied to the stored draft too, so the fill alone is not «typed» — it still travels with the save.
   const withDims = useCallback(
     (d: PriceDraft | null) =>
-      d && d.method === 'cost' && owner ? { ...d, cost: withPackageMeasure(d.cost, packageDims), models: withOptionMeasure(d.models, optionPackages) } : d,
-    [owner, packageDims, optionPackages]
+      d && d.method === 'cost' && owner
+        ? { ...d, cost: withPackageMeasure(d.cost, packageDims), models: withOptionMeasure(d.models, optionPackages, savedOptionPackages) }
+        : d,
+    [owner, packageDims, optionPackages, savedOptionPackages]
   );
   const draftShown = useMemo(() => withDims(draft), [withDims, draft]);
   const baseShown = useMemo(() => withDims(base), [withDims, base]);
@@ -200,6 +211,9 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
     return draftWire(base, draftShown, storedDollars, liveIds, opts);
   }, [mode, base, draftShown, storedDollars, liveIds, opts]);
   const wireKey = JSON.stringify(wire);
+  // The option's measure the preview prices on but the pricing row does not hold yet: unsaved until a save
+  // writes it (row 247) — the leave warning and «تعديلات غير محفوظة» say so, and the model card notes it.
+  const measurePending = useMemo(() => (mode && owner ? measurePendingOf(base, draftShown) : new Set<string>()), [mode, owner, base, draftShown]);
   const typed = useMemo(() => {
     if (!mode || !baseShown || !draftShown) return false;
     const w = draftWire(baseShown, draftShown, storedDollars, liveIds, { ...opts, needsMethod: false });
@@ -320,7 +334,9 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
     draft: draftShown,
     setDraft,
     wire,
-    touched: typed,
+    touched: typed || measurePending.size > 0,
+    measurePending,
+    storedDraft: base,
     drafting: !!previewKey && shown !== stored,
     discard,
     reload,

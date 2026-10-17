@@ -298,9 +298,10 @@ export function blockCodeOf(codes: readonly string[]): string {
  *   - PRICING_V2_LARGE_CHANGE: a change above 15% (or a drop above 30%) nobody previewed. An owner rate or
  *     shipping act carries the owner's own preview and tick of these flags (adminPricing.ts), so only the
  *     unattended triggers (the FX fetch, the sweep) hold it.
- *     The shelf (row 244, `reasons` holding STOCK): a price the shelf RAISES is never held — holding it would
- *     sell units below their cost + the minimum profit, the very thing the owner's rule forbids — so only a
- *     large fall waits for the owner (the higher price meanwhile is safe).
+ *     The shelf (row 244, `reasons` holding STOCK): a DIRECT price the shelf RAISES is never held — holding it
+ *     would sell units below their cost + the minimum profit, the very thing the owner's rule forbids — so the
+ *     whole product is published with it (its pre-orders follow D, row 247). With no direct rise, any large
+ *     change (a fall, or a pre-order rise) waits for the owner (the price meanwhile is safe).
  */
 export function v2AutoHoldCode(
   state: Pick<EngineStateRow, 'inputs_seq' | 'priced_inputs_seq'>,
@@ -311,8 +312,15 @@ export function v2AutoHoldCode(
   if ((state.priced_inputs_seq ?? null) !== state.inputs_seq) return 'PRICING_V2_UNREVIEWED';
   if (!(trigger === 'fx' || trigger === 'sweep')) return null;
   if (reasons.includes('STOCK')) {
-    const largeFall = (ev.rows ?? []).some((r) => r.large && r.old_iqd !== null && r.new_iqd !== null && r.new_iqd < r.old_iqd);
-    return ev.drop_flag || largeFall ? 'PRICING_V2_LARGE_CHANGE' : null;
+    const rows = ev.rows ?? [];
+    // A direct price the shelf raises is published now, whatever else moves with it (row 244: never held) —
+    // the pre-orders that follow D (row 247) go with it, even one that falls because its withdrawn discount
+    // comes back at the higher D.
+    const directRise = rows.some((r) => r.channel === 'direct_sale' && r.old_iqd !== null && r.new_iqd !== null && r.new_iqd > r.old_iqd);
+    if (directRise) return null;
+    // Otherwise nothing here is forced by a unit sold below its cost: a large move either way (a fall, or a
+    // pre-order rise while D does not rise — row 247's one-time move off the supplier anchor) waits for the owner.
+    return ev.drop_flag || rows.some((r) => r.large) ? 'PRICING_V2_LARGE_CHANGE' : null;
   }
   if (ev.large_change || ev.drop_flag) return 'PRICING_V2_LARGE_CHANGE';
   return null;

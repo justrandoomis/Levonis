@@ -515,7 +515,8 @@ export function v2Answer(i: AnswerInput): Record<string, unknown> {
         .map((r) => ({ scope: r.scope, scope_id: r.scope_id ?? '', ...Object.fromEntries(FORM_INPUT_FIELDS.map((k) => [k, (r as Record<string, unknown>)[k] ?? null])) })),
       minimum_profit: ev.stored.rules
         .filter((r) => r.product_id === ev.product_id && r.kind === 'target_profit')
-        .map((r) => ({ scope: r.scope, scope_id: r.scope_id, state: r.state, amount_usd: r.amount_usd ?? null })),
+        // amount_iqd: a legacy dinar rule the dollar field cannot draw — the form shows it kept, never «يتبع المنتج».
+        .map((r) => ({ scope: r.scope, scope_id: r.scope_id, state: r.state, amount_usd: r.amount_usd ?? null, amount_iqd: r.amount_iqd ?? null })),
       // §2.1 rule 2: what the product's minimum profit inherits when its own field is empty (the owner's
       // placeholder «يرث ($40.00)»), resolved as the maths resolves it — never a guess.
       inherited_minimum_profit: inheritedMinimumProfit(ev.stored.rules, ev.product_id, read.rates?.usd_iqd ?? null),

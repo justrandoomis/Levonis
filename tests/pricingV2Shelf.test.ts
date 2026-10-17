@@ -330,6 +330,32 @@ test('pre-order follows the direct price on the shelf (row 247): a batch that mo
   assert.equal((await landOf(w, COMBO)).prepaid, D(720_000 + TU - OFF));
 });
 
+test('row 247 with row 244: a costlier batch that brings a withdrawn discount back is published with D, never held; a fall of D that withdraws it waits', async () => {
+  // Supplier USD 450 by land (the route costs 683,000), T $40, Δ $130 (195,000): at 750,250 the discount is withdrawn.
+  const w = await world({ supplier: true, discountUsd: '130' });
+  assert.equal((await landOf(w, COMBO)).prepaid, COMBO_D, 'withdrawn: the land route sells at D');
+  // A batch at 760,000: D 820,000, still withdrawn — both +9%.
+  const mid = lot(w.raw, COMBO, 1, 760_000);
+  assert.deepEqual((await sweep(w)).repriced, [PID]);
+  assert.equal((await directOf(w, COMBO)).prepaid, D(760_000 + TU));
+  assert.equal((await landOf(w, COMBO)).prepaid, D(760_000 + TU));
+  // A batch at 830,000: D rises to 890,000 and the discount comes back — the land price FALLS 15.2%, with D. Never held:
+  // holding D would sell the 830,000 unit below its cost + the minimum profit.
+  const dear = lot(w.raw, COMBO, 1, 830_000);
+  const up = await sweep(w);
+  assert.deepEqual(up.repriced, [PID], JSON.stringify(up));
+  assert.deepEqual(up.blocked, []);
+  assert.equal((await directOf(w, COMBO)).prepaid, D(830_000 + TU));
+  assert.equal((await landOf(w, COMBO)).prepaid, D(830_000 + TU - 195_000));
+  // It sells out: D falls 7.9% and the land price rises 18% back to D (withdrawn) — no direct rise, a large move: held.
+  take(w.raw, dear, 1);
+  const down = await sweep(w);
+  assert.deepEqual(down.blocked, [{ product_id: PID, code: 'PRICING_V2_LARGE_CHANGE' }], JSON.stringify(down));
+  assert.equal((await directOf(w, COMBO)).prepaid, D(830_000 + TU), 'the higher price meanwhile is safe');
+  assert.equal((await landOf(w, COMBO)).prepaid, D(830_000 + TU - 195_000));
+  void mid;
+});
+
 test('the shelf sold out: back to the supplier price (and to the shelf when stock returns)', async () => {
   const w = await world({ supplier: true });
   for (const id of [w.lots.c1, w.lots.c2, w.lots.c3]) take(w.raw, id, 2);

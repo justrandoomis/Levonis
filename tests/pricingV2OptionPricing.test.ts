@@ -35,6 +35,8 @@ import {
   draftOf,
   draftWire,
   lineWithOption,
+  measurePendingOf,
+  optionDimsHeading,
   preorderOffOf,
   withOptionMeasure,
   type ModelDraft,
@@ -179,6 +181,49 @@ test('issue 2 in the engine: the Combo freighted on its own 13.5 kg box; issue 1
   assert.deepEqual(pair(price(combo({ own: EUR('375'), T: '60', shelf: null }))), [833_750, 781_250]);
 });
 
+test('a SKU sold by pre-order only takes nothing from the shelf: its route keeps the supplier calculation (C-8)', () => {
+  // The Combo with its shelf at 690,062 but no direct sale: 269 EUR by air at 6,240 g + T → 784,500, Δ ignored.
+  const only = (shelf: V2Sku['shelf']) =>
+    priceProductV2({ method: 'cost', rates: RATES, points: [], discounts: [PRODUCT_OFF], skus: [{ ...combo({ shelf }), channels: ['pre_order_land'] }] }).skus[0]!;
+  for (const shelf of [COMBO_SHELF, null, { state: 'sold_out' as const }]) {
+    const r = only(shelf as V2Sku['shelf']);
+    assert.deepEqual(
+      r.channels.map((c) => [c.channel, c.price_iqd, c.shelf]),
+      [['pre_order_land', 784_500, null]],
+      JSON.stringify(shelf)
+    );
+    assert.deepEqual([...new Set(r.issues.map((i) => i.code))], ['V2_DISCOUNT_IGNORED'], JSON.stringify(shelf));
+  }
+});
+
+test('on the shelf the route cost is weighed before the discount: a discount at or above the shelf D is stopped or withdrawn, never V2_DISCOUNT_TOO_LARGE', () => {
+  // Shelf 200,000: D = round(200,000 + 215,850) = 416,000 is below the land route's own cost (463,818 → 464,000): stopped.
+  const stop = price(combo({ shelf: { state: 'on_shelf', cost_iqd: 200_000, units: 1 } }), [], [{ scope: 'product', scope_id: '', usd: '400' }]);
+  assert.equal(stop.direct!.price_iqd, 416_000);
+  assert.equal(stop.land, undefined);
+  assert.deepEqual(stop.r.issues.filter((i) => i.severity === 'error').map((i) => i.code), ['V2_ROUTE_SHELF_CHEAPER']);
+  // Shelf 300,000: D = 516,000 clears the route; a $400 discount (600,000) is more than D — withdrawn: the route sells at D.
+  const back = price(combo({ shelf: { state: 'on_shelf', cost_iqd: 300_000, units: 1 } }), [], [{ scope: 'product', scope_id: '', usd: '400' }]);
+  assert.deepEqual(pair(back), [516_000, 516_000]);
+  assert.equal(back.land!.floor, 'discount_withdrawn');
+  assert.deepEqual(back.codes, ['V2_DISCOUNT_WITHDRAWN']);
+  assert.equal(back.r.ok, true, 'the whole SKU is written — its direct price too');
+  // Off the shelf the rule is unchanged: a discount at or above D is the owner's error to fix.
+  const off = price(combo({ shelf: null }), [], [{ scope: 'product', scope_id: '', usd: '1000' }]);
+  assert.equal(off.land, undefined);
+  assert.deepEqual(off.r.issues.filter((i) => i.severity === 'error').map((i) => i.code), ['V2_DISCOUNT_TOO_LARGE']);
+});
+
+test('a discount worth less than one rounding step can round away (Δ × U < 250): P = D with floor none — the documented exception', () => {
+  const r = priceProductV2({ method: 'cost', rates: RATES, points: [], discounts: [{ scope: 'product', scope_id: '', usd: '0.1' }], skus: [combo()] }).skus[0]!;
+  const land = r.channels.find((c) => c.channel === 'pre_order_land')!;
+  assert.equal(land.price_iqd, land.direct_iqd);
+  assert.equal(land.floor, 'none');
+  // $0.17 × 1,500 = 255 ≥ one step: the pre-order is below D.
+  const r2 = priceProductV2({ method: 'cost', rates: RATES, points: [], discounts: [{ scope: 'product', scope_id: '', usd: '0.17' }], skus: [combo()] }).skus[0]!;
+  assert.ok(r2.channels.find((c) => c.channel === 'pre_order_land')!.price_iqd < r2.channels.find((c) => c.channel === 'direct_sale')!.price_iqd);
+});
+
 /* ------------------------------------------------------- 2. the owner's routes -- */
 
 const PID = 'p_a1';
@@ -272,6 +317,8 @@ test('the owner: a model minimum profit is an option-scope rule — previewed, s
   const back = (await json(await get(w.app, `/api/admin/products-v2/${PID}/pricing`))) as V2Answer;
   assert.ok(back.v2_cost_inputs!.minimum_profit.some((r) => r.scope === 'option' && r.scope_id === COMBO && r.amount_usd === '60'));
   assert.ok(back.v2_cost_inputs!.minimum_profit.some((r) => r.scope === 'product' && r.amount_usd === '143.9'));
+  // The owner's rows carry their dinars too (a legacy dinar rule is drawn as kept, never as «يتبع المنتج»).
+  assert.ok(back.v2_cost_inputs!.minimum_profit.every((r) => 'amount_iqd' in r));
   // The reload shows the exception again: «تكلفة مختلفة», «الحد الأدنى للربح: استثناء $60».
   const m = draftOf(back).models[COMBO]!;
   assert.equal(m.price, 'own_cost');
@@ -299,7 +346,7 @@ test('the owner: a model minimum profit is an option-scope rule — previewed, s
 
 const LIVE: V2LiveIds = { options: new Set(['combo', 'a1']), models: new Set(['combo', 'a1']), colours: new Set(['red']), skus: new Set(['o:combo', 'o:a1', 'o:combo|c:red']) };
 const OPTS = { needsMethod: false, cost: true, money: true };
-function ownerAnswer(o: { inputs?: Array<Record<string, unknown>>; rules?: Array<{ scope: string; scope_id: string | null; state: string | null; amount_usd: string | null }>; points?: V2Answer['v2_points']; discounts?: V2Answer['v2_discounts'] } = {}): V2Answer {
+function ownerAnswer(o: { inputs?: Array<Record<string, unknown>>; rules?: Array<{ scope: string; scope_id: string | null; state: string | null; amount_usd: string | null; amount_iqd?: number | null }>; points?: V2Answer['v2_points']; discounts?: V2Answer['v2_discounts'] } = {}): V2Answer {
   const base = { scope: 'base', scope_id: '', supplier_cost_amount: '269', supplier_cost_currency: 'EUR', shipping_profile: 'CHINA_AIR', shipping_weight_g: 6240, shipping_length_mm: null, shipping_width_mm: null, shipping_height_mm: null, additional_cost_iqd: null };
   return {
     product_id: PID,
@@ -398,6 +445,61 @@ test('«تكلفة مختلفة»: the weight and box ARE the option packaged di
   ]);
 });
 
+test('the mirror follows the option dimensions: «مسح التخصيص» after a save clears the pricing row; a pricing-only value stays', () => {
+  const dims = (o: Partial<Record<'package_weight_g' | 'package_depth_mm' | 'package_width_mm' | 'package_height_mm', number | null>>) => ({
+    net_weight_g: 8300,
+    width_mm: 385,
+    depth_mm: 410,
+    height_mm: 430,
+    package_weight_g: null,
+    package_depth_mm: null,
+    package_width_mm: null,
+    package_height_mm: null,
+    ...o,
+  });
+  const PACKED = dims({ package_weight_g: 13_500, package_depth_mm: 560, package_width_mm: 540, package_height_mm: 430 });
+  // Stored: the row-247 save wrote the mirror (375 EUR, 13,500 g, 56 × 54 × 43) beside the option's own package.
+  const a = ownerAnswer({ inputs: [{ ...OWN_ROW, shipping_weight_g: 13_500, shipping_length_mm: 560, shipping_width_mm: 540, shipping_height_mm: 430 }] });
+  const base = draftOf(a);
+  const wire = (now: Record<string, ReturnType<typeof dims>>, saved: Record<string, ReturnType<typeof dims>>) => {
+    const shown = (d: PriceDraft) => ({ ...d, models: withOptionMeasure(d.models, now, saved) });
+    return { w: draftWire(base, shown(base), { points: [], discounts: a.v2_discounts! }, LIVE, OPTS), pending: measurePendingOf(base, shown(base)) };
+  };
+  // Unchanged: nothing to send, nothing pending.
+  assert.deepEqual(wire({ combo: PACKED }, { combo: PACKED }).w, {});
+  assert.equal(wire({ combo: PACKED }, { combo: PACKED }).pending.size, 0);
+  // «مسح التخصيص / inherit all»: the option inherits again — the mirror is cleared with it (the engine inherits too).
+  const reset = wire({ combo: dims({}) }, { combo: PACKED });
+  assert.deepEqual(reset.w.cost?.inputs, [{ scope: 'option', scope_id: 'combo', shipping_weight_g: null, shipping_length_mm: null, shipping_width_mm: null, shipping_height_mm: null }]);
+  assert.deepEqual([...reset.pending], ['combo']);
+  // Only the box's height cleared: the box goes, the weight stays.
+  const noBox = wire({ combo: { ...PACKED, package_height_mm: null } }, { combo: PACKED });
+  assert.deepEqual(noBox.w.cost?.inputs, [{ scope: 'option', scope_id: 'combo', shipping_length_mm: null, shipping_width_mm: null, shipping_height_mm: null }]);
+  // A value saved in pricing only (never the option's) is kept: the option had no package of its own when saved.
+  assert.deepEqual(wire({ combo: dims({}) }, { combo: dims({}) }).w, {});
+  // Before the first save (shot B): the option's package is not in the pricing row yet — pending, so the form says «غير محفوظ».
+  const legacy = ownerAnswer({ inputs: [OWN_ROW] });
+  const legacyBase = draftOf(legacy);
+  const legacyShown = { ...legacyBase, models: withOptionMeasure(legacyBase.models, { combo: PACKED }, { combo: PACKED }) };
+  assert.deepEqual([...measurePendingOf(legacyBase, legacyShown)], ['combo']);
+  assert.deepEqual([...measurePendingOf(legacyBase, legacyBase)], []);
+});
+
+test('a stored model minimum profit the dollar field cannot draw (dinars, or BLOCKED) is shown kept — never «يتبع المنتج» — and stays until changed', () => {
+  const rules = (r: { state: string; amount_usd: string | null; amount_iqd?: number | null }) =>
+    ownerAnswer({ inputs: [OWN_ROW], rules: [{ scope: 'product', scope_id: '', state: 'ACTIVE', amount_usd: '143.9' }, { scope: 'option', scope_id: 'combo', ...r }] });
+  const dinars = rules({ state: 'ACTIVE', amount_usd: null, amount_iqd: 150_000 });
+  const m = draftOf(dinars).models.combo!;
+  assert.deepEqual([m.price, m.profit, m.profit_iqd], ['own_cost', 'kept', 150_000]);
+  assert.deepEqual(wireOf(dinars, (d) => d), {}, 'left as it is: nothing sent, the rule stays');
+  // Changed: «يتبع المنتج» sends INHERIT; an exception sends its dollars.
+  assert.deepEqual(wireOf(dinars, (d) => withModel(d, 'combo', { profit: 'follow' })).cost?.minimum_profit, [{ kind: 'target_profit', scope: 'option', scope_id: 'combo', amount_usd: '' }]);
+  assert.deepEqual(wireOf(dinars, (d) => withModel(d, 'combo', { profit: 'exception', profit_usd: '60' })).cost?.minimum_profit, [{ kind: 'target_profit', scope: 'option', scope_id: 'combo', amount_usd: '60' }]);
+  const blocked = draftOf(rules({ state: 'BLOCKED', amount_usd: null })).models.combo!;
+  assert.deepEqual([blocked.profit, blocked.profit_iqd], ['kept', null]);
+  assert.equal(V2_STRINGS.ar.profitKeptIqd('150,000'), 'استثناء محفوظ: 150,000 د.ع');
+});
+
 test('a colour difference edited keeps the colour’s stored discount (it was silently dropped)', () => {
   const a = ownerAnswer({ points: [{ scope: 'color', id: 'red', kind: 'delta', usd: '5' }], discounts: [{ scope: 'product', id: '', usd: '35' }, { scope: 'color', id: 'red', usd: '10' }] });
   const edit = (d: PriceDraft) => ({ ...d, colours: { ...d.colours, red: { price: 'delta' as const, usd: '7' } } });
@@ -464,12 +566,20 @@ test('the model card reads its colour-less line, else a colour that follows its 
 
 test('the new words, in Arabic, English and real Sorani', () => {
   const sorani = /[ڕڵێۆە]/;
-  for (const k of ['optionMeasureFrom', 'savedPricingOnly', 'shelfOwnCostNote'] as const) {
+  for (const k of ['shelfOwnCostNote', 'minProfitFrom', 'profitBlocked', 'currencyChoose', 'currencyRequired'] as const) {
     for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(V2_STRINGS[lang][k].trim().length > 0, `${lang}.${k}`);
     assert.notEqual(V2_STRINGS.ckb[k], V2_STRINGS.ar[k]);
     assert.match(V2_STRINGS.ckb[k], sorani, k);
   }
-  for (const k of ['inheritsProductMeasure', 'preorderAfterOff'] as const) {
+  // The hints quote the option's dimensions heading as the form shows it — in every language (a Sorani reader finds it).
+  const heading = optionDimsHeading('A1 Combo');
+  assert.equal(heading, 'أبعاد A1 Combo / Option dimensions');
+  for (const k of ['optionMeasureFrom', 'savedPricingOnly', 'measurePending', 'optionDimsNotPricing'] as const) {
+    for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(V2_STRINGS[lang][k](heading).includes(`«${heading}»`), `${lang}.${k}`);
+    assert.notEqual(V2_STRINGS.ckb[k](heading), V2_STRINGS.ar[k](heading));
+    assert.match(V2_STRINGS.ckb[k]('X'), sorani, k);
+  }
+  for (const k of ['inheritsProductMeasure', 'preorderAfterOff', 'profitKeptIqd'] as const) {
     for (const lang of ['ar', 'en', 'ckb'] as const) assert.match(V2_STRINGS[lang][k]('$35.00'), /\$35\.00/);
     assert.notEqual(V2_STRINGS.ckb[k]('X'), V2_STRINGS.ar[k]('X'));
     assert.match(V2_STRINGS.ckb[k]('X'), sorani, k);
