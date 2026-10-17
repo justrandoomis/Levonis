@@ -40,6 +40,7 @@ import { scrubProse } from '@levonis/catalog/bambuImport/sentences';
 import { specRowId } from '@levonis/catalog/bambuImport/specs';
 import type { ImportPayload, PayloadDocument, PayloadSpec } from '@levonis/catalog/bambuImport/payload';
 import type { DescribedLink } from '@levonis/catalog/bambuImport/describe';
+import { CONFIDENCE_RANK as RANK, keyCovered, REGIONS, SOURCE_KINDS, SPEC_STATUSES as STATUSES } from './curated';
 import { WORST } from './deadline';
 import { HostFetcher, ImportStop } from './fetch';
 import type { DocumentCheck } from './opsClient';
@@ -109,10 +110,6 @@ export function curatedGate(dataDir: string, handle: string, curatedScope: boole
   }
 }
 
-const RANK: Readonly<Record<string, number>> = { official_variant: 5, official_doc: 4, official_page: 3, component_maker: 2, independent: 1, derived: 0 };
-const STATUSES = new Set(['verified', 'unverified', 'not_found', 'not_published', 'not_applicable', 'unknown']);
-const SOURCE_KINDS = new Set(['store_page', 'store_messages', 'store_doc', 'tds', 'sds', 'manual', 'wiki', 'curated', 'derived']);
-const REGIONS = new Set(['', 'us_110v', 'intl_220v']);
 
 function scopeOf(payload: ImportPayload, scope: unknown): { kind: PayloadSpec['scope_kind']; id: string } | null {
   if (!isRec(scope) || scope.kind === undefined || scope.kind === 'product') return { kind: 'product', id: '' };
@@ -157,8 +154,6 @@ function valueFields(value: unknown, unit: string): Pick<PayloadSpec, 'data_type
   }
   return null;
 }
-
-const keyCovered = (pattern: string, key: string) => (pattern.endsWith('.*') ? key.startsWith(pattern.slice(0, -1)) : pattern === key);
 
 export interface CuratedMergeReport {
   specs_added: number;
