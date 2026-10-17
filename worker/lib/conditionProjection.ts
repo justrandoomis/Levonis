@@ -43,6 +43,7 @@
  */
 
 import { isSchemaMissing } from './membershipBenefits';
+import { tableColumns } from './schemaColumns';
 
 /** The column, and the DEFAULT its own migration declares. */
 export const CONDITION_DOC_COLUMN = 'condition_doc';
@@ -118,11 +119,8 @@ export async function productsHaveConditionDoc(db: D1Database): Promise<boolean>
  * beats silently dropping a value the owner just typed.
  */
 export async function productsHaveColumn(db: D1Database, column: string): Promise<boolean> {
-  try {
-    const { results } = await db.prepare('PRAGMA table_info(products)').all<{ name: string }>();
-    if (!results || results.length === 0) return true;
-    return results.some((c) => String(c.name) === column);
-  } catch {
-    return true;
-  }
+  // One PRAGMA per binding, shared by every column asked (worker/lib/schemaColumns.ts): a save asks eleven.
+  const cols = await tableColumns(db, 'products', [column]);
+  if (!cols || cols.size === 0) return true;
+  return cols.has(column);
 }

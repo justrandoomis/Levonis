@@ -1649,12 +1649,12 @@ adminProductsRoutes.post('/', async (c) => {
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body || typeof body !== 'object') throw badRequest('JSON product document required');
 
-  const existingRow =
-    typeof body.id === 'string' && body.id
-      ? await c.env.DB.prepare('SELECT * FROM products WHERE id = ?')
-          .bind(body.id)
-          .first<Record<string, unknown>>()
-      : null;
+  // The stored row and its V2 state, read together: every save waits on both first.
+  const bodyId = typeof body.id === 'string' && body.id ? body.id : null;
+  const [existingRow, storedEngineV2] = await Promise.all([
+    bodyId ? c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(bodyId).first<Record<string, unknown>>() : null,
+    bodyId ? productEngineV2(c.env.DB, bodyId) : false,
+  ]);
   const prev = existingRow ? parseProductRow(existingRow) : null;
   // The same door as the GET above, on the write side: a composition row is
   // created and edited by the bundles panel alone. `planProductSave` refuses
@@ -1856,7 +1856,7 @@ adminProductsRoutes.post('/', async (c) => {
   if (v2Sent && (doc.composition ?? '') !== '') {
     throw new HttpError(409, serverMessage('COMPOSITION_NOT_PRICEABLE'), 'COMPOSITION_NOT_PRICEABLE', { section: 3 });
   }
-  const v2Stored = prev ? await productEngineV2(c.env.DB, prev.id) : false;
+  const v2Stored = prev ? storedEngineV2 : false;
   const v2Installed = v2Stored || (await pricingV2Installed(c.env.DB));
   // A database before 0189 (a deploy ahead of its migration) has nowhere to put a V2 product's prices.
   if (v2Sent && !v2Installed) {
@@ -2032,6 +2032,8 @@ adminProductsRoutes.post('/', async (c) => {
 
   const stored = await reloadForVerification(c.env.DB, doc.id);
   c.set('catalogueSlug', doc.slug); // the product page is purged with the listing
+  // The completeness hook re-evaluates THIS product: named, so it does not look the id up again by slug.
+  c.set('completenessIds', [doc.id]);
   return c.json({
     success: true,
     created: !prev,

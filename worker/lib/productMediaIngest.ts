@@ -285,7 +285,6 @@ export async function verifyStoredProductMedia(
     index += 1;
   }
 
-  const verified: VerifiedProductMediaReference[] = [];
   const verifiedHashes = new Map<string, string>();
   if (unique.size > 0 && !env.IMAGES) {
     throw new ProductMediaIngestError(
@@ -293,7 +292,11 @@ export async function verifyStoredProductMedia(
       'Product media cannot be verified because the Cloudflare Images decoder binding is unavailable'
     );
   }
-  for (const reference of unique.values()) {
+  // EVERY IMAGE AT ONCE, NOT ONE AFTER ANOTHER (the admin save's round trips, 2026-10-17): each check is
+  // an R2 read and a decode by the Images binding, independent of the others. In sequence a product with
+  // eight pictures waited for sixteen of them before its save could even be planned. The refusal is still
+  // the FIRST failing reference's, in the request's order (`inOrder`).
+  const verified = await inOrder([...unique.values()], async (reference): Promise<VerifiedProductMediaReference> => {
     let object: R2ObjectBody | null;
     try {
       // HEAD and file metadata can both lie about what an object contains.
@@ -395,22 +398,23 @@ export async function verifyStoredProductMedia(
       );
     }
 
-    verified.push({
+    verifiedHashes.set(reference.key, await sha256(bytes));
+    return {
       ...reference,
       width: decoded.width,
       height: decoded.height,
       bytes: bytes.byteLength,
       // The decoded bytes, not nullable/stale object metadata, are authoritative.
       content_type: 'image/webp',
-    });
-    verifiedHashes.set(reference.key, await sha256(bytes));
-  }
+    };
+  });
 
   // Validate the whole set before mutating cleanup state. Then acquire the
   // global guard and re-read the object: cleanup either loses the CAS, or it
   // wins and this request observes its claim/deletion instead of publishing a
-  // reference to bytes that no longer exist.
-  for (const reference of verified) {
+  // reference to bytes that no longer exist. Each key's guard and re-read are
+  // its own; the keys go together.
+  await inOrder(verified, async (reference) => {
     await protectProductMediaAttachment(env.DB, reference.key);
     let object: R2ObjectBody | null;
     try {
@@ -451,8 +455,42 @@ export async function verifyStoredProductMedia(
         `Product image changed while the save was being protected: ${reference.url}`
       );
     }
-  }
+  });
   return verified;
+}
+
+/** At most this many images checked at once (a Worker queues past six open connections anyway). */
+const MEDIA_CHECK_CONCURRENCY = 6;
+
+/**
+ * `fn` over `items`, MEDIA_CHECK_CONCURRENCY at a time, the answers in the items' order. Every started
+ * check is let finish, then the FIRST failure by index is thrown — the same refusal the sequential loop
+ * gave, whichever check happened to fail first in time.
+ */
+async function inOrder<T, R>(items: readonly T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: Array<{ ok: true; value: R } | { ok: false; error: unknown }> = new Array(items.length);
+  let next = 0;
+  let failed = false;
+  const worker = async (): Promise<void> => {
+    while (next < items.length && !failed) {
+      const i = next++;
+      try {
+        out[i] = { ok: true, value: await fn(items[i]) };
+      } catch (error) {
+        out[i] = { ok: false, error };
+        failed = true;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(MEDIA_CHECK_CONCURRENCY, items.length) }, worker));
+  const values: R[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const r = out[i];
+    if (!r) continue;
+    if (!r.ok) throw r.error;
+    values.push(r.value);
+  }
+  return values;
 }
 
 const hex = (bytes: Uint8Array): string =>

@@ -237,13 +237,16 @@ export function selectorsOf(rel: ProductRelations, variants: readonly Row[]): St
 
 async function storedSelectors(db: D1Database, productId: string | null): Promise<StoredSelectors> {
   if (!productId) return selectorsOf({ groups: [], values: [], colors: [], links: [], fulfillments: [], transports: [] }, []);
-  const rel = await loadProductRelations(db, productId);
-  const variants = await db
-    .prepare('SELECT id, regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd FROM product_variants WHERE product_id = ?')
-    .bind(productId)
-    .all<Row>()
-    .then((r) => r.results ?? [])
-    .catch(() => [] as Row[]);
+  // Two independent reads, sent together (every product save waits on them).
+  const [rel, variants] = await Promise.all([
+    loadProductRelations(db, productId),
+    db
+      .prepare('SELECT id, regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd FROM product_variants WHERE product_id = ?')
+      .bind(productId)
+      .all<Row>()
+      .then((r) => r.results ?? [])
+      .catch(() => [] as Row[]),
+  ]);
   return selectorsOf(rel, variants);
 }
 

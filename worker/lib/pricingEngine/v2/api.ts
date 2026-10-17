@@ -57,7 +57,7 @@ import { loadPricingRates, type PricingRates } from '../rates';
 import { loadProductsPricing, type InputWrite, type ProductPricingData, type RuleWrite } from '../store';
 import { isFenceMiss } from '../../operations';
 import { engineCoreInstalled } from '../../engineInstalled';
-import { importStockRefusal, isImportStockMiss, refuseImportStockNotConfigured } from '../../importStock';
+import { importStockNotConfigured, importStockRefusal, isImportStockMiss } from '../../importStock';
 import { loadEngineControl, priceImageOf, withRuleIds, type EngineControl } from '../engineWrite';
 import { effectiveWrites, FORM_INPUT_FIELDS, formOptionIds, parseProductInputs } from '../productInputs';
 import { parseRuleWrites } from '../ownerRules';
@@ -111,10 +111,14 @@ export interface V2Read {
 export async function loadV2Read(db: D1Database, productId: string, draft?: LoadedProduct): Promise<V2Read | null> {
   const loaded = draft ?? (await loadProducts(db, [productId])).get(productId) ?? null;
   if (!loaded) return null;
-  const { stored, v2, control } = await loadV2Stores(db, [productId]);
-  const ctx = await loadPreviewContext(db);
-  const rates = await loadPricingRates(db);
-  const image = await priceImageOf(db, productId);
+  // The stores' batches and the rates' batch one after another (never two batches at once); the settings
+  // and the price image beside them — every save, preview and apply waits on this read (round trips
+  // measured by tests/adminSaveRoundTrips.test.ts).
+  const [{ stored, v2, control, rates }, ctx, image] = await Promise.all([
+    loadV2Stores(db, [productId]).then(async (s) => ({ ...s, rates: await loadPricingRates(db) })),
+    loadPreviewContext(db),
+    priceImageOf(db, productId),
+  ]);
   const own = stored.get(productId)!;
   const review = storedMethodOf({ stored: own }) ? null : await pendingReviewOf(db, productId);
   const shelf = (await loadShelves(db, [productId])).get(productId) ?? null;
@@ -144,9 +148,9 @@ export async function loadV2Stores(
     }
     return { stored, v2, control: NO_ENGINE_CONTROL };
   }
-  const stored = await loadProductsPricing(db, ids);
+  // The control row is a plain read: it goes beside the first batch.
+  const [stored, control] = await Promise.all([loadProductsPricing(db, ids), loadEngineControl(db)]);
   const v2 = await loadV2Store(db, ids);
-  const control = await loadEngineControl(db);
   return { stored, v2, control };
 }
 
@@ -598,7 +602,12 @@ export const v2Published = (ev: Pick<V2Evaluation, 'kind' | 'v2'>): boolean => e
 /** §4.3 steps 1 and 3-6 (the sequence check is the caller's, before the evaluation). */
 export async function gateV2(g: GateInput): Promise<V2Verdict> {
   const { c, ev } = g;
-  if (await v2Replayed(c.env.DB, ev.product_id, g.hash)) return 'already';
+  // Both reads at once: a replay answers first, as before; the import stock gate is asked only of a complete write.
+  const [replayed, stockMiss] = await Promise.all([
+    v2Replayed(c.env.DB, ev.product_id, g.hash),
+    ev.complete && !(g.prices_only && !ev.needs_write) ? importStockNotConfigured(c.env.DB, ev.product_id) : Promise.resolve(false),
+  ]);
+  if (replayed) return 'already';
   if (!ev.complete) {
     // A data-only save (no hash, no tick, no fresh sign-in) is for a product no customer sees yet. On a
     // V2-PUBLISHED product it would store an unreviewed price set that the next automatic repricing (FX-5)
@@ -612,7 +621,7 @@ export async function gateV2(g: GateInput): Promise<V2Verdict> {
   // A complete write publishes (its results make the product SELLABLE): a product the catalogue import created is
   // refused until the owner chose its stock mode (Bambu import spec §B.10) — here, before any preview or review
   // sheet, and again by the batch's own fence (v2/write.ts step 0), which stays the authority.
-  await refuseImportStockNotConfigured(c.env.DB, ev.product_id);
+  if (stockMiss) throw importStockRefusal();
   if (!g.priceChange) return 'write';
   if (!isHash(g.hash)) throw refusal(409, 'PRICING_PREVIEW_REQUIRED', { preview: await g.preview() });
   if (g.hash !== ev.hash) throw refusal(409, 'PRICING_PREVIEW_STALE', { preview: await g.preview() });

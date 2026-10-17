@@ -76,7 +76,8 @@ import {
 } from './productModel';
 import { productsHaveColumn, productsHaveConditionDoc } from './conditionProjection';
 import { withClassificationPlacements } from './catalogMembership';
-import { planSearchIndex, searchIndexInstalled } from './search/store';
+import { planSearchIndex } from './search/store';
+import { tableColumns } from './schemaColumns';
 import { toSearchDoc } from './search/document';
 import { loadSearchAliases } from './search/aliases';
 import {
@@ -172,14 +173,10 @@ function hasPhysicalDimensionInput(value: Record<string, unknown>): boolean {
  * existing relation table that lacks 0099's witness returns false.
  */
 async function relationDimensionsInstalled(db: D1Database, table: string): Promise<boolean> {
-  try {
-    const { results } = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
-    if (!results || results.length === 0) return true;
-    const names = new Set(results.map((column) => String(column.name)));
-    return DIMENSION_FIELDS.every((field) => names.has(field));
-  } catch {
-    return true;
-  }
+  // Asked once per binding (worker/lib/schemaColumns.ts); a failed or empty PRAGMA still answers true.
+  const names = await tableColumns(db, table, DIMENSION_FIELDS);
+  if (!names || names.size === 0) return true;
+  return DIMENSION_FIELDS.every((field) => names.has(field));
 }
 
 /** A 0044 adjustment may be negative — a discount below the inherited value is
@@ -3187,15 +3184,21 @@ export async function planProductSave(
   // an owner who cannot correct a price because of a search index they never
   // asked about is the exact failure `deployAheadOfMigrations` exists to
   // prevent. The backfill cron indexes the product as soon as the table lands.
-  if (doc && (await searchIndexInstalled(db))) {
-    const nameRows = await db
-      .prepare(
-        `SELECT (SELECT COALESCE(NULLIF(b.name_en, ''), b.name_ar) FROM brands b WHERE b.id = ?) AS brand,
-                (SELECT COALESCE(NULLIF(c.name_en, ''), c.name_ar) FROM catalogs c WHERE c.id = ?) AS main,
-                (SELECT COALESCE(NULLIF(c2.name_en, ''), c2.name_ar) FROM catalogs c2 WHERE c2.id = ?) AS sub`
-      )
-      .bind(doc.brand_id ?? '', doc.category_id ?? '', doc.sub_category_id ?? '')
-      .first<{ brand: string | null; main: string | null; sub: string | null }>();
+  // Asked once per binding (worker/lib/schemaColumns.ts): the planner runs twice per save. The catch-up job keeps
+  // its own probe (`searchIndexInstalled`), charged to the quarter-hour budget statement for statement.
+  if (doc && (((await tableColumns(db, 'search_tokens'))?.size ?? 0) > 0)) {
+    // The names and the stored aliases are independent reads: sent together.
+    const [nameRows, storedAliases] = await Promise.all([
+      db
+        .prepare(
+          `SELECT (SELECT COALESCE(NULLIF(b.name_en, ''), b.name_ar) FROM brands b WHERE b.id = ?) AS brand,
+                  (SELECT COALESCE(NULLIF(c.name_en, ''), c.name_ar) FROM catalogs c WHERE c.id = ?) AS main,
+                  (SELECT COALESCE(NULLIF(c2.name_en, ''), c2.name_ar) FROM catalogs c2 WHERE c2.id = ?) AS sub`
+        )
+        .bind(doc.brand_id ?? '', doc.category_id ?? '', doc.sub_category_id ?? '')
+        .first<{ brand: string | null; main: string | null; sub: string | null }>(),
+      intent.searchAliases ? Promise.resolve(null) : loadSearchAliases(db, [productId]),
+    ]);
     // Model and colour names in all three languages: "X2D Combo" is an OPTION
     // name on this shop's products, not part of the product name, so a search
     // for «كومبو» reaches nothing without them.
@@ -3205,7 +3208,7 @@ export async function planProductSave(
     ].filter((n): n is string => typeof n === 'string' && n.trim() !== '');
     // The aliases the backfill writes too (one loader, both writers): what the
     // caller is about to write, or what is stored. None without migration 0194.
-    const aliases = intent.searchAliases ?? (await loadSearchAliases(db, [productId])).get(productId) ?? [];
+    const aliases = intent.searchAliases ?? storedAliases?.get(productId) ?? [];
     const indexStmts = planSearchIndex(
       db,
       toSearchDoc({
@@ -3674,13 +3677,17 @@ export async function reloadForVerification(db: D1Database, productId: string): 
   const raw = await db.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>();
   if (!raw) return null;
   const row = parseProductRow(raw);
-  const view = await loadRelationsView(db, productId, raw.inventory_mode);
-  const relations = await loadRelationsResponse(db, productId);
-  const { results } = await db
-    .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ? ORDER BY catalog_id')
-    .bind(productId)
-    .all<{ catalog_id: string }>();
-  const printerFitIds = await loadPrinterFitIds(db, productId);
+  // Four independent reads of the stored product, sent together (the save answers with this read-back:
+  // one after another they were four more waits on the D1 primary before the owner saw «تم الحفظ»).
+  const [view, relations, { results }, printerFitIds] = await Promise.all([
+    loadRelationsView(db, productId, raw.inventory_mode),
+    loadRelationsResponse(db, productId),
+    db
+      .prepare('SELECT catalog_id FROM product_catalogs WHERE product_id = ? ORDER BY catalog_id')
+      .bind(productId)
+      .all<{ catalog_id: string }>(),
+    loadPrinterFitIds(db, productId),
+  ]);
   return {
     row,
     view,

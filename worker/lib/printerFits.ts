@@ -33,6 +33,7 @@ import { listing } from './listing';
 import { badRequest, unavailable } from './http';
 import { isMissingTable } from './membershipBenefits';
 import { printerProductIds } from './printerIdentity';
+import { tableColumns } from './schemaColumns';
 
 /** How many printers one part may name. A nozzle fits a family, not a catalogue. */
 export const MAX_PRINTER_FITS = 40;
@@ -61,12 +62,9 @@ async function orNone<T>(run: () => Promise<T>, none: T): Promise<T> {
 
 /** Is the table there yet? One PRAGMA, the same probe the search index uses — for the WRITER. */
 export async function printerFitsInstalled(db: D1Database): Promise<boolean> {
-  try {
-    const rows = await db.prepare('PRAGMA table_info("product_printer_fits")').all<{ name: string }>();
-    return (rows.results ?? []).length > 0;
-  } catch {
-    return false;
-  }
+  // Kept per binding once present (worker/lib/schemaColumns.ts); absent or failed: asked again next time.
+  const cols = await tableColumns(db, 'product_printer_fits');
+  return !!cols && cols.size > 0;
 }
 
 /** A printer as the admin picker and the storefront chips name it. */
