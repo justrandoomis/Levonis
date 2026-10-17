@@ -252,6 +252,9 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   // product's state. The door itself (worker/routes/priceRequests.ts) asks neither.
   'worker/routes/priceRequests.ts': { visible: 0, sellable: 0, states: 0 },
   'worker/lib/priceRequests.ts': { visible: 1, sellable: 1, states: 1 },
+  // A request is ANSWERED when its selection has a live V2 price on a SELLABLE product (worker/lib/priceRequestState.ts):
+  // the V2 writer's batch, the sweep's repair and the admin chip («طلبات السعر») all ask it — never a customer read.
+  'worker/lib/priceRequestState.ts': { visible: 0, sellable: 1, states: 0 },
 };
 
 /** Every .ts under worker/, relative to the repository root. */

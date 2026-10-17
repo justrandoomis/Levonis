@@ -823,6 +823,17 @@ needs-pricing queue orders by distinct requesters then the latest request in SQL
 cap) and offers «الأكثر طلباً» with per-selection counts; the products list has a `price_requests`
 column, a `requests` sort and `requested=1`. Customers never see counts.
 
+**Answered at the write (2026-10-17, the owner's «طلبات السعر: 2» on a priced eSUN filament;
+`worker/lib/priceRequestState.ts`).** The owner's and editors' V2 price writes (the form's save and
+«اعتمد ونشر», the prices-only apply, the purchase review) carry, in their own batch, the move of every
+`open` request they answer — a live V2 price for that selection on a product a customer can buy — to
+`priced`, the reverse for a `priced` one they un-answer, and the stats recount. The products list's
+`price_requests` counts from source only the people still waiting on the owner (open and not answered).
+Every sweep pass begins with one guarded, idempotent statement that does the same for every other door
+(a hold lifted, a rate that unblocked a colour, products priced before this change) and recounts what it
+moved; FX-5's automatic writes lay nothing in their budgeted batches and are covered by it. Telling the
+customer stays the sweep's, with the same sellable-and-priced check.
+
 ## 10. Pricing from the shelf (DECISIONS row 244, migration 0198)
 
 **The owner's decisions (2026-10-17).** (1) A cost-first («من التكلفة») model with units on the shelf

@@ -45,6 +45,7 @@ import { fence } from '../../operations';
 import { auditStatements } from '../../audit';
 import { catalogKnowledgeInstalled } from '../../catalogKnowledge';
 import { importStockFence } from '../../importStock';
+import { priceRequestTransitions, priceRequestsInstalled, requestGateOf, type RequestGate } from '../../priceRequestState';
 import { directPurchaseStatement } from '../directPurchase';
 import { PRICE_IMAGE_SQL, RATES_FENCE_SQL, SKU_COST_CHUNK, priceRowStatements, rateFenceBinds, type AutoWrite } from '../engineWrite';
 import { batchHead, batchTail, inputStatements, pricingAuditStatement, pricingAuditStatements, ruleStatements, type PricingAuditRow } from '../store';
@@ -102,6 +103,14 @@ export interface V2WriteOptions {
    * (one read); the automatic repricing passes what its state read already learnt, so it costs nothing.
    */
   shelfSig?: boolean;
+  /**
+   * «طلب السعر» (DECISIONS row 240; worker/lib/priceRequestState.ts): the clauses the batch's request
+   * transitions may name, or false for none (0193 absent). Omitted: asked of the binding (kept per binding) —
+   * except for an AUTOMATIC repricing (`auto`: FX-5 and the owner's rate preview), which reprices products
+   * already V2-published and budgets every statement of its tick: it lays none, and the same tick's
+   * price-request sweep moves any request a new rate answered (its step 0, `repairAnsweredRequests`).
+   */
+  priceRequests?: RequestGate | false;
 }
 
 /** The private result row of one planned SKU × channel (each 0189 pair written whole). */
@@ -212,9 +221,16 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
 
   const fresh = o.newProduct === true;
   // 0. Never publish an imported product whose stock mode is not chosen (§B.10). First, so its miss is the one reported.
-  const stockGate = o.stockGate ?? (await catalogKnowledgeInstalled(db));
-  // Row 244: the shelf this write priced at (a hash), so the sweep knows when the shelf moves again.
-  const shelfSig = ev.shelf_sig !== undefined && (o.shelfSig ?? (await shelfSigInstalled(db)));
+  const [stockGate, requests, shelfSig] = await Promise.all([
+    o.stockGate ?? catalogKnowledgeInstalled(db),
+    o.priceRequests !== undefined
+      ? o.priceRequests
+      : auto
+        ? false
+        : Promise.all([priceRequestsInstalled(db), requestGateOf(db)]).then(([on, gate]): RequestGate | false => (on ? gate : false)),
+    // Row 244: the shelf this write priced at (a hash), so the sweep knows when the shelf moves again.
+    ev.shelf_sig !== undefined && (o.shelfSig ?? shelfSigInstalled(db)),
+  ]);
   return [
     ...(stockGate ? importStockFence(db, pid) : []),
     // (A product this save creates: its row and relations first — everything below names it.)
@@ -279,6 +295,9 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
           WHERE product_id = ?`
       )
       .bind(ev.method, ev.stored.config_version, o.now, ...(shelfSig ? [ev.shelf_sig ?? null] : []), o.now, o.now, o.actor, auditId, o.now, pid),
+    // 9b. «طلب السعر»: the requests this batch answers move on with it, the stats recounted (the chip and the
+    //     queue are right the moment the price is; the sweep tells the people who asked).
+    ...(requests ? priceRequestTransitions(db, pid, o.now, requests) : []),
     // 10. The audit.
     ...pricingAuditStatements(db, audits),
     ...(o.extraAudits ?? []),

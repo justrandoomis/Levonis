@@ -14,13 +14,16 @@
  * (plus `rate_limits` and the fence's `ops_guards` scratch rows): never an
  * order, a cart, a wallet, an inventory reservation or any price.
  *
- * THE SWEEP IS THE ONE AUTHORITY for "this is now priced": a selection becomes
- * sellable through many doors (the first V2 write, a later V2 write adding SKU
- * rows, FX-5, the completeness hold lifting, the owner's switch turning off),
- * and a hook on one door would miss the others. It runs in the quarter-hour
- * tick after the completeness sweep, within its own budget, and moves a
- * request to `notified` (the in-app row and the outbox rows in the SAME batch)
- * or `closed(priced)` when the customer did not ask to be told.
+ * THE SWEEP IS THE ONE AUTHORITY for TELLING: a selection becomes sellable
+ * through many doors (the first V2 write, a later V2 write adding SKU rows,
+ * FX-5, the completeness hold lifting, the owner's switch turning off). It
+ * runs in the quarter-hour tick after the completeness sweep, within its own
+ * budget, and moves a request to `notified` (the in-app row and the outbox
+ * rows in the SAME batch) or `closed(priced)` when the customer did not ask to
+ * be told. The owner's V2 price writes move what they answer to `priced` in
+ * their own batch, and the sweep's first statement does the same for every
+ * other door (worker/lib/priceRequestState.ts), so the owner's count never
+ * waits for a tick.
  *
  * THE ADMIN HEARS IN A DIGEST, never once per request: at most one Telegram
  * message an hour, in the existing «البلاغات» topic (default D8), naming the
@@ -53,54 +56,16 @@ import { planNotifyCustomer, reachForMany, type CustomerMessage, type CustomerRe
 import { channelsLive } from './channelReadiness';
 import { announceToAdmins } from './adminTopicRouting';
 
-// ------------------------------------------------------------- installed?
+// ------------------------------------------------------------- installed? the stats
 
-const PRESENT = new WeakMap<object, true>();
-const ABSENT_UNTIL = new WeakMap<object, number>();
-const ABSENT_RECHECK_MS = 60_000;
-
-/** "no such table: product_price_request…" — the deploy-ahead answer. */
-export function isMissingPriceRequestTable(err: unknown): boolean {
-  return /no such table:?\s*product_price_request/i.test(String((err as { message?: unknown })?.message ?? err));
-}
-
-/** Migration 0193's tables are on this database. One probe per binding while unknown, none once present. */
-export async function priceRequestsInstalled(db: D1Database): Promise<boolean> {
-  if (PRESENT.has(db)) return true;
-  if ((ABSENT_UNTIL.get(db) ?? 0) > Date.now()) return false;
-  try {
-    await db.prepare('SELECT 1 AS x FROM product_price_request_stats LIMIT 1').first<{ x: number }>();
-    PRESENT.set(db, true);
-    return true;
-  } catch (e) {
-    if (isMissingPriceRequestTable(e)) ABSENT_UNTIL.set(db, Date.now() + ABSENT_RECHECK_MS);
-    return false;
-  }
-}
-
-/** Whether this database is known to carry 0193 without asking (a read that just succeeded proves it). */
-export function rememberPriceRequestsPresent(db: object): void {
-  PRESENT.set(db, true);
-}
-
-// ------------------------------------------------------------- the stats
-
-/**
- * The per-product aggregates, RECOMPUTED FROM SOURCE over the open rows — one
- * statement, appended to every batch that writes requests. The digest's
- * high-water mark follows the count DOWN (never up: only the digest's claim
- * raises it), so demand that returns after the open rows were told or
- * withdrawn is announced again from its new start.
- */
-const STATS_SQL = `INSERT INTO product_price_request_stats (product_id, requesters, selections, clicks, last_request_at, updated_at)
-SELECT ?1, COUNT(DISTINCT user_id), COUNT(DISTINCT selection), COALESCE(SUM(click_count), 0), COALESCE(MAX(requested_at), ''), ?2
-  FROM product_price_requests WHERE product_id = ?1 AND state = 'open'
-ON CONFLICT(product_id) DO UPDATE SET requesters = excluded.requesters, selections = excluded.selections,
-  clicks = excluded.clicks, last_request_at = excluded.last_request_at, updated_at = excluded.updated_at,
-  digest_requesters = MIN(product_price_request_stats.digest_requesters, excluded.requesters)`;
-
-export const statsRecompute = (db: D1Database, productId: string, now: string): D1PreparedStatement =>
-  db.prepare(STATS_SQL).bind(productId, now);
+// Moved to ./priceRequestState (the V2 writer and the admin list read them without this module's imports).
+export {
+  isMissingPriceRequestTable,
+  priceRequestsInstalled,
+  rememberPriceRequestsPresent,
+  statsRecompute,
+} from './priceRequestState';
+import { priceRequestsInstalled, repairAnsweredRequests, statsRecompute } from './priceRequestState';
 
 // ------------------------------------------------------------- the selection, validated
 
@@ -262,6 +227,14 @@ export async function sweepPriceRequests(
     if (!(await priceRequestsInstalled(db))) return report;
     const now = opts.now ?? new Date().toISOString();
 
+    // 0. The rows left behind (worker/lib/priceRequestState.ts `repairAnsweredRequests`): every open request
+    //    already answered — its selection priced on a sellable product — moves to `priced` with its product's
+    //    stats recounted, whatever product it is; the passes below tell the people. The listing's two probes
+    //    (kept per binding) and the repair's two statements.
+    if (!spend(4)) return report;
+    const L = await listing(db);
+    await db.batch(repairAnsweredRequests(db, now, { held: L.installed, v2: L.v2 }));
+
     // 1. The products to look at (one statement).
     if (!spend(1)) return report;
     const only = opts.productIds && opts.productIds.length ? JSON.stringify([...new Set(opts.productIds)].slice(0, SWEEP_PRODUCTS)) : null;
@@ -277,9 +250,9 @@ export async function sweepPriceRequests(
     if (!ids.length) return report;
     report.products = ids.length;
 
-    // 2. Their states (the listing probes are charged as two, the read as one).
-    if (!spend(3)) return report;
-    const states = await (await listing(db)).statesOf(ids);
+    // 2. Their states (the listing's probes were charged in step 0; the read as one).
+    if (!spend(1)) return report;
+    const states = await L.statesOf(ids);
     const sellableIds = ids.filter((id) => states.get(id) === 'sellable');
 
     // 3. The sellable products' documents with their SKU rows (the listing's own loader).

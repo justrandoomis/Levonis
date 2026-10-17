@@ -36,6 +36,7 @@ import { completenessInstalled, listing } from '../lib/listing';
 import { loadInfoCompleteness, loadInfoCompletenessCard } from '../lib/knowledge/infoCompleteness';
 import { isCatalogBlockingCode } from '@levonis/contracts/productCompleteness';
 import { priceRequestsInstalled } from '../lib/priceRequests';
+import { requestGateOf, requestersWaitingSql } from '../lib/priceRequestState';
 import { parseMissing, projectItems } from '../lib/productCompleteness';
 import { newId } from '../lib/crypto';
 import { DIMENSION_FIELDS, parseProductRow, validateProductDoc, projectAdmin } from '../lib/productModel';
@@ -770,8 +771,11 @@ adminProductsRoutes.get('/', async (c) => {
    * the unpublished ones, default D9). Without 0193 the column reads null, the sort is `updated` and the
    * filter answers nothing (`requests_unavailable`).
    */
-  const requestsInstalled = await priceRequestsInstalled(c.env.DB);
-  const requestersSql = '(SELECT st.requesters FROM product_price_request_stats st WHERE st.product_id = products.id)';
+  const [requestsInstalled, requestGate] = await Promise.all([priceRequestsInstalled(c.env.DB), requestGateOf(c.env.DB)]);
+  // Only the people whose request STILL NEEDS THE OWNER (open, and not answered: a live V2 price for their
+  // selection on a product a customer can buy), counted from source — a priced product never shows a chip
+  // because the sweep has not told its requesters yet (worker/lib/priceRequestState.ts).
+  const requestersSql = requestersWaitingSql('products', requestGate);
   if (q.requested === '1') clauses.push(requestsInstalled ? `COALESCE(${requestersSql}, 0) > 0` : '0');
   const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
   const requestCols = requestsInstalled ? `,
