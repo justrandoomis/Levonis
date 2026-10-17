@@ -672,6 +672,7 @@
     "tests/pricingV2ReviewSurfaces.test.ts": 9.7,
     "tests/pricingV2ReviewUi.test.ts": 15.2,
     "tests/pricingV2Roles.test.ts": 31.2,
+    "tests/pricingV2Shelf.test.ts": 33.5,
     "tests/pricingV2Writer.test.ts": 12.5,
     "tests/printAccessories.test.ts": 0.4,
     "tests/printEstimateContract.test.ts": 9.9,

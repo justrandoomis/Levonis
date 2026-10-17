@@ -807,3 +807,61 @@ open count down (returning demand is news again), and the routing's two reads ar
 needs-pricing queue orders by distinct requesters then the latest request in SQL (inside the 200
 cap) and offers «الأكثر طلباً» with per-selection counts; the products list has a `price_requests`
 column, a `requests` sort and `requested=1`. Customers never see counts.
+
+## 10. Pricing from the shelf (DECISIONS row 244, migration 0198)
+
+**The owner's decisions (2026-10-17).** (1) A cost-first («من التكلفة») model with units on the shelf
+is priced, for the DIRECT sale, from the **highest unit cost among its batches still on the shelf**
+(`inventory_lots.qty_remaining > 0`, each batch at its effective cost — its newest cost version, as
+FIFO reads it). No unit is ever sold below its cost + the minimum profit, and the price stays put
+while the shelf sells: it moves only when a costlier batch arrives or the costliest one sells out.
+(2) A model whose shelf is sold out goes back to the supplier calculation (§1.2); without a supplier
+price it is «يحتاج تسعيرًا» — not sold — and the owner's bell rings. Never a silent stale price.
+
+**The formula — the stock cost stays in dinars.** The landed cost was paid in dinars; it is never
+re-expressed through a rate:
+
+    E_D = R_shelf + T × U + (Σ option ± + colour ±) × U      never below R_shelf + T × U
+    D   = ceil_step(E_D)   (the engine's one rounding, ceilStep)  so D − R_shelf ≥ T × U at publication
+
+A fixed price (SKU or model) on a cost-first product is floored at R_shelf + T × U as at §1.3. A
+change of U moves the profit and the differences only (the `USD` reason, as today). The owner's
+example: A1 Combo's batches at 685,831 / 689,581 / 690,062 IQD, T = $40, U = 1,500 → D =
+ceil_step(690,062 + 60,000) = 751,000 at today's step; when the 690,062 batch sells out, 750,000.
+
+**Which batches are a SKU's shelf** — the cart's own stock rule (`resolveStock`) under the product's
+CURRENT inventory mode: BASE the product's batches; OPTION the batches of each option value the SKU
+selects (its model — two stocked options add their costs, the units are the fewer); COLOR the
+colour's; VARIANT_COMBINATION the variant's. A batch with no known cost never sets the price (the
+highest KNOWN cost does); a shelf of unknown costs only is priced from the supplier.
+
+**Pre-order is not the shelf.** A route keeps the supplier calculation: P_r = ceil_step(E_D,sup −
+Δ × U), E_D,sup being the direct price the supplier cost would give, with the route floors of §1.3
+measured against it — so the shelf never moves a pre-order price. It is capped at the direct price on
+sale (P ≤ D); it is stopped while the shelf sells below the route's own cost
+(`V2_ROUTE_SHELF_CHEAPER`); with no supplier price it is unavailable while the shelf sells
+(`V2_ROUTE_NO_SUPPLIER`) — no error on the direct price. These blocks are temporary: the route row
+stays on, the SKU simply has no row on it, and nothing needs the owner's preview.
+
+**Recomputed by the existing queue.** Every V2 write stores the shelf it priced at as a hash
+(`product_pricing_state.shelf_sig`, migration 0198: each shelf identity's highest known cost,
+«unknown» or «sold out» — never a unit count). The quarter-hour sweep (`autoReprice.ts`) reads the
+shelves of the cost-first products in one statement; a signature that differs makes the product stale
+with the reason `STOCK` — a batch received, FIFO consumption on order confirmation, an adjustment, a
+return or a cost correction. It is evaluated and written exactly as an FX move, `engine_owner` in the
+price history — with one difference in the hold: a price the shelf RAISES is published on that tick
+and never held (holding it would sell units below cost + the minimum profit); a large fall (above
+15%) waits for the owner with the bell «انخفضت أعلى تكلفة على الرف», the higher price meanwhile
+being safe. A sale that leaves the costliest batch changes nothing; a shelf that moved without moving
+a price records its new signature only. A sold-out model with no supplier price is written as unsold
+(`V2_STOCK_SOLD_OUT`) and the bell «نفد مخزون موديل ولا يوجد سعر مورّد» rings; every model sold out
+holds the product with that code and the bell, and the tick after stock returns prices it from the
+new batch (no 24-hour wait).
+
+**Owner-only.** `v2_shelf` (the cost and the units) and `v2_blocked` (why a channel is unsold) are
+FINANCIAL_FIELDS (row 220). The owner's form reads «من المخزون: أعلى تكلفة على الرف 690,062 د.ع (6 قطع)»
+in the result row and the «النتيجة» card; «ما ينقص» no longer lists that model's direct price. A
+price editor and a customer read final prices only.
+
+**Deploy order.** Additive: a database without 0198 still prices from the shelf on every save and
+preview, but stores no signature and detects no `STOCK` move; an older Worker never reads the column.
