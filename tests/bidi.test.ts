@@ -60,6 +60,23 @@ test('ltrRuns keeps a trailing «+», «™», «®» and a one-character unit (
   for (const s of ['أكثر من 2M+ نموذج', 'حتى 180℃', 'رأس E3D High Flow ObXidian™ Hotend']) assert.equal(ltrRuns(s).map((r) => r.text).join(''), s, 'nothing lost');
 });
 
+test('a spaced «-» or «+» between Arabic words and a run is the sentence\'s separator, never the run\'s sign (landing review: «بالمسحوق - 0.075mm» drawn «-0.075mm»)', () => {
+  // Committed reviewed translations (spec values, box items, usage bodies, x.* labels): the mark stays in the RTL
+  // context, between the word and the run, where the plain RTL paragraph drew it before.
+  assert.equal(runs('طلاء PEI بالمسحوق - 0.075mm / صفيحة الفولاذ المقاوم للصدأ - 0.5mm/0.4mm'), 'طلاء [PEI] بالمسحوق - [0.075mm] / صفيحة الفولاذ المقاوم للصدأ - [0.5mm/0.4mm]');
+  assert.equal(runs('السرير الساخن - LV'), 'السرير الساخن - [LV]');
+  assert.equal(runs('بێدی گەرم - LV'), 'بێدی گەرم - [LV]');
+  assert.equal(runs('كابل الناقل (Bus) - (2x)6pin (1.5m)'), 'كابل الناقل ([Bus]) - ([2x])[6pin (1.5m)]');
+  assert.equal(runs('1. وحدة 10 W Laser Module - 1 قطعة 2. عدسة الليزر - 1 قطعة'), '[1]. وحدة [10 W Laser Module - 1] قطعة [2]. عدسة الليزر - [1] قطعة');
+  assert.equal(runs('23 حساسًا + 3 كاميرات'), '[23] حساسًا + [3] كاميرات');
+  assert.equal(runs('تُستخدم لوحة توزيع الطاقة (PDB) - 4 قنوات'), 'تُستخدم لوحة توزيع الطاقة ([PDB]) - [4] قنوات');
+  // A sign glued to its number is still the number's, and a prefix mark keeps its number (the existing cases).
+  assert.equal(runs('من -20℉ إلى +45℃'), 'من [-20℉] إلى [+45℃]');
+  assert.equal(runs('≤ 300 °C كحد أقصى'), '[≤ 300 °C] كحد أقصى');
+  for (const s of ['السرير الساخن - LV', '23 حساسًا + 3 كاميرات', 'كابل الناقل (Bus) - (2x)6pin (1.5m)']) assert.equal(ltrRuns(s).map((r) => r.text).join(''), s, 'nothing lost');
+  assert.equal(renderToStaticMarkup(createElement(BidiText, { text: 'السرير الساخن - LV' })), '<span dir="rtl">السرير الساخن - <bdi dir="ltr">LV</bdi></span>');
+});
+
 test('BidiText: one block line each with its own dir; runs in <bdi dir="ltr">; English plain LTR; empty lines kept', () => {
   const one = renderToStaticMarkup(createElement(BidiText, { text: 'أقل من 10mA' }));
   assert.equal(one, '<span dir="rtl">أقل من <bdi dir="ltr">10mA</bdi></span>');

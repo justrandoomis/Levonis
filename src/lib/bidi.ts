@@ -15,8 +15,11 @@
  *    so «256 × 256 × 256 mm», «220-240 V», «M3*21.5», «(SA011)», «4-Pin» and
  *    «X1 Series» keep their order — European numbers separated by neutrals
  *    otherwise reorder inside an RTL paragraph («× 389 × 458 مم 389»). A run
- *      - starts at a Latin letter, a digit, or one of ≤ ≥ < > ± ~ # + - − (mirrored
- *        or weak marks that must stay inside it, or ≤ would read as ≥);
+ *      - starts at a Latin letter, a digit, or one of ≤ ≥ < > ± ~ # (mirrored
+ *        or weak marks that must stay inside it, or ≤ would read as ≥); a sign
+ *        + - − starts it only glued to a digit («-20℉»): a spaced «-» or «+»
+ *        («بالمسحوق - 0.075mm», «23 حساسًا + 3 كاميرات») separates the
+ *        sentence's words and stays in the RTL context, between them;
  *      - continues through Latin letters, digits, spaces and . , : / \ × * + - – _ ' ’ " % ° ³ ² µ Ω ™ ® © ℃ ℉ & ( );
  *      - ends at a Latin letter, a digit, % ° ³ ² µ Ω ™ ® © ℃ ℉ ) " or + (a name «PLA Silk+», a count «2M+»);
  *      - leaves the Arabic sentence's trailing punctuation (. ، ؛ :) outside;
@@ -42,6 +45,8 @@ const START = new RegExp(`[${LATIN}0-9\\u2264\\u2265<>\\u00B1~#+\\-\\u2212]`);
 const MARKS = '\\u2122\\u00AE\\u00A9\\u2103\\u2109';
 const CONTINUE = new RegExp(`[${LATIN}0-9 \\u00A0.,:/\\\\\\u00D7*+\\-\\u2013_'\\u2019"%\\u00B0\\u00B3\\u00B2\\u00B5\\u03A9${MARKS}&()\\u2264\\u2265<>\\u00B1~#\\u2212]`);
 const END = new RegExp(`[${LATIN}0-9%\\u00B0\\u00B3\\u00B2\\u00B5\\u03A9${MARKS})"+]`);
+/** A sign that starts a run only glued to a digit: spaced, it is the sentence's separator (landing review). */
+const SIGN = /[+\-\u2212]/;
 
 /** The run `s.slice(0, k)` cut back to its last end character, its brackets balanced; 0 when nothing is left. */
 function runLength(s: string): number {
@@ -84,7 +89,7 @@ export function ltrRuns(s: string): Array<{ text: string; ltr: boolean }> {
   let rtl = '';
   let i = 0;
   while (i < text.length) {
-    if (START.test(text[i])) {
+    if (START.test(text[i]) && (!SIGN.test(text[i]) || /[0-9]/.test(text[i + 1] ?? ''))) {
       let j = i;
       while (j < text.length && CONTINUE.test(text[j])) j += 1;
       const k = runLength(text.slice(i, j));

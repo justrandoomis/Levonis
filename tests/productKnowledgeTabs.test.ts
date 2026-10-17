@@ -553,6 +553,32 @@ test('one chip per product in a bucket: a compound whose two labels link the sam
   assert.equal((two.match(/href="\/product\/h2d"/g) ?? []).length, 2);
 });
 
+test('a linked live product with Arabic and Sorani names: its chip reads the English name (B.7, pickName), never an Arabic name forced LTR (landing review)', () => {
+  // The live P1S (a merge keeps its name): GET /api/products/bambu-lab-p1s, name_ar and name_ku in Arabic script.
+  const p1s = {
+    id: 'prd_b1e2ff5081a34f3f9389',
+    slug: 'bambu-lab-p1s',
+    name: {
+      en: 'Bambu Lab P1S / P1S AMS Combo / P1S AMS 2 Combo 3D Printer',
+      ar: 'طابعة Bambu Lab P1S / P1S AMS Combo / P1S AMS 2 Combo ثلاثية الأبعاد',
+      ckb: 'چاپکەری سێ ڕەهەندی Bambu Lab P1S / P1S AMS Combo / P1S AMS 2 Combo',
+    },
+    image: '',
+  };
+  const k = canary(false);
+  k.compatibility.compatible = [{ relation: 'compatible_with', label: 'P1 Series', target_kind: 'family', scope: { kind: 'product', id: '' }, product: p1s }];
+  for (const lang of ['ar', 'ckb', 'en'] as const) {
+    const html = render(createElement(TabBody, { id: 'compatibility', tabs: knowledgeTabs(k, SEL), lang, selection: SEL, scopeNames: {} }));
+    assert.match(html, /<span dir="ltr" class="text-start rtl:text-right">Bambu Lab P1S \/ P1S AMS Combo \/ P1S AMS 2 Combo 3D Printer<\/span>/, `${lang}: the English name, LTR`);
+    assert.doesNotMatch(html, /طابعة Bambu|چاپکەری سێ/, `${lang}: no Arabic-script name in the chip`);
+  }
+  // A row saved before the rule with only an Arabic name: that name, in its own direction.
+  const legacy = canary(false);
+  legacy.compatibility.compatible = [{ relation: 'compatible_with', label: 'P1 Series', target_kind: 'family', scope: { kind: 'product', id: '' }, product: { ...p1s, name: { en: '', ar: p1s.name.ar, ckb: '' } } }];
+  const html = render(createElement(TabBody, { id: 'compatibility', tabs: knowledgeTabs(legacy, SEL), lang: 'ar', selection: SEL, scopeNames: {} }));
+  assert.match(html, /<span dir="rtl" class="text-start rtl:text-right">طابعة Bambu Lab P1S/);
+});
+
 test('«محتويات العلبة»: an English item sits beside its bullet on an RTL page, like a translated one (review: the box list zigzagged)', () => {
   const k = canary(false);
   k.in_the_box = [

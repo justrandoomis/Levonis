@@ -80,3 +80,26 @@ test('without knowledge rows the table is drawn as before: no state, no method',
   const html = render(products, result);
   assert.doesNotMatch(html, /data-test-method|data-state="/);
 });
+
+test('a list cell the server joined with «، » reads left to right on the English page, its items in order; RTL on the Arabic page (landing review: «In the box» reversed)', async () => {
+  const { products, result } = await comparison(false);
+  const cell = (html: string) => /data-field="connectivity"[\s\S]*?(?=data-field=")/.exec(html)?.[0] ?? '';
+  // The language provider reads `levo_lang` from localStorage on mount; a stub picks English for this render.
+  const g = globalThis as { localStorage?: unknown };
+  const had = Object.prototype.hasOwnProperty.call(g, 'localStorage');
+  const before = g.localStorage;
+  g.localStorage = { getItem: (k: string) => (k === 'levo_lang' ? 'en' : null), setItem: () => undefined, removeItem: () => undefined };
+  let en = '';
+  try {
+    en = cell(render(products, result));
+  } finally {
+    if (had) g.localStorage = before;
+    else delete g.localStorage;
+  }
+  assert.ok(en.includes('Connectivity'), 'the English page');
+  assert.match(en, /<bdi dir="ltr">Dual-band Wi-Fi، Bambu-Bus، USB<\/bdi>/, 'one LTR isolate: «Dual-band Wi-Fi» first, at the left');
+  assert.doesNotMatch(en, /dir="rtl"/, 'the separator is not Arabic text');
+  // The Arabic page keeps the list right to left, each Latin item its own LTR run.
+  const ar = cell(render(products, result));
+  assert.match(ar, /<bdi dir="rtl"><bdi dir="ltr">Dual-band Wi-Fi<\/bdi>، <bdi dir="ltr">Bambu-Bus<\/bdi>، <bdi dir="ltr">USB<\/bdi><\/bdi>/);
+});

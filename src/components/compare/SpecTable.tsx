@@ -104,8 +104,11 @@ function ValueText({ row, value, lang }: { row: CompareRow; value: CompareValue;
   const shown = own ?? (row.parse === 'boolean' || row.parse === 'text' || row.parse === 'ordinal' ? specValue(value.text, lang) : value.text);
   // A Latin value (an English option, a model name) is an LTR island inside Arabic; a value with Arabic script (the
   // translation memory's or the dictionary's) reads right to left with its Latin and number runs isolated (I18N-DESIGN §B).
-  if (/[A-Za-z]/.test(shown) && !ARABIC_SCRIPT.test(shown)) return <bdi dir="ltr">{shown}</bdi>;
-  return ARABIC_SCRIPT.test(shown) ? <BidiText as="bdi" text={shown} /> : <>{shown}</>;
+  // The server joins a list's items with «، » in every language (worker/lib/compareSpecs.ts): on the English page that
+  // separator is not Arabic text, so a list of English items reads left to right, in order (landing review).
+  const arabic = ARABIC_SCRIPT.test(lang === 'en' ? shown.replace(/،/g, '') : shown);
+  if (/[A-Za-z]/.test(shown) && !arabic) return <bdi dir="ltr">{shown}</bdi>;
+  return arabic ? <BidiText as="bdi" text={shown} /> : <>{shown}</>;
 }
 
 function Cell({

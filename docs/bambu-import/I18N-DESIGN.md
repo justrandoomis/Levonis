@@ -1,7 +1,8 @@
 # Imported text in Arabic and Sorani, mixed-script rendering, compatibility dedupe — design
 
 Status: BUILT on `feat/import-i18n` (surveyed at `3babbb65`). The review of the build (three reviews, 2026-10-17) changed
-the points marked **Review:** below; everything else is as designed.
+the points marked **Review:** below, and the landing review the points marked **Landing review:**; everything else is
+as designed.
 Scope: the owner's feedback on `/product/filament-buffer` (2026-10-16, two screenshots): (1) description and the
 other imported text are English on the Arabic page, mixed-script text must read correctly; (2) compatibility is
 repeated; (3) the specifications are good, keep them; (4) «يتطلب AMS Hub» must become a link once that product
@@ -310,8 +311,11 @@ After that, each TM load purges its products (§A.4).
    isolate (`[dir] { unicode-bidi: isolate }`). Neighbouring lines and the surrounding layout never reorder each
    other.
 3. **Latin and number runs inside an RTL line** become `<bdi dir="ltr">…</bdi>`. A run:
-   - **starts** at a Latin letter, a digit, or one of `≤ ≥ < > ± ~ # + - −`. These are mirrored or weak
-     characters that must stay inside the run, otherwise `≤` would render as `≥`.
+   - **starts** at a Latin letter, a digit, or one of `≤ ≥ < > ± ~ #`. These are mirrored or weak
+     characters that must stay inside the run, otherwise `≤` would render as `≥`. **Landing review:** a sign
+     `+ - −` starts a run only glued to a digit («-20℉»); a spaced one («بالمسحوق - 0.075mm», «السرير الساخن - LV»,
+     «23 حساسًا + 3 كاميرات») separates the sentence's words and stays in the RTL context, between them — isolated
+     with the run it was drawn on the run's far side and read as a sign («-0.075mm»).
    - **continues** through Latin letters, digits, spaces and `. , : / \ × * + - – _ ' ’ " % ° ³ ² µ Ω ™ ® © ℃ ℉ & ( )`.
    - **ends** at a Latin letter, a digit, `% ° ³ ² µ Ω ™ ® © ℃ ℉ )`, `"` or `+` (**Review:** «2M+», «PLA Silk+»,
      «Up to 180℃» and «ObXidian™ Hotend» were drawn out of order in Chromium).
@@ -361,7 +365,7 @@ Where it is used:
 | `ProductKnowledgeTabs.tsx` box item (~:414) | `BidiText`, `text-start rtl:text-right` (**Review:** an English item among translated ones sits beside its bullet) |
 | `ProductKnowledgeTabs.tsx` document title (~:235) | `BidiText` |
 | `ProductKnowledgeTabs.tsx` compatibility chips | §C.4 |
-| `SpecTable.tsx` `ValueText` (~:98–104) | Numeric values are unchanged (`<bdi dir="ltr">`). A text value with Arabic script uses `BidiText`; Latin-only is unchanged. |
+| `SpecTable.tsx` `ValueText` (~:98–104) | Numeric values are unchanged (`<bdi dir="ltr">`). A text value with Arabic script uses `BidiText`; Latin-only is unchanged. **Landing review:** the server joins a list's items with «، » in every language, so on the English page that separator alone is not Arabic script — a list of English items reads LTR, in order. |
 | `ProductCard.tsx` key line | unchanged (already `<bdi>` per value, name `dir="ltr"`) |
 
 ---
@@ -421,7 +425,9 @@ VERIFY's rows are untouched.
   page and knowledge, and the item gains `product`.
 - **Rendering** (`ProductKnowledgeTabs.tsx` ~:191):
   - **Linked**: `[product, ...more]`, each an `lv-choice` `<Link>` chip with a picture and a link chevron, name per
-    rule B.7. For `target_kind === 'family'` with links, the family label is a plain prefix («P1 Series:») followed
+    rule B.7. **Landing review:** the name is the target's English name in every language (`pickName`'s rule): a merged
+    live product keeps its own Arabic and Sorani names («طابعة Bambu Lab P1S … ثلاثية الأبعاد»), which `dir="ltr"`
+    reversed; a row with no English name shows the one it has with `dir={scriptDir(name)}`. For `target_kind === 'family'` with links, the family label is a plain prefix («P1 Series:») followed
     by the member chips. **Review:** one chip per product in a bucket — a compound's two labels may reach the same
     product («H2D and H2D Laser»: the H2D family and the H2D Laser printer), so a product already drawn in the bucket
     is not drawn again, and an item left with no chip is not drawn. Grouping stays by label (§C.2).

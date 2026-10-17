@@ -302,13 +302,19 @@ export function TabBody({
   );
 }
 
-/** A compatible product on the site: a chip that links to its page — its picture, its name (always Latin, B.7), a chevron. */
+/**
+ * A compatible product on the site: a chip that links to its page — its picture, its name, a chevron. The name is
+ * the English one in every language (B.7; Product.tsx `pickName`): a merged live product keeps its own Arabic and
+ * Sorani names («طابعة Bambu Lab P1S … ثلاثية الأبعاد»), which a forced LTR would reverse (landing review). A row
+ * with no English name shows the one it has, in its script's direction.
+ */
 function CompatLink({ p, fallback, lang }: { p: CompatProduct; fallback: string; lang: KnowledgeLang }) {
+  const name = p.name.en || w(p.name, lang) || fallback;
   return (
     <Link to={`/product/${encodeURIComponent(p.slug)}`} className="lv-choice inline-flex min-h-[44px] items-center gap-2 px-3 py-1.5 text-sm" data-knowledge-link>
       {p.image ? <SafeImage src={p.image} alt="" aspect="square" fit="contain" className="h-8 w-8 shrink-0 rounded-md" sizes="32px" bgClassName="bg-surface-raised" /> : null}
-      <span dir="ltr" className="text-start rtl:text-right">
-        {w(p.name, lang) || fallback}
+      <span dir={scriptDir(name)} className="text-start rtl:text-right">
+        {name}
       </span>
       <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted rtl:rotate-180" />
     </Link>
