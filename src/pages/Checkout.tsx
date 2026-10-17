@@ -18,6 +18,7 @@ import { methodDesc, methodTitle } from '../lib/methodText';
 import type { CartColourTag, DeliveryDayOption } from '../lib/api';
 import { groupCartLines } from '../lib/cartGroups';
 import { colourLang, colourStrings, groupSummaryText } from '../lib/colourQuantities';
+import { choiceName, unnamedChoice } from '../lib/choiceNames';
 import { ColourTag } from '../components/product/ColourTag';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 /**
@@ -1114,8 +1115,11 @@ export default function Checkout() {
     if (fromQuote !== undefined) return fromQuote;
     if (!cartLine) return null;
     if (cartLine.color_tag !== undefined) return cartLine.color_tag;
-    const col = cartLine.color_id ? (cartLine.colors ?? []).find((c) => c.id === cartLine.color_id) : undefined;
-    return col ? { id: col.id, name: col.name || col.id, hex: col.hex ?? '', image: '' } : null;
+    const colours = cartLine.colors ?? [];
+    const at = cartLine.color_id ? colours.findIndex((c) => c.id === cartLine.color_id) : -1;
+    const col = at >= 0 ? colours[at] : undefined;
+    // By name (the product page's rule), never the id: a V2 colour carries no V1 `name` (src/lib/choiceNames.ts).
+    return col ? { id: col.id, name: choiceName(col, colourLang(lang)) || unnamedChoice('colour', at + 1, colourLang(lang)), hex: col.hex ?? '', image: '' } : null;
   };
   const cartSubtotal = items.reduce((sum, item) => sum + item.unit_price_iqd * item.qty, 0);
   const total = quote ? quote.subtotal_iqd : cartSubtotal;

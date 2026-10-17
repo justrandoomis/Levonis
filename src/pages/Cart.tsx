@@ -43,6 +43,7 @@ import { cartEmptyText } from '../lib/cartEmptyText';
 import { groupCartLines } from '../lib/cartGroups';
 import { colourLang, colourStrings, groupSummaryText, isolate } from '../lib/colourQuantities';
 import { ColourSwatch, ColourTag } from '../components/product/ColourTag';
+import VariantChoices from '../components/cart/VariantChoices';
 
 /**
  * Component-local trilingual strings for the support-code block (§3.3).
@@ -2867,58 +2868,17 @@ export default function Cart() {
               </button>
             </div>
 
-            {(variantView.colors ?? []).length > 0 && (
-              <div>
-                <p className="text-text-primary font-bold mb-2">{loc('اللون', 'Color', 'ڕەنگ')}</p>
-                <div className="flex gap-2 flex-wrap">
-                  {(variantView.colors ?? []).map((c) => {
-                    // §7: colour and option names are English only.
-                    const cName = c.name || c.id;
-                    const active = pendingColorId === c.id;
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => setPendingColorId(active ? '' : c.id)}
-                        aria-pressed={active}
-                        className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
-                      >
-                        <span
-                          className="w-3.5 h-3.5 rounded-full border border-border-subtle inline-block"
-                          style={c.gradient ? { background: c.gradient } : { backgroundColor: c.hex || '#333' }}
-                        ></span>
-                        <span>{cName}</span>
-                        <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {(variantView.options ?? []).length > 0 && (
-              <div>
-                <p className="text-text-primary font-bold mb-2">{loc('الخيارات', 'Options', 'هەڵبژاردنەکان')}</p>
-                <div className="flex gap-2 flex-wrap">
-                  {(variantView.options ?? []).map((o) => {
-                    const oName = o.name || o.id;
-                    const active = pendingOptionId === o.id;
-                    return (
-                      <button
-                        key={o.id}
-                        type="button"
-                        onClick={() => setPendingOptionId(active ? '' : o.id)}
-                        aria-pressed={active}
-                        className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
-                      >
-                        <span>{oName}{typeof o.price_iqd === 'number' && o.price_iqd > 0 ? ` — ${money(o.price_iqd)}` : ''}</span>
-                        <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* The colour and option rows, by name in every language — never an id (src/lib/choiceNames.ts). */}
+            <VariantChoices
+              lang={colourLang(lang)}
+              colors={variantView.colors}
+              options={variantView.options}
+              pendingColorId={pendingColorId}
+              pendingOptionId={pendingOptionId}
+              onColor={setPendingColorId}
+              onOption={setPendingOptionId}
+              money={money}
+            />
 
             {variantError && (
               <p className="text-red-400 text-sm">{variantError}</p>

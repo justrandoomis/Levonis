@@ -464,8 +464,10 @@ export interface ApiProduct {
     alt_ckb?: string;
   }>;
   images: string[];
-  options: Array<{ id: string; name?: string; name_ar?: string; image?: string; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
-  colors: Array<{ id: string; name?: string; name_ar?: string; hex?: string; gradient?: string; image?: string; option_id?: string; linked_option_ids?: string[]; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
+  /** A V2 product sends `name_en` / `name_ar` / `name_ckb` (never the V1 `name`): read them with
+   *  `choiceName` (src/lib/choiceNames.ts), never `name || id`. */
+  options: Array<{ id: string; name?: string; name_en?: string; name_ar?: string; name_ckb?: string; variant_label?: string; image?: string; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
+  colors: Array<{ id: string; name?: string; name_en?: string; name_ar?: string; name_ckb?: string; hex?: string; gradient?: string; image?: string; option_id?: string; linked_option_ids?: string[]; price_iqd?: number; prime_price_iqd?: number; pro_price_iqd?: number; cost_iqd?: number }>;
   selling_type: 'direct_sale' | 'pre_order' | 'bundle';
   /** On a CARD too since catalog discovery (S1): «طلب مسبق» can be said on
    *  the card, and the listing's «البيع المباشر أولًا» sorts on it. */
