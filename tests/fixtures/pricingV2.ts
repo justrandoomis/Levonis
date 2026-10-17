@@ -16,6 +16,7 @@ import { loadEngineControl, priceImageOf, withRuleIds } from '../../worker/lib/p
 import { loadV2Store } from '../../worker/lib/pricingEngine/v2/store';
 import { evaluateV2Write, type V2Evaluation } from '../../worker/lib/pricingEngine/v2/evaluate';
 import { v2WriteStatements } from '../../worker/lib/pricingEngine/v2/write';
+import { loadShelves } from '../../worker/lib/pricingEngine/v2/shelf';
 import { evaluateLegacy } from '../../worker/lib/pricingEngine/legacy';
 import { asD1, stubApp, type StubUser } from './app';
 import { OWNER_USER } from './procurementPricing';
@@ -67,7 +68,9 @@ export async function v2Context(db: D1Database, pid: string) {
   const rates = await loadPricingRates(db);
   const control = await loadEngineControl(db);
   const image = await priceImageOf(db, pid);
-  return { loaded, stored: stores.get(pid)!, v2: v2.get(pid) ?? null, ctx, rates, control, image };
+  // DECISIONS row 244: the shelf, as every production evaluation reads it.
+  const shelf = (await loadShelves(db, [pid])).get(pid) ?? null;
+  return { loaded, stored: stores.get(pid)!, v2: v2.get(pid) ?? null, ctx, rates, control, image, shelf };
 }
 
 /** Make (or reprice) a V2 product through the real V2 writer; throws with the codes when incomplete. */
@@ -99,6 +102,7 @@ export async function writeV2(db: D1Database, pid: string, o: WriteV2Options): P
     ruleWrites,
     image: c.image,
     acceptBlocked: o.acceptBlocked,
+    shelf: c.shelf,
   });
   if (o.dryRun) return ev;
   if (!ev.complete) throw new Error(`V2 evaluation of ${pid} incomplete: ${ev.codes.join(', ')}`);

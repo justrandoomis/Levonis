@@ -63,6 +63,7 @@ test('the list holds every readiness code of master plan v2 §2.3 and the writer
     'V2_PRICE_MISSING', 'V2_DISCOUNT_TOO_LARGE', 'V2_ROUTE_BELOW_COST', 'V2_SCOPE_INVALID', 'V2_POINT_CONFLICT',
     'V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN', 'V2_DIRECT_MIN_PROFIT', 'V2_BELOW_COST',
     'V2_BELOW_MIN_PROFIT', // the owner's answer Q3 (DECISIONS row 222); V2_LIFTED_TO_COST retired by Q1
+    'V2_ROUTE_NO_SUPPLIER', 'V2_ROUTE_SHELF_CHEAPER', 'V2_STOCK_SOLD_OUT', // the shelf (DECISIONS row 244)
   ]; // Pricing V2 (docs/PRICING-V2.md, spec V2-1 §1.1)
   assert.deepEqual([...PRICING_ISSUE_CODES], [...v1, ...c2, ...v2, ...check, ...writer, ...pricingV2]);
   assert.equal(new Set(PRICING_ISSUE_CODES).size, PRICING_ISSUE_CODES.length);

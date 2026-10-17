@@ -76,6 +76,8 @@ export interface BlockedChannel {
   option_id: string;
   combo_key: string;
   channel: SkuChannel;
+  /** Why (V2): V2_ROUTE_BELOW_COST, or the shelf's V2_ROUTE_NO_SUPPLIER / V2_ROUTE_SHELF_CHEAPER / V2_STOCK_SOLD_OUT (DECISIONS row 244). */
+  code?: string;
 }
 
 export interface PricePlan<C extends PlanPriceCore = ChannelPrice> {
@@ -323,9 +325,12 @@ export function planWritesFromUnits<C extends PlanPriceCore>(
  * model, which of its own routes. A route blocked for some SKUs only stays on:
  * those SKUs have no row and the strict resolver refuses them (C-13).
  */
-function blockedRoutes(loaded: LoadedProduct, legacy: LegacyEvaluation, blocked: readonly BlockedChannel[]): { routes: string[]; methods: Set<string> } {
+function blockedRoutes(loaded: LoadedProduct, legacy: LegacyEvaluation, all: readonly BlockedChannel[]): { routes: string[]; methods: Set<string> } {
   const routes: string[] = [];
   const methods = new Set<string>();
+  // Only the floor switches a route row off. The shelf's blocks (DECISIONS row 244) are temporary — a route
+  // waiting for its supplier price, a sold-out SKU — so the route stays on and those SKUs simply have no row.
+  const blocked = all.filter((b) => !b.code || b.code === 'V2_ROUTE_BELOW_COST');
   if (!blocked.length) return { routes, methods };
   const view = loaded.view;
   for (const channel of new Set(blocked.map((b) => b.channel))) {

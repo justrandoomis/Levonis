@@ -38,6 +38,7 @@ import { planWritesFromUnits, structuralChannel, verifyPlan, type BlockedChannel
 import { refuseUnreadSkus, skuTableOf, type EngineControl } from '../engineWrite';
 import { discountsOf, pointsOf, type StoredV2Result, type V2Store } from './store';
 import { staleReasonsV2 } from './stale';
+import { shelfOfSku, shelfSignature, type ProductShelf } from './shelf';
 
 /** One planned V2 price: the dinar figure every engine plan carries, and the V2 maths behind it. */
 export interface V2PlanPrice {
@@ -69,6 +70,12 @@ export interface V2EvaluationInput {
   /** FX-5: an automatic repricing (never adopts, never carries drafts). */
   auto?: true;
   /**
+   * The product's shelf (`loadShelves`, DECISIONS row 244): cost-first, a SKU with units on the shelf is
+   * priced from its costliest batch there. Every production caller reads it; left out (an older test
+   * harness), nothing is priced from the shelf and the evaluation carries no shelf signature.
+   */
+  shelf?: ProductShelf | null;
+  /**
    * C-14: the reader may not see a cost (a price editor). The hash then binds the cost writes laid over the
    * store (the purchase overlay's fold) by their scopes and field NAMES only — never a value — so the hash a
    * price editor receives never moves with a supplier cost alone (the prices it binds still do).
@@ -94,6 +101,8 @@ export interface V2Row {
   large: boolean;
   drop_flag: boolean;
   blocked: boolean;
+  /** Why the channel is not sold: V2_ROUTE_BELOW_COST, or the shelf's (row 244); null when it is. */
+  blocked_code: BlockCode | null;
   /**
    * Price-first only: this channel's exact dollars (D_usd ± differences − Δ),
    * every term a figure the price editor typed (owner answer Q2) — never a
@@ -113,8 +122,14 @@ export interface V2Row {
     below_cost: boolean;
     /** Q3: price-first, the direct price is below cost + minimum profit (owner-only). */
     below_min_profit: boolean;
+    /** Row 244: the direct price is priced from the shelf — its costliest batch (dinars) and the units on it. */
+    shelf: { cost_iqd: number; units: number } | null;
   } | null;
 }
+
+/** A channel the maths leaves unsold rather than missing (written as off): its reason. */
+export type BlockCode = 'V2_ROUTE_BELOW_COST' | 'V2_ROUTE_NO_SUPPLIER' | 'V2_ROUTE_SHELF_CHEAPER' | 'V2_STOCK_SOLD_OUT';
+const BLOCK_CODES: ReadonlySet<string> = new Set<BlockCode>(['V2_ROUTE_BELOW_COST', 'V2_ROUTE_NO_SUPPLIER', 'V2_ROUTE_SHELF_CHEAPER', 'V2_STOCK_SOLD_OUT']);
 
 /** Spec §5.4: what is missing, grouped — a code, the field's NAME, the level, how many SKUs, and the first SKU's name. */
 export interface GroupedMissing {
@@ -144,8 +159,15 @@ export interface V2Evaluation {
    * complete write (`gateV2`): an unreviewed set must not wait for FX-5 to publish it.
    */
   drafts: boolean;
-  /** The SKU × channels blocked by the floor (V2_ROUTE_BELOW_COST). */
+  /** The SKU × channels left unsold: the floor (V2_ROUTE_BELOW_COST) and the shelf's (row 244), each with its code. */
   blocked: BlockedChannel[];
+  /** Row 244: the SKUs (combo keys) a sold-out shelf with no supplier price leaves unsold («يحتاج تسعيرًا»). */
+  stock_unpriced: string[];
+  /**
+   * Row 244: the shelf signature this evaluation priced at (`shelfSignature`; null: no batch, or price-first),
+   * written with its prices; undefined when the caller read no shelf.
+   */
+  shelf_sig: string | null | undefined;
   /** What moved since the stored results (FX-5 reasons, codes only). */
   stale: string[];
   missing: GroupedMissing[];
@@ -193,7 +215,7 @@ function groupMissing(units: readonly ModelToday[], result: V2Result | null, ext
       const unit = units[n] ?? null;
       const seen = new Set<string>();
       for (const i of s.issues) {
-        if (i.severity !== 'error' || i.code === 'V2_ROUTE_BELOW_COST') continue;
+        if (i.severity !== 'error' || BLOCK_CODES.has(i.code)) continue;
         const k = `${i.code}\u0000${i.field ?? ''}\u0000${i.level ?? ''}`;
         if (seen.has(k)) continue;
         seen.add(k);
@@ -251,6 +273,8 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
       channels: unit.channels.filter(structuralChannel).map((c) => c.channel),
       chain: chainOfUnit(inputs, { option_value_ids: ids, color_id: colorId, combo_key: combo || null }),
       target: resolveRuleAt(rules, 'target_profit', unitRuleTarget(pid, { option_value_ids: ids, color_id: colorId }), { usdIqdRate: u }),
+      // Row 244: cost-first, the direct sale of a SKU with stock is priced from its costliest batch on the shelf.
+      shelf: a.method === 'cost' ? shelfOfSku(a.shelf, { option_value_ids: ids, color_id: colorId, combo_key: combo }) : null,
     };
   });
 
@@ -275,7 +299,7 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
           continue;
         }
         const errors = s.issues.filter((i) => i.severity === 'error' && (!i.channel || i.channel === channel));
-        if (errors.length && errors.every((i) => i.code === 'V2_ROUTE_BELOW_COST')) blocked.push({ option_id: unit.option_id, combo_key: sku.combo_key, channel });
+        if (errors.length && errors.every((i) => BLOCK_CODES.has(i.code))) blocked.push({ option_id: unit.option_id, combo_key: sku.combo_key, channel, code: errors[0]!.code as BlockCode });
         else for (const i of errors.length ? errors : [{ code: 'V2_PRICE_MISSING' } as const]) codes.add(i.code);
       }
     });
@@ -288,8 +312,21 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
   const stored = a.v2;
   const storedResults: readonly StoredV2Result[] = stored?.results ?? [];
   const storedKeys = new Set(storedResults.map((r) => `${r.combo_key}@${r.channel}`));
-  const alreadyBlocked = kind === 'v2_reprice' && blocked.every((b) => !storedKeys.has(`${b.combo_key}@${b.channel}`));
-  const plan = planWritesFromUnits(a.loaded, legacy, prices, { skuTable, v2: { blocked, acceptBlocked: a.acceptBlocked === true || alreadyBlocked } }, codes);
+  // Row 244: a channel the shelf leaves unsold (a route with no supplier price, or one the shelf undersells, while
+  // the shelf sells; a sold-out SKU with nothing to price it from) is the owner's standing decision — written as
+  // off without a preview, its route row left on (it comes back by itself when the shelf moves).
+  const costBlocked = blocked.filter((b) => b.code === 'V2_ROUTE_BELOW_COST');
+  const alreadyBlocked = kind === 'v2_reprice' && costBlocked.every((b) => !storedKeys.has(`${b.combo_key}@${b.channel}`));
+  const stockUnpriced = [...new Set(blocked.filter((b) => b.code === 'V2_STOCK_SOLD_OUT').map((b) => b.combo_key))];
+  // Nothing left to sell because every SKU is sold out without a supplier price: the product needs pricing.
+  if (!prices.length && stockUnpriced.length) codes.add('V2_STOCK_SOLD_OUT');
+  const plan = planWritesFromUnits(
+    a.loaded,
+    legacy,
+    prices,
+    { skuTable, v2: { blocked, acceptBlocked: a.acceptBlocked === true || alreadyBlocked || costBlocked.length === 0 } },
+    codes
+  );
   for (const c of plan.codes) codes.add(c);
   const verification: Verification = codes.size ? { ok: false, mismatches: [], rows: [] } : verifyPlan(a.loaded, legacy, plan, a.ctx);
   if (!codes.size && !verification.ok) codes.add('RESOLVER_MISMATCH');
@@ -325,6 +362,7 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
         large: large(oldIqd, newIqd),
         drop_flag: drop(oldIqd, newIqd),
         blocked: blocked.some((b) => b.combo_key === sku.combo_key && b.channel === channel),
+        blocked_code: (blocked.find((b) => b.combo_key === sku.combo_key && b.channel === channel)?.code as BlockCode | undefined) ?? null,
         usd_exact: a.method === 'usd' ? (c?.usd_exact ?? null) : null,
         owner: c
           ? {
@@ -335,10 +373,11 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
               deltas_usd: c.deltas_usd,
               discount_usd: c.discount_usd,
               discount_from: c.discount_from,
-              replacement_cost_iqd: c.replacement?.replacement_cost_iqd ?? null,
+              replacement_cost_iqd: c.replacement?.replacement_cost_iqd ?? c.shelf?.cost_iqd ?? null,
               target_profit_usd: c.target_profit_usd,
               below_cost: c.below_cost,
               below_min_profit: c.below_min_profit,
+              shelf: c.shelf ? { cost_iqd: c.shelf.cost_iqd, units: c.shelf.units } : null,
             }
           : null,
       });
@@ -403,6 +442,8 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
     needs_write: needsWrite,
     drafts,
     blocked,
+    stock_unpriced: stockUnpriced,
+    shelf_sig: a.shelf === undefined ? undefined : a.method === 'cost' ? await shelfSignature(a.shelf) : null,
     stale,
     missing: complete ? [] : groupMissing(units, result, extra),
     hash,

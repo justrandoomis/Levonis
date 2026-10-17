@@ -34,6 +34,26 @@
  * A pre-order-only SKU has no discount (C-8, §7 default 3): every route sells at D
  * and a stored Δ that would apply raises V2_DISCOUNT_IGNORED.
  *
+ * THE SHELF (cost-first only; DECISIONS row 244, docs/PRICING-V2.md §10). A SKU
+ * whose stock is on the shelf carries `shelf` = the HIGHEST landed unit cost, in
+ * dinars, among the batches still on its shelf (the worker reads it from
+ * `inventory_lots`). That cost is R_stock of the DIRECT price — in dinars as it
+ * was paid, never converted — and only the minimum profit and the differences
+ * are dollars at U:
+ *
+ *     E_D = R_shelf + T × U + (Σ option ± + colour ±) × U,  never below R_shelf + T × U
+ *     D   = ceil_step(E_D)  (the engine's one rounding, `ceilStep`)   so D − R_shelf ≥ T × U at publication
+ *
+ * Its pre-order routes are not the shelf: they keep the supplier calculation
+ * — P_r = ceil_step(E_D,sup − Δ × U) with E_D,sup the direct price the supplier
+ * cost would give (the same anchor, differences and floors), so the shelf never
+ * moves a pre-order price; it only caps one above the direct price on sale
+ * today (P ≤ D), and stops it while the shelf sells below the route's own
+ * cost (V2_ROUTE_SHELF_CHEAPER). A route with no supplier calculation is unavailable
+ * (V2_ROUTE_NO_SUPPLIER, on that channel only) while the shelf sells. A SKU whose shelf is SOLD OUT
+ * goes back to the supplier calculation; without one, every channel of it is
+ * unsold (V2_STOCK_SOLD_OUT) — never priced from a guess.
+ *
  * So P ≤ D on every channel, every price is a positive multiple of the step, the
  * rounding adds less than one step, cost-first D − R_stock ≥ T × U, and a
  * cost-first route is never below its own replacement cost. These are asserted on
@@ -102,6 +122,13 @@ export interface V2Discount {
   usd: string;
 }
 
+/**
+ * The SKU's shelf (DECISIONS row 244), cost-first only: `on_shelf` — units remain, and
+ * `cost_iqd` is the highest landed unit cost (whole dinars) among its batches still on the
+ * shelf; `sold_out` — it had batches and none remains. Absent: no batch, or no known cost.
+ */
+export type V2Shelf = { state: 'on_shelf'; cost_iqd: number; units: number } | { state: 'sold_out' };
+
 export interface V2Sku {
   /** Canonical (`skuComboKey`); '' = the product itself. */
   combo_key: string;
@@ -116,6 +143,8 @@ export interface V2Sku {
   chain?: SkuInputChain;
   /** `resolveRuleAt(rules, 'target_profit', …)`: required cost-first; optional price-first (Q3's owner warning). */
   target?: RuleResolution;
+  /** Cost-first: the shelf the direct price is priced from (row 244); ignored price-first. */
+  shelf?: V2Shelf | null;
 }
 
 export interface V2Input {
@@ -156,8 +185,11 @@ export interface V2Channel {
   discount_usd: string | null;
   discount_from: { scope: V2Scope; scope_id: string } | null;
   floor: V2Floor;
-  /** R of THIS channel's profile (direct: the stock profile); null price-first without a complete cost. */
+  /** R of THIS channel's profile (direct: the stock profile); null price-first without a complete cost, and on a
+   * direct channel priced from the shelf (`shelf` is its R then). */
   replacement: ReplacementCost | null;
+  /** Cost-first direct sale priced from the shelf (row 244): R_shelf in dinars and the units on the shelf. */
+  shelf: { cost_iqd: number; units: number } | null;
   /** Cost-first only. */
   target_profit_usd: string | null;
   target_rule_id: string | null;
@@ -421,6 +453,16 @@ function targetOf(target: RuleResolution | undefined, ctx: Context): { exact: Pr
   return { exact: procurementExact(target.amount_iqd), usd: null, errors: [], warnings };
 }
 
+/** A shelf as the maths reads it: whole dinars ≥ 0 and a positive unit count, or a programming error. */
+function shelfOf(raw: V2Shelf | null | undefined): V2Shelf | null {
+  if (!raw) return null;
+  if (raw.state === 'sold_out') return raw;
+  invariant(raw.state === 'on_shelf', 'a shelf is on_shelf or sold_out');
+  invariant(Number.isSafeInteger(raw.cost_iqd) && raw.cost_iqd >= 0 && raw.cost_iqd <= MAX_FINAL_PRICE_IQD, 'a shelf cost is whole dinars');
+  invariant(Number.isSafeInteger(raw.units) && raw.units > 0, 'a shelf holds whole units');
+  return raw;
+}
+
 function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
   const { method, step } = ctx;
   const wanted = SKU_CHANNELS.filter((c) => s.channels.includes(c));
@@ -456,16 +498,23 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
   const anchor: V2Anchor | null = pick.anchor;
   const anchorUsd = pick.anchor !== null && pick.anchor !== 'cost' ? parseV2Usd(pick.point.usd) : null;
 
+  // Row 244: cost-first, the shelf prices the direct sale; a sold-out shelf goes back to the supplier.
+  const shelf = method === 'cost' ? shelfOf(s.shelf) : null;
+  const onShelf = shelf?.state === 'on_shelf' ? shelf : null;
   // Cost inputs: required cost-first, optional price-first (owner warnings only).
   const resolved = method === 'cost' || s.chain ? resolveSkuInputs(s.chain ?? {}) : null;
   let stock: Cost | null = null;
   let target: ReturnType<typeof targetOf> | null = null;
+  let supplierErrors: Problem[] = [];
   if (resolved) {
     const r = stockCost(resolved, ctx);
     stock = r.cost;
     if (method === 'cost') {
-      errors.push(...r.errors);
-      r.warnings.forEach((p) => warn(p));
+      // On the shelf, the stock route's supplier calculation does not price the direct sale.
+      if (!onShelf) {
+        supplierErrors = r.errors;
+        r.warnings.forEach((p) => warn(p));
+      }
       target = targetOf(s.target, ctx);
       errors.push(...target.errors);
       target.warnings.forEach((p) => warn(p));
@@ -495,9 +544,18 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
     issues,
   });
 
+  // Row 244: sold out and nothing to price it from — every channel of the SKU is unsold, never guessed.
+  if (shelf?.state === 'sold_out' && supplierErrors.length && !errors.length) {
+    for (const channel of wanted) fail(channel, [{ code: 'V2_STOCK_SOLD_OUT' }]);
+    return done([]);
+  }
+  errors.push(...supplierErrors);
+
   const u = ctx.u;
   const T = target?.exact ?? null;
-  const minProfitAt = stock && T ? addProcurementExact(stock.exact, T) : null; // R_stock + T × U
+  // R_stock: the costliest batch on the shelf (dinars, as paid), else the stock route's supplier calculation.
+  const rStock: ProcurementExact | null = onShelf ? procurementExact(onShelf.cost_iqd) : (stock?.exact ?? null);
+  const minProfitAt = rStock && T ? addProcurementExact(rStock, T) : null; // R_stock + T × U
   const minDirect = method === 'cost' ? minProfitAt : null;
   if (errors.length || !u || anchor === null || (method === 'cost' && !minDirect) || (anchor !== 'cost' && !anchorUsd)) {
     for (const channel of wanted) fail(channel, [...errors, ...(routeCost.get(channel)?.errors ?? [])]);
@@ -534,7 +592,7 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
   }
   const D = ceilStep(eD, step);
   // The owner's rule on direct sale (row 187): rounding, the rate or freight never take profit below T.
-  if (method === 'cost') invariant(cmp(sub(procurementExact(D), stock!.exact), T!) >= 0, 'cost-first: D − R_stock ≥ T');
+  if (method === 'cost') invariant(cmp(sub(procurementExact(D), rStock!), T!) >= 0, 'cost-first: D − R_stock ≥ T');
 
   const common = {
     direct_iqd: D,
@@ -546,6 +604,27 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
     target_rule_version: method === 'cost' && s.target?.status === 'active' ? s.target.rule.version : null,
   };
   const usdCeil6 = (exact: ProcurementExact) => text(ceilToPlaces(quotientProcurementExact(exact, u), USD_DISPLAY_PLACES));
+
+  /*
+   * Row 244: the routes' anchor. Pre-order is not the shelf: a route is priced from the SUPPLIER direct
+   * price (the stock route's replacement cost + T, the same differences and floor) exactly as without
+   * stock, so the shelf never moves a pre-order price — it only caps one that would exceed the direct
+   * price on sale today. A SKU on the shelf with no supplier calculation has no route anchor.
+   */
+  let routeAnchor: { eD: ProcurementExact; D: number; floor: V2Floor } | null = { eD, D, floor: directFloor };
+  if (onShelf) {
+    routeAnchor = null;
+    if (stock && T) {
+      const supMin = addProcurementExact(stock.exact, T);
+      let eSup = addProcurementExact(anchorUsd ? mulProcurementExact(anchorUsd, u) : supMin, mulProcurementExact(deltas, u));
+      let supFloor: V2Floor = 'none';
+      if (cmp(eSup, supMin) < 0) {
+        eSup = supMin;
+        supFloor = 'direct_min_profit';
+      }
+      if (eSup.num > 0n && cmp(eSup, procurementExact(MAX_FINAL_PRICE_IQD)) <= 0) routeAnchor = { eD: eSup, D: ceilStep(eSup, step), floor: supFloor };
+    }
+  }
 
   /* 6. Δ: only on a SKU that sells direct (C-8). */
   const sellsDirect = wanted.includes('direct_sale');
@@ -574,7 +653,8 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
         discount_usd: null,
         discount_from: null,
         floor: directFloor,
-        replacement: stock?.cost ?? null,
+        replacement: onShelf ? null : (stock?.cost ?? null),
+        shelf: onShelf ? { cost_iqd: onShelf.cost_iqd, units: onShelf.units } : null,
         below_cost: below,
         below_min_profit: belowMinProfit,
         ...common,
@@ -583,18 +663,21 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
     }
 
     const own = routeCost.get(channel) ?? { cost: null, errors: [] };
-    if (own.errors.length) {
-      fail(channel, own.errors);
+    if (own.errors.length || !routeAnchor) {
+      // Row 244: while the shelf sells, a route without its supplier calculation is simply unavailable.
+      fail(channel, onShelf ? [{ code: 'V2_ROUTE_NO_SUPPLIER', profile: ROUTE_PROFILE[route] }] : own.errors);
       continue;
     }
-    const eP = sub(eD, mulProcurementExact(delta, u));
+    // The route's own direct price: D itself, or — a SKU on the shelf — the supplier direct price (row 244).
+    const { eD: eA, D: A } = routeAnchor;
+    const eP = sub(eA, mulProcurementExact(delta, u));
     if (eP.num <= 0n) {
       fail(channel, [deltaFrom ? problem('V2_DISCOUNT_TOO_LARGE', deltaFrom.scope, deltaFrom.scope_id) : { code: 'V2_DISCOUNT_TOO_LARGE' }]);
       continue;
     }
     let price = ceilStep(eP, step);
     let exact = eP;
-    let floor: V2Floor = directFloor;
+    let floor: V2Floor = routeAnchor.floor;
     const rR = own.cost;
     if (method === 'cost') {
       const rExact = rR!.exact;
@@ -602,16 +685,26 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
       // to the step, which would publish it. The cost on the step is the line: the route is blocked when even
       // the direct price does not clear it, and its discount is withdrawn when the discounted price does not.
       const rStep = ceilStep(rExact, step);
-      if (rStep >= D) {
+      if (rStep >= A) {
         fail(channel, [{ code: 'V2_ROUTE_BELOW_COST', profile: ROUTE_PROFILE[route] }]);
         continue;
       }
       if (price <= rStep) {
         // Q1: the direct price, no discount on this route — never lifted to the cost.
-        price = D;
-        exact = eD;
+        price = A;
+        exact = eA;
         floor = 'discount_withdrawn';
         warn({ code: 'V2_DISCOUNT_WITHDRAWN', profile: ROUTE_PROFILE[route] }, channel);
+      }
+      // Row 244: a pre-order never costs more than the shelf sells today (P ≤ D) — capped at D, or stopped
+      // while the shelf sells below the route's own cost (V2_ROUTE_SHELF_CHEAPER: the shelf's, not the floor's).
+      if (price > D) {
+        if (rStep >= D) {
+          fail(channel, [{ code: 'V2_ROUTE_SHELF_CHEAPER', profile: ROUTE_PROFILE[route] }]);
+          continue;
+        }
+        price = D;
+        exact = eD;
       }
       invariant(price > rStep && cmp(procurementExact(price), rExact) > 0, 'a cost-first route always sells above its own cost');
     }
@@ -627,6 +720,7 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
       discount_from: deltaFrom,
       floor,
       replacement: rR?.cost ?? null,
+      shelf: null,
       below_cost: below,
       below_min_profit: belowMinProfit,
       ...common,

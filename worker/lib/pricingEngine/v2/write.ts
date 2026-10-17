@@ -50,6 +50,7 @@ import { PRICE_IMAGE_SQL, RATES_FENCE_SQL, SKU_COST_CHUNK, priceRowStatements, r
 import { batchHead, batchTail, inputStatements, pricingAuditStatement, pricingAuditStatements, ruleStatements, type PricingAuditRow } from '../store';
 import type { V2Evaluation } from './evaluate';
 import { discountStatements, discountWrites, pointStatements, pointWrites, V2_RESULT_COLUMNS, type StoredV2Result } from './store';
+import { shelfSigInstalled } from './shelf';
 
 /** A product save with V2 prices (structure + prices in one batch): D1's per-invocation budget is the hard limit (risk R-4). */
 export const V2_SAVE_STATEMENT_CAP = 600;
@@ -96,6 +97,11 @@ export interface V2WriteOptions {
    * results (autoReprice.ts step 5) — so the gate can never fire and costs its quarter-hour budget nothing.
    */
   stockGate?: boolean;
+  /**
+   * Migration 0198 (`product_pricing_state.shelf_sig`, DECISIONS row 244) is present. Undefined: probed here
+   * (one read); the automatic repricing passes what its state read already learnt, so it costs nothing.
+   */
+  shelfSig?: boolean;
 }
 
 /** The private result row of one planned SKU × channel (each 0189 pair written whole). */
@@ -132,8 +138,10 @@ function resultRow(ev: V2Evaluation, p: V2Evaluation['plan']['prices'][number], 
     cross_fx_version: cross === null ? null : crossVersion,
     shipping_rate: rep ? rep.shipping_rate : null,
     shipping_version: rep ? rep.shipping_version : null,
-    replacement_exact: rep ? rep.replacement_exact : null,
-    replacement_cost_iqd: rep ? rep.replacement_cost_iqd : null,
+    // Row 244: a direct price from the shelf stores its costliest batch as R (dinars, exact), with no
+    // supplier, rate or freight beside it — U alone moves it then (its minimum profit, T × U).
+    replacement_exact: rep ? rep.replacement_exact : c.shelf ? String(c.shelf.cost_iqd) : null,
+    replacement_cost_iqd: rep ? rep.replacement_cost_iqd : c.shelf ? c.shelf.cost_iqd : null,
     target_profit_usd: c.target_profit_usd,
     target_rule_id: c.target_rule_id,
     target_rule_version: c.target_rule_id === null ? null : c.target_rule_version,
@@ -205,6 +213,8 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
   const fresh = o.newProduct === true;
   // 0. Never publish an imported product whose stock mode is not chosen (§B.10). First, so its miss is the one reported.
   const stockGate = o.stockGate ?? (await catalogKnowledgeInstalled(db));
+  // Row 244: the shelf this write priced at (a hash), so the sweep knows when the shelf moves again.
+  const shelfSig = ev.shelf_sig !== undefined && (o.shelfSig ?? (await shelfSigInstalled(db)));
   return [
     ...(stockGate ? importStockFence(db, pid) : []),
     // (A product this save creates: its row and relations first — everything below names it.)
@@ -256,11 +266,11 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
         )
         .bind(pid, pid, JSON.stringify(chunk))
     ),
-    // 9. The state.
+    // 9. The state (and, with 0198, the shelf it was priced at — row 244).
     db
       .prepare(
         `UPDATE product_pricing_state
-            SET mode = 'engine', pricing_method = ?, write_seq = write_seq + 1, priced_config_version = ?, priced_inputs_seq = inputs_seq, priced_at = ?,
+            SET mode = 'engine', pricing_method = ?, write_seq = write_seq + 1, priced_config_version = ?, priced_inputs_seq = inputs_seq, priced_at = ?,${shelfSig ? ' shelf_sig = ?,' : ''}
                 v2_since = COALESCE(v2_since, ?),
                 opted_in_at = CASE WHEN mode = 'manual' THEN ? ELSE opted_in_at END,
                 opted_in_by = CASE WHEN mode = 'manual' THEN ? ELSE opted_in_by END,
@@ -268,7 +278,7 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
                 reprice_blocked_code = NULL, reprice_blocked_at = NULL, updated_at = ?
           WHERE product_id = ?`
       )
-      .bind(ev.method, ev.stored.config_version, o.now, o.now, o.now, o.actor, auditId, o.now, pid),
+      .bind(ev.method, ev.stored.config_version, o.now, ...(shelfSig ? [ev.shelf_sig ?? null] : []), o.now, o.now, o.actor, auditId, o.now, pid),
     // 10. The audit.
     ...pricingAuditStatements(db, audits),
     ...(o.extraAudits ?? []),

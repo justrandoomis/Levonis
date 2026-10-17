@@ -14,6 +14,7 @@ import type { PricingRates } from '../rates';
 import type { ProductPricingData } from '../store';
 import { evaluateV2Write, storedDesired, type V2Evaluation } from './evaluate';
 import type { V2Store } from './store';
+import type { ProductShelf } from './shelf';
 
 /** Spec C-1: `mode = 'engine'` with a method. */
 export const isV2 = (stored: Pick<ProductPricingData, 'state'>): boolean => isV2Product(stored);
@@ -33,6 +34,8 @@ export interface AnyEvaluationInput {
   storedCosts: readonly StoredSkuCost[];
   /** FX-5: an automatic repricing. */
   auto?: true;
+  /** Row 244: the product's shelf (`loadShelves`); a cost-first SKU with stock is priced from it. */
+  shelf?: ProductShelf | null;
 }
 
 /**
@@ -75,6 +78,7 @@ export async function evaluateAny(a: AnyEvaluationInput): Promise<AnyEvaluation>
       ruleWrites: [],
       image: a.image,
       ...(a.auto ? { auto: true as const } : {}),
+      ...(a.shelf !== undefined ? { shelf: a.shelf } : {}),
     }),
   };
 }

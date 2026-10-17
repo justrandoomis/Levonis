@@ -78,9 +78,19 @@ test('orderProfit and the lot code import nothing from the engine or FX; the eng
     if (!src) continue;
     assert.doesNotMatch(src, /from\s+['"][^'"]*\/(fx|pricingEngine)\//, f);
   }
+  // DECISIONS row 244: a cost-first model with stock is priced from its costliest batch on the shelf — ONE engine
+  // module READS the lots (their cost and what remains), in dinars as paid, and never writes one; the accounting
+  // still reads no rate, and nothing else of the engine or FX names a lot.
+  const SHELF = 'worker/lib/pricingEngine/v2/shelf.ts';
   for (const { f, src } of worker.filter(({ f }) => f.startsWith('worker/lib/fx/') || f.startsWith('worker/lib/pricingEngine/'))) {
+    if (f === SHELF) {
+      assert.doesNotMatch(src, /\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+inventory_lots\b/i, f);
+      assert.doesNotMatch(src, /\bwallet_transactions\b|\border_items\b/, f);
+      continue;
+    }
     assert.doesNotMatch(src, /\binventory_lots\b|\bwallet_transactions\b|\border_items\b/, f);
   }
+  assert.match(worker.find((w) => w.f === SHELF)!.src, /\bFROM inventory_lots\b/, 'the shelf is read where row 244 says');
 });
 
 test('FX-1 writes no product price: the FX module never names a price column or the product tables', () => {

@@ -12,8 +12,9 @@
  *     FINANCIAL_FIELDS — the V2 change is `change_percent`);
  *   - the owner alone (`v2_*`, every key in FINANCIAL_FIELDS): the exact IQD,
  *     the USD ceiling, the floor and its flags, R, T, `below_cost`,
- *     `below_min_profit` (Q3), U — never
- *     to a price editor;
+ *     `below_min_profit` (Q3), U, and the shelf a direct price is read from
+ *     (`v2_shelf`: its costliest batch and its units, DECISIONS row 244) and
+ *     why a channel is unsold (`v2_blocked`) — never to a price editor;
  *   - on a PRICE-FIRST product, the owner AND the price editors (the owner's
  *     answer Q2, DECISIONS row 222: «staff see and edit USD»; the owner
  *     accepted that staff may work out U, risk R-2): the dollar points and
@@ -53,6 +54,7 @@ function ownerExtras(r: V2Row) {
         v2_profit_usd: o.target_profit_usd,
         v2_below_cost: o.below_cost,
         v2_below_min_profit: o.below_min_profit,
+        v2_shelf: o.shelf ? { cost_iqd: o.shelf.cost_iqd, units: o.shelf.units } : null,
       }
     : null;
 }
@@ -93,7 +95,7 @@ export function v2OwnerAnswer(ev: V2Evaluation) {
   const base = v2EditorAnswer(ev);
   return {
     ...base,
-    table: ev.rows.map((r) => ({ ...publicRow(r), owner: ownerExtras(r) })),
+    table: ev.rows.map((r) => ({ ...publicRow(r), owner: ownerExtras(r), ...(r.blocked_code ? { v2_blocked: r.blocked_code } : {}) })),
     v2_points: ev.points.map((p) => ({ scope: p.scope, id: p.scope_id, kind: p.kind, usd: p.usd })),
     v2_discounts: ev.discounts.map((d) => ({ scope: d.scope, id: d.scope_id, usd: d.usd })),
     v2_rate: ev.rates?.usd_iqd ? { usd_iqd: ev.rates.usd_iqd, version: ev.rates.pair_versions.USD_IQD } : null,

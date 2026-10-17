@@ -69,6 +69,7 @@ import { evaluateV2Write, type V2Evaluation } from './evaluate';
 import { discountsOf, loadV2Store, pointsOf, type V2Store } from './store';
 import { v2EditorAnswer, v2OwnerAnswer } from './dto';
 import { firstWriteInputs, pendingReviewOf, reviewFoldInputs, withFirstWriteInputs, type FirstWriteReview } from './firstWrite';
+import { loadShelves, type ProductShelf } from './shelf';
 
 /* ------------------------------------------------------------------ who -- */
 
@@ -98,6 +99,8 @@ export interface V2Read {
   image: string;
   /** A product with no method yet: its newest pending purchase review (D1), folded into the owner's prefill. */
   review?: FirstWriteReview | null;
+  /** The product's shelf (DECISIONS row 244): cost-first, a model with stock is priced from its costliest batch. */
+  shelf?: ProductShelf | null;
 }
 
 /**
@@ -114,7 +117,8 @@ export async function loadV2Read(db: D1Database, productId: string, draft?: Load
   const image = await priceImageOf(db, productId);
   const own = stored.get(productId)!;
   const review = storedMethodOf({ stored: own }) ? null : await pendingReviewOf(db, productId);
-  return { loaded, stored: own, v2: v2.get(productId) ?? null, ctx, rates, control, image, review };
+  const shelf = (await loadShelves(db, [productId])).get(productId) ?? null;
+  return { loaded, stored: own, v2: v2.get(productId) ?? null, ctx, rates, control, image, review, shelf };
 }
 
 /** The engine control's defaults (0181's seeded row), for a database without it. */
@@ -389,6 +393,8 @@ export async function evaluateDesired(read: V2Read, desired: V2Desired): Promise
     inputWrites: desired.inputWrites,
     ruleWrites: desired.ruleWrites,
     image: read.image,
+    // Row 244: the shelf as it is now (read with the product).
+    shelf: read.shelf ?? null,
     // The answer lists every blocked route to the reader («متوقف: أقل من التكلفة»); the hash binds the set.
     acceptBlocked: true,
     structureDigest: await structureDigestOf(read.loaded),
@@ -413,9 +419,13 @@ export function statusOf(ev: V2Evaluation, rates: PricingRates | null): V2Status
   return { kind: 'current' };
 }
 
-/** Where each SKU's price comes from (§4.2 `source`): a kind of point, never its value. */
-function sourceOf(ev: V2Evaluation, row: V2Evaluation['rows'][number]): string {
+/**
+ * Where each SKU's price comes from (§4.2 `source`): a kind of point, never its value. `stock` (row 244: the
+ * costliest batch on the shelf) is the owner's alone — to a price editor that row reads as any cost-first row.
+ */
+function sourceOf(ev: V2Evaluation, row: V2Evaluation['rows'][number], viewer: V2Viewer): string {
   const anchor = row.owner?.anchor ?? null;
+  if (viewer === 'owner' && anchor === 'cost' && ev.rows.some((r) => r.combo_key === row.combo_key && r.channel === 'direct_sale' && r.owner?.shelf)) return 'stock';
   if (anchor === 'sku_fixed') return 'sku_fixed';
   const colour = row.color_id !== null && ev.points.some((p) => p.scope === 'color' && p.scope_id === row.color_id);
   if (colour) return 'colour_delta';
@@ -468,7 +478,7 @@ export function v2Answer(i: AnswerInput): Record<string, unknown> {
     const from = viewer === 'owner' || priceFirst ? discountFromOf(ev, r) : undefined;
     return {
       ...row,
-      source: sourceOf(ev, r),
+      source: sourceOf(ev, r, viewer),
       ...(from ? { discount_from: from } : {}),
       ...(priceFirst && dollars && r.usd_exact !== null ? { editor_usd_price: r.usd_exact } : {}),
     };

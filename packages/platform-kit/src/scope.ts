@@ -503,6 +503,10 @@ export const FINANCIAL_FIELDS = [
   'estimated_fx_version',
   'purchase_review',
   'v2_purchase_inputs',
+  // -- The shelf (DECISIONS row 244): a cost-first direct price read from the costliest batch on the shelf
+  // -- (its cost and units), and why a channel is unsold (a route without a supplier price, a sold-out model).
+  'v2_shelf',
+  'v2_blocked',
   // -- Services S-P2, trade-in v2 (DECISIONS row 238; migration 0192): the owner's valuation record — the
   // -- store's cap, the expected resale, its costs and margin, the condition factor, a component's owner
   // -- USD reference, the stock cost basis and the record/parameter containers. The staff ceiling

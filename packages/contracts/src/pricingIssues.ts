@@ -95,6 +95,11 @@ export const PRICING_ISSUE_CODES = [
   'V2_BELOW_COST',
   // The owner's answer Q3 (DECISIONS row 222): price-first below cost + minimum profit saves, with a warning.
   'V2_BELOW_MIN_PROFIT',
+  // The shelf (DECISIONS row 244): a model with stock is priced from its costliest batch on the shelf; its
+  // pre-order routes keep the supplier calculation, and a sold-out model without one is not sold.
+  'V2_ROUTE_NO_SUPPLIER',
+  'V2_ROUTE_SHELF_CHEAPER',
+  'V2_STOCK_SOLD_OUT',
 ] as const;
 
 export type PricingIssueCode = (typeof PRICING_ISSUE_CODES)[number];
@@ -469,6 +474,30 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
       ar: 'سعر البيع المباشر أقل من التكلفة + الحد الأدنى للربح',
       en: 'The direct price is below cost plus the minimum profit',
       ckb: 'نرخی فرۆشتنی ڕاستەوخۆ لە تێچوو + کەمترین قازانج کەمترە',
+    },
+  },
+  V2_ROUTE_NO_SUPPLIER: {
+    severity: 'error',
+    label: {
+      ar: 'لا يوجد سعر مورّد لهذا المسار؛ الطلب المسبق عبره غير متاح ما دام الموديل يُباع من المخزون',
+      en: 'There is no supplier price for this route; pre-order by it is unavailable while the model sells from stock',
+      ckb: 'نرخی دابینکەر بۆ ئەم ڕێڕەوە نییە؛ تا مۆدێلەکە لە کۆگاوە دەفرۆشرێت پێشداواکردن بەم ڕێڕەوە بەردەست نییە',
+    },
+  },
+  V2_ROUTE_SHELF_CHEAPER: {
+    severity: 'error',
+    label: {
+      ar: 'سعر المخزون الحالي أقل من تكلفة هذا المسار؛ الطلب المسبق عبره متوقف ما دام المخزون يُباع',
+      en: "Today's stock price is below this route's cost; pre-order by it is stopped while the stock sells",
+      ckb: 'نرخی ئێستای کۆگا لە تێچووی ئەم ڕێڕەوە کەمترە؛ تا کۆگاکە دەفرۆشرێت پێشداواکردن بەم ڕێڕەوە ڕاگیراوە',
+    },
+  },
+  V2_STOCK_SOLD_OUT: {
+    severity: 'error',
+    label: {
+      ar: 'نفد مخزون هذا الموديل ولا يوجد سعر مورّد لحساب سعره؛ لا يُباع حتى يُسعَّر',
+      en: 'This model is sold out and has no supplier price to price it from; it is not sold until it is priced',
+      ckb: 'کۆگای ئەم مۆدێلە نەماوە و نرخی دابینکەر نییە بۆ نرخدانانی؛ تا نرخ دانەنرێت نافرۆشرێت',
     },
   },
 };

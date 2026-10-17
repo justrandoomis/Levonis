@@ -23,6 +23,7 @@ import { v2EditorAnswer } from './dto';
 import type { V2Method } from '@levonis/pricing/priceV2';
 import { PRICE_REQUEST_ADMIN_TEXT } from '@levonis/contracts/priceRequests';
 import { selectionLabel } from '../../priceRequests';
+import { loadShelves } from './shelf';
 
 
 /** How many ordinary products are V2-published, and how many still need pricing (codes and counts only). */
@@ -81,10 +82,12 @@ export async function loadQueueReads(db: D1Database, ids: readonly string[]): Pr
   const ctx = await loadPreviewContext(db);
   const rates = await loadPricingRates(db);
   const images = await priceImagesEach(db, ids);
+  // Row 244: the shelves, so a cost-first product with stock reads as it would publish.
+  const shelves = await loadShelves(db, ids);
   for (const id of ids) {
     const l = loaded.get(id);
     if (!l) continue;
-    out.set(id, { loaded: l, stored: stored.get(id)!, v2: v2.get(id) ?? null, ctx, rates, control, image: images.get(id) ?? '' });
+    out.set(id, { loaded: l, stored: stored.get(id)!, v2: v2.get(id) ?? null, ctx, rates, control, image: images.get(id) ?? '', shelf: shelves.get(id) ?? null });
   }
   return out;
 }
