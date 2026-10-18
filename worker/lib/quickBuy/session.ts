@@ -32,7 +32,6 @@ import { fence } from '../operations';
 import { freeOnTargets, planInventory, stockRowKey, type InventoryPlan, type StockMove, type StockTarget } from '../inventory';
 import { assertHoldStateStatement, purchaseHoldInsertStatement, releaseHoldStatement } from '../walletOps';
 import { walletFreeDeliveryPublic, WALLET_FREE_DELIVERY_LABEL } from '../walletFreeDelivery';
-import { PRINTER_STANDARD_DELIVERY_POLICY, isPrinterStandardAcceptance } from '@levonis/shipping/printerDeliveryPolicy';
 import { CART_LINE_COLUMNS } from '../cartLineProjection';
 import { isUsdCents } from '@levonis/pricing/usdCents';
 import {
@@ -633,20 +632,10 @@ export async function applyQuickBuyChange(
   // --- price it
   const comp = await quoteCandidates(c, user, session, address!, items, remaining);
   if (comp.requiredAdvance > comp.walletApplied || comp.walletUsdCents <= 0) throw insufficient(comp);
-  const containsPrinter = comp.lines.some((l) => l.is_printer);
-  let printerAck: string | null = session?.printer_ack_json ?? null;
-  if (containsPrinter && !printerAck) {
-    const ack = change.kind === 'add' ? change.printerAck : null;
-    if (!isPrinterStandardAcceptance(ack)) {
-      throw new HttpError(
-        409,
-        'تجب الموافقة على تحذير التوصيل العادي للطابعات قبل الشراء السريع. / Acknowledge the printer standard-delivery warning first.',
-        'PRINTER_STANDARD_DELIVERY_ACCEPTANCE_REQUIRED',
-        { policy: PRINTER_STANDARD_DELIVERY_POLICY }
-      );
-    }
-    printerAck = JSON.stringify({ ...PRINTER_STANDARD_DELIVERY_POLICY, accepted: true, accepted_at: new Date().toISOString() });
-  }
+  // The printer standard-delivery warning is retired (personal delivery was
+  // cancelled): nothing is asked for. A session opened before keeps the
+  // acknowledgement it already recorded.
+  const printerAck: string | null = session?.printer_ack_json ?? null;
 
   const now = new Date().toISOString();
   const sid = session?.id ?? newId('qbs');

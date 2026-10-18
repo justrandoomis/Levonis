@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { listing } from '../lib/listing';
-import { PRINTER_STANDARD_DELIVERY_POLICY, isPrinterStandardAcceptance, requiresPrinterStandardAcceptance } from '@levonis/shipping/printerDeliveryPolicy';
 import { announceStoreOrder } from '../lib/chatCards';
 import { notifyOrderCreditAvailable } from '../lib/merchantNotify';
 import type { Context } from 'hono';
@@ -4470,9 +4469,6 @@ orderRoutes.post('/quote', async (c) => {
         pro_benefits_context: comp.proContext,
       },
       policies: comp.policies,
-      printer_standard_warning: requiresPrinterStandardAcceptance(comp.delivery.id,
-        comp.lines.some((line) => line.is_printer) || comp.shipping.components.some((part) => part.kind === 'printer_small' || part.kind === 'printer_large'))
-        ? PRINTER_STANDARD_DELIVERY_POLICY : null,
       blockers,
       can_checkout: blockers.length === 0,
     },
@@ -4601,13 +4597,6 @@ export async function placeOrder(
 
   const orderId = quickBuy?.orderId ?? newOrderId();
   const now = new Date().toISOString();
-  const printerStandardRequired = requiresPrinterStandardAcceptance(comp.delivery.id,
-    comp.lines.some((line) => line.is_printer) || comp.shipping.components.some((part) => part.kind === 'printer_small' || part.kind === 'printer_large'));
-  if (printerStandardRequired && !isPrinterStandardAcceptance(body.printerStandardDeliveryAcceptance)) {
-    throw new HttpError(400, 'تجب الموافقة على تحذير التوصيل العادي للطابعات قبل تأكيد الطلب.', 'PRINTER_STANDARD_DELIVERY_ACCEPTANCE_REQUIRED', {
-      policy: PRINTER_STANDARD_DELIVERY_POLICY,
-    });
-  }
   // The cart rule guarantees a single type across the lines, so the first one
   // speaks for the order. Falls back to direct for an order with no transport,
   // which is what "no transport" has always meant.
@@ -4695,14 +4684,6 @@ export async function placeOrder(
     ...comp.delivery,
     quote: comp.shipping,
     priority_delivery: comp.priorityDelivery,
-    ...(printerStandardRequired ? {
-      printer_standard_transport_acceptance: {
-        ...PRINTER_STANDARD_DELIVERY_POLICY,
-        accepted: true,
-        accepted_at: now,
-        user_id: user.id,
-      },
-    } : {}),
   });
 
   /**

@@ -163,10 +163,6 @@ export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown 
             <input type="checkbox" checked={value.methods.includes('standard')} onChange={(e) => toggleMethod('standard', e.target.checked)} />
             <span className="text-sm">التوصيل العادي (standard)</span>
           </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={value.methods.includes('personal')} onChange={(e) => toggleMethod('personal', e.target.checked)} />
-            <span className="text-sm">التوصيل الشخصي (personal)</span>
-          </label>
         </div>
       </div>
 
