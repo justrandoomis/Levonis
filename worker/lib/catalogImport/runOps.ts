@@ -386,13 +386,14 @@ export async function finishRun(db: D1Database, run: ImportRun, bundle: Pick<Rev
 
 // ---------------------------------------------------------------- /items/:sid/withdraw
 
-const DAY_MS = 24 * 3_600_000;
+/** The second fetch's distance from the block: 6 h (the owner, 2026-10-18; it was 24 h, IMPORT-SPEC §1 row 20). */
+const WITHDRAW_GAP_MS = 6 * 3_600_000;
 const APPROVAL = /^workflow-60-run-(?:\d{1,20}|local)$/;
 const WITHDRAWN_STATUS = new Set([301, 302, 303, 307, 308, 404, 410]);
 
 /**
  * BLOCKED SOURCE_WITHDRAWN → WITHDRAWN_AT_SOURCE (§1 row 20): the owner's approval reference (workflow 60's run),
- * a second fetch at least 24 h after the block that still finds the page gone, and the sitemap no longer listing
+ * a second fetch at least 6 h after the block that still finds the page gone, and the sitemap no longer listing
  * it. Terminal: never COMPLETE.
  */
 export async function withdrawItem(db: D1Database, run: ImportRun, item: ItemRow, body: Record<string, unknown>): Promise<{ state: string }> {
@@ -409,7 +410,7 @@ export async function withdrawItem(db: D1Database, run: ImportRun, item: ItemRow
   const ok =
     Number.isFinite(firstAt) &&
     Number.isFinite(secondAt) &&
-    secondAt - firstAt >= DAY_MS &&
+    secondAt - firstAt >= WITHDRAW_GAP_MS &&
     secondAt <= Date.now() + 60_000 &&
     second.outcome === 'withdrawn' &&
     typeof second.status === 'number' &&

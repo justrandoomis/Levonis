@@ -9,7 +9,7 @@
  *   - finish: refused while an item is queued or in flight; `partial` when an
  *     item is BLOCKED; the token cleared, so the door is gone;
  *   - withdraw: only BLOCKED SOURCE_WITHDRAWN, the approval reference of
- *     workflow 60, a second fetch ≥ 24 h after the block that still finds the
+ *     workflow 60, a second fetch ≥ 6 h after the block that still finds the
  *     page gone, and the sitemap no longer listing it;
  *   - readback: a vanished object or a binding to another product's value is a
  *     mismatch the answer counts; through the door, a write whose post-commit
@@ -85,7 +85,7 @@ test('finish: refused while an item is queued; partial with a BLOCKED item; the 
   assert.equal(gone.status, 404);
 });
 
-test('withdraw: BLOCKED SOURCE_WITHDRAWN, workflow 60\'s approval, a second fetch ≥ 24 h later still gone, the sitemap no longer listing it', async () => {
+test('withdraw: BLOCKED SOURCE_WITHDRAWN, workflow 60\'s approval, a second fetch ≥ 6 h later still gone, the sitemap no longer listing it', async () => {
   const w = opsWorld();
   const x = sample('ams-2-pro-feeder-unit');
   setBundle(bundleTexts({ manifestRows: [manifestRowOf(x, 1)], matches: [] }));

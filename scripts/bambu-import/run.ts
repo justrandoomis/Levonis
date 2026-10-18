@@ -1529,7 +1529,7 @@ export class Importer {
       a = await this.ops.withdraw(row.source_product_id, approval, { second_fetch: second, sitemap_absent: absent });
     } catch (err) {
       // The door refuses a withdrawal with a 409: IMPORT_WITHDRAW_REFUSED (permanent) when the item is not BLOCKED
-      // SOURCE_WITHDRAWN or its evidence does not hold (a second fetch less than 24 h after the block, an approval it
+      // SOURCE_WITHDRAWN or its evidence does not hold (a second fetch less than 6 h after the block, an approval it
       // does not take), IMPORT_ILLEGAL_TRANSITION (stale) when the item moved under the batch. The runner cannot tell
       // which from the code: it reads where the item is and reports it in words that do not guess; an irreversible,
       // owner-approved step is never sent again on a guess.

@@ -1338,7 +1338,7 @@ test('/withdraw refused by the door (409): the item moved, its evidence is refus
     assert.equal(withdraws.length, 1);
     assert.ok(w.calls.some((c) => c.seq > withdraws[0].seq && c.path === '/run/status'), 'where the item is now is read');
     assert.ok(
-      w.logLines.some((l) => /withdraw refused \(IMPORT_WITHDRAW_REFUSED; the item is RETRYING now\): the door withdraws only an item BLOCKED SOURCE_WITHDRAWN whose second fetch is at least 24 h after the block; nothing is sent again/.test(l)),
+      w.logLines.some((l) => /withdraw refused \(IMPORT_WITHDRAW_REFUSED; the item is RETRYING now\): the door withdraws only an item BLOCKED SOURCE_WITHDRAWN whose second fetch is at least 6 h after the block; nothing is sent again/.test(l)),
       w.logLines.join('\n')
     );
     assert.ok(!w.logLines.some((l) => /ops withdraw:/.test(l)), 'a refusal it reports, not an ops error');
@@ -1346,7 +1346,7 @@ test('/withdraw refused by the door (409): the item moved, its evidence is refus
   } finally {
     w.dispose();
   }
-  // Still BLOCKED SOURCE_WITHDRAWN, but the door refuses the evidence (a second fetch less than 24 h after the block):
+  // Still BLOCKED SOURCE_WITHDRAWN, but the door refuses the evidence (a second fetch less than 6 h after the block):
   // the same words, which never claim the item moved.
   const early = new World({ handles: ['filament-buffer'], items: { '6945416380552': { state: 'BLOCKED', last_completed: '', blocker_code: 'SOURCE_WITHDRAWN' } }, ...gone });
   try {
