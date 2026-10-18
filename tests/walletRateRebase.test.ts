@@ -21,6 +21,8 @@ import { walletRoutes } from '../worker/routes/wallet';
 import { createDepositRequest, releaseHold } from '../worker/lib/walletOps';
 import { getOfficialUsdRate } from '../worker/lib/fx/officialRate';
 import { runWalletRateRebase } from '../worker/lib/fx/walletRateRebase';
+import { holdEscrow, refundEscrow, releaseEscrow } from '../worker/lib/escrowOps';
+import { orderRoutes } from '../worker/routes/orders';
 import { iqdToUsdCents } from '../src/lib/api';
 
 const L = 1400;
@@ -199,7 +201,10 @@ test('a wallet with an open withdrawal, a purchase hold and a deposit under revi
   const released = await wallet(a);
   const heldIqdAtL = Math.floor((1000 * L) / 100);
   assert.ok(released.balance_iqd - after.balance_iqd >= heldIqdAtL, 'not less than it held');
-  assert.ok(released.balance_iqd - after.balance_iqd < heldIqdAtL + Math.ceil(U / 100), 'not more than a cent above it');
+  assert.ok(
+    released.balance_iqd - after.balance_iqd < heldIqdAtL + Math.ceil(U / 100),
+    'at most one cent at U above it: the stated, bounded cost of rounding a reservation up'
+  );
 
   // A withdrawal filed after the rebase converts at the official rate.
   const late = await json(
@@ -239,4 +244,98 @@ test('migration 0202: a database already holding wallet money gets no marker, an
   assert.equal(count(fresh, 'SELECT COUNT(*) AS n FROM wallet_rate_rebase'), 1, 'an empty shop is born on the official rate');
   fresh.exec(readFileSync(join(ROOT, 'migrations/0202_wallet_rate_rebase.sql'), 'utf8'));
   assert.equal(count(fresh, 'SELECT COUNT(*) AS n FROM wallet_rate_rebase'), 1);
+});
+
+/** A community order of 50,000 د.ع whose escrow can be held from the buyer's wallet. */
+function communityOrder(raw: DatabaseSync) {
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash) VALUES ('owner','Owner','o@x.co','h'), ('boss','Admin','ad@x.co','h');
+    INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','owner','Shop');
+    INSERT INTO community_requests (id,customer_id,title) VALUES ('r1','buyer','Print');
+    INSERT INTO community_offers (id,request_id,merchant_id,price_iqd) VALUES ('o1','r1','m1',50000);
+    INSERT INTO community_orders
+      (id,request_id,offer_id,customer_id,merchant_id,price_iqd,commission_percent_x100,platform_fee_iqd,merchant_receivable_iqd)
+      VALUES ('co1','r1','o1','buyer','m1',50000,1000,5000,45000);
+  `);
+}
+
+const holdCommunityOrder = (db: D1Database) =>
+  holdEscrow(db, {
+    communityOrderId: 'co1', customerId: 'buyer', merchantId: 'm1',
+    grossIqd: 50_000, platformFeeIqd: 5_000, merchantReceivableIqd: 45_000, idempotencyKey: 'esc-1',
+  });
+
+test('an escrow held at 1,400 and settled after the rebase: its recorded rate and cents follow the rescaled hold, so a partial refund gives back its dinars and a release spends only its own', async () => {
+  for (const settle of ['partial', 'release'] as const) {
+    const { raw, db } = setup();
+    communityOrder(raw);
+    await topUp(db, raw, 'buyer', 100_000, 'esc');
+    const held = await holdCommunityOrder(db);
+    assert.equal(held.ok, true, JSON.stringify(held));
+    const escrowId = (held as { escrowId: string }).escrowId;
+    holdingMoneyAtU(raw);
+    assert.equal((await runWalletRateRebase({ DB: db })).status, 'rebased');
+
+    const hold = row<{ amount_cents: number }>(raw, 'SELECT h.amount_cents FROM wallet_holds h JOIN community_escrows c ON c.hold_id = h.id')!;
+    assert.equal(
+      row<{ reason: string }>(raw, "SELECT reason FROM community_escrow_events WHERE kind = 'held'")!.reason,
+      `rate=${U};cents=${hold.amount_cents}`,
+      'the hold-time record moved with the hold'
+    );
+    const free = (await wallet(app(db))).balance_iqd as number;
+    if (settle === 'partial') {
+      const rf = await refundEscrow(db, { escrowId, actorId: 'boss', actorRole: 'admin', amountIqd: 20_000, idempotencyKey: 'prf' });
+      assert.equal(rf.ok, true, JSON.stringify(rf));
+      assert.deepEqual(
+        row(raw, 'SELECT amount, amount_iqd, exchange_rate_snapshot FROM wallet_transactions WHERE id = ?', `wtx_escrow_refund_${escrowId}`),
+        { amount: Math.floor((20_000 * 100) / U), amount_iqd: 20_000, exchange_rate_snapshot: U }
+      );
+      const after = (await wallet(app(db))).balance_iqd as number;
+      assert.ok(after <= free + 20_000 && after >= free + 20_000 - Math.ceil(U / 100), `refunded 20,000, read ${after - free}`);
+    } else {
+      const rel = await releaseEscrow(db, { escrowId, actorId: 'buyer', actorRole: 'customer', idempotencyKey: 'rel' });
+      assert.equal(rel.ok, true, JSON.stringify(rel));
+      const after = (await wallet(app(db))).balance_iqd as number;
+      assert.ok(after <= free && after >= free - Math.ceil(U / 100), `the free balance moved by ${after - free}`);
+    }
+  }
+});
+
+test('an order paid from the wallet before the rebase and cancelled after it gives back its dinars, not 20% more', async () => {
+  const { raw, db } = setup();
+  raw.exec(`
+    INSERT INTO orders(id,user_id,status,stage,shipping_type,address_snapshot,delivery_method_id,
+      delivery_method_snapshot,payment_method_id,subtotal_iqd,shipping_iqd,points_discount_iqd,
+      wallet_applied_iqd,wallet_applied_usd_cents,exchange_rate,total_iqd,due_on_delivery_iqd,idempotency_key)
+    VALUES('ORD1','buyer','pending','received','preorder_land','{}','pickup','{}','cash',100000,0,0,50000,3572,${L},100000,50000,'ord1');
+    INSERT INTO wallet_transactions(id,user_id,type,currency,amount,status,ref,amount_iqd,exchange_rate_snapshot) VALUES
+      ('wtx_ord_ORD1_usd','buyer','withdrawal','USD',3572,'approved','ORD1',50000,${L});
+  `);
+  await topUp(db, raw, 'buyer', 60_000, 'pay');
+  await topUp(db, raw, 'buyer', 10_000, 'left');
+  holdingMoneyAtU(raw);
+  const before = (await wallet(app(db))).balance_iqd as number;
+  assert.equal((await runWalletRateRebase({ DB: db })).status, 'rebased');
+  assert.equal((await wallet(app(db))).balance_iqd, before);
+
+  const buyer = stubApp(db, { id: 'buyer', role: 'customer', email: 'buyer@x.co' }, (a) => a.route('/api/orders', orderRoutes));
+  const res = await post(buyer, '/api/orders/ORD1/cancel', {});
+  assert.equal(res.status, 200, JSON.stringify(await json(res)));
+  const refund = row<Record<string, number>>(raw, "SELECT amount, amount_iqd, exchange_rate_snapshot FROM wallet_transactions WHERE id = 'wtx_refund_ORD1_usd'")!;
+  assert.deepEqual([refund.amount, refund.amount_iqd, refund.exchange_rate_snapshot], [Math.floor((3572 * L) / U), 50_000, U]);
+  const back = ((await wallet(app(db))).balance_iqd as number) - before;
+  // The 50,000 paid, to the dinar the reading's own floor allows (one cent at U is 16.8 دينار).
+  assert.ok(back >= 50_000 && back <= 50_001, `gave back ${back}`);
+});
+
+test('after the rebase an unreadable applied rate keeps the wallet on U, never back on the legacy rate', async () => {
+  const { raw, db } = setup();
+  await topUp(db, raw, 'buyer', 50_000, 'b1');
+  holdingMoneyAtU(raw);
+  assert.equal((await runWalletRateRebase({ DB: db })).status, 'rebased');
+  assert.equal(await getOfficialUsdRate(db), U);
+  raw.exec('ALTER TABLE pricing_fx_rates RENAME TO pricing_fx_rates_unreadable');
+  assert.equal(await getOfficialUsdRate(db), U, 'the last U this isolate read');
+  assert.equal(await getOfficialUsdRate(asD1(raw)), U, 'a fresh handle: the U the rebase moved to');
+  assert.equal((await wallet(app(asD1(raw)))).balance_iqd, 50_000);
 });

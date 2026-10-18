@@ -13,7 +13,7 @@
  * (migration 0202) FIRST — a plain INSERT on a one-row table, so a second run,
  * concurrent or later, aborts on its primary key and changes nothing — then
  * every statement below as `INSERT … SELECT` / `UPDATE … SET`, so the batch is
- * the same thirteen statements whatever the number of wallets. Until the marker
+ * the same fourteen statements whatever the number of wallets. Until the marker
  * exists `getOfficialUsdRate` returns L (worker/lib/fx/officialRate.ts): there
  * is never a moment when a balance is read at U before it was rescaled.
  *
@@ -26,7 +26,8 @@
  *      migration 0108) equal the reading before the rebase, to the dinar.
  *   2. Every active hold that still reserves money, and what it reserves for:
  *      the open withdrawal request (amount, fee, net) and its pending ledger
- *      row, and a Quick Buy session's held cents and rate.
+ *      row, a Quick Buy session's held cents and rate, and an escrow's
+ *      hold-time rate and cents (its `held` event, which settlement reads).
  *   3. Every pending deposit and its review record: at most the cents its
  *      typed dinars are worth at U (a deposit of those dinars filed today),
  *      never more than its cents rescaled and rounded up.
@@ -40,8 +41,16 @@
  * deposit, so the balance the customer reads is unchanged to the dinar. A
  * reservation (a hold, a withdrawal request) is rounded UP to the cent so it
  * still covers the dinars it was placed for at U, and comes out of the
- * rounded-down settled balance, so released it gives back no more than was
- * there; a withdrawal's fee is rounded down. Only a wallet whose free balance
+ * rounded-down settled balance; a withdrawal's fee is rounded down. The
+ * reading is exact whether the reservation is later spent or released, and
+ * the price of that is stated, not hidden: a hold H' = ceil(H × L / U) is
+ * worth up to one cent more at U than H was at L, and the reopening credit
+ * keeps the reading exact while it stands, so RELEASED (a rejected
+ * withdrawal, a cancelled escrow or Quick Buy) it gives back at most one cent
+ * at U (≤ 16 د.ع at 1,680) more than it reserved — a bounded, one-time cost
+ * to the shop per hold open at the rebase. Lowering the credit instead would
+ * leave a customer whose hold is SPENT up to 16 د.ع short, which the owner's
+ * «keep the balances' value» forbids. Only a wallet whose free balance
  * is smaller than its reservations' rounding keeps them whole (≤ 1 cent each). A wallet whose whole balance is under one cent at U (13 د.ع or
  * less) reads 0, as any such wallet always has.
  *
@@ -79,6 +88,10 @@ const DEPOSIT = (cents: string, iqd: string) =>
 const TX_IQD = `COALESCE(wallet_transactions.amount_iqd, (SELECT m.declared_amount_iqd FROM wallet_deposit_meta m WHERE m.tx_id = wallet_transactions.id))`;
 /** Users whose settled balance is rescaled (holds can only reserve settled money). */
 const SETTLED_USERS = `(SELECT user_id FROM ${E} WHERE settled_cents_before > 0)`;
+/** The holds step 3 rescales: exactly the ones `effectiveHoldsUsdSql` counts, of a wallet whose settled balance moves. */
+const RESCALED_HOLD = (h: string) => `${h}.state = 'active'
+        AND (${h}.tx_id IS NULL OR EXISTS (SELECT 1 FROM wallet_transactions ht WHERE ht.id = ${h}.tx_id AND ht.status <> 'approved'))
+        AND ${h}.user_id IN ${SETTLED_USERS}`;
 
 /**
  * The batch, in order. ?1 = L, ?2 = U, ?3 = now, ?4 = the ledger note. The two
@@ -92,7 +105,9 @@ export function walletRateRebaseSql(): string[] {
 function rebaseStatements(): string[] {
   return [
     // 0. The marker FIRST: a second run aborts here, on the primary key, before anything moves.
-    `INSERT INTO wallet_rate_rebase (id, legacy_rate, official_rate, wallets, rebased_at) VALUES (1, ?1, ?2, 0, ?3)`,
+    //    Stamped by the database clock, the one that stamps every ledger row's `created_at`: a
+    //    refund tells a payment made before the rebase from one made after by it (officialRate.ts).
+    `INSERT INTO wallet_rate_rebase (id, legacy_rate, official_rate, wallets, rebased_at) VALUES (1, ?1, ?2, 0, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
     // 1. What every wallet held and showed, at L — read once, before anything is written.
     `INSERT INTO ${E} (user_id, legacy_rate, official_rate, settled_cents_before, held_cents_before,
         available_cents_before, settled_dust_iqd_before, available_iqd_before, pending_deposit_cents_before, created_at)
@@ -115,9 +130,16 @@ function rebaseStatements(): string[] {
        FROM ${E} e WHERE e.settled_cents_before > 0`,
     // 3. Holds that still reserve money (exactly the ones `effectiveHoldsUsdSql` counts), rounded up.
     `UPDATE wallet_holds SET amount_cents = ${UP('amount_cents')}, updated_at = ?3
-      WHERE state = 'active'
-        AND (tx_id IS NULL OR EXISTS (SELECT 1 FROM wallet_transactions ht WHERE ht.id = wallet_holds.tx_id AND ht.status <> 'approved'))
-        AND user_id IN ${SETTLED_USERS}`,
+      WHERE ${RESCALED_HOLD('wallet_holds')}`,
+    // 3b. An escrow's hold-time rate and cents live in its `held` event (`heldAtRate`, escrowOps.ts):
+    //     they follow its rescaled hold, or a settlement or partial refund would price U-cents at L.
+    `UPDATE community_escrow_events
+        SET reason = 'rate=' || ?2 || ';cents=' || (SELECT h.amount_cents FROM community_escrows c
+                                                     JOIN wallet_holds h ON h.id = c.hold_id
+                                                    WHERE c.id = community_escrow_events.escrow_id)
+      WHERE kind = 'held' AND reason LIKE 'rate=%'
+        AND escrow_id IN (SELECT c.id FROM community_escrows c JOIN wallet_holds h ON h.id = c.hold_id
+                           WHERE ${RESCALED_HOLD('h')})`,
     // 4. Open withdrawal requests: amount up (as its hold), fee down, net = amount − fee; dinars kept.
     `UPDATE wallet_withdrawals
         SET amount_cents = ${UP('amount_cents')},

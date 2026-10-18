@@ -12,7 +12,7 @@ import { requireAuth, requireAdmin, requireMainHost, badRequest, forbidden, notF
 import { canMoveMoney } from '../lib/adminScope';
 import { sha256Hex } from '../lib/crypto';
 import { getSetting, setSetting, SETTING_DEFAULTS } from '../lib/settings';
-import { getOfficialUsdRate } from '../lib/fx/officialRate';
+import { getOfficialUsdRate, refundCentsAcrossRebase } from '../lib/fx/officialRate';
 import {
   ENTITLEMENT_MINIMUM_TIER,
   dailyRewardMultiplierX100,
@@ -468,13 +468,14 @@ async function readChargeForRefund(
   currency: string;
   amount_iqd: number | null;
   exchange_rate_snapshot: number | null;
+  created_at: string | null;
 } | null> {
   const withDinars = await walletLedgerDinarsReady(db);
   const row = await db
     .prepare(
       withDinars
-        ? "SELECT amount, currency, amount_iqd, exchange_rate_snapshot FROM wallet_transactions WHERE id = ? AND type = 'withdrawal'"
-        : "SELECT amount, currency FROM wallet_transactions WHERE id = ? AND type = 'withdrawal'"
+        ? "SELECT amount, currency, amount_iqd, exchange_rate_snapshot, created_at FROM wallet_transactions WHERE id = ? AND type = 'withdrawal'"
+        : "SELECT amount, currency, created_at FROM wallet_transactions WHERE id = ? AND type = 'withdrawal'"
     )
     .bind(txId)
     .first<{
@@ -482,6 +483,7 @@ async function readChargeForRefund(
       currency: string;
       amount_iqd?: number | null;
       exchange_rate_snapshot?: number | null;
+      created_at?: string | null;
     }>();
   if (!row) return null;
   return {
@@ -489,6 +491,7 @@ async function readChargeForRefund(
     currency: String(row.currency),
     amount_iqd: (row.amount_iqd as number) ?? null,
     exchange_rate_snapshot: (row.exchange_rate_snapshot as number) ?? null,
+    created_at: row.created_at ?? null,
   };
 }
 
@@ -1731,6 +1734,11 @@ membershipsRoutes.post('/admin/:id/cancel', async (c) => {
             ? (tx.exchange_rate_snapshot as number)
             : null;
         if (refundRate === null) refundIqd = null;
+        // Charged before the one-time wallet rebase: legacy cents, given back rescaled to U
+        // and recorded at U, so the copied dinars still read back exactly (fx/officialRate.ts).
+        const back = await refundCentsAcrossRebase(db, cents, tx.created_at, refundRate);
+        cents = back.cents;
+        if (back.rescaled && refundIqd !== null) refundRate = back.rate;
       }
     }
     if (cents === 0 && Number(m.price_paid_iqd) > 0) {

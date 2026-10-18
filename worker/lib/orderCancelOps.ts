@@ -27,6 +27,7 @@
 import type { Env } from './types';
 import { releaseOrderRedemptionsStatement } from './offers';
 import { walletLedgerDinarsReady } from './walletOps';
+import { refundCentsAcrossRebase } from './fx/officialRate';
 import { baghdadDay, journalPlan, operationsInstalled } from './operations';
 
 /** The order row as both routes hold it (a raw `SELECT *`); only four columns are read. */
@@ -119,17 +120,35 @@ export async function cancelledOrderRefundStatements(
     const refundRateSql = `(SELECT MAX(d.exchange_rate_snapshot) FROM wallet_transactions d
             WHERE d.ref = ?2 AND d.user_id = ?3 AND d.currency = 'USD' AND d.type = 'withdrawal' AND d.status = 'approved'
               AND d.amount_iqd > 0 AND d.exchange_rate_snapshot > 0)`;
+    /**
+     * PAID BEFORE THE ONE-TIME WALLET REBASE, REFUNDED AFTER IT: the order's
+     * cents were counted at the legacy rate, the wallet now counts at U, so
+     * they come back rescaled by legacy / U and recorded at U — the dinars,
+     * copied as above, still read back exactly (worker/lib/fx/officialRate.ts).
+     * The payment's time is its wallet debit's (the order's when none is found).
+     */
+    const back = await refundCentsAcrossRebase(env.DB, walletCents, async () => {
+      const debit = await env.DB.prepare(
+        `SELECT MIN(created_at) AS at FROM wallet_transactions
+          WHERE ref = ? AND user_id = ? AND currency = 'USD' AND type = 'withdrawal' AND status = 'approved'`
+      ).bind(id, userId).first<{ at: string | null }>();
+      return debit?.at ?? order.created_at;
+    }, null);
+    const rateSql = back.rescaled ? `CASE WHEN ${refundRateSql} IS NULL THEN NULL ELSE ?8 END` : refundRateSql;
     out.push(
       env.DB.prepare(
         ledgerDinars
           ? `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at, amount_iqd, exchange_rate_snapshot)
          SELECT ?1, ?3, 'deposit', 'USD', CASE WHEN ${ORDER_IS_CANCELLED} THEN ?4 ELSE -1 END, 'approved', ?5, ?2, ?6, ?7,
-                ${refundDinarsSql}, ${refundRateSql}
+                ${refundDinarsSql}, ${rateSql}
           WHERE NOT EXISTS (SELECT 1 FROM wallet_transactions t WHERE t.id = ?1)`
           : `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
          SELECT ?1, ?3, 'deposit', 'USD', CASE WHEN ${ORDER_IS_CANCELLED} THEN ?4 ELSE -1 END, 'approved', ?5, ?2, ?6, ?7
           WHERE NOT EXISTS (SELECT 1 FROM wallet_transactions t WHERE t.id = ?1)`
-      ).bind(`wtx_refund_${id}_usd`, id, userId, walletCents, `Refund for cancelled order ${id}`, createdBy, nowIso)
+      ).bind(
+        `wtx_refund_${id}_usd`, id, userId, back.cents, `Refund for cancelled order ${id}`, createdBy, nowIso,
+        ...(ledgerDinars && back.rescaled ? [back.rate] : [])
+      )
     );
     if (ledgerDinars) {
       // A previous partial price refund can leave the remaining cents worth

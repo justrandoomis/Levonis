@@ -58,6 +58,7 @@ import { applyRelations, loadRelationsView } from '../lib/productOverlay';
 import { reversePointsForOrder, unitMerchandiseIqd } from '../lib/pointsOps';
 import { walletCreditStatement } from '../lib/wallet';
 import { walletLedgerDinarsReady } from '../lib/walletOps';
+import { refundRateAcrossRebase } from '../lib/fx/officialRate';
 import { planInventory, planReservationFence, chunk, IN_CHUNK } from '../lib/inventory';
 import { restoreMovesForItem } from '../lib/orderInventory';
 import { planLotRestore } from '../lib/inventoryLots';
@@ -1036,7 +1037,9 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       const giniPaidIqd = Math.max(0, Math.trunc(Number(order.gini_paid_iqd) || 0));
       const settledByGini = giniPaidIqd > 0;
       const walletRefundIqd = settledByGini ? 0 : refundIqd;
-      const rate = Math.trunc(Number(order.exchange_rate)) || 1400; // the ORDER's historical rate
+      // The ORDER's historical rate — or, for an order placed before the one-time wallet rebase,
+      // today's official rate: its rate counted legacy cents the wallet no longer holds (fx/officialRate.ts).
+      const rate = await refundRateAcrossRebase(c.env.DB, Math.trunc(Number(order.exchange_rate)) || 1400, order.created_at);
       // THE REFUNDED DINARS ARE THE DINARS THE CUSTOMER SEES (migration 0108).
       // `Math.round` over the order's rate turned a 50,000 د.ع return into
       // 3,571 cents and recorded nothing else, so the wallet showed «+49,994»
@@ -2074,9 +2077,10 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, requireMone
     beneficiaryUserId: claim.user_id,
     reason,
   });
-  const order = await c.env.DB.prepare('SELECT exchange_rate FROM orders WHERE id = ?')
-    .bind(claim.order_id).first<{ exchange_rate: number }>();
-  const rate = Math.trunc(Number(order?.exchange_rate)) || 1400;
+  const order = await c.env.DB.prepare('SELECT exchange_rate, created_at FROM orders WHERE id = ?')
+    .bind(claim.order_id).first<{ exchange_rate: number; created_at: string | null }>();
+  // An order placed before the one-time wallet rebase converts at today's official rate (fx/officialRate.ts).
+  const rate = await refundRateAcrossRebase(c.env.DB, Math.trunc(Number(order?.exchange_rate)) || 1400, order?.created_at);
   const cents = Math.floor((credit * 100) / rate);
   if (!Number.isSafeInteger(credit) || !Number.isSafeInteger(cents) || cents <= 0) {
     throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');

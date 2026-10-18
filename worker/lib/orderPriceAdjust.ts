@@ -58,6 +58,7 @@ import { notifyCustomer, notificationLang, reachFor, NOTIFY_LANG_SELECT, type No
 import { enqueue } from './outbox';
 import type { EmailLang } from './emailTemplates';
 import { availableUsdSql, walletLedgerDinarsReady } from './walletOps';
+import { refundCentsAcrossRebase } from './fx/officialRate';
 import { planDinarLegs, type DinarLeg } from './walletAdjust';
 import { multipliedPointsSql } from './pointsMultiplier';
 import { answerCallbackQuery, editMessageText, sendMessageToChat } from './telegram';
@@ -398,8 +399,15 @@ interface RefundLegs {
   /** Whether the legs record dinars (0108) — only when the debit did. */
   withDinars: boolean;
   rate: number;
-  /** Net cents credited; the order's `wallet_applied_usd_cents` falls by this. */
+  /** Net cents credited. */
   netCents: number;
+  /**
+   * What the order's `wallet_applied_usd_cents` falls by: `netCents`, except
+   * for a payment made before the one-time wallet rebase, whose figure stays
+   * in the legacy cents it was paid in (rounded up, so what is left on the
+   * order can never later refund more than it is worth).
+   */
+  orderCents: number;
 }
 
 /**
@@ -418,22 +426,33 @@ async function refundLegsFor(
 ): Promise<RefundLegs | null> {
   if (plan.walletRefundIqd <= 0) return null;
   const orderId = String(order.id);
-  const walletCents = Math.max(0, Math.trunc(Number(order.wallet_applied_usd_cents) || 0));
-  const debit = await env.DB.prepare('SELECT amount_iqd, exchange_rate_snapshot FROM wallet_transactions WHERE id = ?')
+  const orderWalletCents = Math.max(0, Math.trunc(Number(order.wallet_applied_usd_cents) || 0));
+  const debit = await env.DB.prepare('SELECT amount_iqd, exchange_rate_snapshot, created_at FROM wallet_transactions WHERE id = ?')
     .bind(orderDebitId(orderId))
-    .first<{ amount_iqd: number | null; exchange_rate_snapshot: number | null }>()
+    .first<{ amount_iqd: number | null; exchange_rate_snapshot: number | null; created_at: string | null }>()
     .catch(() => null);
   const debitRate = Math.trunc(Number(debit?.exchange_rate_snapshot) || 0);
-  const rate = debitRate > 0 ? debitRate : Math.trunc(Number(order.exchange_rate) || 0);
-  if (walletCents <= 0 || rate <= 0) return null;
+  const recordedRate = debitRate > 0 ? debitRate : Math.trunc(Number(order.exchange_rate) || 0);
+  if (orderWalletCents <= 0 || recordedRate <= 0) return null;
+  // Paid before the one-time wallet rebase: the cents left on the order are legacy cents, worth
+  // legacy / U of today's (worker/lib/fx/officialRate.ts). The refund is planned in today's cents at U.
+  const back = await refundCentsAcrossRebase(env.DB, orderWalletCents, debit?.created_at ?? order.created_at, recordedRate);
+  const walletCents = back.cents;
+  const rate = back.rate ?? recordedRate;
+  const toOrderCents = (net: number) =>
+    net >= walletCents ? orderWalletCents
+      : back.rescaled ? Math.min(orderWalletCents, Math.ceil((net * orderWalletCents) / walletCents)) : net;
   const withDinars = (Number(debit?.amount_iqd) || 0) > 0 && debitRate > 0 && (await walletLedgerDinarsReady(env.DB));
 
   if (plan.newWalletIqd === 0) {
-    return { legs: [{ type: 'deposit', cents: walletCents, amountIqd: plan.walletRefundIqd }], withDinars, rate, netCents: walletCents };
+    return {
+      legs: [{ type: 'deposit', cents: walletCents, amountIqd: plan.walletRefundIqd }],
+      withDinars, rate, netCents: walletCents, orderCents: orderWalletCents,
+    };
   }
   if (!withDinars) {
     const cents = Math.min(walletCents, Math.max(1, Math.floor((plan.walletRefundIqd * 100) / rate)));
-    return { legs: [{ type: 'deposit', cents, amountIqd: plan.walletRefundIqd }], withDinars, rate, netCents: cents };
+    return { legs: [{ type: 'deposit', cents, amountIqd: plan.walletRefundIqd }], withDinars, rate, netCents: cents, orderCents: toOrderCents(cents) };
   }
   let legs = planDinarLegs(plan.walletRefundIqd, rate);
   let net = legs.reduce((n, l) => n + (l.type === 'deposit' ? l.cents : -l.cents), 0);
@@ -443,7 +462,7 @@ async function refundLegsFor(
     legs = [{ type: 'deposit', cents: walletCents, amountIqd: plan.walletRefundIqd }];
     net = walletCents;
   }
-  return { legs, withDinars, rate, netCents: net };
+  return { legs, withDinars, rate, netCents: net, orderCents: toOrderCents(net) };
 }
 
 export type DecideOutcome =
@@ -494,7 +513,7 @@ export async function decidePriceAdjustment(
   const oldCents = Math.max(0, Math.trunc(Number(order.wallet_applied_usd_cents) || 0));
   const refund = await refundLegsFor(env, order, plan);
   if (plan.walletRefundIqd > 0 && !refund) throw httpOf('PRICE_ADJUST_UNSUPPORTED_PAYMENT');
-  const newCents = oldCents - (refund?.netCents ?? 0);
+  const newCents = oldCents - (refund?.orderCents ?? 0);
 
   const token = randomToken(12);
   const now = new Date().toISOString();
