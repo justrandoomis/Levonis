@@ -567,7 +567,8 @@ The customer's past orders are read in USD at the order's own snapshot, not at t
 
 Decision D. The recommended option writes the purchase's supplier cost into the **same**
 product inputs the form edits. Pre-order follows through Δ. The 0186 overlay and the 0188
-direct-only locks retire.
+direct-only locks retire. When the review is born, refreshed and dropped, and at which level each
+line lands, is §11 (DECISIONS row 247).
 
 ### 4.6 Smaller finance fixes in the same programme
 
@@ -938,3 +939,50 @@ price editor and a customer read final prices only.
 
 **Deploy order.** Additive: a database without 0198 still prices from the shelf on every save and
 preview, but stores no signature and detects no `STOCK` move; an older Worker never reads the column.
+
+## 11. Incoming stock linked to the product (DECISIONS row 247)
+
+**The owner's report (2026-10-17).** «When the admin enters incoming stock and its arrival is then
+confirmed and it is added to the product, it carries data that may change — the cost, the price, the
+supplier price and others — per option or colour. Make sure of that.»
+
+**The review's life (rows 221/222 D1, modified).** Nothing moves before the owner. A purchase's
+review (`pricing_v2_purchase_reviews`, 0190) is keyed by (product, purchase) and is written or
+refreshed by **every** save that leaves the document `ordered` with a FINAL cost — the confirm, an
+estimated → final edit, a cost or quantity edit before receipt. The same figures again write nothing
+(the review id stays). New figures supersede that purchase's pending review and insert a fresh one. A
+pending review of ANOTHER purchase is superseded only when every (scope, scope_id) it names is named by
+the new one, so purchases of different models or colours keep their own reviews; the owner sees all of
+them oldest first (`GET /:id/purchase-review` → `purchase_reviews`, `purchase_review` = the newest).
+A save back to draft or estimated, and a close with nothing received (cancelled), supersede the
+purchase's pending reviews in the same batch; an apply refuses a purchase that is not
+ordered/partial/received (`PRICING_REVIEW_PURCHASE_CANCELLED`). A close after a partial receipt keeps
+the review: those units arrived at that cost. A needs-pricing product folds every pending review in
+creation order (a later field wins) and its owner's first complete write applies them all.
+
+**Arrival.** Confirming arrival writes stock only (lots, counters, ledger, receipts). When it lands
+units of a product whose review of this purchase is pending, the verified owner's bell rings once per
+product and purchase (`pricing.v2.purchase_review_arrived`, kind `fx_attention`, no figure, a link to
+section ٣).
+
+**The level a line lands at.** A line lands exactly where it was bought: an option line on its model,
+a colour line on its colour, a variant line on its SKU (with the SKU rung, 0183). The broader level (the
+product for a colour, the model for a variant) is only SEEDED: a field is written there while nothing
+resolves for it yet, and it is never raised or lowered by a narrower line. The bought level is written
+whenever it differs from what it inherits after that seed. A sibling bought cheaper therefore never
+moves when a costlier sibling is bought. The review card names, per input, the level and its name, the
+supplier price and currency, the shipping weight, the CBM and the extra cost, and the colours or
+variants whose own cost the purchase will not reach («لن تصل هذه التكلفة إلى: … — لها تكلفة خاصة»).
+
+**A dinar purchase.** An IQD line is offered as a USD supplier cost `IQD_CONVERTED`: its unit dinars
+converted once at the purchase's U (its FX snapshot, or the central effective U and version the same
+confirm snapshots), rounded up at 6 places, with the conversion's snapshot — the rule of a typed dinar
+supplier cost (rows 214, 224). Without a known U and version the line offers nothing.
+
+**The purchase card.** It types no minimum profit and no per-line tick: the minimum profit is set in
+the product's prices section only, and the preview reads every line as the confirm does. The next
+purchase's prefill (`procurement_selection_cost_defaults`) learns a FINAL cost only.
+
+**The stock level.** A product's `inventory_mode` does not change while units sit on the shelf or
+purchase lines are open under the current level (`INVENTORY_MODE_HAS_STOCK`): the shelf, FIFO and the
+receive read the current level only.

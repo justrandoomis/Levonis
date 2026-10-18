@@ -4,7 +4,8 @@
  * D1 and 222).
  *
  *   - confirming a purchase writes exactly one pending review per product
- *     (a second confirm supersedes it) and moves no price and no input;
+ *     (a second purchase of the same levels supersedes it) and moves no price
+ *     and no input;
  *   - the receive works with a review pending;
  *   - the review is owner-only (COST_ACCESS_DENIED for everyone else, the
  *     same body for a real and an invented id);
@@ -202,7 +203,7 @@ test('the purchase document names the products whose review waits — ids and st
   assert.deepEqual(doc.price_reviews, [{ product_id: AMS, state: 'pending' }]);
 });
 
-test('a manual purchase (no supplier route) in a supplier currency writes a review too; an IQD purchase writes none', async () => {
+test('a manual purchase (no supplier route) in a supplier currency writes a review too; an IQD purchase writes its own, converted once to USD (row 247)', async () => {
   const w = pricingWorld();
   await publishV2(w.raw, AMS);
   const manual = { cost_profile_id: undefined, cost_profile_version: undefined, shipping_rate_iqd: undefined };
@@ -212,5 +213,14 @@ test('a manual purchase (no supplier route) in a supplier currency writes a revi
   const inputs = JSON.parse(list[0]!.inputs_json) as Array<{ set: Record<string, unknown> }>;
   assert.ok(inputs.some((i) => i.set.supplier_cost_amount === '450' && i.set.supplier_cost_currency === 'USD'), JSON.stringify(inputs));
   await w.save(w.draft({ ...manual, currency: 'IQD', exchange_rate: 1 }));
-  assert.deepEqual(reviews(w).map((r) => r.state), ['pending'], 'a dinar purchase names no supplier currency: no review, the pending one stays');
+  // Row 247 («الدولار هو الأساس»): the dinars are converted once to USD at the purchase's U (1,600), with the
+  // conversion's snapshot; the USD purchase's review goes only because this one names the same model.
+  const after = reviews(w);
+  assert.deepEqual(after.map((r) => r.state), ['superseded', 'pending']);
+  const iqd = JSON.parse(after[1]!.inputs_json) as Array<{ set: Record<string, unknown>; iqd?: Record<string, unknown> }>;
+  const supplier = iqd.find((i) => i.set.supplier_cost_amount !== undefined)!;
+  assert.equal(supplier.set.supplier_cost_currency, 'USD');
+  assert.equal(supplier.set.supplier_cost_amount, '0.28125', '450 IQD ÷ 1,600');
+  assert.equal(supplier.iqd?.original_input_amount, '450');
+  assert.equal(supplier.iqd?.conversion_rate_snapshot, '1600');
 });

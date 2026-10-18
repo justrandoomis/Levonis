@@ -131,3 +131,59 @@ export async function offerBelowCostBell(
   });
   return [stmt];
 }
+
+/* --------------------------------------- stock arrived, its cost awaits review (row 247) -- */
+
+/**
+ * INCOMING STOCK ARRIVED WITH A PURCHASE COST AWAITING THE OWNER (DECISIONS row 247). Confirming the
+ * arrival of a purchase whose cost review is still pending rings the verified owner's bell once per
+ * product and purchase (a second receipt of the same purchase rings nothing more: the event key). The
+ * product id and name only, never a figure; nothing moves before the owner applies the review in
+ * section ٣ (rows 221/222 D1).
+ */
+export const PURCHASE_ARRIVED_EVENT = 'pricing.v2.purchase_review_arrived';
+
+export const PURCHASE_ARRIVED_NOTICE = {
+  title: {
+    ar: 'وصل مخزون بتكلفة شراء بانتظار مراجعتك',
+    en: 'Stock arrived with a purchase cost awaiting your review',
+    ckb: 'بارێک گەیشت و تێچووی کڕینەکەی چاوەڕێی پێداچوونەوەتە',
+  },
+  body: {
+    ar: 'تم تأكيد وصول شحنة لهذا المنتج. راجع تكلفة الشراء الجديدة في قسم «الأسعار»؛ لا يتغير سعر المورد قبل اعتمادك.',
+    en: 'A shipment of this product was received. Review the new purchase cost in the Prices section; the supplier price does not change before you apply it.',
+    ckb: 'گەیشتنی بارێکی ئەم بەرهەمە پشتڕاست کرایەوە. تێچووی کڕینە نوێیەکە لە بەشی «نرخەکان» ببینە؛ نرخی دابینکەر پێش پەسەندکردنی تۆ ناگۆڕێت.',
+  },
+} as const;
+
+/** The bell's statement for one received product whose review of this purchase is pending (none without a verified owner). */
+export async function purchaseReviewArrivedBell(
+  env: Pick<Env, 'DB' | 'INITIAL_ADMIN_EMAIL'>,
+  productId: string,
+  purchaseId: string,
+  name: string | null
+): Promise<D1PreparedStatement[]> {
+  const ownerId = await verifiedOwnerId(env);
+  if (!ownerId) return [];
+  const { stmt } = notifyStatement(env.DB, {
+    userId: ownerId,
+    kind: 'fx_attention',
+    title_ar: PURCHASE_ARRIVED_NOTICE.title.ar,
+    title_en: PURCHASE_ARRIVED_NOTICE.title.en,
+    body_ar: PURCHASE_ARRIVED_NOTICE.body.ar,
+    body_en: PURCHASE_ARRIVED_NOTICE.body.en,
+    link: `/admin?tab=products&edit=${encodeURIComponent(productId)}&section=3`,
+    entity_type: 'product',
+    entity_id: productId,
+    meta: {
+      title_ckb: PURCHASE_ARRIVED_NOTICE.title.ckb,
+      body_ckb: PURCHASE_ARRIVED_NOTICE.body.ckb,
+      reason: PURCHASE_ARRIVED_EVENT,
+      product_id: productId,
+      purchase_id: purchaseId,
+      ...(name ? { product_name: name } : {}),
+    },
+    eventKey: `${PURCHASE_ARRIVED_EVENT}:${productId}:${purchaseId}`,
+  });
+  return [stmt];
+}

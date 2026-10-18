@@ -776,6 +776,7 @@
     "tests/publicSettingsDisplayRate.test.ts": 13.2,
     "tests/publicUserHint.test.ts": 4,
     "tests/purchaseRename.test.ts": 16.2,
+    "tests/purchaseStockLink.test.ts": 40,
     "tests/purchaseSurplusReturn.test.ts": 53.6,
     "tests/pwaClient.test.ts": 0.3,
     "tests/qr.test.ts": 0.3,

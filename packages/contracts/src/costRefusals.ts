@@ -755,6 +755,18 @@ export const COST_REFUSALS = {
     en: 'This cost was already reviewed',
     ckb: 'ئەم تێچووە پێشتر پێداچوونەوەی بۆ کراوە',
   },
+  // DECISIONS row 247: the review of a purchase that was cancelled is never applied.
+  PRICING_REVIEW_PURCHASE_CANCELLED: {
+    ar: 'أُلغي هذا الشراء؛ لا تُعتمد تكلفته.',
+    en: 'This purchase was cancelled; its cost cannot be applied.',
+    ckb: 'ئەم کڕینە هەڵوەشێنرایەوە؛ تێچووەکەی پەسەند ناکرێت.',
+  },
+  // DECISIONS row 247: a product's stock level never changes under batches on the shelf or open purchases.
+  INVENTORY_MODE_HAS_STOCK: {
+    ar: 'لا يمكن تغيير مستوى المخزون: توجد قطع على الرف أو شحنات مفتوحة تحت المستوى الحالي. بِع القطع أو سوِّها وأغلق الشحنات المفتوحة أولًا.',
+    en: 'The stock level cannot change: units are on the shelf or purchases are open under the current level. Sell or adjust those units and close the open purchases first.',
+    ckb: 'ئاستی کۆگا ناگۆڕدرێت: پارچە لەسەر ڕەفەن یان کڕینی کراوە هەن لەژێر ئاستی ئێستادا. سەرەتا ئەو پارچانە بفرۆشە یان ڕێکیان بخە و کڕینە کراوەکان دابخە.',
+  },
   // Catalog-only products and price requests (DECISIONS rows 239 (3)-(4) and 240, migration 0193): a
   // product a customer can see but not buy yet (no V2 price, or a commercial completeness gap), and the
   // signed-in «طلب السعر» door's own answers.

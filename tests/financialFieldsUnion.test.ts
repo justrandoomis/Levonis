@@ -146,6 +146,8 @@ const AREAS: Record<string, readonly string[]> = {
   CLEAN_START: [
     'v2_below_min_profit', 'estimated_cost_usd', 'estimated_usd_iqd_rate', 'estimated_fx_version', 'purchase_review', 'v2_purchase_inputs',
   ],
+  // Incoming stock linked to the product (DECISIONS row 247): every pending review of a product, one per purchase.
+  STOCK_LINK: ['purchase_reviews'],
   // Services S-P2, trade-in v2 (DECISIONS row 238; spec §9): the owner's valuation record and the stock cost basis.
   TRADE_IN_V2: [
     'store_cap_iqd', 'resale_iqd', 'costs_iqd', 'trade_in_margin_iqd', 'expected_margin_iqd', 'cost_basis_iqd', 'ref_price_usd',

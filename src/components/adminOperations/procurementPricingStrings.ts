@@ -23,17 +23,11 @@ type Fill3 = (a: string, b: string, c: string) => string;
 
 export interface ProcurementPricingStrings {
   // field and hint
-  fieldLabel: string;
-  fieldHint: Fill;
   levelProduct: string;
   levelOption: string;
   levelColour: string;
   levelVariant: string;
-  inherits: Fill2;
-  nothingToInherit: string;
   invalid: string;
-  variantLine: string;
-  colourLine: string;
   storePrice: Fill;
   lineHint: string;
   // the bar
@@ -80,7 +74,6 @@ export interface ProcurementPricingStrings {
   n3: Fill;
   n3Tooltip: string;
   // manual lines and charges
-  manualOptIn: string;
   excludedCharge: string;
   confirmNotFreight: string;
   countedInPricing: string;
@@ -139,17 +132,11 @@ export interface ProcurementPricingStrings {
 }
 
 const ar: ProcurementPricingStrings = {
-  fieldLabel: 'الحد الأدنى للربح (USD)',
-  fieldHint: (level) => `أقل ربح بالدولار فوق التكلفة الحالية لـ${level}. يُحفظ عند اعتماد تكلفة الشراء في التسعير بعد تأكيد الشراء؛ اتركه فارغًا ليرث.`,
   levelProduct: 'المنتج',
   levelOption: 'الخيار',
   levelColour: 'اللون',
   levelVariant: 'النسخة',
-  inherits: (level, amount) => `يرث من ${level}: ${amount}`,
-  nothingToInherit: 'لا يوجد حد أدنى في المستويات الأعلى — أدخله',
   invalid: 'أدخل مبلغًا أكبر من صفر بالدولار، بمنزلتين عشريتين على الأكثر، حتى 100,000',
-  variantLine: 'يُحفظ على مستوى الخيار ويشمل كل ألوانه',
-  colourLine: 'يُحفظ على مستوى المنتج ويشمل كل ألوانه',
   storePrice: (price) => `سعر المتجر الحالي: ${price}`,
   lineHint: 'ابحث عن المنتج ثم حدد الخيار واللون. نجلب الوزن المعبّأ، ثم آخر سعر خام محفوظ لمسار المورد الذي تختاره في التكاليف والشحن.',
   cellCost: 'التكلفة النهائية',
@@ -189,9 +176,8 @@ const ar: ProcurementPricingStrings = {
   n1: 'التسعير يستخدم أسعار الصرف والشحن المركزية الحالية، لا أسعار هذا المستند',
   n1Doc: (rate) => `سعر هذا المستند: ${rate}`,
   n2: (pre, x, direct) => `سعر البيع المباشر = ${pre} + زيادة البيع المباشر ${x} = ${direct}`,
-  n3: (n) => `يُقرَّب السعر لأعلى إلى أقرب 1,000 د.ع (+${n})`,
+  n3: (n) => `فوق 1,000 د.ع يُقرَّب السعر لأعلى إلى أقرب 250 د.ع (+${n})`,
   n3Tooltip: 'الأرقام بالدولار مقرّبة إلى السنت للعرض؛ السعر يُحسب من القيم الدقيقة',
-  manualOptIn: 'اعتمد سعر المورد هذا (دون الشحن) للتسعير',
   excludedCharge: 'مستبعد من التسعير: يبدو شحنًا وقد يكرر شحن المسار. أكّد أنه ليس شحنًا لاحتسابه',
   confirmNotFreight: 'ليست شحنًا، احتسبها في التسعير أيضًا',
   countedInPricing: 'تُحتسب في التسعير أيضًا',
@@ -246,17 +232,11 @@ const ar: ProcurementPricingStrings = {
 };
 
 const en: ProcurementPricingStrings = {
-  fieldLabel: 'Minimum profit (USD)',
-  fieldHint: (level) => `The least profit in USD above today's cost, for the ${level}. Saved when the purchase cost is applied to pricing after you confirm the purchase; leave it empty to inherit.`,
   levelProduct: 'product',
   levelOption: 'option',
   levelColour: 'colour',
   levelVariant: 'variant',
-  inherits: (level, amount) => `Inherits from ${level}: ${amount}`,
-  nothingToInherit: 'No minimum is set at a higher level — enter one',
   invalid: 'Enter an amount above zero in USD, with at most two decimals, up to 100,000',
-  variantLine: 'Saved at option level; it covers every colour of the option',
-  colourLine: 'Saved at product level; it covers every colour',
   storePrice: (price) => `Current store price: ${price}`,
   lineHint: 'Choose the exact item. Its packed measurements load here; saved raw supplier prices load when you choose the route in Costs & freight.',
   cellCost: 'Final cost',
@@ -296,9 +276,8 @@ const en: ProcurementPricingStrings = {
   n1: "Pricing uses today's central exchange and shipping rates, not this document's rates",
   n1Doc: (rate) => `This document's rate: ${rate}`,
   n2: (pre, x, direct) => `Direct sale price = ${pre} + Direct Sale Extra ${x} = ${direct}`,
-  n3: (n) => `Rounded up to the next 1,000 IQD (+${n})`,
+  n3: (n) => `Above 1,000 IQD, rounded up to the next 250 IQD (+${n})`,
   n3Tooltip: 'USD figures are rounded to the cent for display; the price is computed from exact values',
-  manualOptIn: 'Use this supplier price (without freight) for pricing',
   excludedCharge: 'Left out of pricing: it looks like freight and may repeat the route freight. Confirm it is not freight to count it',
   confirmNotFreight: 'Not freight — count it in pricing too',
   countedInPricing: 'Counted in pricing too',
@@ -353,17 +332,11 @@ const en: ProcurementPricingStrings = {
 };
 
 const ckb: ProcurementPricingStrings = {
-  fieldLabel: 'کەمترین قازانجی مەبەست (USD)',
-  fieldHint: (level) => `کەمترین قازانج بە دۆلار لە سەرووی تێچووی ئێستا بۆ ${level}. کاتێک تێچووی کڕینەکە لە نرخداناندا جێبەجێ دەکرێت، دوای پشتڕاستکردنەوەی کڕینەکە، پاشەکەوت دەکرێت؛ بەتاڵی بهێڵەوە بۆ ئەوەی لە ئاستی سەرەوە وەربگیرێت.`,
   levelProduct: 'بەرهەم',
   levelOption: 'هەڵبژاردە',
   levelColour: 'ڕەنگ',
   levelVariant: 'جۆر',
-  inherits: (level, amount) => `وەرگیراو لە ${level}: ${amount}`,
-  nothingToInherit: 'هیچ کەمترینێک لە ئاستە سەرووترەکان دانەنراوە — بینووسە',
   invalid: 'بڕێکی سەرووی سفر بە دۆلار بنووسە، بە زۆرترین دوو ژمارەی دوای فاریزە، تا 100,000',
-  variantLine: 'لە ئاستی هەڵبژاردەدا پاشەکەوت دەکرێت و هەموو ڕەنگەکانی دەگرێتەوە',
-  colourLine: 'لە ئاستی بەرهەمدا پاشەکەوت دەکرێت و هەموو ڕەنگەکانی دەگرێتەوە',
   storePrice: (price) => `نرخی ئێستای فرۆشگا: ${price}`,
   lineHint: 'بەرهەمەکە بدۆزەرەوە، پاشان هەڵبژاردە و ڕەنگ دیاری بکە. کێشی پاکێجکراو لێرە دێت، و دوایین نرخی خاوی پاشەکەوتکراو بۆ ڕێگای دابینکەر کاتێک لە تێچوو و ناردندا هەڵیدەبژێریت.',
   cellCost: 'تێچووی کۆتایی',
@@ -403,9 +376,8 @@ const ckb: ProcurementPricingStrings = {
   n1: 'نرخدانان نرخە ناوەندییەکانی ئێستای ئاڵوگۆڕ و ناردن بەکاردەهێنێت، نەک نرخەکانی ئەم بەڵگەنامەیە',
   n1Doc: (rate) => `نرخی ئەم بەڵگەنامەیە: ${rate}`,
   n2: (pre, x, direct) => `نرخی فرۆشتنی ڕاستەوخۆ = ${pre} + زیادەی فرۆشتنی ڕاستەوخۆ ${x} = ${direct}`,
-  n3: (n) => `بەرەو سەرەوە بۆ نزیکترین 1,000 د.ع خڕ دەکرێتەوە (+${n})`,
+  n3: (n) => `لە سەروو 1,000 د.ع، بەرەو سەرەوە بۆ نزیکترین 250 د.ع خڕ دەکرێتەوە (+${n})`,
   n3Tooltip: 'ژمارەکانی دۆلار بۆ پیشاندان تا سەنت خڕ کراونەتەوە؛ نرخەکە لە بەها وردەکان هەژمار دەکرێت',
-  manualOptIn: 'ئەم نرخەی دابینکەر (بەبێ کرێی ناردن) بۆ نرخدانان بەکاربهێنە',
   excludedCharge: 'لە نرخدانان دەرکراوە: وەک کرێی ناردن دەردەکەوێت و لەوانەیە کرێی ناردنی ڕێگاکە دووبارە بکاتەوە. دڵنیابەرەوە کە کرێی ناردن نییە بۆ ئەوەی حیساب بکرێت',
   confirmNotFreight: 'کرێی ناردن نییە، لە نرخدانانیشدا حیسابی بکە',
   countedInPricing: 'لە نرخدانانیشدا حیساب دەکرێت',

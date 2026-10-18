@@ -1,4 +1,5 @@
-import { purchaseReviewStatements } from '../lib/pricingEngine/v2/purchaseReview';
+import { purchaseReviewStatements, supersedePurchaseReviews } from '../lib/pricingEngine/v2/purchaseReview';
+import { productNameOf, purchaseReviewArrivedBell } from '../lib/pricingEngine/v2/bell';
 import { draftForPricing } from '../lib/pricingEngine/purchaseRead';
 import { Hono, type Context } from 'hono';
 import { allocateProcurementCharges, exactProcurementUnitDefault, procurementSelectionKey } from '../../packages/contracts/src/procurementCost';
@@ -26,7 +27,7 @@ import { investorFinanceInstalled } from '../lib/investorFinance';
 import { packedMeasure, procurementProfiles, profileRates, type PurchaseCharge } from '../lib/procurementCosts';
 import { parseProcurementDraft } from '../lib/procurementDraft';
 import { approvedProcurementRates, requireApprovedDocumentRate } from '../lib/pricingEngine/procurementRate';
-import { engineColumnInstalled } from '../lib/engineInstalled';
+import { cleanStartInstalled, engineColumnInstalled } from '../lib/engineInstalled';
 import { batchSnapshotInstalled, purchaseLotSnapshot, type PurchaseFxSource } from '../lib/batchSnapshot';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { unitOriginsInstalled, normalizeUnitOrigins, planCreateUnitOrigins, planReceiveUnitOrigins, unitOriginsByIncoming } from '../lib/inventoryUnitOrigins';
@@ -296,13 +297,20 @@ adminProcurementRoutes.get('/documents', async (c) => {
  * D1 (the clean start, addendum A.10): which products of a purchase have a
  * price review from its confirm, and its state — product ids and states only,
  * never a figure (the review's cost stays behind the owner's review routes).
- * A database before 0190 has none.
+ * Row 247: a purchase refreshes its review on every save, so each product is
+ * named once — by its pending review, else its latest one. A database before
+ * 0190 has none.
  */
 async function priceReviewsOf(db: D1Database, purchaseId: string): Promise<Array<{ product_id: string; state: string }>> {
   try {
-    return (
-      (await db.prepare('SELECT product_id, state FROM pricing_v2_purchase_reviews WHERE purchase_id = ? ORDER BY created_at, id').bind(purchaseId).all<{ product_id: string; state: string }>()).results ?? []
-    );
+    const rows =
+      (await db.prepare('SELECT product_id, state FROM pricing_v2_purchase_reviews WHERE purchase_id = ? ORDER BY created_at, id').bind(purchaseId).all<{ product_id: string; state: string }>()).results ?? [];
+    const latest = new Map<string, { product_id: string; state: string }>();
+    for (const r of rows) {
+      const at = latest.get(r.product_id);
+      if (!at || at.state !== 'pending') latest.set(r.product_id, { product_id: r.product_id, state: r.state });
+    }
+    return [...latest.values()];
   } catch (e) {
     if (/no such table/i.test(e instanceof Error ? e.message : String(e))) return [];
     throw e;
@@ -427,6 +435,26 @@ async function fxSnapshotStatements(db: D1Database, id: string, now: string): Pr
       )
       .bind(of('USD_IQD'), of('EUR_USD'), of('CNY_USD'), now, id),
   ];
+}
+
+/**
+ * A dinar document's U for its price review (DECISIONS row 247): the purchase's own FX snapshot once it
+ * has one (with its version), else the central effective USD/IQD the confirm in this same batch snapshots.
+ * Null when no rate or version is known — the dinar lines then offer no supplier cost (no rate is guessed).
+ */
+async function purchaseUsdIqd(db: D1Database, previous: Purchase | undefined, now: string): Promise<{ rate: string; version: number; at: string } | null> {
+  const version = (v: unknown) => (Number.isSafeInteger(Number(v)) && Number(v) > 0 ? Number(v) : null);
+  if (previous?.fx_snapshot_at) {
+    const rate = previous.fx_usd_iqd_at_purchase, v = version(previous.fx_usd_iqd_version_at_purchase);
+    return rate != null && v !== null ? { rate: String(rate), version: v, at: String(previous.fx_snapshot_at) } : null;
+  }
+  try {
+    const r = await db.prepare("SELECT effective_rate, effective_version FROM fx_rate_pairs WHERE pair = 'USD_IQD'").first<{ effective_rate: string | null; effective_version: number | null }>();
+    const v = version(r?.effective_version);
+    return r?.effective_rate != null && v !== null ? { rate: String(r.effective_rate), version: v, at: now } : null;
+  } catch {
+    return null;
+  }
 }
 
 async function planDocument(
@@ -585,10 +613,13 @@ async function planDocument(
   // (UNKNOWN), and its next edit must not record the edit day's rates as its
   // purchase-time rates (FX-1 correctness review C7; FX-6's L10 reads them).
   if (status === 'ordered' && previous?.status !== 'ordered') statements.push(...(await fxSnapshotStatements(db, id, now)));
-  // D1 (the clean start, addendum A.10): the FIRST confirm writes one pending purchase review per
-  // product, in this batch — never a price or an input; the owner decides each from the product.
-  if (status === 'ordered' && previous?.status !== 'ordered') {
-    statements.push(...(await purchaseReviewStatements(db, draftForPricing(parsedDraft, { ...b, status: 'ordered' }, id), actor, now)));
+  // D1 (the clean start, addendum A.10; DECISIONS row 247): EVERY save that leaves the document ordered
+  // creates or refreshes its pending purchase review per product, in this batch — the confirm, an
+  // estimated → final edit, a cost edit before receipt — never a price or an input; the owner decides each
+  // from the product. A save that takes an ordered document back to draft or estimated supersedes its reviews.
+  if (status === 'ordered' || previous?.status === 'ordered') {
+    const usdIqd = currency === 'IQD' && status === 'ordered' ? await purchaseUsdIqd(db, previous, now) : null;
+    statements.push(...(await purchaseReviewStatements(db, { ...draftForPricing(parsedDraft, { ...b, status }, id), usd_iqd: usdIqd }, actor, now)));
   }
   if (profile) {
     // A concurrent settings save must not be silently overwritten by an older
@@ -659,7 +690,8 @@ async function planDocument(
       purchaseId: id, incomingId: incoming, productId: l.sel.product_id,
       scope: l.sel.scope, scopeId: l.sel.scope_id, units: origins[lineIndex], actorId: actor,
     }));
-    if (profile && status === 'ordered') statements.push(db.prepare(`INSERT INTO procurement_selection_cost_defaults(profile_id,product_id,scope,scope_id,source_unit_amount,weight_g,volume_mm3,updated_by,updated_at)
+    // The next purchase's prefill learns only a FINAL cost (row 247): an estimate is never offered as the last price.
+    if (profile && status === 'ordered' && state === 'final') statements.push(db.prepare(`INSERT INTO procurement_selection_cost_defaults(profile_id,product_id,scope,scope_id,source_unit_amount,weight_g,volume_mm3,updated_by,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(profile_id,product_id,scope,scope_id) DO UPDATE SET source_unit_amount=excluded.source_unit_amount,weight_g=excluded.weight_g,volume_mm3=excluded.volume_mm3,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
       .bind(profile.id, l.sel.product_id, l.sel.scope, l.sel.scope_id, l.costMode === 'total' ? exactProcurementUnitDefault(l.sourceTotal!, l.qty) : l.source, l.weight, l.volume, actor, now));
   }
@@ -859,6 +891,26 @@ adminProcurementRoutes.patch('/documents/:id/unit-origins', async (c) => {
   return c.json({ success: true, version: version + 1 });
 });
 
+/**
+ * DECISIONS row 247: confirming the arrival of units whose purchase cost still waits for the owner's
+ * review rings his bell once per product and purchase (bell.ts, no figure), in the receive's own batch.
+ * One read; nothing on a database before 0190.
+ */
+async function arrivedBells(c: Context<AppContext>, purchaseId: string, productIds: string[]): Promise<D1PreparedStatement[]> {
+  if (!productIds.length || !(await cleanStartInstalled(c.env.DB))) return [];
+  const rows =
+    (
+      await c.env.DB.prepare(
+        "SELECT r.product_id, p.name, p.name_ar FROM pricing_v2_purchase_reviews r JOIN products p ON p.id = r.product_id WHERE r.purchase_id = ? AND r.state = 'pending' AND r.product_id IN (SELECT value FROM json_each(?)) ORDER BY r.product_id",
+      )
+        .bind(purchaseId, JSON.stringify(productIds))
+        .all<Record<string, unknown> & { product_id: string }>()
+    ).results ?? [];
+  const out: D1PreparedStatement[] = [];
+  for (const r of rows) out.push(...(await purchaseReviewArrivedBell(c.env, r.product_id, purchaseId, productNameOf(r))));
+  return out;
+}
+
 adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
   const user = c.get('user')!;
   await requireCapability(c.env, user, 'receive');
@@ -900,6 +952,7 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
     seq = 0,
     changed = 0;
   const seen = new Set<string>();
+  const receivedProducts = new Set<string>();
   for (const rawLine of raw) {
     const r = rawLine as Record<string, unknown>,
       line = d.lines.find((l) => l.line_id === r.line_id);
@@ -923,6 +976,7 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
     }
     if (qty > 0 && selected.stock === null) throw badRequest('فعّل تتبع مخزون النسخة قبل الاستلام');
     if (qty === 0 && rejected === 0) continue;
+    if (qty > 0 && line.product_id) receivedProducts.add(line.product_id);
     changed += qty + rejected;
     if (qty + line.qty_received > line.qty_ordered) throw badRequest('المستلم يتجاوز كمية الشراء');
     if (rejected + line.rejected_qty > line.qty_ordered - line.qty_received - qty)
@@ -1023,9 +1077,11 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
       `UPDATE purchase_orders SET status=CASE WHEN NOT EXISTS(SELECT 1 FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=? AND i.qty_received<i.qty_ordered) THEN 'received' ELSE 'partial' END,version=version+1,updated_at=? WHERE id=?`,
     ).bind(id, new Date().toISOString(), id),
   );
+  statements.push(...(await arrivedBells(c, id, [...receivedProducts])));
   await commitPurchase(c.env.DB, d.purchase, statements);
   await audit(c.env.DB, user.id, 'purchase.received', id, { event_id: eventId });
-  return c.json({ success: true });
+  // The owner's own answer names the products whose review of this purchase waits (ids and states, never a figure).
+  return c.json({ success: true, ...(isOwner(c.env, user) ? { price_reviews: await priceReviewsOf(c.env.DB, id) } : {}) });
 });
 adminProcurementRoutes.post('/documents/:id/payments', async (c) => {
   const user = c.get('user')!;
@@ -1102,6 +1158,8 @@ adminProcurementRoutes.post('/documents/:id/close', async (c) => {
     d = await document(c.env.DB, id),
     reason = str(b.reason, 'سبب إغلاق المتبقي', { min: 3, max: 500 });
   if (['received', 'cancelled'].includes(d.purchase.status)) return c.json({ success: true, already: true });
+  const cancelled = d.matching.received_qty <= 0;
+  const now = new Date().toISOString();
   await c.env.DB.batch([
     ...fence(c.env.DB, 'EXISTS(SELECT 1 FROM purchase_orders WHERE id=? AND version=?)', [
       id,
@@ -1113,11 +1171,14 @@ adminProcurementRoutes.post('/documents/:id/close', async (c) => {
     c.env.DB.prepare(
       'UPDATE purchase_orders SET status=?,note=note||?,version=version+1,updated_at=? WHERE id=?',
     ).bind(
-      d.matching.received_qty > 0 ? 'received' : 'cancelled',
+      cancelled ? 'cancelled' : 'received',
       `\n${reason}`,
-      new Date().toISOString(),
+      now,
       id,
     ),
+    // Row 247: a purchase closed with nothing received was never bought at that cost — its reviews go with it.
+    // A close after a partial receipt keeps them: those units arrived at that cost.
+    ...(cancelled && (await cleanStartInstalled(c.env.DB)) ? [supersedePurchaseReviews(c.env.DB, id, user.id, now)] : []),
   ]);
   await audit(c.env.DB, user.id, 'purchase.remainder_closed', id, { reason });
   return c.json({ success: true });

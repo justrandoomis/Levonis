@@ -20,62 +20,89 @@
  * PRIVATE: the inputs are the owner's; nothing here is logged.
  */
 import { directPurchaseStore } from '../directPurchase';
-import { INPUT_FIELD_NAMES, ownerRow, type InputFields, type InputScope, type InputWrite, type ProductPricingData } from '../store';
+import { INPUT_FIELD_NAMES, ownerRow, type InputFields, type InputScope, type InputWrite, type IqdSnapshot, type ProductPricingData } from '../store';
 
 /**
  * D1 on a product still in «يحتاج تسعيرًا» (addendum A.10: "a needs-pricing
- * product's review feeds its prefill"): the product's newest PENDING purchase
- * review — the cost inputs a confirmed stock purchase implies. It is laid over
- * the prefill the OWNER prices from (never an editor's: an editor never reads
- * or writes a cost), and the owner's first complete V2 write marks it
- * `applied` in the same batch: the owner reviewed the resulting prices on
- * that write's own sheet. Null on a database before 0190 or when none waits.
+ * product's review feeds its prefill"): the product's PENDING purchase
+ * reviews — the cost inputs its confirmed stock purchases imply, one per
+ * purchase (DECISIONS row 247: purchases of different models or colours each
+ * keep their own), folded oldest first so a later purchase's field wins. They
+ * are laid over the prefill the OWNER prices from (never an editor's: an
+ * editor never reads or writes a cost), and the owner's first complete V2
+ * write marks every folded review `applied` in the same batch: the owner
+ * reviewed the resulting prices on that write's own sheet. Null on a database
+ * before 0190 or when none waits.
  */
 export interface FirstWriteReview {
+  /** The newest folded review (the prefill names it). */
   id: string;
-  inputs: ReadonlyArray<{ scope: InputScope; scope_id: string; set: Partial<InputFields>; source_ref: string }>;
+  /** Every folded review, oldest first. */
+  ids: readonly string[];
+  /** The reviews' inputs, oldest review first. */
+  inputs: ReadonlyArray<{ scope: InputScope; scope_id: string; set: Partial<InputFields>; source_ref: string; iqd?: IqdSnapshot }>;
 }
 
-export async function pendingReviewOf(db: D1Database, productId: string): Promise<FirstWriteReview | null> {
-  let row: { id: string; inputs_json: string } | null;
+export async function pendingReviewsOf(db: D1Database, productId: string): Promise<FirstWriteReview | null> {
+  let rows: Array<{ id: string; inputs_json: string }>;
   try {
-    row = await db
-      .prepare("SELECT id, inputs_json FROM pricing_v2_purchase_reviews WHERE product_id = ? AND state = 'pending' ORDER BY created_at DESC LIMIT 1")
-      .bind(productId)
-      .first<{ id: string; inputs_json: string }>();
+    rows =
+      (
+        await db
+          .prepare("SELECT r.id, r.inputs_json FROM pricing_v2_purchase_reviews r WHERE r.product_id = ? AND r.state = 'pending' AND NOT EXISTS (SELECT 1 FROM purchase_orders p WHERE p.id = r.purchase_id AND p.status NOT IN ('ordered','partial','received')) ORDER BY r.created_at, r.id")
+          .bind(productId)
+          .all<{ id: string; inputs_json: string }>()
+      ).results ?? [];
   } catch (e) {
     if (/no such table/i.test(e instanceof Error ? e.message : String(e))) return null;
     throw e;
   }
-  if (!row) return null;
-  let parsed: unknown = [];
-  try {
-    parsed = JSON.parse(row.inputs_json);
-  } catch {
-    parsed = [];
-  }
+  if (!rows.length) return null;
   const scopes: readonly string[] = ['base', 'option', 'color', 'sku'];
-  const inputs = (Array.isArray(parsed) ? parsed : []).filter(
-    (i): i is FirstWriteReview['inputs'][number] =>
-      !!i && typeof i === 'object' && scopes.includes((i as { scope?: unknown }).scope as string) && typeof (i as { scope_id?: unknown }).scope_id === 'string' && !!(i as { set?: unknown }).set && typeof (i as { set?: unknown }).set === 'object'
-  );
-  return { id: row.id, inputs };
+  const inputs: Array<FirstWriteReview['inputs'][number]> = [];
+  for (const row of rows) {
+    let parsed: unknown = [];
+    try {
+      parsed = JSON.parse(row.inputs_json);
+    } catch {
+      parsed = [];
+    }
+    inputs.push(
+      ...(Array.isArray(parsed) ? parsed : []).filter(
+        (i): i is FirstWriteReview['inputs'][number] =>
+          !!i && typeof i === 'object' && scopes.includes((i as { scope?: unknown }).scope as string) && typeof (i as { scope_id?: unknown }).scope_id === 'string' && !!(i as { set?: unknown }).set && typeof (i as { set?: unknown }).set === 'object'
+      )
+    );
+  }
+  return { id: rows[rows.length - 1]!.id, ids: rows.map((r) => r.id), inputs };
 }
 
-/** The review's writes over the stored set (a scope the product no longer has is dropped). */
+/**
+ * The reviews' writes over the stored set, one write per scope (a later review's field wins; a scope
+ * the product no longer has is dropped). A dinar purchase's conversion travels with its supplier cost.
+ */
 export function reviewFoldInputs(stored: ProductPricingData, review: FirstWriteReview | null | undefined, live: (scope: Exclude<InputScope, 'base'>, id: string) => boolean): InputWrite[] {
   if (!review) return [];
   const known = new Set<string>(INPUT_FIELD_NAMES);
-  return review.inputs
-    .filter((i) => i.scope === 'base' || live(i.scope, i.scope_id))
-    .map((i) => ({
+  const out = new Map<string, InputWrite>();
+  for (const i of review.inputs) {
+    if (i.scope !== 'base' && !live(i.scope, i.scope_id)) continue;
+    const set = Object.fromEntries(Object.entries(i.set).filter(([k]) => known.has(k))) as Partial<InputFields>;
+    if (!Object.keys(set).length) continue;
+    const key = `${i.scope}\u0000${i.scope === 'base' ? '' : i.scope_id}`;
+    const at = out.get(key);
+    const supplier = 'supplier_cost_amount' in set;
+    const iqd = supplier ? i.iqd : at?.iqd;
+    out.set(key, {
       scope: i.scope,
       scope_id: i.scope_id,
       existing: ownerRow(stored.inputs, i.scope, i.scope_id),
-      set: Object.fromEntries(Object.entries(i.set).filter(([k]) => known.has(k))) as Partial<InputFields>,
+      set: { ...(at?.set ?? {}), ...set },
       source_ref: typeof i.source_ref === 'string' && i.source_ref ? i.source_ref : 'purchase',
-    }))
-    .filter((w) => Object.keys(w.set).length > 0);
+      ...(iqd ? { iqd } : {}),
+    });
+  }
+  return [...out.values()];
 }
 
 /** A direct-only product's purchase overlay folded into the ordinary inputs: one write per scope it changes. */
@@ -113,24 +140,22 @@ export function withFirstWriteInputs(fold: readonly InputWrite[], own: readonly 
 
 /**
  * The rows a complete first write retires (inside the V2 batch, after the owner's data, before the prices),
- * and — `review`, only when the owner's write folded it — the pending purchase review it applied.
+ * and — `review`, only when the owner's write folded them — the pending purchase reviews it applied.
  */
-export function firstWriteStatements(db: D1Database, stored: ProductPricingData, review?: { id: string; actor: string; now: string } | null): D1PreparedStatement[] {
+export function firstWriteStatements(db: D1Database, stored: ProductPricingData, review?: { ids: readonly string[]; actor: string; now: string } | null): D1PreparedStatement[] {
   const pid = stored.product_id;
   const dse = stored.rules.some((r) => r.product_id === pid && r.kind === 'direct_sale_extra');
   return [
     ...(dse ? [db.prepare("DELETE FROM pricing_rules WHERE product_id = ? AND kind = 'direct_sale_extra'").bind(pid)] : []),
     ...(stored.direct_purchase ? [db.prepare('DELETE FROM pricing_direct_purchase WHERE product_id = ?').bind(pid)] : []),
-    ...(review
-      ? [
-          db
-            .prepare("UPDATE pricing_v2_purchase_reviews SET state = 'applied', decided_at = ?, decided_by = ? WHERE id = ? AND product_id = ? AND state = 'pending'")
-            .bind(review.now, review.actor, review.id, pid),
-        ]
-      : []),
+    ...(review?.ids ?? []).map((id) =>
+      db
+        .prepare("UPDATE pricing_v2_purchase_reviews SET state = 'applied', decided_at = ?, decided_by = ? WHERE id = ? AND product_id = ? AND state = 'pending'")
+        .bind(review!.now, review!.actor, id, pid)
+    ),
   ];
 }
 
 /** The review a write's first-write retirement marks applied: the owner's, when one was folded into its prefill. */
 export const foldedReviewOf = (read: { review?: FirstWriteReview | null }, viewer: string, actor: string, now: string) =>
-  viewer === 'owner' && read.review ? { id: read.review.id, actor, now } : null;
+  viewer === 'owner' && read.review ? { ids: read.review.ids, actor, now } : null;

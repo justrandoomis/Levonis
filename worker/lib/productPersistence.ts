@@ -47,6 +47,7 @@
  */
 
 import { badRequest, notFound, str, int, HttpError } from './http';
+import { serverMessage } from '@levonis/contracts/costRefusals';
 import { newId } from './crypto';
 import { audit } from './audit';
 import { busFor, nextAggregateSeq, outboxStatement } from './eventBus';
@@ -298,6 +299,8 @@ export interface RelationsSnapshot {
   productId: string;
   baseLadder: Ladder;
   inventoryMode: InventoryMode;
+  /** DECISIONS row 247: units on the shelf or purchase lines open under `inventoryMode` (the level cannot change then). */
+  strandedStock?: boolean;
   saleTypes: string[];
   baseReserved: number;
   existing: ProductRelations;
@@ -373,7 +376,8 @@ export async function loadRelationsSnapshot(
     }>();
   if (!product) throw notFound('Product not found');
 
-  const [existing, variants, images, lines] = await Promise.all([
+  const inventoryMode: InventoryMode = isInventoryMode(product.inventory_mode) ? product.inventory_mode : 'BASE';
+  const [existing, variants, images, lines, stranded] = await Promise.all([
     loadProductRelations(db, productId),
     db
       .prepare('SELECT * FROM product_variants WHERE product_id = ?')
@@ -384,12 +388,14 @@ export async function loadRelationsSnapshot(
       >(),
     db.prepare('SELECT * FROM product_images WHERE product_id = ?').bind(productId).all<ImageRow>(),
     loadLiveLines(db, productId),
+    strandedStock(db, productId, inventoryMode),
   ]);
 
   return {
     productId,
     baseLadder: over.ladder ?? ladderOf(product),
-    inventoryMode: isInventoryMode(product.inventory_mode) ? product.inventory_mode : 'BASE',
+    inventoryMode,
+    strandedStock: stranded,
     saleTypes:
       over.saleTypes ?? (normalizeSaleTypes(product.sale_types, String(product.selling_type ?? 'direct_sale')) as string[]),
     baseReserved: Number(product.stock_reserved ?? 0),
@@ -618,6 +624,32 @@ export type RelationsPlan =
  * for a variant, an open order names its combination (deactivated instead,
  * and the caller is told).
  */
+/** The lot and purchase-line scope each inventory mode reads (worker/lib/inventory.ts `resolveStock`). */
+const STOCK_SCOPE_OF_MODE: Readonly<Record<InventoryMode, string>> = { BASE: 'base', OPTION: 'option', COLOR: 'color', VARIANT_COMBINATION: 'variant' };
+
+/**
+ * DECISIONS row 247: are units on the shelf (`inventory_lots.qty_remaining > 0`) or purchase lines still open
+ * (`incoming_inventory` incoming/partial, not all received) under the level the product counts today? A
+ * stock-level change is then refused. One statement, read with the snapshot's relations (no wave of its own); a
+ * database without either table strands nothing.
+ */
+async function strandedStock(db: D1Database, productId: string, current: InventoryMode): Promise<boolean> {
+  const scope = STOCK_SCOPE_OF_MODE[current];
+  try {
+    const r = await db
+      .prepare(
+        `SELECT (EXISTS (SELECT 1 FROM inventory_lots WHERE product_id = ? AND scope = ? AND qty_remaining > 0)
+              OR EXISTS (SELECT 1 FROM incoming_inventory WHERE product_id = ? AND scope = ? AND status IN ('incoming','partial') AND qty_received < qty_ordered)) AS x`
+      )
+      .bind(productId, scope, productId, scope)
+      .first<{ x: number }>();
+    return Number(r?.x ?? 0) === 1;
+  } catch (e) {
+    if (/no such (table|column)/i.test(e instanceof Error ? e.message : String(e))) return false;
+    throw e;
+  }
+}
+
 export async function planRelationsWriteFrom(
   db: D1Database,
   snap: RelationsSnapshot,
@@ -1281,6 +1313,9 @@ export async function planRelationsWriteFrom(
   const mode: InventoryMode = isInventoryMode(body.inventory_mode)
     ? body.inventory_mode
     : (preservedMode ?? derivedMode);
+  // DECISIONS row 247: the stock level never moves from under batches still on the shelf or purchase lines
+  // still open — the shelf, FIFO and the receive read the CURRENT level only, so they would be stranded.
+  if (mode !== snap.inventoryMode && snap.strandedStock) throw new HttpError(409, serverMessage('INVENTORY_MODE_HAS_STOCK'), 'INVENTORY_MODE_HAS_STOCK');
   if (!isInventoryMode(body.inventory_mode) && preservedMode === null && snap.inventoryMode !== derivedMode) {
     warnings.push(
       `inventory_mode moved from ${snap.inventoryMode} to ${derivedMode} — the stock level it named has no rows left / تغيّر مستوى المخزون`

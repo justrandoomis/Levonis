@@ -7,6 +7,7 @@
  * text. The screen formats them; it never computes a price (BRIEF §9).
  */
 import { api } from '../../lib/api';
+import { procurementSelectionKey } from '../../../packages/contracts/src/procurementCost';
 
 export const PRICING = '/api/admin/pricing';
 
@@ -251,12 +252,28 @@ export const pricingBody = (c: PricingChoices) => ({
   prefer_purchase_values: c.prefer,
 });
 
-export function previewDraft(draft: Record<string, unknown>, choices: PricingChoices, purchaseId: string | null, signal?: AbortSignal) {
-  return api.post<PricingPreview>(`${PRICING}/procurement/preview`, { draft, ...(purchaseId ? { purchase_id: purchaseId } : {}), pricing: pricingBody(choices) }, { signal, mascot: 'silent' });
+/**
+ * What the purchase card's preview reads besides the purchase (DECISIONS row 247): no typed minimum
+ * profit (the product's prices section is its one source) and no per-line tick — every line counts,
+ * as the confirm's review counts it, so the preview equals the commit.
+ */
+export type PreviewChoices = Pick<PricingChoices, 'extras' | 'usePurchase' | 'prefer'>;
+
+/** The selection keys of a draft's lines (every line opted in). */
+const draftLineKeys = (draft: Record<string, unknown>): string[] =>
+  (Array.isArray(draft.lines) ? (draft.lines as Array<Record<string, unknown>>) : []).flatMap((l) =>
+    typeof l?.product_id === 'string' && l.product_id ? [procurementSelectionKey({ product_id: l.product_id, scope: String(l.scope ?? ''), scope_id: String(l.scope_id ?? '') })] : []
+  );
+
+const previewBody = (c: PreviewChoices, lineKeys: readonly string[]) => pricingBody({ ...c, minimums: [], optIn: [...new Set(lineKeys)] });
+
+export function previewDraft(draft: Record<string, unknown>, choices: PreviewChoices, purchaseId: string | null, signal?: AbortSignal) {
+  return api.post<PricingPreview>(`${PRICING}/procurement/preview`, { draft, ...(purchaseId ? { purchase_id: purchaseId } : {}), pricing: previewBody(choices, draftLineKeys(draft)) }, { signal, mascot: 'silent' });
 }
 
-export function previewSaved(purchaseId: string, choices: PricingChoices, signal?: AbortSignal) {
-  return api.post<PricingPreview>(`${PRICING}/procurement/preview`, { purchase_id: purchaseId, pricing: pricingBody(choices) }, { signal, mascot: 'silent' });
+/** A saved purchase's preview; `lineKeys` are its lines' selection keys (every line opted in). */
+export function previewSaved(purchaseId: string, choices: PreviewChoices & { lineKeys?: readonly string[] }, signal?: AbortSignal) {
+  return api.post<PricingPreview>(`${PRICING}/procurement/preview`, { purchase_id: purchaseId, pricing: previewBody(choices, choices.lineKeys ?? []) }, { signal, mascot: 'silent' });
 }
 
 /**

@@ -94,7 +94,7 @@ import {
 import { firstWriteStatements, foldedReviewOf } from '../lib/pricingEngine/v2/firstWrite';
 import { V2_PRICING_STATEMENT_CAP, v2DataStatements, v2StructureStatements, v2WriteStatements } from '../lib/pricingEngine/v2/write';
 import { needsPricingAnswer, QUEUE_FILTERS, type QueueFilter } from '../lib/pricingEngine/v2/queue';
-import { applyPurchaseReview, dismissPurchaseReview, loadPurchaseReview, previewPurchaseReview, reviewView } from '../lib/pricingEngine/v2/purchaseReview';
+import { applyPurchaseReview, dismissPurchaseReview, loadPurchaseReviews, previewPurchaseReview, purchaseReviewContext, reviewView } from '../lib/pricingEngine/v2/purchaseReview';
 import { belowMinProfitBell, productNameOf } from '../lib/pricingEngine/v2/bell';
 import { inputInvalid } from '../lib/pricingEngine/whatIf';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
@@ -926,9 +926,12 @@ const requireReviewOwner = (c: Context<AppContext>) => {
 };
 adminProductsRoutes.get('/:id/purchase-review', limitRoute('pricing-read', 1200), async (c) => {
   requireReviewOwner(c);
-  const row = await loadPurchaseReview(c.env.DB, c.req.param('id'));
+  // Row 247: every pending review, one per purchase, oldest first; `purchase_review` (the newest) stays for older readers.
+  const rows = await loadPurchaseReviews(c.env.DB, c.req.param('id'));
+  const cx = rows.length ? await purchaseReviewContext(c.env.DB, c.req.param('id')) : undefined;
+  const views = rows.map((r) => reviewView(r, cx));
   c.header('Cache-Control', 'private, no-store');
-  return c.json({ success: true, purchase_review: row ? reviewView(row) : null });
+  return c.json({ success: true, purchase_reviews: views, purchase_review: views.at(-1) ?? null });
 });
 adminProductsRoutes.post('/:id/purchase-review/:reviewId/preview', limitRoute('pricing-read', 1200), async (c) => {
   requireReviewOwner(c);

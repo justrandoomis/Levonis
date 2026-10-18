@@ -68,7 +68,7 @@ import { sellableSkus } from '../legacy';
 import { evaluateV2Write, type V2Evaluation } from './evaluate';
 import { discountsOf, loadV2Store, pointsOf, type V2Store } from './store';
 import { v2EditorAnswer, v2OwnerAnswer } from './dto';
-import { firstWriteInputs, pendingReviewOf, reviewFoldInputs, withFirstWriteInputs, type FirstWriteReview } from './firstWrite';
+import { firstWriteInputs, pendingReviewsOf, reviewFoldInputs, withFirstWriteInputs, type FirstWriteReview } from './firstWrite';
 import { loadShelves, type ProductShelf } from './shelf';
 
 /* ------------------------------------------------------------------ who -- */
@@ -97,7 +97,7 @@ export interface V2Read {
   rates: PricingRates | null;
   control: EngineControl;
   image: string;
-  /** A product with no method yet: its newest pending purchase review (D1), folded into the owner's prefill. */
+  /** A product with no method yet: its pending purchase reviews (D1, row 247), folded into the owner's prefill. */
   review?: FirstWriteReview | null;
   /** The product's shelf (DECISIONS row 244): cost-first, a model with stock is priced from its costliest batch. */
   shelf?: ProductShelf | null;
@@ -121,7 +121,7 @@ export async function loadV2Read(db: D1Database, productId: string, draft?: Load
     loadShelves(db, [productId]),
   ]);
   const own = stored.get(productId)!;
-  const review = storedMethodOf({ stored: own }) ? null : await pendingReviewOf(db, productId);
+  const review = storedMethodOf({ stored: own }) ? null : await pendingReviewsOf(db, productId);
   const shelf = shelves.get(productId) ?? null;
   return { loaded, stored: own, v2: v2.get(productId) ?? null, ctx, rates, control, image, review, shelf };
 }
@@ -520,8 +520,9 @@ export function v2Answer(i: AnswerInput): Record<string, unknown> {
       // §2.1 rule 2: what the product's minimum profit inherits when its own field is empty (the owner's
       // placeholder «يرث ($40.00)»), resolved as the maths resolves it — never a guess.
       inherited_minimum_profit: inheritedMinimumProfit(ev.stored.rules, ev.product_id, read.rates?.usd_iqd ?? null),
-      // D1: a needs-pricing product's prefill carries this pending purchase review (its first write applies it).
-      ...(!storedMethod && read.review ? { purchase_review_id: read.review.id } : {}),
+      // D1: a needs-pricing product's prefill carries its pending purchase reviews (its first write applies them;
+      // row 247: one per purchase, the newest named first for the older readers).
+      ...(!storedMethod && read.review ? { purchase_review_id: read.review.id, purchase_review_ids: [...read.review.ids] } : {}),
     };
   }
   return answer;

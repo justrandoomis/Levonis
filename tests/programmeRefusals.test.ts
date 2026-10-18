@@ -192,6 +192,9 @@ const REQUIRED: Record<string, readonly string[]> = {
   // The Bambu import's stock gate (import spec §B.10, §C.11; DECISIONS row 241; owner decision L-16): a product the
   // catalogue import created is never V2-published until an admin chooses its stock mode.
   'Bambu import stock gate (DECISIONS row 241)': ['IMPORT_STOCK_NOT_CONFIGURED', 'IMPORT_STOCK_TRACKED_EMPTY', 'IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER'],
+  // Incoming stock linked to the product (DECISIONS row 247): a cancelled purchase's cost is never applied, and the
+  // stock level never changes under batches on the shelf or open purchases.
+  'Purchase ↔ product link (DECISIONS row 247)': ['PRICING_REVIEW_PURCHASE_CANCELLED', 'INVENTORY_MODE_HAS_STOCK'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

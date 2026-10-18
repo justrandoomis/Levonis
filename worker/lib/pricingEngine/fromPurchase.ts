@@ -7,9 +7,13 @@
  *
  * A line feeds when the purchase is confirmed (`ordered`, `partial` or
  * `received` — quick receive included) with a FINAL cost, and it is on a route
- * document, or a manual line in USD/EUR/CNY the owner ticked («اعتمد سعر
- * المورد هذا…», supplier cost only), and the owner kept «استعمل هذا الشراء
- * لتسعير هذا المنتج».
+ * document, or a manual line (supplier cost only), and the owner kept «استعمل
+ * هذا الشراء لتسعير هذا المنتج». A manual line in USD/EUR/CNY feeds in its
+ * currency. A local dinar purchase (IQD) feeds too (DECISIONS row 247, «الدولار
+ * هو الأساس»): its unit dinars are converted ONCE to USD at the purchase's U
+ * (its FX snapshot, `usd_iqd`) and offered as an IQD_CONVERTED supplier cost
+ * with that conversion's snapshot — the same rule as a typed dinar supplier
+ * cost (rows 214, 224); without a known U and version the line does not feed.
  *
  * Field mapping (§3.2), every value rounded UP — never to nearest:
  *   - supplier cost in its currency: unit mode ceil6(unit); total mode the exact
@@ -25,9 +29,13 @@
  *     none — never overwritten;
  *   - source_ref = 'purchase:<id>' (line ids change on every PUT).
  * Scopes: base → base, option → option, variant → its first option, colour →
- * base. A line NARROWER than its pricing scope never lowers a stored value (max
- * per field) unless the owner ticks «استعمل قيمة هذا الشراء حتى لو كانت أقل من
- * الحالية»; several lines on one scope take the maximum.
+ * base. A line NARROWER than its pricing scope (a colour, a variant) lands at
+ * its own level (below); its broader scope is only SEEDED — a field is written
+ * there only while nothing resolves for it yet (DECISIONS row 247), and never
+ * raised or lowered, so a sibling colour or variant never moves because another
+ * was bought (unless the owner ticks «استعمل قيمة هذا الشراء حتى لو كانت أقل من
+ * الحالية», the old preview's replace). Several lines on one scope take the
+ * maximum.
  *
  * FX-7 gaps — THE COLOUR'S AND THE VARIANT'S OWN LEVEL (with the SKU rung,
  * 0183): a colour line ALSO feeds its colour, and a variant line its SKU
@@ -48,16 +56,16 @@ import {
   ceilToPlaces,
   compareProcurementExact,
   divProcurementExact,
-  mulProcurementExact,
   procurementExact,
   procurementExactText,
+  quotientProcurementExact,
   exactProcurementUnitDefault,
   type ProcurementExact,
 } from '@levonis/contracts/procurementCost';
 import { resolveSkuInputs, type SupplierCurrency } from '@levonis/pricing/costToPrice';
 import { canonicalUsdRuleAmount } from '@levonis/pricing/ruleResolution';
 import { parseSkuComboKey, type ShippingProfile } from '@levonis/pricing/skuChannel';
-import { chainOf, chainOfUnit, ownerRow, ruleAt, type InputFields, type InputScope, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow, type UnitSelection } from './store';
+import { chainOf, chainOfUnit, ownerRow, ruleAt, type InputFields, type InputScope, type InputWrite, type IqdSnapshot, type ProductPricingData, type RuleWrite, type StoredInputRow, type UnitSelection } from './store';
 import type { PricingRates } from './rates';
 
 export type PurchaseStatus = 'draft' | 'ordered' | 'partial' | 'received' | 'cancelled';
@@ -102,6 +110,11 @@ export interface PurchaseForPricing {
   profile: { id: 'germany_land' | 'china_air' | 'china_sea'; shipping_basis: 'weight' | 'volume' } | null;
   lines: PurchaseLineForPricing[];
   charges: PurchaseChargeForPricing[];
+  /**
+   * An IQD document's U (row 247): the central USD/IQD of its FX snapshot (or of the save that writes
+   * it) with its version and time. Absent or null: an IQD line does not feed (no rate is guessed).
+   */
+  usd_iqd?: { rate: string; version: number; at: string } | null;
 }
 
 export const PROFILE_OF_ROUTE: Readonly<Record<'germany_land' | 'china_air' | 'china_sea', ShippingProfile>> = {
@@ -120,9 +133,21 @@ export function purchaseIneligibility(p: Pick<PurchaseForPricing, 'status' | 'co
   return null;
 }
 
-/** The line feeds pricing by its kind: a route document, or a ticked manual line in USD/EUR/CNY. */
+/** A dinar document's U and version, when both are known (row 247); null otherwise. */
+const iqdRateOf = (p: Pick<PurchaseForPricing, 'currency' | 'usd_iqd'>): { rate: string; version: number; at: string } | null => {
+  if (p.currency !== 'IQD' || !p.usd_iqd) return null;
+  const { rate, version, at } = p.usd_iqd;
+  if (!Number.isSafeInteger(version) || version <= 0 || typeof at !== 'string' || !at) return null;
+  try {
+    return procurementExact(rate).num > 0n ? { rate, version, at } : null;
+  } catch {
+    return null;
+  }
+};
+
+/** The line feeds pricing by its kind: a route document, or a ticked manual line in USD/EUR/CNY — or IQD at a known U (row 247). */
 export function lineFeeds(p: PurchaseForPricing, line: PurchaseLineForPricing, optIn: ReadonlySet<string>): boolean {
-  if (!SUPPLIER.has(p.currency)) return false;
+  if (!SUPPLIER.has(p.currency) && !iqdRateOf(p)) return false;
   return p.profile !== null || optIn.has(line.key);
 }
 
@@ -188,6 +213,8 @@ export function supplierUnitText(line: Pick<PurchaseLineForPricing, 'cost_mode' 
 interface LineFields {
   supplier_cost_amount?: string;
   supplier_cost_currency?: SupplierCurrency;
+  /** An IQD line's conversion (row 247): the supplier cost above is then its USD. */
+  iqd?: IqdSnapshot;
   shipping_weight_g?: number;
   manual_cbm?: string;
   additional_cost_iqd?: number;
@@ -199,6 +226,21 @@ function lineFields(p: PurchaseForPricing, line: PurchaseLineForPricing, manual:
   if (supplier && SUPPLIER.has(p.currency)) {
     out.supplier_cost_amount = supplier;
     out.supplier_cost_currency = p.currency as SupplierCurrency;
+  }
+  const u = iqdRateOf(p);
+  if (supplier && u) {
+    // Row 247: the dinars (whole, rounded up) converted once to USD at the purchase's U, rounded UP at 6 places.
+    try {
+      const dinars = procurementExactText(ceilToPlaces(procurementExact(supplier), 0));
+      const usd = ceilToPlaces(quotientProcurementExact(procurementExact(dinars), procurementExact(u.rate)), 6);
+      if (usd.num > 0n && /^[1-9][0-9]{0,12}$/.test(dinars)) {
+        out.supplier_cost_amount = procurementExactText(usd);
+        out.supplier_cost_currency = 'USD';
+        out.iqd = { original_input_amount: dinars, conversion_rate_snapshot: u.rate, conversion_fx_version: u.version, converted_at: u.at };
+      }
+    } catch {
+      /* an unreadable figure does not feed */
+    }
   }
   if (manual || !p.profile) return out;
   if (p.profile.shipping_basis === 'weight') {
@@ -220,18 +262,6 @@ function lineFields(p: PurchaseForPricing, line: PurchaseLineForPricing, manual:
     if (Number.isSafeInteger(unit) && unit >= 0 && unit <= 1_000_000_000) out.additional_cost_iqd = unit;
   }
   return out;
-}
-
-/** The USD value of a supplier cost at today's rates, for "never lower" comparisons; null without its rate. */
-function supplierUsd(amount: string, currency: string, rates: PricingRates | null): ProcurementExact | null {
-  try {
-    const a = procurementExact(amount);
-    if (currency === 'USD') return a;
-    const rate = currency === 'EUR' ? rates?.eur_usd : currency === 'CNY' ? rates?.cny_usd : null;
-    return rate ? mulProcurementExact(a, procurementExact(rate)) : null;
-  } catch {
-    return null;
-  }
 }
 
 const maxNum = (a: number | null | undefined, b: number | undefined): number | undefined =>
@@ -258,14 +288,14 @@ export interface DerivedProduct {
   entries: DerivedEntry[];
   /** shipping_profile proposed from the route at a scope that resolves none. */
   proposals: Array<{ scope: InputScope; scope_id: string; shipping_profile: ShippingProfile }>;
-  /** Written fields a more specific value shadows (the price will not use them). */
-  shadowed: Array<{ scope: InputScope; scope_id: string; field: keyof InputFields }>;
+  /** Written fields a more specific value shadows (the price will not use them; `shadowedOf`). */
+  shadowed: ShadowedWrite[];
 }
 
 /**
  * The input writes one purchase derives for one product (see the file header).
- * `stored` is the product's store as read; `rates` compares supplier costs of
- * different currencies (none in practice: one document has one currency).
+ * `stored` is the product's store as read; `rates` is kept for the callers
+ * (a narrow line no longer compares currencies: it only seeds, row 247).
  */
 export function deriveProductEntries(
   p: PurchaseForPricing,
@@ -287,7 +317,13 @@ export function deriveProductEntries(
     g.indexes.push(line.index);
     if (line.line_id) g.ids.push(line.line_id);
     // Several lines on one scope: the maximum per field (the details name the lines).
-    g.fields.supplier_cost_amount = maxDecimal(g.fields.supplier_cost_amount, fields.supplier_cost_amount) ?? g.fields.supplier_cost_amount;
+    const supplier = maxDecimal(g.fields.supplier_cost_amount, fields.supplier_cost_amount) ?? g.fields.supplier_cost_amount;
+    // The dinar conversion travels with the line whose USD won (row 247).
+    if (fields.supplier_cost_amount !== undefined && supplier === fields.supplier_cost_amount) {
+      if (fields.iqd) g.fields.iqd = fields.iqd;
+      else delete g.fields.iqd;
+    }
+    g.fields.supplier_cost_amount = supplier;
     g.fields.supplier_cost_currency = fields.supplier_cost_currency ?? g.fields.supplier_cost_currency;
     g.fields.shipping_weight_g = maxNum(g.fields.shipping_weight_g, fields.shipping_weight_g) ?? g.fields.shipping_weight_g;
     g.fields.manual_cbm = maxDecimal(g.fields.manual_cbm, fields.manual_cbm) ?? g.fields.manual_cbm;
@@ -309,47 +345,42 @@ export function deriveProductEntries(
       scope: g.scope,
       scope_id: g.scope_id,
       narrow: g.narrow,
-      fields: Object.fromEntries(Object.entries(g.fields).filter(([, v]) => v !== undefined)) as Record<string, string | number>,
+      fields: rawFields(g.fields),
     });
     const existing = ownerRow(stored.inputs, g.scope, g.scope_id);
     const set: Partial<InputFields> = {};
     const kept: Array<keyof InputFields> = [];
-    const lowerKept = g.narrow && !opts.prefer;
-    // Supplier cost: replaced, or (a narrower line) only when not lower in USD at today's rates.
+    // Row 247: a narrower line (a colour, a variant) only SEEDS its broader scope — a field is written there
+    // only while nothing resolves for it yet; it is never raised or lowered (the bought level carries the
+    // purchase, skuLevelEntries). The old preview's «use this purchase's value» still replaces.
+    const seedOnly = g.narrow && !opts.prefer;
+    const held = seedOnly ? resolveSkuInputs(chainOf(stored.inputs, g.scope === 'option' ? g.scope_id : '')).inputs : null;
     if (g.fields.supplier_cost_amount && g.fields.supplier_cost_currency) {
-      let take = true;
-      if (lowerKept && existing && (existing.supplier_cost_amount != null || existing.supplier_cost_delta != null)) {
-        // One currency compares as typed; two compare in USD at today's rates (unknown → kept).
-        const same = existing.supplier_cost_amount != null && existing.supplier_cost_currency === g.fields.supplier_cost_currency;
-        const before = same
-          ? procurementExact(existing.supplier_cost_amount!)
-          : existing.supplier_cost_amount != null && existing.supplier_cost_currency ? supplierUsd(existing.supplier_cost_amount, existing.supplier_cost_currency, opts.rates) : null;
-        const after = same ? procurementExact(g.fields.supplier_cost_amount) : supplierUsd(g.fields.supplier_cost_amount, g.fields.supplier_cost_currency, opts.rates);
-        take = before !== null && after !== null && compareProcurementExact(after, before) > 0;
-      }
-      if (take) {
+      const has = !!held && (held.supplier !== null || existing?.supplier_cost_amount != null || existing?.supplier_cost_delta != null);
+      if (!has) {
         set.supplier_cost_amount = g.fields.supplier_cost_amount;
         set.supplier_cost_currency = g.fields.supplier_cost_currency;
-      } else kept.push('supplier_cost_amount');
+      } else if (!(held!.supplier && held!.supplier.currency === g.fields.supplier_cost_currency && compareProcurementExact(procurementExact(held!.supplier.amount), procurementExact(g.fields.supplier_cost_amount)) === 0))
+        kept.push('supplier_cost_amount');
     }
-    for (const field of ['shipping_weight_g', 'additional_cost_iqd'] as const) {
-      const v = g.fields[field];
-      if (v === undefined) continue;
-      const before = existing?.[field] ?? null;
-      if (lowerKept && before != null && before >= v) {
-        if (before > v) kept.push(field);
-        continue;
-      }
-      set[field] = v;
+    if (g.fields.shipping_weight_g !== undefined) {
+      const v = g.fields.shipping_weight_g;
+      if (!held || (held.weight === null && existing?.shipping_weight_g == null)) set.shipping_weight_g = v;
+      else if (held.weight?.value !== v) kept.push('shipping_weight_g');
+    }
+    if (g.fields.additional_cost_iqd !== undefined) {
+      const v = g.fields.additional_cost_iqd;
+      if (!held || (held.additional_cost_iqd === null && existing?.additional_cost_iqd == null)) set.additional_cost_iqd = v;
+      else if (held.additional_cost_iqd?.value !== v) kept.push('additional_cost_iqd');
     }
     if (g.fields.manual_cbm !== undefined) {
-      const before = existing?.manual_cbm ?? null;
-      if (lowerKept && before != null && compareProcurementExact(procurementExact(before), procurementExact(g.fields.manual_cbm)) >= 0) {
-        if (compareProcurementExact(procurementExact(before), procurementExact(g.fields.manual_cbm)) > 0) kept.push('manual_cbm');
-      } else set.manual_cbm = g.fields.manual_cbm;
+      const cbm = procurementExact(g.fields.manual_cbm);
+      if (!held || (held.cbm === null && existing?.manual_cbm == null)) set.manual_cbm = g.fields.manual_cbm;
+      else if (!(held.cbm && compareProcurementExact(procurementExact(held.cbm.effective), cbm) === 0)) kept.push('manual_cbm');
     }
+    const iqd = set.supplier_cost_amount !== undefined ? g.fields.iqd : undefined;
     out.entries.push({
-      write: { scope: g.scope, scope_id: g.scope_id, existing, set, source_ref: sourceRef },
+      write: { scope: g.scope, scope_id: g.scope_id, existing, set, source_ref: sourceRef, ...(iqd ? { iqd } : {}) },
       line_indexes: g.indexes,
       line_ids: g.ids,
       narrow: g.narrow,
@@ -372,18 +403,63 @@ export function deriveProductEntries(
   // FX-7 gaps: each colour's and variant's own level, against what its SKUs inherit after the writes above.
   if (opts.levels && exact.size) skuLevelEntries(out, [...exact.values()], stored, opts.levels, sourceRef);
 
-  // Shadowing: a value written at the product level that a model's own row holds,
-  // or a shipping weight the owner's pricing weight beats.
-  const optionRows = stored.inputs.filter((r) => r.scope === 'option');
-  for (const e of out.entries) {
-    if (e.write.scope === 'color' || e.write.scope === 'sku') continue; // their own (skuLevelEntries)
-    for (const field of Object.keys(e.write.set) as Array<keyof InputFields>) {
-      if (field === 'supplier_cost_currency') continue;
-      const sameRowPricingWeight = field === 'shipping_weight_g' && (e.write.existing?.pricing_weight_g ?? null) !== null;
-      const deeper =
-        e.write.scope === 'base' &&
-        optionRows.some((r) => (field === 'shipping_weight_g' ? r.shipping_weight_g != null || r.pricing_weight_g != null : r[field as keyof StoredInputRow] != null));
-      if (sameRowPricingWeight || deeper) out.shadowed.push({ scope: e.write.scope, scope_id: e.write.scope_id, field });
+  // Shadowing: a value written that a more specific level's own row holds (row 247), or a shipping weight the
+  // owner's pricing weight beats.
+  for (const s of shadowedOf(stored.inputs, out.entries.map((e) => e.write), opts.levels)) {
+    if (!out.shadowed.some((x) => x.scope === s.scope && x.scope_id === s.scope_id && x.field === s.field)) out.shadowed.push(s);
+  }
+  return out;
+}
+
+/** A group's fields as the idempotency basis reads them (figures only; the dinar conversion is its own). */
+const rawFields = (f: LineFields): Record<string, string | number> =>
+  Object.fromEntries(Object.entries(f).filter(([k, v]) => v !== undefined && k !== 'iqd')) as Record<string, string | number>;
+
+/** One shadowed write: the field, its scope, and the more specific levels whose own row holds it. */
+export interface ShadowedWrite {
+  scope: InputScope;
+  scope_id: string;
+  field: keyof InputFields;
+  by?: Array<{ scope: InputScope; scope_id: string }>;
+}
+
+/**
+ * The fields of `writes` that a MORE SPECIFIC level's own row holds already, so
+ * the price of some SKU will not use them (row 247): a product write under a
+ * model's, a colour's or a SKU's row; a model write under the row of a colour
+ * one of its SKUs has (any colour row without the SKU rung) or a SKU row whose
+ * selection includes it; a colour write under a SKU row of that colour. A
+ * shipping weight the same row's pricing weight beats is listed too (no `by`).
+ * Read at the review's read time from the stored inputs as they are then.
+ */
+export function shadowedOf(
+  stored: readonly StoredInputRow[],
+  writes: ReadonlyArray<Pick<InputWrite, 'scope' | 'scope_id' | 'set' | 'existing'>>,
+  levels?: PurchaseSkuLevels
+): ShadowedWrite[] {
+  const out: ShadowedWrite[] = [];
+  const holds = (r: StoredInputRow, field: keyof InputFields) =>
+    field === 'shipping_weight_g' ? r.shipping_weight_g != null || r.pricing_weight_g != null : field === 'supplier_cost_amount' ? r.supplier_cost_amount != null : r[field as keyof StoredInputRow] != null;
+  const own = stored.filter((r) => r.origin === 'MANUAL_OVERRIDE' || r.origin === 'SOURCE');
+  for (const w of writes) {
+    const deeper = own.filter((r) => {
+      if (w.scope === 'base') return r.scope !== 'base';
+      if (w.scope === 'option') {
+        if (r.scope === 'sku') return parseSkuComboKey(r.scope_id)?.option_value_ids.includes(w.scope_id) ?? false;
+        if (r.scope === 'color') return levels ? levels.units.some((u) => u.color_id === r.scope_id && u.option_value_ids.includes(w.scope_id)) : true;
+        return false;
+      }
+      if (w.scope === 'color') return r.scope === 'sku' && parseSkuComboKey(r.scope_id)?.color_id === w.scope_id;
+      return false;
+    });
+    for (const field of Object.keys(w.set) as Array<keyof InputFields>) {
+      if (field === 'supplier_cost_currency' || field === 'shipping_profile') continue;
+      const by = deeper.filter((r) => holds(r, field));
+      const sameRowPricingWeight = field === 'shipping_weight_g' && (w.existing?.pricing_weight_g ?? null) !== null;
+      if (!by.length && !sameRowPricingWeight) continue;
+      const seen = new Set<string>();
+      const names = by.flatMap((r) => (seen.has(`${r.scope}:${r.scope_id}`) ? [] : (seen.add(`${r.scope}:${r.scope_id}`), [{ scope: r.scope, scope_id: r.scope_id }])));
+      out.push({ scope: w.scope, scope_id: w.scope_id, field, ...(names.length ? { by: names } : {}) });
     }
   }
   return out;
@@ -411,7 +487,7 @@ function skuLevelEntries(
       scope: g.scope,
       scope_id: g.scope_id,
       narrow: false,
-      fields: Object.fromEntries(Object.entries(g.fields).filter(([, v]) => v !== undefined)) as Record<string, string | number>,
+      fields: rawFields(g.fields),
     });
     const existing = ownerRow(stored.inputs, g.scope, g.scope_id);
     const without = after.filter((r) => !(r.scope === g.scope && r.scope_id === g.scope_id));
@@ -448,21 +524,14 @@ function skuLevelEntries(
       const v = g.fields.additional_cost_iqd;
       if (ownValue('additional_cost_iqd') || !(inherited.length > 0 && inherited.every((i) => (i.additional_cost_iqd?.value ?? 0) === v))) set.additional_cost_iqd = v;
     }
+    const iqd = set.supplier_cost_amount !== undefined ? g.fields.iqd : undefined;
     out.entries.push({
-      write: { scope: g.scope, scope_id: g.scope_id, existing, set, source_ref: sourceRef },
+      write: { scope: g.scope, scope_id: g.scope_id, existing, set, source_ref: sourceRef, ...(iqd ? { iqd } : {}) },
       line_indexes: g.indexes,
       line_ids: g.ids,
       narrow: false,
       kept_higher: [],
     });
-    // A colour's value a SKU row of that colour holds is shadowed there.
-    if (g.scope === 'color') {
-      for (const field of Object.keys(set) as Array<keyof InputFields>) {
-        if (field === 'supplier_cost_currency') continue;
-        const deeper = stored.inputs.some((r) => r.scope === 'sku' && parseSkuComboKey(r.scope_id)?.color_id === g.scope_id && r[field as keyof StoredInputRow] != null);
-        if (deeper) out.shadowed.push({ scope: g.scope, scope_id: g.scope_id, field });
-      }
-    }
   }
 }
 

@@ -45,10 +45,8 @@ for (const [name, table] of [
   });
 }
 
-test('the brief’s field label replaces the old reference price in all three languages', () => {
-  assert.equal(PROCUREMENT_PRICING_STRINGS.ar.fieldLabel, 'الحد الأدنى للربح (USD)');
-  assert.equal(PROCUREMENT_PRICING_STRINGS.en.fieldLabel, 'Minimum profit (USD)');
-  assert.equal(PROCUREMENT_PRICING_STRINGS.ckb.fieldLabel, 'کەمترین قازانجی مەبەست (USD)');
+test('the purchase card types no minimum profit and no per-line tick any more (row 247); the old reference price is gone in all three languages', () => {
+  for (const k of ['fieldLabel', 'fieldHint', 'manualOptIn']) assert.equal(k in PROCUREMENT_PRICING_STRINGS.ar, false, k);
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const all = Object.values(PROCUREMENT_PRICING_STRINGS[lang]).map(text).join('\n');
     assert.doesNotMatch(all, /سعر البيع المرجعي للقطعة بالدينار|Reference unit selling price/);
@@ -58,6 +56,12 @@ test('the brief’s field label replaces the old reference price in all three la
     [PROCUREMENT_PRICING_STRINGS.ar.cellCost, PROCUREMENT_PRICING_STRINGS.ar.cellProfit, PROCUREMENT_PRICING_STRINGS.ar.cellFinalUsd, PROCUREMENT_PRICING_STRINGS.ar.cellCustomer],
     ['التكلفة النهائية', 'الحد الأدنى للربح', 'السعر النهائي بالدولار', 'السعر النهائي للزبون']
   );
+});
+
+test('the rounding note says row 245’s rule: above 1,000 IQD up to the next 250, in all three languages', () => {
+  assert.equal(PROCUREMENT_PRICING_STRINGS.ar.n3('250'), 'فوق 1,000 د.ع يُقرَّب السعر لأعلى إلى أقرب 250 د.ع (+250)');
+  assert.equal(PROCUREMENT_PRICING_STRINGS.en.n3('250'), 'Above 1,000 IQD, rounded up to the next 250 IQD (+250)');
+  assert.equal(PROCUREMENT_PRICING_STRINGS.ckb.n3('250'), 'لە سەروو 1,000 د.ع، بەرەو سەرەوە بۆ نزیکترین 250 د.ع خڕ دەکرێتەوە (+250)');
 });
 
 test('the direct-sale review (owner request 2026-10-10): the Direct Sale Extra always by its full name, in every language; never a bare «زيادة» / «زیادە»', () => {
