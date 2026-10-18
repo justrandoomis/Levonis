@@ -867,8 +867,19 @@ export function channelsOf(table: readonly V2TableRow[]): V2Channel[] {
   return V2_CHANNELS.filter((c) => seen.has(c));
 }
 
-/** A SKU priced apart from its model — a colour's difference or own cost (row 254), its own price, or a blocked channel. */
-const differs = (l: SkuLine) => l.source === 'colour_delta' || l.source === 'colour_cost' || l.source === 'sku_fixed' || Object.values(l.channels).some((r) => r?.blocked);
+/** A line's price as the table compares it: its direct sale's, else its first channel's (in display order). */
+const shownPrice = (l: SkuLine): number | null => V2_CHANNELS.map((c) => l.channels[c]).find(Boolean)?.price_iqd ?? null;
+
+/**
+ * A SKU priced apart from its model — a colour's difference, its own price, or a blocked channel; a colour on its own
+ * cost (row 254) only when that cost moves its price off the block's lead (a purchase writes a colour row for every
+ * colour it bought, most at the same cost: those still fold).
+ */
+const differs = (l: SkuLine, lead: SkuLine) =>
+  l.source === 'colour_delta' ||
+  l.source === 'sku_fixed' ||
+  (l.source === 'colour_cost' && shownPrice(l) !== shownPrice(lead)) ||
+  Object.values(l.channels).some((r) => r?.blocked);
 
 /** One block per model: its first SKU leads, the SKUs that differ are shown, the rest fold (§2.2). */
 export function modelBlocks(table: readonly V2TableRow[], modelNames: (id: string) => V2Names | null): ModelBlock[] {
@@ -878,7 +889,7 @@ export function modelBlocks(table: readonly V2TableRow[], modelNames: (id: strin
     const block = blocks.get(key);
     if (!block) {
       blocks.set(key, { model_id: line.model_id, names: (line.model_id && modelNames(line.model_id)) || line.names, lead: line, shown: [], folded: [] });
-    } else if (differs(line)) block.shown.push(line);
+    } else if (differs(line, block.lead)) block.shown.push(line);
     else block.folded.push(line);
   }
   return [...blocks.values()];
@@ -912,10 +923,13 @@ export function firstLineOf(table: readonly V2TableRow[], modelId: string | null
 export function lineWithOption(table: readonly V2TableRow[], optionId: string, colours?: Readonly<Record<string, ColourDraft>>): SkuLine | null {
   const lines = skuLines(table).filter((l) => l.option_value_ids.includes(optionId));
   const follows = (l: SkuLine) => !colourApart(l, colours);
+  // Else a colour with no difference (on its own cost: price-first that cost moves no price) before one with a difference.
+  const noDelta = (l: SkuLine) => (colours ? (colours[l.color_id ?? '']?.price ?? 'follow') !== 'delta' : l.source !== 'colour_delta');
   return (
     lines.find((l) => l.model_id === optionId && l.color_id === null) ??
     lines.find((l) => l.color_id === null) ??
     lines.find(follows) ??
+    lines.find(noDelta) ??
     lines[0] ??
     null
   );
@@ -1040,11 +1054,16 @@ export function profitForFinal(typed: string, base: string): { ok: true; usd: st
  */
 /** The draft a final price reads (`colours` optional: without it the server's source decides a colour's own cost). */
 type FinalDraft = Pick<PriceDraft, 'models' | 'skus'> & { colours?: PriceDraft['colours'] };
-const finalFromCost = (draft: FinalDraft, l: SkuLine): boolean => {
+/**
+ * Is this line a final price's reference — priced from cost, on no special price? `strict` also refuses a colour on
+ * its own cost (row 254): its price is read from that cost, so a reference it is only when no other line is (a
+ * purchase writes a colour row for every colour it bought — every colour then has its own cost, and the field,
+ * which names the line's colour, still opens).
+ */
+const finalFromCost = (draft: FinalDraft, l: SkuLine, strict = true): boolean => {
   const m = l.model_id ? draft.models[l.model_id] : undefined;
   if (m?.price === 'fixed' && cleanUsd(m.usd)) return false;
-  // Row 254: a colour on its own cost is priced from that cost — never the reference of a model's or the product's T.
-  if (l.color_id !== null && (draft.colours ? (draft.colours[l.color_id]?.cost ?? 'follow') === 'own' : l.source === 'colour_cost')) return false;
+  if (strict && l.color_id !== null && (draft.colours ? (draft.colours[l.color_id]?.cost ?? 'follow') === 'own' : l.source === 'colour_cost')) return false;
   return !cleanUsd(draft.skus[l.combo_key]?.fixed_usd ?? '') && finalUsdOf(l) !== null;
 };
 
@@ -1054,17 +1073,23 @@ const finalFromCost = (draft: FinalDraft, l: SkuLine): boolean => {
  * minimum profit never is, nor a SKU on a special price, nor a colour on its own cost (row 254).
  */
 export function productFinalLine(table: readonly V2TableRow[], lead: SkuLine | null, draft: FinalDraft): SkuLine | null {
-  const follows = (l: SkuLine) => {
-    const m = l.model_id ? draft.models[l.model_id] : undefined;
-    return !(m && m.cost === 'own' && m.profit !== 'follow') && finalFromCost(draft, l);
+  const pick = (strict: boolean) => {
+    const follows = (l: SkuLine) => {
+      const m = l.model_id ? draft.models[l.model_id] : undefined;
+      return !(m && m.cost === 'own' && m.profit !== 'follow') && finalFromCost(draft, l, strict);
+    };
+    return lead && follows(lead) ? lead : (skuLines(table).find(follows) ?? null);
   };
-  return lead && follows(lead) ? lead : (skuLines(table).find(follows) ?? null);
+  // A line whose colour follows first; else (every colour on its own cost) the first priced from cost.
+  return pick(true) ?? pick(false);
 }
 
 /** A model's («تكلفة مختلفة») reference SKU for its own final price: its card's line when priced from cost, else its first that is. */
 export function modelFinalLine(table: readonly V2TableRow[], line: SkuLine | null, modelId: string, draft: FinalDraft): SkuLine | null {
-  if (line && line.model_id === modelId && finalFromCost(draft, line)) return line;
-  return skuLines(table).find((l) => l.model_id === modelId && finalFromCost(draft, l)) ?? null;
+  const pick = (strict: boolean) =>
+    line && line.model_id === modelId && finalFromCost(draft, line, strict) ? line : (skuLines(table).find((l) => l.model_id === modelId && finalFromCost(draft, l, strict)) ?? null);
+  // A line whose colour follows first; else (every colour on its own cost) the first priced from cost.
+  return pick(true) ?? pick(false);
 }
 
 /** A signed dollar difference as typed («+2», «−25»). Display only. */

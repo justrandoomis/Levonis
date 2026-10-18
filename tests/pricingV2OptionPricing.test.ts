@@ -73,6 +73,7 @@ import { toEditorDoc } from '../src/components/adminProducts/types';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { chainOfUnit, packagedMeasureOf, type InputWrite, type StoredInputRow, type UnitSelection } from '../worker/lib/pricingEngine/store';
 import { mergedInputs } from '../worker/lib/pricingEngine/fromPurchase';
+import { withFirstWriteInputs } from '../worker/lib/pricingEngine/v2/firstWrite';
 
 /* ------------------------------------------------------- 1. the engine, pure -- */
 
@@ -1011,8 +1012,9 @@ test('a colour on its own cost is never a model card’s line, nor the reference
   const draft = { models: { combo: { ...FOLLOW_MODEL, cost: 'own' as const, supplier_amount: '370', supplier_currency: 'USD' as const, profit: 'exception' as const, profit_usd: '50' } }, skus: {}, colours };
   assert.equal(modelFinalLine(rows, red, 'combo', draft)!.combo_key, 'o:combo|c:black', 'the model’s T is read on the model’s own cost');
   assert.equal(productFinalLine(rows, red, { models: {}, skus: {}, colours })!.combo_key, 'o:combo|c:black');
-  // Only own-cost colours: no reference at all (the field waits), never a colour's cost read as the model's.
-  assert.equal(modelFinalLine([rows[0]!], red, 'combo', draft), null);
+  // Only own-cost colours (a purchase writes a colour row for every colour it bought): the field still opens, on
+  // the first line priced from cost — it names that line's colour.
+  assert.equal(modelFinalLine([rows[0]!], red, 'combo', draft)!.combo_key, 'o:combo|c:red');
   // A colour that follows again is a reference again.
   assert.equal(modelFinalLine(rows, red, 'combo', { ...draft, colours: { red: { ...FOLLOW_COLOUR } } })!.combo_key, 'o:combo|c:red');
 });
@@ -1053,4 +1055,71 @@ test('cost-first, a colour on its own cost is «من تكلفة اللون» —
   assert.deepEqual([V2_STRINGS.ar.sourceColourCost, V2_STRINGS.en.sourceColourCost], ['من تكلفة اللون', "From the colour's cost"]);
   assert.notEqual(V2_STRINGS.ckb.sourceColourCost, V2_STRINGS.ar.sourceColourCost);
   assert.match(V2_STRINGS.ckb.sourceColourCost, /[ڕڵێۆە]/);
+});
+
+/* -------- 6. the verification of row 254: every colour bought, equal-priced colours, the fold's dinars kept -- */
+
+test('every colour bought (each on its own cost): the final price still opens, on the first line — the product’s and a model’s', () => {
+  // A purchase of red and black at the same cost writes a colour row for each: both own, both $155 (cost $105 + T $50).
+  const line = (combo_key: string, price: number) => tableRow(combo_key, 'direct_sale', price, { v2_usd_ceil6: '155', v2_profit_usd: '50' }, { source: 'colour_cost' });
+  const own = { ...FOLLOW_COLOUR, cost: 'own' as const, supplier_amount: '105', supplier_currency: 'USD' as const };
+  const colours = { red: own, black: own };
+  // Colours only (no model): the product's «السعر النهائي» takes the lead line.
+  const flat = [tableRow('c:red', 'direct_sale', 232_500, { v2_usd_ceil6: '155', v2_profit_usd: '50' }, { source: 'colour_cost', option_value_ids: [] }), tableRow('c:black', 'direct_sale', 232_500, { v2_usd_ceil6: '155', v2_profit_usd: '50' }, { source: 'colour_cost', option_value_ids: [] })];
+  const lead = skuLines(flat)[0]!;
+  assert.equal(productFinalLine(flat, lead, { models: {}, skus: {}, colours })!.combo_key, 'c:red');
+  assert.equal(productFinalLine(flat, lead, { models: {}, skus: {} })!.combo_key, 'c:red', 'from the server’s source alone too');
+  // A model on its own cost and minimum profit, every colour bought: its field opens on the card's line.
+  const rows = [line('o:combo|c:red', 232_500), line('o:combo|c:black', 232_500)];
+  const card = lineWithOption(rows, 'combo', colours)!;
+  assert.equal(card.combo_key, 'o:combo|c:red');
+  const draft = { models: { combo: { ...FOLLOW_MODEL, cost: 'own' as const, supplier_amount: '100', supplier_currency: 'USD' as const, profit: 'exception' as const, profit_usd: '50' } }, skus: {}, colours };
+  assert.equal(modelFinalLine(rows, card, 'combo', draft)!.combo_key, 'o:combo|c:red');
+  // A special price on the model still closes it (no line is priced from cost).
+  assert.equal(modelFinalLine(rows, card, 'combo', { ...draft, models: { combo: { ...draft.models.combo, price: 'fixed', usd: '300' } } }), null);
+});
+
+test('a colour on its own cost at the lead’s price folds under its model; one its cost moves is shown apart', () => {
+  const row = (colour: string, price: number, source: V2TableRow['source']) => tableRow(`o:combo|c:${colour}`, 'direct_sale', price, {}, { source });
+  // Bought at the product's cost: the same price as the lead — folded, as before row 254.
+  const same = modelBlocks([row('black', 906_000, 'model_cost'), row('red', 906_000, 'colour_cost'), row('blue', 906_000, 'colour_cost')], () => null)[0]!;
+  assert.deepEqual([same.lead.color_id, same.shown.map((l) => l.color_id), same.folded.map((l) => l.color_id)], ['black', [], ['red', 'blue']]);
+  // One whose own cost moves its price: shown.
+  const moved = modelBlocks([row('black', 906_000, 'model_cost'), row('red', 951_000, 'colour_cost'), row('blue', 906_000, 'colour_cost')], () => null)[0]!;
+  assert.deepEqual([moved.shown.map((l) => l.color_id), moved.folded.map((l) => l.color_id)], [['red'], ['blue']]);
+  // A pre-order-only SKU compares its first channel's price.
+  const pre = (colour: string, price: number, source: V2TableRow['source']) => tableRow(`o:combo|c:${colour}`, 'pre_order_land', price, {}, { source });
+  const preOnly = modelBlocks([pre('black', 853_500, 'model_cost'), pre('red', 853_500, 'colour_cost'), pre('blue', 900_000, 'colour_cost')], () => null)[0]!;
+  assert.deepEqual([preOnly.shown.map((l) => l.color_id), preOnly.folded.map((l) => l.color_id)], [['blue'], ['red']]);
+});
+
+test('the model card prefers a colour with no difference: price-first, a colour on its own cost before a colour difference', () => {
+  // Price-first an own cost moves no price; a difference does. Black (+$5) is listed first.
+  const rows = [tableRow('o:combo|c:black', 'direct_sale', 1_057_500, {}, { source: 'colour_delta' }), tableRow('o:combo|c:red', 'direct_sale', 1_050_000, {}, { source: 'product' })];
+  const colours = { red: { ...FOLLOW_COLOUR, cost: 'own' as const, supplier_amount: '105', supplier_currency: 'USD' as const }, black: { ...FOLLOW_COLOUR, price: 'delta' as const, usd: '5' } };
+  assert.equal(lineWithOption(rows, 'combo', colours)!.combo_key, 'o:combo|c:red');
+  assert.equal(lineWithOption(rows, 'combo')!.combo_key, 'o:combo|c:red');
+});
+
+test('a needs-pricing fold over dinars keeps its conversion when the owner’s write at that scope leaves the supplier cost alone', () => {
+  const SNAP = { original_input_amount: '15000', conversion_rate_snapshot: '1430', conversion_fx_version: 3, converted_at: '2026-10-01T00:00:00.000Z' };
+  const fold: InputWrite = { scope: 'option', scope_id: 'o1', existing: null, set: { supplier_cost_amount: '10.489510', supplier_cost_currency: 'USD', shipping_weight_g: 400 }, source_ref: 'purchase', iqd: SNAP };
+  // A weight edit (the owner's, or the option's package weight the form mirrors): the purchase's dinars stay.
+  const [weight] = withFirstWriteInputs([fold], [{ scope: 'option', scope_id: 'o1', existing: null, set: { shipping_weight_g: 520 }, source_ref: 'owner' }]);
+  assert.deepEqual(weight!.set, { supplier_cost_amount: '10.489510', supplier_cost_currency: 'USD', shipping_weight_g: 520 });
+  assert.deepEqual(weight!.iqd, SNAP);
+  const [row] = mergedInputs([], [weight!]);
+  assert.deepEqual([row!.supplier_input_mode, row!.original_input_amount, row!.shipping_weight_g], ['IQD_CONVERTED', '15000', 520]);
+  // The owner's own supplier cost replaces the fold's — and its dinars.
+  for (const set of [{ supplier_cost_amount: '12', supplier_cost_currency: 'USD' as const }, { supplier_cost_currency: 'EUR' as const }, { supplier_cost_amount: null }]) {
+    const [own] = withFirstWriteInputs([fold], [{ scope: 'option', scope_id: 'o1', existing: null, set, source_ref: 'owner' }]);
+    assert.equal(own!.iqd, undefined, JSON.stringify(set));
+  }
+  // The owner's own dinars win over the fold's.
+  const mine = { ...SNAP, original_input_amount: '30000' };
+  const [typed] = withFirstWriteInputs([fold], [{ scope: 'option', scope_id: 'o1', existing: null, set: { supplier_cost_amount: '20.979021', supplier_cost_currency: 'USD' }, source_ref: 'owner', iqd: mine }]);
+  assert.deepEqual(typed!.iqd, mine);
+  // Another scope: both writes, each its own.
+  const both = withFirstWriteInputs([fold], [{ scope: 'base', scope_id: '', existing: null, set: { shipping_weight_g: 900 }, source_ref: 'owner' }]);
+  assert.deepEqual(both.map((w) => [w.scope, !!w.iqd]), [['option', true], ['base', false]]);
 });

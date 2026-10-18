@@ -129,9 +129,15 @@ export function firstWriteInputs(stored: ProductPricingData): InputWrite[] {
   return writes;
 }
 
+/** The fields of a supplier cost: a write naming any of them replaces the fold's (and its dinar conversion). */
+const SUPPLIER_FIELDS = ['supplier_cost_amount', 'supplier_cost_delta', 'supplier_cost_currency'] as const;
+
 /**
  * The prefill under the request's own input writes: a scope both name is one
- * write, the request's fields over the fold's (the reader's typing wins).
+ * write, the request's fields over the fold's (the reader's typing wins). The
+ * fold's dinar conversion (`iqd`) stays with its supplier cost unless the
+ * request's write touches that cost (its own conversion, when it has one, wins):
+ * a weight edit at the same scope never turns the purchase's dinars into USD.
  */
 export function withFirstWriteInputs(fold: readonly InputWrite[], own: readonly InputWrite[]): InputWrite[] {
   if (!fold.length) return [...own];
@@ -139,7 +145,16 @@ export function withFirstWriteInputs(fold: readonly InputWrite[], own: readonly 
   const out = new Map<string, InputWrite>(fold.map((w) => [key(w), { ...w, set: { ...w.set } }]));
   for (const w of own) {
     const at = out.get(key(w));
-    out.set(key(w), at ? { ...w, set: { ...at.set, ...w.set } } : w);
+    if (!at) {
+      out.set(key(w), w);
+      continue;
+    }
+    const supplierTouched = SUPPLIER_FIELDS.some((k) => k in w.set);
+    const iqd = w.iqd ?? (supplierTouched ? undefined : at.iqd);
+    const merged: InputWrite = { ...w, set: { ...at.set, ...w.set } };
+    if (iqd) merged.iqd = iqd;
+    else delete merged.iqd;
+    out.set(key(w), merged);
   }
   return [...out.values()];
 }
