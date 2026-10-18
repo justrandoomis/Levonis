@@ -83,7 +83,7 @@ const STRINGS = {
     warrantyExtended: (ext: string, total: string | null) =>
       total ? `ضمان ممدد +${ext} (الإجمالي ${total})` : `ضمان ممدد +${ext}`,
     codDirectPricing: 'سُعِّر كبيع مباشر (الدفع عند الاستلام)',
-    printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
+    printerNote: (v: string) => `عند طلب توصيل الطابعات إلى المنزل يُدفع ${v} لكل طابعة عند الاستلام.`,
     giniAwaiting: 'لم يُؤكَّد هذا الطلب بعد: يجب مسح باركود الاستلام في تطبيق جني أولاً.',
     giniHold: (d: string) => `إذا لم يتم المسح حتى ${d} يُلغى الطلب تلقائيًا.`,
     giniNo: 'رقم الطلب في تطبيق جني',
@@ -123,7 +123,7 @@ const STRINGS = {
     warrantyExtended: (ext: string, total: string | null) =>
       total ? `Extended warranty +${ext} (${total} in total)` : `Extended warranty +${ext}`,
     codDirectPricing: 'Priced as a direct sale (cash on delivery)',
-    printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
+    printerNote: (v: string) => `When home delivery is requested for printers, ${v} per printer is paid on delivery.`,
     giniAwaiting: 'This order is not confirmed yet: the receipt barcode has to be scanned in the Gini app first.',
     giniHold: (d: string) => `If it is not scanned by ${d}, the order is cancelled automatically.`,
     giniNo: 'Gini app order number',
@@ -162,7 +162,7 @@ const STRINGS = {
     warrantyExtended: (ext: string, total: string | null) =>
       total ? `گەرەنتی درێژکراوە +${ext} (کۆی گشتی ${total})` : `گەرەنتی درێژکراوە +${ext}`,
     codDirectPricing: 'وەک فرۆشتنی ڕاستەوخۆ نرخ کراوە (پارەدان لە کاتی گەیاندن)',
-    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
+    printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، بۆ هەر پرینتەرێک ${v} لە کاتی گەیاندن دەدرێت.`,
     giniAwaiting: 'ئەم داواکارییە هێشتا پەسەند نەکراوە: پێویستە سەرەتا باڕکۆدی وەرگرتن لە ئەپی جینی سکان بکرێت.',
     giniHold: (d: string) => `ئەگەر تا ${d} سکان نەکرێت، داواکارییەکە خۆکارانە هەڵدەوەشێتەوە.`,
     giniNo: 'ژمارەی داواکاری لە ئەپی جینی',
