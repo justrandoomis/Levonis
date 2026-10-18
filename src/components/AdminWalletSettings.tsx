@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useWallet, PaymentMethod } from '../WalletContext';
 import RoundingDriftTool from './adminWallet/RoundingDriftTool';
+import CourierTaxPanel from './adminWallet/CourierTaxPanel';
 import { api, ApiError, formatIqd, type PayoutMethod } from '../lib/api';
-import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle, Truck, ArrowUpFromLine, Banknote } from 'lucide-react';
+import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle, ArrowUpFromLine, Banknote } from 'lucide-react';
 
 /**
  * THE OWNER TYPES A PERCENT — «عمولة سحب 3% قابلة للتغيير من لوحة الإدارة».
@@ -59,7 +60,6 @@ function SaveStatus({ state, error }: { state: SaveState; error?: string | null 
 export default function AdminWalletSettings() {
   const {
     exchangeRate, setExchangeRate,
-    codTaxPerBlockIqd, codTaxBlockIqd, setCodTaxRate,
     adVideoUrl, setAdVideoUrl,
     paymentMethods, updatePaymentMethods,
     settings, refreshSettings,
@@ -70,11 +70,6 @@ export default function AdminWalletSettings() {
   const [rateInput, setRateInput] = useState<string>('');
   const [rateState, setRateState] = useState<SaveState>('idle');
   const [rateError, setRateError] = useState<string | null>(null);
-
-  const [codPerInput, setCodPerInput] = useState<string>('');
-  const [codBlockInput, setCodBlockInput] = useState<string>('');
-  const [codState, setCodState] = useState<SaveState>('idle');
-  const [codError, setCodError] = useState<string | null>(null);
 
   const [urlInput, setUrlInput] = useState<string>('');
   const [urlState, setUrlState] = useState<SaveState>('idle');
@@ -128,8 +123,6 @@ export default function AdminWalletSettings() {
     if (!isLoaded || hydratedRef.current) return;
     hydratedRef.current = true;
     setRateInput(String(exchangeRate));
-    setCodPerInput(String(codTaxPerBlockIqd));
-    setCodBlockInput(String(codTaxBlockIqd));
     setUrlInput(adVideoUrl);
     setMethods(paymentMethods);
     setPayouts(settings?.payoutMethods ?? []);
@@ -140,13 +133,6 @@ export default function AdminWalletSettings() {
     if (!hydratedRef.current) return;
     if (rateState === 'idle' || rateState === 'saved') setRateInput(String(exchangeRate));
   }, [exchangeRate]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!hydratedRef.current) return;
-    if (codState === 'idle' || codState === 'saved') {
-      setCodPerInput(String(codTaxPerBlockIqd));
-      setCodBlockInput(String(codTaxBlockIqd));
-    }
-  }, [codTaxPerBlockIqd, codTaxBlockIqd]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!hydratedRef.current) return;
     if (urlState === 'idle' || urlState === 'saved') setUrlInput(adVideoUrl);
@@ -175,37 +161,6 @@ export default function AdminWalletSettings() {
     } catch (e) {
       setRateState('error');
       setRateError(e instanceof ApiError ? e.message : 'Save failed');
-    }
-  };
-
-  /**
-   * THE BLOCK IS WHAT GETS DIVIDED BY, so it is the one that is guarded
-   * hardest: a zero would make the charge Infinity, and a fractional one
-   * would make «عن كل 500000.5» a sentence nobody can act on. A per-block of
-   * exactly 0 is allowed and means the charge is switched off — a thing an
-   * owner may genuinely want and should not have to delete a row to get.
-   */
-  const handleSaveCodTax = async () => {
-    const per = parseInt(codPerInput, 10);
-    const block = parseInt(codBlockInput, 10);
-    if (!Number.isFinite(per) || per < 0) {
-      setCodState('error');
-      setCodError('Enter a whole number of IQD per block (0 disables the charge)');
-      return;
-    }
-    if (!Number.isFinite(block) || block < 1) {
-      setCodState('error');
-      setCodError('The block must be a whole number of IQD, at least 1');
-      return;
-    }
-    setCodState('saving');
-    setCodError(null);
-    try {
-      await setCodTaxRate({ perBlockIqd: per, blockIqd: block });
-      setCodState('saved');
-    } catch (e) {
-      setCodState('error');
-      setCodError(e instanceof ApiError ? e.message : 'Save failed');
     }
   };
 
@@ -376,64 +331,7 @@ export default function AdminWalletSettings() {
           </div>
         </div>
 
-        {/* THE DELIVERY COMPANY'S CASH-HANDLING CHARGE — «قابله للتغير من قبل
-            الادارة». It was compiled into packages/shipping until the owner
-            halved it and asked for it to be theirs.
-
-            IT IS NOT RETROACTIVE, and the note says so: every order stores the
-            figure it was charged in `orders.cod_tax_iqd` at placement, so
-            lowering this today cannot rewrite last month's invoices. */}
-        <div className="lv-surface p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="shrink-0">
-              <Truck className="w-5 h-5 text-text-secondary" />
-            </div>
-            <h3 className="text-lg font-bold text-text-primary">Cash-on-Delivery Charge</h3>
-          </div>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-text-secondary">Charge</label>
-                <div className="relative">
-                  <input
-                    className="lv-input font-bold disabled:opacity-50"
-                    type="number"
-                    value={codPerInput}
-                    onChange={(e) => { setCodPerInput(e.target.value); setCodState('dirty'); }}
-                    disabled={!isLoaded}
-                  />
-                  <span className="absolute end-4 top-1/2 -translate-y-1/2 text-text-muted font-bold text-sm">IQD</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-text-secondary">For every</label>
-                <div className="relative">
-                  <input
-                    className="lv-input font-bold disabled:opacity-50"
-                    type="number"
-                    value={codBlockInput}
-                    onChange={(e) => { setCodBlockInput(e.target.value); setCodState('dirty'); }}
-                    disabled={!isLoaded}
-                  />
-                  <span className="absolute end-4 top-1/2 -translate-y-1/2 text-text-muted font-bold text-sm">IQD</span>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={handleSaveCodTax}
-              disabled={codState === 'saving' || !isLoaded}
-              className="lv-button lv-button-primary w-full"
-            >
-              <Save className="w-4 h-4" /> Save
-            </button>
-            <p className="text-[11px] text-text-muted">
-              Charged only on cash-on-delivery orders sent to an address — never on store pickup,
-              wallet or advance payment. Orders already placed keep the charge they were quoted;
-              changing this affects new orders only. Set the charge to 0 to switch it off.
-            </p>
-            <SaveStatus state={codState} error={codError} />
-          </div>
-        </div>
+        <CourierTaxPanel />
 
         {/* THE WITHDRAWAL COMMISSION. Deducted from the requested amount —
             the worked example below is there so that cannot be read the other

@@ -33,6 +33,24 @@ export const COD_TAX_BLOCK_IQD = 500_000;
  */
 export const COD_TAX_PER_BLOCK_IQD = 3_000;
 
+/**
+ * THE LIMITS AN OWNER'S RATE IS HELD TO (owner, 2026-10-18: «اجعل بالامكان
+ * التعديل على رسوم ضريبه شركه التوصيل مثلا تكون 5 الف لكل 500 الف»). The
+ * settings route enforces them and the admin form mirrors them. Whole dinars
+ * on both sides; a per-block of 0 stays legal (it switches the tax off, see
+ * `normalizeCodTaxRate`); a block under 1,000 IQD is a typo, not a policy.
+ */
+export const COD_TAX_MIN_BLOCK_IQD = 1_000;
+export const COD_TAX_MAX_IQD = 100_000_000;
+
+/** One half of a typed rate as the whole dinars it will be stored as, or null when it is refused. */
+export function acceptedCodTaxField(field: keyof CodTaxRate, value: unknown): number | null {
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isInteger(n) || n > COD_TAX_MAX_IQD) return null;
+  return n >= (field === 'blockIqd' ? COD_TAX_MIN_BLOCK_IQD : 0) ? n : null;
+}
+
 export interface CodTaxRate {
   /** The block size the charge is counted in. */
   blockIqd: number;

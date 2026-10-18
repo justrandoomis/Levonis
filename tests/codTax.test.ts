@@ -151,8 +151,9 @@ test('the browser reads the rate through the same normalizer, so a saved 0 survi
   assert.notEqual(shown.perBlockIqd, COD_TAX_PER_BLOCK_IQD);
 
   // The admin screen's promise, which is the half that made this a trap: it
-  // rejects only a NEGATIVE charge, and says so on screen.
-  const admin = read('src/components/AdminWalletSettings.tsx');
+  // rejects only a NEGATIVE charge, and says so on screen. The form is the
+  // courier-tax panel now (2026-10-18), and its check is the shared one.
+  const admin = read('src/components/adminWallet/CourierTaxPanel.tsx');
   assert.ok(admin.includes('per < 0'), 'the admin handler stopped allowing a charge of 0');
   assert.ok(admin.includes('Set the charge to 0 to switch it off'), 'the on-screen promise was dropped');
 });

@@ -18,11 +18,12 @@ import { serverMessage } from '@levonis/contracts/costRefusals';
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { limitRoute, rateLimit } from '../lib/ratelimit';
-import { canMoveMoney, canViewCost, isOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
+import { canMoveMoney, canViewCost, isOwner, isUnverifiedOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
 import { moneyAuthorityMessage } from '../../packages/contracts/src/moneyAuthority';
 import { requireMoneyAuthority } from '../lib/moneyAuthority';
 import { completenessMessage } from '@levonis/contracts/productCompleteness';
-import { assertCostRead, assertCostWrite, requireFreshSession } from '../lib/costAccess';
+import { assertCostRead, assertCostWrite, ownerEmailUnverified, ownerOnly, requireFreshSession } from '../lib/costAccess';
+import { acceptedCodTaxField } from '../lib/codTax';
 import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
 import { normalizeText } from '../lib/search/normalize';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
@@ -4137,6 +4138,23 @@ adminRoutes.put('/settings/:key', async (c) => {
     value = gate;
   } else if (key === 'exchangeRate') {
     value = int(value, 'exchangeRate', { min: 1, max: 1_000_000 });
+  } else if (key === 'codTaxPerBlockIqd' || key === 'codTaxBlockIqd') {
+    // THE DELIVERY COMPANY'S TAX («ضريبة شركة التوصيل») is the owner's alone
+    // (2026-10-18), in whole dinars: 0 per block switches it off, a block
+    // under 1,000 is refused (packages/shipping/src/codTax.ts). Never
+    // retroactive — a placed order keeps `orders.cod_tax_iqd`.
+    if (!isOwner(c.env, adminUser)) throw ownerOnly();
+    if (isUnverifiedOwner(c.env, adminUser)) throw ownerEmailUnverified();
+    const accepted = acceptedCodTaxField(key === 'codTaxBlockIqd' ? 'blockIqd' : 'perBlockIqd', value);
+    if (accepted === null) {
+      throw badRequest(
+        key === 'codTaxBlockIqd'
+          ? 'الشريحة عدد صحيح من الدنانير لا يقل عن 1,000 / The block must be a whole number of IQD, at least 1,000'
+          : 'الضريبة عدد صحيح من الدنانير، صفر أو أكثر / The tax must be a whole number of IQD, 0 or more',
+        'COD_TAX_INVALID'
+      );
+    }
+    value = accepted;
   } else if (key === 'currency') {
     value = oneOf(value, 'currency', ['IQD', 'USD'] as const);
   } else if (key === 'adVideoUrl') {
@@ -4289,9 +4307,10 @@ adminRoutes.put('/settings/:key', async (c) => {
   }
 
   await setSetting(c.env.DB, key, value);
-  // A delivery fee the shop stops charging is money: the audit keeps the
-  // whole rule as saved, not just the key.
-  await audit(c.env.DB, adminUser.id, 'settings.update', key, key === 'walletFreeDelivery' || key === 'serialPrepGate' ? { value } : {});
+  // A delivery fee the shop stops charging is money, and so is the courier
+  // tax: the audit keeps the whole value as saved, not just the key.
+  await audit(c.env.DB, adminUser.id, 'settings.update', key,
+    key === 'walletFreeDelivery' || key === 'serialPrepGate' || key === 'codTaxPerBlockIqd' || key === 'codTaxBlockIqd' ? { value } : {});
   // P2a: the cached public answers this key feeds, and the isolate's pricing inputs.
   await afterSettingsWrite(c, key);
   return c.json({ success: true });
