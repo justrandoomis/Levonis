@@ -7,7 +7,7 @@ import { acceptedPolicies } from './lib/policies';
 import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
 import { SETTING_DEFAULTS } from '../worker/lib/settings';
-import { PRINTER_STANDARD_DELIVERY_POLICY, chooseDeliveryMethod, isPrinterStandardAcceptance, printerStandardAcceptanceContext, requiresPrinterStandardAcceptance } from '../packages/shipping/src/printerDeliveryPolicy';
+import { PRINTER_STANDARD_DELIVERY_POLICY, chooseDeliveryMethod } from '../packages/shipping/src/printerDeliveryPolicy';
 import type { ProductDeliveryOptions } from '../packages/shipping/src/shipping';
 import DeliveryAvailabilityNotice from '../src/components/adminProducts/DeliveryAvailabilityNotice';
 import { seedCatalogue, addBundle, orderBody as bundleOrderBody } from './lib/bundles';
@@ -60,7 +60,7 @@ test('legacy products inherit delivery availability; explicit disables are honor
     } else {
       assert.ok(quote.quote, JSON.stringify(quote));
       assert.deepEqual(quote.quote.delivery_method_fees.find((m: { id: string }) => m.id === 'standard'), { id: 'standard', fee_iqd: 5000, available: true });
-      assert.equal(quote.quote.printer_standard_warning, null);
+      assert.equal(quote.quote.printer_standard_warning, undefined);
     }
     raw.close();
   }
@@ -100,25 +100,26 @@ test('an option/color selection with no product delivery override inherits the n
   raw.close();
 });
 
-test('printer standard delivery rejects absent, unchecked and stale consent before any order, hold or stock write', async () => {
+/**
+ * RETIRED WITH PERSONAL DELIVERY (owner, 2026-10-18). The transport warning a
+ * printer sent by standard delivery once had to accept existed because the
+ * customer could still pick personal delivery; with that method cancelled the
+ * warning is never shown, asked for or required, and an older client's
+ * acceptance is ignored rather than frozen onto the order.
+ */
+test('printer standard delivery needs no transport acknowledgment: no warning on the quote, the order places', async () => {
   const { raw, app, body } = fixture();
   const q = await json(await post(app, '/api/orders/quote', body));
-  assert.deepEqual(q.quote.printer_standard_warning, PRINTER_STANDARD_DELIVERY_POLICY);
+  assert.equal(q.quote.printer_standard_warning, undefined);
   assert.equal(q.quote.shipping.total_iqd, 10000, 'one printer consignment for two printers');
-  const walletBefore = count(raw, 'SELECT COUNT(*) n FROM wallet_transactions');
-  for (const invalid of [undefined, { accepted: false, version: 1 }, { accepted: true, version: 0 }, { accepted: 'true', version: 1 }]) {
-    const res = await post(app, '/api/orders', order(body, { printerStandardDeliveryAcceptance: invalid }));
-    assert.equal(res.status, 400);
-    assert.equal((await json(res)).code, 'PRINTER_STANDARD_DELIVERY_ACCEPTANCE_REQUIRED');
-  }
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM orders'), 0);
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM wallet_holds'), 0);
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM wallet_transactions'), walletBefore);
-  assert.equal(row<{ stock: number }>(raw, "SELECT stock FROM products WHERE id='printer'")?.stock, 30);
+  const placed = await json(await post(app, '/api/orders', order(body)));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  assert.equal(placed.order.delivery_method.printer_standard_transport_acceptance, undefined);
+  await Promise.allSettled(pending.splice(0));
   raw.close();
 });
 
-q7Test('a printer inside a bundle requires its own standard-transport acknowledgment', async () => {
+q7Test('a printer inside a bundle places by standard delivery with no acknowledgment', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_bundle', slug: 'test-policy-bundle', priceIqd: 400000 });
   const app = stubApp(asD1(raw), { id: 'buyer', role: 'customer', email: 'buyer@x.co' }, (a) => a.route('/api/cart', cartRoutes).route('/api/orders', orderRoutes));
@@ -126,27 +127,20 @@ q7Test('a printer inside a bundle requires its own standard-transport acknowledg
   const input = bundleOrderBody({ printerStandardDeliveryAcceptance: undefined });
   const q = await json(await post(app, '/api/orders/quote', input));
   assert.equal(q.quote.shipping.total_iqd, 10000);
-  assert.deepEqual(q.quote.printer_standard_warning, PRINTER_STANDARD_DELIVERY_POLICY);
-  assert.equal((await json(await post(app, '/api/orders', input))).code, 'PRINTER_STANDARD_DELIVERY_ACCEPTANCE_REQUIRED');
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM orders'), 0);
-  const placed = await json(await post(app, '/api/orders', { ...input, printerStandardDeliveryAcceptance: acceptance }));
+  assert.equal(q.quote.printer_standard_warning, undefined);
+  const placed = await json(await post(app, '/api/orders', input));
   assert.equal(placed.success, true, JSON.stringify(placed));
   await Promise.allSettled(pending.splice(0));
   raw.close();
 });
 
-test('accepted printer transport policy is frozen with server time; replay keeps its original acceptance', async () => {
+test('an older client still sending the acceptance is ignored, never frozen; replay keeps the same order', async () => {
   const { raw, app, body } = fixture();
-  const input = order(body, { printerStandardDeliveryAcceptance: { ...acceptance, accepted_at: '1900-01-01', user_id: 'someone' } });
-  const before = Date.now();
+  const input = order(body, { printerStandardDeliveryAcceptance: acceptance });
   const placed = await json(await post(app, '/api/orders', input));
   assert.equal(placed.success, true, JSON.stringify(placed));
   const snapshot = JSON.parse(row<{ delivery_method_snapshot: string }>(raw, 'SELECT delivery_method_snapshot FROM orders WHERE id=?', placed.order.id)!.delivery_method_snapshot);
-  assert.deepEqual(snapshot.printer_standard_transport_acceptance, {
-    ...PRINTER_STANDARD_DELIVERY_POLICY, accepted: true, accepted_at: snapshot.printer_standard_transport_acceptance.accepted_at, user_id: 'buyer',
-  });
-  assert.ok(Date.parse(snapshot.printer_standard_transport_acceptance.accepted_at) >= before);
-  assert.ok(Date.parse(snapshot.printer_standard_transport_acceptance.accepted_at) <= Date.now());
+  assert.equal(snapshot.printer_standard_transport_acceptance, undefined);
   const replay = await json(await post(app, '/api/orders', { ...input, printerStandardDeliveryAcceptance: undefined }));
   assert.equal(replay.success, true, JSON.stringify(replay));
   assert.equal(replay.order.id, placed.order.id);
@@ -155,18 +149,18 @@ test('accepted printer transport policy is frozen with server time; replay keeps
   raw.close();
 });
 
-test('membership-free printer standard delivery still requires acknowledgment; personal and pickup do not', async () => {
+test('membership-free printer delivery places with no acknowledgment on any method', async () => {
   for (const method of ['standard', 'personal', 'pickup']) {
     const { raw, app, body } = fixture('printer', { prime: true, rules: enabled });
     const input = { ...body, deliveryMethodId: method };
     const q = await json(await post(app, '/api/orders/quote', input));
     assert.ok(q.quote, JSON.stringify(q));
+    assert.equal(q.quote.printer_standard_warning, undefined);
     if (method === 'standard') {
       assert.equal(q.quote.shipping.total_iqd, 0);
       assert.equal(q.quote.delivery_method_fees.find((m: { id: string }) => m.id === 'standard').available, true);
-      assert.equal((await json(await post(app, '/api/orders', order(input)))).code, 'PRINTER_STANDARD_DELIVERY_ACCEPTANCE_REQUIRED');
-    } else assert.equal(q.quote.printer_standard_warning, null);
-    const placed = await json(await post(app, '/api/orders', order(input, method === 'standard' ? { printerStandardDeliveryAcceptance: acceptance } : {})));
+    }
+    const placed = await json(await post(app, '/api/orders', order(input)));
     assert.equal(placed.success, true, JSON.stringify(placed));
     await Promise.allSettled(pending.splice(0));
     raw.close();
@@ -185,59 +179,41 @@ test('unconfigured personal printer shipping is unavailable rather than falsely 
   raw.close();
 });
 
-test('printer initial choice prefers personal, explicit standard choice stays, and a missing method safely falls back', () => {
-  assert.equal(chooseDeliveryMethod('', ['standard', 'personal', 'pickup'], true), 'personal');
-  assert.equal(chooseDeliveryMethod('', ['standard', 'personal', 'pickup'], false), 'standard');
-  assert.equal(chooseDeliveryMethod('standard', ['standard', 'personal'], true), 'standard');
-  assert.equal(chooseDeliveryMethod('personal', ['standard', 'pickup'], true), 'standard');
-  assert.equal(chooseDeliveryMethod('standard', [], true), '');
-  assert.equal(requiresPrinterStandardAcceptance('standard', true), true);
-  assert.equal(requiresPrinterStandardAcceptance('standard', false), false);
-  assert.equal(requiresPrinterStandardAcceptance('personal', true), false);
-  assert.equal(isPrinterStandardAcceptance(acceptance), true);
+test('the initial choice is the first visible method, an explicit choice stays, and a missing method safely falls back', () => {
+  assert.equal(chooseDeliveryMethod('', ['standard', 'personal', 'pickup']), 'standard');
+  assert.equal(chooseDeliveryMethod('', ['pickup', 'standard']), 'pickup');
+  assert.equal(chooseDeliveryMethod('pickup', ['standard', 'pickup']), 'pickup');
+  assert.equal(chooseDeliveryMethod('personal', ['standard', 'pickup']), 'standard');
+  assert.equal(chooseDeliveryMethod('standard', []), '');
 });
 
-test('all-unconfigured quote fees keep a stable visible selection; a free eligible method is still preferred', () => {
-  const visible = ['personal'];
-  const missing = [{ id: 'personal', available: false }];
-  let method = chooseDeliveryMethod('', visible, true);
-  assert.equal(method, 'personal');
+test('all-unconfigured quote fees keep a stable visible selection; a priced method is preferred over an unpriced one', () => {
+  const visible = ['standard'];
+  const missing = [{ id: 'standard', available: false }];
+  let method = chooseDeliveryMethod('', visible);
+  assert.equal(method, 'standard');
   for (let quote = 0; quote < 4; quote++) {
-    method = chooseDeliveryMethod('', visible, true, missing);
-    assert.equal(method, 'personal', 'the quote never clears the configured method and never needs to be discarded');
+    method = chooseDeliveryMethod('', visible, missing);
+    assert.equal(method, 'standard', 'the quote never clears the configured method and never needs to be discarded');
   }
-  assert.deepEqual(visible, ['personal'], 'quote configuration blockers do not remove visible choices');
-  assert.equal(chooseDeliveryMethod('', ['standard', 'personal'], true, [
-    { id: 'standard', available: true }, { id: 'personal', available: false },
-  ]), 'standard');
-  assert.equal(chooseDeliveryMethod('', ['standard', 'personal'], true, [
-    { id: 'standard', available: true, fee_iqd: 5000 }, { id: 'personal', available: true, fee_iqd: 0 },
-  ] as Array<{ id: string; available: boolean; fee_iqd: number }>), 'personal', 'zero is a fee, not an availability signal');
-  assert.equal(chooseDeliveryMethod('standard', ['standard', 'personal'], true, missing), 'standard', 'a valid explicit choice is preserved');
+  assert.deepEqual(visible, ['standard'], 'quote configuration blockers do not remove visible choices');
+  assert.equal(chooseDeliveryMethod('', ['standard', 'pickup'], [
+    { id: 'standard', available: false }, { id: 'pickup', available: true },
+  ]), 'pickup');
+  assert.equal(chooseDeliveryMethod('', ['standard', 'pickup'], [
+    { id: 'standard', available: true, fee_iqd: 0 }, { id: 'pickup', available: true, fee_iqd: 0 },
+  ] as Array<{ id: string; available: boolean; fee_iqd: number }>), 'standard', 'zero is a fee, not an availability signal');
+  assert.equal(chooseDeliveryMethod('standard', ['standard', 'pickup'], missing), 'standard', 'a valid explicit choice is preserved');
 });
 
-test('printer acknowledgment cannot follow a changed method, address, item selection, locale or policy version', () => {
-  const original = printerStandardAcceptanceContext('standard', true, 'address', 'cart:1:100000', 1, 'ar');
-  assert.ok(original);
-  assert.equal(printerStandardAcceptanceContext('standard', true, 'address', 'cart:1:100000', 1, 'ar'), original);
-  assert.equal(printerStandardAcceptanceContext('personal', true, 'address', 'cart:1:100000', 1, 'ar'), null);
-  assert.equal(printerStandardAcceptanceContext('standard', false, 'address', 'cart:1:100000', 1, 'ar'), null);
-  for (const changed of [
-    printerStandardAcceptanceContext('standard', true, 'new-address', 'cart:1:100000', 1, 'ar'),
-    printerStandardAcceptanceContext('standard', true, 'address', 'cart:2:100000', 1, 'ar'),
-    printerStandardAcceptanceContext('standard', true, 'address', 'new-cart:1:100000', 1, 'ar'),
-    printerStandardAcceptanceContext('standard', true, 'address', 'cart:1:100000', 2, 'ar'),
-    printerStandardAcceptanceContext('standard', true, 'address', 'cart:1:100000', 1, 'en'),
-  ]) assert.notEqual(changed, original);
-});
-
-test('admin shipping preview exposes both disabled methods and a concrete save-to-repair action without changing the rules', () => {
+test('admin shipping preview: a disabled standard delivery leaves no home delivery, names the repair, never changes the rules', () => {
   const options = { standard: { ...enabled.standard, enabled: false }, personal: { ...enabled.personal, enabled: false } };
   const markup = renderToStaticMarkup(createElement(DeliveryAvailabilityNotice, { options, printer: false }));
   assert.match(markup, /role="alert"/);
   assert.match(markup, /كل طرق التوصيل للمنزل معطّلة/);
   assert.match(markup, /استخدام التعرفة العامة/);
   assert.match(markup, /ثم احفظ المنتج/);
+  assert.doesNotMatch(markup, /التوصيل الشخصي/, 'personal delivery was cancelled; the preview no longer names it');
   assert.equal(options.standard.enabled, false);
   assert.equal(options.personal.enabled, false);
   const legacy = renderToStaticMarkup(createElement(DeliveryAvailabilityNotice, { options: null, printer: true }));

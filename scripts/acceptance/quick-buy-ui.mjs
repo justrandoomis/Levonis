@@ -85,16 +85,10 @@ try {
   check('the small cart is named «العودة إلى الإضافة للسلة»', (await cta.getAttribute('aria-label')) === 'العودة إلى الإضافة للسلة');
   check('the big capsule reads «شراء سريع»', /شراء سريع/.test(await toggle.innerText()), await toggle.innerText());
   await toggle.click();
-  // The printer asks for the standard-delivery acknowledgement first (the
-  // server answered PRINTER_STANDARD_DELIVERY_ACCEPTANCE_REQUIRED).
-  const ack = page.getByRole('dialog').filter({ hasText: 'تحذير التوصيل العادي' });
-  await ack.waitFor({ timeout: 15000 });
-  const go = ack.getByRole('button', { name: /موافقة وإضافة/ });
-  check('acknowledgement: unchecked, button disabled until read', !(await ack.getByRole('checkbox').first().isChecked()) && (await go.isDisabled()));
-  await shot('5-printer-ack');
-  await ack.getByRole('checkbox').first().check({ force: true });
-  await go.click();
+  // The printer standard-delivery acknowledgement is retired with personal
+  // delivery (owner, 2026-10-18): the tap buys at once, nothing is asked.
   await page.waitForTimeout(3000);
+  check('no printer acknowledgement is asked for', (await page.getByRole('dialog').filter({ hasText: 'تحذير التوصيل العادي' }).count()) === 0);
   let s = one(`SELECT id, state, total_iqd, held_iqd, shipping_iqd FROM quick_buy_sessions WHERE user_id='u_sara' AND state='open'`);
   check('a session opened with the printer held', s && s.total_iqd === 600000 && s.held_iqd === 600000 && s.shipping_iqd === 0, JSON.stringify(s));
   await shot('6-bought');

@@ -84,7 +84,6 @@ import {
   Banner,
   Field,
   Grid,
-  Money,
   Qty,
   SectionCard,
   Select,
@@ -1626,7 +1625,7 @@ export default function ProductForm({
                 خيارات التوصيل <span className="text-[11px] font-medium text-text-muted">Delivery options</span>
               </h4>
               <p className="text-[11px] leading-relaxed text-text-muted mt-0.5">
-                العادي رسم واحد للشحنة: ٥٬٠٠٠ د.ع للقطع العادية و١٠٬٠٠٠ د.ع للشحنة التي تحتوي طابعة. شرائح الكمية تخص التوصيل الشخصي. تعطيل الطريقة يمنع اختيارها لهذا المنتج.
+                العادي رسم واحد للشحنة: ٥٬٠٠٠ د.ع للقطع العادية و١٠٬٠٠٠ د.ع للشحنة التي تحتوي طابعة. تعطيل الطريقة يمنع اختيارها لهذا المنتج.
               </p>
             </div>
             {doc.delivery_options ? (
@@ -1660,7 +1659,6 @@ export default function ProductForm({
             <div className="divide-y divide-border-subtle rounded-lg border border-border-subtle px-3">
               {([
                 ['standard', 'التوصيل العادي', 'Standard delivery'],
-                ['personal', 'التوصيل الشخصي', 'Personal delivery'],
               ] as const).map(([method, ar, en]) => {
                 const rule = doc.delivery_options![method];
                 const setRule = (change: Partial<typeof rule>) =>
@@ -1685,22 +1683,7 @@ export default function ProductForm({
                         sub={en}
                       />
                     </div>
-                    {method === 'personal' ? <Grid cols={2}>
-                      <Field
-                        ar="عدد القطع لكل شريحة"
-                        en="Quantity per fee tier"
-                        error={showErrors ? errors[`delivery:${method}:quantity_step`] : undefined}
-                      >
-                        <Qty value={rule.quantity_step} onChange={(v) => setRule({ quantity_step: v ?? 1 })} />
-                      </Field>
-                      <Field
-                        ar="رسم الشريحة (د.ع)"
-                        en="Fee per tier (IQD)"
-                        error={showErrors ? errors[`delivery:${method}:fee_iqd`] : undefined}
-                      >
-                        <Money value={rule.fee_iqd} onChange={(v) => setRule({ fee_iqd: v ?? 0 })} />
-                      </Field>
-                    </Grid> : <p className="text-[11px] text-text-secondary">تعطيل أو تفعيل التوصيل العادي فقط؛ الرسم ثابت للشحنة ولا يزيد مع الكمية أو عدد المنتجات.</p>}
+                    <p className="text-[11px] text-text-secondary">تعطيل أو تفعيل التوصيل العادي فقط؛ الرسم ثابت للشحنة ولا يزيد مع الكمية أو عدد المنتجات.</p>
                   </div>
                 );
               })}
