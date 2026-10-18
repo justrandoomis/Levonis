@@ -54,6 +54,7 @@ export const UPLOAD_CLASSES: readonly BodyClass[] = [
   // multipart kind's 256 KB allowance is slack here, not a need; the route refuses over `chunk_bytes` itself.
   { prefix: '/api/uploads/sessions', methods: ['PUT'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/lib/uploadEntity.ts#SESSION_PART_MAX_BYTES', routeFile: 'uploadSessions.ts' },
   { prefix: '/api/kyc/upload', methods: ['POST'], kind: 'multipart', maxBytes: 8 * MB, source: 'worker/routes/kyc.ts#IMAGE_MAX', routeFile: 'kyc.ts' },
+  { prefix: '/api/merchant-application/photo', methods: ['POST'], kind: 'multipart', maxBytes: 8 * MB, source: 'worker/routes/merchantApplication.ts#PHOTO_MAX', routeFile: 'merchantApplication.ts' },
   { prefix: '/api/marketplace/requests', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/lib/attachments.ts#MODEL_MAX_BYTES', routeFile: 'marketplace.ts' },
   { prefix: '/api/reviews/uploads', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/reviews.ts#VIDEO_MAX', routeFile: 'reviews.ts' },
   { prefix: '/api/devices/claims/upload', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/devices.ts#CLAIM_VIDEO_MAX', routeFile: 'devices.ts' },

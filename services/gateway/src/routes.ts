@@ -288,6 +288,8 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/store-orders', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'auth', rateClass: 'money' },
   { prefix: '/api/marketplace', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'write', note: '/api/marketplace/print extends the same requests' },
   { prefix: '/api/admin/community', hosts: 'main', owner: 'MARKETPLACE', flipPhase: 6, requires: 'admin', rateClass: 'admin-write' },
+  { prefix: '/api/admin/merchant-applications', hosts: 'main', owner: 'MARKETPLACE', flipPhase: 6, requires: 'admin', rateClass: 'admin-write', note: 'the merchant approval queue (Community V3, DECISIONS rows 256-257): worker/routes/adminMerchantApplications.ts; the service re-checks the reviewer scope (owner, full admins, assistants with an owner grant) on every call' },
+  { prefix: '/api/merchant-application', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'auth', rateClass: 'upload', note: 'the applicant\'s own merchant application and its private review photo (Community V3, DECISIONS row 256): worker/routes/merchantApplication.ts' },
   // The printer-model economics editor (worker/routes/printQuote.ts `adminPrintQuoteRoutes`) —
   // the admin half of the print quote engine, so it moves with /api/print-quote.
   { prefix: '/api/admin/print-quote', hosts: 'main', owner: 'MARKETPLACE', flipPhase: 6, requires: 'admin', rateClass: 'admin-write' },

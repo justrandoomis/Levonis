@@ -74,6 +74,9 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/warranty': 'DEVICES',
   '/api/admin/warranties': 'DEVICES',
   '/api/admin/community': 'MARKETPLACE',
+  // Community V3 (DECISIONS rows 256-257): the merchant approval queue and the applicant's own application.
+  '/api/admin/merchant-applications': 'MARKETPLACE',
+  '/api/merchant-application': 'MARKETPLACE',
   '/api/admin/import': 'CATALOG',
   '/api/admin/chats': 'CORE',
   '/api/admin/wallet-adjust': 'LEDGER',
