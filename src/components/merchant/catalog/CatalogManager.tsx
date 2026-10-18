@@ -30,6 +30,7 @@ import { catalogApi, type BulkAction, type CatalogProduct, type CatalogStats, ty
 import { catalogRefusalText, catalogStrings } from './strings';
 import { StateChip, readRefusal } from './parts';
 import BulkValueSheet, { type BulkValueKind } from './BulkValueSheet';
+import { bulkInverse, type UndoStep } from './bulkUndo';
 import VariantImg from '../../ui/VariantImg';
 
 const ProductEditorSheet = lazy(() => import('./ProductEditorSheet'));
@@ -145,10 +146,14 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
   async function bulk(action: BulkAction, ids: string[], extra: Record<string, unknown> = {}) {
     if (!ids.length || busy) return;
     setBusy(true);
+    // What the list showed before, for an exact «تراجع» (./bulkUndo.ts).
+    const before = (rows ?? []).filter((p) => ids.includes(p.id));
     try {
       const r = await catalogApi.bulk(action, ids, extra);
       const failed = r.results.filter((x) => !x.ok);
-      if (!failed.length) toast.success(s.bulkDone(r.done, ids.length));
+      const back = bulkInverse(action, extra, before, r.results.filter((x) => x.ok).map((x) => x.id), canSell);
+      const undo = back ? { action: { label: s.undo, onClick: () => void undoBulk(back) } } : undefined;
+      if (!failed.length) toast.success(s.bulkDone(r.done, ids.length), undo);
       else {
         const reasons = [...new Set(failed.map((f) => catalogRefusalText(f.code, loc, s.saveFailed)))].join(' ');
         toast.error(s.bulkDone(r.done, ids.length), { description: reasons });
@@ -159,6 +164,23 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
       toast.error(readRefusal(e, loc, s.saveFailed).message || s.saveFailed);
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Runs the inverse calls in turn; any refusal says so instead of claiming the list is back. */
+  async function undoBulk(steps: UndoStep[]) {
+    setBusy(true);
+    try {
+      for (const step of steps) {
+        const r = await catalogApi.bulk(step.action, step.ids, step.extra);
+        if (r.results.some((x) => !x.ok)) throw new Error('partial');
+      }
+      toast.success(s.undone);
+    } catch {
+      toast.error(s.undoFailed);
+    } finally {
+      setBusy(false);
+      reload();
     }
   }
 

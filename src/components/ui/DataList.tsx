@@ -36,7 +36,11 @@
  *
  *   ROWS ARE OPENED BY A LINK, the title cell (`rowHref`), never by a
  *   clickable `<tr>`: a link is reachable by keyboard, announced, and opens in
- *   a new tab when asked to.
+ *   a new tab when asked to. A tap elsewhere on the row or card is PASSED ON
+ *   to that link (`rowTapLink`, src/lib/listView.ts) — never one that began on
+ *   the checkbox, the actions button or any other control — so on a phone the
+ *   whole card is the target while the link stays the only way in for a
+ *   keyboard or a screen reader.
  *
  *   CLAY (docs/DECISIONS.md row 209): the list is ONE resting tray
  *   (`lv-surface`); its rows are flat, divided by hairlines. A selected row
@@ -47,7 +51,7 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MoreHorizontal } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { isWideLayout, listView } from '../../lib/listView';
+import { isWideLayout, listView, rowTapLink } from '../../lib/listView';
 import { EmptyState, ErrorState } from './AsyncStates';
 import { IconButton } from './Button';
 import { ListRowsSkeleton, TableRowsSkeleton } from './DashboardSkeletons';
@@ -149,17 +153,13 @@ export function DataList<T>({
   const nameOf = (row: T) => rowLabel?.(row) ?? rowKey(row);
   const titleColumn = columns.find((c) => c.card === 'title') ?? columns[0];
 
-  // Words. «إجراءات» / «کردارەکان» already exist, hand-written; the selection
-  // phrases do not.
+  // Words, in the Sorani the repo already writes: «کردارەکان» (actions),
+  // «هەڵبژێردراو» (selected), «پاککردنەوەی هەڵبژاردن» (clear selection).
   const actionsFor = (row: T) => `${loc('إجراءات', 'Actions', 'کردارەکان')}: ${nameOf(row)}`;
-  // OWNER: Sorani to be written by hand.
-  const selectRow = (row: T) => loc(`تحديد ${nameOf(row)}`, `Select ${nameOf(row)}`);
-  // OWNER: Sorani to be written by hand.
-  const selectAll = loc('تحديد الكل', 'Select all');
-  // OWNER: Sorani to be written by hand.
-  const selectedCount = loc(`${chosen.length} محدد`, `${chosen.length} selected`);
-  // OWNER: Sorani to be written by hand.
-  const clearSelection = loc('إلغاء التحديد', 'Clear selection');
+  const selectRow = (row: T) => loc(`تحديد ${nameOf(row)}`, `Select ${nameOf(row)}`, `هەڵبژاردنی ${nameOf(row)}`);
+  const selectAll = loc('تحديد الكل', 'Select all', 'هەمووی هەڵبژێرە');
+  const selectedCount = loc(`${chosen.length} محدد`, `${chosen.length} selected`, `${chosen.length} هەڵبژێردراو`);
+  const clearSelection = loc('إلغاء التحديد', 'Clear selection', 'پاککردنەوەی هەڵبژاردن');
 
   const toggleRow = (key: string, on: boolean) => {
     if (!selection) return;
@@ -182,13 +182,28 @@ export function DataList<T>({
     const content = titleColumn.cell(row);
     const href = rowHref?.(row);
     return href ? (
-      <Link to={href} className="rounded-sm font-semibold text-text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+      <Link to={href} data-row-link className="rounded-sm font-semibold text-text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
         {content}
       </Link>
     ) : (
       <span className="font-semibold text-text-primary">{content}</span>
     );
   };
+
+  // The tap is replayed on the link with its modifier keys, so Ctrl/⌘ still opens a new tab.
+  const onRowTap = (e: React.MouseEvent<HTMLElement>) => {
+    const link = rowTapLink<Element>({
+      target: e.target as Element,
+      row: e.currentTarget,
+      button: e.button,
+      defaultPrevented: e.defaultPrevented,
+      selection: window.getSelection?.()?.toString() ?? '',
+    });
+    link?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey })
+    );
+  };
+  const tapProps = (opens: boolean) => (opens ? { onClick: onRowTap, 'data-row-tap': '' } : {});
 
   const actionsMenu = (row: T) => {
     const entries = rowActions?.(row) ?? [];
@@ -234,8 +249,15 @@ export function DataList<T>({
           {list.map((row) => {
             const key = rowKey(row);
             const on = !!selection?.selected.has(key);
+            const opens = !!rowHref?.(row);
             return (
-              <tr key={key} data-row={key} aria-selected={selection ? on : undefined} className={on ? 'bg-surface-selected' : ''}>
+              <tr
+                key={key}
+                data-row={key}
+                aria-selected={selection ? on : undefined}
+                {...tapProps(opens)}
+                className={`${on ? 'bg-surface-selected' : ''} ${opens ? 'cursor-pointer hover:bg-white/[0.03]' : ''}`}
+              >
                 {selection && (
                   // The selected row's second cue: a 2px gold bar at its
                   // inline start (logical, so it mirrors in Arabic), held in
@@ -272,6 +294,7 @@ export function DataList<T>({
       {list.map((row) => {
         const key = rowKey(row);
         const on = !!selection?.selected.has(key);
+        const opens = !!rowHref?.(row);
         const meta = columns.filter((c) => c.card === 'meta');
         const badges = columns.filter((c) => c.card === 'badge');
         const fields = columns.filter((c) => c !== titleColumn && (c.card ?? 'field') === 'field');
@@ -280,7 +303,10 @@ export function DataList<T>({
             key={key}
             data-row={key}
             aria-selected={selection ? on : undefined}
-            className={`flex items-start gap-2 py-2 pe-1 ps-3 ${selection ? `border-s-2 ${on ? 'border-s-gold bg-surface-selected' : 'border-s-transparent'}` : ''}`}
+            {...tapProps(opens)}
+            className={`flex items-start gap-2 py-2 pe-1 ps-3 ${selection ? `border-s-2 ${on ? 'border-s-gold bg-surface-selected' : 'border-s-transparent'}` : ''} ${
+              opens ? 'cursor-pointer transition-colors active:bg-[var(--clay-well-bg)]' : ''
+            }`}
           >
             {selection && (
               <Checkbox checked={on} onChange={(v) => toggleRow(key, v)} aria-label={selectRow(row)} className="-ms-2 shrink-0" />

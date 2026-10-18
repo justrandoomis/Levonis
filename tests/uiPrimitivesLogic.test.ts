@@ -271,7 +271,12 @@ test('the toast queue: errors stay longer, an undo gets time to be pressed, one 
   const [ok, err, undo] = toastQueue();
   assert.equal(ok.duration, 4000);
   assert.equal(err.duration, 8000);
-  assert.ok(undo.duration >= 6000, 'an action keeps the toast at least 6s');
+  assert.equal(undo.duration, 10_000, 'an action keeps the toast 10 s — time to read it and reach the button');
+  toast.success('Hidden', { action: { label: 'Undo', onClick: () => {} }, duration: 2000 });
+  const last = () => toastQueue()[toastQueue().length - 1];
+  assert.equal(last().duration, 10_000, 'a shorter duration asked for an action toast is raised to 10 s');
+  toast.error('Failed', { action: { label: 'Retry', onClick: () => {} }, duration: 15_000 });
+  assert.equal(last().duration, 15_000, 'a longer one is kept');
   toast.show('info', 'Saving…', { id: 'op' });
   toast.show('success', 'Saved', { id: 'op' });
   const ops = toastQueue().filter((t) => t.id === 'op');

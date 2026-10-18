@@ -1,15 +1,15 @@
 /**
  * THE WORKSPACE SHELL'S WORDS.
  *
- * Sorani is never machine-written (see docs/DECISIONS.md rows 166–168 (D6)). Every `ckb`
- * below already existed, hand-written, elsewhere in the repo and is copied
- * verbatim: the tab names from the dashboard page this shell replaces
+ * Most `ckb` below already existed, hand-written, elsewhere in the repo and is
+ * copied verbatim: the tab names from the dashboard page this shell replaces
  * (src/pages/MerchantDashboardPage.tsx before W3-A), the sidebar words from
  * src/components/DashboardLayout.tsx, the store-status reasons from
  * src/components/merchant/StoreCta.tsx `reasonText`, the order states from
- * src/components/merchant/dashboard/SalesTabs.tsx `statusLabel`. A phrase
- * nobody has written in Sorani carries only ar/en — `loc` then shows the
- * Arabic — and says so: `// OWNER: Sorani to be written by hand.`
+ * src/components/merchant/dashboard/SalesTabs.tsx `statusLabel`. The words
+ * nobody had written in Sorani are written here in the app's own vocabulary
+ * (docs/DECISIONS.md row 183: a Sorani slot never carries the Arabic), so
+ * every entry has all three spellings — tests/merchantWorkspaceShell.test.ts.
  */
 export type Loc = (ar: string, en: string, ckb?: string) => string;
 
@@ -32,8 +32,7 @@ export const W = {
   printers: ['الطابعات', 'Printers', 'چاپکەرەکان'],
   costing: ['تسعير الطباعة', 'Print costing', 'نرخی چاپ'],
   requests: ['طلبات الزبائن', 'Customer requests', 'داواکاری کڕیاران'],
-  // OWNER: Sorani to be written by hand.
-  storeDesign: ['تصميم المتجر', 'Store design'],
+  storeDesign: ['تصميم المتجر', 'Store design', 'دیزاینی فرۆشگا'],
   storeSettings: ['إعداد المتجر', 'Store setup', 'ڕێکخستنی فرۆشگا'],
   delivery: ['التوصيل', 'Delivery', 'گەیاندن'],
   money: ['الأرباح', 'Earnings', 'قازانج'],
@@ -44,47 +43,34 @@ export const W = {
 
   // ---- groups
   sales: ['المبيعات', 'Sales', 'فرۆش'],
-  // OWNER: Sorani to be written by hand.
-  catalogue: ['الكتالوج', 'Catalogue'],
-  // OWNER: Sorani to be written by hand.
-  workshop: ['الورشة', 'Workshop'],
-  // OWNER: Sorani to be written by hand.
-  store: ['المتجر', 'Store'],
+  catalogue: ['الكتالوج', 'Catalogue', 'کاتالۆگ'],
+  workshop: ['الورشة', 'Workshop', 'وۆرکشۆپ'],
+  store: ['المتجر', 'Store', 'فرۆشگا'],
   more: ['المزيد', 'More', 'زیاتر'],
 
   // ---- chrome
   search: ['بحث', 'Search', 'گەڕان'],
-  // OWNER: Sorani to be written by hand.
-  searchPlaceholder: ['ابحث عن طلب أو منتج أو عميل أو صفحة…', 'Search orders, products, customers, pages…'],
+  searchPlaceholder: ['ابحث عن طلب أو منتج أو عميل أو صفحة…', 'Search orders, products, customers, pages…', 'لە داواکاری، بەرهەم، کڕیار یان پەڕە بگەڕێ…'],
   create: ['إنشاء', 'Create', 'دروستکردن'],
   newProduct: ['منتج جديد', 'New product', 'بەرهەمی نوێ'],
   newCoupon: ['كوبون جديد', 'New coupon', 'کۆبۆنی نوێ'],
-  // OWNER: Sorani to be written by hand.
-  newCollection: ['قسم جديد', 'New section'],
+  newCollection: ['قسم جديد', 'New section', 'بەشی نوێ'],
   viewStore: ['عرض المتجر', 'View store', 'بینینی فرۆشگا'],
   mainMenu: ['القائمة الرئيسية', 'Main menu', 'لیستی سەرەکی'],
   collapse: ['طيّ الشريط الجانبي', 'Collapse sidebar', 'نوقاندنی لای لیست'],
   expand: ['توسيع الشريط الجانبي', 'Expand sidebar', 'فراوانکردنی لای لیست'],
-  // OWNER: Sorani to be written by hand.
-  goTo: ['الانتقال إلى', 'Go to'],
-  // OWNER: Sorani to be written by hand.
-  actions: ['إجراءات', 'Actions'],
-  // OWNER: Sorani to be written by hand.
-  results: ['نتائج البحث', 'Search results'],
-  // OWNER: Sorani to be written by hand.
-  skipToContent: ['تخطَّ إلى المحتوى', 'Skip to content'],
-  // OWNER: Sorani to be written by hand.
-  storeStatus: ['حالة المتجر', 'Store status'],
+  goTo: ['الانتقال إلى', 'Go to', 'بڕۆ بۆ'],
+  actions: ['إجراءات', 'Actions', 'کردارەکان'],
+  results: ['نتائج البحث', 'Search results', 'ئەنجامەکانی گەڕان'],
+  skipToContent: ['تخطَّ إلى المحتوى', 'Skip to content', 'بازبدە بۆ ناوەڕۆک'],
+  storeStatus: ['حالة المتجر', 'Store status', 'دۆخی فرۆشگا'],
 
   // ---- store status (the pill)
   open: ['مفتوح', 'Open', 'کراوە'],
   paused: ['متوقّف', 'Paused', 'ڕاگیراوە'],
-  // OWNER: Sorani to be written by hand.
-  suspended: ['موقوف', 'Suspended'],
-  // OWNER: Sorani to be written by hand.
-  lapsed: ['PLUS منتهٍ', 'PLUS lapsed'],
-  // OWNER: Sorani to be written by hand.
-  restricted: ['مقيّد', 'Restricted'],
+  suspended: ['موقوف', 'Suspended', 'هەڵپەسێردراو'],
+  lapsed: ['PLUS منتهٍ', 'PLUS lapsed', 'PLUS بەسەرچوو'],
+  restricted: ['مقيّد', 'Restricted', 'سنووردارکراو'],
 } as const satisfies Record<string, Words>;
 
 /** Why the store cannot sell, in the merchant's words (StoreCta.tsx `reasonText`, verbatim). */
@@ -116,11 +102,11 @@ export function sellingReason(reason: string, loc: Loc): string {
         'تایبەتمەندی فرۆشگا کاتی سنووردارکراوە. ئەندامێتییە پارەدراوەکەت هەڵنەوەشێنراوەتەوە — پەیوەندی بکە.'
       );
     case 'merchant_restricted':
-      // The dashboard's restriction notice, verbatim (ar/en only there).
-      // OWNER: Sorani to be written by hand.
+      // The dashboard's restriction notice, verbatim; its Sorani per DECISIONS row 183.
       return loc(
         'قيّدت Levonis حسابك: متجرك ظاهر ويمكنك تعديله، لكنه لا يستقبل طلبات جديدة ولا يمكنك تقديم عروض حتى يُرفع التقييد. طلباتك الحالية وأرباحك كما هي — تواصل مع الدعم.',
-        'Levonis has restricted your account: your store stays visible and editable, but it takes no new orders and you cannot make offers until the restriction is lifted. Your current orders and earnings are unaffected — contact support.'
+        'Levonis has restricted your account: your store stays visible and editable, but it takes no new orders and you cannot make offers until the restriction is lifted. Your current orders and earnings are unaffected — contact support.',
+        'Levonis هەژمارەکەتی سنووردار کردووە: فرۆشگاکەت دیارە و دەتوانیت دەستکاری بکەیت، بەڵام داواکاری نوێ وەرناگرێت و ناتوانیت ئۆفەر بدەیت تا سنووردارکردنەکە لادەبرێت. داواکارییەکانی ئێستا و قازانجەکەت وەک خۆیانن — پەیوەندی بە پشتیوانییەوە بکە.'
       );
     default:
       return loc('لا يمكن البيع حاليًا.', 'Selling is not available right now.', 'لە ئێستادا فرۆشتن بەردەست نییە.');

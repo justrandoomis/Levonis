@@ -422,6 +422,8 @@ export default function OrdersList({
       label: s.trackingLabel,
       placeholder: s.trackingPlaceholder,
       inputMode: 'text',
+      // A courier's code: written left to right in an Arabic page, never «corrected».
+      ltr: true,
       maxLength: TRACKING_NO_MAX,
       validate: (v) => ([...v.trim()].length > TRACKING_NO_MAX ? s.trackingTooLong : null),
       confirmLabel: s.shipConfirm,

@@ -90,10 +90,13 @@ export interface PayoutRequestBody {
 
 export const financeApi = {
   summary: () => api.get<{ summary: FinanceSummary }>('/api/merchant/finance/summary'),
-  ledger: (q: { cursor?: string | null; kind?: string; limit?: number } = {}) => {
+  /** `from` inclusive, `to` exclusive — UTC instants (./ledgerPeriod.ts), the route's own names. */
+  ledger: (q: { cursor?: string | null; kind?: string; from?: string; to?: string; limit?: number } = {}) => {
     const p = new URLSearchParams();
     if (q.cursor) p.set('cursor', q.cursor);
     if (q.kind) p.set('kind', q.kind);
+    if (q.from) p.set('from', q.from);
+    if (q.to) p.set('to', q.to);
     p.set('limit', String(q.limit ?? 30));
     return api.get<{ entries: LedgerEntry[]; next_cursor: string | null }>(`/api/merchant/finance/ledger?${p}`);
   },

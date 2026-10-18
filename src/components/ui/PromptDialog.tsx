@@ -56,6 +56,8 @@ export interface PromptOptions {
   maxLength?: number;
   /** Numeric keyboard on phones, and a left-to-right field. */
   inputMode?: 'text' | 'numeric' | 'decimal';
+  /** A code in Latin letters and digits (a tracking number): left to right, no spell-check, no auto-capitals. */
+  ltr?: boolean;
   /** The verb on the button: «رفض العرض». Defaults to «تأكيد». */
   confirmLabel?: React.ReactNode;
   cancelLabel?: React.ReactNode;
@@ -95,6 +97,7 @@ export function PromptDialog({
   multiline = false,
   maxLength,
   inputMode = 'text',
+  ltr = false,
   confirmLabel,
   cancelLabel,
   destructive = false,
@@ -184,7 +187,15 @@ export function PromptDialog({
               }}
             />
           ) : (
-            <Input {...common} dir={numeric ? 'ltr' : 'auto'} inputMode={numeric ? inputMode : undefined} enterKeyHint="done" autoComplete="off" />
+            <Input
+              {...common}
+              dir={numeric || ltr ? 'ltr' : 'auto'}
+              inputMode={numeric ? inputMode : undefined}
+              spellCheck={ltr ? false : undefined}
+              autoCapitalize={ltr ? 'off' : undefined}
+              enterKeyHint="done"
+              autoComplete="off"
+            />
           )}
         </Field>
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -242,6 +253,7 @@ export function usePrompt(): [(options: PromptOptions) => Promise<string | null>
       multiline={asking?.multiline}
       maxLength={asking?.maxLength}
       inputMode={asking?.inputMode}
+      ltr={asking?.ltr}
       confirmLabel={asking?.confirmLabel}
       cancelLabel={asking?.cancelLabel}
       destructive={asking?.destructive}

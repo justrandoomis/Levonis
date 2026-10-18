@@ -115,13 +115,13 @@ export const offersApi = {
 export function deliveryLabel(method: string, loc: Loc): string {
   switch (method) {
     case 'pickup':
-      return loc('يستلمه الزبون من الورشة', 'Customer collects');
+      return loc('يستلمه الزبون من الورشة', 'Customer collects', 'کڕیار لە وۆرکشۆپەکە وەریدەگرێت');
     case 'merchant_delivery':
-      return loc('يوصله التاجر', 'Merchant delivers');
+      return loc('يوصله التاجر', 'Merchant delivers', 'بازرگان دەیگەیەنێت');
     case 'courier':
-      return loc('شركة توصيل', 'Courier');
+      return loc('شركة توصيل', 'Courier', 'کۆمپانیای گەیاندن');
     case '':
-      return loc('غير محدد', 'Not stated');
+      return loc('غير محدد', 'Not stated', 'دیاری نەکراوە');
     default:
       // A free-text method from before offers v2, shown as the merchant wrote it.
       return method;
@@ -132,12 +132,12 @@ export function offerStateLabel(o: Pick<OfferV2, 'state' | 'stale' | 'expired' |
   // A DRAFT (0159) rides the first page of «عروضي» and was never sent: it must
   // not wear the «قائم» a live offer wears (review 2026-09-30).
   if (o.draft || o.state === 'draft') return { text: loc('مسودة — لم تُرسل', 'Draft — not sent', 'ڕەشنووس — نەنێردراوە'), tone: 'warning' };
-  if (o.state === 'accepted') return { text: loc('مقبول', 'Accepted'), tone: 'success' };
-  if (o.state === 'superseded' || (o.state === 'pending' && o.stale)) return { text: loc('بانتظار تأكيد التاجر', 'Awaiting re-confirmation'), tone: 'warning' };
-  if (o.state === 'expired' || o.expired) return { text: loc('منتهي الصلاحية', 'Expired'), tone: 'neutral' };
-  if (o.state === 'rejected') return { text: loc('لم يُختر', 'Not chosen'), tone: 'neutral' };
-  if (o.state === 'withdrawn') return { text: loc('مسحوب', 'Withdrawn'), tone: 'neutral' };
-  return { text: loc('قائم', 'Open'), tone: 'info' };
+  if (o.state === 'accepted') return { text: loc('مقبول', 'Accepted', 'پەسەندکراو'), tone: 'success' };
+  if (o.state === 'superseded' || (o.state === 'pending' && o.stale)) return { text: loc('بانتظار تأكيد التاجر', 'Awaiting re-confirmation', 'چاوەڕوانی پشتڕاستکردنەوەی بازرگان'), tone: 'warning' };
+  if (o.state === 'expired' || o.expired) return { text: loc('منتهي الصلاحية', 'Expired', 'بەسەرچوو'), tone: 'neutral' };
+  if (o.state === 'rejected') return { text: loc('لم يُختر', 'Not chosen', 'هەڵنەبژێردرا'), tone: 'neutral' };
+  if (o.state === 'withdrawn') return { text: loc('مسحوب', 'Withdrawn', 'کشێنرایەوە'), tone: 'neutral' };
+  return { text: loc('قائم', 'Open', 'کراوە'), tone: 'info' };
 }
 
 /** «صالح حتى ٣ أكتوبر» in the reader's calendar, or null. */

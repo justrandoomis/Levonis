@@ -47,28 +47,28 @@ export default function MyOffersList({ requestHref }: { requestHref: (requestId:
   return (
     <section aria-labelledby="my-offers-title" data-my-offers>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 id="my-offers-title" className="text-[15px] font-bold text-text-primary">{loc('عروضي', 'My offers')}</h2>
+        <h2 id="my-offers-title" className="text-[15px] font-bold text-text-primary">{loc('عروضي', 'My offers', 'ئۆفەرەکانم')}</h2>
         <div className="w-full sm:w-auto sm:min-w-[340px]">
           <Segmented
             group="my-offers-filter"
             size="sm"
-            label={loc('تصفية العروض', 'Filter offers')}
+            label={loc('تصفية العروض', 'Filter offers', 'پاڵاوتنی ئۆفەرەکان')}
             value={filter || 'all'}
             onChange={(id) => setFilter((id === 'all' ? '' : id) as Filter)}
             items={[
-              { id: 'all', label: loc('الكل', 'All') },
-              { id: 'superseded', label: loc('للتأكيد', 'Re-confirm') },
-              { id: 'pending', label: loc('قائمة', 'Open') },
-              { id: 'accepted', label: loc('مقبولة', 'Accepted') },
+              { id: 'all', label: loc('الكل', 'All', 'هەموو') },
+              { id: 'superseded', label: loc('للتأكيد', 'Re-confirm', 'بۆ پشتڕاستکردنەوە') },
+              { id: 'pending', label: loc('قائمة', 'Open', 'کراوە') },
+              { id: 'accepted', label: loc('مقبولة', 'Accepted', 'پەسەندکراو') },
             ]}
           />
         </div>
       </div>
       {failed ? (
         <p className="py-6 text-center text-[13px] text-text-muted">
-          {loc('تعذّر تحميل عروضك.', 'Could not load your offers.')}{' '}
+          {loc('تعذّر تحميل عروضك.', 'Could not load your offers.', 'نەتوانرا ئۆفەرەکانت بار بکرێن.')}{' '}
           <button type="button" className="font-semibold text-gold underline-offset-4 hover:underline" onClick={() => load(filter)}>
-            {loc('أعد المحاولة', 'Retry')}
+            {loc('أعد المحاولة', 'Retry', 'دووبارە هەوڵ بدەرەوە')}
           </button>
         </p>
       ) : rows === null ? (
@@ -77,7 +77,11 @@ export default function MyOffersList({ requestHref }: { requestHref: (requestId:
         </div>
       ) : !rows.length ? (
         <p className="py-6 text-center text-[13px] text-text-muted">
-          {filter ? loc('لا عروض هنا.', 'No offers here.') : loc('لم تقدّم عروضًا بعد. الطلبات التي تناسب ورشتك على لوحة الطلبات.', 'You have not made offers yet. Requests that fit your workshop are on the board.')}
+          {filter ? loc('لا عروض هنا.', 'No offers here.', 'لێرە هیچ ئۆفەرێک نییە.') : loc(
+                'لم تقدّم عروضًا بعد. الطلبات التي تناسب ورشتك على لوحة الطلبات.',
+                'You have not made offers yet. Requests that fit your workshop are on the board.',
+                'هێشتا هیچ ئۆفەرێکت نەداوە. ئەو داواکاریانەی لەگەڵ وۆرکشۆپەکەت دەگونجێن لەسەر بۆردی داواکاریەکانن.'
+              )}
         </p>
       ) : (
         <ul className="lv-surface overflow-hidden divide-y divide-border-subtle/60">
@@ -100,8 +104,8 @@ export default function MyOffersList({ requestHref }: { requestHref: (requestId:
                       <Money iqd={o.price_iqd} /> ·{' '}
                       {o.draft || o.state === 'draft'
                         ? loc('أكمله وأرسله من صفحة الطلب', 'Finish and send it on the request', 'لە پەڕەی داواکاریەکە تەواوی بکە و بینێرە')
-                        : loc(`نسخة ${o.revision}`, `v${o.revision}`)}
-                      {until && o.state === 'pending' ? <> · {loc(`حتى ${until}`, `until ${until}`)}</> : null}
+                        : loc(`نسخة ${o.revision}`, `v${o.revision}`, `وەشانی ${o.revision}`)}
+                      {until && o.state === 'pending' ? <> · {loc(`حتى ${until}`, `until ${until}`, `تا ${until}`)}</> : null}
                     </span>
                     {/* On a phone the state goes under the figures: beside them, a long
                         state («Awaiting re-confirmation») squeezed the title to «C.» and
@@ -132,7 +136,7 @@ export default function MyOffersList({ requestHref }: { requestHref: (requestId:
               setMore(false);
             }}
           >
-            {loc('المزيد', 'More')}
+            {loc('المزيد', 'More', 'زیاتر')}
           </Button>
         </div>
       )}

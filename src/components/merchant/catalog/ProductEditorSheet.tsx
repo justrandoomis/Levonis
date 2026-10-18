@@ -382,7 +382,7 @@ export default function ProductEditorSheet({
             </Field>
             {!hasVariants && (
               <Field label={s.sku} error={errors.sku} optional>
-                <Input ltr value={form.sku} maxLength={64} spellCheck={false} onChange={(e) => set('sku', e.target.value)} />
+                <Input ltr value={form.sku} maxLength={64} spellCheck={false} autoCapitalize="off" autoCorrect="off" onChange={(e) => set('sku', e.target.value)} />
               </Field>
             )}
             {form.trackStock && (

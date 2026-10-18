@@ -11,7 +11,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { ROOT } from './fixtures/d1';
@@ -79,4 +79,47 @@ test('the owner’s product picker names a status in words, never prints the sto
   for (const [ar, en, ckb] of [['منشور', 'Published', 'بڵاوکراوە'], ['مسودة', 'Draft', 'ڕەشنووس'], ['مخفي', 'Hidden', 'شاراوە']]) {
     assert.ok(code.includes(`loc('${ar}', '${en}', '${ckb}')`), `no label for ${en}`);
   }
+});
+
+// ------------------------------------------------------- the merchant admin
+
+/** Every .ts/.tsx file under `dir`, relative to the repo root. */
+function sourceFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(join(ROOT, dir))) {
+    const rel = `${dir}/${name}`;
+    if (statSync(join(ROOT, rel)).isDirectory()) out.push(...sourceFiles(rel));
+    else if (/\.tsx?$/.test(name)) out.push(rel);
+  }
+  return out;
+}
+
+/**
+ * THE MERCHANT ADMIN'S SORANI RATCHET. About 1,190 `loc()` calls under
+ * src/components/merchant still pass Arabic and English only, so a Sorani
+ * reader sees the Arabic (DECISIONS row 183 lists them as the batches still to
+ * write). The ceiling is today's count: a new two-language call fails here,
+ * and each batch that writes Sorani lowers it.
+ */
+const MERCHANT_TWO_LANGUAGE_CEILING = 1188;
+
+test('the merchant admin never gains a two-language string; the ceiling only comes down', () => {
+  const found = sourceFiles('src/components/merchant').flatMap(twoLanguageLoc);
+  assert.ok(
+    found.length <= MERCHANT_TWO_LANGUAGE_CEILING,
+    `${found.length} two-language loc() calls under src/components/merchant, over the ceiling of ${MERCHANT_TWO_LANGUAGE_CEILING} — write the Sorani`
+  );
+  if (found.length < MERCHANT_TWO_LANGUAGE_CEILING) {
+    console.log(`sorani ratchet: ${found.length} left under src/components/merchant — lower MERCHANT_TWO_LANGUAGE_CEILING to it`);
+  }
+});
+
+test('the shared pieces every merchant screen shows speak Sorani: DataList selection, the shell words, «عروضي»', () => {
+  for (const f of ['src/components/ui/DataList.tsx', 'src/components/community/offers/MyOffersList.tsx', 'src/components/community/offers/types.ts', 'src/components/merchant/shell/strings.ts']) {
+    assert.deepEqual(twoLanguageLoc(f), [], `${f} still passes Arabic and English only`);
+    assert.doesNotMatch(read(f), /OWNER: Sorani to be written by hand/, `${f} still says its Sorani is missing`);
+  }
+  const list = read('src/components/ui/DataList.tsx');
+  assert.ok(list.includes("loc('تحديد الكل', 'Select all', 'هەمووی هەڵبژێرە')"));
+  assert.ok(list.includes("loc('إلغاء التحديد', 'Clear selection', 'پاککردنەوەی هەڵبژاردن')"));
 });

@@ -37,7 +37,13 @@ export interface ToastRecord {
 }
 
 const DEFAULT_MS: Record<ToastTone, number> = { success: 4000, info: 4000, error: 8000 };
-const ACTION_MIN_MS = 6000;
+/**
+ * A toast that carries an action («تراجع») stays at least 10 s: reading the
+ * line, finding the button and reaching it with a thumb or the keyboard takes
+ * longer than a plain notice. Hovering or focusing the stack still pauses it
+ * (components/ui/Toast.tsx).
+ */
+const ACTION_MIN_MS = 10_000;
 
 let toasts: ToastRecord[] = [];
 let seq = 0;

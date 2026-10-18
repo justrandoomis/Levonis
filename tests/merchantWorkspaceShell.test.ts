@@ -332,15 +332,26 @@ test('NO NATIVE DIALOGS in the merchant workspace or the community admin: no con
   assert.deepEqual(offenders, []);
 });
 
-test('NO SORANI WAS INVENTED in the shell: every ckb word already existed elsewhere; a file that passes ar/en only says so', () => {
+test('THE SHELL SPEAKS SORANI: every word has all three spellings, never the Arabic in the Sorani slot; a file that passes ar/en only says so', () => {
   const shellDir = 'src/components/merchant/shell';
   const corpus = walk('src')
     .filter((f) => !f.startsWith(shellDir))
     .map(read)
     .join('\n');
+  // DECISIONS row 183: the shell words a Sorani reader used to see in Arabic,
+  // written in the app's own vocabulary. Every other ckb word is copied from
+  // where it was already written.
+  const writtenUnderRow183 = new Set([
+    'لە داواکاری، بەرهەم، کڕیار یان پەڕە بگەڕێ…',
+    'بەشی نوێ',
+    'بازبدە بۆ ناوەڕۆک',
+    'PLUS بەسەرچوو',
+  ]);
   for (const [key, words] of Object.entries(W)) {
-    const ckb = (words as readonly string[])[2];
-    if (ckb) assert.ok(corpus.includes(ckb), `W.${key}: «${ckb}» is Sorani nobody wrote before`);
+    const [ar, en, ckb] = words as readonly string[];
+    assert.ok(ckb, `W.${key} («${en}») has no Sorani`);
+    assert.notEqual(ckb, ar, `W.${key}: the Sorani slot carries the Arabic`);
+    assert.ok(corpus.includes(ckb) || writtenUnderRow183.has(ckb), `W.${key}: «${ckb}» is Sorani nobody wrote before`);
   }
   for (const f of walk(shellDir)) {
     const src = read(f);

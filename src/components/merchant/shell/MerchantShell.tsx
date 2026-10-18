@@ -54,8 +54,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import * as Motion from 'motion/react-m';
 import { ChevronsLeft, ChevronsRight, ExternalLink, MoreHorizontal, Plus, Search, Store } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
-import { api } from '../../../lib/api';
-import { formatMoney } from '../../../lib/money';
 import { useMotion } from '../../../lib/motion';
 import { MotionFeatures } from '../../../lib/motionFeatures';
 import type { MerchantMe } from '../../../lib/merchant';
@@ -72,16 +70,20 @@ import MerchantNotificationBell from '../notifications/MerchantNotificationBell'
 import { useAttention, type Attention } from './attention';
 import { WorkspaceContext, type WorkspaceValue } from './context';
 import { NAV, PHONE_TABS, badgeCount, moreEntries, navEntry, navGroups, phoneTabFor, sectionPath, type NavEntry } from './nav';
-import { SEARCH_DEBOUNCE_MS, isPaletteKey, paletteGroups, searchable, type QuickAction, type SearchResults } from './paletteModel';
+import { isPaletteKey } from './paletteModel';
 import { resolveWorkspaceRoute } from './routeTable';
 import { SECTIONS } from './sections';
 import SectionFallback from './SectionFallback';
 import { storeStatus } from './status';
 import { W, say } from './strings';
 
-// Fetched the first time they are opened — neither is needed to draw the frame.
-const CommandPalette = lazy(() => import('../../ui/CommandPalette').then((m) => ({ default: m.CommandPalette })));
+// Fetched the first time they are opened — none is needed to draw the frame
+// (the account menu: right after the frame, on a wider screen only).
+/** The search (⌘K): its model, its requests and the palette primitive, in one chunk. */
+const WorkspacePalette = lazy(() => import('./WorkspacePalette'));
 const MoreSheet = lazy(() => import('./MoreSheet'));
+/** Language, account, help, sign out — its own chunk; on a phone the same choices sit in «More». */
+const AccountMenu = lazy(() => import('./AccountMenu'));
 
 const COLLAPSE_KEY = 'levo_merchant_sidebar_collapsed';
 /** The phone tab bar's height; toasts and sticky bars sit above it. */
@@ -296,6 +298,16 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
             href={href}
             mode={section === 'store_design' ? 'design' : 'operate'}
             onMode={(next) => go(next === 'design' ? merchantHref.storeDesign() : merchantHref.home())}
+            account={
+              isPhone ? null : (
+                // A chunk that does not arrive leaves the slot empty, never a broken bar.
+                <ChunkBoundary renderFallback={() => null}>
+                  <Suspense fallback={<span aria-hidden="true" className="inline-block h-11 w-11" />}>
+                    <AccountMenu />
+                  </Suspense>
+                </ChunkBoundary>
+              )
+            }
           />
 
           <div
@@ -526,6 +538,7 @@ function TopBar({
   href,
   mode,
   onMode,
+  account,
 }: {
   store: MerchantMe['store'] & object;
   status: ReturnType<typeof storeStatus>;
@@ -538,6 +551,8 @@ function TopBar({
   href: (link: string) => string;
   mode: WorkspaceMode;
   onMode: (next: WorkspaceMode) => void;
+  /** The account menu (lazy); null on a phone, where «More» holds it. */
+  account: ReactNode;
 }) {
   const { loc } = useLanguage();
   // Operate | Design (v2 §2.3). The three words are copied verbatim from
@@ -644,6 +659,7 @@ function TopBar({
           <span className="hidden lg:inline">{say(loc, W.viewStore)}</span>
         </a>
         {bell}
+        {account}
       </div>
     </header>
   );
@@ -698,101 +714,5 @@ function BottomTabs({ base, current, attention, onMore }: { base: string; curren
         {lit === 'more' && seam}
       </button>
     </nav>
-  );
-}
-
-// ------------------------------------------------------------------ palette
-
-function WorkspacePalette({
-  open,
-  onOpenChange,
-  base,
-  storeUrl,
-  canSell,
-  href,
-  recentKey,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  base: string;
-  storeUrl: string;
-  canSell: boolean;
-  href: (link: string) => string;
-  recentKey: string;
-}) {
-  const { loc, lang } = useLanguage();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResults | null>(null);
-  const [loading, setLoading] = useState(false);
-  const seq = useRef(0);
-
-  // One request per pause in typing; an answer to an older query is dropped.
-  useEffect(() => {
-    const q = query.trim();
-    if (!open || !searchable(q)) {
-      setLoading(false);
-      return;
-    }
-    const mine = ++seq.current;
-    setLoading(true);
-    const t = window.setTimeout(() => {
-      api
-        .get<{ success: true } & SearchResults>(`/api/merchant/search?q=${encodeURIComponent(q)}`)
-        .then((r) => {
-          if (mine === seq.current) setResults(r);
-        })
-        .catch(() => {
-          // The local destinations still answer; a failed search is not a dead palette.
-          if (mine === seq.current) setResults(null);
-        })
-        .finally(() => {
-          if (mine === seq.current) setLoading(false);
-        });
-    }, SEARCH_DEBOUNCE_MS);
-    return () => window.clearTimeout(t);
-  }, [query, open]);
-
-  const actions: QuickAction[] = [
-    ...(canSell
-      ? [
-          { id: 'new-product', label: say(loc, W.newProduct), href: href(merchantHref.newProduct()), icon: <Plus className="h-4 w-4" /> },
-          { id: 'new-coupon', label: say(loc, W.newCoupon), href: href(merchantHref.newCoupon()), icon: <Plus className="h-4 w-4" /> },
-          { id: 'new-collection', label: say(loc, W.newCollection), href: href(merchantHref.newCollection()), icon: <Plus className="h-4 w-4" /> },
-        ]
-      : []),
-    {
-      id: 'view-store',
-      label: say(loc, W.viewStore),
-      icon: <ExternalLink className="h-4 w-4" />,
-      onSelect: () => window.open(storeUrl, '_blank', 'noopener,noreferrer'),
-    },
-  ];
-
-  const groups = paletteGroups({
-    loc,
-    lang,
-    base,
-    query,
-    results,
-    actions,
-    money: (iqd) => formatMoney(iqd, lang),
-    href,
-    icon: (Icon) => <Icon className="h-4 w-4" />,
-  });
-
-  return (
-    <CommandPalette
-      open={open}
-      onOpenChange={(o) => {
-        onOpenChange(o);
-        if (!o) setQuery('');
-      }}
-      groups={groups}
-      recentKey={recentKey}
-      label={say(loc, W.search)}
-      placeholder={say(loc, W.searchPlaceholder)}
-      onQueryChange={setQuery}
-      loading={loading}
-    />
   );
 }

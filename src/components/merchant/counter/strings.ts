@@ -148,6 +148,9 @@ const STRINGS = {
       design: 'التصميم',
       // P5: the announcement door opens the lazy AnnouncementSheet (its words: announceStrings.ts).
       announce: 'إعلان',
+      // W0: the delivery settings, and the store's share panel (link + QR) in a window.
+      delivery: 'التوصيل',
+      share: 'شارك متجرك',
     },
     weekdays: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
   },
@@ -279,6 +282,8 @@ const STRINGS = {
       cover: 'Cover',
       design: 'Design',
       announce: 'Announcement',
+      delivery: 'Delivery',
+      share: 'Share your store',
     },
     weekdays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   },
@@ -410,6 +415,8 @@ const STRINGS = {
       cover: 'بەرگ',
       design: 'دیزاین',
       announce: 'ڕاگەیاندن',
+      delivery: 'گەیاندن',
+      share: 'هاوبەشکردنی فرۆشگا',
     },
     weekdays: ['یەکشەممە', 'دووشەممە', 'سێشەممە', 'چوارشەممە', 'پێنجشەممە', 'هەینی', 'شەممە'],
   },

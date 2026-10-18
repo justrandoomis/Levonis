@@ -216,7 +216,7 @@ export function VariantEditor({
                         </Field>
                       )}
                       <Field label={s.sku}>
-                        <Input ltr value={v.sku} maxLength={64} spellCheck={false} onChange={(e) => setVariant(key, { sku: e.target.value })} />
+                        <Input ltr value={v.sku} maxLength={64} spellCheck={false} autoCapitalize="off" autoCorrect="off" onChange={(e) => setVariant(key, { sku: e.target.value })} />
                       </Field>
                       {pictures.length > 0 && (
                         <Field label={s.variantImage}>

@@ -598,11 +598,14 @@ const WORKSPACE_CLOSURE_BUDGET = 32 * KB;
 const WORKSPACE_SCREENS = [
   'CommandCenter', 'SalesTabs', 'CatalogTabs', 'ProductsManager', 'PrintersTab', 'CostingTab', 'StoreSettingsTab',
   'StoreDesignPanel', 'MerchantFinance', 'DeliverySettingsEditor', 'MerchantInbox', 'AnalyticsSection', 'ReviewsSection',
-  'CustomersSection', 'RequestsSection', 'NotificationsSection', 'CommandPalette', 'MoreSheet',
+  // W0: the search is one lazy chunk — its model, its requests and the palette primitive.
+  'CustomersSection', 'RequestsSection', 'NotificationsSection', 'WorkspacePalette', 'MoreSheet',
   // W3-B: the orders address picks the list or the order's own screen, each lazy.
   'OrdersSection', 'OrderDetailScreen',
   // P3b: the orders list itself is a lazy chunk beside the order screen.
   'OrdersList',
+  // W0: language, account, help and sign-out — the frame carries only its slot.
+  'AccountMenu',
 ];
 
 test('the merchant workspace shell is small, stays out of every customer closure, and loads each screen lazily', () => {

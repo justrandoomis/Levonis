@@ -2,7 +2,9 @@
  * «المزيد» — on a phone, every destination the four bottom tabs do not open,
  * grouped as the sidebar groups them (the same nav table, ./nav.ts). A sheet
  * that drags from its handle only (ui/Sheet v2), so the list inside scrolls
- * freely. Its own chunk: only a phone ever opens it.
+ * freely. Its own chunk: only a phone ever opens it. At its foot, the
+ * account choices the top bar carries on a wider screen (./AccountMenu.tsx):
+ * language, account, help, sign out.
  */
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../../LanguageContext';
@@ -11,6 +13,7 @@ import type { MerchantSection } from '../../../lib/merchantRoutes';
 import { badgeCount, moreEntries, navGroups, sectionPath } from './nav';
 import { W, say } from './strings';
 import type { Attention } from './attention';
+import { AccountPanel } from './AccountMenu';
 
 export default function MoreSheet({
   open,
@@ -72,6 +75,7 @@ export default function MoreSheet({
           </div>
         ))}
       </nav>
+      <AccountPanel onDone={onClose} />
     </Sheet>
   );
 }

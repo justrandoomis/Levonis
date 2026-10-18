@@ -67,6 +67,24 @@ export function financeStrings(loc: Loc) {
     filterRefunds: loc('الاسترداد', 'Refunds'), // OWNER: Sorani to be written by hand.
     filterPayouts: loc('السحب', 'Payouts'), // OWNER: Sorani to be written by hand.
     filterLabel: loc('نوع الحركة', 'Entry type'), // OWNER: Sorani to be written by hand.
+    // The ledger's period (./ledgerPeriod.ts), in the words the app already
+    // uses for periods; the rest written per DECISIONS row 183.
+    periodLabel: loc('الفترة', 'Period', 'ماوە'),
+    periodAll: loc('كل الأوقات', 'All time', 'هەموو کاتێک'),
+    periodThisMonth: loc('هذا الشهر', 'This month', 'ئەم مانگە'),
+    periodLastMonth: loc('الشهر الماضي', 'Last month', 'مانگی پێشوو'),
+    periodCustom: loc('مدة مخصّصة', 'Custom range', 'ماوەی دیاریکراو'),
+    periodFrom: loc('من', 'From', 'لە'),
+    periodTo: loc('إلى', 'To', 'بۆ'),
+    periodShow: loc('عرض', 'Show', 'پیشاندان'),
+    periodIncomplete: loc('اختر تاريخي البداية والنهاية.', 'Choose a start and an end date.', 'ڕێکەوتی دەستپێک و کۆتایی هەڵبژێرە.'),
+    periodOrder: loc(
+      'يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له.',
+      'The start must be on or before the end.',
+      'ڕێکەوتی دەستپێک دەبێت پێش ڕێکەوتی کۆتایی بێت یان هەمان ڕۆژ بێت.'
+    ),
+    periodBaghdad: loc('الأيام بتوقيت بغداد.', 'Days are Baghdad days.', 'ڕۆژەکان بە کاتی بەغدان.'),
+    ledgerEmptyPeriod: loc('لا حركات في هذه الفترة.', 'No entries in this period.', 'لەم ماوەیەدا هیچ تۆمارێک نییە.'),
     carried: loc('منقول من السجل القديم', 'Carried from the old ledger'), // OWNER: Sorani to be written by hand.
     orderRef: (id: string) => loc(`الطلب ${id}`, `Order ${id}`), // OWNER: Sorani to be written by hand.
     customRef: (id: string) => loc(`طلب مخصص ${id}`, `Custom order ${id}`), // OWNER: Sorani to be written by hand.

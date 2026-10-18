@@ -133,7 +133,11 @@ export function catalogStrings(loc: Loc) {
       'يُحذف ما لم يُطلب قط. ما له طلبات سابقة لا يُحذف — أرشفه بدلًا من ذلك.',
       'Products nobody ever ordered are deleted. Products with past orders are not — archive those instead.'
     ), // OWNER: Sorani to be written by hand.
-    bulkDone: (done: number, total: number) => loc(`تم على ${done} من ${total}.`, `Done for ${done} of ${total}.`), // OWNER: Sorani to be written by hand.
+    bulkDone: (done: number, total: number) => loc(`تم على ${done} من ${total}.`, `Done for ${done} of ${total}.`, `بۆ ${done} لە ${total} ئەنجامدرا.`),
+    // «تراجع» after a bulk action whose inverse is exact (./bulkUndo.ts); Sorani per DECISIONS row 183.
+    undo: loc('تراجع', 'Undo', 'پاشگەزبوونەوە'),
+    undone: loc('أُعيدت كما كانت.', 'Put back as it was.', 'وەک خۆی گەڕێنرایەوە.'),
+    undoFailed: loc('تعذّر التراجع — راجع المنتجات.', 'Could not undo — check the products.', 'نەگەڕێنرایەوە — بەرهەمەکان بپشکنە.'),
     apply: loc('تطبيق', 'Apply'), // OWNER: Sorani to be written by hand.
     cancel: loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە'),
     chooseCollection: loc('اختر المجموعة', 'Choose a collection'), // OWNER: Sorani to be written by hand.

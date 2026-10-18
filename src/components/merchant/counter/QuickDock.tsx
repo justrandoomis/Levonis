@@ -1,7 +1,9 @@
 /**
- * THE DOCK — the four doors a shop owner opens every day (merchant platform
- * v2 §3.2 «افعل الآن»): a new product, a reel, the cover, the design. A row
- * of chips that scrolls on a phone and sits in the side column on a desk.
+ * THE DOCK — the doors a shop owner opens every day (merchant platform v2
+ * §3.2 «افعل الآن»): a new product, a reel, an announcement, the cover, the
+ * design, the delivery settings, and sharing the store (its link and QR, in
+ * the same window the storefront's owner menu opens). A row of chips that
+ * scrolls on a phone and sits in the side column on a desk.
  *
  * The reel door is Levo Community's composer, so it appears only when GET
  * /api/community/access says this person may enter (rule 13 of the community
@@ -9,7 +11,7 @@
  * a failed or slow answer simply means no reel door this visit.
  */
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Clapperboard, Image, Megaphone, Palette, Plus } from 'lucide-react';
+import { Clapperboard, Image, Megaphone, Palette, Plus, Share2, Truck } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { merchantHref } from '../../../lib/merchantRoutes';
 import { Door } from './PulseRow';
@@ -24,11 +26,14 @@ export const REEL_COMPOSER_PATH = '/community/projects/new';
  * chunk: Today downloads it only when the door is pressed.
  */
 const AnnouncementSheet = lazy(() => import('./AnnouncementSheet'));
+/** «شارك متجرك»: the share window (link, QR, the share sheet), lazy — the QR encoder included. */
+const ShareStoreSheet = lazy(() => import('../share/ShareStoreSheet'));
 
 export default function QuickDock() {
   const s = useCounterStrings();
   const [reel, setReel] = useState(false);
   const [announcing, setAnnouncing] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -51,6 +56,8 @@ export default function QuickDock() {
     { id: 'announce', open: () => setAnnouncing(true), icon: Megaphone, label: s.dock.announce },
     { id: 'cover', to: merchantHref.storeSettings(), icon: Image, label: s.dock.cover },
     { id: 'design', to: merchantHref.storeDesign(), icon: Palette, label: s.dock.design },
+    { id: 'delivery', to: merchantHref.storeDelivery(), icon: Truck, label: s.dock.delivery },
+    { id: 'share', open: () => setSharing(true), icon: Share2, label: s.dock.share },
   ];
 
   return (
@@ -61,8 +68,8 @@ export default function QuickDock() {
       {/* Edge to edge on a phone only (the row scrolls under the 16 px gutter);
           from `sm` up it is a row inside its column — `bleed-x` is the viewport
           bleed and would cross the side column on a desk. In the 340 px side
-          column at `lg` the four doors WRAP: a hidden scrollbar there left the
-          fourth door clipped with no way to reach it by mouse (§3.2). */}
+          column at `lg` the doors WRAP: a hidden scrollbar there left the
+          last door clipped with no way to reach it by mouse (§3.2). */}
       <nav aria-label={s.dock.title} data-quick-dock className="-mx-4 -my-2 flex gap-2 overflow-x-auto px-4 py-2 hide-scrollbar sm:mx-0 sm:px-0 lg:flex-wrap lg:overflow-visible">
         {doors.map((d) => {
           const Icon = d.icon;
@@ -85,6 +92,11 @@ export default function QuickDock() {
       {announcing && (
         <Suspense fallback={null}>
           <AnnouncementSheet open onClose={() => setAnnouncing(false)} />
+        </Suspense>
+      )}
+      {sharing && (
+        <Suspense fallback={null}>
+          <ShareStoreSheet open onClose={() => setSharing(false)} kit={null} />
         </Suspense>
       )}
     </section>

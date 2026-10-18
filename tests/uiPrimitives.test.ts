@@ -240,7 +240,13 @@ test('DataList mounts ONE layout, a real table when wide, and a failure is never
   assert.match(d, /if \(view === 'error'\) return <ErrorState error=\{error\} onRetry=\{onRetry\}/);
   assert.match(d, /view === 'stale' && <ErrorState/);
   assert.match(d, /new ResizeObserver\(measure\)/, 'the CONTAINER decides, not the viewport');
-  assert.doesNotMatch(d, /<tr[^>]*onClick/, 'rows open by a link, never by a clickable <tr>');
+  // Rows open by their title LINK. A tap elsewhere on the row is passed on to
+  // that link (rowTapLink), but the row never becomes a control of its own:
+  // no role, no tab stop, no keyboard handler — the link is the one way in.
+  assert.doesNotMatch(d, /<(tr|li)\b[^>]*(role=|tabIndex|onKeyDown)/, 'a row is never a control of its own');
+  assert.match(d, /<Link to=\{href\} data-row-link /, 'the title link is the one the tap is passed to');
+  assert.match(d, /const link = rowTapLink<Element>\(\{/);
+  assert.match(d, /new MouseEvent\('click', \{ bubbles: true, cancelable: true, ctrlKey: e\.ctrlKey, metaKey: e\.metaKey, shiftKey: e\.shiftKey, altKey: e\.altKey \}\)/, 'Ctrl/⌘ still opens a new tab');
   assert.match(d, /indeterminate=\{chosen\.length > 0 && !allChosen\}/);
   assert.match(d, /className="sr-only" aria-live="polite"/, 'the selection count is announced');
 });
@@ -359,6 +365,10 @@ test('NO SORANI WAS INVENTED: every ckb string already existed, or the Arabic st
     return out;
   };
   const mine = new Set([...TOUCHED, ...NEW_LIB]);
+  // DECISIONS row 183 (a Sorani slot never carries the Arabic): the selection
+  // words DataList showed in Arabic to a Sorani reader, written in the app's
+  // own vocabulary («هەڵبژاردن», «هەڵبژێردراو»).
+  const WRITTEN_UNDER_ROW_183 = new Set(['هەڵبژاردنی ${nameOf(row)}', 'هەمووی هەڵبژێرە', '${chosen.length} هەڵبژێردراو']);
   const corpus = walk('src')
     .filter((f) => !mine.has(f))
     .map((f) => read(f))
@@ -367,10 +377,13 @@ test('NO SORANI WAS INVENTED: every ckb string already existed, or the Arabic st
   for (const f of [...TOUCHED, ...NEW_LIB]) {
     const raw = read(f);
     const src = blankComments(raw);
-    // loc(ar, en, ckb): the Sorani must exist, hand-written, somewhere else.
+    // loc(ar, en, ckb): the Sorani must exist, hand-written, somewhere else —
+    // or be one of the phrases written under DECISIONS row 183 (listed
+    // above) — and is never the Arabic.
     for (const m of src.matchAll(new RegExp(`loc\\(\\s*${q}\\s*,\\s*${q}\\s*,\\s*${q}\\s*\\)`, 'g'))) {
       const ckb = m[6];
-      assert.ok(corpus.includes(ckb), `${f}: «${ckb}» is Sorani nobody wrote before`);
+      assert.notEqual(ckb, m[2], `${f}: the Sorani slot carries the Arabic «${ckb}»`);
+      assert.ok(corpus.includes(ckb) || WRITTEN_UNDER_ROW_183.has(ckb), `${f}: «${ckb}» is Sorani nobody wrote before`);
     }
     // loc(ar, en): the Arabic stands in, and the file says so right there.
     const lines = src.split('\n');

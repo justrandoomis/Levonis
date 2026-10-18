@@ -1,6 +1,9 @@
 /**
  * THE LEDGER, LINE BY LINE — every line that makes up the figures above,
- * newest first, filterable by kind, paged by the server's cursor. Each line
+ * newest first, filterable by kind and by period (this month, last month, or
+ * two days the merchant picks — Baghdad days, ./ledgerPeriod.ts — so the cash
+ * a courier brought can be reconciled against the payouts of the same days),
+ * paged by the server's cursor. Each line
  * says which figure it moved (its bucket) and opens what it belongs to: the
  * order, the custom-orders screen, or the payout request.
  *
@@ -14,9 +17,11 @@ import { Money } from '../../ui/Money';
 import { Button } from '../../ui/Button';
 import { Segmented } from '../../ui/Segmented';
 import { ErrorState } from '../../ui/AsyncStates';
+import { Field, Input } from '../../ui/Field';
 import { ListRowsSkeleton } from '../../ui/DashboardSkeletons';
 import { financeApi, type LedgerEntry } from './financeApi';
 import { bucketLabel, financeStrings, kindLabel, LEDGER_FILTERS } from './strings';
+import { baghdadToday, ledgerRange, LEDGER_PERIODS, type LedgerPeriod, type LedgerRange } from './ledgerPeriod';
 
 export default function FinanceLedger({
   version,
@@ -38,20 +43,28 @@ export default function FinanceLedger({
   const [error, setError] = useState<unknown>(null);
   const [more, setMore] = useState<'idle' | 'loading' | 'error'>('idle');
   const seq = useRef(0);
+  const [period, setPeriod] = useState<LedgerPeriod>('all');
+  /** The custom days being typed, and the ones last shown. */
+  const [draft, setDraft] = useState<LedgerRange>({ from: '', to: '' });
+  const [custom, setCustom] = useState<LedgerRange>({ from: '', to: '' });
+  const [rangeError, setRangeError] = useState('');
 
   const kind = LEDGER_FILTERS.find((f) => f.id === filter)?.kind ?? '';
+  const answer = ledgerRange(period, Date.now(), custom);
+  const from = answer.ok ? answer.range.from : '';
+  const to = answer.ok ? answer.range.to : '';
   const first = useCallback(() => {
     const mine = ++seq.current;
     setError(null);
     financeApi
-      .ledger({ kind })
+      .ledger({ kind, from, to })
       .then((d) => {
         if (mine !== seq.current) return;
         setEntries(d.entries);
         setCursor(d.next_cursor);
       })
       .catch((e) => mine === seq.current && setError(e));
-  }, [kind]);
+  }, [kind, from, to]);
   useEffect(() => {
     setEntries(null);
     first();
@@ -61,13 +74,42 @@ export default function FinanceLedger({
     if (!cursor) return;
     setMore('loading');
     financeApi
-      .ledger({ kind, cursor })
+      .ledger({ kind, from, to, cursor })
       .then((d) => {
         setEntries((was) => [...(was ?? []), ...d.entries]);
         setCursor(d.next_cursor);
         setMore('idle');
       })
       .catch(() => setMore('error'));
+  };
+
+  const choosePeriod = (id: string) => {
+    const next = id as LedgerPeriod;
+    setRangeError('');
+    // Custom opens on this month so far, already shown, so the list always
+    // matches the controls above it; the days are then changed and shown.
+    if (next === 'custom' && !custom.from) {
+      const today = baghdadToday();
+      const start = { from: `${today.slice(0, 7)}-01`, to: today };
+      setDraft(start);
+      setCustom(start);
+    }
+    setPeriod(next);
+  };
+  const applyCustom = () => {
+    const a = ledgerRange('custom', Date.now(), draft);
+    if (a.ok === false) {
+      setRangeError(a.reason === 'order' ? s.periodOrder : s.periodIncomplete);
+      return;
+    }
+    setRangeError('');
+    setCustom({ ...draft });
+  };
+  const periodLabels: Record<LedgerPeriod, string> = {
+    all: s.periodAll,
+    this_month: s.periodThisMonth,
+    last_month: s.periodLastMonth,
+    custom: s.periodCustom,
   };
 
   const date = (iso: string) =>
@@ -94,12 +136,47 @@ export default function FinanceLedger({
           className="min-w-[340px]"
         />
       </div>
+      <div className="px-4 pb-3 overflow-x-auto hide-scrollbar">
+        <Segmented
+          items={LEDGER_PERIODS.map((id) => ({ id, label: periodLabels[id] }))}
+          value={period}
+          onChange={choosePeriod}
+          label={s.periodLabel}
+          group="finance-ledger-period"
+          size="sm"
+          className="min-w-[340px]"
+          dataAttr="data-ledger-period"
+        />
+      </div>
+      {period === 'custom' && (
+        <form
+          className="grid grid-cols-2 items-end gap-2 px-4 pb-3 sm:flex sm:flex-wrap sm:gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            applyCustom();
+          }}
+          data-ledger-custom
+        >
+          <Field label={s.periodFrom} className="min-w-0 sm:w-[160px]">
+            <Input ltr type="date" value={draft.from} max={baghdadToday()} onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))} />
+          </Field>
+          <Field label={s.periodTo} className="min-w-0 sm:w-[160px]">
+            <Input ltr type="date" value={draft.to} max={baghdadToday()} onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))} />
+          </Field>
+          <Button type="submit" variant="secondary" className="col-span-2 sm:col-span-1">
+            {s.periodShow}
+          </Button>
+          <p className={`col-span-2 w-full text-[12px] ${rangeError ? 'lv-field-error' : 'text-text-muted'}`} role={rangeError ? 'alert' : undefined}>
+            {rangeError || s.periodBaghdad}
+          </p>
+        </form>
+      )}
       {error && !entries ? (
         <ErrorState error={error} onRetry={first} compact />
       ) : !entries ? (
         <div className="px-4 pb-4"><ListRowsSkeleton rows={4} thumbnail={false} /></div>
       ) : entries.length === 0 ? (
-        <p className="px-4 pb-4 text-[13px] text-text-muted">{s.ledgerEmpty}</p>
+        <p className="px-4 pb-4 text-[13px] text-text-muted">{from || to ? s.ledgerEmptyPeriod : s.ledgerEmpty}</p>
       ) : (
         <>
           <ul className="divide-y divide-white/[0.06]" data-finance-ledger>
