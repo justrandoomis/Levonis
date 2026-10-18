@@ -9,12 +9,32 @@
  *   1,450,500 (بعد خصم $35.00)», each figure labelled by its channel (a
  *   pre-order-only SKU names its route), and the owner's reasons under it
  *   (`lineNotes`, row 247);
- *   «حدّد» ticks it for «طبّق على الألوان المحددة» (ColourBulkBar).
+ *   «حدّد» ticks it for «طبّق على الألوان المحددة» (ColourBulkBar);
+ *   «التكلفة [تتبع الموديل | تكلفة مختلفة]» — the owner's, in both methods
+ *   (DECISIONS row 254): the colour's own supplier price in its own currency
+ *   (Iraqi dinars too), which replaces the model's and the product's on every
+ *   model in this colour (the chain SKU → colour → model → product). From cost
+ *   the colour's prices are computed from it; price-first it moves no price.
+ *   Its weight and box are the colour's packaged dimensions, never fields here.
  * The default is «كل الألوان بسعر واحد»: colours follow their model.
  */
-import { FOLLOW_COLOUR, colourLines, firstPreorder, iqdText, nameIn, preorderOffOf, usdText, type ColourDraft, type V2TableRow } from './v2Model';
+import {
+  COST_CURRENCIES,
+  FOLLOW_COLOUR,
+  colourLines,
+  firstPreorder,
+  iqdText,
+  nameIn,
+  preorderOffOf,
+  unreadableAmount,
+  usdText,
+  type ColourDraft,
+  type CostCurrency,
+  type V2TableRow,
+} from './v2Model';
 import { useV2 } from './useV2Pricing';
-import { Select } from '../formUi';
+import { Select, TextInput } from '../formUi';
+import { currencyLabel } from './CostCard';
 import { lineNotes } from './ResultBar';
 import { channelName, Chip, UsdInput, useV2Lang, useV2Strings, V2Field } from './v2Ui';
 
@@ -77,6 +97,13 @@ export default function ColourPriceSelector({ id, table }: { id: string; table: 
   }
   const set = (patch: Partial<ColourDraft>) => v2.setDraft((x) => ({ ...x, colours: { ...x.colours, [id]: { ...(x.colours[id] ?? FOLLOW_COLOUR), ...patch } } }));
   const selected = v2.selectedColours.has(id);
+  // Row 254: the colour's own cost — the owner's alone, in both methods.
+  const ownCost = owner && c.cost === 'own';
+  const followCost = (): Partial<ColourDraft> => ({ cost: 'follow', supplier_amount: '', supplier_currency: '' });
+  const productCost = d.cost.supplier_amount ? `${d.cost.supplier_amount} ${d.cost.supplier_currency || ''}`.trim() : null;
+  const amountCurrency = c.supplier_currency || d.cost.supplier_currency;
+  const unreadable = unreadableAmount(c.supplier_amount, amountCurrency);
+  const currencyMissing = !c.supplier_currency && !d.cost.supplier_currency && c.supplier_amount.trim() !== '';
   return (
     <div className="mt-2 border-t border-border-subtle pt-2 min-w-0 grid gap-2" data-v2-colour={id}>
       <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
@@ -100,14 +127,62 @@ export default function ColourPriceSelector({ id, table }: { id: string; table: 
           {s.selectColour}
         </label>
       </div>
+      {owner ? (
+        <V2Field label={s.costLabel} hint={ownCost ? (d.method === 'cost' ? s.colourCostHint : s.colourCostPriceFirstHint) : undefined}>
+          {(fid) => (
+            <Select id={fid} value={c.cost} onChange={(e) => set(e.target.value === 'own' ? { cost: 'own' } : followCost())} data-v2-field={`colour-cost:${id}`}>
+              <option value="follow">{s.costFollowsModel}</option>
+              <option value="own">{s.ownCost}</option>
+            </Select>
+          )}
+        </V2Field>
+      ) : null}
+      {ownCost ? (
+        <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
+          <V2Field label={s.supplier} hint={unreadable ? s.amountUnreadable : amountCurrency === 'IQD' ? s.iqdHint : productCost ? s.inheritedProduct(productCost) : undefined}>
+            {(fid) => (
+              <TextInput
+                id={fid}
+                inputMode="decimal"
+                value={c.supplier_amount}
+                placeholder={productCost ?? undefined}
+                aria-invalid={unreadable || undefined}
+                onChange={(e) => set({ supplier_amount: e.target.value.replace(/[^\d.٠-٩٫]/g, '') })}
+                data-v2-field={`colour-supplier:${id}`}
+              />
+            )}
+          </V2Field>
+          <V2Field label={s.supplierCurrency} hint={currencyMissing ? s.currencyRequired : undefined}>
+            {(fid) => (
+              <Select id={fid} value={c.supplier_currency} onChange={(e) => set({ supplier_currency: e.target.value as CostCurrency | '' })} data-v2-field={`colour-currency:${id}`}>
+                {/* Empty: the product's currency, named by the request beside an amount (as a model's). */}
+                <option value="">{d.cost.supplier_currency ? `${s.followsProduct}: ${d.cost.supplier_currency}` : s.currencyChoose}</option>
+                {COST_CURRENCIES.map((x) => (
+                  <option key={x} value={x}>
+                    {currencyLabel(x, s.iqdName)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </V2Field>
+        </div>
+      ) : null}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         {result}
-        {c.price === 'delta' ? (
-          <span className="flex items-center gap-2">
+        {c.price === 'delta' || ownCost ? (
+          <span className="flex flex-wrap items-center gap-2">
             <Chip tone="info" data="exception">{s.exception}</Chip>
-            <button type="button" className="inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary" onClick={() => set({ ...FOLLOW_COLOUR })} data-v2-inherit={id}>
-              {s.backToInherited}
-            </button>
+            {/* One reset per choice: the price and the cost are two decisions (row 254). */}
+            {c.price === 'delta' ? (
+              <button type="button" className="inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary" onClick={() => set({ price: 'follow', usd: '' })} data-v2-inherit={id}>
+                {s.backToInherited}
+              </button>
+            ) : null}
+            {ownCost ? (
+              <button type="button" className="inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary" onClick={() => set(followCost())} data-v2-inherit-cost={id}>
+                {s.resetCost}
+              </button>
+            ) : null}
           </span>
         ) : null}
       </div>
@@ -128,8 +203,9 @@ export function ColourBulkBar({ colourIds }: { colourIds: readonly string[] }) {
   const ticked = colourIds.filter((id) => v2.selectedColours.has(id));
   const anyOwn = colourIds.some((id) => (draft.colours[id] ?? FOLLOW_COLOUR).price === 'delta');
   const first = ticked.length ? (draft.colours[ticked[0]!] ?? FOLLOW_COLOUR) : FOLLOW_COLOUR;
+  // The price only: each colour keeps its own cost (row 254).
   const apply = (usd: string) =>
-    v2.setDraft((x) => ({ ...x, colours: { ...x.colours, ...Object.fromEntries(ticked.map((id) => [id, { price: 'delta' as const, usd }])) } }));
+    v2.setDraft((x) => ({ ...x, colours: { ...x.colours, ...Object.fromEntries(ticked.map((id) => [id, { ...(x.colours[id] ?? FOLLOW_COLOUR), price: 'delta' as const, usd }])) } }));
   return (
     <div className="lv-well mb-2 grid min-w-0 gap-2 rounded-lg p-2.5" data-v2-colour-bulk>
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
@@ -139,7 +215,7 @@ export function ColourBulkBar({ colourIds }: { colourIds: readonly string[] }) {
             type="button"
             className="inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary"
             onClick={() => {
-              v2.setDraft((x) => ({ ...x, colours: Object.fromEntries(colourIds.map((id) => [id, { ...FOLLOW_COLOUR }])) }));
+              v2.setDraft((x) => ({ ...x, colours: Object.fromEntries(colourIds.map((id) => [id, { ...(x.colours[id] ?? FOLLOW_COLOUR), price: 'follow' as const, usd: '' }])) }));
               v2.clearColours();
             }}
             data-v2-colours-follow

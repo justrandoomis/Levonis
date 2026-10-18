@@ -27,6 +27,7 @@ import { legacyProductId } from './fixtures/legacyCatalogue';
 import { pricingWorld, AMS } from './fixtures/procurementPricing';
 import { cartGrid, v2App, writeV2 } from './fixtures/pricingV2';
 import {
+  FOLLOW_COLOUR,
   FOLLOW_MODEL,
   dollarsOf,
   draftOf,
@@ -115,7 +116,7 @@ test('add-product (owner, price-first): the form’s draft is previewed under it
     product_usd: '100',
     discount_usd: '10',
     models: { [`${id}_pro`]: { ...FOLLOW_MODEL, price: 'fixed', usd: '150' } },
-    colours: { [`${id}_red`]: { price: 'delta', usd: '5' } },
+    colours: { [`${id}_red`]: { ...FOLLOW_COLOUR, price: 'delta', usd: '5' } },
   };
   const wire = draftWire(base, draft, { points: [], discounts: [] }, live, { needsMethod: true, cost: true, money: true });
   assert.equal(wire.method, 'usd');

@@ -4,7 +4,9 @@
  *
  * The OWNER's card, mounted for the owner alone (the server sends no cost to
  * anyone else, and refuses any cost field from them by name):
- *   - the supplier price in its currency;
+ *   - the supplier price in its currency — Iraqi dinars too (DECISIONS row 254):
+ *     whole dinars, converted to dollars ONCE at the save at the official rate
+ *     (`supplier_cost_iqd`), and read back as the dinars typed;
  *   - «مسار شحن المخزون» (how the stock arrives; it moves the direct price only
  *     through the replacement cost R);
  *   - the weight AND the box, always both shown (P4/P15), «مأخوذ من الأبعاد
@@ -19,7 +21,7 @@
 import { useEffect, useState } from 'react';
 import { PRICING_PROFILE_LABELS } from '../../../../../packages/contracts/src/pricingFieldLabels';
 import { Money, Select, TextInput } from '../formUi';
-import { cleanUsdAmount, STOCK_ROUTES, SUPPLIER_CURRENCIES, iqdText, type CostDraft, type StockRoute, type SupplierCurrency } from './v2Model';
+import { COST_CURRENCIES, STOCK_ROUTES, iqdText, unreadableAmount, type CostCurrency, type CostDraft, type StockRoute } from './v2Model';
 import { useV2Lang, useV2Strings, V2Field } from './v2Ui';
 
 /** A number typed in one unit and stored in another (kg → g, cm → mm): the text stays as typed while it is typed. */
@@ -65,6 +67,9 @@ export function UnitInput({ id, stored, factor, decimals, onChange, label, data,
 }
 
 /** A box from its three typed axes: all three set, or none at all (a partial box is never sent). */
+/** A currency as the cost choices show it: its code, and the dinar named («IQD · دينار عراقي»). */
+export const currencyLabel = (c: CostCurrency, iqdName: string): string => (c === 'IQD' ? `IQD · ${iqdName}` : c);
+
 export function boxOf(axes: ReadonlyArray<number | null>): [number, number, number] | null {
   return axes.length === 3 && axes.every((x) => x !== null) ? (axes as [number, number, number]) : null;
 }
@@ -129,7 +134,7 @@ export default function CostCard({
     setBoxDraft(next);
     onChange({ box: boxOf(next) });
   };
-  const invalidAmount = cost.supplier_amount.trim() !== '' && cleanUsdAmount(cost.supplier_amount) === null;
+  const invalidAmount = unreadableAmount(cost.supplier_amount, cost.supplier_currency);
   return (
     <section className="lv-well min-w-0 rounded-lg p-3" data-v2-card="cost" aria-label={optional ? s.costOptional : s.costOwnerOnly}>
       <button
@@ -158,8 +163,8 @@ export default function CostCard({
       </button>
       {shown ? (
         <div className="mt-3 grid min-w-0 gap-3">
-          <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)_6.5rem]">
-            <V2Field label={s.supplier}>
+          <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)_minmax(0,9.5rem)]">
+            <V2Field label={s.supplier} hint={invalidAmount ? s.amountUnreadable : cost.supplier_currency === 'IQD' ? s.iqdHint : undefined}>
               {(id) => (
                 <TextInput
                   id={id}
@@ -174,11 +179,11 @@ export default function CostCard({
             </V2Field>
             <V2Field label={s.supplierCurrency}>
               {(id) => (
-                <Select id={id} value={cost.supplier_currency} onChange={(e) => onChange({ supplier_currency: e.target.value as SupplierCurrency | '' })} data-v2-field="currency">
+                <Select id={id} value={cost.supplier_currency} onChange={(e) => onChange({ supplier_currency: e.target.value as CostCurrency | '' })} data-v2-field="currency">
                   <option value="">—</option>
-                  {SUPPLIER_CURRENCIES.map((c) => (
+                  {COST_CURRENCIES.map((c) => (
                     <option key={c} value={c}>
-                      {c}
+                      {currencyLabel(c, s.iqdName)}
                     </option>
                   ))}
                 </Select>

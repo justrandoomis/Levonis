@@ -3,7 +3,9 @@
  * 2026-10-17, DECISIONS row 247; docs/PRICING-V2.md §2.5).
  *
  *   - «تكلفة مختلفة» carries a minimum profit «يتبع المنتج: $X | استثناء»,
- *     inside the own-cost panel only, cleared by «رجوع للموروث»;
+ *     inside the own-cost panel only, cleared by «التكلفة: رجوع للموروث»;
+ *   - the cost is a choice of its own beside the price, the owner's on every
+ *     model and colour card in both methods, its currency IQD too (row 254);
  *   - its weight and box are the option's «أبعاد الخيار» — the inputs write
  *     through the option's dimensions patcher, never a second copy;
  *   - the result lines show the discount taken and the owner's reasons
@@ -19,15 +21,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { followPrice } from '../src/components/adminProducts/form/v2/ModelPriceSelector';
+import { followCost, followPrice } from '../src/components/adminProducts/form/v2/ModelPriceSelector';
 import { V2_STRINGS, type V2Strings } from '../src/components/adminProducts/form/v2/v2Strings';
 
 const src = (p: string) => readFileSync(join(import.meta.dirname, '..', p), 'utf8');
 const v2 = (f: string) => src(`src/components/adminProducts/form/v2/${f}.tsx`);
 
-test('«تكلفة مختلفة» has its own minimum profit — in the own-cost panel only — and «رجوع للموروث» clears it', () => {
+test('«تكلفة مختلفة» has its own minimum profit — in the own-cost panel only — and «التكلفة: رجوع للموروث» clears it', () => {
   const m = v2('ModelPriceSelector');
-  const panel = m.slice(m.indexOf("{price === 'own_cost' ? ("), m.indexOf('{isModel ? (', m.indexOf("{price === 'own_cost' ? (")));
+  const panel = m.slice(m.indexOf('{ownCost ? ('), m.indexOf('{isModel ? (', m.indexOf('{ownCost ? (')));
   assert.ok(panel.length > 0);
   for (const field of ['`model-profit:${id}`', '`model-profit-usd:${id}`']) {
     assert.ok(panel.includes(field), `${field} in the own-cost panel`);
@@ -36,10 +38,42 @@ test('«تكلفة مختلفة» has its own minimum profit — in the own-cost
   // The inherited product value is visible beside the exception (§2.1 rule 2).
   assert.match(panel, /\$\{s\.followsProduct\}: \$\{productT\}/);
   assert.match(panel, /s\.inheritedProduct\(productT\)/);
-  const reset = followPrice();
+  const reset = followCost();
+  assert.equal(reset.cost, 'follow');
   assert.equal(reset.profit, 'follow');
   assert.equal(reset.profit_usd, '');
   assert.equal(reset.supplier_amount, '');
+  // The price and the cost are two decisions (row 254): the price's reset leaves the cost as it is.
+  assert.deepEqual(followPrice(), { price: 'follow', usd: '' });
+});
+
+test('row 254: the cost is its own choice — the owner’s, on every model and colour card, in both methods, IQD offered', () => {
+  const m = v2('ModelPriceSelector');
+  // No «تكلفة مختلفة» among the price modes any more, and no cost-first-only gate.
+  assert.doesNotMatch(m, /own_cost/);
+  assert.match(m, /const costChoice = owner && isModel;/);
+  assert.match(m, /data-v2-field=\{`model-cost:\$\{id\}`\}/);
+  assert.match(m, /<option value="follow">\{s\.costFollowsProduct\}<\/option>/);
+  assert.match(m, /COST_CURRENCIES\.map/);
+  // The hint states what the engine does with the cost in each method and price mode.
+  assert.match(m, /!costFirst \? s\.ownCostPriceFirstHint : price === 'delta' \? s\.ownCostDeltaHint : price === 'fixed' \? s\.ownCostFixedHint : s\.ownCostFollowHint/);
+  // The model's final price edits its minimum profit only where the price follows that cost.
+  assert.match(m, /costFirst && price === 'follow' && m\.profit === 'exception' \? <FinalPriceField/);
+  const c = v2('ColourPriceSelector');
+  // The colour's cost: the owner's alone (never shown to a price editor), amount and currency only.
+  assert.match(c, /const ownCost = owner && c\.cost === 'own';/);
+  assert.match(c, /\{owner \? \(\n\s+<V2Field label=\{s\.costLabel\}/);
+  assert.match(c, /<option value="follow">\{s\.costFollowsModel\}<\/option>/);
+  assert.match(c, /data-v2-field=\{`colour-supplier:\$\{id\}`\}/);
+  assert.match(c, /data-v2-field=\{`colour-currency:\$\{id\}`\}/);
+  assert.doesNotMatch(c, /colour-weight|colour-box/);
+  // A price change (one colour, the ticked ones, or all back) keeps each colour's own cost.
+  assert.doesNotMatch(c, /\{ \.\.\.FOLLOW_COLOUR \}/);
+  assert.match(c, /\.\.\.\(x\.colours\[id\] \?\? FOLLOW_COLOUR\), price: 'delta' as const, usd/);
+  // The base cost card offers dinars too.
+  const card = v2('CostCard');
+  assert.match(card, /COST_CURRENCIES\.map/);
+  assert.match(card, /currencyLabel\(c, s\.iqdName\)/);
 });
 
 test('the own-cost weight and box ARE the option dimensions: written through measure.onDims, never a copy in the draft', () => {
@@ -79,7 +113,7 @@ test('the model card shows the discount taken, the shelf, the owner’s reasons 
   assert.match(m, /pre\.blocked \?/);
   assert.match(m, /s\.noPriceYet/);
   assert.match(m, /s\.sourceStock\(/);
-  assert.match(m, /shelf && m\.price === 'own_cost' \?/);
+  assert.match(m, /shelf && m\.cost === 'own' \?/);
   assert.match(m, /s\.shelfOwnCostNote/);
   // One live region (section ٣'s), not one per model card.
   assert.doesNotMatch(m, /aria-live/);
@@ -100,9 +134,29 @@ test('the colour card labels every figure by its channel — never an unlabelled
   assert.match(c, /s\.noPriceYet/);
 });
 
-test('the five new words in ar, en and ckb — ckb never the Arabic, with a Sorani letter', () => {
+test('the new words in ar, en and ckb — ckb never the Arabic, with a Sorani letter', () => {
   const sample = (v: V2Strings[keyof V2Strings]) => (typeof v === 'function' ? (v as (a: string) => string)('X') : v);
-  for (const k of ['optionMeasureFrom', 'inheritsProductMeasure', 'savedPricingOnly', 'preorderAfterOff', 'shelfOwnCostNote'] as const) {
+  for (const k of [
+    'optionMeasureFrom',
+    'inheritsProductMeasure',
+    'savedPricingOnly',
+    'preorderAfterOff',
+    'shelfOwnCostNote',
+    // Row 254.
+    'costLabel',
+    'costFollowsProduct',
+    'costFollowsModel',
+    'iqdName',
+    'iqdHint',
+    'amountUnreadable',
+    'ownCostFollowHint',
+    'ownCostDeltaHint',
+    'ownCostFixedHint',
+    'ownCostPriceFirstHint',
+    'colourCostHint',
+    'colourCostPriceFirstHint',
+    'resetCost',
+  ] as const) {
     for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(sample(V2_STRINGS[lang][k]).trim().length > 0, `${lang}.${k}`);
     assert.notEqual(sample(V2_STRINGS.ckb[k]), sample(V2_STRINGS.ar[k]), k);
     assert.match(sample(V2_STRINGS.ckb[k]), /[ڕڵێۆە]/, k);

@@ -57,12 +57,20 @@ export type V2Channel = 'direct_sale' | 'pre_order_land' | 'pre_order_sea' | 'pr
 export type V2Floor = 'none' | 'discount_withdrawn' | 'direct_min_profit';
 export type StockRoute = 'GERMANY_LAND' | 'CHINA_AIR' | 'CHINA_SEA';
 export type SupplierCurrency = 'USD' | 'EUR' | 'CNY';
+/**
+ * A cost's currency as the owner types it (DECISIONS row 254): a supplier currency, or Iraqi dinars — whole
+ * dinars the server converts ONCE at the official rate (`supplier_cost_iqd`, stored IQD_CONVERTED). Another
+ * currency needs its own rate source first (the FX tables know USD, EUR and CNY only).
+ */
+export type CostCurrency = SupplierCurrency | 'IQD';
 export type V2Lang = 'ar' | 'en' | 'ckb';
 
 /** The order channels are shown in, everywhere. */
 export const V2_CHANNELS: readonly V2Channel[] = ['direct_sale', 'pre_order_land', 'pre_order_sea', 'pre_order_air'];
 export const STOCK_ROUTES: readonly StockRoute[] = ['GERMANY_LAND', 'CHINA_SEA', 'CHINA_AIR'];
 export const SUPPLIER_CURRENCIES: readonly SupplierCurrency[] = ['USD', 'EUR', 'CNY'];
+/** The currencies a cost field offers: the supplier currencies, then Iraqi dinars (row 254). */
+export const COST_CURRENCIES: readonly CostCurrency[] = [...SUPPLIER_CURRENCIES, 'IQD'];
 
 // ------------------------------------------------------------------- wire --
 
@@ -77,12 +85,16 @@ export interface WireDiscount {
   id: string;
   usd: string;
 }
-/** One scope's cost inputs (productInputs.ts `parseInputEntry`): absent keys are untouched, null clears. */
+/**
+ * One scope's cost inputs (productInputs.ts `parseInputEntry`): absent keys are untouched, null clears. A cost
+ * typed in dinars travels as `supplier_cost_iqd` (whole dinars) ALONE — never beside an amount or a currency.
+ */
 export interface WireInput {
-  scope: 'base' | 'option';
+  scope: 'base' | 'option' | 'color';
   scope_id?: string;
   supplier_cost_amount?: string | null;
   supplier_cost_currency?: SupplierCurrency | null;
+  supplier_cost_iqd?: number;
   shipping_profile?: StockRoute | null;
   shipping_weight_g?: number | null;
   shipping_length_mm?: number | null;
@@ -193,6 +205,9 @@ export interface V2CostInputRow {
   shipping_height_mm: number | null;
   manual_cbm?: string | null;
   additional_cost_iqd: number | null;
+  /** IQD_CONVERTED: the cost was typed in dinars (`original_input_amount`), stored converted to USD at the rate of its save. */
+  supplier_input_mode?: 'SOURCE_CURRENCY' | 'IQD_CONVERTED' | null;
+  original_input_amount?: string | null;
 }
 
 /** GET /api/admin/products-v2/:id/pricing, the preview, and every 409's `details.preview` (§4.2). */
@@ -289,7 +304,7 @@ export function wholeIqd(raw: string, signed = false): number | null {
 
 // ------------------------------------------------------------- the draft --
 
-export type ModelPriceMode = 'follow' | 'own_cost' | 'delta' | 'fixed';
+export type ModelPriceMode = 'follow' | 'delta' | 'fixed';
 
 export interface ModelDraft {
   price: ModelPriceMode;
@@ -297,9 +312,16 @@ export interface ModelDraft {
   usd: string;
   discount: 'follow' | 'exception';
   discount_usd: string;
+  /**
+   * «التكلفة: تتبع المنتج | تكلفة مختلفة» (the owner's, both methods — DECISIONS row 254): a choice of its own,
+   * beside the price. Cost-first, a model on its own cost is priced from it (its price «يتبع المنتج»: cost + its
+   * minimum profit; a difference on top; a special price never below them); price-first it moves no price — it
+   * feeds the owner's profit reading and the below-minimum-profit warning.
+   */
+  cost: 'follow' | 'own';
   /** «تكلفة مختلفة»: the model's own supplier price, its currency, its weight and its box (§1.4: weight OR box). */
   supplier_amount: string;
-  supplier_currency: SupplierCurrency | '';
+  supplier_currency: CostCurrency | '';
   /** The option's packaged weight and box («أبعاد الخيار», `withOptionMeasure`) — the pricing row mirrors them. */
   weight_g: number | null;
   /** L × W × H in mm — one unit (a model shipped by sea is priced per CBM). */
@@ -316,6 +338,14 @@ export interface ModelDraft {
 export interface ColourDraft {
   price: 'follow' | 'delta';
   usd: string;
+  /**
+   * The colour's own supplier cost (the owner's, row 254): it replaces the model's and the product's for every
+   * model in this colour (the chain: SKU → colour → model → product). Its weight and box are the colour's
+   * packaged dimensions (the measure chain), never fields here.
+   */
+  cost: 'follow' | 'own';
+  supplier_amount: string;
+  supplier_currency: CostCurrency | '';
 }
 export interface SkuDraft {
   fixed_usd: string;
@@ -323,7 +353,7 @@ export interface SkuDraft {
 }
 export interface CostDraft {
   supplier_amount: string;
-  supplier_currency: SupplierCurrency | '';
+  supplier_currency: CostCurrency | '';
   route: StockRoute | '';
   weight_g: number | null;
   box: [number, number, number] | null;
@@ -347,6 +377,7 @@ export const FOLLOW_MODEL: ModelDraft = {
   usd: '',
   discount: 'follow',
   discount_usd: '',
+  cost: 'follow',
   supplier_amount: '',
   supplier_currency: '',
   weight_g: null,
@@ -355,13 +386,19 @@ export const FOLLOW_MODEL: ModelDraft = {
   profit_usd: '',
   profit_iqd: null,
 };
-export const FOLLOW_COLOUR: ColourDraft = { price: 'follow', usd: '' };
+export const FOLLOW_COLOUR: ColourDraft = { price: 'follow', usd: '', cost: 'follow', supplier_amount: '', supplier_currency: '' };
 export const NO_SKU: SkuDraft = { fixed_usd: '', discount_usd: '' };
 
 const boxOf = (r: Pick<V2CostInputRow, 'shipping_length_mm' | 'shipping_width_mm' | 'shipping_height_mm'> | undefined): [number, number, number] | null =>
   r && r.shipping_length_mm !== null && r.shipping_width_mm !== null && r.shipping_height_mm !== null
     ? [r.shipping_length_mm, r.shipping_width_mm, r.shipping_height_mm]
     : null;
+
+/** A stored row's supplier cost as the owner typed it: dinars typed in dinars (IQD_CONVERTED), else the amount in its currency. */
+const supplierOf = (r: V2CostInputRow | undefined): { supplier_amount: string; supplier_currency: CostCurrency | '' } =>
+  r?.supplier_input_mode === 'IQD_CONVERTED' && r.original_input_amount
+    ? { supplier_amount: r.original_input_amount, supplier_currency: 'IQD' }
+    : { supplier_amount: r?.supplier_cost_amount ?? '', supplier_currency: r?.supplier_cost_currency ?? '' };
 
 /**
  * The draft as the server stores it (`null`: add-product, nothing stored).
@@ -377,27 +414,24 @@ export function draftOf(answer: V2Answer | null, fallbackMethod: V2Method = 'cos
   for (const r of inputs) {
     if (r.scope !== 'option' || !r.scope_id) continue;
     if (r.supplier_cost_amount === null && r.shipping_weight_g === null && boxOf(r) === null) continue;
-    Object.assign(model(r.scope_id), {
-      price: 'own_cost',
-      supplier_amount: r.supplier_cost_amount ?? '',
-      supplier_currency: r.supplier_cost_currency ?? '',
-      weight_g: r.shipping_weight_g,
-      box: boxOf(r),
-    });
+    Object.assign(model(r.scope_id), { cost: 'own', ...supplierOf(r), weight_g: r.shipping_weight_g, box: boxOf(r) });
   }
-  // Row 247: a model's own minimum profit is an «تكلفة مختلفة» choice (a point below still decides the price mode).
-  // A rule the dollar field cannot draw (dinars, or BLOCKED) still decides the model's T: shown as kept, never
-  // as «يتبع المنتج».
+  // Row 247: a model's own minimum profit is an «تكلفة مختلفة» choice (the points below decide the price mode,
+  // apart — row 254). A rule the dollar field cannot draw (dinars, or BLOCKED) still decides the model's T:
+  // shown as kept, never as «يتبع المنتج».
   for (const r of answer?.v2_cost_inputs?.minimum_profit ?? []) {
     if (r.scope !== 'option' || !r.scope_id) continue;
-    if (r.state === 'ACTIVE' && r.amount_usd) Object.assign(model(r.scope_id), { price: 'own_cost', profit: 'exception', profit_usd: r.amount_usd });
-    else if (r.state === 'ACTIVE' && typeof r.amount_iqd === 'number') Object.assign(model(r.scope_id), { price: 'own_cost', profit: 'kept', profit_iqd: r.amount_iqd });
-    else if (r.state === 'BLOCKED') Object.assign(model(r.scope_id), { price: 'own_cost', profit: 'kept', profit_iqd: null });
+    if (r.state === 'ACTIVE' && r.amount_usd) Object.assign(model(r.scope_id), { cost: 'own', profit: 'exception', profit_usd: r.amount_usd });
+    else if (r.state === 'ACTIVE' && typeof r.amount_iqd === 'number') Object.assign(model(r.scope_id), { cost: 'own', profit: 'kept', profit_iqd: r.amount_iqd });
+    else if (r.state === 'BLOCKED') Object.assign(model(r.scope_id), { cost: 'own', profit: 'kept', profit_iqd: null });
   }
   for (const p of points) if (p.scope === 'option') Object.assign(model(p.id), { price: p.kind, usd: p.usd });
   for (const d of discounts) if (d.scope === 'option') Object.assign(model(d.id), { discount: 'exception', discount_usd: d.usd });
   const colours: Record<string, ColourDraft> = {};
-  for (const p of points) if (p.scope === 'color') colours[p.id] = { price: 'delta', usd: p.usd };
+  const colour = (id: string) => (colours[id] ??= { ...FOLLOW_COLOUR });
+  // Row 254: a colour's own supplier cost (its weight and box are its packaged dimensions, never this row's).
+  for (const r of inputs) if (r.scope === 'color' && r.scope_id && r.supplier_cost_amount !== null) Object.assign(colour(r.scope_id), { cost: 'own', ...supplierOf(r) });
+  for (const p of points) if (p.scope === 'color') Object.assign(colour(p.id), { price: 'delta', usd: p.usd });
   const skus: Record<string, SkuDraft> = {};
   for (const p of points) if (p.scope === 'sku') skus[p.id] = { ...(skus[p.id] ?? NO_SKU), fixed_usd: p.usd };
   for (const d of discounts) if (d.scope === 'sku') skus[d.id] = { ...(skus[d.id] ?? NO_SKU), discount_usd: d.usd };
@@ -408,8 +442,7 @@ export function draftOf(answer: V2Answer | null, fallbackMethod: V2Method = 'cos
     discount_usd: discounts.find((d) => d.scope === 'product')?.usd ?? '',
     min_profit_usd: minimum?.amount_usd ?? '',
     cost: {
-      supplier_amount: base?.supplier_cost_amount ?? '',
-      supplier_currency: base?.supplier_cost_currency ?? '',
+      ...supplierOf(base),
       route: base?.shipping_profile ?? '',
       weight_g: base?.shipping_weight_g ?? null,
       box: boxOf(base),
@@ -470,7 +503,7 @@ export function withOptionMeasure(
 ): Record<string, ModelDraft> {
   let out: Record<string, ModelDraft> | null = null;
   for (const [id, m] of Object.entries(models)) {
-    if (m.price !== 'own_cost') continue;
+    if (m.cost !== 'own') continue;
     const nowWeight = optionPackageWeight(optionPackages[id]);
     const wasWeight = optionPackageWeight(saved[id]);
     const weight = nowWeight ?? (wasWeight !== null && m.weight_g === wasWeight ? null : m.weight_g);
@@ -493,7 +526,7 @@ export function measurePendingOf(base: PriceDraft | null, shown: PriceDraft | nu
   const out = new Set<string>();
   if (!base || !shown || shown.method !== 'cost') return out;
   for (const [id, m] of Object.entries(shown.models)) {
-    if (m.price !== 'own_cost') continue;
+    if (m.cost !== 'own') continue;
     const b = base.models[id] ?? FOLLOW_MODEL;
     if (m.weight_g !== b.weight_g || !same(m.box, b.box)) out.add(id);
   }
@@ -563,13 +596,19 @@ const liveRow = (live: V2LiveIds, scope: V2Scope, id: string, kind?: 'fixed' | '
   return live.skus.has(id);
 };
 
-/** The cost entry of one scope: the fields that differ from the stored ones, or null. */
-function costEntry(scope: 'base' | 'option', id: string, now: Partial<WireInput>, was: Partial<WireInput>): WireInput | null {
-  const out: WireInput = { scope, ...(scope === 'option' ? { scope_id: id } : {}) };
+/**
+ * The cost entry of one scope: the fields that differ from the stored ones, or null. Dinars (`supplier_cost_iqd`)
+ * travel alone, and the same dinars again are no change (the stored conversion stands); leaving dinars, the amount
+ * — and its currency, when named — always travel, even an emptied one.
+ */
+function costEntry(scope: 'base' | 'option' | 'color', id: string, now: Partial<WireInput>, was: Partial<WireInput>): WireInput | null {
+  const out: WireInput = { scope, ...(scope === 'base' ? {} : { scope_id: id }) };
   let any = false;
+  const wasIqd = was.supplier_cost_iqd !== undefined;
   for (const k of Object.keys(now) as Array<keyof WireInput>) {
     if (k === 'scope' || k === 'scope_id') continue;
-    if (!same(now[k] ?? null, was[k] ?? null)) {
+    const leavesIqd = wasIqd && (k === 'supplier_cost_amount' || k === 'supplier_cost_currency');
+    if (leavesIqd || !same(now[k] ?? null, was[k] ?? null)) {
       (out as unknown as Record<string, unknown>)[k] = now[k] ?? null;
       any = true;
     }
@@ -583,9 +622,41 @@ function costEntry(scope: 'base' | 'option', id: string, now: Partial<WireInput>
   return any ? out : null;
 }
 
+/** The server's ceiling on a cost typed in dinars (productInputs.ts `MAX_SUPPLIER_IQD`; 0181: 13 digits). */
+const MAX_SUPPLIER_IQD = 1_000_000_000_000;
+
+/** A supplier cost typed in dinars: whole dinars (thousands marks dropped, no fraction), 1 … 10¹²; null otherwise. */
+export function cleanIqdAmount(text: string): number | null {
+  const t = toAscii(text).trim().replace(/[,\s]/g, '');
+  if (!/^\d{1,13}$/.test(t)) return null;
+  const n = Number(t);
+  return n >= 1 && n <= MAX_SUPPLIER_IQD ? n : null;
+}
+
+/** A supplier amount as typed in its currency: readable, or not (the field says so). Empty is not unreadable. */
+export const unreadableAmount = (amount: string, currency: CostCurrency | ''): boolean =>
+  amount.trim() !== '' && (currency === 'IQD' ? cleanIqdAmount(amount) === null : cleanUsdAmount(amount) === null);
+
+/** A supplier cost on the wire: dinars as `supplier_cost_iqd` alone, else the amount and its currency. */
+const supplierFields = (amount: string, currency: CostCurrency | ''): Partial<WireInput> => {
+  if (currency !== 'IQD') return { supplier_cost_amount: cleanUsdAmount(amount), supplier_cost_currency: currency || null };
+  const iqd = cleanIqdAmount(amount);
+  return iqd !== null ? { supplier_cost_iqd: iqd } : { supplier_cost_amount: null, supplier_cost_currency: null };
+};
+
+/**
+ * A model's or a colour's own supplier cost. An amount typed with the currency left at «يتبع المنتج» carries the
+ * product's currency explicitly (the server refuses an amount without one, productInputs.ts) — dinars when the
+ * product's cost is in dinars.
+ */
+const ownSupplierFields = (amount: string, own: CostCurrency | '', product: CostCurrency | ''): Partial<WireInput> => {
+  const fields = supplierFields(amount, own || product);
+  // «يتبع المنتج» names the product's currency only beside an amount: an empty (or unreadable) one names none.
+  return !own && fields.supplier_cost_amount === null ? { supplier_cost_amount: null, supplier_cost_currency: null } : fields;
+};
+
 const baseFields = (c: CostDraft): Partial<WireInput> => ({
-  supplier_cost_amount: cleanUsdAmount(c.supplier_amount),
-  supplier_cost_currency: c.supplier_currency || null,
+  ...supplierFields(c.supplier_amount, c.supplier_currency),
   shipping_profile: c.route || null,
   shipping_weight_g: c.weight_g,
   shipping_length_mm: c.box?.[0] ?? null,
@@ -601,15 +672,11 @@ export function cleanUsdAmount(text: string): string | null {
   return t;
 }
 
-/**
- * A model's own cost fields. A supplier amount typed with the currency left at «يتبع المنتج» carries the
- * product's currency explicitly: the server refuses an amount without one (productInputs.ts).
- */
-export const modelCostFields = (m: ModelDraft | undefined, productCurrency: SupplierCurrency | '' = ''): Partial<WireInput> =>
-  m && m.price === 'own_cost'
+/** A model's own cost fields («تكلفة مختلفة», both methods — row 254); «تتبع المنتج» clears them (INHERIT). */
+export const modelCostFields = (m: ModelDraft | undefined, productCurrency: CostCurrency | '' = ''): Partial<WireInput> =>
+  m && m.cost === 'own'
     ? {
-        supplier_cost_amount: cleanUsdAmount(m.supplier_amount),
-        supplier_cost_currency: m.supplier_currency || (cleanUsdAmount(m.supplier_amount) !== null ? productCurrency || null : null),
+        ...ownSupplierFields(m.supplier_amount, m.supplier_currency, productCurrency),
         shipping_weight_g: m.weight_g,
         shipping_length_mm: m.box?.[0] ?? null,
         shipping_width_mm: m.box?.[1] ?? null,
@@ -617,11 +684,15 @@ export const modelCostFields = (m: ModelDraft | undefined, productCurrency: Supp
       }
     : { supplier_cost_amount: null, shipping_weight_g: null, shipping_length_mm: null, shipping_width_mm: null, shipping_height_mm: null };
 
+/** A colour's own supplier cost (row 254): the amount and its currency only; «تتبع الموديل» clears it. */
+export const colourCostFields = (c: ColourDraft | undefined, productCurrency: CostCurrency | '' = ''): Partial<WireInput> =>
+  c && c.cost === 'own' ? ownSupplierFields(c.supplier_amount, c.supplier_currency, productCurrency) : { supplier_cost_amount: null };
+
 /** A stored option rule the form keeps as it is (`profit: 'kept'`): never sent, compared only. */
 const PROFIT_KEPT = 'kept';
 /** A model's own minimum profit as the request states it (row 247): its exception, from «تكلفة مختلفة» only; else null. */
 export const modelProfitRule = (m: ModelDraft | undefined): string | null =>
-  m && m.price === 'own_cost' ? (m.profit === 'exception' ? cleanUsd(m.profit_usd) : m.profit === 'kept' ? PROFIT_KEPT : null) : null;
+  m && m.cost === 'own' ? (m.profit === 'exception' ? cleanUsd(m.profit_usd) : m.profit === 'kept' ? PROFIT_KEPT : null) : null;
 
 /**
  * The request block: what differs from the stored draft (`base`), the stored
@@ -654,7 +725,9 @@ export function draftWire(
     if (a.price !== b.price || a.usd !== b.usd || a.discount !== b.discount || a.discount_usd !== b.discount_usd) touch('option', id);
   }
   for (const id of new Set([...Object.keys(draft.colours), ...Object.keys(base.colours)])) {
-    if (!same(draft.colours[id] ?? FOLLOW_COLOUR, base.colours[id] ?? FOLLOW_COLOUR)) touch('color', id);
+    const a = draft.colours[id] ?? FOLLOW_COLOUR;
+    const b = base.colours[id] ?? FOLLOW_COLOUR;
+    if (a.price !== b.price || a.usd !== b.usd) touch('color', id);
   }
   for (const id of new Set([...Object.keys(draft.skus), ...Object.keys(base.skus)])) {
     if (!same(draft.skus[id] ?? NO_SKU, base.skus[id] ?? NO_SKU)) touch('sku', id);
@@ -688,13 +761,19 @@ export function draftWire(
   const profitRows: WireRule[] = [];
   for (const id of new Set([...Object.keys(draft.models), ...Object.keys(base.models)])) {
     if (!live.models.has(id)) continue;
-    // «تكلفة مختلفة» is a cost-first choice: a price-first save never touches a model's own cost.
-    const mine = draft.method === 'cost' ? draft.models[id] : base.models[id];
+    // «تكلفة مختلفة» is the owner's in both methods (row 254): price-first it moves no price, and still saves.
+    const mine = draft.models[id];
     const now = modelCostFields(mine, draft.cost.supplier_currency);
     const entry = costEntry('option', id, now, modelCostFields(base.models[id], base.cost.supplier_currency));
     if (entry) inputs.push(entry);
     const profit = modelProfitRule(mine);
     if (profit !== PROFIT_KEPT && profit !== modelProfitRule(base.models[id])) profitRows.push({ kind: 'target_profit', scope: 'option', scope_id: id, amount_usd: profit ?? '' });
+  }
+  // A colour's own supplier cost (row 254): the colour level of the chain, both methods.
+  for (const id of new Set([...Object.keys(draft.colours), ...Object.keys(base.colours)])) {
+    if (!live.colours.has(id)) continue;
+    const entry = costEntry('color', id, colourCostFields(draft.colours[id], draft.cost.supplier_currency), colourCostFields(base.colours[id], base.cost.supplier_currency));
+    if (entry) inputs.push(entry);
   }
   const minimum = draft.min_profit_usd !== base.min_profit_usd;
   if (inputs.length || minimum || profitRows.length) {
@@ -961,7 +1040,7 @@ const finalFromCost = (draft: Pick<PriceDraft, 'models' | 'skus'>, l: SkuLine): 
 export function productFinalLine(table: readonly V2TableRow[], lead: SkuLine | null, draft: Pick<PriceDraft, 'models' | 'skus'>): SkuLine | null {
   const follows = (l: SkuLine) => {
     const m = l.model_id ? draft.models[l.model_id] : undefined;
-    return !(m && m.price === 'own_cost' && m.profit !== 'follow') && finalFromCost(draft, l);
+    return !(m && m.cost === 'own' && m.profit !== 'follow') && finalFromCost(draft, l);
   };
   return lead && follows(lead) ? lead : (skuLines(table).find(follows) ?? null);
 }

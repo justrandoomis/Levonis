@@ -83,7 +83,7 @@ const answer = (table: V2TableRow[], over: Partial<V2Answer> = {}): V2Answer => 
   v2_cost_inputs: { inputs: [], minimum_profit: [{ scope: 'product', scope_id: null, state: 'active', amount_usd: '25' }], inherited_minimum_profit: null },
   ...over,
 });
-const M2_OWN: PriceDraft['models'][string] = { ...FOLLOW_MODEL, price: 'own_cost', supplier_amount: '200', supplier_currency: 'USD', profit: 'exception', profit_usd: '30' };
+const M2_OWN: PriceDraft['models'][string] = { ...FOLLOW_MODEL, cost: 'own', supplier_amount: '200', supplier_currency: 'USD', profit: 'exception', profit_usd: '30' };
 const draftWith = (a: V2Answer, over: Partial<PriceDraft> = {}): PriceDraft => {
   const d = draftOf(a);
   return { ...d, models: { ...d.models, m2: M2_OWN }, ...over };

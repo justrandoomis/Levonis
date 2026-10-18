@@ -18,7 +18,12 @@
  *   3. the form's pure half: the wire sends only what changed, the currency
  *      «يتبع المنتج» travels named, the weight and box ARE the option's
  *      packaged dimensions, a colour edit never drops a colour's discount, and
- *      the model and colour cards read the server's reasons.
+ *      the model and colour cards read the server's reasons;
+ *   4. DECISIONS row 254: a cost on every model and colour, in both methods —
+ *      the wire sends a model's own cost price-first too, a colour's as scope
+ *      color, dinars as `supplier_cost_iqd` alone (read back as typed), and
+ *      nothing for a price editor; the server takes them on a price-first
+ *      product, moves no price, and the owner's reading follows them.
  *
  * Run: node --import tsx --test tests/pricingV2OptionPricing.test.ts
  */
@@ -32,7 +37,10 @@ import { priceProductV2, type V2Discount, type V2PricePoint, type V2Sku } from '
 import { resolveSkuInputs } from '@levonis/pricing/costToPrice';
 import { roundPriceIqd } from '../packages/pricing/src/priceRounding';
 import {
+  FOLLOW_COLOUR,
   FOLLOW_MODEL,
+  cleanIqdAmount,
+  dollarsOf,
   draftOf,
   draftWire,
   lineWithOption,
@@ -43,6 +51,7 @@ import {
   pricedStructureKey,
   withoutLegacyMoney,
   withOptionMeasure,
+  type ColourDraft,
   type ModelDraft,
   type PriceDraft,
   type V2Answer,
@@ -328,7 +337,8 @@ test('the owner: a model minimum profit is an option-scope rule — previewed, s
   assert.ok(back.v2_cost_inputs!.minimum_profit.every((r) => 'amount_iqd' in r));
   // The reload shows the exception again: «تكلفة مختلفة», «الحد الأدنى للربح: استثناء $60».
   const m = draftOf(back).models[COMBO]!;
-  assert.equal(m.price, 'own_cost');
+  assert.equal(m.cost, 'own');
+  assert.equal(m.price, 'follow', 'the price is a choice of its own (row 254)');
   assert.equal(m.profit, 'exception');
   assert.equal(m.profit_usd, '60');
   assert.equal(draftOf(back).min_profit_usd, '143.9');
@@ -382,24 +392,24 @@ const OWN_ROW = { scope: 'option', scope_id: 'combo', supplier_cost_amount: '375
 test('the wire: the product minimum profit alone is text; a model one sends only its changed row; leaving «تكلفة مختلفة» sends INHERIT', () => {
   const a = ownerAnswer();
   assert.equal(wireOf(a, (d) => ({ ...d, min_profit_usd: '150' })).cost?.minimum_profit, '150', 'back-compatible: the product alone is text');
-  const model = wireOf(a, (d) => withModel(d, 'combo', { price: 'own_cost', profit: 'exception', profit_usd: '60' }));
+  const model = wireOf(a, (d) => withModel(d, 'combo', { cost: 'own', profit: 'exception', profit_usd: '60' }));
   assert.deepEqual(model.cost?.minimum_profit, [{ kind: 'target_profit', scope: 'option', scope_id: 'combo', amount_usd: '60' }]);
   // Both changed: the product's row first, then the model's — never a row that did not change.
-  const both = wireOf(a, (d) => withModel({ ...d, min_profit_usd: '150' }, 'combo', { price: 'own_cost', profit: 'exception', profit_usd: '60' }));
+  const both = wireOf(a, (d) => withModel({ ...d, min_profit_usd: '150' }, 'combo', { cost: 'own', profit: 'exception', profit_usd: '60' }));
   assert.deepEqual(both.cost?.minimum_profit, [
     { kind: 'target_profit', scope: 'product', amount_usd: '150' },
     { kind: 'target_profit', scope: 'option', scope_id: 'combo', amount_usd: '60' },
   ]);
-  // A minimum profit is an «تكلفة مختلفة» choice: under «زيادة» or «يتبع المنتج» nothing is sent.
+  // A minimum profit is an «تكلفة مختلفة» choice: with the cost «تتبع المنتج» nothing is sent, whatever the price.
   assert.equal(wireOf(a, (d) => withModel(d, 'combo', { price: 'delta', usd: '+5', profit: 'exception', profit_usd: '60' })).cost?.minimum_profit, undefined);
 
   // Stored: the Combo on its own cost (375 EUR) with its own $60 → «رجوع للموروث».
   const stored = ownerAnswer({ inputs: [OWN_ROW], rules: [{ scope: 'product', scope_id: '', state: 'ACTIVE', amount_usd: '143.9' }, { scope: 'option', scope_id: 'combo', state: 'ACTIVE', amount_usd: '60' }] });
   assert.deepEqual(
-    { price: draftOf(stored).models.combo!.price, profit: draftOf(stored).models.combo!.profit, profit_usd: draftOf(stored).models.combo!.profit_usd },
-    { price: 'own_cost', profit: 'exception', profit_usd: '60' }
+    { cost: draftOf(stored).models.combo!.cost, price: draftOf(stored).models.combo!.price, profit: draftOf(stored).models.combo!.profit, profit_usd: draftOf(stored).models.combo!.profit_usd },
+    { cost: 'own', price: 'follow', profit: 'exception', profit_usd: '60' }
   );
-  const follow = wireOf(stored, (d) => withModel(d, 'combo', { price: 'follow', supplier_amount: '', supplier_currency: '', weight_g: null, box: null, profit: 'follow', profit_usd: '' }));
+  const follow = wireOf(stored, (d) => withModel(d, 'combo', { cost: 'follow', supplier_amount: '', supplier_currency: '', weight_g: null, box: null, profit: 'follow', profit_usd: '' }));
   assert.deepEqual(follow.cost?.minimum_profit, [{ kind: 'target_profit', scope: 'option', scope_id: 'combo', amount_usd: '' }]);
   assert.deepEqual(follow.cost?.inputs, [{ scope: 'option', scope_id: 'combo', supplier_cost_amount: null }], 'its own cost cleared too');
   // An INHERIT row stored for the model is not an exception.
@@ -407,10 +417,10 @@ test('the wire: the product minimum profit alone is text; a model one sends only
 });
 
 test('the wire: an amount typed with the currency at «يتبع المنتج» names the product currency (never a refused preview)', () => {
-  const w = wireOf(ownerAnswer(), (d) => withModel(d, 'combo', { price: 'own_cost', supplier_amount: '375', supplier_currency: '' }));
+  const w = wireOf(ownerAnswer(), (d) => withModel(d, 'combo', { cost: 'own', supplier_amount: '375', supplier_currency: '' }));
   assert.deepEqual(w.cost?.inputs, [{ scope: 'option', scope_id: 'combo', supplier_cost_amount: '375', supplier_cost_currency: 'EUR' }]);
   // A currency chosen is the model's own.
-  const usd = wireOf(ownerAnswer(), (d) => withModel(d, 'combo', { price: 'own_cost', supplier_amount: '375', supplier_currency: 'USD' }));
+  const usd = wireOf(ownerAnswer(), (d) => withModel(d, 'combo', { cost: 'own', supplier_amount: '375', supplier_currency: 'USD' }));
   assert.equal(usd.cost?.inputs?.[0]?.supplier_cost_currency, 'USD');
 });
 
@@ -426,7 +436,7 @@ test('«تكلفة مختلفة»: the weight and box ARE the option packaged di
     package_height_mm: null,
     ...o,
   });
-  const own: ModelDraft = { ...FOLLOW_MODEL, price: 'own_cost', supplier_amount: '375', supplier_currency: 'EUR' };
+  const own: ModelDraft = { ...FOLLOW_MODEL, cost: 'own', supplier_amount: '375', supplier_currency: 'EUR' };
   const full = withOptionMeasure({ combo: own }, { combo: dims({ package_weight_g: 13_500, package_depth_mm: 560, package_width_mm: 540, package_height_mm: 430 }) });
   assert.equal(full.combo!.weight_g, 13_500, 'the packaged weight — never the net 8,300');
   assert.deepEqual(full.combo!.box, [560, 540, 430]);
@@ -497,7 +507,7 @@ test('a stored model minimum profit the dollar field cannot draw (dinars, or BLO
     ownerAnswer({ inputs: [OWN_ROW], rules: [{ scope: 'product', scope_id: '', state: 'ACTIVE', amount_usd: '143.9' }, { scope: 'option', scope_id: 'combo', ...r }] });
   const dinars = rules({ state: 'ACTIVE', amount_usd: null, amount_iqd: 150_000 });
   const m = draftOf(dinars).models.combo!;
-  assert.deepEqual([m.price, m.profit, m.profit_iqd], ['own_cost', 'kept', 150_000]);
+  assert.deepEqual([m.cost, m.profit, m.profit_iqd], ['own', 'kept', 150_000]);
   assert.deepEqual(wireOf(dinars, (d) => d), {}, 'left as it is: nothing sent, the rule stays');
   // Changed: «يتبع المنتج» sends INHERIT; an exception sends its dollars.
   assert.deepEqual(wireOf(dinars, (d) => withModel(d, 'combo', { profit: 'follow' })).cost?.minimum_profit, [{ kind: 'target_profit', scope: 'option', scope_id: 'combo', amount_usd: '' }]);
@@ -509,7 +519,7 @@ test('a stored model minimum profit the dollar field cannot draw (dinars, or BLO
 
 test('a colour difference edited keeps the colour’s stored discount (it was silently dropped)', () => {
   const a = ownerAnswer({ points: [{ scope: 'color', id: 'red', kind: 'delta', usd: '5' }], discounts: [{ scope: 'product', id: '', usd: '35' }, { scope: 'color', id: 'red', usd: '10' }] });
-  const edit = (d: PriceDraft) => ({ ...d, colours: { ...d.colours, red: { price: 'delta' as const, usd: '7' } } });
+  const edit = (d: PriceDraft) => ({ ...d, colours: { ...d.colours, red: { ...FOLLOW_COLOUR, price: 'delta' as const, usd: '7' } } });
   const w = wireOf(a, edit);
   assert.deepEqual(w.points, [{ scope: 'color', id: 'red', kind: 'delta', usd: '7' }]);
   assert.equal(w.discounts, undefined, 'the discounts did not change: nothing sent, every stored row kept');
@@ -565,7 +575,7 @@ test('the model card reads its colour-less line, else a colour that follows its 
     tableRow('o:combo|c:black', 'direct_sale', 906_000, {}, { source: 'stock' }),
   ];
   assert.equal(lineWithOption(rows, 'combo')!.combo_key, 'o:combo|c:black');
-  assert.equal(lineWithOption(rows, 'combo', { red: { price: 'delta', usd: '10' } })!.combo_key, 'o:combo|c:black');
+  assert.equal(lineWithOption(rows, 'combo', { red: { ...FOLLOW_COLOUR, price: 'delta', usd: '10' } })!.combo_key, 'o:combo|c:black');
   assert.equal(lineWithOption([...rows, tableRow('o:combo', 'direct_sale', 906_000)], 'combo')!.combo_key, 'o:combo');
   assert.equal(lineWithOption([rows[0]!], 'combo')!.combo_key, 'o:combo|c:red', 'the only line, named by the card');
   assert.equal(lineWithOption(rows, 'a1'), null);
@@ -716,4 +726,201 @@ test('the new words, in Arabic, English and real Sorani', () => {
   }
   assert.equal(V2_STRINGS.ar.inheritsProductMeasure('6.24'), 'يرث من المنتج: 6.24');
   assert.equal(V2_STRINGS.en.preorderAfterOff('$35.00'), 'after $35.00 off');
+});
+
+/* ---------- 4. a cost on every model and colour, both methods, dinars too (the owner 2026-10-18, DECISIONS row 254) -- */
+
+const PRODUCT_700 = { scope: 'product' as const, id: '', kind: 'fixed' as const, usd: '700' };
+const priceFirstAnswer = (o: Parameters<typeof ownerAnswer>[0] = {}): V2Answer => {
+  const a = ownerAnswer(o);
+  return { ...a, method: 'usd', v2_points: [...(a.v2_points ?? []), PRODUCT_700] };
+};
+const withColour = (d: PriceDraft, id: string, patch: Partial<ColourDraft>): PriceDraft => ({ ...d, colours: { ...d.colours, [id]: { ...(d.colours[id] ?? FOLLOW_COLOUR), ...patch } } });
+const COLOUR_ROW = { ...OWN_ROW, scope: 'color', scope_id: 'red', supplier_cost_amount: '290' };
+
+test('row 254, the wire: a model’s own cost is the owner’s in both methods — price-first it is sent, and moves no price', () => {
+  const a = priceFirstAnswer();
+  const w = wireOf(a, (d) => withModel(d, 'combo', { cost: 'own', supplier_amount: '375', supplier_currency: 'EUR' }));
+  assert.equal(w.method, undefined, 'the method stays');
+  assert.equal(w.points, undefined, 'no price moves');
+  assert.deepEqual(w.cost?.inputs, [{ scope: 'option', scope_id: 'combo', supplier_cost_amount: '375', supplier_cost_currency: 'EUR' }]);
+  // Stored on a price-first product: «تكلفة مختلفة», the price still «يتبع المنتج» — two choices.
+  const stored = priceFirstAnswer({ inputs: [OWN_ROW] });
+  const m = draftOf(stored).models.combo!;
+  assert.deepEqual([m.cost, m.price, m.supplier_amount, m.supplier_currency], ['own', 'follow', '375', 'EUR']);
+  // A difference beside the own cost: only the point travels; the cost did not change.
+  const both = wireOf(stored, (d) => withModel(d, 'combo', { price: 'delta', usd: '+20' }));
+  assert.deepEqual(both.points, [{ scope: 'option', id: 'combo', kind: 'delta', usd: '20' }, PRODUCT_700]);
+  assert.equal(both.cost, undefined);
+  // A stored own cost beside a stored difference reads back as both (it was hidden behind «فرق في السعر»).
+  const delta = draftOf(ownerAnswer({ inputs: [OWN_ROW], points: [{ scope: 'option', id: 'combo', kind: 'delta', usd: '20' }] })).models.combo!;
+  assert.deepEqual([delta.cost, delta.price, delta.usd, delta.supplier_amount], ['own', 'delta', '20', '375']);
+  // «تتبع المنتج» clears it (INHERIT), price-first too; switching the method keeps it as it is.
+  assert.deepEqual(wireOf(stored, (d) => withModel(d, 'combo', { cost: 'follow' })).cost?.inputs, [{ scope: 'option', scope_id: 'combo', supplier_cost_amount: null }]);
+  assert.equal(wireOf(stored, (d) => ({ ...d, method: 'cost' })).cost, undefined, 'the method switch alone sends no cost');
+});
+
+test('row 254, the wire: a colour’s own cost travels as scope color — its currency named, its price untouched', () => {
+  const a = ownerAnswer({ points: [{ scope: 'color', id: 'red', kind: 'delta', usd: '5' }] });
+  const w = wireOf(a, (d) => withColour(d, 'red', { cost: 'own', supplier_amount: '290' }));
+  assert.deepEqual(w.cost?.inputs, [{ scope: 'color', scope_id: 'red', supplier_cost_amount: '290', supplier_cost_currency: 'EUR' }], '«يتبع المنتج» names the product currency');
+  assert.equal(w.points, undefined, 'the colour difference is untouched');
+  // In its own currency, price-first too.
+  const usd = wireOf(priceFirstAnswer(), (d) => withColour(d, 'red', { cost: 'own', supplier_amount: '320', supplier_currency: 'USD' }));
+  assert.deepEqual(usd.cost?.inputs, [{ scope: 'color', scope_id: 'red', supplier_cost_amount: '320', supplier_cost_currency: 'USD' }]);
+  // Stored, it reads back beside its difference; «تتبع الموديل» clears it.
+  const stored = ownerAnswer({ inputs: [COLOUR_ROW], points: [{ scope: 'color', id: 'red', kind: 'delta', usd: '5' }] });
+  const c = draftOf(stored).colours.red!;
+  assert.deepEqual([c.cost, c.price, c.usd, c.supplier_amount, c.supplier_currency], ['own', 'delta', '5', '290', 'EUR']);
+  assert.deepEqual(wireOf(stored, (d) => withColour(d, 'red', { cost: 'follow', supplier_amount: '', supplier_currency: '' })).cost?.inputs, [
+    { scope: 'color', scope_id: 'red', supplier_cost_amount: null },
+  ]);
+  // The difference edited keeps the own cost: only the point travels.
+  const moved = wireOf(stored, (d) => withColour(d, 'red', { usd: '7' }));
+  assert.deepEqual(moved.points, [{ scope: 'color', id: 'red', kind: 'delta', usd: '7' }]);
+  assert.equal(moved.cost, undefined);
+  // The cost edited alone resends no point; a colour gone from the product is never named.
+  const cost = wireOf(stored, (d) => withColour(d, 'red', { supplier_amount: '300' }));
+  assert.equal(cost.points, undefined);
+  assert.deepEqual(cost.cost?.inputs, [{ scope: 'color', scope_id: 'red', supplier_cost_amount: '300' }]);
+  const base = draftOf(stored);
+  const gone = draftWire(base, withColour(base, 'red', { supplier_amount: '300' }), { points: [], discounts: [] }, { ...LIVE, colours: new Set() }, OPTS);
+  assert.equal(gone.cost, undefined);
+});
+
+test('row 254, the wire: a cost in Iraqi dinars travels as supplier_cost_iqd alone, and reads back as the dinars typed', () => {
+  assert.deepEqual(wireOf(ownerAnswer(), (d) => withModel(d, 'combo', { cost: 'own', supplier_amount: '1500000', supplier_currency: 'IQD' })).cost?.inputs, [
+    { scope: 'option', scope_id: 'combo', supplier_cost_iqd: 1_500_000 },
+  ]);
+  // A colour's (Arabic-Indic digits are digits), and the product's own (its card offers dinars too).
+  assert.deepEqual(wireOf(ownerAnswer(), (d) => withColour(d, 'red', { cost: 'own', supplier_amount: '٣٠٠٠٠٠', supplier_currency: 'IQD' })).cost?.inputs, [
+    { scope: 'color', scope_id: 'red', supplier_cost_iqd: 300_000 },
+  ]);
+  assert.deepEqual(wireOf(ownerAnswer(), (d) => ({ ...d, cost: { ...d.cost, supplier_amount: '400000', supplier_currency: 'IQD' } })).cost?.inputs, [{ scope: 'base', supplier_cost_iqd: 400_000 }]);
+  // Whole dinars only: a fraction or nothing is no amount (the field says so), never a guess.
+  assert.equal(cleanIqdAmount('1500.5'), null);
+  assert.equal(cleanIqdAmount('0'), null);
+  assert.equal(cleanIqdAmount('1,500,000'), 1_500_000);
+  // The product's cost stored in dinars (IQD_CONVERTED): drawn as the dinars typed; untouched, nothing travels.
+  const a = ownerAnswer();
+  const converted = { ...a.v2_cost_inputs!.inputs[0]!, supplier_cost_amount: '266.666667', supplier_cost_currency: 'USD' as const, supplier_input_mode: 'IQD_CONVERTED' as const, original_input_amount: '400000' };
+  const iqd: V2Answer = { ...a, v2_cost_inputs: { ...a.v2_cost_inputs!, inputs: [converted] } };
+  assert.deepEqual([draftOf(iqd).cost.supplier_amount, draftOf(iqd).cost.supplier_currency], ['400000', 'IQD']);
+  assert.deepEqual(wireOf(iqd, (d) => d), {}, 'the same dinars: the stored conversion stands');
+  // A model following that currency types dinars too.
+  assert.deepEqual(wireOf(iqd, (d) => withModel(d, 'combo', { cost: 'own', supplier_amount: '250000' })).cost?.inputs, [{ scope: 'option', scope_id: 'combo', supplier_cost_iqd: 250_000 }]);
+  // Leaving dinars, the amount and its currency travel — even the same digits; emptied, both clear.
+  assert.deepEqual(wireOf(iqd, (d) => ({ ...d, cost: { ...d.cost, supplier_currency: 'USD' } })).cost?.inputs, [{ scope: 'base', supplier_cost_amount: '400000', supplier_cost_currency: 'USD' }]);
+  assert.deepEqual(wireOf(iqd, (d) => ({ ...d, cost: { ...d.cost, supplier_amount: '' } })).cost?.inputs, [{ scope: 'base', supplier_cost_amount: null, supplier_cost_currency: null }]);
+  // An option row stored in dinars reads back the same way.
+  const model = draftOf(ownerAnswer({ inputs: [{ ...OWN_ROW, supplier_cost_amount: '1000', supplier_cost_currency: 'USD', supplier_input_mode: 'IQD_CONVERTED', original_input_amount: '1500000' }] })).models.combo!;
+  assert.deepEqual([model.cost, model.supplier_amount, model.supplier_currency], ['own', '1500000', 'IQD']);
+});
+
+test('row 254, the wire: a price editor never sends a cost — a model’s, a colour’s or the product’s', () => {
+  const a = priceFirstAnswer({ inputs: [OWN_ROW, COLOUR_ROW] });
+  const base = draftOf(a);
+  const typed = withColour(withModel({ ...base, cost: { ...base.cost, supplier_amount: '400000', supplier_currency: 'IQD' } }, 'combo', { supplier_amount: '999' }), 'red', { supplier_amount: '1' });
+  const editor = draftWire(base, typed, { points: a.v2_points ?? [], discounts: a.v2_discounts ?? [] }, LIVE, { needsMethod: false, cost: false, money: true });
+  assert.equal(editor.cost, undefined);
+  assert.ok(!JSON.stringify(editor).includes('supplier'));
+});
+
+async function colourWorld() {
+  const raw: DatabaseSync = freshDb();
+  raw.exec(OWNER_ROW_SQL);
+  applyRate(raw, 'USD_IQD', '1500');
+  applyRate(raw, 'EUR_USD', '1.1');
+  applyRate(raw, 'CNY_USD', '0.14');
+  raw.exec("UPDATE pricing_shipping_rates SET rate_iqd = '3200', version = version + 1 WHERE profile = 'GERMANY_LAND'");
+  seedOptionless(raw, COL, { colours: 2, routes: ['land'] });
+  const db = asD1(raw);
+  await writeV2(db, COL, {
+    method: 'usd',
+    points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd: '400' }],
+    inputs: { supplier_cost_amount: '100', supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2000 },
+    minimumProfitUsd: '50',
+  });
+  return { raw, db, app: v2App(raw) };
+}
+const COL = 'p_colours254';
+const directOf = (table: V2TableRow[], match: (r: V2TableRow) => boolean) => table.find((r) => r.channel === 'direct_sale' && match(r))!;
+
+test('row 254, the server: price-first takes a model’s own cost — no price moves, the owner’s reading follows it', async () => {
+  const w = await world({ shelf: false });
+  await writeV2(w.db, PID, { method: 'usd', points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd: '700' }], discounts: [{ scope: 'product', scope_id: '', usd: '35' }] });
+  const stored = (await json(await get(w.app, `/api/admin/products-v2/${PID}/pricing`))) as V2Answer;
+  assert.equal(stored.method, 'usd');
+  // The form's own wire for «تكلفة مختلفة: 375 EUR» on the Combo, price-first.
+  const wire = draftWire(draftOf(stored), withModel(draftOf(stored), COMBO, { cost: 'own', supplier_amount: '375', supplier_currency: 'EUR' }), dollarsOf(stored), {
+    options: new Set([A1, COMBO]),
+    models: new Set([A1, COMBO]),
+    colours: new Set(),
+    skus: new Set(stored.table.map((r) => r.combo_key)),
+  }, OPTS);
+  assert.deepEqual(wire, { cost: { inputs: [{ scope: 'option', scope_id: COMBO, supplier_cost_amount: '375', supplier_cost_currency: 'EUR' }] } });
+  const pre = await previewOf(w.app, { ...wire });
+  // Price-first: the typed dollars price every model, the own cost or not ($700 × 1,500).
+  for (const id of [A1, COMBO]) {
+    assert.equal(at(pre.table, id, 'direct_sale'), 1_050_000, id);
+    assert.equal(at(pre.table, id, 'direct_sale'), at(stored.table, id, 'direct_sale'));
+  }
+  // The owner's reading follows it: the Combo's cost is 106 EUR × 1.1 × 1,500 = 174,900 higher, A1's unchanged;
+  // its own cost + the minimum profit ($143.90) is now above $700 — the warning, never a moved price.
+  const owner = (t: V2TableRow[], id: string) => directOf(t, (r) => r.combo_key === `o:${id}`).owner!;
+  assert.equal(owner(pre.table, COMBO).v2_replacement_iqd! - owner(stored.table, COMBO).v2_replacement_iqd!, 174_900);
+  assert.equal(owner(pre.table, A1).v2_replacement_iqd, owner(stored.table, A1).v2_replacement_iqd);
+  assert.equal(owner(stored.table, COMBO).v2_below_min_profit, false);
+  assert.equal(owner(pre.table, COMBO).v2_below_min_profit, true);
+  // Saved, read back: the cost on the Combo, the method and the prices as they were.
+  const saved = await put(w.app, `/api/admin/products-v2/${PID}/pricing`, { seq: pre.seq, pricing: wire, preview_hash: pre.review_hash });
+  assert.equal(saved.status, 200, (await saved.clone().text()).slice(0, 400));
+  const back = (await json(await get(w.app, `/api/admin/products-v2/${PID}/pricing`))) as V2Answer;
+  assert.equal(back.method, 'usd');
+  assert.equal(at(back.table, COMBO, 'direct_sale'), 1_050_000);
+  const m = draftOf(back).models[COMBO]!;
+  assert.deepEqual([m.cost, m.price, m.supplier_amount, m.supplier_currency], ['own', 'follow', '375', 'EUR']);
+});
+
+test('row 254, the server: a colour’s own cost in dinars — converted once, priced on its colour only, read back as the dinars typed', async () => {
+  const w = await colourWorld();
+  const stored = (await json(await get(w.app, `/api/admin/products-v2/${COL}/pricing`))) as V2Answer;
+  const c0 = `${COL}_c0`;
+  const c1 = `${COL}_c1`;
+  const live: V2LiveIds = { options: new Set(), models: new Set(), colours: new Set([c0, c1]), skus: new Set(stored.table.map((r) => r.combo_key)) };
+  const base = draftOf(stored);
+  const wire = draftWire(base, withColour(base, c0, { cost: 'own', supplier_amount: '300000', supplier_currency: 'IQD' }), dollarsOf(stored), live, OPTS);
+  assert.deepEqual(wire, { cost: { inputs: [{ scope: 'color', scope_id: c0, supplier_cost_iqd: 300_000 }] } });
+  const res = await post(w.app, '/api/admin/products-v2/pricing/preview', { product_id: COL, pricing: wire });
+  const pre = (await json(res)) as V2Answer & { review_hash: string };
+  assert.equal(res.status, 200, JSON.stringify(pre).slice(0, 400));
+  const colourRow = (t: V2TableRow[], id: string) => directOf(t, (r) => r.color_id === id);
+  // The price is the typed $400 on both; the cost of c0 alone is 300,000 instead of $100 × 1,500.
+  assert.equal(colourRow(pre.table, c0).price_iqd, 600_000);
+  assert.equal(colourRow(pre.table, c1).price_iqd, 600_000);
+  assert.equal(colourRow(pre.table, c0).owner!.v2_replacement_iqd! - colourRow(pre.table, c1).owner!.v2_replacement_iqd!, 150_000);
+  assert.equal(colourRow(pre.table, c1).owner!.v2_replacement_iqd, colourRow(stored.table, c1).owner!.v2_replacement_iqd);
+  const saved = await put(w.app, `/api/admin/products-v2/${COL}/pricing`, { seq: pre.seq, pricing: wire, preview_hash: pre.review_hash });
+  assert.equal(saved.status, 200, (await saved.clone().text()).slice(0, 400));
+  const stored0 = row<{ supplier_cost_amount: string; supplier_cost_currency: string; supplier_input_mode: string; original_input_amount: string }>(
+    w.raw,
+    "SELECT supplier_cost_amount, supplier_cost_currency, supplier_input_mode, original_input_amount FROM pricing_inputs WHERE product_id = ? AND scope = 'color' AND scope_id = ?",
+    COL,
+    c0
+  );
+  assert.deepEqual({ ...stored0, supplier_cost_amount: Number(stored0!.supplier_cost_amount) }, { supplier_cost_amount: 200, supplier_cost_currency: 'USD', supplier_input_mode: 'IQD_CONVERTED', original_input_amount: '300000' });
+  // The owner's answer reads it back as typed; the form draws dinars, and sends nothing for them again.
+  const back = (await json(await get(w.app, `/api/admin/products-v2/${COL}/pricing`))) as V2Answer;
+  const input = back.v2_cost_inputs!.inputs.find((r) => r.scope === 'color' && r.scope_id === c0)!;
+  assert.deepEqual([input.supplier_input_mode, input.original_input_amount], ['IQD_CONVERTED', '300000']);
+  assert.ok(back.v2_cost_inputs!.inputs.every((r) => 'original_input_amount' in r && 'supplier_input_mode' in r));
+  const again = draftOf(back);
+  assert.deepEqual([again.colours[c0]!.cost, again.colours[c0]!.supplier_amount, again.colours[c0]!.supplier_currency], ['own', '300000', 'IQD']);
+  assert.deepEqual(draftWire(again, again, dollarsOf(back), live, OPTS), {});
+  // A price editor's answer carries no cost row at all (v2_cost_inputs is the owner's).
+  const editor = stubApp(asD1(w.raw), EDITOR, (a) => a.route('/api/admin/products-v2', adminProductsRoutes));
+  const theirs = await get(editor, `/api/admin/products-v2/${COL}/pricing`);
+  assert.equal(theirs.status, 200);
+  const text = await theirs.text();
+  assert.doesNotMatch(text, /v2_cost_inputs|original_input_amount|supplier_input_mode|300000/);
 });

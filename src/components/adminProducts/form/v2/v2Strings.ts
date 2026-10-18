@@ -210,6 +210,33 @@ export interface V2Strings {
   preorderAfterOff: Fill;
   /** «تكلفة مختلفة» on a model with stock: the shelf prices the direct sale; this cost prices it once the shelf is empty. */
   shelfOwnCostNote: string;
+  // -- DECISIONS row 254: a cost on every model and colour card, in both methods, in its own currency (IQD too).
+  /** The label of a model's or a colour's cost choice. */
+  costLabel: string;
+  /** A model's cost «تتبع المنتج» (the cost, not the price: Arabic agrees with التكلفة). */
+  costFollowsProduct: string;
+  /** A colour's cost «تتبع الموديل»: each model's cost (its own, or the product's). */
+  costFollowsModel: string;
+  /** The Iraqi dinar in the currency choice, beside its code. */
+  iqdName: string;
+  /** Under an amount typed in dinars: whole dinars, converted once at the save. */
+  iqdHint: string;
+  /** An amount that cannot be read in its currency (dinars take no fraction). */
+  amountUnreadable: string;
+  /** A model's own cost, cost-first, its price «يتبع المنتج». */
+  ownCostFollowHint: string;
+  /** A model's own cost, cost-first, with a price difference. */
+  ownCostDeltaHint: string;
+  /** A model's own cost, cost-first, with a special price. */
+  ownCostFixedHint: string;
+  /** A model's own cost, price-first: no price moves. */
+  ownCostPriceFirstHint: string;
+  /** A colour's own cost, cost-first. */
+  colourCostHint: string;
+  /** A colour's own cost, price-first. */
+  colourCostPriceFirstHint: string;
+  /** The reset of a model's or a colour's own cost. */
+  resetCost: string;
 }
 
 const AR: V2Strings = {
@@ -379,6 +406,19 @@ const AR: V2Strings = {
   currencyRequired: 'اختر عملة سعر المورّد — لا عملة للمنتج يتبعها، ولا يُحسب السعر بدونها',
   preorderAfterOff: (usd) => `بعد خصم ${usd}`,
   shelfOwnCostNote: 'ما دام للموديل قطع على الرف فسعر البيع المباشر من المخزون؛ تكلفة المورّد هنا تُسعّره حين ينفد الرف، وتحدّد هل يغطي الطلب المسبق بعد الخصم تكلفته',
+  costLabel: 'التكلفة',
+  costFollowsProduct: 'تتبع المنتج',
+  costFollowsModel: 'تتبع الموديل',
+  iqdName: 'دينار عراقي',
+  iqdHint: 'بالدينار العراقي، رقم صحيح — يُحوَّل إلى الدولار بسعر الصرف المعتمد عند الحفظ',
+  amountUnreadable: 'مبلغ غير مقروء — اكتب رقماً (الدينار بلا كسور)',
+  ownCostFollowHint: 'يُحسب سعر هذا الموديل من هذه التكلفة + حدّه الأدنى للربح',
+  ownCostDeltaHint: 'يُحسب سعره من هذه التكلفة + حدّه الأدنى للربح ثم يُضاف الفرق — ولا ينزل تحتهما',
+  ownCostFixedHint: 'السعر الخاص لا ينزل تحت هذه التكلفة + حدّه الأدنى للربح',
+  ownCostPriceFirstHint: 'لا تغيّر السعر بالدولار — للربح وتنبيه «أقل من الحد الأدنى للربح» فقط',
+  colourCostHint: 'تحلّ محل سعر مورّد الموديل والمنتج في كل موديل بهذا اللون — ومن التكلفة يُبنى عليها سعره (والسعر الخاص لا ينزل تحتها + الحد الأدنى للربح)',
+  colourCostPriceFirstHint: 'تحلّ محل سعر مورّد الموديل والمنتج في كل موديل بهذا اللون — لا تغيّر السعر بالدولار، للربح والتنبيه فقط',
+  resetCost: 'التكلفة: رجوع للموروث',
 };
 
 const EN: V2Strings = {
@@ -548,6 +588,19 @@ const EN: V2Strings = {
   preorderAfterOff: (usd) => `after ${usd} off`,
   shelfOwnCostNote:
     'While this model has units on the shelf its direct price comes from stock; this supplier cost prices it once the shelf is empty, and decides whether the discounted pre-order clears its cost',
+  costLabel: 'Cost',
+  costFollowsProduct: 'Follows the product',
+  costFollowsModel: 'Follows the model',
+  iqdName: 'Iraqi dinar',
+  iqdHint: 'In Iraqi dinars, a whole number — converted to dollars at the official rate when saved',
+  amountUnreadable: 'Unreadable amount — type a number (dinars take no fraction)',
+  ownCostFollowHint: "This model's price is computed from this cost + its minimum profit",
+  ownCostDeltaHint: 'Priced from this cost + its minimum profit, then the difference is added — never below them',
+  ownCostFixedHint: 'The special price never goes below this cost + its minimum profit',
+  ownCostPriceFirstHint: 'Moves no dollar price — for profit and the «below minimum profit» warning only',
+  colourCostHint: "Replaces the model's and the product's supplier price on every model in this colour — from cost its price builds on it (a special price never below it + the minimum profit)",
+  colourCostPriceFirstHint: "Replaces the model's and the product's supplier price on every model in this colour — moves no dollar price; for profit and the warning only",
+  resetCost: 'Cost: back to inherited',
 };
 
 const CKB: V2Strings = {
@@ -717,6 +770,19 @@ const CKB: V2Strings = {
   preorderAfterOff: (usd) => `دوای کەمکردنەوەی ${usd}`,
   shelfOwnCostNote:
     'تا ئەم مۆدێلە دانەی لەسەر ڕەفە هەبێت نرخی فرۆشتنی ڕاستەوخۆ لە کۆگاوە دێت؛ ئەم تێچووی دابینکەرە کاتێک ڕەفەکە بەتاڵ بوو نرخی بۆ دادەنێت، و دیاری دەکات ئایا پێشداواکردن دوای داشکاندن تێچووەکەی دادەپۆشێت',
+  costLabel: 'تێچوو',
+  costFollowsProduct: 'شوێن تێچووی بەرهەم دەکەوێت',
+  costFollowsModel: 'شوێن تێچووی مۆدێل دەکەوێت',
+  iqdName: 'دیناری عێراقی',
+  iqdHint: 'بە دیناری عێراقی، ژمارەیەکی تەواو — لە کاتی پاشەکەوتکردندا بە نرخی فەرمی دەگۆڕدرێت بۆ دۆلار',
+  amountUnreadable: 'بڕەکە ناخوێندرێتەوە — ژمارەیەک بنووسە (دینار کەرتی نییە)',
+  ownCostFollowHint: 'نرخی ئەم مۆدێلە لەم تێچووە + کەمترین قازانجەکەی هەژمار دەکرێت',
+  ownCostDeltaHint: 'نرخەکەی لەم تێچووە + کەمترین قازانجەکەی هەژمار دەکرێت، پاشان جیاوازییەکە زیاد دەکرێت — هەرگیز لە خوار ئەوانەوە نابێت',
+  ownCostFixedHint: 'نرخی تایبەت هەرگیز لە خوار ئەم تێچووە + کەمترین قازانجەکەیەوە نابێت',
+  ownCostPriceFirstHint: 'نرخی دۆلار ناگۆڕێت — تەنها بۆ قازانج و ئاگاداریی «کەمتر لە کەمترین قازانج»',
+  colourCostHint: 'لە هەموو مۆدێلێکی ئەم ڕەنگەدا جێگەی نرخی دابینکەری مۆدێل و بەرهەم دەگرێتەوە — لە تێچووەوە نرخەکەی لەسەری بنیات دەنرێت (نرخی تایبەت هەرگیز لە خوار ئەو + کەمترین قازانجەوە نابێت)',
+  colourCostPriceFirstHint: 'لە هەموو مۆدێلێکی ئەم ڕەنگەدا جێگەی نرخی دابینکەری مۆدێل و بەرهەم دەگرێتەوە — نرخی دۆلار ناگۆڕێت، تەنها بۆ قازانج و ئاگاداری',
+  resetCost: 'تێچوو: گەڕانەوە بۆ تێچووی بنەڕەت',
 };
 
 export const V2_STRINGS: Readonly<Record<'ar' | 'en' | 'ckb', V2Strings>> = { ar: AR, en: EN, ckb: CKB };

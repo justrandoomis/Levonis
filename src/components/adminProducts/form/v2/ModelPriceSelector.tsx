@@ -2,15 +2,21 @@
  * A MODEL'S PRICE, IN ITS OWN CARD OF SECTION ٥ (implementation spec §5.2
  * `ModelPriceSelector.tsx`, §5.4; docs/PRICING-V2.md §1.4, §2.4, §2.5).
  *
- *   «السعر [يتبع المنتج | تكلفة مختلفة | فرق في السعر ± $ | سعر خاص $]»
+ *   «السعر [يتبع المنتج | فرق في السعر ± $ | سعر خاص $]»
+ *   «التكلفة [تتبع المنتج | تكلفة مختلفة]»   (the owner's, both methods)
  *   «خصم المسبق [يتبع المنتج: 50$ | استثناء]»
  * The inherited value is shown in grey; an override carries the chip
  * «استثناء» and «رجوع للموروث»; the result line «مباشر · مسبق» is the
- * server's answer for the model's SKU (`lineWithOption`). «تكلفة مختلفة» is
- * the owner's and exists from cost only: its own supplier price (the
- * product's shown in grey), its weight and box — the option's packaged
- * «أبعاد الخيار» themselves, one source, edited here or there — and its own
- * minimum profit «يتبع المنتج: $X | استثناء» (DECISIONS row 247). Under the
+ * server's answer for the model's SKU (`lineWithOption`). The cost is a
+ * choice of its own beside the price (DECISIONS row 254), the owner's in
+ * both methods: «تكلفة مختلفة» holds its own supplier price in its own
+ * currency — Iraqi dinars too, converted once at the save — (the product's
+ * shown in grey), its weight and box — the option's packaged «أبعاد الخيار»
+ * themselves, one source, edited here or there — and its own minimum profit
+ * «يتبع المنتج: $X | استثناء» (DECISIONS row 247). From cost it prices the
+ * model (cost + its minimum profit, a difference on top, a special price
+ * never below them); price-first it moves no price and feeds the owner's
+ * profit reading and the below-minimum-profit warning. Under the
  * result line the owner reads why: the discount taken («بعد خصم $35.00»),
  * the shelf, a discount withdrawn or a route stopped (`lineNotes`), and the
  * card's own «يجري الحساب» or failure. A price editor
@@ -22,8 +28,8 @@
 import { Select, TextInput } from '../formUi';
 import { emptyDimensions, type ProductDimensionsV2 } from '../../../../lib/productTypes';
 import {
+  COST_CURRENCIES,
   FOLLOW_MODEL,
-  SUPPLIER_CURRENCIES,
   firstPreorder,
   iqdText,
   modelFinalLine,
@@ -33,14 +39,15 @@ import {
   preorderOffOf,
   shelfOf,
   signedUsd,
+  unreadableAmount,
   usdText,
+  type CostCurrency,
   type ModelDraft,
   type ModelPriceMode,
   type SkuLine,
-  type SupplierCurrency,
 } from './v2Model';
 import { useV2 } from './useV2Pricing';
-import { boxOf, UnitInput } from './CostCard';
+import { boxOf, currencyLabel, UnitInput } from './CostCard';
 import { lineNotes } from './ResultBar';
 import FinalPriceField from './FinalPriceField';
 import { useEffect, useState } from 'react';
@@ -49,13 +56,14 @@ import { channelName, Chip, UsdInput, useV2Lang, useV2Strings, V2Field } from '.
 /** A reset is a real button (44px), not a text link. */
 const RESET = 'inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary';
 
+/** The model's price back to «يتبع المنتج» — its cost and its discount exception untouched (row 254: apart). */
+export const followPrice = (): Partial<ModelDraft> => ({ price: 'follow', usd: '' });
 /**
- * The model's price back to «يتبع المنتج» — its discount exception untouched. Its own cost and its own minimum
- * profit go (the save clears them: INHERIT); the weight and box are the option's dimensions, which stay.
+ * The model's cost back to «تتبع المنتج» — its price untouched. Its own cost and its own minimum profit go (the
+ * save clears them: INHERIT); the weight and box are the option's dimensions, which stay.
  */
-export const followPrice = (): Partial<ModelDraft> => ({
-  price: 'follow',
-  usd: '',
+export const followCost = (): Partial<ModelDraft> => ({
+  cost: 'follow',
   supplier_amount: '',
   supplier_currency: '',
   weight_g: null,
@@ -145,7 +153,7 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
           {s.sourceStock(iqdText(shelf.cost_iqd), shelf.units)}
         </p>
       ) : null}
-      {shelf && m.price === 'own_cost' ? (
+      {shelf && m.cost === 'own' ? (
         <p className="text-[11px] text-text-muted" dir="auto" data-v2-model-shelf-note={id}>
           {s.shelfOwnCostNote}
         </p>
@@ -157,7 +165,7 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
           ))}
         </ul>
       ) : null}
-      {owner && v2.measurePending.has(id) && m.price === 'own_cost' ? (
+      {owner && v2.measurePending.has(id) && m.cost === 'own' ? (
         <p className="text-[11px] text-amber-300" dir="auto" data-v2-model-measure-pending={id}>
           {s.measurePending(measure.heading)}
         </p>
@@ -182,11 +190,14 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
   const costFirst = d.method === 'cost';
   const modes: Array<{ value: ModelPriceMode; label: string }> = [
     { value: 'follow', label: s.followsProduct },
-    ...(isModel && costFirst && v2.owner ? [{ value: 'own_cost' as const, label: s.ownCost }] : []),
     { value: 'delta', label: s.priceDelta },
     ...(isModel ? [{ value: 'fixed' as const, label: s.fixedPrice }] : []),
   ];
   const price = modes.some((x) => x.value === m.price) ? m.price : 'follow';
+  // Row 254: the cost, beside the price — the owner's, on a model, in both methods.
+  const costChoice = owner && isModel;
+  const ownCost = costChoice && m.cost === 'own';
+  const ownCostHint = !costFirst ? s.ownCostPriceFirstHint : price === 'delta' ? s.ownCostDeltaHint : price === 'fixed' ? s.ownCostFixedHint : s.ownCostFollowHint;
 
   const productDiscount = d.discount_usd ? usdText(d.discount_usd) : s.discountNone;
   // The stored rule as it is (the stored draft's, so switching away and back finds it again).
@@ -197,7 +208,7 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
   // The note names what the option holds: pricing takes its weight and its whole box each on their own.
   const packWeight = optionPackageWeight(measure.dims) !== null;
   const packBox = optionPackageBox(measure.dims) !== null;
-  const dimsPricing = owner && d.method === 'cost' && m.price !== 'own_cost' && (packWeight || packBox);
+  const dimsPricing = owner && d.method === 'cost' && m.cost !== 'own' && (packWeight || packBox);
   // «تكلفة مختلفة»: the product's values every empty field inherits, shown in grey (§2.1 rule 2).
   const productCost = d.cost.supplier_amount ? `${d.cost.supplier_amount} ${d.cost.supplier_currency || ''}`.trim() : null;
   const inheritedT = v2.inheritedMinimumProfit;
@@ -216,6 +227,9 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
   const boxHint = ownBox !== null ? s.optionMeasureFrom(measure.heading) : m.box !== null ? s.savedPricingOnly(measure.heading) : s.inheritsProductMeasure(cmBoxText(d.cost.box) ?? '—');
   // An amount typed with no currency to price it in (the product has none to follow): said at the field.
   const currencyMissing = !m.supplier_currency && !d.cost.supplier_currency && m.supplier_amount.trim() !== '';
+  // The currency the amount is typed in (its own, else the product's): dinars are whole, converted at the save.
+  const amountCurrency = m.supplier_currency || d.cost.supplier_currency;
+  const amountHint = unreadableAmount(m.supplier_amount, amountCurrency) ? s.amountUnreadable : amountCurrency === 'IQD' ? s.iqdHint : productCost ? s.inheritedProduct(productCost) : undefined;
   // Emptied here, the field inherits: the option's own value goes, and so does a value saved in pricing only.
   const onWeight = (package_weight_g: number | null) => {
     measure.onDims({ ...dims, package_weight_g });
@@ -247,15 +261,31 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
           </V2Field>
         ) : null}
       </div>
-      {price === 'own_cost' ? (
+      {costChoice ? (
+        <V2Field label={s.costLabel} hint={ownCost ? ownCostHint : undefined}>
+          {(fid) => (
+            <Select
+              id={fid}
+              value={m.cost}
+              onChange={(e) => set(e.target.value === 'own' ? { cost: 'own' } : followCost())}
+              data-v2-field={`model-cost:${id}`}
+            >
+              <option value="follow">{s.costFollowsProduct}</option>
+              <option value="own">{s.ownCost}</option>
+            </Select>
+          )}
+        </V2Field>
+      ) : null}
+      {ownCost ? (
         <div className="grid min-w-0 gap-2 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
-          <V2Field label={s.supplier} hint={productCost ? s.inheritedProduct(productCost) : undefined}>
+          <V2Field label={s.supplier} hint={amountHint}>
             {(fid) => (
               <TextInput
                 id={fid}
                 inputMode="decimal"
                 value={m.supplier_amount}
                 placeholder={productCost ?? undefined}
+                aria-invalid={unreadableAmount(m.supplier_amount, amountCurrency) || undefined}
                 onChange={(e) => set({ supplier_amount: e.target.value.replace(/[^\d.٠-٩٫]/g, '') })}
                 data-v2-field={`model-supplier:${id}`}
               />
@@ -263,13 +293,13 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
           </V2Field>
           <V2Field label={s.supplierCurrency} hint={currencyMissing ? s.currencyRequired : undefined}>
             {(fid) => (
-              <Select id={fid} value={m.supplier_currency} onChange={(e) => set({ supplier_currency: e.target.value as SupplierCurrency | '' })} data-v2-field={`model-currency:${id}`}>
+              <Select id={fid} value={m.supplier_currency} onChange={(e) => set({ supplier_currency: e.target.value as CostCurrency | '' })} data-v2-field={`model-currency:${id}`}>
                 {/* Empty: the product's currency, which the request then names (an amount never travels without one);
                     a product with none offers no «يتبع المنتج» — the owner chooses. */}
                 <option value="">{d.cost.supplier_currency ? `${s.followsProduct}: ${d.cost.supplier_currency}` : s.currencyChoose}</option>
-                {SUPPLIER_CURRENCIES.map((c) => (
+                {COST_CURRENCIES.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {currencyLabel(c, s.iqdName)}
                   </option>
                 ))}
               </Select>
@@ -310,8 +340,9 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
                 )}
               </V2Field>
             ) : null}
-            {/* The model's final price: a two-way editor of its own minimum profit (2026-10-18). */}
-            {m.profit === 'exception' ? <FinalPriceField line={modelFinalLine(v2.answer?.table ?? [], line, id, d)} profit={m.profit_usd} onProfit={(profit_usd) => set({ profit_usd })} data={`model-final-usd:${id}`} /> : null}
+            {/* The model's final price: a two-way editor of its own minimum profit (2026-10-18) — from cost, its price
+                following that cost (a difference or a special price is typed, never derived from the profit). */}
+            {costFirst && price === 'follow' && m.profit === 'exception' ? <FinalPriceField line={modelFinalLine(v2.answer?.table ?? [], line, id, d)} profit={m.profit_usd} onProfit={(profit_usd) => set({ profit_usd })} data={`model-final-usd:${id}`} /> : null}
           </div>
         </div>
       ) : null}
@@ -340,7 +371,7 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
       ) : null}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         {result}
-        {price !== 'follow' || m.discount === 'exception' ? (
+        {price !== 'follow' || m.discount === 'exception' || ownCost ? (
           <span className="flex flex-wrap items-center gap-2">
             <Chip tone="info" data="exception">
               {s.exception}
@@ -350,6 +381,11 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
             {price !== 'follow' ? (
               <button type="button" className={RESET} onClick={() => set(followPrice())} data-v2-inherit={id} data-v2-inherit-price={id}>
                 {s.resetPrice}
+              </button>
+            ) : null}
+            {ownCost ? (
+              <button type="button" className={RESET} onClick={() => set(followCost())} data-v2-inherit-cost={id}>
+                {s.resetCost}
               </button>
             ) : null}
             {m.discount === 'exception' ? (

@@ -23,7 +23,7 @@ import { v2App, v2Context, writeV2 } from './fixtures/pricingV2';
 import { missingLine } from '../src/components/adminProducts/NeedsPricingQueue';
 import { boxOf, costSummaryParts } from '../src/components/adminProducts/form/v2/CostCard';
 import { resultTitle } from '../src/components/adminProducts/form/v2/ResultBar';
-import { followDiscount, followPrice } from '../src/components/adminProducts/form/v2/ModelPriceSelector';
+import { followCost, followDiscount, followPrice } from '../src/components/adminProducts/form/v2/ModelPriceSelector';
 import { inheritedUsd } from '../src/components/adminProducts/form/v2/FinalPricesTable';
 import { draftOf, FOLLOW_MODEL, inheritedSkuDiscount, inheritPlaceholder, type SkuLine, type V2Answer } from '../src/components/adminProducts/form/v2/v2Model';
 import { headerStatusText, V2_STRINGS } from '../src/components/adminProducts/form/v2/v2Strings';
@@ -84,7 +84,7 @@ test('C4/C11/C16: a box is kept until its three axes are set; the summary keeps 
     },
   } as unknown as V2Answer);
   assert.deepEqual(d.models.m1?.box, [400, 300, 200]);
-  assert.equal(d.models.m1?.price, 'own_cost');
+  assert.equal(d.models.m1?.cost, 'own');
   assert.match(src('src/components/adminProducts/form/v2/ModelPriceSelector.tsx'), /<ModelBoxInputs/);
 });
 
@@ -103,14 +103,19 @@ test('C18/C10: the result title of a product without options has no «(—)»; t
   assert.doesNotMatch(labels, /طريقة الشحن الافتراضية|Default shipping profile/);
 });
 
-test('C15: the model\'s price and its discount exception have one reset each', () => {
+test('C15: the model\'s price, its cost and its discount exception have one reset each', () => {
   const p = followPrice();
   const d = followDiscount();
+  const c = followCost();
   assert.equal(p.price, 'follow');
   assert.ok(!('discount' in p) && !('discount_usd' in p), 'resetting the price keeps the discount exception');
   assert.equal(d.discount, 'follow');
   assert.ok(!('price' in d) && !('usd' in d), 'resetting the discount keeps the price exception');
-  assert.equal(p.box, null);
+  // Row 254: the cost is a choice of its own — its reset clears the own cost, the price's leaves it.
+  assert.ok(!('cost' in p) && !('supplier_amount' in p), 'resetting the price keeps the own cost');
+  assert.equal(c.cost, 'follow');
+  assert.equal(c.box, null);
+  assert.ok(!('price' in c) && !('discount' in c), 'resetting the cost keeps the price and the discount');
 });
 
 test('C8: inherited values — the minimum-profit placeholder, the SKU discount and price behind visible labels', () => {

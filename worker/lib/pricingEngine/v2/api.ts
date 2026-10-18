@@ -512,7 +512,16 @@ export function v2Answer(i: AnswerInput): Record<string, unknown> {
     answer.v2_cost_inputs = {
       inputs: ev.inputs
         .filter((r) => !!r.scope)
-        .map((r) => ({ scope: r.scope, scope_id: r.scope_id ?? '', ...Object.fromEntries(FORM_INPUT_FIELDS.map((k) => [k, (r as Record<string, unknown>)[k] ?? null])) })),
+        .map((r) => ({
+          scope: r.scope,
+          scope_id: r.scope_id ?? '',
+          ...Object.fromEntries(FORM_INPUT_FIELDS.map((k) => [k, (r as Record<string, unknown>)[k] ?? null])),
+          // Row 254: a cost typed in dinars reads back as typed — the dinars (the stored amount is their USD at the
+          // rate of that save). The owner's alone (`v2_cost_inputs` is a FINANCIAL field). A preview's rows keep the
+          // stored row's mode: the form draws its fields from the stored answer only.
+          supplier_input_mode: r.supplier_input_mode ?? null,
+          original_input_amount: r.supplier_input_mode === 'IQD_CONVERTED' ? (r.original_input_amount ?? null) : null,
+        })),
       minimum_profit: ev.stored.rules
         .filter((r) => r.product_id === ev.product_id && r.kind === 'target_profit')
         // amount_iqd: a legacy dinar rule the dollar field cannot draw — the form shows it kept, never «يتبع المنتج».

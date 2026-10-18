@@ -126,8 +126,8 @@ are always both shown (fixes P4/P15).
 | Level | Choices (one selector) | Effect on D (P follows through Δ) |
 |---|---|---|
 | Product | method + inputs (1.2) | base D |
-| Model | «يتبع المنتج» · «تكلفة مختلفة» (cost-first, owner: own supplier cost + an optional minimum-profit exception, row 247) · «فرق في السعر ± $» · «سعر خاص $» — every mode ships on the option's packaged weight and box from «أبعاد الخيار» (row 247, 2026-10-18) | replaces or adjusts D |
-| Colour | «يتبع الموديل» · «± $ فوق الموديل» (Decision C) | adds to every model's D for that colour |
+| Model | price: «يتبع المنتج» · «فرق في السعر ± $» · «سعر خاص $»; beside it the owner's cost (both methods, row 254): «تتبع المنتج» · «تكلفة مختلفة» (own supplier cost in USD/EUR/CNY/IQD + an optional minimum-profit exception, row 247) — every mode ships on the option's packaged weight and box from «أبعاد الخيار» (row 247, 2026-10-18) | replaces or adjusts D (from cost, an own cost is the base the price follows, a difference adds to, a special price never goes below with T) |
+| Colour | price: «يتبع الموديل» · «± $ فوق الموديل» (Decision C); the owner's cost (row 254): «تتبع الموديل» · «تكلفة مختلفة» (amount + currency; it replaces the model's and the product's supplier cost on every model in that colour) | adds to every model's D for that colour |
 | SKU (model × colour) | in «التفاصيل» only: «سعر خاص $» | replaces D for that SKU |
 
 - A colour difference adds the same USD to every model, so «Red +$2» never erases Combo's
@@ -398,7 +398,9 @@ four-cell bar plus the pre-order cell. The per-model table becomes one card per 
 - The structure (models, colours, links, «يُباع» with routes and lead times, stock) stays here
   for everyone.
 - The price selectors are the only money on these cards.
-- «تكلفة مختلفة» appears only in cost-first mode and only for the owner.
+- The cost choice («التكلفة») is the owner's alone, on every model and colour card, in both methods
+  (DECISIONS row 254): from cost it prices; price-first it moves no price and feeds the owner's
+  cost/profit reading and the below-minimum-profit warning only. A price editor never sees it.
 - Adding a model or enabling a route is a normal edit. The same save computes and reviews the
   new SKU prices. There is no 409 `ENGINE_MANAGED` dead end any more (P9).
 
