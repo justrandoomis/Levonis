@@ -717,6 +717,9 @@ export function docWithoutLegacyMoney<T extends Record<string, unknown>>(doc: T)
 /** Is there anything to send? */
 export const wireIsEmpty = (w: V2DraftWire): boolean => Object.keys(w).length === 0;
 
+/** The wire but the minimum profit: what a SKU's dollars without profit depend on (the final price's cost). */
+export const withoutMinimumProfit = ({ cost, ...rest }: V2DraftWire): V2DraftWire => (cost?.inputs ? { ...rest, cost: { inputs: cost.inputs } } : rest);
+
 // ---------------------------------------------------------- the table view --
 
 export interface SkuLine {
@@ -917,16 +920,33 @@ export function profitForFinal(typed: string, base: string): { ok: true; usd: st
 }
 
 /**
- * The product's reference SKU for its final price: the result bar's line when it takes the product's minimum
- * profit and is priced, else the first that is — a model in «تكلفة مختلفة» with its own (or a kept) minimum
- * profit never is.
+ * A SKU whose direct dollars T moves one for one: priced from its cost, with no «سعر خاص» of its model or its own
+ * (the draft's points, as `draftRows` sends them). On a special price the server takes max(the price, cost + T)
+ * (C-9), so «final − T» there is not the cost.
  */
-export function productFinalLine(table: readonly V2TableRow[], lead: SkuLine | null, models: Readonly<Record<string, ModelDraft>>): SkuLine | null {
+const finalFromCost = (draft: Pick<PriceDraft, 'models' | 'skus'>, l: SkuLine): boolean => {
+  const m = l.model_id ? draft.models[l.model_id] : undefined;
+  if (m?.price === 'fixed' && cleanUsd(m.usd)) return false;
+  return !cleanUsd(draft.skus[l.combo_key]?.fixed_usd ?? '') && finalUsdOf(l) !== null;
+};
+
+/**
+ * The product's reference SKU for its final price: the result bar's line when it takes the product's minimum
+ * profit and is priced from cost, else the first that is — a model in «تكلفة مختلفة» with its own (or a kept)
+ * minimum profit never is, nor a SKU on a special price.
+ */
+export function productFinalLine(table: readonly V2TableRow[], lead: SkuLine | null, draft: Pick<PriceDraft, 'models' | 'skus'>): SkuLine | null {
   const follows = (l: SkuLine) => {
-    const m = l.model_id ? models[l.model_id] : undefined;
-    return !(m && m.price === 'own_cost' && m.profit !== 'follow') && finalUsdOf(l) !== null;
+    const m = l.model_id ? draft.models[l.model_id] : undefined;
+    return !(m && m.price === 'own_cost' && m.profit !== 'follow') && finalFromCost(draft, l);
   };
   return lead && follows(lead) ? lead : (skuLines(table).find(follows) ?? null);
+}
+
+/** A model's («تكلفة مختلفة») reference SKU for its own final price: its card's line when priced from cost, else its first that is. */
+export function modelFinalLine(table: readonly V2TableRow[], line: SkuLine | null, modelId: string, draft: Pick<PriceDraft, 'models' | 'skus'>): SkuLine | null {
+  if (line && line.model_id === modelId && finalFromCost(draft, line)) return line;
+  return skuLines(table).find((l) => l.model_id === modelId && finalFromCost(draft, l)) ?? null;
 }
 
 /** A signed dollar difference as typed («+2», «−25»). Display only. */

@@ -23,7 +23,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '../../../../lib/api';
 import type { ProductDimensionsV2 } from '../../../../lib/productTypes';
-import { dollarsOf, draftOf, draftWire, measurePendingOf, withOptionMeasure, withPackageMeasure, wireIsEmpty, type PriceDraft, type V2Answer, type V2DraftWire, type V2LiveIds } from './v2Model';
+import { dollarsOf, draftOf, draftWire, measurePendingOf, withOptionMeasure, withPackageMeasure, wireIsEmpty, withoutMinimumProfit, type PriceDraft, type V2Answer, type V2DraftWire, type V2LiveIds } from './v2Model';
 
 export interface V2FormInput {
   /** The form edits an ordinary product (a bundle is never V2-priced). */
@@ -86,6 +86,12 @@ export interface V2PricingState {
   storedDraft: PriceDraft | null;
   /** The answer on screen prices the draft (not the stored product). */
   drafting: boolean;
+  /**
+   * What the answer on screen prices (the final price, FinalPriceField): `draft` — the draft as it stands;
+   * `cost` — every input of it but the minimum profit, so its dollars without profit are current. Both false
+   * from an edit until its preview answers (the 400 ms wait, the request) and while a preview has failed.
+   */
+  priced: { draft: boolean; cost: boolean };
   discard: () => void;
   reload: () => void;
   /**
@@ -111,6 +117,7 @@ export interface V2PricingState {
 const V2Context = createContext<V2PricingState | null>(null);
 export const V2PricingProvider = V2Context.Provider;
 export const useV2 = (): V2PricingState | null => useContext(V2Context);
+const STORED = { all: '', cost: '' };
 
 /** No saved option dimensions (add-product, or before the first load). */
 const NO_PACKAGES: Readonly<Record<string, ProductDimensionsV2 | null | undefined>> = {};
@@ -125,6 +132,8 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
   const [loading, setLoading] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState('');
+  // The preview keys (below) the answer on screen was computed for: '' the stored product, nothing drafted.
+  const [pricedFor, setPricedFor] = useState<{ all: string; cost: string } | null>(null);
   const [base, setBase] = useState<PriceDraft | null>(null);
   const [draft, setDraftState] = useState<PriceDraft | null>(null);
   const [review, setReview] = useState<V2Review | null>(null);
@@ -165,6 +174,7 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
         if (!alive) return;
         setStored(a);
         setAnswer(a);
+        setPricedFor(STORED);
         adopt(a);
       })
       .catch((e) => {
@@ -185,6 +195,7 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
     loadedFor.current = `new#${draftId}`;
     setStored(null);
     setAnswer(null);
+    setPricedFor(null);
     adopt(null);
   }, [mode, draftId, adopt]);
 
@@ -229,12 +240,19 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
   // The preview: the draft and the structure, 400 ms after the last change, the previous request aborted.
   const needsPreview = mode === 'new' || (mode === 'stored' && (!wireIsEmpty(wire) || structureDirty));
   const previewKey = needsPreview ? `${mode}|${wireKey}|${mode === 'new' || structureDirty ? structureKey : ''}` : '';
+  // The same, the minimum profit aside: a T typed (in its field or as a final price) leaves the cost priced.
+  const costWire = withoutMinimumProfit(wire);
+  const costKey =
+    mode === 'new' || (mode === 'stored' && (!wireIsEmpty(costWire) || structureDirty)) ? `${mode}|${JSON.stringify(costWire)}|${mode === 'new' || structureDirty ? structureKey : ''}` : '';
   const structureRef = useRef(structureOf);
   structureRef.current = structureOf;
   useEffect(() => {
     if (!previewKey) {
       // Nothing drafted: the stored answer is what is shown.
-      if (mode === 'stored') setAnswer(stored);
+      if (mode === 'stored') {
+        setAnswer(stored);
+        setPricedFor(STORED);
+      }
       setPreviewing(false);
       return;
     }
@@ -252,6 +270,7 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
         .post<V2Answer>('/api/admin/products-v2/pricing/preview', body, { signal: controller.signal, mascot: 'silent' })
         .then((a) => {
           setAnswer(a);
+          setPricedFor({ all: previewKey, cost: costKey });
           setError('');
         })
         .catch((e) => {
@@ -273,6 +292,7 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
   const discard = useCallback(() => {
     setDraftState(base);
     setAnswer(stored);
+    setPricedFor(STORED);
     setError('');
   }, [base, stored]);
 
@@ -338,6 +358,7 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
     measurePending,
     storedDraft: base,
     drafting: !!previewKey && shown !== stored,
+    priced: { draft: !!pricedFor && pricedFor.all === previewKey, cost: !!pricedFor && pricedFor.cost === costKey },
     discard,
     reload,
     saveBlock,

@@ -91,7 +91,11 @@ There are two ways to set it, chosen per product (Decision A):
     X stores T = X − (the reference SKU's D_usd − T, from the current preview), taken down to
     the cent, so the customer's dollars (rounded up to the cent, row 248) are X. A typed T moves
     it on the next preview. At or below cost it is refused. The dinars may still be lifted by
-    the rounding rule (row 245).
+    the rounding rule (row 245). The reference SKU is priced from cost alone: never one on a
+    «سعر خاص» (its model's or its own), where D is max(the price, R + T) and T does not move it
+    one for one. Any other edit (cost, shipping, a difference, the route) closes the field («…»)
+    until its preview answers, and so does a failed preview; an emptied or unreadable T shows
+    no figure until its preview.
 - **«سعر بالدولار» (price-first):** the owner types D_usd. Cost inputs become optional and serve
   profit reports and estimates only.
 

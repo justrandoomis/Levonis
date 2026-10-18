@@ -124,7 +124,7 @@ export default function PricesSectionV2({
               modelNames={modelNames}
               onJump={onJump}
               inheritedMinProfit={a?.v2_cost_inputs?.inherited_minimum_profit ?? null}
-              finalLine={v2.owner ? productFinalLine(table, lead, d.models) : null}
+              finalLine={v2.owner ? productFinalLine(table, lead, d) : null}
             />
           </div>
         )

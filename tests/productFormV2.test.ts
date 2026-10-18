@@ -112,6 +112,7 @@ function stateOf(a: V2Answer | null, over: Partial<V2PricingState> = {}): V2Pric
     measurePending: new Set(),
     storedDraft: draftOf(a),
     drafting: false,
+    priced: { draft: true, cost: true },
     discard: () => undefined,
     reload: () => undefined,
     saveBlock: () => null,

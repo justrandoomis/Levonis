@@ -23,10 +23,13 @@ import {
   draftWire,
   finalUsdOf,
   FOLLOW_MODEL,
+  modelFinalLine,
   productFinalLine,
   profitForFinal,
   skuLines,
   usdCentsUp,
+  wireIsEmpty,
+  withoutMinimumProfit,
   type PriceDraft,
   type V2Answer,
   type V2LiveIds,
@@ -85,7 +88,8 @@ const draftWith = (a: V2Answer, over: Partial<PriceDraft> = {}): PriceDraft => {
   const d = draftOf(a);
   return { ...d, models: { ...d.models, m2: M2_OWN }, ...over };
 };
-function stateOf(a: V2Answer, draft: PriceDraft = draftWith(a)): V2PricingState {
+// The answer prices the draft when the draft is its own; `priced` says otherwise (an edit waiting for its preview).
+function stateOf(a: V2Answer, draft: PriceDraft = draftWith(a), over: Partial<V2PricingState> = {}): V2PricingState {
   const owner = a.can_edit.cost;
   return {
     mode: 'stored',
@@ -105,6 +109,7 @@ function stateOf(a: V2Answer, draft: PriceDraft = draftWith(a)): V2PricingState 
     measurePending: new Set(),
     storedDraft: draftWith(a),
     drafting: false,
+    priced: { draft: JSON.stringify(draft) === JSON.stringify(draftWith(a)), cost: true },
     discard: () => undefined,
     reload: () => undefined,
     saveBlock: () => null,
@@ -116,6 +121,7 @@ function stateOf(a: V2Answer, draft: PriceDraft = draftWith(a)): V2PricingState 
     selectedColours: new Set(),
     toggleColour: () => undefined,
     clearColours: () => undefined,
+    ...over,
   };
 }
 const inLang = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement(LanguageProvider, { children: el }));
@@ -237,6 +243,69 @@ test('a model in «تكلفة مختلفة» has its own final price beside its 
   // The product's reference SKU is never one with its own minimum profit.
   const lines = skuLines(a.table);
   const m2 = lines.find((l) => l.model_id === 'm2')!;
-  assert.equal(productFinalLine(a.table, m2, base.models)?.model_id, 'm1');
-  assert.equal(productFinalLine(a.table, m2, {})?.model_id, 'm2', 'a model that follows the product is its reference');
+  assert.equal(productFinalLine(a.table, m2, base)?.model_id, 'm1');
+  assert.equal(productFinalLine(a.table, m2, { models: {}, skus: {} })?.model_id, 'm2', 'a model that follows the product is its reference');
+});
+
+test('a SKU on a special price is never the final price’s reference — T does not move it one for one (C-9)', () => {
+  // m1 «سعر خاص» $150 at cost $100 and T $10: the server prices max($150, $110) = $150, so «150 − 10» is no cost.
+  const a = answer([row('m1', '150', '10', 225_000), row('m3', '110', '10', 165_000)]);
+  const m1 = skuLines(a.table)[0];
+  const special = (usd: string): PriceDraft['models'] => ({ m1: { ...FOLLOW_MODEL, price: 'fixed', usd } });
+  assert.equal(productFinalLine(a.table, m1, draftWith(a, { models: special('150') }))?.model_id, 'm3', 'the first SKU priced from cost alone');
+  assert.equal(productFinalLine(a.table, m1, draftWith(a, { skus: { 'o:m1': { fixed_usd: '150', discount_usd: '' } } }))?.model_id, 'm3', 'a SKU’s own special price, too');
+  assert.equal(productFinalLine(a.table, m1, draftWith(a, { models: special('') }))?.model_id, 'm1', 'an empty special price sends no point: priced from cost');
+  // Nothing priced from cost alone: the field is closed, and says why.
+  const only = answer([row('m1', '150', '10', 225_000)]);
+  const html = section3(stateOf(only, draftWith(only, { models: special('150') }), { priced: { draft: true, cost: true } }));
+  assert.match(inputOf(html, 'final-usd') ?? '', /disabled/);
+  assert.ok(html.includes(S.finalPriceWaiting));
+  // A model's own final price skips its SKU on a special price.
+  const t = answer(TABLE());
+  const m2 = skuLines(t.table).find((l) => l.model_id === 'm2')!;
+  assert.equal(modelFinalLine(t.table, m2, 'm2', draftWith(t))?.combo_key, 'o:m2');
+  const fixedSku = draftWith(t, { skus: { 'o:m2': { fixed_usd: '300', discount_usd: '' } } });
+  assert.equal(modelFinalLine(t.table, m2, 'm2', fixedSku), null);
+  assert.match(inputOf(modelCard(stateOf(t, fixedSku, { priced: { draft: true, cost: true } }), 'm2'), 'model-final-usd:m2') ?? '', /disabled/);
+});
+
+test('any other edit (the cost, the shipping, a difference…) closes the final price until its preview answers — never an old cost', () => {
+  const a = answer(TABLE());
+  const base = draftWith(a);
+  const moved = { ...base, cost: { ...base.cost, supplier_amount: '120', supplier_currency: 'USD' as const } };
+  const waiting = { priced: { draft: false, cost: false } };
+  for (const previewing of [false, true]) {
+    const html = section3(stateOf(a, moved, { ...waiting, previewing }));
+    const tag = inputOf(html, 'final-usd') ?? '';
+    assert.match(tag, /disabled/, 'the 400 ms wait and the request alike');
+    assert.equal(valueOf(html, 'final-usd'), '', 'never the old $125.00');
+    assert.match(tag, /placeholder="…"/);
+    assert.ok(html.includes(S.computing));
+  }
+  // A failed preview: still closed, and it says it waits for a priced preview.
+  const failed = section3(stateOf(a, moved, { ...waiting, error: 'x' }));
+  assert.match(inputOf(failed, 'final-usd') ?? '', /disabled/);
+  assert.ok(failed.includes(S.finalPriceWaiting));
+  // The model's own final price waits too.
+  assert.match(inputOf(modelCard(stateOf(a, moved, waiting), 'm2'), 'model-final-usd:m2') ?? '', /disabled/);
+  // What «cost» compares: the wire but the minimum profit — a T typed (the product's or a model's) leaves it, so
+  // the final price stays open while it is typed; any other input moves it.
+  const costOf = (d: PriceDraft) => withoutMinimumProfit(draftWire(base, d, { points: [], discounts: [] }, LIVE, OPTS));
+  assert.ok(wireIsEmpty(costOf({ ...base, min_profit_usd: '40' })));
+  assert.ok(wireIsEmpty(costOf({ ...base, min_profit_usd: '' })));
+  assert.ok(wireIsEmpty(costOf({ ...base, models: { ...base.models, m2: { ...M2_OWN, profit_usd: '50' } } })));
+  assert.ok(!wireIsEmpty(costOf(moved)));
+});
+
+test('an emptied (inherited) or unreadable minimum profit never shows the old T’s final price', () => {
+  const inherited = { amount_usd: '10', amount_iqd: null };
+  const a = answer(TABLE(), { v2_cost_inputs: { inputs: [], minimum_profit: [{ scope: 'product', scope_id: null, state: 'active', amount_usd: '25' }], inherited_minimum_profit: inherited } });
+  for (const min_profit_usd of ['', 'abc']) {
+    const html = section3(stateOf(a, draftWith(a, { min_profit_usd })));
+    assert.equal(valueOf(html, 'final-usd'), '', `«${min_profit_usd}»: not the $125.00 of T $25`);
+    assert.match(inputOf(html, 'final-usd') ?? '', /placeholder="…"/);
+  }
+  // Its preview answers with the inherited T ($100 + $10): the draft's own figure, shown.
+  const after = answer(TABLE(row('m1', '110', '10', 165_000)), { v2_cost_inputs: { inputs: [], minimum_profit: [], inherited_minimum_profit: inherited } });
+  assert.equal(valueOf(section3(stateOf(after, draftWith(after, { min_profit_usd: '' }))), 'final-usd'), '110.00');
 });

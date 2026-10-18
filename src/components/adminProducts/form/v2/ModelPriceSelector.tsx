@@ -26,6 +26,7 @@ import {
   SUPPLIER_CURRENCIES,
   firstPreorder,
   iqdText,
+  modelFinalLine,
   nameIn,
   optionPackageBox,
   optionPackageWeight,
@@ -306,7 +307,7 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
               </V2Field>
             ) : null}
             {/* The model's final price: a two-way editor of its own minimum profit (2026-10-18). */}
-            {m.profit === 'exception' ? <FinalPriceField line={line} profit={m.profit_usd} onProfit={(profit_usd) => set({ profit_usd })} data={`model-final-usd:${id}`} /> : null}
+            {m.profit === 'exception' ? <FinalPriceField line={modelFinalLine(v2.answer?.table ?? [], line, id, d)} profit={m.profit_usd} onProfit={(profit_usd) => set({ profit_usd })} data={`model-final-usd:${id}`} /> : null}
           </div>
         </div>
       ) : null}
