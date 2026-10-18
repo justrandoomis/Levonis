@@ -44,7 +44,7 @@
  * printer fees in mixed carts, carton-fee interaction with the waiver.
  */
 
-import { DELIVERY_POLICY_FALLBACK, deliveryCharge, type DeliveryMode, type DeliveryPolicy } from './storeDelivery';
+import { DELIVERY_POLICY_FALLBACK, deliveryCharge, type DeliveryMode, type DeliveryName, type DeliveryPolicy } from './storeDelivery';
 
 export interface ShippingConfig {
   ordinary_iqd: number;
@@ -120,6 +120,8 @@ export interface ShippingComponent {
   block_size?: number;
   /** The default component's price: the governorate's own, or the default. */
   fee_source?: 'governorate' | 'default';
+  /** A delivery-policy group component: the group's name (ar / en / ckb). */
+  rule_name?: DeliveryName;
 }
 
 export interface ShippingQuote {
@@ -380,6 +382,7 @@ export function quoteShipping(input: {
         block_size: part.block_size,
         fee_per_step_iqd: part.fee_per_step_iqd,
         ...(part.fee_source ? { fee_source: part.fee_source } : {}),
+        ...(part.rule_name ? { rule_name: part.rule_name } : {}),
         fee_iqd: part.fee_iqd,
         waived: ruleFeeWaived,
         units: part.units,

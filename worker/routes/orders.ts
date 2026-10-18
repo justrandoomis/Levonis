@@ -3098,14 +3098,14 @@ export async function computeCheckout(
 
   // Store pickup: no last-mile delivery happens, so no delivery fees at all.
   const isPickup = delivery.id === 'pickup';
-  const productDeliveryMethod: ProductDeliveryMethod | null =
-    delivery.id === 'standard' || delivery.id === 'personal' ? delivery.id : null;
   /**
-   * THE DELIVERY POLICY'S DOOR (standard method): a governorate where
-   * delivery is stopped, or a product in a «لا يُوصَّل» group, refuses the
-   * method — the same pure answer the quote below prices with.
+   * THE DELIVERY POLICY'S DOOR (every home-delivery method, not only
+   * standard): a governorate where delivery is stopped, or a product in a
+   * «لا يُوصَّل» group, cannot be delivered by any courier, so it refuses the
+   * method — the same pure answer the standard quote below prices with.
+   * Only a method that is not a home delivery (store pickup) stays open.
    */
-  if (!isPickup && productDeliveryMethod === 'standard') {
+  if (!isPickup && deliversToHome(delivery)) {
     const answer = deliveryCharge({
       parts: priced.shippingItems.map((it) => ({ ...it, category_path: deliveryPath(it) })),
       policy: deliveryPolicy,
@@ -3122,7 +3122,7 @@ export async function computeCheckout(
       throw badRequest(
         'The selected delivery method is unavailable for one or more products in the cart.',
         'DELIVERY_METHOD_UNAVAILABLE',
-        { delivery_method_id: productDeliveryMethod, unavailable_product_ids: answer.stopped_product_ids }
+        { delivery_method_id: delivery.id, unavailable_product_ids: answer.stopped_product_ids }
       );
     }
   }

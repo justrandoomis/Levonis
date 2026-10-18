@@ -937,7 +937,8 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     labels: upgradeLabels(row.labels),
     warranty_plans: upgradeWarranty(row.warranty_plans),
     ...ops,
-    delivery_options: readProductDeliveryOptions(ops.ops_policy),
+    // Retired (DECISIONS row 253): no reader; a leftover stored value is not projected.
+    delivery_options: null,
     content_blocks: upgradeContentBlocks(row.content_blocks),
     translation_meta: safeParse<TranslationMeta>(row.translation_meta, {}),
     is_featured: !!row.is_featured,
@@ -1190,17 +1191,25 @@ export function validateProductDoc(
       ? (body.ops_policy as Record<string, unknown>)
       : {};
 
+  /**
+   * RETIRED (DECISIONS row 253): delivery is the store's «إدارة التوصيل»
+   * policy, and nothing reads a per-product `delivery_options` any more. It is
+   * never stored again (serializeDoc drops it). A save that asks to STOP a
+   * product's standard delivery here — an admin tab still on the old form —
+   * is refused in words rather than stored and silently ignored; anything
+   * else (the old form's defaults, an import carry-over) is dropped.
+   */
   const deliveryRaw = body.delivery_options === undefined ? opsCarried.delivery_options : body.delivery_options;
-  let deliveryOptions: ProductDeliveryOptions | null = null;
-  if (deliveryRaw !== undefined && deliveryRaw !== null && deliveryRaw !== '') {
-    deliveryOptions = readProductDeliveryOptions(deliveryRaw);
-    if (!deliveryOptions) {
-      fail(
-        'delivery_options',
-        'standard and personal must each contain enabled (boolean), quantity_step (integer >= 1), and fee_iqd (integer >= 0)'
-      );
-    }
+  const deliveryAsked = deliveryRaw !== undefined && deliveryRaw !== null && deliveryRaw !== '' ? readProductDeliveryOptions(deliveryRaw) : null;
+  if (deliveryAsked && !deliveryAsked.standard.enabled) {
+    fail(
+      'delivery_options',
+      'أُلغي إيقاف التوصيل من نموذج المنتج — استخدم «إدارة التوصيل» (قاعدة «لا يُوصَّل») / ' +
+        'Per-product delivery is retired — use Delivery management («لا يُوصَّل» rule) / ' +
+        'ڕاگرتنی گەیاندن لە فۆرمی بەرهەمەوە لابراوە — «بەڕێوەبردنی گەیاندن» بەکاربهێنە (یاسای «ناگەیەندرێت»)'
+    );
   }
+  const deliveryOptions: ProductDeliveryOptions | null = null;
 
   const stock = body.stock === null || body.stock === undefined || body.stock === '' ? null : body.stock;
   if (stock !== null && (!Number.isInteger(stock) || (stock as number) < 0)) fail('stock', 'must be a non-negative integer or null (untracked)');
@@ -1479,8 +1488,8 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     serialized: doc.serialized,
     warranty_base_months: doc.warranty_base_months,
   });
-  if (doc.delivery_options) ops.delivery_options = doc.delivery_options;
-  else delete ops.delivery_options;
+  // Retired per-product delivery (DECISIONS row 253): never written again.
+  delete ops.delivery_options;
   return {
     id: doc.id,
     slug: doc.slug,

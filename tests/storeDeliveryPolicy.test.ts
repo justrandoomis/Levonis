@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { quoteShipping, type ShippingConfig, type ShippingItem } from '../worker/lib/shipping';
+import { serializeDoc, validateProductDoc } from '../worker/lib/productModel';
 import {
   DELIVERY_POLICY_FALLBACK,
   deliveryCharge,
@@ -29,7 +30,7 @@ const group = (over: Partial<DeliveryRuleGroup> & Pick<DeliveryRuleGroup, 'id'>)
   ...over,
 });
 
-/** The owner's starting rules, as migration 0201 seeds them. */
+/** The owner's starting rules, as migration 0203 seeds them. */
 const SEEDED: DeliveryPolicy = {
   version: 1,
   default_fee_iqd: 5_000,
@@ -249,4 +250,58 @@ test('normalizeDeliveryPolicy drops a malformed group or governorate entry and k
   assert.deepEqual(n.governorates, { baghdad: { fee_iqd: 3000 } });
   assert.equal(normalizeDeliveryPolicy('nonsense'), DELIVERY_POLICY_FALLBACK);
   assert.equal(normalizeDeliveryPolicy({ ...v, default_fee_iqd: 'x' }).default_fee_iqd, 5_000);
+});
+
+test('a printer by the owner\'s flag that no group names is priced by the printers group, never the default', () => {
+  // «أجهزة الليزر» itself is a printer catalog the seeded rule leaves out (it holds accessories too).
+  const laser = { product_id: 'lz', qty: 2, category_path: ['cat_laser'], is_printer: true };
+  assert.equal(resolveDeliveryGroup(laser, SEEDED)?.id, 'g_printers');
+  assert.equal(deliveryCharge({ parts: [laser], policy: SEEDED }).total_iqd, 20_000);
+  // With filament the printer still adds its own charge.
+  const spools = { product_id: 'pla', qty: 12, category_path: ['cat_materials_fdm'] };
+  assert.equal(deliveryCharge({ parts: [laser, spools], policy: SEEDED }).total_iqd, 30_000);
+  // A product or section rule still wins over the flag; a non-printer stays on the default.
+  assert.equal(resolveDeliveryGroup({ product_id: 'h2s', category_path: ['cat_laser'], is_printer: true }, SEEDED)?.id, 'g_printers_large');
+  assert.equal(resolveDeliveryGroup({ product_id: 'acc', category_path: ['cat_laser'] }, SEEDED), null);
+  // The missing-row fallback reproduces the old tariff for ANY flagged printer: one flat 10,000.
+  assert.equal(deliveryCharge({ parts: [{ ...laser, qty: 3 }], policy: DELIVERY_POLICY_FALLBACK }).total_iqd, 10_000);
+  assert.equal(deliveryCharge({ parts: [{ ...laser, qty: 1 }, spools], policy: DELIVERY_POLICY_FALLBACK }).total_iqd, 10_000);
+  // The printers group switched off: the flag alone prices nothing extra.
+  const off: DeliveryPolicy = { ...SEEDED, groups: SEEDED.groups.map((g) => (g.id === 'g_printers' ? { ...g, enabled: false } : g)) };
+  assert.equal(deliveryCharge({ parts: [laser], policy: off }).total_iqd, 5_000);
+});
+
+test('every rule component carries its group\'s name in the three languages for the checkout breakdown', () => {
+  const charge = deliveryCharge({
+    parts: [{ product_id: 'pla', qty: 12, category_path: ['cat_materials_fdm'] }],
+    policy: SEEDED,
+  });
+  assert.deepEqual(charge.components[0].rule_name, { ar: 'قاعدة', en: 'Rule', ckb: 'یاسا' });
+  const q = quote([filament(12)]);
+  assert.equal(q.components[0].kind, 'rule');
+  assert.deepEqual(q.components[0].rule_name, { ar: 'قاعدة', en: 'Rule', ckb: 'یاسا' });
+  assert.equal(q.total_iqd, 10_000);
+  // Through the quote, the printer FACT on a line reaches the printers group too.
+  const lz = quote([{ product_id: 'lz', qty: 2, size_class: 'ordinary', category_path: ['cat_laser'], is_printer: true } as ShippingItem]);
+  assert.equal(lz.total_iqd, 20_000);
+});
+
+test('a product save can never re-create the retired per-product delivery_options', () => {
+  const rule = (enabled: boolean, fee: number) => ({ enabled, quantity_step: 1, fee_iqd: fee });
+  // The old form's defaults (a stale admin tab, a new product's blank doc): dropped, not stored.
+  const doc = validateProductDoc({
+    name_en: 'Probe',
+    price_iqd: 100_000,
+    delivery_options: { standard: rule(true, 5_000), personal: rule(true, 10_000) },
+    ops_policy: { delivery_options: { standard: rule(true, 5_000), personal: rule(true, 10_000) }, keep: 1 },
+  });
+  assert.equal(doc.delivery_options, null);
+  const ops = JSON.parse(String(serializeDoc({ ...doc, ops_policy: { ...doc.ops_policy, delivery_options: { stale: true } } }).ops_policy));
+  assert.equal('delivery_options' in ops, false);
+  assert.equal(ops.keep, 1, 'the rest of ops_policy is carried');
+  // Asking to STOP a product's delivery here is refused in words, never silently ignored.
+  assert.throws(
+    () => validateProductDoc({ name_en: 'Probe', price_iqd: 100_000, delivery_options: { standard: rule(false, 5_000), personal: rule(true, 10_000) } }),
+    (err: unknown) => /delivery_options/.test(String((err as Error).message)) && /Delivery management/.test(String((err as Error).message))
+  );
 });
