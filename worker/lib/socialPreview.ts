@@ -719,7 +719,7 @@ function segmentForApi(raw: string): string | null {
  *                              the gate decides whether Community renders at all)
  *
  * THE CATEGORY PAGES NAME THEIR OWN CHUNK ONLY, AT LOW PRIORITY (speed lane
- * review): their whole closure (24 modulepreloads, the cap) shared the Slow-4G
+ * review): their whole closure (24 modulepreloads, the cap then) shared the Slow-4G
  * link with the entry and painted the shell 40–250 ms LATER than the bare
  * document did. With the page's chunk alone, behind the entry and the first read,
  * the shell paints 80–110 ms earlier than the bare document and the largest
@@ -759,6 +759,18 @@ export function mainOpeningFor(pathname: string, search = ''): MainOpening | nul
   return null;
 }
 
+/**
+ * THE CAP sits above the largest closure a document names whole, so it stays
+ * the runaway guard and never cuts a real page short. /product/:slug is 30
+ * files beyond the entry since the colour and discount work (speed landing
+ * review, 2026-10-18); at 24 its last six (ColourTag among them) were found
+ * only once their importer had been parsed. They are helpers dozens of pages
+ * import, so they cannot fold into the page's chunk, and folding them into the
+ * entry would make every route pay for them before its first paint.
+ * tests/bundleBudget.test.ts holds the product opening inside this cap.
+ */
+export const CHUNK_PRELOAD_CAP = 32;
+
 /** Every manifest key reachable from `key` through STATIC imports, `key` first. */
 function staticClosure(manifest: ViteManifest, key: string): string[] {
   const seen = new Set<string>();
@@ -790,7 +802,7 @@ function staticClosure(manifest: ViteManifest, key: string): string[] {
 export function chunkPreloads(
   manifest: ViteManifest,
   key: string,
-  cap = 24
+  cap = CHUNK_PRELOAD_CAP
 ): { scripts: string[]; styles: string[] } {
   let routeKey = key;
   if (!manifest[routeKey]) {

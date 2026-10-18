@@ -36,6 +36,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STOREFRONT_FIXED_KB } from '../worker/lib/storeSpeed';
+import { CHUNK_PRELOAD_CAP, chunkPreloads, type ViteManifest } from '../worker/lib/socialPreview';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'dist');
@@ -483,13 +484,18 @@ test('opening a product excludes below-fold reviews, closed purchase dialogs, re
   const bytes = [...opening].reduce((sum, file) => sum + gz(join(ASSETS, file)), 0);
   console.log(`bundle: product opening ${kb(bytes)} gzip (complete static closure)`);
   assert.ok(bytes <= PRODUCT_OPENING_BUDGET, `the product page's opening is ${kb(bytes)} gzip, over ${kb(PRODUCT_OPENING_BUDGET)}`);
-  // The Worker modulepreloads at most 24 files of a route's closure beyond the entry (socialPreview.ts chunkPreloads):
-  // a 25th is discovered only when its importer has been parsed. The colour and discount work had already taken
-  // the opening to 30 files beyond the entry before the speed lanes landed on it (2026-10-18), so the six past the
-  // 24th are found late; held at 30 here so it cannot grow further while that is brought back under the cap.
+  // The Worker modulepreloads at most CHUNK_PRELOAD_CAP files of a route's closure beyond the entry
+  // (socialPreview.ts chunkPreloads): one past the cap is discovered only when its importer has been parsed.
+  // Asked of chunkPreloads itself on this build, so a reordered closure cannot push a file (the 32 KB animation
+  // core above all) out of the document's list while the count still fits.
   const entryClosure = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
   const beyondEntry = [...opening].filter((f) => !entryClosure.has(f));
-  assert.ok(beyondEntry.length <= 30, `the product opening is ${beyondEntry.length} files beyond the entry; the document preloads 24`);
+  assert.ok(beyondEntry.length <= CHUNK_PRELOAD_CAP, `the product opening is ${beyondEntry.length} files beyond the entry; the document preloads ${CHUNK_PRELOAD_CAP}`);
+  const manifest = JSON.parse(readFileSync(join(DIST, '.vite', 'manifest.json'), 'utf8')) as ViteManifest;
+  const preloaded = new Set(chunkPreloads(manifest, 'src/pages/Product.tsx').scripts.map((href) => href.replace(/^\/assets\//, '')));
+  assert.deepEqual(beyondEntry.filter((f) => !preloaded.has(f)), [], 'every file of the product opening beyond the entry is in the document\'s modulepreloads');
+  const motionCore = [...opening].find((f) => f.startsWith('vendor-motion-core-'));
+  assert.ok(!motionCore || entryClosure.has(motionCore) || preloaded.has(motionCore), 'the animation core reaches a product landing with the document, never late');
   // «طلب السعر» (DECISIONS row 240) is mounted only for a product or selection with no price: a priced page never pays for it.
   // The Bambu import spec §G.6: the knowledge tabs (specifications, documents …) load near the viewport, never with the page.
   // docs/ux/COLOUR-QUANTITIES.md §3.11: «عدة ألوان» (the per-colour list, the batch add, its sheet) loads when the
