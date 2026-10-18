@@ -97,6 +97,8 @@ test('a shop hands /auth to the apex, and the apex sends the person back afterwa
   assert.match(handoff, /q\.set\('store', slug\)/, 'the slug comes from the server-resolved store');
   assert.match(handoff, /window\.location\.replace\(target\)/);
   assert.match(handoff, /if \(!target\) return <Auth \/>;/, 'no root domain configured: the ordinary page, without Google');
+  assert.match(handoff, /const \{ lang \} = useLanguage\(\);[\s\S]*q\.set\('lang', lang\);/, 'the reader\'s language travels to the apex');
+  assert.match(handoff, /if \(!mainSite \|\| isLocalHost\(window\.location\.hostname\)\) return null;/, 'a local run (levonis.test:8787) stays on its own host');
   // App.tsx puts nextPath.ts in the entry chunk; the host table stays out of it.
   assert.doesNotMatch(readFileSync(join(ROOT, 'src/components/auth/nextPath.ts'), 'utf8'), /worker\/lib\/hosts/, 'storeReturnUrl lives in its own module');
 

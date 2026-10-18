@@ -9,6 +9,7 @@ import PhoneField, { emptyPhoneValue, type PhoneValue } from './PhoneField';
 import AuthTextField from './AuthTextField';
 import FillButton, { combineFillProgress, lengthProgress } from './FillButton';
 import { sessionNotKeptText } from './sessionStrings';
+import { notKeptNext } from '../../lib/sessionCheck';
 import { refusalText } from '../../lib/refusalStrings';
 import { OWNER_FIRST_PROOF_REQUIRED, OWNER_FIRST_PROOF_STRINGS, announceOwnerFirstProof } from '../../lib/ownerFirstProof';
 
@@ -237,6 +238,10 @@ interface CodeAuthProps {
   askPassword?: { label: string; hint: string; reveal?: { show: string; hide: string } };
   onSuccess?: (created: boolean) => void;
   onSwitchMode?: (view: 'signup') => void;
+  /** The account was CREATED and this browser did not keep its session: the
+   *  ticket is spent, so the page offers signing in to the new account (with
+   *  the address or number) instead of a retry that cannot work. */
+  onAccountCreatedNotKept: (identifier: string) => void;
 }
 
 type Phase = 'target' | 'code' | 'profile' | 'done';
@@ -251,6 +256,7 @@ export default function CodeAuth({
   askPassword,
   onSuccess,
   onSwitchMode,
+  onAccountCreatedNotKept,
 }: CodeAuthProps) {
   const { lang } = useLanguage();
   const s = STRINGS[lang] || STRINGS.ar;
@@ -469,9 +475,10 @@ export default function CodeAuth({
       const kept = await adoptSession(res?.user);
       if (!mounted.current) return;
       if (kept === 'not_kept') {
-        // The account exists now; it is THIS browser that did not keep the
-        // session. Signing in again is the way on, not a second account.
-        setError(sessionNotKeptText(lang));
+        // The account exists now and the ticket is spent: «create» again could
+        // only fail. The page offers signing in to the new account instead.
+        const next = notKeptNext(true, identifier);
+        if (next.message === 'ACCOUNT_CREATED_NOT_KEPT') onAccountCreatedNotKept(next.signInAs);
         return;
       }
       setPhase('done');
@@ -482,7 +489,7 @@ export default function CodeAuth({
     } finally {
       if (mounted.current) setBusy(false);
     }
-  }, [busy, ticket, newName, newUsername, newPassword, askPassword, initialProfile, lang, referralCode, adoptSession, onSuccess, navigate, describeError]);
+  }, [busy, ticket, newName, newUsername, newPassword, askPassword, initialProfile, identifier, lang, referralCode, adoptSession, onAccountCreatedNotKept, onSuccess, navigate, describeError]);
 
   if (notConfigured) {
     return (

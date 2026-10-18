@@ -1,13 +1,11 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
-import { api, ApiUser, clearApiSessionRequests } from './lib/api';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo, useRef } from 'react';
+import { api, ApiError, ApiUser, clearApiSessionRequests } from './lib/api';
 import { clearPageCache } from './lib/pageCache';
 import { AUTH_ME_PATH, clearPrimedRequests, takePrimedJson } from './lib/bootFetch';
 import { privateDrafts, purgeLegacyPrivateDrafts } from './lib/privateDrafts';
-import { decideSession, type MeCheck } from './lib/sessionCheck';
+import { createSessionAdopter, type SessionAdoption } from './lib/sessionCheck';
 
-/** What a sign-in caller learns from `adoptSession`: 'not_kept' means the
- *  server signed the person in and THIS browser did not keep the session. */
-export type SessionAdoption = 'ok' | 'not_kept';
+export type { SessionAdoption };
 
 /**
  * Authentication state. The session lives in a Secure HttpOnly cookie managed
@@ -94,25 +92,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * are cancelled first (and the boot-time primed /me is dropped). The check
    * carries its own AbortSignal, which is what keeps it out of the GET
    * coalescer: it can never join an anonymous /me that started before the
-   * cookie existed. Only `refreshUser`'s background callers keep the old,
-   * forgiving behaviour.
+   * cookie existed. ONE adoption at a time — a second caller joins the one in
+   * flight instead of cancelling its /me — and a /me cancelled by another
+   * session change is asked again, never read as a failed check
+   * (src/lib/sessionCheck.ts `createSessionAdopter`). Only `refreshUser`'s
+   * background callers keep the old, forgiving behaviour.
    */
-  const adoptSession = useCallback(
-    async (postUser?: ApiUser | null): Promise<SessionAdoption> => {
-      clearApiSessionRequests();
-      clearPrimedRequests();
-      let me: MeCheck<ApiUser>;
-      try {
-        const data = await api.get<{ user?: ApiUser | null }>(AUTH_ME_PATH, { signal: new AbortController().signal });
-        me = { ok: true, user: data?.user ?? null };
-      } catch {
-        me = { ok: false };
-      }
-      const decision = decideSession(postUser ?? null, me);
-      if (decision.status === 'not_kept') return 'not_kept';
-      if (decision.publish !== 'keep') setUser(decision.publish);
-      return 'ok';
-    },
+  const adoptSession = useMemo(
+    () =>
+      createSessionAdopter<ApiUser>({
+        clear: () => {
+          clearApiSessionRequests();
+          clearPrimedRequests();
+        },
+        readMe: async () =>
+          (await api.get<{ user?: ApiUser | null }>(AUTH_ME_PATH, { signal: new AbortController().signal }))?.user ?? null,
+        // Our signal is never aborted, so ABORTED here can only be the session
+        // epoch moving under the request (src/lib/api.ts).
+        isSuperseded: (err) => err instanceof ApiError && err.code === 'ABORTED',
+        publish: setUser,
+      }),
     [setUser]
   );
 

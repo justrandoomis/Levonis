@@ -250,18 +250,25 @@ export function apexRedirectFor(
   return `https://${root}${pathname.startsWith('/') ? pathname : `/${pathname}`}${search}`;
 }
 
+const LOCAL_SUFFIXES = ['.localhost', '.local', '.test', '.example', '.invalid'];
+
 /**
  * A development machine's own address — never upgraded to https.
  *
- * `localhost` and its subdomains, mDNS `.local` names, and IP literals (an
- * IPv6 literal is bracketed in `URL.hostname`). Local runs and e2e serve plain
- * http on these (vite on 127.0.0.1, `wrangler dev` on localhost:8787), and a
- * test's `app.request('/api/…')` resolves to `http://localhost`.
+ * `localhost` and its subdomains, mDNS `.local` names, the names RFC 2606/6761
+ * reserve for testing (`.test`, `.example`, `.invalid` — the subdomain recipe
+ * in docs/SUBDOMAIN_ARCHITECTURE.md runs on `levonis.test:8787`, and
+ * scripts/e2e-subdomains.mjs follows it), and IP literals (an IPv6 literal is
+ * bracketed in `URL.hostname`). Local runs and e2e serve plain http on these
+ * (vite on 127.0.0.1, `wrangler dev` on localhost:8787), and a test's
+ * `app.request('/api/…')` resolves to `http://localhost`. None of them can be
+ * a public site's address.
  */
 export function isLocalHostname(hostname: string): boolean {
   const h = hostname.trim().toLowerCase().replace(/\.$/, '');
   if (!h) return false;
-  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local')) return true;
+  if (h === 'localhost') return true;
+  if (LOCAL_SUFFIXES.some((suffix) => h.endsWith(suffix))) return true;
   if (h.startsWith('[')) return true;
   return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(h);
 }

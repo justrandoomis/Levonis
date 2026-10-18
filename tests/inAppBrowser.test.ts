@@ -127,6 +127,29 @@ test('the return path survives the switch to a real browser — and only a safe 
   assert.equal(externalAuthUrl(O, '//evil.com'), `${O}/auth`);
 });
 
+test('a shop visitor who switches browser still goes back to the shop, in their language', () => {
+  // The shop hands sign-in to the apex with ?store=<slug>&lang=… (src/App.tsx
+  // StoreHostAuthHandoff). Opening Chrome/Safari from an Instagram WebView
+  // used to drop both: the person landed on the platform's /cart, in Arabic.
+  const O = 'https://levonis-iq.com';
+  const u = new URL(externalAuthUrl(O, '/cart', '', { store: 'ali3d', lang: 'ckb' }));
+  assert.equal(u.searchParams.get('next'), '/cart');
+  assert.equal(u.searchParams.get('store'), 'ali3d');
+  assert.equal(u.searchParams.get('lang'), 'ckb');
+  // Only a valid, non-system slug and one of the three languages travel.
+  for (const store of ['evil.com', 'a.b', 'ali3d@evil.com', 'studio', 'www', 'ALI3D', 'ab', '//evil.com', '']) {
+    assert.equal(new URL(externalAuthUrl(O, '/cart', '', { store })).searchParams.get('store'), null, `store ${store}`);
+  }
+  for (const lang of ['fr', 'ku', 'AR', '', 'en;x']) {
+    assert.equal(new URL(externalAuthUrl(O, '/', '', { lang })).searchParams.get('lang'), null, `lang ${lang}`);
+  }
+  // The banner passes both from the page.
+  const notice = readFileSync(new URL('../src/components/auth/InAppBrowserNotice.tsx', import.meta.url), 'utf8');
+  assert.match(notice, /externalAuthUrl\(window\.location\.origin, next, referralCode, \{ store, lang: carryLang \?\? lang \}\)/);
+  const auth = readFileSync(new URL('../src/pages/Auth.tsx', import.meta.url), 'utf8');
+  assert.match(auth, /<InAppBrowserNotice[\s\S]*?store=\{onStoreHost \? '' : storeFromQuery\}[\s\S]*?lang=\{lang\}/);
+});
+
 // ------------------------------------------------------------- wiring
 
 test('the /auth page hides the Google button in an in-app browser and shows the banner instead', () => {
@@ -134,7 +157,7 @@ test('the /auth page hides the Google button in an in-app browser and shows the 
   assert.match(src, /detectInAppBrowser\(/);
   assert.match(src, /googleUsable\s*=\s*googleConfigured\s*&&\s*!inApp\.inApp/);
   assert.match(src, /\{googleUsable && \(\s*<div>\s*<GoogleAuthButton/);
-  assert.match(src, /googleConfigured && inApp\.inApp && \(\s*<InAppBrowserNotice info=\{inApp\} next=\{dest\}/);
+  assert.match(src, /googleConfigured && inApp\.inApp && \(\s*<InAppBrowserNotice\s+info=\{inApp\}\s+next=\{dest\}/);
   // The other ways in are not gated on the browser.
   assert.doesNotMatch(src, /telegramConfigured && !inApp/);
   assert.doesNotMatch(src, /phoneEntry && !inApp/);

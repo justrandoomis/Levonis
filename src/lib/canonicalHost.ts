@@ -15,8 +15,8 @@
  * cookie is `Secure`, so a sign-in on http left the browser a guest on the
  * very next page. Every non-local `http:` page is moved to `https:` before
  * anything renders. Local development (localhost, `*.localhost`, `*.local`,
- * IP literals — the same rule as worker/lib/hosts.ts `isLocalHostname`) is
- * left on http.
+ * the reserved `*.test`, `*.example` and `*.invalid`, IP literals — the same
+ * rule as worker/lib/hosts.ts `isLocalHostname`) is left on http.
  *
  * Only `www.` changes host: merchant subdomains are shops of their own and
  * never begin a sign-in — a shop's /auth hands the visitor to the apex's
@@ -47,12 +47,17 @@ export function apexUrlFor(href: string): string | null {
   return moved ? url.toString() : null;
 }
 
+const LOCAL_SUFFIXES = ['.localhost', '.local', '.test', '.example', '.invalid'];
+
 /** Kept in step with worker/lib/hosts.ts `isLocalHostname` (tests/canonicalHost.test.ts
- *  compares them); not imported, so the entry carries none of the host table. */
-function isLocalHost(hostname: string): boolean {
+ *  compares them); not imported, so the entry carries none of the host table.
+ *  The reserved names of RFC 2606/6761 (`.test`, `.example`, `.invalid`,
+ *  `.localhost`) count too: the subdomain recipe runs on levonis.test:8787. */
+export function isLocalHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/\.$/, '');
   if (!h) return false;
-  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local')) return true;
+  if (h === 'localhost') return true;
+  if (LOCAL_SUFFIXES.some((suffix) => h.endsWith(suffix))) return true;
   if (h.startsWith('[')) return true;
   return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(h);
 }

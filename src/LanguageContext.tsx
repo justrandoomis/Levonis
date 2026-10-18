@@ -27,7 +27,44 @@ const LANG_KEY = 'levo_lang';
  */
 let currentLang: Language = 'ar';
 
+/**
+ * THE LANGUAGE A SIGN-IN LINK CARRIES (review of the sign-in fix, 2026-10-18).
+ *
+ * A shop hands sign-in to the apex (src/App.tsx `StoreHostAuthHandoff`), and
+ * the in-app-browser banner reopens /auth in another browser
+ * (src/lib/inAppBrowser.ts `externalAuthUrl`). The language lives in each
+ * origin's own storage, so the apex — or the other browser — would greet a
+ * Sorani or English reader in Arabic, and send the code e-mail and create
+ * the account (`users.locale`) in Arabic too. Both links carry `lang=`.
+ *
+ * Read on /auth ONLY: elsewhere `?lang=` already means something else (a
+ * policy document's language, src/pages/Policies.tsx) and must not switch the
+ * whole site. Anything but ar/en/ckb is ignored.
+ */
+export function authLinkLang(href: string): Language | null {
+  try {
+    const url = new URL(href);
+    if (url.pathname !== '/auth' && url.pathname !== '/auth/') return null;
+    const v = url.searchParams.get('lang');
+    return v === 'ar' || v === 'en' || v === 'ckb' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 function initialLang(): Language {
+  // Adopted once, at mount, and kept the way `setLang` keeps a choice (this
+  // origin's storage). Nobody is signed in yet at this point, so there is no
+  // account to write it to; the sign-up and code requests send it themselves.
+  const linked = typeof window === 'undefined' ? null : authLinkLang(window.location.href);
+  if (linked) {
+    try {
+      localStorage.setItem(LANG_KEY, linked);
+    } catch {
+      /* storage unavailable — this page still opens in it */
+    }
+    return linked;
+  }
   try {
     const stored = localStorage.getItem(LANG_KEY);
     if (stored === 'ku') {

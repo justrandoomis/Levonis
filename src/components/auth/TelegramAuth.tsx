@@ -9,6 +9,7 @@ import PhoneField, { emptyPhoneValue, type PhoneValue } from './PhoneField';
 import FillButton, { combineFillProgress, lengthProgress } from './FillButton';
 import TelegramOpen from './TelegramOpen';
 import { sessionNotKeptText } from './sessionStrings';
+import { notKeptNext } from '../../lib/sessionCheck';
 
 /**
  * Telegram-verified phone + OTP registration & sign-in (§4), embedded by the
@@ -207,6 +208,10 @@ interface TelegramAuthProps {
    *  says the other flow is the right one. Optional — a plain notice is
    *  shown when absent. */
   onSwitchMode?: (mode: 'signin' | 'signup') => void;
+  /** The account was CREATED and this browser did not keep its session: the
+   *  challenge is spent, so the page offers signing in to the new account
+   *  (with the number) instead of a retry that cannot work. */
+  onAccountCreatedNotKept: (identifier: string) => void;
 }
 
 interface StoredFlow {
@@ -287,7 +292,14 @@ function storeFlow(v: StoredFlow | null) {
 
 type Phase = 'phone' | 'waiting' | 'otp' | 'blocked' | 'expired' | 'done';
 
-export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCode, initialPhone = null }: TelegramAuthProps) {
+export default function TelegramAuth({
+  mode,
+  onSuccess,
+  onSwitchMode,
+  onAccountCreatedNotKept,
+  referralCode,
+  initialPhone = null,
+}: TelegramAuthProps) {
   const { lang } = useLanguage();
   const s = STRINGS[lang] || STRINGS.ar;
   const navigate = useNavigate();
@@ -329,6 +341,8 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const completingRef = useRef(false);
+  /** Set by the first `finish` of a flow; cleared only by `reset`. */
+  const finishingRef = useRef(false);
 
   const reset = useCallback(() => {
     storeFlow(null);
@@ -342,6 +356,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
     setStartError(null);
     setResendNotice(null);
     setResendIn(0);
+    finishingRef.current = false;
   }, []);
 
   // Switching signin/signup mid-flow drops the other purpose's pending flow
@@ -351,21 +366,40 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [purpose]);
 
-  const finish = useCallback(async (postUser?: ApiUser | null) => {
+  /**
+   * «completed» is handled ONCE. The wake handler below fires on focus,
+   * visibilitychange and pageshow together, and the form's own completion can
+   * race a poll: every one of them reaching here used to start its own
+   * adoption and its own navigation.
+   *
+   * `created` is the server's word on whether this completion made the
+   * account (`/telegram/complete` answers it). A poll that saw another tab
+   * finish does not know, and assumes it from the purpose.
+   */
+  const finish = useCallback(async (postUser?: ApiUser | null, created?: boolean) => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     storeFlow(null);
     const kept = await adoptSession(postUser);
     if (!mountedRef.current) return;
     if (kept === 'not_kept') {
-      // The challenge is spent; a new attempt starts from the number again,
-      // with the reason on screen instead of a «done» that is not.
+      const next = notKeptNext(created ?? purpose === 'signup', phone.e164 ?? '');
       reset();
-      setSessionError(sessionNotKeptText(lang));
+      if (next.message === 'ACCOUNT_CREATED_NOT_KEPT') {
+        // The account exists now; a retry here would only meet a spent
+        // challenge. The page offers signing in to it instead.
+        onAccountCreatedNotKept(next.signInAs);
+      } else {
+        // A sign-in: the challenge is spent, so a new attempt starts from the
+        // number again, with the reason on screen instead of a «done» that is not.
+        setSessionError(sessionNotKeptText(lang));
+      }
       return;
     }
     setPhase('done');
     if (onSuccess) onSuccess();
     else navigate('/');
-  }, [adoptSession, reset, lang, onSuccess, navigate]);
+  }, [adoptSession, reset, lang, onSuccess, navigate, purpose, phone.e164, onAccountCreatedNotKept]);
 
   const fetchStatus = useCallback(async () => {
     const f = flowRef.current;
@@ -515,8 +549,8 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
         // server stored the column's English default for every phone account.
         body.lang = lang;
       }
-      const done = await api.post<{ user?: ApiUser }>('/api/auth/telegram/complete', body);
-      await finish(done?.user);
+      const done = await api.post<{ user?: ApiUser; created?: boolean }>('/api/auth/telegram/complete', body);
+      await finish(done?.user, typeof done?.created === 'boolean' ? done.created : undefined);
     } catch (err) {
       completingRef.current = false;
       if (!mountedRef.current) return;

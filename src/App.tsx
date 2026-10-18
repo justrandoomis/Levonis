@@ -10,6 +10,7 @@ import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom'
 import NavigationRouter from './components/NavigationRouter';
 import { StoreProvider, useStore } from './StoreContext';
 import { sanitizeNextPath } from './components/auth/nextPath';
+import { isLocalHost } from './lib/canonicalHost';
 import ChunkBoundary from './components/ChunkBoundary';
 import { afterCriticalPaint, allowsSpeculativeLoads } from './lib/afterCriticalPaint';
 import { INLINE_RESOLVE_ID, navigationCategoryOpening, navigationDataPath, primeGet, readInlineJson } from './lib/bootFetch';
@@ -265,7 +266,7 @@ function useIdlePrefetch() {
     return detach;
   }, []);
 }
-import { LanguageProvider } from './LanguageContext';
+import { LanguageProvider, useLanguage } from './LanguageContext';
 import { WalletProvider } from './WalletContext';
 import { CurrencyProvider } from './CurrencyContext';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -578,25 +579,32 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
  * src/components/auth/storeReturn.ts `storeReturnUrl`), already signed in: the
  * session cookie is scoped to the parent domain.
  *
- * With no root domain configured (`mainSite` empty) there is no apex to go
- * to, and the ordinary page is shown — without Google, which the server and
- * Auth.tsx both withhold on a shop.
+ * With no root domain configured (`mainSite` empty), or on a local run, there
+ * is no apex to go to, and the ordinary page is shown — without Google, which
+ * the server and Auth.tsx both withhold on a shop.
  */
 function StoreHostAuthHandoff() {
   const { store, mainSite } = useStore();
+  const { lang } = useLanguage();
   const location = useLocation();
   const slug = store?.slug ?? '';
   const from = (location.state as { from?: unknown } | null)?.from;
   const target = React.useMemo(() => {
-    if (!mainSite) return null;
+    // `mainSite` is always https and portless, which a local run
+    // (levonis.test:8787, docs/SUBDOMAIN_ARCHITECTURE.md) is not: stay here.
+    if (!mainSite || isLocalHost(window.location.hostname)) return null;
     // Everything else the link carried (a referral code, …) travels as it
     // came; `next` is sanitized here and `store` is only ever the server's.
     const q = new URLSearchParams(location.search);
     q.set('next', sanitizeNextPath(from ?? q.get('next') ?? '/'));
     q.delete('store');
     if (slug) q.set('store', slug);
+    // The language is this origin's storage; the apex has its own. Carried so
+    // the sign-in page, the code e-mail and a new account are in the reader's
+    // language (src/LanguageContext.tsx `authLinkLang`).
+    q.set('lang', lang);
     return `${mainSite}/auth?${q.toString()}`;
-  }, [mainSite, slug, from, location.search]);
+  }, [mainSite, slug, from, location.search, lang]);
   React.useEffect(() => {
     if (target) window.location.replace(target);
   }, [target]);

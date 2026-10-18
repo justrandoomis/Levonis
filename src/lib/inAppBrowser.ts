@@ -29,6 +29,8 @@
  *    module never accepts an absolute URL from the query string.
  */
 
+import { isSystemSlug, isValidSlugSyntax } from '../../worker/lib/hosts';
+
 export type InAppApp =
   | 'instagram'
   | 'facebook'
@@ -135,18 +137,32 @@ export const IN_APP_NAMES: Record<InAppApp, string> = {
 
 /**
  * The absolute sign-in URL to reopen in a real browser, carrying the return
- * destination (`next`) and the referral code (`ref`).
+ * destination (`next`), the referral code (`ref`), the shop the visitor came
+ * from (`store`) and the language they were reading (`lang`).
  *
  * `origin` must be the page's own `location.origin`; `next` must already have
  * passed sanitizeNextPath (a same-origin relative path). Router state
  * (`location.state.from`) does not survive a browser switch — that is why the
- * destination is written into the query here.
+ * destination is written into the query here. Neither does anything the
+ * WebView kept: a shop visitor who switches browser must still be sent back
+ * to the shop afterwards (src/components/auth/storeReturn.ts), and the other
+ * browser's storage has no language yet (src/LanguageContext.tsx reads
+ * `?lang=` on /auth). A store value that is not a valid, non-system slug and
+ * a language that is not one of the three are dropped.
  */
-export function externalAuthUrl(origin: string, next: string, ref = ''): string {
+export function externalAuthUrl(
+  origin: string,
+  next: string,
+  ref = '',
+  carry: { store?: string; lang?: string } = {}
+): string {
   const u = new URL('/auth', origin);
   if (next && next !== '/' && next.startsWith('/') && !next.startsWith('//')) u.searchParams.set('next', next);
   const r = ref.trim();
   if (r) u.searchParams.set('ref', r.slice(0, 64));
+  const store = carry.store ?? '';
+  if (store && isValidSlugSyntax(store) && !isSystemSlug(store)) u.searchParams.set('store', store);
+  if (carry.lang === 'ar' || carry.lang === 'en' || carry.lang === 'ckb') u.searchParams.set('lang', carry.lang);
   return u.toString();
 }
 

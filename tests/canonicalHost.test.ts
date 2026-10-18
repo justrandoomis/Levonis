@@ -59,6 +59,12 @@ test('local development stays on http: localhost, *.localhost, *.local and IP li
     'http://box.local/',
     'http://192.168.1.4:4173/',
     `https://${APEX}/auth`,
+    // The subdomain recipe (docs/SUBDOMAIN_ARCHITECTURE.md, scripts/e2e-subdomains.mjs):
+    // wrangler dev on levonis.test:8787, a shop on myshop.levonis.test:8787.
+    'http://levonis.test:8787/auth',
+    'http://myshop.levonis.test:8787/',
+    'http://site.example/',
+    'http://nowhere.invalid/',
   ]) {
     assert.equal(apexUrlFor(href), null, `${href} must be left alone`);
   }
@@ -67,7 +73,7 @@ test('local development stays on http: localhost, *.localhost, *.local and IP li
 test('the SPA and the Worker draw the same line around local hosts', () => {
   // canonicalHost.ts keeps its own copy (the entry must not carry the host
   // table); this is what keeps the copy honest.
-  for (const host of ['localhost', 'app.localhost', 'box.local', '127.0.0.1', '192.168.1.4', '[::1]', APEX, WWW, MERCHANT_HOST, 'levonis-staging.example.workers.dev', 'localhost.evil.com', 'local']) {
+  for (const host of ['localhost', 'app.localhost', 'box.local', '127.0.0.1', '192.168.1.4', '[::1]', 'levonis.test', 'myshop.levonis.test', 'site.example', 'nowhere.invalid', APEX, WWW, MERCHANT_HOST, 'levonis-staging.example.workers.dev', 'localhost.evil.com', 'local', 'test', 'example.com', 'test.levonis-iq.com', 'testshop.com']) {
     const spaLeavesIt = apexUrlFor(`http://${host}/`) === null;
     assert.equal(spaLeavesIt, isLocalHostname(host), host);
   }

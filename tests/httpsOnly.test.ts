@@ -78,6 +78,25 @@ test('https, a CF-Visitor that saw https, and local hosts are left alone', () =>
   assert.equal(isLocalHostname('localhost.evil.com'), false);
 });
 
+test('the documented subdomain recipe on levonis.test:8787 keeps working over plain http', () => {
+  // docs/SUBDOMAIN_ARCHITECTURE.md: wrangler dev with STORE_ROOT_DOMAIN=levonis.test,
+  // APP_ORIGIN=http://levonis.test:8787; scripts/e2e-subdomains.mjs signs in and
+  // POSTs on the apex and a shop. A 403 on every POST — or a redirect to https
+  // with the port dropped — would end that run.
+  const ROOT = 'levonis.test';
+  for (const href of ['http://levonis.test:8787/', 'http://levonis.test:8787/api/auth/login', 'http://myshop.levonis.test:8787/api/cart']) {
+    for (const method of ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE']) {
+      assert.equal(httpsUpgradeFor(href, undefined, ROOT, method), null, `${method} ${href}`);
+    }
+  }
+  // The RFC 2606 names, and only them: a real domain that merely CONTAINS one is not local.
+  for (const host of ['levonis.test', 'myshop.levonis.test', 'site.example', 'nowhere.invalid']) assert.equal(isLocalHostname(host), true, host);
+  for (const host of ['test.levonis-iq.com', 'example.com', 'testshop.com', 'levonis-iq.com.evil', 'test', 'example']) {
+    assert.equal(isLocalHostname(host), false, host);
+  }
+  assert.deepEqual(httpsUpgradeFor(`http://test.${APEX}/`, undefined, APEX, 'GET'), { redirect: `https://test.${APEX}/` });
+});
+
 // ------------------------------------------------------ through the real Worker
 
 const PW = 'Str0ng-passw0rd';

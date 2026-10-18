@@ -23,7 +23,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Hono } from 'hono';
 import { AuthContext } from '../src/AuthContext';
-import { LanguageProvider, useLanguage } from '../src/LanguageContext';
+import { LanguageProvider, authLinkLang, useLanguage } from '../src/LanguageContext';
 import { asD1, freshDb } from './fixtures/app';
 import type { AppContext } from '../worker/lib/types';
 import { profileRoutes } from '../worker/routes/profile';
@@ -134,4 +134,55 @@ test('THE OTHER HALF — that PATCH turns an English column into Arabic notifica
   });
   assert.equal(res.status, 200, await res.text());
   assert.equal((await reachFor(env, 'u1')).lang, 'ar', 'after: the reader’s own choice');
+});
+
+// ------------------------------------------- the language a sign-in link carries (review, 2026-10-18)
+
+test('authLinkLang: only on /auth, only ar/en/ckb', () => {
+  assert.equal(authLinkLang('https://levonis-iq.com/auth?next=%2Fcart&store=ali3d&lang=ckb'), 'ckb');
+  assert.equal(authLinkLang('https://levonis-iq.com/auth?lang=en'), 'en');
+  assert.equal(authLinkLang('https://levonis-iq.com/auth/?lang=ar'), 'ar');
+  // ?lang= means a policy document's language elsewhere; it must not switch the site.
+  assert.equal(authLinkLang('https://levonis-iq.com/policies/terms?version=3&lang=en'), null);
+  assert.equal(authLinkLang('https://levonis-iq.com/?lang=en'), null);
+  assert.equal(authLinkLang('https://levonis-iq.com/authx?lang=en'), null);
+  for (const bad of ['fr', 'ku', 'EN', '', 'ckb;x']) {
+    assert.equal(authLinkLang(`https://levonis-iq.com/auth?lang=${encodeURIComponent(bad)}`), null, bad);
+  }
+  assert.equal(authLinkLang('not a url'), null);
+});
+
+test('a shop visitor handed to the apex reads the sign-in page in THEIR language, and keeps it', () => {
+  // levo_lang is per-origin storage: the apex had none, and greeted a Sorani
+  // reader from a shop in Arabic — and mailed the code, and created the
+  // account, in Arabic too.
+  const g = globalThis as unknown as { window?: unknown; localStorage?: unknown };
+  const before = { window: g.window, localStorage: g.localStorage };
+  const store = new Map<string, string>();
+  const at = (href: string) => {
+    g.window = { location: { href } };
+    g.localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+    };
+  };
+  try {
+    at('https://levonis-iq.com/auth?next=%2Fcart&store=ali3d&lang=ckb');
+    assert.equal(mount(null).lang, 'ckb', 'the page opens in the carried language');
+    assert.equal(store.get('levo_lang'), 'ckb', 'and keeps it, as a switch would');
+
+    // Later pages read the stored choice; a policy link's ?lang= changes nothing.
+    at('https://levonis-iq.com/policies/terms?lang=en');
+    assert.equal(mount(null).lang, 'ckb');
+    // An invalid value is ignored: the stored choice stands.
+    at('https://levonis-iq.com/auth?lang=fr');
+    assert.equal(mount(null).lang, 'ckb');
+    assert.equal(store.get('levo_lang'), 'ckb');
+  } finally {
+    g.window = before.window;
+    g.localStorage = before.localStorage;
+    if (before.window === undefined) delete g.window;
+    if (before.localStorage === undefined) delete g.localStorage;
+  }
 });

@@ -19,7 +19,8 @@ import CodeAuth from '../components/auth/CodeAuth';
 import TelegramAuth from '../components/auth/TelegramAuth';
 import { sanitizeNextPath } from '../components/auth/nextPath';
 import { storeReturnUrl } from '../components/auth/storeReturn';
-import { sessionNotKeptText } from '../components/auth/sessionStrings';
+import { accountCreatedNotKeptText, sessionNotKeptText } from '../components/auth/sessionStrings';
+import { notKeptNext } from '../lib/sessionCheck';
 import InAppBrowserNotice from '../components/auth/InAppBrowserNotice';
 import { detectInAppBrowser } from '../lib/inAppBrowser';
 import FillButton, {
@@ -604,6 +605,11 @@ export default function Auth() {
   // in THIS browser instead of opening the link, which a mail app may open
   // in a different one (and the session with it).
   const [codeFromPending, setCodeFromPending] = useState(false);
+  // An account was CREATED and this browser did not keep its session: the
+  // address or number to sign in with (possibly ''), or null. While set, the
+  // page shows that and one way on — signing in — and no retry, which could
+  // only meet a spent token or ticket.
+  const [createdNotKept, setCreatedNotKept] = useState<string | null>(null);
   // The finish screen (/auth?finish=TOKEN): the pending profile behind the
   // link, read once so the person sees which address they are opening.
   const [finishInfo, setFinishInfo] = useState<{ email: string; name: string; username: string | null } | null>(null);
@@ -804,10 +810,30 @@ export default function Auth() {
    * in» (src/lib/sessionCheck.ts). False means it did not: the reason is on
    * screen and the page stays where it is.
    */
-  const sessionKept = (outcome: SessionAdoption): boolean => {
+  const sessionKept = (outcome: SessionAdoption, created?: { identifier: string }): boolean => {
     if (outcome === 'ok') return true;
-    setServerError(sessionNotKeptText(lang));
+    const next = notKeptNext(!!created, created?.identifier);
+    if (next.message === 'ACCOUNT_CREATED_NOT_KEPT') showCreatedNotKept(next.signInAs);
+    else setServerError(sessionNotKeptText(lang));
     return false;
+  };
+
+  /** Also what CodeAuth and TelegramAuth call after a sign-up whose session was not kept. */
+  const showCreatedNotKept = (identifier: string) => {
+    clearMessages();
+    setCreatedNotKept(identifier);
+  };
+
+  /** The one action on that screen: the sign-in form, the account's address
+   *  or number already in it. Leaves a finish link behind (it is spent). */
+  const signInToCreatedAccount = () => {
+    const identifier = createdNotKept ?? '';
+    setCreatedNotKept(null);
+    if (finishToken) leaveFinish('signin');
+    else switchView('signin');
+    if (identifier) setEmail(identifier);
+    setPassword('');
+    setConfirmPassword('');
   };
 
   const clearMessages = () => {
@@ -1093,7 +1119,9 @@ export default function Auth() {
         setPendingEmail(true);
         return;
       }
-      if (!sessionKept(await adoptSession(created.user))) return;
+      // /register made the account (and spent nothing reusable): «create»
+      // again would answer EMAIL_TAKEN, so a session not kept means sign in.
+      if (!sessionKept(await adoptSession(created.user), { identifier: trimmedEmail })) return;
       setSucceeded(true);
       finishAuth(true);
     } catch (err) {
@@ -1211,9 +1239,11 @@ export default function Auth() {
       });
       setPassword('');
       setConfirmPassword('');
-      // The account exists now whatever this browser does with the cookie, so
-      // a session that was not kept is a reason to sign in, not to retry here.
-      if (!sessionKept(await adoptSession(r?.user))) return;
+      // The account exists now whatever this browser does with the cookie, and
+      // the link is spent: a session that was not kept is a reason to sign
+      // in, not to retry here (that would only answer TOKEN_USED).
+      const createdEmail = finishInfo?.email || (typeof r?.user?.email === 'string' ? r.user.email : '');
+      if (!sessionKept(await adoptSession(r?.user), { identifier: createdEmail })) return;
       setSucceeded(true);
       finishAuth(true);
     } catch (err) {
@@ -1457,7 +1487,13 @@ export default function Auth() {
         </div>
         {googleUsable && <p className="lv-note-google">{s.googleNote}</p>}
         {googleConfigured && inApp.inApp && (
-          <InAppBrowserNotice info={inApp} next={dest} referralCode={referralCode} />
+          <InAppBrowserNotice
+            info={inApp}
+            next={dest}
+            referralCode={referralCode}
+            store={onStoreHost ? '' : storeFromQuery}
+            lang={lang}
+          />
         )}
       </>
     ) : null;
@@ -1527,6 +1563,7 @@ export default function Auth() {
           referralCode={referralCode}
           onSuccess={(created) => finishAuth(created)}
           onSwitchMode={signup ? undefined : switchView}
+          onAccountCreatedNotKept={showCreatedNotKept}
           {...(fromPending
             ? {
                 initialEmail: trimmedEmail,
@@ -1559,6 +1596,7 @@ export default function Auth() {
             initialPhone={phoneValue}
             referralCode={referralCode}
             onSuccess={(created) => finishAuth(created)}
+            onAccountCreatedNotKept={showCreatedNotKept}
           />
         </div>
       );
@@ -1575,6 +1613,7 @@ export default function Auth() {
             initialPhone={phoneValue}
             onSuccess={() => finishAuth(signup)}
             onSwitchMode={switchView}
+            onAccountCreatedNotKept={showCreatedNotKept}
             referralCode={referralCode}
           />
         </div>
@@ -1880,7 +1919,13 @@ export default function Auth() {
           {heading(SHEET.telegram, s.signUpTitle)}
           {errorSummary}
           {/* TelegramAuth renders its own <form>s; it is never nested in the credentials form. */}
-          <TelegramAuth mode="signup" onSuccess={() => finishAuth(true)} onSwitchMode={switchView} referralCode={referralCode} />
+          <TelegramAuth
+            mode="signup"
+            onSuccess={() => finishAuth(true)}
+            onSwitchMode={switchView}
+            onAccountCreatedNotKept={showCreatedNotKept}
+            referralCode={referralCode}
+          />
         </div>
       );
     } else if (step === 1) {
@@ -2072,7 +2117,12 @@ export default function Auth() {
           {backLink(() => setPanel('form'))}
           {heading(SHEET.telegram, s.signInTitle)}
           {errorSummary}
-          <TelegramAuth mode="signin" onSuccess={() => finishAuth(false)} onSwitchMode={switchView} />
+          <TelegramAuth
+            mode="signin"
+            onSuccess={() => finishAuth(false)}
+            onSwitchMode={switchView}
+            onAccountCreatedNotKept={showCreatedNotKept}
+          />
         </div>
       );
     } else {
@@ -2121,6 +2171,28 @@ export default function Auth() {
         </div>
       );
     }
+  }
+
+  // AN ACCOUNT WAS CREATED, AND THIS BROWSER DID NOT KEEP ITS SESSION. Whatever
+  // screen made it (the finish link, a code or Telegram sign-up, a password
+  // sign-up), its token or ticket is spent, so this replaces it: what
+  // happened, and one way on — signing in to the account that now exists.
+  if (createdNotKept !== null) {
+    screenKey = 'created-not-kept';
+    screen = (
+      <div className="lv-center">
+        <span className="lv-center__icon" aria-hidden>
+          <Info />
+        </span>
+        <h1 className="lv-title">{s.signedUp}</h1>
+        <p className="lv-sub" role="alert">
+          {accountCreatedNotKeptText(lang)}
+        </p>
+        <button type="button" onClick={signInToCreatedAccount} className="lv-btn-gold">
+          {s.signInCta}
+        </button>
+      </div>
+    );
   }
 
   // The Google provider is mounted ONCE for the page, only when a client id

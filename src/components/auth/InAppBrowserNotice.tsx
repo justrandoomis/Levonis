@@ -72,15 +72,20 @@ export interface InAppBrowserNoticeProps {
   /** Return destination, already through sanitizeNextPath. */
   next: string;
   referralCode?: string;
+  /** The shop that handed sign-in to this page (`?store=`), so the other
+   *  browser still goes back to it afterwards. Validated again in the URL builder. */
+  store?: string;
+  /** The language being read, so the other browser opens in it too. */
+  lang?: string;
 }
 
-export default function InAppBrowserNotice({ info, next, referralCode = '' }: InAppBrowserNoticeProps) {
+export default function InAppBrowserNotice({ info, next, referralCode = '', store = '', lang: carryLang }: InAppBrowserNoticeProps) {
   const { lang } = useLanguage();
   // OWNER: Sorani to be written by hand. (ckb reads the Arabic until then.)
   const s = lang === 'en' ? EN : AR;
   const [copyState, setCopyState] = useState<'idle' | 'done' | 'failed'>('idle');
 
-  const url = externalAuthUrl(window.location.origin, next, referralCode);
+  const url = externalAuthUrl(window.location.origin, next, referralCode, { store, lang: carryLang ?? lang });
   const appName = info.app ? IN_APP_NAMES[info.app] : '';
   const why = appName ? s.whyNamed.replace('{app}', appName) : s.whyGeneric;
   const safari = info.os === 'ios' ? safariSchemeUrl(url) : null;
