@@ -71,6 +71,7 @@ import { AVAILABILITY_TYPES, normalizeAvailability, variantKeyFrom, variantLabel
 import type { Lookups } from './lookups';
 import { parseFeePercent } from './warrantyPlans';
 import type { ProductDeliveryOptions } from './shipping';
+import { RETIRED_DELIVERY_KEY, RETIRED_DELIVERY_WARNING } from './retiredDeliveryColumns';
 import { DIMENSION_FIELDS, EMPTY_DIMENSIONS, canonicalProductMediaUrl, type ProductDimensions } from './productModel';
 
 export type RowType =
@@ -251,14 +252,6 @@ export const BASE_COLUMNS = [
    *          Neither ever touches units already held for live orders.
    */
   'capacity',
-  // Product-owned last-mile delivery rules. Empty across all six columns is
-  // the backward-compatible legacy/global tariff state.
-  'standard_delivery_enabled',
-  'standard_delivery_quantity_step',
-  'standard_delivery_fee_iqd',
-  'personal_delivery_enabled',
-  'personal_delivery_quantity_step',
-  'personal_delivery_fee_iqd',
   // ---- device coverage (products.ops_policy): the base the extended warranty
   // adds to (printers default to 12) and whether a unit is recorded per device
   'warranty_base_months',
@@ -572,12 +565,6 @@ export function labelRow(shape: TemplateShape): string[] {
     stock: 'المخزون',
     low_stock_threshold: 'حد التنبيه',
     capacity: 'سعة الطلب المسبق',
-    standard_delivery_enabled: 'التوصيل العادي مفعّل (yes/no)',
-    standard_delivery_quantity_step: 'عدد القطع لكل رسم توصيل عادي',
-    standard_delivery_fee_iqd: 'رسم شريحة التوصيل العادي (د.ع)',
-    personal_delivery_enabled: 'التوصيل الشخصي مفعّل (yes/no)',
-    personal_delivery_quantity_step: 'عدد القطع لكل رسم توصيل شخصي',
-    personal_delivery_fee_iqd: 'رسم شريحة التوصيل الشخصي (د.ع)',
     warranty_base_months: 'مدة الضمان الأساسي بالأشهر (الطابعات 12؛ فارغ = كما هو محفوظ)',
     condition_kind: 'حالة المنتج: open_box أو used أو refurbished — اتركه فارغاً للمنتج الجديد',
     condition_grade: 'درجة الحالة: like_new أو excellent أو good أو fair',
@@ -1370,7 +1357,9 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
     };
   }
   const known = new Set<string>(shape.columns);
-  const unknownColumns = header.filter((h) => h && !known.has(h));
+  // The retired per-product delivery columns: ignored, one warning per file.
+  const unknownColumns = header.filter((h) => h && !known.has(h) && !RETIRED_DELIVERY_KEY.test(h));
+  const retiredDelivery = header.some((h) => RETIRED_DELIVERY_KEY.test(h));
 
   // The inverse of `defuse` in toCsv: the export prefixes a cell that starts
   // with = + - @ with a single quote so a spreadsheet does not run it as a
@@ -1483,39 +1472,9 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
           for (const k of DIMENSION_FIELDS) d[k] = intCell(cell(r, k), line, k, issues);
           return d;
         })(),
-        delivery_options: (() => {
-          const names = [
-            'standard_delivery_enabled',
-            'standard_delivery_quantity_step',
-            'standard_delivery_fee_iqd',
-            'personal_delivery_enabled',
-            'personal_delivery_quantity_step',
-            'personal_delivery_fee_iqd',
-          ] as const;
-          const raw = Object.fromEntries(names.map((name) => [name, cell(r, name)])) as Record<typeof names[number], string>;
-          if (names.every((name) => raw[name] === '')) return null;
-          for (const name of names) {
-            if (raw[name] === '') issues.push({ line, severity: 'error', message: `${name}: مطلوب عند إعداد توصيل خاص بالمنتج` });
-          }
-          const standardStep = intCell(raw.standard_delivery_quantity_step, line, 'standard_delivery_quantity_step', issues);
-          const standardFee = intCell(raw.standard_delivery_fee_iqd, line, 'standard_delivery_fee_iqd', issues);
-          const personalStep = intCell(raw.personal_delivery_quantity_step, line, 'personal_delivery_quantity_step', issues);
-          const personalFee = intCell(raw.personal_delivery_fee_iqd, line, 'personal_delivery_fee_iqd', issues);
-          if (standardStep !== null && standardStep < 1) issues.push({ line, severity: 'error', message: 'standard_delivery_quantity_step: يجب أن يكون 1 أو أكبر' });
-          if (personalStep !== null && personalStep < 1) issues.push({ line, severity: 'error', message: 'personal_delivery_quantity_step: يجب أن يكون 1 أو أكبر' });
-          return {
-            standard: {
-              enabled: boolCell(raw.standard_delivery_enabled, line, 'standard_delivery_enabled', issues, false),
-              quantity_step: standardStep ?? 1,
-              fee_iqd: standardFee ?? 0,
-            },
-            personal: {
-              enabled: boolCell(raw.personal_delivery_enabled, line, 'personal_delivery_enabled', issues, false),
-              quantity_step: personalStep ?? 1,
-              fee_iqd: personalFee ?? 0,
-            },
-          };
-        })(),
+        // Retired (owner, 2026-10-18): delivery is priced by «إدارة التوصيل»;
+        // the six old columns are ignored with one warning per file (below).
+        delivery_options: null,
         condition: (() => {
           // Absent columns = "this sheet has nothing to say about condition".
           if (!index.has('condition_kind')) return undefined;
@@ -2158,6 +2117,7 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
     }
   }
 
+  if (retiredDelivery) issues.push({ line: 1, severity: 'warning', message: RETIRED_DELIVERY_WARNING });
   return { products: [...products.values()], issues, unknownColumns };
 }
 
@@ -2279,12 +2239,6 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       ...Object.fromEntries(
         DIMENSION_FIELDS.map((k) => [k, num((p.dimensions ?? EMPTY_DIMENSIONS())[k])])
       ),
-      standard_delivery_enabled: p.delivery_options ? bool(p.delivery_options.standard.enabled) : '',
-      standard_delivery_quantity_step: p.delivery_options ? num(p.delivery_options.standard.quantity_step) : '',
-      standard_delivery_fee_iqd: p.delivery_options ? num(p.delivery_options.standard.fee_iqd) : '',
-      personal_delivery_enabled: p.delivery_options ? bool(p.delivery_options.personal.enabled) : '',
-      personal_delivery_quantity_step: p.delivery_options ? num(p.delivery_options.personal.quantity_step) : '',
-      personal_delivery_fee_iqd: p.delivery_options ? num(p.delivery_options.personal.fee_iqd) : '',
       warranty_base_months: num(p.warranty_base_months),
       serialized: p.serialized === null ? '' : bool(p.serialized),
       // An empty `condition_kind` on export means NEW, which is exactly what
@@ -2609,12 +2563,6 @@ export function exampleRows(shape: TemplateShape): Array<Record<string, string>>
     pro_price_iqd: '',
     stock: '10',
     low_stock_threshold: '2',
-    standard_delivery_enabled: 'yes',
-    standard_delivery_quantity_step: '10',
-    standard_delivery_fee_iqd: '5000',
-    personal_delivery_enabled: 'yes',
-    personal_delivery_quantity_step: '1',
-    personal_delivery_fee_iqd: '50000',
     how_to_use: 'Unbox, plug in, follow the setup guide.',
     hashtags: 'example',
     ...spec,
@@ -3007,7 +2955,7 @@ ${def.hint_ar}
 أنواع الأسطر
 ------------
 ${[
-    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, fits_printers, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, standard_delivery_enabled, standard_delivery_quantity_step, standard_delivery_fee_iqd, personal_delivery_enabled, personal_delivery_quantity_step, personal_delivery_fee_iqd, warranty_base_months, serialized, payment_options, how_to_use, usage_url, gini_url, light_image, membership.*, spec.*'),
+    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, fits_printers, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, warranty_base_months, serialized, payment_options, how_to_use, usage_url, gini_url, light_image, membership.*, spec.*'),
     rowType('option', 'قيمة واحدة من مجموعة خيارات — نسخة المنتج ونوع توفرها معًا', 'group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, availability_type, lead_time_text, lead_time_min_days, lead_time_max_days, variant_key, variant_label'),
     rowType('color', 'لون واحد وروابطه بالخيارات', 'value (اسم اللون), hex, sku_part, image, links, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
     rowType('variant', 'توليفة مخزون واحدة (خيارات + لون)', 'links (Group:Value|Group:Value|color:Name), sku_part, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),

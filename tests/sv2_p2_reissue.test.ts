@@ -231,7 +231,7 @@ test('review F-8: a qty-2 line bought with a credit worth one whole unit, points
   const orderId = pb.order.id as string;
   await delivered(raw, orderId);
   assert.equal(req(raw, id).status, 'completed');
-  const o = row<Record<string, any>>(raw, 'SELECT points_discount_iqd, coupon_snapshot FROM orders WHERE id = ?', orderId)!;
+  const o = row<Record<string, any>>(raw, 'SELECT points_discount_iqd, coupon_snapshot, shipping_iqd FROM orders WHERE id = ?', orderId)!;
   const line = row<{ id: string; unit_price_iqd: number }>(raw, "SELECT id, unit_price_iqd FROM order_items WHERE order_id = ? AND product_id = 'p_mini'", orderId)!;
   const credit = JSON.parse(o.coupon_snapshot).discount_iqd as number;
   assert.ok(o.points_discount_iqd > 0, 'points were spent on the order');
@@ -240,8 +240,12 @@ test('review F-8: a qty-2 line bought with a credit worth one whole unit, points
   openCase(raw, 'r2', orderId, line.id);
   assert.equal((await resolve(raw, 'r2')).status, 200);
   const cash = refundOf(raw, 'r1') + refundOf(raw, 'r2');
-  // The goods' cash the customer paid: 2 units − the credit − the points' share of the goods (shipping is not refunded).
-  const paidCashForGoods = 2 * line.unit_price_iqd - credit - o.points_discount_iqd;
+  // The goods' cash the customer paid: 2 units − the credit − the points' share of the goods (shipping is not
+  // refunded). The points are spread over the goods and the delivery fee pro rata, so the goods' share is
+  // points × goods / (goods + shipping) — with «إدارة التوصيل» two printers ship at 20,000, not one 10,000.
+  const goods = 2 * line.unit_price_iqd - credit;
+  const pointsOnGoods = Math.floor((o.points_discount_iqd * goods) / (goods + Number(o.shipping_iqd)));
+  const paidCashForGoods = goods - pointsOnGoods;
   assert.ok(cash <= paidCashForGoods + 1_000, `cash back ${cash} > cash paid for the goods ${paidCashForGoods}`);
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM trade_in_credit_reissues WHERE request_id = ?', id), 1, 'the credit itself comes back once');
 });

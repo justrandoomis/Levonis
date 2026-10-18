@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useWallet, CheckoutDeliveryMethod, CheckoutPaymentMethod, CartShippingMethod } from '../WalletContext';
 import { api, ApiError } from '../lib/api';
+import { useLanguage } from '../LanguageContext';
 import { Plus, Trash2, Check, AlertTriangle, Lock } from 'lucide-react';
 import WalletFreeDeliveryPanel from './adminStoreSettings/WalletFreeDeliveryPanel';
 
@@ -147,6 +148,7 @@ function SaveButton({ state, onClick, error }: { state: SaveState; onClick: () =
 }
 
 export default function AdminStoreSettings() {
+  const { loc } = useLanguage();
   const {
     checkoutDeliveryMethods, updateCheckoutDeliveryMethods,
     checkoutPaymentMethods, updateCheckoutPaymentMethods,
@@ -655,31 +657,18 @@ export default function AdminStoreSettings() {
           <p className="text-sm text-text-secondary mb-4">
             تُطبَّق على كل المنتجات. الحقول الفارغة تعني «غير مُفعَّلة» — لا يُحتسب أي مبلغ لم تحدّده.
           </p>
+          <p className="text-sm mb-4" data-delivery-management-link>
+            {loc('أسعار التوصيل (الافتراضي، المحافظات، قواعد الأقسام والمنتجات) تُدار من ', 'Delivery prices (default, governorates, section and product rules) are managed in ', 'نرخەکانی گەیاندن (بنەڕەت، پارێزگاکان، یاساکانی بەش و بەرهەم) لە ')}
+            <a className="font-semibold underline" href="/admin?tab=delivery_pricing">{loc('إدارة التوصيل', 'Delivery management', 'بەڕێوەبردنی گەیاندن')}</a>
+            {loc('.', '.', ' بەڕێوە دەبرێن.')}
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <MoneyField
-              label="التوصيل العادي (Standard)"
-              hint="التعرفة الأساسية لكل طلب"
-              value={policy.ordinary_iqd}
-              onChange={(v) => { setPolicy((p) => (p ? { ...p, ordinary_iqd: v ?? 0 } : p)); setPolicyState('idle'); }}
-            />
             <MoneyField
               label="التوصيل المحمي (Protected)"
               hint="إضافة اختيارية فوق التعرفة الأساسية — مجانية لمشترك PRO المؤهّل"
               value={policy.protected_iqd}
               nullable
               onChange={(v) => { setPolicy((p) => (p ? { ...p, protected_iqd: v } : p)); setPolicyState('idle'); }}
-            />
-            <MoneyField
-              label="طابعة صغيرة"
-              value={policy.printer_small_iqd}
-              nullable
-              onChange={(v) => { setPolicy((p) => (p ? { ...p, printer_small_iqd: v } : p)); setPolicyState('idle'); }}
-            />
-            <MoneyField
-              label="طابعة كبيرة"
-              value={policy.printer_large_iqd}
-              nullable
-              onChange={(v) => { setPolicy((p) => (p ? { ...p, printer_large_iqd: v } : p)); setPolicyState('idle'); }}
             />
             <MoneyField
               label="حد التوصيل المجاني لـ PRO"
@@ -692,19 +681,6 @@ export default function AdminStoreSettings() {
               hint="أكبر تمامًا من هذا المبلغ"
               value={policy.prime_threshold_iqd}
               onChange={(v) => { setPolicy((p) => (p ? { ...p, prime_threshold_iqd: v ?? 0 } : p)); setPolicyState('idle'); }}
-            />
-            <MoneyField
-              label="حد الكرتون (عدد البكرات)"
-              hint="يُحتسب فوق هذا العدد فقط"
-              value={policy.carton_threshold_spools}
-              nullable
-              onChange={(v) => { setPolicy((p) => (p ? { ...p, carton_threshold_spools: v } : p)); setPolicyState('idle'); }}
-            />
-            <MoneyField
-              label="رسوم الكرتون"
-              value={policy.carton_fee_iqd}
-              nullable
-              onChange={(v) => { setPolicy((p) => (p ? { ...p, carton_fee_iqd: v } : p)); setPolicyState('idle'); }}
             />
             <label className="block">
               <span className="block text-sm text-text-secondary mb-1">إعفاء PRO يغطي</span>

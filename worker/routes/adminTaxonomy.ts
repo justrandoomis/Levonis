@@ -44,7 +44,6 @@ import {
 import { normalizeText } from '../lib/search/normalize';
 import { backfillSearchIndex, forgetSearchSynonyms, planSearchRestamp, searchIndexInstalled } from '../lib/search/store';
 import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
-import { allCategoryDeliveryRules, parseCategoryRuleInput } from '../lib/categoryDelivery';
 import { forgetCatalogIndex } from '../lib/catalogPresentation';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 import { purgeCatalogTreeCache } from './catalog';
@@ -272,8 +271,6 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
   const countById = new Map(
     (await catalogTreeWithCounts(c.env.DB)).map((r) => [r.id, r.product_count] as const)
   );
-  // The pooled quantity delivery rules (0135), one read for the whole tree.
-  const deliveryRules = await allCategoryDeliveryRules(c.env.DB);
 
   // The branch slugs, leaf-first, so a section resolves to the product type
   // its template is built for — the panel and the form both need to say
@@ -340,9 +337,6 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
         effective_template_family: family,
         product_type: type,
         product_count: countById.get(r.id) ?? 0,
-        delivery_rules: deliveryRules
-          .filter((d) => d.catalog_id === r.id)
-          .map((d) => ({ method: d.method, enabled: d.enabled, quantity_step: d.quantity_step, fee_iqd: d.fee_iqd })),
         spec_columns: groups.reduce((n, g) => n + g.fields.length, 0),
         spec_groups: groups.map((g) => ({ id: g.id, label_ar: g.label_ar, label_en: g.label_en, fields: g.fields.length })),
         /** 0 for a main section; the list is in tree order. */
@@ -708,7 +702,9 @@ adminTaxonomyRoutes.delete('/catalogs/:id', async (c) => {
       placements: placements?.n ?? 0,
     });
   }
-  // Its delivery rules go with it (the FK would otherwise refuse the delete).
+  // The retired section delivery rules (0135, no reader since the delivery
+  // management) go with it: the FK would otherwise refuse the delete while
+  // the table still exists.
   await degradeIfSchemaMissing(
     'category_delivery_rules (migration 0135)',
     () => c.env.DB.prepare('DELETE FROM category_delivery_rules WHERE catalog_id = ?').bind(id).run(),
@@ -748,62 +744,6 @@ async function catalogOr404(db: D1Database, id: string): Promise<CatalogRow> {
   if (!row) throw notFound('Section not found');
   return row;
 }
-
-/**
- * A SECTION'S POOLED QUANTITY DELIVERY RULE (migration 0135) — one per
- * delivery method. Every unit filed under the section or its sub-sections,
- * any product, option or colour, counts toward ONE pool per order:
- * fee = ceil(units / quantity_step) × fee_iqd. See worker/lib/categoryDelivery.ts.
- *
- * PUT upserts the method's rule; DELETE removes it (the lines return to their
- * product rule / the ordinary tariff).
- */
-adminTaxonomyRoutes.put('/catalogs/:id/delivery-rules/:method', async (c) => {
-  const admin = c.get('user')!;
-  const id = c.req.param('id');
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const parsed = parseCategoryRuleInput({ ...body, method: c.req.param('method') });
-  if (!parsed.ok) throw badRequest('Invalid category delivery rule', parsed.code);
-  const row = await c.env.DB.prepare('SELECT id FROM catalogs WHERE id = ?').bind(id).first<{ id: string }>();
-  if (!row) throw notFound('Section not found');
-  await c.env.DB
-    .prepare(
-      `INSERT INTO category_delivery_rules (catalog_id, method, enabled, quantity_step, fee_per_step_iqd, updated_by, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-       ON CONFLICT (catalog_id, method) DO UPDATE SET
-         enabled = excluded.enabled,
-         quantity_step = excluded.quantity_step,
-         fee_per_step_iqd = excluded.fee_per_step_iqd,
-         updated_by = excluded.updated_by,
-         updated_at = excluded.updated_at`
-    )
-    .bind(id, parsed.method, parsed.enabled ? 1 : 0, parsed.quantity_step, parsed.fee_iqd, admin.id)
-    .run();
-  await audit(c.env.DB, admin.id, 'catalog.delivery_rule.set', id, {
-    method: parsed.method,
-    enabled: parsed.enabled,
-    quantity_step: parsed.quantity_step,
-    fee_iqd: parsed.fee_iqd,
-  });
-  return c.json({
-    success: true,
-    rule: { method: parsed.method, enabled: parsed.enabled, quantity_step: parsed.quantity_step, fee_iqd: parsed.fee_iqd },
-  });
-});
-
-adminTaxonomyRoutes.delete('/catalogs/:id/delivery-rules/:method', async (c) => {
-  const admin = c.get('user')!;
-  const id = c.req.param('id');
-  const method = c.req.param('method');
-  if (method !== 'standard' && method !== 'personal') throw badRequest('Invalid delivery method', 'CATEGORY_DELIVERY_METHOD_INVALID');
-  const res = await c.env.DB
-    .prepare('DELETE FROM category_delivery_rules WHERE catalog_id = ? AND method = ?')
-    .bind(id, method)
-    .run();
-  const removed = Number(res.meta?.changes ?? 0) > 0;
-  if (removed) await audit(c.env.DB, admin.id, 'catalog.delivery_rule.delete', id, { method });
-  return c.json({ success: true, removed });
-});
 
 /**
  * THE PICTURES A SECTION CAN CARRY, one upload path for each. A section draws

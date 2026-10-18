@@ -33,8 +33,6 @@ export default {
         'POST /catalogs': 'op',
         'POST /catalogs/order': 'op',
         'DELETE /catalogs/:id': 'op',
-        'PUT /catalogs/:id/delivery-rules/:method': 'op',
-        'DELETE /catalogs/:id/delivery-rules/:method': 'op',
         'POST /catalogs/:id/image': 'op',
         'DELETE /catalogs/:id/image': 'op',
         'POST /catalogs/:id/image-mobile': 'op',

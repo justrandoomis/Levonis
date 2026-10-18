@@ -219,6 +219,9 @@ const ADMIN_ROUTES: Record<string, MoneyClass> = {
   'PATCH /coupons/:id': 'none',
   'DELETE /coupons/:id': 'none',
   'GET /settings': 'none',
+  // «إدارة التوصيل»: reads the delivery policy and resolves a product's rule; no money moves.
+  'GET /delivery-policy': 'none',
+  'GET /delivery-policy/resolve': 'none',
   'GET /site-media': 'none',
   'POST /site-media/:slot': 'none',
   'DELETE /site-media/:slot': 'none',

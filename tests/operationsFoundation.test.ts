@@ -28,34 +28,25 @@ const base = {
   config,
 };
 
-test('standard shipment stays 5k across products, colours, category blocks and carton thresholds', () => {
+test('standard shipment outside every rule group stays 5k across products, colours and carton thresholds', () => {
+  // No delivery policy passed: the fallback (the pre-policy tariff). The
+  // retired carton and size-class knobs never reach the standard method.
   const q = quoteShipping({
     ...base,
     items: [
       { product_id: 'PLA', qty: 31, size_class: 'ordinary', is_spool: true, category_path: ['filament'] },
-      {
-        product_id: 'part',
-        qty: 10,
-        size_class: 'ordinary',
-        delivery: {
-          standard: { enabled: true, quantity_step: 1, fee_iqd: 15000 },
-          personal: { enabled: false, quantity_step: 1, fee_iqd: 0 },
-        },
-      },
-    ],
-    categoryRules: [
-      { catalog_id: 'filament', method: 'standard', enabled: true, quantity_step: 15, fee_iqd: 5000 },
+      { product_id: 'part', qty: 10, size_class: 'ordinary' },
     ],
   });
   assert.equal(q.total_iqd, 5000);
   assert.equal(q.components.length, 1);
 });
 
-test('catalogue printer classification makes a mixed shipment 10k without a configured size surcharge', () => {
+test('a printers-section line makes a mixed shipment 10k under the fallback tariff, with no size surcharge', () => {
   const q = quoteShipping({
     ...base,
     items: [
-      { product_id: 'printer', qty: 2, size_class: null, is_printer: true },
+      { product_id: 'printer', qty: 2, size_class: null, is_printer: true, category_path: ['cat_printers_fdm', 'cat_printers'] },
       { product_id: 'filament', qty: 5, size_class: 'ordinary' },
     ],
   });
@@ -70,7 +61,7 @@ test('a standard delivery waiver applies after the single printer shipment tarif
     tier: 'prime',
     tierActive: true,
     merchandiseIqd: 100000,
-    items: [{ product_id: 'printer', qty: 1, size_class: null, is_printer: true }],
+    items: [{ product_id: 'printer', qty: 1, size_class: null, is_printer: true, category_path: ['cat_printers'] }],
     membershipShipping: {
       rule_id: 'premium',
       eligible: true,

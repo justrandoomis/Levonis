@@ -70,6 +70,9 @@ export default {
         'PATCH /coupons/:id': { cls: 'owner', why: 'editing a public promo code (moneyAuthority coupon_issue)' },
         'DELETE /coupons/:id': { cls: 'op', noBody: 'promo codes (a discount rule); no cost column is read' },
         'GET /settings': 'op',
+        // «إدارة التوصيل»: the delivery policy and the product form's rule line (no cost column).
+        'GET /delivery-policy': 'op',
+        'GET /delivery-policy/resolve': 'op',
         'GET /site-media': 'op',
         'POST /site-media/:slot': { cls: 'op', noBody: NB.MEDIA },
         'DELETE /site-media/:slot': { cls: 'op', noBody: NB.MEDIA },

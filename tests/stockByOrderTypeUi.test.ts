@@ -99,7 +99,7 @@ test('direct stock is option-owned until a colour is linked, then exact option-c
 
 test('the product-level selling section keeps delivery and warranty, not stock or surcharge fields', () => {
   const form = read(FORM);
-  assert.match(form, /خيارات التوصيل والضمان/);
+  assert.match(form, /ar="التوصيل والضمان"/);
   assert.match(form, /Delivery & warranty/);
   assert.doesNotMatch(form, /ar="مخزون المنتج"/);
   assert.doesNotMatch(form, /ar="حد التنبيه"/);

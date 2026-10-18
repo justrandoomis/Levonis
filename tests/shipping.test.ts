@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { productDeliveryFeeIqd, productDeliveryMethodAvailable, quoteShipping } from '../worker/lib/shipping';
+import { productDeliveryFeeIqd, quoteShipping } from '../worker/lib/shipping';
 import type { ShippingConfig, ShippingItem } from '../worker/lib/shipping';
 
 const cfg = (over: Partial<ShippingConfig> = {}): ShippingConfig => ({
@@ -293,24 +293,11 @@ test('product delivery tiers use ceil(quantity / step) with integer IQD', () => 
   assert.equal(productDeliveryFeeIqd(35, { ...rule, enabled: false }), 0);
 });
 
-test('standard delivery stays flat despite per-product quantity fees', () => {
+test('standard delivery ignores the retired per-product fields: the delivery policy prices it', () => {
+  // `delivery` (ops_policy.delivery_options) is no longer a ShippingItem field;
+  // an old caller's extra property changes nothing.
   const q = quoteShipping({
-    items: [
-      {
-        product_id: 'tiered', qty: 35, size_class: 'ordinary',
-        delivery: {
-          standard: { enabled: true, quantity_step: 10, fee_iqd: 5000 },
-          personal: { enabled: true, quantity_step: 1, fee_iqd: 50000 },
-        },
-      },
-      {
-        product_id: 'single', qty: 2, size_class: 'ordinary',
-        delivery: {
-          standard: { enabled: true, quantity_step: 1, fee_iqd: 3000 },
-          personal: { enabled: false, quantity_step: 1, fee_iqd: 0 },
-        },
-      },
-    ],
+    items: [{ product_id: 'tiered', qty: 35, size_class: 'ordinary' }],
     deliveryMethod: 'standard', merchandiseIqd: 50000,
     ...asFree, atApprovedDefaultAddress: false, config: cfg(),
   });
@@ -319,27 +306,7 @@ test('standard delivery stays flat despite per-product quantity fees', () => {
   assert.equal(q.components[0].kind, 'ordinary');
 });
 
-test('a disabled product method is unavailable and never contributes a fee', () => {
-  const items: ShippingItem[] = [{
-    product_id: 'standard-only', qty: 2, size_class: 'ordinary',
-    delivery: {
-      standard: { enabled: true, quantity_step: 1, fee_iqd: 5000 },
-      personal: { enabled: false, quantity_step: 1, fee_iqd: 50000 },
-    },
-  }];
-  assert.deepEqual(productDeliveryMethodAvailable(items, 'personal'), {
-    available: false,
-    unavailable_product_ids: ['standard-only'],
-  });
-  const q = quoteShipping({
-    items, deliveryMethod: 'personal', merchandiseIqd: 20000,
-    ...asFree, atApprovedDefaultAddress: false, config: cfg(),
-  });
-  assert.equal(q.total_iqd, 0);
-  assert.ok(q.needs_config.includes('product:standard-only:personal_unavailable'));
-});
-
-test('legacy products without delivery options keep the existing global tariff', () => {
+test('a line in no rule group pays the default once, whatever the quantity', () => {
   const q = quoteShipping({
     items: [ordinary(4)], deliveryMethod: 'standard', merchandiseIqd: 30000,
     ...asFree, atApprovedDefaultAddress: false, config: cfg(),

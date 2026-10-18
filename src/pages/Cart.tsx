@@ -11,7 +11,7 @@ import { api, ApiError, CartItem } from '../lib/api';
 import type { CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
 import { methodDesc, methodTitle } from '../lib/methodText';
-import { standardDeliveryFeeIqd } from '../../packages/shipping/src/shipping';
+import { deliveryCharge, type DeliveryPolicy } from '../../packages/shipping/src/storeDelivery';
 import { asLang, monthsLabel } from '../components/orders/format';
 import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
@@ -334,10 +334,45 @@ interface UnavailableLine {
   slug?: string | null;
 }
 
+/** The server's delivery-policy inputs for the cart's ESTIMATE («إدارة التوصيل»). */
+interface CartDeliveryTariff {
+  default_fee_iqd: number;
+  governorate: string;
+  governorate_stopped: boolean;
+  groups: Array<Pick<DeliveryPolicy['groups'][number], 'id' | 'mode' | 'fee_iqd' | 'block_size' | 'name'>>;
+}
+
+/**
+ * The cart's standard-delivery estimate, from the SAME pure `deliveryCharge`
+ * the checkout prices with, over the lines' server-resolved groups. An older
+ * server without a tariff gets the pre-policy figure (10,000 with a printer).
+ */
+function cartDeliveryEstimate(items: CartItem[], tariff: CartDeliveryTariff | null): number {
+  if (!tariff) return items.some((item) => item.is_printer) ? 10_000 : 5_000;
+  if (tariff.governorate_stopped) return 0;
+  const policy: DeliveryPolicy = {
+    version: 1,
+    default_fee_iqd: tariff.default_fee_iqd,
+    governorates: {},
+    groups: tariff.groups.map((g) => ({ ...g, enabled: true, catalog_ids: [], product_ids: [] })),
+    updated_at: '',
+    updated_by: '',
+  };
+  const parts = items.flatMap((item) =>
+    (item.delivery_parts ?? [{ product_id: item.productId, rule_id: null, units_per_line: 1 }]).map((p) => ({
+      product_id: p.product_id,
+      rule_id: p.rule_id,
+      qty: p.units_per_line * (Number(item.qty) || 0),
+    }))
+  );
+  return deliveryCharge({ parts, policy }).total_iqd;
+}
+
 interface CartResponse {
   items: CartItem[];
   unavailable_lines?: UnavailableLine[];
   membership?: CartMembership | null;
+  delivery_tariff?: CartDeliveryTariff;
   scope?: { seller_type?: string } | null;
 }
 
@@ -400,6 +435,7 @@ export default function Cart() {
   // each line back to the row it was resolved for and adds up the rows the
   // customer has actually ticked.
   const [membership, setMembership] = useState<CartMembership | null>(null);
+  const [deliveryTariff, setDeliveryTariff] = useState<CartDeliveryTariff | null>(null);
   const membershipRef = useRef<CartMembership | null>(null);
   // Only the latest re-read may answer: three quantity taps fire three of them.
   const membershipSeqRef = useRef(0);
@@ -640,6 +676,7 @@ export default function Cart() {
       // line and in total — null for a customer without one, and for one whose
       // membership has lapsed.
       putMembership(data.membership ?? null);
+      setDeliveryTariff(data.delivery_tariff ?? null);
       setError('');
       setLoadError(null);
     } catch (err) {
@@ -1220,13 +1257,13 @@ export default function Cart() {
   /** Everything the selected lines saved, however each part was applied. */
   const savedTotal = otherDiscounts + memberNamedSaving;
 
-  // Shipping preview only — the same one-consignment standard tariff as the
-  // server. The final figure, and every waiver (an active
+  // Shipping preview only — the delivery policy's own pure charge over the
+  // lines' server-resolved rule groups. The final figure, and every waiver (an active
   // membership's rule — a referral or support code waives nothing), is the
   // checkout quote's: the thresholds live
   // in the server's shipping policy and are not repeated here, because a
   // browser-side copy of them had already drifted from the real rule once.
-  const shipping = selectedCount > 0 ? standardDeliveryFeeIqd(selectedItems.some((item) => item.is_printer)) : 0;
+  const shipping = selectedCount > 0 ? cartDeliveryEstimate(selectedItems, deliveryTariff) : 0;
 
   // §5: points come after the membership, against the merchandise the
   // membership has already reduced.
@@ -2565,6 +2602,15 @@ export default function Cart() {
               )}
             </span>
           </div>
+          {deliveryTariff?.governorate_stopped && selectedCount > 0 && (
+            <p className="text-[12.5px] text-text-secondary" data-cart-governorate-stopped>
+              {loc(
+                'التوصيل متوقف حالياً إلى محافظة عنوانك الافتراضي — اختر عنواناً آخر أو الاستلام من المتجر عند الدفع.',
+                'Delivery to your default address’s governorate is currently stopped — choose another address or store pickup at checkout.',
+                'گەیاندن بۆ پارێزگای ناونیشانە بنەڕەتییەکەت ئێستا ڕاگیراوە — لە کاتی پارەداندا ناونیشانێکی تر یان وەرگرتن لە فرۆشگا هەڵبژێرە.'
+              )}
+            </p>
+          )}
 
           {/* WHAT THE MEMBERSHIP DOES TO THE DELIVERY, beside the fee it
               applies to. The row above stays the store's preview and the

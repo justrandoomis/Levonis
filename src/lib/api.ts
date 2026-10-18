@@ -744,6 +744,9 @@ export interface CartItem {
   shipping_methods: ApiProduct['shipping_methods'];
   /** Server-derived method availability for this exact physical line. */
   delivery_availability?: { standard: boolean; personal: boolean };
+  /** «إدارة التوصيل»: the rule group (null = the default) that prices each
+   *  shipped piece of this line, and how many pieces one unit of the line is. */
+  delivery_parts?: Array<{ product_id: string; rule_id: string | null; units_per_line: number }>;
   /** 'bundle' / 'mystery' for a composition line, 'gift' for a gift line (0175); absent on an ordinary one. */
   kind?: 'bundle' | 'mystery' | 'gift';
   /**

@@ -1,6 +1,7 @@
 import { normalizeHomeBento, type HomeBento } from './homeBento';
 import { WALLET_FREE_DELIVERY_DEFAULT, normalizeWalletFreeDelivery, type WalletFreeDeliveryConfig } from './walletFreeDelivery';
 import { safeParse } from './types';
+import { DELIVERY_POLICY_FALLBACK, normalizeDeliveryPolicy, type DeliveryPolicy } from './storeDelivery';
 import { DEFAULT_WARRANTY_CONFIG, type WarrantyConfig } from './warrantyConfig';
 import { DEFAULT_PRICING, DEFAULT_MATERIALS, type PrintPricingConfig, type PrintMaterial } from './printPricing';
 import { DEFAULT_ACCESSORIES, type PrintAccessory } from './printAccessories';
@@ -406,6 +407,14 @@ export const SETTING_DEFAULTS = {
    * worker/lib/walletFreeDelivery.ts.
    */
   walletFreeDelivery: WALLET_FREE_DELIVERY_DEFAULT as WalletFreeDeliveryConfig,
+  /**
+   * «إدارة التوصيل» (owner, 2026-10-18): the store's standard-delivery
+   * policy — default price, governorate exceptions and the rule groups by
+   * section / product. Read through `normalizeDeliveryPolicy`, written through
+   * the strict validator in `PUT /api/admin/settings/deliveryPolicy`. Missing
+   * row → the fallback, which is the pre-policy tariff. Not public.
+   */
+  deliveryPolicy: DELIVERY_POLICY_FALLBACK as DeliveryPolicy,
   /**
    * §19 THE SERIAL PREPARATION GATE — «تبقى أرقام تسلسلية غير مرتبطة لهذا
    * الطلب» (serial-scan brief 2026-10-07, worker/lib/serialAssignments.ts).
@@ -955,6 +964,9 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
   }
   if (key === 'payoutMethods') {
     return normalizePayoutMethods(value) as (typeof SETTING_DEFAULTS)[K];
+  }
+  if (key === 'deliveryPolicy') {
+    return normalizeDeliveryPolicy(value) as (typeof SETTING_DEFAULTS)[K];
   }
   if (key === 'walletFreeDelivery') {
     return normalizeWalletFreeDelivery(value) as (typeof SETTING_DEFAULTS)[K];

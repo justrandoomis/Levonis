@@ -13,7 +13,6 @@ import { isUsdCents } from '@levonis/pricing/usdCents';
 import { requireAuth, badRequest, conflict, notFound, str, int, unavailable, HttpError } from '../lib/http';
 import { cartLineSelect } from '../lib/cartLineProjection';
 import { newId, newOrderId } from '../lib/crypto';
-import { readProductDeliveryOptions } from '../lib/productModel';
 import { productImageForSelection } from '../lib/productSelectionImage';
 import {
   EMPTY_PHYSICAL_DIMENSIONS,
@@ -206,8 +205,9 @@ import type { PointsRule, OrderPointsSnapshot } from '../lib/pointsOps';
 import { audit, auditStatements } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { quoteShipping } from '../lib/shipping';
-import { activeCategoryDeliveryRules } from '../lib/categoryDelivery';
-import { productDeliveryMethodAvailable } from '../lib/shipping';
+import { deliveryCharge, type DeliveryPolicy } from '../lib/storeDelivery';
+import { normalizeGovernorate } from '../lib/iraqGovernorates';
+import { productCatalogPlacements } from '../lib/printerIdentity';
 import type { ProductDeliveryMethod, ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
 import { codDeliveryTaxIqd } from '../lib/codTax';
 import { getRequiredCheckoutPolicies, preparePolicyAcceptance, isPolicyAcceptanceConflict } from '../lib/policyOps';
@@ -1143,7 +1143,7 @@ function persistedItemRef(l: ComputedLine, all: ComputedLine[]) {
 function shippingFactsFrom(
   opsPolicyRaw: unknown,
   sections?: { category_id?: unknown; sub_category_id?: unknown }
-): Pick<ShippingItem, 'size_class' | 'is_spool' | 'delivery' | 'category_path'> {
+): Pick<ShippingItem, 'size_class' | 'is_spool' | 'category_path'> {
   const o = safeParse<Record<string, unknown>>(
     typeof opsPolicyRaw === 'string' ? opsPolicyRaw : JSON.stringify(opsPolicyRaw ?? {}),
     {}
@@ -1152,12 +1152,18 @@ function shippingFactsFrom(
   return {
     size_class: sc === 'printer_small' || sc === 'printer_large' || sc === 'ordinary' ? sc : null,
     is_spool: o.is_spool === true,
-    delivery: readProductDeliveryOptions(o) ?? undefined,
     category_path: [sections?.sub_category_id, sections?.category_id].filter(
       (id): id is string => typeof id === 'string' && id !== ''
     ),
   };
 }
+
+/** «التوصيل متوقف حالياً إلى هذه المحافظة» — the delivery policy's governorate stop. */
+export const GOVERNORATE_STOPPED_MESSAGE = {
+  ar: 'التوصيل متوقف حالياً إلى هذه المحافظة — اختر عنواناً آخر أو الاستلام من المتجر',
+  en: 'Delivery to this governorate is currently stopped — choose another address or store pickup',
+  ckb: 'گەیاندن بۆ ئەم پارێزگایە ئێستا ڕاگیراوە — ناونیشانێکی تر یان وەرگرتن لە فرۆشگا هەڵبژێرە',
+} as const;
 
 /** A line's raw sections → every section above them, nearest first. */
 function expandCategoryPath(index: Map<string, string[]> | null, raw: string[] | undefined): string[] {
@@ -1404,7 +1410,9 @@ function priceCompositionLine(
      * `is_spool` is the honest fact; the owner sets it where they set every
      * other shipping fact.
      */
-    const facts = shippingFactsFrom(b.row.ops_policy);
+    // The OFFER's sections price it too (the delivery policy's rule groups),
+    // never the drawn spool's — the same reason as the facts above.
+    const facts = shippingFactsFrom(b.row.ops_policy, b.doc);
     shippingItems.push({ product_id: String(b.doc.id), qty: 1, is_printer: printerIds.has(String(b.doc.id)), ...facts });
   });
   included.forEach((k, i) => {
@@ -2185,6 +2193,9 @@ export async function computeCheckout(
     // «توصيل عادي مجاني — للدفع الكامل من محفظة Levo»: read with the fees it
     // waives, so the rule and the tariff come from one snapshot.
     'walletFreeDelivery',
+    // «إدارة التوصيل»: the standard tariff itself (default, governorates,
+    // rule groups). A missing row reads as the pre-policy tariff.
+    'deliveryPolicy',
   ]);
   const delivery = (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === input.deliveryMethodId);
   if (!delivery) throw badRequest('Please choose a valid delivery method');
@@ -2204,7 +2215,7 @@ export async function computeCheckout(
   // approved default PRO address, and an active restriction case on
   // 'proPricing' / 'noPreorderCommission' pauses the whole pricing context.
   // 'freeDelivery' gates only the shipping waiver below.
-  const [{ tierStatus, atApprovedDefault, proContext, pricingTierActive }, benefitRules, benefitAncestry, categoryDeliveryRules] = await Promise.all([
+  const [{ tierStatus, atApprovedDefault, proContext, pricingTierActive }, benefitRules, benefitAncestry] = await Promise.all([
     pricingTierContext(c.env.DB, user.id, address),
     /**
      * THE CONFIGURED MEMBERSHIP BENEFITS (migration 0074), read ONCE for the
@@ -2219,14 +2230,9 @@ export async function computeCheckout(
     // The section tree, so a rule on "Printers" reaches a product filed under
     // a sub-section of it (`catalogAncestry`).
     catalogAncestry(c.env.DB),
-    /**
-     * Category-level quantity delivery rules (0135), read ONCE here so every
-     * pass — the quote and the placement alike — pools the same units under
-     * the same rows. The same section tree above resolves which rule a line
-     * falls under.
-     */
-    activeCategoryDeliveryRules(c.env.DB),
   ]);
+  const deliveryPolicy = settings.deliveryPolicy as DeliveryPolicy;
+  const deliveryGovernorate = normalizeGovernorate((address as { governorate?: unknown }).governorate);
   /**
    * The rules the ORDER was priced with, frozen at this instant. Every pass
    * below reads this one context, so the requested-basis pass, the prepaid
@@ -3032,6 +3038,13 @@ export async function computeCheckout(
   let priced = priceLines(requestedPricing);
   const prepaidPriced = isPreorderCart ? (requestedPricing === 'prepaid' ? priced : priceLines('prepaid')) : priced;
   const codPriced = isPreorderCart ? (requestedPricing === 'cod' ? priced : priceLines('cod')) : priced;
+  /**
+   * THE SECTIONS THE DELIVERY POLICY MATCHES A LINE ON: its own sections, then
+   * every catalog its product is placed in, each with every section above it.
+   */
+  const placements = await productCatalogPlacements(c.env.DB, priced.shippingItems.map((it) => it.product_id));
+  const deliveryPath = (it: ShippingItem) =>
+    expandCategoryPath(benefitAncestry, [...(it.category_path ?? []), ...(placements.get(it.product_id) ?? [])]);
   const codReprices =
     isPreorderCart && prepaidPriced.lines.some((l, i) => l.unit !== codPriced.lines[i].unit);
   /**
@@ -3087,23 +3100,29 @@ export async function computeCheckout(
   const isPickup = delivery.id === 'pickup';
   const productDeliveryMethod: ProductDeliveryMethod | null =
     delivery.id === 'standard' || delivery.id === 'personal' ? delivery.id : null;
-  if (!isPickup && priced.shippingItems.some((item) => item.delivery !== undefined)) {
-    if (!productDeliveryMethod) {
+  /**
+   * THE DELIVERY POLICY'S DOOR (standard method): a governorate where
+   * delivery is stopped, or a product in a «لا يُوصَّل» group, refuses the
+   * method — the same pure answer the quote below prices with.
+   */
+  if (!isPickup && productDeliveryMethod === 'standard') {
+    const answer = deliveryCharge({
+      parts: priced.shippingItems.map((it) => ({ ...it, category_path: deliveryPath(it) })),
+      policy: deliveryPolicy,
+      governorate: deliveryGovernorate,
+    });
+    if (answer.governorate_rule === 'stopped') {
       throw badRequest(
-        'This delivery method is not configured for one or more products in the cart.',
-        'DELIVERY_METHOD_UNAVAILABLE',
-        { delivery_method_id: delivery.id }
+        `${GOVERNORATE_STOPPED_MESSAGE.ar} / ${GOVERNORATE_STOPPED_MESSAGE.en} / ${GOVERNORATE_STOPPED_MESSAGE.ckb}`,
+        'DELIVERY_GOVERNORATE_STOPPED',
+        { governorate: deliveryGovernorate, message: GOVERNORATE_STOPPED_MESSAGE }
       );
     }
-    const availability = productDeliveryMethodAvailable(priced.shippingItems, productDeliveryMethod);
-    if (!availability.available) {
+    if (answer.stopped_product_ids.length) {
       throw badRequest(
         'The selected delivery method is unavailable for one or more products in the cart.',
         'DELIVERY_METHOD_UNAVAILABLE',
-        {
-          delivery_method_id: productDeliveryMethod,
-          unavailable_product_ids: availability.unavailable_product_ids,
-        }
+        { delivery_method_id: productDeliveryMethod, unavailable_product_ids: answer.stopped_product_ids }
       );
     }
   }
@@ -3315,13 +3334,14 @@ export async function computeCheckout(
      * card instead of a base rate that ignores the cart. It is a pure
      * function over figures already in hand, so N methods cost no queries.
      */
-    const quoteItems: ShippingItem[] = categoryDeliveryRules.length
-      ? shippingItems.map((it) => ({ ...it, category_path: expandCategoryPath(benefitAncestry, it.category_path) }))
-      : shippingItems;
+    // Every line carries its full section path: the delivery policy's rule
+    // groups name sections at any depth.
+    const quoteItems: ShippingItem[] = shippingItems.map((it) => ({ ...it, category_path: deliveryPath(it) }));
     const runQuote = (basisIqd: number, primeBasisIqd?: number, methodId: string = delivery.id): ShippingQuote =>
       quoteShipping({
         items: quoteItems,
-        categoryRules: categoryDeliveryRules,
+        deliveryPolicy,
+        governorate: deliveryGovernorate,
         deliveryMethod:
           methodId === 'standard' || methodId === 'personal' ? (methodId as ProductDeliveryMethod) : undefined,
         merchandiseIqd: basisIqd,
@@ -3830,23 +3850,24 @@ export async function computeCheckout(
      * the screen can grey it out instead of quoting a delivery that would be
      * refused at the door.
      */
-    const deliveryMethodFees: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: 'needs_configuration' }> = (
+    const deliveryMethodFees: Array<{
+      id: string;
+      fee_iqd: number | null;
+      available: boolean;
+      reason?: 'needs_configuration' | 'governorate_stopped';
+    }> = (
       settings.checkoutDeliveryMethods as DeliveryMethod[]
     ).map((m) => {
       if (m.id === 'pickup') return { id: m.id, fee_iqd: 0, available: true };
-      const asProduct: ProductDeliveryMethod | null =
-        m.id === 'standard' || m.id === 'personal' ? m.id : null;
-      // The same two doors the chosen method goes through above — asked here
-      // as a question instead of thrown as a refusal.
-      if (priced.shippingItems.some((item) => item.delivery !== undefined)) {
-        if (!asProduct) return { id: m.id, fee_iqd: null, available: false };
-        if (!productDeliveryMethodAvailable(priced.shippingItems, asProduct).available) {
-          return { id: m.id, fee_iqd: null, available: false };
-        }
-      }
       // The SAME basis the chosen method's own final quote uses, so the
       // card's figure and the summary's figure cannot disagree.
       const q = runQuote(memberMerchandise, undefined, m.id);
+      // The same door the chosen method goes through above — asked here as a
+      // question instead of thrown as a refusal.
+      if (q.delivery_unavailable === 'governorate_stopped') {
+        return { id: m.id, fee_iqd: null, available: false, reason: 'governorate_stopped' as const };
+      }
+      if (q.needs_config.some((n) => n.endsWith(':standard_unavailable'))) return { id: m.id, fee_iqd: null, available: false };
       return q.needs_config.length
         ? { id: m.id, fee_iqd: null, available: false, reason: 'needs_configuration' as const }
         : { id: m.id, fee_iqd: q.total_iqd, available: true };

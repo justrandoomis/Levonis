@@ -115,6 +115,7 @@ test('the core moved libraries are one-line re-exports of the packages, and the 
     'worker/lib/pricing.ts': '@levonis/pricing/pricing', 'worker/lib/priceGrid.ts': '@levonis/pricing/priceGrid', 'worker/lib/pinnedPrices.ts': '@levonis/pricing/pinnedPrices',
     'worker/lib/cheapestBase.ts': '@levonis/pricing/cheapestBase', 'worker/lib/shippingType.ts': '@levonis/pricing/shippingType', 'worker/lib/paymentPolicy.ts': '@levonis/pricing/paymentPolicy',
     'worker/lib/availability.ts': '@levonis/pricing/availability', 'worker/lib/shipping.ts': '@levonis/shipping/shipping', 'worker/lib/iraqGovernorates.ts': '@levonis/shipping/iraqGovernorates',
+    'worker/lib/storeDelivery.ts': '@levonis/shipping/storeDelivery',
   };
   for (const [file, spec] of Object.entries(map)) {
     const src = read(file).trim();

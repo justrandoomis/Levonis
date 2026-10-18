@@ -771,6 +771,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This product is not published right now, so it cannot be sent.',
     ckb: 'ئەم بەرهەمە ئێستا بڵاو نەکراوەتەوە، بۆیە نانێردرێت.',
   },
+  // «إدارة التوصيل» (owner, 2026-10-18): the address's governorate is stopped.
+  DELIVERY_GOVERNORATE_STOPPED: {
+    ar: 'التوصيل متوقف حالياً إلى هذه المحافظة — اختر عنواناً آخر أو الاستلام من المتجر',
+    en: 'Delivery to this governorate is currently stopped — choose another address or store pickup',
+    ckb: 'گەیاندن بۆ ئەم پارێزگایە ئێستا ڕاگیراوە — ناونیشانێکی تر یان وەرگرتن لە فرۆشگا هەڵبژێرە',
+  },
   CART_EMPTY: {
     ar: 'سلتك فارغة. أضف منتجًا ثم أكمل الطلب.',
     en: 'Your cart is empty. Add a product, then check out.',

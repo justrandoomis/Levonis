@@ -59,7 +59,6 @@ import { emptyDimensions } from '../../lib/productTypes';
 import type { BrandV2, CatalogV2, ProductDimensionsV2 } from '../../lib/productTypes';
 import {
   blankDoc,
-  defaultProductDeliveryOptions,
   importedTexts,
   preservedGroups,
   specIdsOutsideTemplate,
@@ -69,7 +68,7 @@ import {
   type ProductResponse,
   type SaveResponse,
 } from './types';
-import DeliveryAvailabilityNotice from './DeliveryAvailabilityNotice';
+import DeliveryRuleLine from './DeliveryRuleLine';
 const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
 // «تحديث البيانات» — the product data file, both ways (owner brief 2026-10-10):
 // its own lazy chunk too; only a saved product opens it. (The older
@@ -827,7 +826,6 @@ export default function ProductForm({
       rel,
       publishing: status === 'active',
       warranty: warrantyInput,
-      delivery_options: next.delivery_options,
     });
     if (Object.keys(check).length > 0) {
       setSaveErr(saveOutcomeText('checkFields', lang));
@@ -1593,11 +1591,9 @@ export default function ProductForm({
         n={4}
         missing={sectionMissing(4)}
         missingLabel={sectionMissingLabel(4)}
-        ar="خيارات التوصيل والضمان"
+        ar="التوصيل والضمان"
         en="Delivery & warranty"
         summary={summarize([
-          doc.delivery_options ? 'توصيل مخصص' : 'تعرفة التوصيل العامة',
-          doc.delivery_options?.standard.enabled === false ? 'العادي معطّل' : undefined,
           isPrinterCatalog && doc.warranty_plans.some((p) => p.active)
             ? `ضمان ممدد ${doc.warranty_plans.filter((p) => p.active).map((p) => `+${p.duration_months}`).join(' / ')}`
             : undefined,
@@ -1608,81 +1604,10 @@ export default function ProductForm({
         }
         {...section(4)}
       >
-        {/* Product-owned delivery tariffs. Existing products remain on the
-            global legacy tariff until an admin explicitly opts them in; this
-            prevents an unrelated edit from changing live checkout totals. */}
-        <div className="border-t border-border-subtle pt-3 mb-4" data-form="delivery-options">
-          <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
-            <div className="min-w-0">
-              <h4 className="text-[13px] font-bold text-text-primary">
-                خيارات التوصيل <span className="text-[11px] font-medium text-text-muted">Delivery options</span>
-              </h4>
-              <p className="text-[11px] leading-relaxed text-text-muted mt-0.5">
-                العادي رسم واحد للشحنة: ٥٬٠٠٠ د.ع للقطع العادية و١٠٬٠٠٠ د.ع للشحنة التي تحتوي طابعة. تعطيل الطريقة يمنع اختيارها لهذا المنتج.
-              </p>
-            </div>
-            {doc.delivery_options ? (
-              <button
-                type="button"
-                className={`${btnGhost} !h-8 text-[11px]`}
-                onClick={() => setDoc((d) => ({ ...d, delivery_options: null }))}
-                data-delivery-use-legacy
-              >
-                استخدام التعرفة العامة
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={`${btnGhost} !h-8 text-[11px]`}
-                onClick={() => setDoc((d) => ({ ...d, delivery_options: defaultProductDeliveryOptions() }))}
-                data-delivery-configure
-              >
-                تخصيص لهذا المنتج
-              </button>
-            )}
-          </div>
-
-          <DeliveryAvailabilityNotice options={doc.delivery_options} printer={isPrinterCatalog} />
-
-          {!doc.delivery_options ? (
-            <p className="rounded-md bg-surface-raised px-3 py-2 text-[11px] text-text-secondary" data-delivery-legacy-note>
-              هذا المنتج يستخدم تعرفة التوصيل العامة الحالية للحفاظ على توافق الطلبات والمنتجات القديمة.
-            </p>
-          ) : (
-            <div className="divide-y divide-border-subtle rounded-lg border border-border-subtle px-3">
-              {([
-                ['standard', 'التوصيل العادي', 'Standard delivery'],
-              ] as const).map(([method, ar, en]) => {
-                const rule = doc.delivery_options![method];
-                const setRule = (change: Partial<typeof rule>) =>
-                  setDoc((d) =>
-                    d.delivery_options
-                      ? {
-                          ...d,
-                          delivery_options: {
-                            ...d.delivery_options,
-                            [method]: { ...d.delivery_options[method], ...change },
-                          },
-                        }
-                      : d
-                  );
-                return (
-                  <div key={method} className="py-3" data-delivery-method={method}>
-                    <div className="max-w-sm mb-2">
-                      <Toggle
-                        checked={rule.enabled}
-                        onChange={(enabled) => setRule({ enabled })}
-                        label={ar}
-                        sub={en}
-                      />
-                    </div>
-                    <p className="text-[11px] text-text-secondary">تعطيل أو تفعيل التوصيل العادي فقط؛ الرسم ثابت للشحنة ولا يزيد مع الكمية أو عدد المنتجات.</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        {/* «قاعدة التوصيل»: read-only. Delivery is priced centrally in
+            «إدارة التوصيل» (owner, 2026-10-18); the line re-resolves when the
+            sections change, and works for an unsaved product too. */}
+        <DeliveryRuleLine productId={doc.id || null} categoryId={doc.category_id ?? null} subCategoryId={doc.sub_category_id ?? null} />
 
         {/* Extended warranty — printers only (owner mandate). Two switches
             (+12 → 24, +24 → 36), a percent of the printer price each, and the

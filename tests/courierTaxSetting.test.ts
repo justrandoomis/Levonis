@@ -93,6 +93,9 @@ test('the admin form reads the typed figures with the same limits, and keeps its
   const panel = readFileSync(join(ROOT, 'src/components/adminWallet/CourierTaxPanel.tsx'), 'utf8');
   assert.ok(panel.includes("'ضريبة شركة التوصيل', 'Delivery company tax', 'باجی کۆمپانیای گەیاندن'"));
   assert.ok(panel.includes('Set the charge to 0 to switch it off'), 'the on-screen promise that 0 switches it off');
+  // «إدارة التوصيل» hosts the panel now (owner, 2026-10-18); the wallet settings keep a link to it.
+  const page = readFileSync(join(ROOT, 'src/components/adminDeliveryPricing/DeliveryManagement.tsx'), 'utf8');
+  assert.ok(page.includes('<CourierTaxPanel />'), 'the delivery management page hosts the panel');
   const wallet = readFileSync(join(ROOT, 'src/components/AdminWalletSettings.tsx'), 'utf8');
-  assert.ok(wallet.includes('<CourierTaxPanel />'), 'the wallet settings screen hosts the panel');
+  assert.ok(wallet.includes('href="/admin?tab=delivery_pricing"'), 'the wallet settings link to it');
 });

@@ -62,18 +62,6 @@ export interface CatalogNode {
   description_ar?: string;
   description_en?: string;
   description_ckb?: string;
-  /**
-   * The section's pooled quantity delivery rules (migration 0135), one per
-   * method at most. Absent on a server older than 0135.
-   */
-  delivery_rules?: SectionDeliveryRule[];
-}
-
-export interface SectionDeliveryRule {
-  method: 'standard' | 'personal';
-  enabled: boolean;
-  quantity_step: number;
-  fee_iqd: number;
 }
 
 export interface BrandRow {
