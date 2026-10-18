@@ -52,6 +52,7 @@ import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, normalizePayoutMethods, normalizeSerialPrepGate, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
+import { getOfficialUsdRate } from '../lib/fx/officialRate';
 import { validateWalletFreeDelivery } from '../lib/walletFreeDelivery';
 import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
 import { CLAIM_ALREADY_OPEN_DESK, type CreateUnitsResult } from '../lib/deviceOps';
@@ -902,7 +903,7 @@ adminRoutes.get('/users/:id/detail', async (c) => {
      */
     getAvailableBalances(c.env, id),
     readWalletDust(c.env.DB, id),
-    getSetting(c.env.DB, 'exchangeRate'),
+    getOfficialUsdRate(c.env.DB),
     degradeIfSchemaMissing('bnpl ledger (0002)', () => bnplOutstanding(c.env.DB, id), 0),
   ]);
 

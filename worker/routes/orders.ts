@@ -21,6 +21,7 @@ import {
   type PhysicalDimensions,
 } from '../lib/physicalDimensions';
 import { deliversToHome, getSetting, getSettings, printerNoteIqdFrom } from '../lib/settings';
+import { getOfficialUsdRate } from '../lib/fx/officialRate';
 import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig, GiniPolicy } from '../lib/settings';
 import { addDays, baghdadDay, baghdadDayOf, isDay } from '../lib/baghdadTime';
 import { COMPOSED_SNAPSHOT, costSnapshot, type CostBasis } from '../lib/financeLedger';
@@ -2152,10 +2153,11 @@ export async function computeCheckout(
       .first<Record<string, unknown>>());
   if (!address) throw badRequest('Please choose a valid delivery address');
 
+  // The ONE official rate the products are priced at (DECISIONS row 252), read beside the settings.
+  const officialRate = options.source?.exchangeRate === undefined ? getOfficialUsdRate(c.env.DB) : null;
   const settings = await getSettings(c.env.DB, [
     'checkoutDeliveryMethods',
     'checkoutPaymentMethods',
-    'exchangeRate',
     'proPricingPolicy',
     'preorderTransportDefaults',
     'printerGiftConfig',
@@ -2191,7 +2193,7 @@ export async function computeCheckout(
     payment = (settings.checkoutPaymentMethods as CheckoutPaymentMethod[]).find((m) => m.id === input.paymentMethodId) ?? null;
     if (!payment) throw badRequest('Please choose a valid payment method');
   }
-  const exchangeRate = options.source?.exchangeRate ?? (Number(settings.exchangeRate) || 1400);
+  const exchangeRate = options.source?.exchangeRate ?? (await officialRate) ?? 1400;
   const shippingConfig = shippingConfigFrom(settings.shippingPolicy);
 
   // Effective tier from the memberships ledger — never the client, never the

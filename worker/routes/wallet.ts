@@ -44,6 +44,7 @@ import {
   type WithdrawalRow,
 } from '../lib/walletOps';
 import { getSetting } from '../lib/settings';
+import { getOfficialUsdRate } from '../lib/fx/officialRate';
 import { notifyAdminTopic } from '../lib/telegramAdmin';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { availableUsdSql, isConstraintAbort } from '../lib/walletOps';
@@ -245,7 +246,8 @@ walletRoutes.get('/', async (c) => {
     // on mount and never repolls, so a long-open tab would compute a balance
     // at a rate the shop has since moved.
     readWalletDust(c.env.DB, user.id),
-    getSetting(c.env.DB, 'exchangeRate'),
+    // The ONE official rate the products are priced at (DECISIONS row 252).
+    getOfficialUsdRate(c.env.DB),
     c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>(),
     c.env.DB.prepare(
       "SELECT * FROM wallet_transactions WHERE user_id = ? AND currency = 'POINT' ORDER BY created_at DESC LIMIT 200"
@@ -513,7 +515,7 @@ walletRoutes.post('/deposits', async (c) => {
 
   // The rate is read once, here, and stored beside the dinars — never
   // re-read at display time, which is what made the figure drift.
-  const exchangeRate = declaredAmountIqd ? Number(await getSetting(c.env.DB, 'exchangeRate')) || 0 : 0;
+  const exchangeRate = declaredAmountIqd ? await getOfficialUsdRate(c.env.DB) : 0;
   /**
    * «يضاف كما هو ولكن يحول الى الدولار وليس العكس». When the customer typed
    * dinars, the DINARS are the request and the cents are converted from them
@@ -653,7 +655,7 @@ walletRoutes.post('/withdrawals', async (c) => {
    * beside 100 cents, both come out the same way: NULL, and every screen
    * converts the cents instead. The withdrawal itself is never refused for it.
    */
-  const exchangeRate = declaredAmountIqd ? Number(await getSetting(c.env.DB, 'exchangeRate')) || 0 : 0;
+  const exchangeRate = declaredAmountIqd ? await getOfficialUsdRate(c.env.DB) : 0;
   // The typed dinars are the request; the cents follow from them at the
   // server's rate (see the deposit route above).
   const amount = dinarsToCents(declaredAmountIqd, exchangeRate) ?? clientCents;

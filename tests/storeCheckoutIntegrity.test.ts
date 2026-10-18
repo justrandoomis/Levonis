@@ -37,6 +37,13 @@ import type { Env } from '../worker/lib/types';
 
 /** 100,000 cents at 1,400 IQD/USD — 1,400,000 IQD of spendable balance. */
 const DEP = 100_000;
+/**
+ * The wallet converts at THE ONE OFFICIAL RATE (DECISIONS row 252): the applied USD/IQD, which the
+ * clean-start fixture approves at 1,500 on the first customer request (tests/fixtures/autoPublish.ts).
+ * A 14,000 IQD order is 933 cents at it.
+ */
+const OFFICIAL = 1500;
+const ORDER_CENTS = Math.floor((14000 * 100) / OFFICIAL);
 const FUTURE = '2099-01-01T00:00:00.000Z';
 
 function seed(raw: DatabaseSync, opts: { aliDelivery?: string; aliPlus?: boolean; aliTier?: string } = {}) {
@@ -221,7 +228,7 @@ test('B6 a single-use coupon spent by a concurrent order ABORTS this order (409 
   const { res: again, body: placed } = await place(app, 'b6-key-0002');
   assert.equal(again.status, 201, JSON.stringify(placed));
   assert.deepEqual(holds(raw, 'buyer').map((h) => h.state).sort(), ['committed', 'released']);
-  assert.equal(spendable(raw, 'buyer'), DEP - 1000, 'charged once, for the order that exists');
+  assert.equal(spendable(raw, 'buyer'), DEP - ORDER_CENTS, 'charged once, for the order that exists');
   await Promise.allSettled(pending);
 });
 
@@ -508,7 +515,7 @@ test('B24 the store debit records the dinars it spent, beside the rate — as th
   const debit = row<{ amount: number; amount_iqd: number | null; exchange_rate_snapshot: number | null }>(
     raw, "SELECT amount, amount_iqd, exchange_rate_snapshot FROM wallet_transactions WHERE ref = ? AND type = 'withdrawal'", body.order.id
   )!;
-  assert.deepEqual(debit, { amount: 1000, amount_iqd: 14000, exchange_rate_snapshot: 1400 });
+  assert.deepEqual(debit, { amount: ORDER_CENTS, amount_iqd: 14000, exchange_rate_snapshot: OFFICIAL });
   await Promise.allSettled(pending);
 });
 
@@ -542,7 +549,7 @@ test('B13 an abandoned checkout’s wallet hold is handed back after its TTL —
   // A second checkout that DID become an order.
   const placed = await post(app, '/api/store-orders', { idempotencyKey: 'b13-good-001', addressId: 'a1', quoteFingerprint: q.quote_fingerprint });
   assert.equal(placed.status, 201);
-  assert.equal(spendable(raw, 'buyer'), DEP - 1000 - 1000, 'one debit, one orphaned reservation');
+  assert.equal(spendable(raw, 'buyer'), DEP - ORDER_CENTS - ORDER_CENTS, 'one debit, one orphaned reservation');
 
   const env = { DB: asD1(raw) } as unknown as Env;
   const early = await releaseOrphanStoreHolds(env, new Date().toISOString());
@@ -551,7 +558,7 @@ test('B13 an abandoned checkout’s wallet hold is handed back after its TTL —
   const later = new Date(Date.now() + (STORE_HOLD_TTL_MINUTES + 1) * 60_000).toISOString();
   const swept = await releaseOrphanStoreHolds(env, later);
   assert.equal(swept.holds_released, 1);
-  assert.equal(spendable(raw, 'buyer'), DEP - 1000, 'the reserved money is spendable again');
+  assert.equal(spendable(raw, 'buyer'), DEP - ORDER_CENTS, 'the reserved money is spendable again');
   const states = holds(raw, 'buyer').map((h) => h.state).sort();
   assert.deepEqual(states, ['committed', 'released'], 'the settled hold was never touched');
   assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action = 'wallet.store_hold_released'"), 1);

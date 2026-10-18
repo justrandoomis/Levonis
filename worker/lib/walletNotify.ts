@@ -4,7 +4,7 @@ import { audit } from './audit';
 import { enqueue as enqueueOutbox } from './outbox';
 import { isE164 } from './wasender';
 import { maskPhone } from './phone';
-import { getSetting } from './settings';
+import { getOfficialUsdRate } from './fx/officialRate';
 import { escapeHtml, emailLang, type EmailLang } from './emailTemplates';
 import {
   answerCallbackQuery,
@@ -570,7 +570,7 @@ export async function enqueueDepositAdminNotification(env: Env, requestId: strin
   const dest = routed.ok ? routed.destination : null;
   const targetChat = dest?.chatId ?? '';
 
-  const rate = Number(await getSetting(env.DB, 'exchangeRate')) || 1400;
+  const rate = await getOfficialUsdRate(env.DB);
   const email = verifiedEmail(facts.email, facts.email_verified_at);
   const caption = buildDepositCaption({
     operationNumber: operationNumber(facts.id),
@@ -1516,7 +1516,7 @@ export async function enqueueUserDepositStatusNotification(
   const status = row.status as 'approved' | 'rejected';
   const lang = emailLang(row.locale === 'ku' ? 'ckb' : row.locale);
   const copy = STATUS_COPY[status][lang];
-  const rate = Number(await getSetting(env.DB, 'exchangeRate')) || 1400;
+  const rate = await getOfficialUsdRate(env.DB);
   /**
    * The customer's own dinar figure when the request recorded it (0105), the
    * conversion when it did not. Telling somebody their 50,000 د.ع deposit was

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useWallet, PaymentMethod } from '../WalletContext';
+import { useLanguage } from '../LanguageContext';
 import RoundingDriftTool from './adminWallet/RoundingDriftTool';
 import CourierTaxPanel from './adminWallet/CourierTaxPanel';
 import { api, ApiError, formatIqd, type PayoutMethod } from '../lib/api';
@@ -59,17 +60,18 @@ function SaveStatus({ state, error }: { state: SaveState; error?: string | null 
 
 export default function AdminWalletSettings() {
   const {
-    exchangeRate, setExchangeRate,
+    exchangeRate,
     adVideoUrl, setAdVideoUrl,
     paymentMethods, updatePaymentMethods,
     settings, refreshSettings,
     isLoaded,
   } = useWallet();
 
-  // Local editable copies — saved explicitly, never per keystroke.
-  const [rateInput, setRateInput] = useState<string>('');
-  const [rateState, setRateState] = useState<SaveState>('idle');
-  const [rateError, setRateError] = useState<string | null>(null);
+  const { loc } = useLanguage();
+  // THE ONE OFFICIAL RATE (DECISIONS row 252): the applied USD/IQD the products are priced at, set in
+  // «التسعير والشحن». Read-only here — the legacy `exchangeRate` setting no longer drives anything
+  // while an applied rate exists. `displayUsdRate` is that rate exactly; null while none is set.
+  const officialRate = settings?.displayUsdRate ?? null;
 
   const [urlInput, setUrlInput] = useState<string>('');
   const [urlState, setUrlState] = useState<SaveState>('idle');
@@ -122,17 +124,12 @@ export default function AdminWalletSettings() {
   useEffect(() => {
     if (!isLoaded || hydratedRef.current) return;
     hydratedRef.current = true;
-    setRateInput(String(exchangeRate));
     setUrlInput(adVideoUrl);
     setMethods(paymentMethods);
     setPayouts(settings?.payoutMethods ?? []);
-  }, [isLoaded, exchangeRate, adVideoUrl, paymentMethods, settings]);
+  }, [isLoaded, adVideoUrl, paymentMethods, settings]);
 
   // Keep untouched sections in sync when the context refreshes (e.g. after a save elsewhere).
-  useEffect(() => {
-    if (!hydratedRef.current) return;
-    if (rateState === 'idle' || rateState === 'saved') setRateInput(String(exchangeRate));
-  }, [exchangeRate]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!hydratedRef.current) return;
     if (urlState === 'idle' || urlState === 'saved') setUrlInput(adVideoUrl);
@@ -145,24 +142,6 @@ export default function AdminWalletSettings() {
     if (!hydratedRef.current) return;
     if (payoutState === 'idle' || payoutState === 'saved') setPayouts(settings?.payoutMethods ?? []);
   }, [settings?.payoutMethods]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleSaveRate = async () => {
-    const parsed = parseInt(rateInput, 10);
-    if (!Number.isFinite(parsed) || parsed < 1) {
-      setRateState('error');
-      setRateError('Enter a whole number of IQD per USD (at least 1)');
-      return;
-    }
-    setRateState('saving');
-    setRateError(null);
-    try {
-      await setExchangeRate(parsed);
-      setRateState('saved');
-    } catch (e) {
-      setRateState('error');
-      setRateError(e instanceof ApiError ? e.message : 'Save failed');
-    }
-  };
 
   // The rate lives outside the settings context, so this screen fetches it
   // itself — once, on mount — and never guesses a value it has not been told.
@@ -303,31 +282,27 @@ export default function AdminWalletSettings() {
             </div>
             <h3 className="text-lg font-bold text-text-primary">Exchange Rate</h3>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2" data-official-rate>
             <label className="text-sm font-bold text-text-secondary">1 USD = IQD</label>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 relative">
-                <input
-                  className="lv-input font-bold disabled:opacity-50"
-                  type="number"
-                  value={rateInput}
-                  onChange={(e) => { setRateInput(e.target.value); setRateState('dirty'); }}
-                  disabled={!isLoaded}
-                />
-                <span className="absolute end-4 top-1/2 -translate-y-1/2 text-text-muted font-bold text-sm">IQD</span>
-              </div>
-              <button
-                onClick={handleSaveRate}
-                disabled={rateState === 'saving' || !isLoaded}
-                className="lv-button lv-button-primary shrink-0"
-              >
-                <Save className="w-4 h-4" /> Save
-              </button>
+            <div className="lv-input font-bold tabular-nums" dir="ltr" aria-readonly="true">
+              {isLoaded ? (officialRate ?? String(exchangeRate)) : '…'}
             </div>
             <p className="text-[11px] text-text-muted">
-              Product prices are stored in IQD and are not affected by rate changes; the rate only converts wallet USD at checkout.
+              {officialRate
+                ? loc(
+                    'هذا هو سعر الصرف الرسمي للموقع كله: تُسعَّر به المنتجات، ويُحسب به رصيد المحفظة والشحن والسحب. لا يُعدَّل من هنا.',
+                    'This is the official exchange rate for the whole site: products are priced at it, and the wallet balance, top-ups and withdrawals are converted at it. It is not edited here.',
+                    'ئەمە نرخی فەرمیی ئاڵوگۆڕە بۆ هەموو ماڵپەڕەکە: بەرهەمەکان پێی نرخ دەدرێن، و باڵانسی جزدان و پڕکردنەوە و ڕاکێشان پێی دەگۆڕدرێن. لێرەوە دەستکاری ناکرێت.'
+                  )
+                : loc(
+                    'لا يوجد سعر صرف رسمي بعد — تستعمل المحفظة هذا السعر القديم إلى أن يعتمد المالك سعراً في «التسعير والشحن».',
+                    'No official exchange rate yet — the wallet uses this older rate until the owner approves one in «Pricing & shipping».',
+                    'هێشتا نرخی فەرمیی ئاڵوگۆڕ نییە — جزدان ئەم نرخە کۆنە بەکاردەهێنێت تا خاوەن لە «نرخدانان و گواستنەوە» نرخێک پەسەند دەکات.'
+                  )}
             </p>
-            <SaveStatus state={rateState} error={rateError} />
+            <a href="/admin?tab=pricing" className="inline-flex min-h-11 items-center px-1 text-sm font-bold underline underline-offset-2 text-text-primary">
+              {loc('تغيير سعر الصرف في «التسعير والشحن»', 'Change the rate in «Pricing & shipping»', 'گۆڕینی نرخ لە «نرخدانان و گواستنەوە»')}
+            </a>
           </div>
         </div>
 

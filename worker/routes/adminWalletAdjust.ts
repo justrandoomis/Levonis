@@ -24,7 +24,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, int, notFound, oneOf, requireAdmin, str, unavailable } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
-import { getSetting } from '../lib/settings';
+import { getOfficialUsdRate } from '../lib/fx/officialRate';
 import {
   applyRoundingDrift,
   assertFinancialScope,
@@ -44,7 +44,7 @@ const MAX_ADJUST_IQD = 1_000_000_000;
 const MAX_ADJUST_POINTS = 10_000_000;
 
 async function todayRate(db: D1Database): Promise<number> {
-  const rate = Number(await getSetting(db, 'exchangeRate'));
+  const rate = await getOfficialUsdRate(db);
   return Number.isInteger(rate) && rate > 0 ? rate : 0;
 }
 

@@ -24,7 +24,11 @@ import type { Env } from '../worker/lib/types';
 import { repriceV2 } from './fixtures/v2Publish';
 import { usdCeilCentsOf } from '../packages/pricing/src/usdCents';
 
-const RATE = 1400;
+/**
+ * The wallet's rate is THE ONE OFFICIAL RATE (DECISIONS row 252): the applied USD/IQD, which the
+ * clean-start fixture approves at 1,500 (tests/fixtures/v2Publish.ts FIXTURE_U).
+ */
+const RATE = 1500;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- rows are read field by field
 type Row = Record<string, any>;
 const cents = (iqd: number) => Math.ceil((iqd * 100) / RATE);

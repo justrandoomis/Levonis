@@ -211,6 +211,12 @@ test('THE BUG: cash on delivery is refused, and refused BEFORE anything is writt
   assert.equal(lines(raw), 1, 'the cart is untouched, so they can still pay properly');
 });
 
+/**
+ * The wallet converts at THE ONE OFFICIAL RATE (DECISIONS row 252): the applied USD/IQD, which the
+ * clean-start fixture approves at 1,500 on the first customer request (tests/fixtures/autoPublish.ts).
+ */
+const OFFICIAL = 1500;
+
 test('a merchant order is wallet-paid, with nothing due at the door and no pickup to choose', async () => {
   const raw = freshDb();
   seed(raw);
@@ -230,11 +236,11 @@ test('a merchant order is wallet-paid, with nothing due at the door and no picku
   assert.equal(placed.order.seller_type, 'merchant');
   assert.equal(placed.order.merchant_id, 'm_ali');
 
-  // Paid, not promised: 14,000 IQD at 1,400 = 1,000 cents, actually debited.
+  // Paid, not promised: 14,000 IQD at the official 1,500 = 933 cents, actually debited.
   const h = holds(raw, 'buyer');
   assert.equal(h.length, 1);
   assert.equal(h[0].state, 'committed');
-  assert.equal(h[0].amount_cents, 1000);
+  assert.equal(h[0].amount_cents, Math.floor((14000 * 100) / OFFICIAL));
   await Promise.allSettled(pending);
 });
 
@@ -264,7 +270,7 @@ test('the quote answers "can my wallet actually pay this" before the button, not
   const rich = (await json(await post(app, '/api/store-orders/quote', {}))).quote;
   assert.equal(rich.payment_method, 'wallet');
   assert.equal(rich.total_iqd, 14000);
-  assert.equal(rich.wallet_available_iqd, 1_400_000, '100,000 cents at 1,400 IQD/USD');
+  assert.equal(rich.wallet_available_iqd, (100_000 * OFFICIAL) / 100, '100,000 cents at the official 1,500 IQD/USD');
   assert.equal(rich.wallet_covers, true);
   assert.equal(rich.wallet_shortfall_iqd, 0);
 
@@ -273,8 +279,8 @@ test('the quote answers "can my wallet actually pay this" before the button, not
               VALUES ('w_out','buyer','withdrawal','USD',${DEP - 500},'approved','spent')`);
   const poor = (await json(await post(app, '/api/store-orders/quote', {}))).quote;
   assert.equal(poor.wallet_covers, false);
-  assert.equal(poor.wallet_available_iqd, 7000, '500 cents at 1,400');
-  assert.equal(poor.wallet_shortfall_iqd, 7000, 'and the customer is told the exact gap');
+  assert.equal(poor.wallet_available_iqd, (500 * OFFICIAL) / 100, '500 cents at 1,500');
+  assert.equal(poor.wallet_shortfall_iqd, 14000 - (500 * OFFICIAL) / 100, 'and the customer is told the exact gap');
 
   // The screen's answer and the checkout's answer must be the same answer.
   const refused = await json(await placeStoreOrder(app, {

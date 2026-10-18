@@ -1,6 +1,8 @@
 /**
  * THE DOLLAR READING ON A RATE THE OWNER TYPES (owner, 2026-10-17; DECISIONS
- * row 246, amending row 220 for this one figure).
+ * row 246, amending row 220 for this one figure). AMENDED by DECISIONS row 252
+ * (owner 2026-10-18): the reading is now always the rate in force — the one
+ * official rate — so a typed rate is published beside a market figure too.
  *
  * Live: USD/IQD on MANUAL («إيقاف»), the provider never configured (no market
  * reading, no rate ever built from one), the owner typing the shop's rate in
@@ -132,7 +134,7 @@ test('a typed rate purges /api/settings/public and the home answers that carry t
   }
 });
 
-test('with a market figure nothing changes: the reading is the market sell, credited, never the typed rate', async () => {
+test('with a market figure: the reading is the rate in force (DECISIONS row 252) — 1,680 built from the market, credited; then the typed 1,700, the shop\'s own', async () => {
   // A rate built from the provider (market 1,660 + the owner's 20 = 1,680 in force), then a typed 1,700.
   const raw = freshDb();
   raw.exec(OWNER_ROW_SQL);
@@ -140,19 +142,19 @@ test('with a market figure nothing changes: the reading is the market sell, cred
   applyRate(raw, 'USD_IQD', '1680');
   raw.exec("UPDATE fx_rate_pairs SET market_rate = '1660' WHERE pair = 'USD_IQD'");
   const { publicSettings, typeRate } = apps(raw);
-  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed], ['1660', true]);
+  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed, s.exchangeRate], ['1680', true, 1680]);
   await typeRate('1700');
-  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed], ['1660', true], 'the market it was built from');
+  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed, s.exchangeRate], ['1700', false, 1700], 'the rate he typed is the one in force');
 
-  // The provider's last validated reading alone (a typed rate, a reading never applied): still the market, credited.
+  // The provider's last validated reading alone (a typed rate, a reading never applied): the typed rate, uncredited.
   const lone = manualWorld();
   const t = apps(lone);
   await t.typeRate('1700');
   lone.exec("UPDATE fx_rate_pairs SET market_rate = '1655' WHERE pair = 'USD_IQD'");
-  assert.deepEqual(await getPublicDisplayRate(asD1(lone) as unknown as D1Database), { displayUsdRate: '1655', displayUsdRateAttributed: true });
+  assert.deepEqual(await getPublicDisplayRate(asD1(lone) as unknown as D1Database), { displayUsdRate: '1700', displayUsdRateAttributed: false, exchangeRate: 1700 });
 });
 
-test('back on AUTO with still no market figure: no typed rate is in force, nothing is published — an adjustment there shifts the rate, and its step would be the adjustment', async () => {
+test('back on AUTO with still no market figure: the rate in force is still the reading (DECISIONS row 252) — an adjustment there moves it, purged, uncredited', async () => {
   const raw = manualWorld();
   const { owner, publicSettings, typeRate } = apps(raw);
   await typeRate('1660');
@@ -164,15 +166,12 @@ test('back on AUTO with still no market figure: no typed rate is in force, nothi
   } finally {
     spy.restore();
   }
-  assert.ok(purged(spy.deleted, '/api/settings/public'), 'the mode change withdraws the typed reading: purged');
+  assert.ok(purged(spy.deleted, '/api/settings/public'), 'the mode change is purged');
   assert.deepEqual([pairOf(raw, 'USD_IQD').mode, pairOf(raw, 'USD_IQD').market_rate], ['AUTO', null], 'control: AUTO, the provider still silent');
   const adj = await put(owner, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ov(), market_adjustment_iqd: '20' });
   assert.equal(adj.status, 200, await adj.clone().text());
   assert.equal(derivedOf(raw).USD!.rate_iqd, '1680', 'control: the adjustment shifted the rate in force');
-  for (const s of await publicSettings()) {
-    assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed], [null, null], '1,680 beside the 1,660 published before is the adjustment');
-    assert.equal(JSON.stringify(s).includes('1680'), false);
-  }
+  for (const s of await publicSettings()) assert.deepEqual([s.displayUsdRate, s.displayUsdRateAttributed, s.exchangeRate], ['1680', false, 1680], 'the one official rate');
   // «إيقاف» again: the rate in force becomes the typed rate, and is the reading once more.
   const off = await put(owner, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ov(), mode: 'MANUAL' });
   assert.equal(off.status, 200, await off.clone().text());

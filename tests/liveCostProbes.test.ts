@@ -348,7 +348,7 @@ test('fx.json (FX-1): the public settings and the home carry only the effective 
       const text = await res.text();
       assert.deepEqual(judge(p, res.status, text), [], `${p.path} (${withRate ? 'a rate' : 'no rate'})`);
       if (p.path === '/api/settings/public' || p.path === '/api/home') {
-        // Not vacuous: the figure is there — the market base to the dinar (DECISIONS row 220), or null before the first approval.
+        // Not vacuous: the figure is there — the one official (applied) rate (DECISIONS row 252), or null before the first approval.
         assert.equal(JSON.parse(text).settings.displayUsdRate, withRate ? FX_DISPLAY_RATE : null, p.path);
         for (const v of FX_SENTINELS) assert.equal(text.includes(v), false, `${p.path} carries the private figure ${v}`);
       }

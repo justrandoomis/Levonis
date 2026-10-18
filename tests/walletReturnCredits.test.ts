@@ -19,6 +19,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, json, post, get, row } from './fixtures/app';
+import { applyRate } from './fixtures/fx';
 import { returnRoutes, priceProtectionRoutes } from '../worker/routes/returns';
 import { walletRoutes } from '../worker/routes/wallet';
 import { createDepositRequest, usdSpendStatement, walletSpendCents } from '../worker/lib/walletOps';
@@ -32,6 +33,8 @@ const RATE = 1400;
  */
 async function seed(): Promise<{ raw: DatabaseSync; db: D1Database }> {
   const raw = freshDb();
+  // The shop's ONE official rate (DECISIONS row 252) is the applied USD/IQD: this wallet was funded at it.
+  applyRate(raw, 'USD_IQD', String(RATE));
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role) VALUES
       ('buyer','Sara','s@x.co','h','customer'), ('boss','Admin','a@x.co','h','admin');

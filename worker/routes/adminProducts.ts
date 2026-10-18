@@ -2364,14 +2364,11 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
 
 /**
  * Admin price preview: full resolver output INCLUDING cost fields, plus a
- * USD preview at THE SHOP'S rate, never the wallet's `exchangeRate` (owner
- * decision 9: 1,400 is the wallet's own rate). WHICH shop rate depends on who
- * asks (DECISIONS row 220): the OWNER reads the APPLIED USD/IQD the prices are
- * built at (`getAppliedUsdRate` — market + his adjustment, or the rate he
- * typed), so the dollar figure is the dollar price he set, as it always was;
- * every other admin reads the PUBLIC figure customers read dollars at
- * (`getDisplayUsdRate`: the market figure — beside it the applied rate would
- * be the adjustment — or, with none, the rate the owner typed, row 246).
+ * USD preview at THE SHOP'S rate, never the legacy `exchangeRate` setting.
+ * The OWNER reads the APPLIED USD/IQD the prices are built at
+ * (`getAppliedUsdRate`); every other admin reads the PUBLIC figure customers
+ * read dollars at (`getDisplayUsdRate`) — since DECISIONS row 252 the same
+ * official rate.
  * Before the owner approves a first USD/IQD value `usd_preview` is null.
  * `tier` may be supplied to preview what a member of that tier would pay
  * (server data only otherwise).

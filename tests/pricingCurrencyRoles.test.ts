@@ -45,7 +45,7 @@ test('no accounting write path reads the central rates: only the FX module, the 
   assert.ok(readers.includes('worker/lib/fx/displayRate.ts'));
 });
 
-test('the FX module is imported only by the cron, the pricing workspace, the public display rate, the profit page\'s rate history and the money-free edge seam', () => {
+test('the FX module is imported only by the cron, the pricing workspace, the public display rate, the profit page\'s rate history, the money-free edge seam and the official-rate readers', () => {
   const importers = worker.filter(({ f, src }) => !f.startsWith('worker/lib/fx/') && /from\s+['"][^'"]*\/fx\/[^'"]+['"]/.test(src)).map(({ f }) => f).sort();
   // The engine's owner writes share the FX owner acts' strict body and decimal parsers, and the
   // versioned rate reader the FX pairs' table probe (USD design §2.6, §4.2) — nothing else of FX.
@@ -56,7 +56,14 @@ test('the FX module is imported only by the cron, the pricing workspace, the pub
     const fx = [...src.matchAll(/from\s+['"]([^'"]*\/fx\/[^'"]+)['"]/g)].map((m) => join(dirname(f), m[1]!).split('\\').join('/'));
     assert.deepEqual(fx.filter((m) => m !== 'worker/lib/fx/ownerActs' && m !== 'worker/lib/fx/pairs'), [], f);
   }
-  assert.deepEqual(importers.filter((f) => !engine.includes(f)), ['worker/index.ts', 'worker/routes/adminFinanceWorkspace.ts', 'worker/routes/adminPricing.ts', 'worker/routes/adminProducts.ts', 'worker/routes/misc.ts', 'worker/routes/products.ts']);
+  // THE ONE OFFICIAL RATE (DECISIONS row 252): the wallet, checkout, memberships, escrow, the wallet
+  // notices and the admin read U through `fx/officialRate` — that one reader, nothing else of FX.
+  const official = ['worker/lib/escrowOps.ts', 'worker/lib/walletNotify.ts', 'worker/routes/admin.ts', 'worker/routes/adminWalletAdjust.ts', 'worker/routes/memberships.ts', 'worker/routes/orders.ts', 'worker/routes/wallet.ts'];
+  for (const f of official) {
+    const src = worker.find((w) => w.f === f)!.src;
+    assert.deepEqual([...src.matchAll(/from\s+['"]([^'"]*\/fx\/[^'"]+)['"]/g)].map((m) => m[1]!.replace(/^.*\/fx\//, 'fx/')), ['fx/officialRate'], f);
+  }
+  assert.deepEqual(importers.filter((f) => !engine.includes(f) && !official.includes(f)), ['worker/index.ts', 'worker/routes/adminFinanceWorkspace.ts', 'worker/routes/adminPricing.ts', 'worker/routes/adminProducts.ts', 'worker/routes/misc.ts', 'worker/routes/products.ts']);
   // P-A (design §8): «الأرباح والتكاليف» reads the shop's USD/IQD AS IT WAS for its
   // display toggle and its promotion-rate suggestion — the ONE history reader,
   // nothing else of FX; it writes no rate and re-derives no dinar figure.

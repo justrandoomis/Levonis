@@ -59,6 +59,12 @@ import { iqdToUsdCentsExact, readCachedDisplayRate, rememberDisplayRate, usableR
  * charged without telling anyone.
  *
  * ─────────────────────────────────────────────────────────────────────────────
+ * ONE OFFICIAL RATE (owner 2026-10-18, DECISIONS row 252): the server now sends
+ * the applied USD/IQD the products are priced at as BOTH `displayUsdRate`
+ * (exactly) and the wallet's `exchangeRate` (in whole dinars), so the two
+ * paths below read the same rate; they stay separate only so an older server,
+ * or a shop with no applied rate yet, never converts prices at the legacy 1,400.
+ *
  * THE RATE IS THE SHOP'S, NEVER THE WALLET'S (FX programme plan §13, D7, Q5;
  * owner decision 9, 2026-10-09).
  *

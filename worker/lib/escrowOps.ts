@@ -33,6 +33,7 @@
 
 import { newId } from './crypto';
 import { escrowCreditStatements, merchantSuspendedSql } from './merchantLedger';
+import { getOfficialUsdRate } from './fx/officialRate';
 import {
   assertHoldStateStatement,
   availableUsdSql,
@@ -149,11 +150,9 @@ async function heldAtRate(db: D1Database, escrowId: string): Promise<number | nu
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-/** The authoritative rate, from the same setting the rest of checkout reads. */
+/** The authoritative rate: the shop's ONE official USD/IQD, the one checkout reads (DECISIONS row 252). */
 export async function exchangeRate(db: D1Database): Promise<number> {
-  const row = await db.prepare("SELECT value FROM admin_settings WHERE key = 'exchangeRate'").first<{ value: string }>();
-  const n = Number(row?.value);
-  return Number.isFinite(n) && n > 0 ? n : 1400;
+  return getOfficialUsdRate(db);
 }
 
 /**

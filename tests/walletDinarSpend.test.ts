@@ -36,6 +36,7 @@ import { acceptedPolicies } from './lib/policies';
 import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import { iqdToUsdCents } from '../src/lib/api';
+import { applyRate } from './fixtures/fx';
 
 const RATE = 1400;
 
@@ -56,6 +57,8 @@ function setup() {
     INSERT INTO catalogs (id, slug, name_ar, is_printer_catalog) VALUES ('cat_wds','wds-printers','طابعات',1);
     INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_x1','cat_wds',0);
   `);
+  // The shop's ONE official rate (DECISIONS row 252) is the applied USD/IQD: the wallet is funded and spent at it.
+  applyRate(raw, 'USD_IQD', String(RATE));
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 

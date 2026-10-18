@@ -3,79 +3,56 @@
  *
  * The top bar's display currency divides a dinar price by a USD/IQD rate. It is
  * public by necessity (anyone can read dollar prices) and it is the ONLY FX
- * figure that is: no adjustment, applied, typed, pending or history value ever
- * reaches `/api/settings/public` or `/api/home`.
+ * figure that is: no adjustment, typed-but-pending, guard or history value
+ * ever reaches `/api/settings/public` or `/api/home`.
  *
- * WHICH RATE (owner rule 2026-10-10, DECISIONS row 220). It used to be the
- * shop's EFFECTIVE rate — the parallel-market sell PLUS the owner's private
- * `market_adjustment_iqd` — credited to IQWealth beside a link to IQWealth's
- * own page. Subtracting the sell IQWealth publishes gave every visitor the
- * owner's adjustment exactly, and each later change of it as a step in the
- * public figure. The public figure is now the MARKET SELL that the last
- * market-built rate was built from: IQWealth's own public number, exactly
- * (no rounding — with a zero adjustment it is the applied rate to the last
- * decimal), which is what the credit says it is.
+ * WHICH RATE: THE OFFICIAL ONE (owner 2026-10-18, DECISIONS row 252, amending
+ * rows 220, 246 and 248). «سعر الصرف يكون رسمي وسائد للموقع»: the figure is the
+ * APPLIED USD/IQD every product is priced at (`pricing_fx_rates.rate_iqd`) —
+ * on AUTO the market sell plus the owner's adjustment, on MANUAL the rate he
+ * typed — exactly, as decimal text. It used to be the market sell the rate was
+ * last built from (row 220) so that the adjustment stayed private; the owner
+ * chose one official rate for the products, the storefront and the wallet,
+ * accepting that the applied rate is visible (row 248 clause (7) resolved).
+ * Beside it, `exchangeRate`: the same U in whole dinars
+ * (worker/lib/fx/officialRate.ts), which overrides the legacy setting of that
+ * name in the public answer, so the wallet the browser draws reads U too.
  *
- * WHERE IT IS READ. Not from the pair's live columns: on MANUAL («إيقاف») the
- * adjustment is no part of the rate in force, yet the owner may still save a
- * new one, and a rate the owner TYPES carries none at all — `effective −
- * current adjustment` then published a figure that moved with an act that
- * moved no rate, and a typed rate published as it is told every visitor the
- * owner's markup over the market (both found by the verification of row 220).
- * So it is read from the immutable FX log: the newest USD/IQD row that
- * APPLIED a rate built as market + adjustment (`apply`, `review_approved`,
- * `review_cleared` with result APPLIED — each records the adjustment it
- * carried), as `effective_after − market_adjustment_iqd`. Only a new market
- * reading the shop applies moves it. An adjustment change on AUTO shifts the
- * rate in force by its own amount and writes no such row; a freeze, a typed
- * rate and an adjustment saved on MANUAL write none either — the public
- * figure stays the market it was. With no such row yet (a typed rate before
- * any market reading was ever applied) it is the provider's last validated
- * reading, `fx_rate_pairs.market_rate`.
+ * `displayUsdRateAttributed`, one flag and no figure: true when U was built
+ * from the provider's market reading (the menu reads «the shop's rate, based
+ * on IQWealth data»), false when the owner typed it on MANUAL or no market
+ * reading exists («a rate set by the shop», no credit).
  *
- * WITH NO MARKET FIGURE AT ALL, THE RATE THE OWNER TYPES (owner 2026-10-17,
- * DECISIONS row 246, amending row 220 for this one figure). A shop on MANUAL
- * whose provider was never configured has no market reading and no rate ever
- * built from one; it used to publish null, and a customer who chose dollars
- * read every price in dinars, silently. The owner's rule: the dollar prices a
- * customer reads are converted at the rate he sets in «التسعير والشحن» — the
- * APPLIED USD/IQD (`pricing_fx_rates.rate_iqd`, the rate every engine price is
- * built at), published only on MANUAL, where it IS the `manual_rate` he
- * typed (the table's CHECK) and carries no adjustment. It is the shop's own
- * figure, never IQWealth's. Only this one figure: no market figure exists to
- * subtract it from, the adjustment saved on MANUAL is no part of it, and
- * nothing else from FX is published. Back on AUTO with still no market
- * figure, `manual_rate` is cleared and nothing is published: an adjustment
- * saved there shifts the rate in force, and its step from the typed rate
- * would be the adjustment.
- *
- * Beside it, one flag and no figure: `displayUsdRateAttributed` — true when
- * the figure is IQWealth's own market sell (the customer menu and Settings
- * credit IQWealth, «based on IQWealth data»), false when it is the rate the
- * owner typed («a rate set by the shop», no credit). Prices are dinars and
- * are built at the APPLIED rate (`pricing_fx_rates`); this only converts them
- * for reading, so no price anyone pays moves.
- *
- * Null until the owner approves or types the first USD/IQD value (no applied
- * rate, no public rate), and null on a database without migration 0179: the
- * client then reads prices in dinars and says so, never at the wallet's
- * `exchangeRate` (owner decision 9 — the wallet's 1 USD = 1,400 IQD is its own
- * rate, not a market reading). Never throws. One statement, read in the same
- * wave as the settings. A typed rate moves `pricing_fx_rates` and so purges
- * every cached answer that carries this figure (adminPricing.ts `commitAct`,
- * `displayRateChanged`), as the provider's first reading does (commit.ts).
+ * Null (and no `exchangeRate`, so the legacy setting stands) until the owner
+ * approves or types the first USD/IQD value, and on a database without
+ * migration 0179: the client then reads prices in dinars and says so. Never
+ * throws. One statement, read in the same wave as the settings. Every move of
+ * U purges every cached answer that carries it (commit.ts
+ * `displayRateChanged`; adminPricing.ts `commitAct`).
  */
-import { rebaseOnAdjustment, sameRate } from '@levonis/pricing/fxChain';
+import { sameRate } from '@levonis/pricing/fxChain';
 
 const DECIMAL = /^[0-9]+(\.[0-9]+)?$/;
-const SIGNED = /^[+-]?[0-9]+(\.[0-9]+)?$/;
 
 export interface PublicDisplayRate {
   displayUsdRate: string | null;
   displayUsdRateAttributed: boolean | null;
+  /** The official rate in whole dinars — present only when an applied rate exists. */
+  exchangeRate?: number;
 }
 
 const usable = (v: unknown): v is string => typeof v === 'string' && DECIMAL.test(v) && v.length <= 32;
+
+/**
+ * A USD/IQD decimal text as whole dinars per dollar (nearest), or null when
+ * unusable. The wallet, the snapshots and the orders count whole dinars
+ * (worker/lib/fx/officialRate.ts).
+ */
+export function wholeDinarRate(rateText: unknown): number | null {
+  if (typeof rateText !== 'string' || !/^[0-9]{1,12}(\.[0-9]{1,12})?$/.test(rateText)) return null;
+  const rounded = Math.round(Number(rateText));
+  return Number.isSafeInteger(rounded) && rounded >= 1 ? rounded : null;
+}
 
 export async function getPublicDisplayRate(db: D1Database): Promise<PublicDisplayRate> {
   const none: PublicDisplayRate = { displayUsdRate: null, displayUsdRateAttributed: null };
@@ -98,19 +75,12 @@ export async function getPublicDisplayRate(db: D1Database): Promise<PublicDispla
       .first<{ rate_iqd: unknown; last_market: unknown; typed_rate: unknown; built_rate: unknown; built_adjustment: unknown }>();
     // No applied rate yet: nothing is published (the first value waits for the owner).
     if (!row || !usable(row.rate_iqd)) return none;
-    let market: string | null = null;
-    if (usable(row.built_rate) && typeof row.built_adjustment === 'string' && SIGNED.test(row.built_adjustment)) {
-      market = rebaseOnAdjustment(row.built_rate, row.built_adjustment, '0');
-    } else if (usable(row.last_market)) {
-      market = row.last_market;
-    }
-    if (market !== null) return usable(market) ? { displayUsdRate: market, displayUsdRateAttributed: true } : none;
-    // No market figure at all: the rate the owner typed, as the shop's own (DECISIONS row 246) — on
-    // MANUAL, where the rate in force IS `manual_rate` (the table's CHECK). Back on AUTO `manual_rate`
-    // is null: an adjustment there shifts the rate in force, and that rate is never published.
-    return usable(row.typed_rate) && sameRate(row.rate_iqd, row.typed_rate)
-      ? { displayUsdRate: row.rate_iqd, displayUsdRateAttributed: false }
-      : none;
+    const whole = wholeDinarRate(row.rate_iqd);
+    if (whole === null) return none;
+    // MANUAL: the rate in force IS `manual_rate` (the table's CHECK) — the shop's own, never credited.
+    const typed = usable(row.typed_rate) && sameRate(row.rate_iqd, row.typed_rate);
+    const fromMarket = usable(row.built_rate) || usable(row.last_market);
+    return { displayUsdRate: row.rate_iqd, displayUsdRateAttributed: fromMarket && !typed, exchangeRate: whole };
   } catch {
     return none;
   }
@@ -124,10 +94,8 @@ export async function getDisplayUsdRate(db: D1Database): Promise<string | null> 
 /**
  * THE APPLIED USD/IQD — the rate every engine price is built at
  * (`pricing_fx_rates.rate_iqd`), market + the owner's adjustment or the rate he
- * typed. OWNER-ONLY: beside the public market figure it IS the adjustment.
- * Read by the owner's own price preview so the owner keeps reading the dollar
- * price he set; never by a public or staff answer. Null when unset or
- * unreadable. Never throws.
+ * typed: since DECISIONS row 252 the shop's one official rate, the same figure
+ * the public display rate carries. Null when unset or unreadable. Never throws.
  */
 export async function getAppliedUsdRate(db: D1Database): Promise<string | null> {
   try {
@@ -144,8 +112,7 @@ export async function getAppliedUsdRate(db: D1Database): Promise<string | null> 
  * reads with (`iqdToUsdCentsExact`, src/lib/displayRate.ts): U = n / 10^k, so
  * cents = floor(|iqd| × 100 × 10^k / n), the sign put back. Null for an
  * unusable rate or dinar figure — never 0 for "unknown". For the admin price
- * preview (owner decision 9: it reads the shop's rate, never the wallet's —
- * the applied rate for the owner, the public market figure for staff).
+ * preview (it reads the shop's official rate, DECISIONS row 252).
  */
 export function iqdToUsdCentsAtRate(iqd: number, rateText: string): number | null {
   const m = /^([0-9]{1,12})(?:\.([0-9]{1,12}))?$/.exec(rateText);

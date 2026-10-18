@@ -116,15 +116,16 @@ throughout, never a float.
   being made included — above 15% need the explicit confirmation and that
   fresh sign-in too. An adjustment that would make the rate implausible is
   refused (400 `FX_RATE_OUT_OF_BOUNDS`).
-- **The wallet keeps its own rate** (owner decision 9): `exchangeRate`
-  (1 USD = 1,400 IQD, DECISIONS row 6) stays the rate of every wallet screen
-  and operation — deposits, wallet payments at checkout, refunds, escrow,
-  Quick Buy, memberships — and a market update never changes it (market
-  1,670 beside wallet 1,400 is the normal state). No wallet, escrow, Quick
-  Buy, membership or checkout code imports the FX module or names its
-  tables, and no FX or engine code reads `exchangeRate`
-  (`tests/walletRateSeparation.test.ts`). The display currency never falls
-  back to it: before the owner approves the first USD/IQD value,
+- **One official rate, even in the wallet** (owner 2026-10-18, DECISIONS
+  row 252, overturning owner decision 9's separate 1,400): the applied
+  USD/IQD the products are priced at is the rate of every wallet screen and
+  operation — deposits, withdrawals, wallet payments at checkout, escrow,
+  memberships, the wallet notices — read through one helper,
+  `getOfficialUsdRate` (worker/lib/fx/officialRate.ts), in whole dinars; the
+  public `displayUsdRate` is that same rate. The legacy `exchangeRate` setting
+  is read only while no applied rate exists; stored snapshots keep the rate
+  they recorded (`tests/officialRate.test.ts`). The display currency never
+  falls back to the legacy setting: before the owner approves the first USD/IQD value,
   `displayUsdRate` is null and the storefront reads in dinars with a note
   that the dollar reading comes once the shop's rate is approved. The admin
   product price preview reads the shop's rate too (`usd_preview` null before

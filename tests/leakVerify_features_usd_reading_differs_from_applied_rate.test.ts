@@ -15,13 +15,12 @@
  * Only a DINAR-NATIVE amount — a fee, points, a coupon — is still read at the
  * public display rate, and the public figure itself still gives nothing away.
  *
- * WHAT IS STILL OPEN (DECISIONS row 248 (7), row 220 (ز)). A dollar price
- * beside its dinar price IS that row's applied rate (dinars ÷ dollars), and
- * the applied rate less IQWealth's public sell IS the owner's private
- * adjustment (or his markup over the market, on a typed rate). The owner's
- * instruction asks for exactly the figure that reveals it, so it ships; his
- * explicit word on that consequence is still awaited, and the third test
- * below stays a `todo` until he gives it.
+ * THE OPEN QUESTION, ANSWERED (owner 2026-10-18, DECISIONS row 252, resolving
+ * row 248 (7)): «سعر الصرف يكون رسمي وسائد للموقع». The public figure is now
+ * the APPLIED rate itself — one official rate for the products, the
+ * storefront and the wallet — and the owner accepts that the applied rate is
+ * visible. A dollar price beside its dinar price and the public figure agree:
+ * there is one rate, and nothing to tell apart.
  *
  * LOCAL ONLY: in-memory SQLite, the real misc router (/api/settings/public),
  * the client's own exact converter (src/lib/displayRate.ts) and money()
@@ -47,39 +46,32 @@ async function world() {
   return { settings };
 }
 
-test('a dinar-native amount (a 5,000 IQD delivery fee) reads at the market 1,660, and the public figure gives no adjustment away', async () => {
+test('a dinar-native amount (a 5,000 IQD delivery fee) reads at the official 1,680 — the applied rate is the public figure', async () => {
   const { settings } = await world();
-  assert.equal(settings.displayUsdRate, '1660', 'the public figure is IQWealth’s sell');
-  assert.equal(settings.displayUsdRateAttributed, true);
+  assert.equal(settings.displayUsdRate, '1680', 'the public figure is the rate the prices are built at');
+  assert.equal(settings.displayUsdRateAttributed, true, 'built from IQWealth’s sell: «based on IQWealth data»');
   // A fee has no dollar base: it is read at the public rate, floored to the cent.
-  assert.equal(iqdToUsdCentsExact(5_000, settings.displayUsdRate), 301, '$3.01 at the market rate');
+  assert.equal(iqdToUsdCentsExact(5_000, settings.displayUsdRate), 297, '$2.97 at the official rate');
   const money = currencyValue('USD', () => {}, { text: settings.displayUsdRate, source: 'shop' }).money;
-  assert.equal(money(5_000), '$3.01');
-  // public − IQWealth's sell: nothing of the owner's 20.
-  assert.equal(Number(settings.displayUsdRate) - 1660, 0);
+  assert.equal(money(5_000), '$2.97');
 });
 
-test('a product the shop priced at $100 (168,000 IQD at the applied 1,680) reads $100.00 to a dollar reader', async () => {
+test('a product the shop priced at $100 (168,000 IQD at the applied 1,680) reads $100.00 to a dollar reader — with or without the server’s dollar figure', async () => {
   const { settings } = await world();
   // The server's dollar price of the row (`usd_ceil6` '100' ceiled to the cent) travels beside its dinars.
   const cents = usdCeilCentsOf('100.000000');
   assert.equal(cents, 10_000);
   const view = currencyValue('USD', () => {}, { text: settings.displayUsdRate, source: 'shop' });
-  assert.equal(view.money(100 * 1680, cents), '$100.00', 'the shop’s own dollars, not 168,000 ÷ 1,660');
-  // Without the server's figure (an older server, a legacy product) it is still the reading at the market rate.
-  assert.equal(view.money(100 * 1680), '$101.20');
+  assert.equal(view.money(100 * 1680, cents), '$100.00', 'the shop’s own dollars');
+  // Without the server's figure (an older server, a legacy product) the reading at the official rate agrees.
+  assert.equal(view.money(100 * 1680), '$100.00');
   // In dinars nothing moves.
   assert.equal(currencyValue('IQD', () => {}, { text: settings.displayUsdRate, source: 'shop' }).money(100 * 1680, cents), '168,000 د.ع');
 });
 
-const OWNER_RULING =
-  'OWNER RULING NEEDED (DECISIONS rows 220 (ز) and 248 (7)): the dollar price beside its dinar price is the applied rate, and the applied rate less the public market sell is the private adjustment — shipped on the owner’s instruction «الدولار هو الاساس», his confirmation of this consequence is awaited';
-
-test('no public pair of figures gives the owner’s adjustment away', { todo: OWNER_RULING }, async () => {
+test('one official rate (DECISIONS row 252): the dollar price beside its dinar price IS the public figure — the owner accepted the applied rate is visible', async () => {
   const { settings } = await world();
-  // What any visitor can read: the dinar price, the shop's dollar price of it, and the public figure.
   const dinars = 100 * 1680;
   const cents = usdCeilCentsOf('100.000000')!;
-  const derivedApplied = dinars / (cents / 100);
-  assert.equal(derivedApplied - Number(settings.displayUsdRate), 0, 'the adjustment derivable from public payloads');
+  assert.equal(dinars / (cents / 100), Number(settings.displayUsdRate), 'one rate, nothing to tell apart');
 });

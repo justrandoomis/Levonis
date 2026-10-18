@@ -12,6 +12,7 @@ import { requireAuth, requireAdmin, requireMainHost, badRequest, forbidden, notF
 import { canMoveMoney } from '../lib/adminScope';
 import { sha256Hex } from '../lib/crypto';
 import { getSetting, setSetting, SETTING_DEFAULTS } from '../lib/settings';
+import { getOfficialUsdRate } from '../lib/fx/officialRate';
 import {
   ENTITLEMENT_MINIMUM_TIER,
   dailyRewardMultiplierX100,
@@ -415,7 +416,7 @@ export async function quotePurchase(
     ? ended.reduce((best, e) => (tierRank(e.row.tier) > tierRank(best.row.tier) ? e : best)).row
     : null;
 
-  const exchangeRate = Number(await getSetting(db, 'exchangeRate')) || 1400;
+  const exchangeRate = await getOfficialUsdRate(db);
   /**
    * THE PRICE IS IN DINARS AND THE WALLET PAYS IT IN DINARS — «يضاف كما هو
    * ولكن يحول الى الدولار وليس العكس» (migration 0108).
@@ -1114,7 +1115,7 @@ membershipsRoutes.post('/bnpl/repay', requireAuth, async (c) => {
 
   const outstanding = await bnplOutstanding(c.env.DB, user.id);
   if (amountIqd > outstanding) throw badRequest('Repayment cannot exceed the outstanding balance', 'BNPL_REPAYMENT_EXCEEDS_DEBT');
-  const rate = Number(await getSetting(c.env.DB, 'exchangeRate')) || 1400;
+  const rate = await getOfficialUsdRate(c.env.DB);
   /**
    * A REPAYMENT IS A DINAR DEBT PAID FROM A DINAR BALANCE — «يضاف كما هو ولكن
    * يحول الى الدولار وليس العكس» (migration 0108).
@@ -1736,7 +1737,7 @@ membershipsRoutes.post('/admin/:id/cancel', async (c) => {
       // No visible charge row to copy. The price is converted at today's rate,
       // and it stays a CEIL: this is the one place that gives back more than
       // it can prove was taken, and it must never give back less.
-      const rate = Number(await getSetting(db, 'exchangeRate')) || 1400;
+      const rate = await getOfficialUsdRate(db);
       cents = Math.ceil((Number(m.price_paid_iqd) * 100) / rate);
     }
     if (cents > 0) {

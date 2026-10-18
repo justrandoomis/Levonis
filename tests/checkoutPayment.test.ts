@@ -54,6 +54,12 @@ import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 const SEA = JSON.stringify([{ method: 'sea', commission_iqd: 15_000, active: true }]);
 
+/**
+ * The wallet reads at THE ONE OFFICIAL RATE (DECISIONS row 252): the applied USD/IQD, which the
+ * clean-start fixture approves at 1,500 (tests/fixtures/autoPublish.ts). 'thin' holds $50 of it.
+ */
+const THIN_IQD = (5000 * 1500) / 100;
+
 function setup() {
   // A NEW DATABASE IS A NEW ARCHIVE. `ensurePolicyCorpus` memoises a COMPLETED
   // mirror per isolate, and one test process is one isolate holding many
@@ -87,8 +93,8 @@ function setup() {
     INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,price_paid_iqd,starts_at,expires_at) VALUES
       ('m_pro','pro','pro_12mo','pro','active',12,499000,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z'),
       ('m_pro2','pro2','pro_12mo','pro','active',12,499000,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
-    -- Three wallets hold $1,000 (100,000 cents) — plenty at 1,400 IQD/USD;
-    -- 'thin' holds $50 (70,000 IQD), enough for part of an order, never all of it.
+    -- Three wallets hold $1,000 (100,000 cents) — plenty at the official 1,500 IQD/USD;
+    -- 'thin' holds $50 (75,000 IQD at the official 1,500), enough for part of an order, never all of it.
     INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status) VALUES
       ('dep_b','buyer','deposit','USD',100000,'approved'),
       ('dep_p','pro','deposit','USD',100000,'approved'),
@@ -391,8 +397,8 @@ test('cash + a wallet that covers the whole total is a PREPAID pre-order: pre-or
   assert.equal(partial.pricing_basis, 'direct');
   assert.equal(partial.lines[0].unit_price_iqd, 150_000);
   assert.equal(partial.total_iqd, 155_000);
-  assert.equal(partial.wallet.applied_iqd, 70_000);
-  assert.equal(partial.due_on_delivery_iqd, 85_000);
+  assert.equal(partial.wallet.applied_iqd, THIN_IQD);
+  assert.equal(partial.due_on_delivery_iqd, 155_000 - THIN_IQD);
   assert.equal(partial.prepaid_by_wallet, false);
   assert.deepEqual(arithmeticLeaks(partial.lines[0]), []);
   await Promise.allSettled(pending);
@@ -752,7 +758,7 @@ test('two identical quotes produce an identical consent signature', async () => 
  * always was; and the order debits exactly the applied amount, which a cancel
  * returns.
  *
- * 'thin' holds $50 = 70,000 IQD at the fixture's 1,400 rate; a direct p_a1
+ * 'thin' holds $50 = THIN_IQD (75,000 IQD) at the official rate; a direct p_a1
  * line is 150,000 on cash, so the balance is short of the total.
  */
 test('partial wallet: a balance smaller than the total is deducted in full and the rest is due on delivery', async () => {
@@ -761,21 +767,21 @@ test('partial wallet: a balance smaller than the total is deducted in full and t
   const a = appAs(db, 'thin');
 
   const off = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash')))).quote;
-  assert.equal(off.wallet.balance_iqd, 70_000);
+  assert.equal(off.wallet.balance_iqd, THIN_IQD);
   assert.equal(off.wallet.applied_iqd, 0, 'the switch off takes nothing');
   assert.equal(off.wallet.required_advance_iqd, 0);
   assert.equal(off.due_on_delivery_iqd, off.total_iqd);
 
   const on = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash', { useWallet: true })))).quote;
-  assert.ok(on.total_iqd > 70_000, 'the fixture must put the total above the balance');
-  assert.equal(on.wallet.applied_iqd, 70_000, 'the WHOLE balance, not nothing');
-  assert.equal(on.due_on_delivery_iqd, on.total_iqd - 70_000, 'the remainder is collected at the door');
+  assert.ok(on.total_iqd > THIN_IQD, 'the fixture must put the total above the balance');
+  assert.equal(on.wallet.applied_iqd, THIN_IQD, 'the WHOLE balance, not nothing');
+  assert.equal(on.due_on_delivery_iqd, on.total_iqd - THIN_IQD, 'the remainder is collected at the door');
   assert.equal(on.can_checkout, true, 'a cash order is never blocked by a short wallet');
   assert.equal(on.prepaid_by_wallet, false);
 
   const placed = await json(await post(a, '/api/orders', orderBody('addr_t', 'cash', { useWallet: true })));
   assert.equal(placed.success, true, JSON.stringify(placed));
-  assert.equal(placed.order.wallet_applied_iqd, 70_000);
+  assert.equal(placed.order.wallet_applied_iqd, THIN_IQD);
   assert.equal(placed.order.due_on_delivery_iqd, on.due_on_delivery_iqd);
   assert.equal(placed.order.total_iqd, on.total_iqd);
   assert.equal(placed.order.financial.outstanding_iqd, on.due_on_delivery_iqd);
@@ -786,7 +792,7 @@ test('partial wallet: a balance smaller than the total is deducted in full and t
     .all(placed.order.id) as Array<{ amount: number; amount_iqd: number | null }>;
   assert.equal(debits.length, 1, 'one debit for the order');
   assert.equal(debits[0].amount, 5000, 'the whole $50 — the cents the 70,000 was quoted from');
-  if (debits[0].amount_iqd !== null) assert.equal(debits[0].amount_iqd, 70_000);
+  if (debits[0].amount_iqd !== null) assert.equal(debits[0].amount_iqd, THIN_IQD);
 
   cartLine(raw, 'ci2', 'thin', 'p_pla', '');
   const after = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash', { useWallet: true })))).quote;
@@ -797,7 +803,7 @@ test('partial wallet: a balance smaller than the total is deducted in full and t
   const cancelled = await json(await post(a, `/api/orders/${placed.order.id}/cancel`, {}));
   assert.equal(cancelled.success, true, JSON.stringify(cancelled));
   const back = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash', { useWallet: true })))).quote;
-  assert.equal(back.wallet.balance_iqd, 70_000, 'the partial wallet payment came back whole');
+  assert.equal(back.wallet.balance_iqd, THIN_IQD, 'the partial wallet payment came back whole');
   await Promise.allSettled(pending);
 });
 
@@ -845,7 +851,7 @@ test('partial wallet: the full-advance method with a short balance is still repo
   cartLine(raw, 'ci1', 'thin', 'p_a1', '');
   const q = (await json(await post(appAs(db, 'thin'), '/api/orders/quote', quoteBody('addr_t', 'wallet', { useWallet: true })))).quote;
   assert.equal(q.wallet.required_advance_iqd, q.total_iqd, 'the wallet METHOD still means the whole total');
-  assert.equal(q.wallet.applied_iqd, 70_000);
+  assert.equal(q.wallet.applied_iqd, THIN_IQD);
   assert.equal(q.can_checkout, false, 'and the screen sends the customer to the partial path instead');
 });
 
@@ -859,6 +865,6 @@ test('partial wallet: the COD printer advance is unchanged — the switch off ta
   assert.equal(off.due_on_delivery_iqd, off.total_iqd - 50_000);
   const on = (await json(await post(a, '/api/orders/quote', quoteBody('addr_t', 'cash', { useWallet: true })))).quote;
   assert.equal(on.wallet.required_advance_iqd, 50_000);
-  assert.equal(on.wallet.applied_iqd, 70_000, 'the switch on spends the whole balance toward the total');
-  assert.equal(on.due_on_delivery_iqd, on.total_iqd - 70_000);
+  assert.equal(on.wallet.applied_iqd, THIN_IQD, 'the switch on spends the whole balance toward the total');
+  assert.equal(on.due_on_delivery_iqd, on.total_iqd - THIN_IQD);
 });
