@@ -27,7 +27,28 @@
  * Pure: no React, no request.
  */
 import type { ProductDimensionsV2 } from '../../../../lib/productTypes';
+import type { RelationsState } from '../model';
 import { toAscii, typingUsd } from './usdTyping';
+
+/** A level's packaged measure as pricing reads it (the worker's `packagedMeasureOf`): the weight with packaging, the box. */
+const packageKey = (d: ProductDimensionsV2 | null | undefined) => [d?.package_weight_g ?? null, d?.package_depth_mm ?? null, d?.package_width_mm ?? null, d?.package_height_mm ?? null];
+
+/**
+ * The priced part of the structure: «يُباع» and its routes, the models, colours, links, the variant rows — and the
+ * model's (the first group's values) and every colour's packaged weight and box, their freight measure in every
+ * model mode (row 247). Any of them edited, the preview prices the draft: the same document the save prices.
+ */
+export function pricedStructureKey(saleTypes: unknown, r: Pick<RelationsState, 'groups' | 'colors' | 'variants'>): string {
+  return JSON.stringify({
+    sale: saleTypes,
+    groups: r.groups.map((g, i) => [
+      g.id,
+      g.values.map((v) => [v.id, v.active, v.fulfillments.map((f) => [f.fulfillment_type, f.enabled, f.transports.map((t) => [t.method, t.enabled])]), ...(i === 0 ? [packageKey(v.dimensions)] : [])]),
+    ]),
+    colors: r.colors.map((c) => [c.id, c.active, c.option_value_ids, packageKey(c.dimensions)]),
+    variants: r.variants.map((v) => [v.option_value_ids, v.color_id, v.active]),
+  });
+}
 
 export type V2Method = 'cost' | 'usd';
 export type V2Scope = 'product' | 'option' | 'color' | 'sku';

@@ -38,7 +38,7 @@ import { evaluateLegacy, skuLevelScopeIds, unitColorId, unitComboKey, unitOption
 import { ruleTargetOf } from './compute';
 import type { LoadedProduct } from './load';
 import type { PricingRates } from './rates';
-import { chainOf, chainOfUnit, INPUT_FIELD_NAMES, type InputFields, type InputScope, type ProductPricingData, type RuleWrite, type StoredInputRow } from './store';
+import { chainOf, chainOfUnit, packagesOf, INPUT_FIELD_NAMES, type InputFields, type InputScope, type ProductPricingData, type RuleWrite, type StoredInputRow, type UnitPackages } from './store';
 import {
   deriveProductEntries,
   directSaleExtraWrites,
@@ -71,6 +71,7 @@ export function purchaseSkuLevels(loaded: LoadedProduct): PurchaseSkuLevels | un
     sku,
     variants: new Map((loaded.view?.variants ?? []).map((v) => [v.id, v.combo_key] as const)),
     units: units.map((u) => ({ option_value_ids: u.option_value_ids, color_id: u.color?.id ?? null, combo_key: u.combo_key })),
+    packages: packagesOf(loaded.doc),
   };
 }
 
@@ -289,7 +290,7 @@ export async function previewProduct(p: PurchaseForPricing, input: ProductInput,
   const inputs = mergedInputs(stored.inputs, derived.entries.map((e) => e.write));
   const rules: PricingRuleRow[] = mergedRules(stored, ruleWrites);
   const legacy = evaluateLegacy(pid, input.loaded.doc, input.loaded.view, ctx);
-  const models = priceModels(pid, legacy.models.map((m) => ({ ...m, channels: m.channels.filter((c) => c.channel === 'direct_sale') })), inputs, rules, rates);
+  const models = priceModels(pid, legacy.models.map((m) => ({ ...m, channels: m.channels.filter((c) => c.channel === 'direct_sale') })), inputs, rules, rates, undefined, packagesOf(input.loaded.doc));
   const direct = new Set(legacy.models.filter((m) => m.channels.some((c) => c.ok && c.channel === 'direct_sale')).map((m) => m.option_id));
   const extraSuggestions = legacy.legacy.models
     .filter((m) => direct.has(m.option_id) && m.extra.state === 'MIGRATED' && typeof m.extra.value_iqd === 'number' && m.extra.value_iqd >= 0 && m.extra.value_iqd % ROUNDING_STEP_IQD === 0)
@@ -358,7 +359,9 @@ export function priceModels(
   inputs: ReadonlyArray<Partial<StoredInputRow>>,
   rules: readonly PricingRuleRow[],
   rates: PricingRates | null,
-  direct?: Pick<ProductPricingData, 'inputs' | 'rules'>
+  direct?: Pick<ProductPricingData, 'inputs' | 'rules'>,
+  /** The document's packages (row 247): each unit freighted on its model's and colour's own, as V2 prices it. */
+  packages?: UnitPackages
 ): PricedModel[] {
   const u = rates?.usd_iqd ?? null;
   return models.map((m) => {
@@ -370,7 +373,7 @@ export function priceModels(
     const isSku = m.combo_key !== undefined;
     const at = isSku ? unitRuleTarget(productId, unit) : ruleTargetOf(productId, m.option_id);
     const run = (channels: SkuChannel[], inputRows: ReadonlyArray<Partial<StoredInputRow>>, ruleRows: readonly PricingRuleRow[]) => priceSku({
-      chain: isSku ? chainOfUnit(inputRows, unit) : chainOf(inputRows, m.option_id),
+      chain: isSku ? chainOfUnit(inputRows, { ...unit, ...(packages ? { packaged: packages(unit.option_value_ids, unit.color_id) } : {}) }) : chainOf(inputRows, m.option_id, packages),
       rates: rates.central,
       channels,
       target: resolveRuleAt(ruleRows, 'target_profit', at, { usdIqdRate: u }),
@@ -439,6 +442,7 @@ export function lineSummary(p: PurchaseForPricing, line: PurchaseLineForPricing,
     storePrice: line.store_price_iqd,
     excludedCharges: excluded,
     documentRate,
+    packages: packagesOf(input.loaded.doc),
   });
 }
 
@@ -460,6 +464,8 @@ export interface ModelSummaryInput {
   storePrice: number | null;
   excludedCharges: string[];
   documentRate: string | null;
+  /** The document's packages (row 247): the bar freights the model on the measure V2 prices it at. */
+  packages?: UnitPackages;
 }
 
 /**
@@ -488,7 +494,9 @@ export function modelSummary(a: ModelSummaryInput): LineSummary {
   const unit = model.sku
     ? { option_value_ids: model.option_value_ids ?? (model.option_id ? [model.option_id] : []), color_id: model.color_id ?? null, combo_key: model.combo_key ?? null }
     : null;
-  const chain = unit ? chainOfUnit(a.inputs, unit) : chainOf(a.inputs, model.option_id);
+  const chain = unit
+    ? chainOfUnit(a.inputs, { ...unit, ...(a.packages ? { packaged: a.packages(unit.option_value_ids, unit.color_id) } : {}) })
+    : chainOf(a.inputs, model.option_id, a.packages);
   const resolved = resolveSkuInputs(chain).inputs;
   const u = rates.usd_iqd;
   const at = unit ? unitRuleTarget(a.productId, unit) : ruleTargetOf(a.productId, model.option_id);

@@ -48,6 +48,16 @@ test('the summary is the cost at the CENTRAL rates — the brief’s $500 / +$12
   assert.equal(row<{ n: number }>(w.raw, 'SELECT COUNT(*) AS n FROM purchase_orders')!.n, 0);
 });
 
+test('the card freights a model on its own package, as V2 prices it (row 247): 1,200 g, never the purchase’s 2,500 g', async () => {
+  const w = pricingWorld();
+  w.raw.exec(`UPDATE product_option_values SET package_weight_g = 1200 WHERE id = '${AMS_MODEL}'`);
+  const r = await w.preview({ draft: w.draft(), pricing: { minimum_profits: [{ product_id: AMS, scope: 'product', amount_usd: '120' }] } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const s = summaryOf(r.body);
+  assert.equal(s.effective_weight_g, 1200);
+  assert.equal(s.shipping_cost_iqd, 3_840, 'the central 3,200 IQD/kg × 1.2 kg');
+});
+
 test('the freight words: the shared regex catches «گواستنەوە» and «ناردن», and the editor re-exports it', () => {
   for (const t of ['شحن محلي', 'freight', 'Shipping fee', 'بارکردن', 'کرێی گواستنەوە', 'تێچووی ناردن']) assert.equal(looksLikeFreight(t), true, t);
   for (const t of ['شحنة', 'customs', 'تغليف', 'packaging']) assert.equal(looksLikeFreight(t), false, t);

@@ -68,7 +68,7 @@ import {
 import { resolveSkuInputs, type SupplierCurrency } from '@levonis/pricing/costToPrice';
 import { canonicalUsdRuleAmount } from '@levonis/pricing/ruleResolution';
 import { parseSkuComboKey, type ShippingProfile } from '@levonis/pricing/skuChannel';
-import { chainOf, chainOfUnit, ownerRow, ruleAt, type InputFields, type InputScope, type InputWrite, type IqdSnapshot, type ProductPricingData, type RuleWrite, type StoredInputRow, type UnitSelection } from './store';
+import { chainOf, chainOfUnit, ownerRow, ruleAt, type InputFields, type InputScope, type InputWrite, type IqdSnapshot, type ProductPricingData, type RuleWrite, type StoredInputRow, type UnitPackages, type UnitSelection } from './store';
 import type { PricingRates } from './rates';
 
 export type PurchaseStatus = 'draft' | 'ordered' | 'partial' | 'received' | 'cancelled';
@@ -166,6 +166,8 @@ export interface PurchaseSkuLevels {
   variants: ReadonlyMap<string, string>;
   /** Every sellable SKU (relation order, the model first): the units a level reaches. */
   units: ReadonlyArray<UnitSelection & { combo_key: string }>;
+  /** The document's packages (row 247): a level's SKUs inherit its model's and colour's own measure, as V2 prices them. */
+  packages?: UnitPackages;
 }
 
 /** The colour or SKU level a colour or variant line is exactly (FX-7 gaps), or null: no SKU rung, a colour or variant gone, a variant that is its model alone. */
@@ -509,7 +511,7 @@ function skuLevelEntries(
       const sel = parseSkuComboKey(g.scope_id);
       if (sel) units = [{ option_value_ids: sel.option_value_ids, color_id: sel.color_id, combo_key: g.scope_id }];
     }
-    const inherited = units.map((u) => resolveSkuInputs(chainOfUnit(without, u)).inputs);
+    const inherited = units.map((u) => resolveSkuInputs(chainOfUnit(without, levels.packages ? { ...u, packaged: levels.packages(u.option_value_ids, u.color_id) } : u)).inputs);
     const set: Partial<InputFields> = {};
     const ownValue = (field: keyof InputFields) => existing?.[field] != null;
     if (g.fields.supplier_cost_amount && g.fields.supplier_cost_currency) {

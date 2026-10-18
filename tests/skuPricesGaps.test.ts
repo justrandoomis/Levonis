@@ -33,7 +33,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveProductEntries, type PurchaseForPricing, type PurchaseSkuLevels } from '../worker/lib/pricingEngine/fromPurchase';
-import { type ProductPricingData, type StoredInputRow } from '../worker/lib/pricingEngine/store';
+import { packagesOf, type ProductPricingData, type StoredInputRow } from '../worker/lib/pricingEngine/store';
 
 // ------------------------------------------------------------- 1. one figure reads the rung
 
@@ -108,6 +108,11 @@ test('purchase lines per colour feed the colour’s own level: what differs from
   const w2 = deriveProductEntries(colourLines(), 'p1', weighed, { optIn: new Set(), prefer: false, usePurchase: true, rates: null, levels: COLOUR_LEVELS });
   assert.equal(w2.entries.find((e) => e.write.scope === 'color' && e.write.scope_id === 'c1')!.write.set.shipping_weight_g, undefined);
   assert.ok(w2.shadowed.some((x) => x.scope === 'color' && x.scope_id === 'c1' && x.field === 'shipping_weight_g'), JSON.stringify(w2.shadowed));
+  // The colour's own package decides its weight as V2 prices it (row 247): the purchase's weight there is shadowed too.
+  const packages = packagesOf({ colors: [{ id: 'c1', package_weight_g: 2500 }] });
+  const p2 = deriveProductEntries(colourLines(), 'p1', stored, { optIn: new Set(), prefer: false, usePurchase: true, rates: null, levels: { ...COLOUR_LEVELS, packages } });
+  assert.equal(p2.entries.find((e) => e.write.scope === 'color' && e.write.scope_id === 'c1')!.write.set.shipping_weight_g, undefined);
+  assert.ok(p2.shadowed.some((x) => x.scope === 'color' && x.scope_id === 'c1' && x.field === 'shipping_weight_g'), JSON.stringify(p2.shadowed));
 
   // A colour with its own row: replaced exactly (the purchase priced that colour).
   const own = storedWith([

@@ -157,12 +157,19 @@ are always both shown (fixes P4/P15).
   preview), so the preview, the save, the automatic repricing and the cart agree. Precedence is the
   chain's: the SKU's pricing row → the colour's package → the model's package (the selection's first
   value only) → the product, field by field (weight, then the whole box) — an option and a colour that
-  both have one: the colour, the more specific level, wins, as the cart's dimensions do. A level's
+  both have one: the colour, the more specific level, wins. The cart's dimensions (the shown
+  measure, `resolvePhysicalDimensionChain`) walk each axis on its own; pricing takes the box whole —
+  a colour with only a height gives the cart the model's length and width with the colour's height,
+  and pricing the model's whole box. A level's
   package decides that level (its weight before any pricing-row weight, its full box before any box or
   manual CBM); what it does not hold stays its pricing row's; a partial box is no package; net weight
   is never used. The own-cost mirror above stays (it keeps the stored row in step and clears it with
   the dimensions); the dimensions are the one source. A follow / difference / special-price card whose
-  option has a package says it ships on it. Published prices move only through a reviewed publish (a
+  option has a package says what it ships on: the option's weight and box, its weight with the
+  product's box, or its box with the product's weight. The form's preview prices the draft whenever a
+  model's or a colour's package is edited (the priced structure, `pricedStructureKey`), the same
+  document the save prices; the purchase card and the purchase review freight each SKU on the same
+  packages (`packagesOf`). Published prices move only through a reviewed publish (a
   save that moves a price needs the review sheet) or the automatic repricing (large changes held).
 
 ### 1.5 Rounding (one rule, one place)

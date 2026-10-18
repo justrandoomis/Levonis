@@ -53,7 +53,7 @@ import StatusChipV2 from './form/v2/StatusChipV2';
 import ReviewSheetV2 from './form/v2/ReviewSheetV2';
 import ModelPriceSelector from './form/v2/ModelPriceSelector';
 import ColourPriceSelector, { ColourBulkBar } from './form/v2/ColourPriceSelector';
-import { comboKeyOf, docWithoutLegacyMoney, iqdText, isContentOnlySave, lineWithOption, lowestPrice, optionDimsHeading, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
+import { comboKeyOf, docWithoutLegacyMoney, iqdText, isContentOnlySave, lineWithOption, lowestPrice, optionDimsHeading, previewOf, pricedStructureKey, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
 import { headerStatusText, v2Strings } from './form/v2/v2Strings';
 import { emptyDimensions } from '../../lib/productTypes';
 import type { BrandV2, CatalogV2, ProductDimensionsV2 } from '../../lib/productTypes';
@@ -651,14 +651,8 @@ export default function ProductForm({
     void _o; void _c; void _m;
     return { doc: docFields as Record<string, unknown>, relations: relationsToWire(relRef.current) as unknown as Record<string, unknown> };
   }, []);
-  /** The priced part of the structure: models, colours, links, «يُباع» and its routes, the variant rows. */
-  const structureKeyOf = (d: Pick<EditorDoc, 'sale_types'>, r: RelationsState) =>
-    JSON.stringify({
-      sale: d.sale_types,
-      groups: r.groups.map((g) => [g.id, g.values.map((v) => [v.id, v.active, v.fulfillments.map((f) => [f.fulfillment_type, f.enabled, f.transports.map((t) => [t.method, t.enabled])])])]),
-      colors: r.colors.map((c) => [c.id, c.active, c.option_value_ids]),
-      variants: r.variants.map((v) => [v.option_value_ids, v.color_id, v.active]),
-    });
+  /** The priced part of the structure (v2Model `pricedStructureKey`), the model's and the colours' packages with it. */
+  const structureKeyOf = (d: Pick<EditorDoc, 'sale_types'>, r: RelationsState) => pricedStructureKey(d.sale_types, r);
   const structureKey = structureKeyOf(doc, rel);
   const savedStructureKey = useMemo(() => {
     try {

@@ -37,8 +37,11 @@ import {
   draftWire,
   lineWithOption,
   measurePendingOf,
+  docWithoutLegacyMoney,
   optionDimsHeading,
   preorderOffOf,
+  pricedStructureKey,
+  withoutLegacyMoney,
   withOptionMeasure,
   type ModelDraft,
   type PriceDraft,
@@ -50,6 +53,8 @@ import {
 } from '../src/components/adminProducts/form/v2/v2Model';
 import { lineNotes } from '../src/components/adminProducts/form/v2/ResultBar';
 import { V2_STRINGS } from '../src/components/adminProducts/form/v2/v2Strings';
+import { hydrateRelations, relationsToWire, type RelationsState } from '../src/components/adminProducts/form/model';
+import { toEditorDoc } from '../src/components/adminProducts/types';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { chainOfUnit, packagedMeasureOf, type StoredInputRow, type UnitSelection } from '../worker/lib/pricingEngine/store';
 
@@ -646,6 +651,49 @@ test('a colour with its own packaged dimensions ships on them; a colour with non
   assert.equal(route(sea, 'p_col_c1').effective_cbm, '0.024');
 });
 
+test('«أبعاد الخيار» edited on a saved product: the form prices the draft, and the save prices the same (own cost and follow)', async () => {
+  const w = await world({ shelf: false });
+  // What the form holds and posts (ProductForm `structureOf` / `save`): the document, its relations.
+  const product = (await json(await get(w.app, `/api/admin/products-v2/${PID}`))).product;
+  const state = hydrateRelations((await json(await get(w.app, `/api/admin/products/${PID}/relations`))) as never, product as never);
+  const { options: _o, colors: _c, media: _m, ...docFields } = toEditorDoc(product as never) as unknown as Record<string, unknown>;
+  void _o; void _c; void _m;
+  const withCombo = (rs: RelationsState, patch: Record<string, number>): RelationsState => ({
+    ...rs,
+    groups: rs.groups.map((g, i) => (i ? g : { ...g, values: g.values.map((v) => (v.id === COMBO ? { ...v, dimensions: { ...v.dimensions!, ...patch } } : v)) })),
+  });
+  const heavier = withCombo(state, { package_weight_g: 20_000 });
+  // The priced structure follows the model's and the colour's packages (it held ids and flags only); net weight never prices.
+  const key = (rs: RelationsState) => pricedStructureKey(product.sale_types, rs);
+  assert.notEqual(key(heavier), key(state), 'a package edit marks the structure dirty: the preview prices the draft');
+  assert.equal(key(withCombo(state, { net_weight_g: 9000 })), key(state));
+  const colourPack = { ...state, colors: [{ id: 'c1', active: true, option_value_ids: [], dimensions: { package_weight_g: 900 } }] } as unknown as RelationsState;
+  assert.notEqual(key(colourPack), key({ ...state, colors: [{ id: 'c1', active: true, option_value_ids: [] }] } as unknown as RelationsState), 'a colour’s package too');
+  const structure = { doc: docFields, relations: relationsToWire(heavier) as unknown as Record<string, unknown> };
+  const preview = async (pricing: Record<string, unknown>, withStructure = true) => {
+    const res = await post(w.app, '/api/admin/products-v2/pricing/preview', { product_id: PID, ...(withStructure ? { structure } : {}), pricing });
+    const body = await json(res);
+    assert.equal(res.status, 200, JSON.stringify(body).slice(0, 400));
+    return body as V2Answer & { review_hash: string };
+  };
+  // «يتبع المنتج»: the draft's 20 kg freights the Combo (CHINA_AIR 20,000 IQD/kg: 6.5 kg more), A1 unmoved.
+  const stored = (await json(await get(w.app, `/api/admin/products-v2/${PID}/pricing`))) as V2Answer;
+  const follow = await preview({});
+  assert.ok(at(follow.table, COMBO, 'pre_order_land')! > at(stored.table, COMBO, 'pre_order_land')!, 'the heavier package moves the price');
+  assert.equal(at(follow.table, A1, 'pre_order_land'), at(stored.table, A1, 'pre_order_land'));
+  // «تكلفة مختلفة»: the wire's weight is the mirror of the edited package — the draft and the wire agree on 20 kg.
+  const own = (g: number) => ({ cost: { inputs: [{ scope: 'option', scope_id: COMBO, supplier_cost_amount: '375', supplier_cost_currency: 'EUR', shipping_weight_g: g, shipping_length_mm: 560, shipping_width_mm: 540, shipping_height_mm: 430 }] } });
+  const ownHeavy = await preview(own(20_000));
+  const ownStored = await preview(own(13_500), false);
+  assert.notEqual(at(ownHeavy.table, COMBO, 'pre_order_land'), at(ownStored.table, COMBO, 'pre_order_land'), 'the 20 kg the form shows is the 20 kg it prices');
+  // The save prices the same draft: the preview's hash is accepted, and the published prices are the preview's.
+  const body = { ...docWithoutLegacyMoney(docFields), relations: withoutLegacyMoney(relationsToWire(heavier)), expected_updated_at: product.updated_at };
+  const saved = await post(w.app, '/api/admin/products-v2', { ...body, pricing_v2: { pricing: own(20_000), preview_hash: ownHeavy.review_hash, confirm_large_change: true } });
+  assert.equal(saved.status, 200, JSON.stringify(await json(saved.clone())).slice(0, 400));
+  const back = (await json(await get(w.app, `/api/admin/products-v2/${PID}/pricing`))) as V2Answer;
+  for (const channel of ['direct_sale', 'pre_order_land']) assert.equal(at(back.table, COMBO, channel), at(ownHeavy.table, COMBO, channel), channel);
+});
+
 test('the new words, in Arabic, English and real Sorani', () => {
   const sorani = /[ڕڵێۆە]/;
   for (const k of ['shelfOwnCostNote', 'minProfitFrom', 'profitBlocked', 'currencyChoose', 'currencyRequired'] as const) {
@@ -656,7 +704,7 @@ test('the new words, in Arabic, English and real Sorani', () => {
   // The hints quote the option's dimensions heading as the form shows it — in every language (a Sorani reader finds it).
   const heading = optionDimsHeading('A1 Combo');
   assert.equal(heading, 'أبعاد A1 Combo / Option dimensions');
-  for (const k of ['optionMeasureFrom', 'savedPricingOnly', 'measurePending', 'optionDimsPricing'] as const) {
+  for (const k of ['optionMeasureFrom', 'savedPricingOnly', 'measurePending', 'optionDimsPricing', 'optionWeightPricing', 'optionBoxPricing'] as const) {
     for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(V2_STRINGS[lang][k](heading).includes(`«${heading}»`), `${lang}.${k}`);
     assert.notEqual(V2_STRINGS.ckb[k](heading), V2_STRINGS.ar[k](heading));
     assert.match(V2_STRINGS.ckb[k]('X'), sorani, k);

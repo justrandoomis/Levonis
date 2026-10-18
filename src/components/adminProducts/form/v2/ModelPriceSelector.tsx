@@ -194,7 +194,10 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
   const keptProfit = storedModel?.profit === 'kept' ? (storedModel.profit_iqd !== null ? s.profitKeptIqd(iqdText(storedModel.profit_iqd)) : s.profitBlocked) : null;
   // A follow / difference / special-price model whose option has its own package: it ships on it, as in every mode
   // (the server's measure chain, row 247 — the owner 2026-10-18); the card says so (no field: the dimensions edit it).
-  const dimsPricing = owner && d.method === 'cost' && m.price !== 'own_cost' && (optionPackageWeight(measure.dims) !== null || optionPackageBox(measure.dims) !== null);
+  // The note names what the option holds: pricing takes its weight and its whole box each on their own.
+  const packWeight = optionPackageWeight(measure.dims) !== null;
+  const packBox = optionPackageBox(measure.dims) !== null;
+  const dimsPricing = owner && d.method === 'cost' && m.price !== 'own_cost' && (packWeight || packBox);
   // «تكلفة مختلفة»: the product's values every empty field inherits, shown in grey (§2.1 rule 2).
   const productCost = d.cost.supplier_amount ? `${d.cost.supplier_amount} ${d.cost.supplier_currency || ''}`.trim() : null;
   const inheritedT = v2.inheritedMinimumProfit;
@@ -314,7 +317,7 @@ export default function ModelPriceSelector({ id, isModel, line, measure }: { id:
       ) : null}
       {dimsPricing && isModel ? (
         <p className="text-[11px] text-text-muted" dir="auto" data-v2-model-dims-pricing={id}>
-          {s.optionDimsPricing(measure.heading)}
+          {(packWeight && packBox ? s.optionDimsPricing : packWeight ? s.optionWeightPricing : s.optionBoxPricing)(measure.heading)}
         </p>
       ) : null}
       {isModel ? (

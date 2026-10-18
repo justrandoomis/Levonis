@@ -211,8 +211,9 @@ const rowAt = (inputs: readonly Partial<StoredInputRow>[], scope: string, scopeI
   inputs.find((r) => r.scope === scope && (r.scope_id ?? '') === scopeId && r.origin === origin) ?? null;
 
 /** The input chain of one model (its option value, or the product itself): base, then the model's option. */
-export function chainOf(inputs: readonly Partial<StoredInputRow>[], optionId: string): SkuInputChain {
-  return chainOfUnit(inputs, { option_value_ids: optionId ? [optionId] : [], color_id: null, combo_key: null });
+export function chainOf(inputs: readonly Partial<StoredInputRow>[], optionId: string, packages?: UnitPackages): SkuInputChain {
+  const ids = optionId ? [optionId] : [];
+  return chainOfUnit(inputs, { option_value_ids: ids, color_id: null, combo_key: null, ...(packages ? { packaged: packages(ids, null) } : {}) });
 }
 
 /** What one priced unit is: a model (its option value) or a SKU (its whole selection, its colour, its key). */
@@ -241,6 +242,19 @@ export function packagedMeasureOf(d: PhysicalDimensionOverrides | null | undefin
   const [l, w, h] = [d?.package_depth_mm, d?.package_width_mm, d?.package_height_mm];
   const box = isPositivePhysicalDimension(l) && isPositivePhysicalDimension(w) && isPositivePhysicalDimension(h) ? ([l, w, h] as const) : null;
   return weight_g === null && !box ? null : { weight_g, box };
+}
+
+/** A unit's packages: its model's (the first option value's) and its colour's, read from one document. */
+export type UnitPackages = (optionValueIds: readonly string[], colorId: string | null) => NonNullable<UnitSelection['packaged']>;
+
+/**
+ * The packages of a document's units (row 247) — the one reading V2, the purchase card and the purchase
+ * review share, so each freights a SKU on the same measure. A document without dimensions: none.
+ */
+export function packagesOf(doc: { options?: ReadonlyArray<PhysicalDimensionOverrides & { id: string }>; colors?: ReadonlyArray<PhysicalDimensionOverrides & { id: string }> } | null | undefined): UnitPackages {
+  const options = new Map((doc?.options ?? []).map((o) => [o.id, o]));
+  const colours = new Map((doc?.colors ?? []).map((c) => [c.id, c]));
+  return (ids, colorId) => ({ model: packagedMeasureOf(options.get(ids[0] ?? '')), color: packagedMeasureOf(colorId ? colours.get(colorId) : null) });
 }
 
 const scopeInputs = (inputs: readonly Partial<StoredInputRow>[], scope: string, scopeId: string, packaged?: PackagedMeasure | null) => {

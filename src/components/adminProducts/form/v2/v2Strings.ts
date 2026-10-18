@@ -192,6 +192,10 @@ export interface V2Strings {
   measurePending: Fill;
   /** A follow / difference / special-price model whose option has its own package: it ships on it (quotes the heading; row 247). */
   optionDimsPricing: Fill;
+  /** The same, the option holding only a packaged weight: the box stays the product's (pricing takes the box whole). */
+  optionWeightPricing: Fill;
+  /** The same, the option holding only a whole box: the weight stays the product's. */
+  optionBoxPricing: Fill;
   /** The label of the model's minimum-profit choice (the amount beside it keeps «الحد الأدنى للربح ($)»). */
   minProfitFrom: string;
   /** A stored model minimum profit in dinars (legacy), kept as it is. */
@@ -366,6 +370,8 @@ const AR: V2Strings = {
   savedPricingOnly: (h) => `محفوظ في التسعير فقط — اكتبه في «${h}»`,
   measurePending: (h) => `السعر المعروض محسوب بوزن «${h}» وصندوقها — يُحفظ في التسعير مع الحفظ التالي`,
   optionDimsPricing: (h) => `يُشحن هذا الموديل بالوزن والصندوق من «${h}» (مع التغليف)، لا بوزن المنتج وصندوقه`,
+  optionWeightPricing: (h) => `يُشحن هذا الموديل بالوزن من «${h}» (مع التغليف)، وبصندوق المنتج`,
+  optionBoxPricing: (h) => `يُشحن هذا الموديل بالصندوق من «${h}» (مع التغليف)، وبوزن المنتج`,
   minProfitFrom: 'مصدر الحد الأدنى للربح',
   profitKeptIqd: (v) => `استثناء محفوظ: ${v} د.ع`,
   profitBlocked: 'محجوز — يوقف تسعير هذا الموديل',
@@ -532,6 +538,8 @@ const EN: V2Strings = {
   savedPricingOnly: (h) => `Saved in pricing only — enter it in «${h}»`,
   measurePending: (h) => `The price shown uses the weight and box of «${h}» — written to pricing by the next save`,
   optionDimsPricing: (h) => `This model ships on the weight and box of «${h}» (packaged), not the product's`,
+  optionWeightPricing: (h) => `This model ships on the weight of «${h}» (packaged) and the product's box`,
+  optionBoxPricing: (h) => `This model ships on the box of «${h}» (packaged) and the product's weight`,
   minProfitFrom: 'Minimum profit from',
   profitKeptIqd: (v) => `Saved exception: ${v} IQD`,
   profitBlocked: "Blocked — stops this model's pricing",
@@ -699,6 +707,8 @@ const CKB: V2Strings = {
   savedPricingOnly: (h) => `تەنها لە نرخداناندا پاشەکەوت کراوە — لە «${h}»دا بینووسە`,
   measurePending: (h) => `نرخی پیشاندراو بە کێش و سندوقی «${h}» هەژمار کراوە — لە پاشەکەوتکردنی داهاتوودا لە نرخداناندا پاشەکەوت دەکرێت`,
   optionDimsPricing: (h) => `ئەم مۆدێلە بە کێش و سندوقی «${h}» (پاکێجکراو) دەنێردرێت، نەک بە هی بەرهەمەکە`,
+  optionWeightPricing: (h) => `ئەم مۆدێلە بە کێشی «${h}» (پاکێجکراو) و سندوقی بەرهەمەکە دەنێردرێت`,
+  optionBoxPricing: (h) => `ئەم مۆدێلە بە سندوقی «${h}» (پاکێجکراو) و کێشی بەرهەمەکە دەنێردرێت`,
   minProfitFrom: 'سەرچاوەی کەمترین قازانج',
   profitKeptIqd: (v) => `حاڵەتی تایبەتی پاشەکەوتکراو: ${v} دینار`,
   profitBlocked: 'ڕاگیراوە — نرخدانانی ئەم مۆدێلە ڕادەگرێت',
