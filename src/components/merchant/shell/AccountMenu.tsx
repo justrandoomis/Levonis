@@ -11,11 +11,16 @@
  * (`AccountPanel`). Its own lazy chunk — the frame carries only the place it
  * sits in (tests/bundleBudget.test.ts).
  *
- * THE LANGUAGE applies at once (`setLang`, kept by this browser) and is also
- * written to the profile, as Settings does, so the next sign-in on another
- * device opens in it; that write is best effort — the choice already holds
- * here. Account and help are platform pages: from a store's own address they
- * are another site, so `resolveLink` decides between a route and a page load.
+ * THE LANGUAGE applies at once (`setLang`, kept by this browser), and
+ * `setLang` itself writes it to the profile for a signed-in person, quietly
+ * and best effort (`persistLocale`), so the next sign-in on another device
+ * opens in it — one write per choice, never a second one from here. On the
+ * phone the three languages are plain buttons, not a radiogroup: a
+ * radiogroup selects as the arrows move, and each step here would switch the
+ * whole workspace's language and direction (and so which way the next arrow
+ * goes). Account and help are platform pages: from a store's own address
+ * they are another site, so `resolveLink` decides between a route and a page
+ * load.
  */
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -23,10 +28,8 @@ import { Check, CircleUserRound, LifeBuoy, LogOut, UserRound } from 'lucide-reac
 import { useOptionalAuth } from '../../../AuthContext';
 import { useLanguage } from '../../../LanguageContext';
 import type { Language } from '../../../translations';
-import { api } from '../../../lib/api';
 import { IconButton } from '../../ui/Button';
 import { Menu, type MenuEntry } from '../../ui/Menu';
-import { Segmented } from '../../ui/Segmented';
 import { useWorkspace } from './context';
 import { say } from './strings';
 import { ACCOUNT_WORDS as W } from './accountWords';
@@ -51,7 +54,6 @@ export function useAccountActions() {
   const chooseLanguage = (next: Language) => {
     if (next === lang) return;
     setLang(next);
-    if (auth?.user) void api.patch('/api/profile', { locale: next }).catch(() => undefined);
   };
   const signOut = async () => {
     try {
@@ -130,16 +132,25 @@ export function AccountPanel({ onDone }: { onDone: () => void }) {
   return (
     <section aria-label={title} className="border-t border-border-subtle px-2 pb-4 pt-2" data-account-panel>
       <p className="px-3 pb-2 pt-2 text-[12px] font-medium text-text-muted">{title}</p>
-      <div className="px-3 pb-2">
-        <Segmented
-          group="ws-language"
-          size="sm"
-          label={say(loc, W.language)}
-          items={LANGUAGES.map(([id, name]) => ({ id, label: name }))}
-          value={a.lang}
-          onChange={(id) => a.chooseLanguage(id as Language)}
-          dataAttr="data-ws-language"
-        />
+      <div role="group" aria-label={say(loc, W.language)} className="mx-3 mb-2 grid grid-cols-3 gap-1 rounded-full border border-border-subtle p-1 lv-well">
+        {LANGUAGES.map(([code, name]) => {
+          const on = code === a.lang;
+          return (
+            <button
+              key={code}
+              type="button"
+              lang={code}
+              aria-pressed={on}
+              onClick={() => a.chooseLanguage(code)}
+              data-ws-language={code}
+              className={`min-h-11 min-w-0 truncate rounded-full px-2 text-[13px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                on ? 'border border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {name}
+            </button>
+          );
+        })}
       </div>
       <ul>
         <li>{pageRow(ACCOUNT_PATH, say(loc, W.account), <UserRound aria-hidden="true" className={glyph} />)}</li>

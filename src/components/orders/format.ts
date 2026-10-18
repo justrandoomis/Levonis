@@ -34,7 +34,7 @@ export function dateLocale(lang: string): string {
  * no Sorani meridiem in the browser to borrow) — the same form as
  * src/components/adminPricing/fxParts.tsx `fxDate`.
  */
-const CKB_MONTHS = [
+export const CKB_MONTHS = [
   'کانوونی دووەم', 'شوبات', 'ئازار', 'نیسان', 'ئایار', 'حوزەیران',
   'تەمموز', 'ئاب', 'ئەیلوول', 'تشرینی یەکەم', 'تشرینی دووەم', 'کانوونی یەکەم',
 ] as const;

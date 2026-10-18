@@ -36,6 +36,8 @@ import VariantImg from '../../ui/VariantImg';
 const ProductEditorSheet = lazy(() => import('./ProductEditorSheet'));
 const InsightsSheet = lazy(() => import('./InsightsSheet'));
 const ImportSheet = lazy(() => import('./ImportSheet'));
+/** The one toast that offers a bulk «تراجع»: a newer one replaces it, never stacks beside it. */
+const UNDO_TOAST = 'catalog-bulk-undo';
 
 type StateFilter = '' | 'published' | 'draft' | 'hidden' | 'archived';
 
@@ -100,10 +102,11 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
   const seq = useRef(0);
   const query = useMemo(() => ({ q, state, stock, collection, sort }), [q, state, stock, collection, sort]);
 
+  // Returns its promise: a bulk holds `busy` until the list is replaced.
   const load = useCallback(() => {
     const n = ++seq.current;
     setError(null);
-    catalogApi
+    return catalogApi
       .list(query)
       .then((d) => {
         if (n !== seq.current) return;
@@ -120,12 +123,33 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
     catalogApi.collections().then((d) => setCollections(d.collections)).catch(() => {});
   }, []);
 
-  useEffect(load, [load]);
+  useEffect(() => void load(), [load]);
   useEffect(loadMeta, [loadMeta]);
   const reload = useCallback(() => {
-    load();
+    const listed = load();
     loadMeta();
+    return listed;
   }, [load, loadMeta]);
+
+  // ONE WAY BACK AT A TIME. A «تراجع» writes back the values the list showed
+  // before ITS change; after any newer change those values are stale and
+  // would silently overwrite it. So every change drops the standing undo:
+  // its toast goes (one id, never stacked) and its generation stops matching.
+  // `busy` is also a ref, read by the undo's closure from an older render.
+  const undoGen = useRef(0);
+  const busyRef = useRef(false);
+  const hold = (on: boolean) => {
+    busyRef.current = on;
+    setBusy(on);
+  };
+  const dropUndo = () => {
+    undoGen.current++;
+    toast.dismiss(UNDO_TOAST);
+  };
+  const changed = () => {
+    dropUndo();
+    void reload();
+  };
 
   async function more() {
     if (!cursor) return;
@@ -144,32 +168,39 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
   }
 
   async function bulk(action: BulkAction, ids: string[], extra: Record<string, unknown> = {}) {
-    if (!ids.length || busy) return;
-    setBusy(true);
+    if (!ids.length || busyRef.current) return;
+    hold(true);
+    dropUndo();
+    const gen = undoGen.current;
     // What the list showed before, for an exact «تراجع» (./bulkUndo.ts).
     const before = (rows ?? []).filter((p) => ids.includes(p.id));
     try {
       const r = await catalogApi.bulk(action, ids, extra);
       const failed = r.results.filter((x) => !x.ok);
       const back = bulkInverse(action, extra, before, r.results.filter((x) => x.ok).map((x) => x.id), canSell);
-      const undo = back ? { action: { label: s.undo, onClick: () => void undoBulk(back) } } : undefined;
+      if (ids.length > 1) setSelected(new Set());
+      // The list is replaced before `busy` lets go (and before the undo is
+      // offered), so the next bulk never reads `before` from the old one.
+      await reload();
+      const undo = back ? { id: UNDO_TOAST, action: { label: s.undo, onClick: () => void undoBulk(back, gen) } } : undefined;
       if (!failed.length) toast.success(s.bulkDone(r.done, ids.length), undo);
       else {
         const reasons = [...new Set(failed.map((f) => catalogRefusalText(f.code, loc, s.saveFailed)))].join(' ');
         toast.error(s.bulkDone(r.done, ids.length), { description: reasons });
       }
-      if (ids.length > 1) setSelected(new Set());
-      reload();
     } catch (e) {
       toast.error(readRefusal(e, loc, s.saveFailed).message || s.saveFailed);
     } finally {
-      setBusy(false);
+      hold(false);
     }
   }
 
   /** Runs the inverse calls in turn; any refusal says so instead of claiming the list is back. */
-  async function undoBulk(steps: UndoStep[]) {
-    setBusy(true);
+  async function undoBulk(steps: UndoStep[], gen: number) {
+    // Never beside another change, and never after a newer one.
+    if (busyRef.current || gen !== undoGen.current) return;
+    hold(true);
+    dropUndo();
     try {
       for (const step of steps) {
         const r = await catalogApi.bulk(step.action, step.ids, step.extra);
@@ -179,8 +210,8 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
     } catch {
       toast.error(s.undoFailed);
     } finally {
-      setBusy(false);
-      reload();
+      await reload();
+      hold(false);
     }
   }
 
@@ -190,7 +221,7 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
     try {
       const r = await catalogApi.remove(p.id);
       toast.success(r.archived ? s.archivedInstead : s.deleted);
-      reload();
+      changed();
     } catch (e) {
       toast.error(readRefusal(e, loc, s.saveFailed).message || s.saveFailed);
     }
@@ -205,7 +236,7 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
     try {
       await catalogApi.duplicate(p.id);
       toast.success(s.duplicated);
-      reload();
+      changed();
     } catch (e) {
       toast.error(readRefusal(e, loc, s.saveFailed).message || s.saveFailed);
     }
@@ -459,11 +490,11 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
               setEditing(null);
               if (focusProductId) onEditorClose?.();
             }}
-            onSaved={reload}
+            onSaved={changed}
           />
         )}
         {insightsFor && <InsightsSheet product={insightsFor} onClose={() => setInsightsFor(null)} />}
-        {importOpen && <ImportSheet open={importOpen} onClose={() => setImportOpen(false)} onImported={reload} />}
+        {importOpen && <ImportSheet open={importOpen} onClose={() => setImportOpen(false)} onImported={changed} />}
       </Suspense>
       <BulkValueSheet
         kind={bulkValue}

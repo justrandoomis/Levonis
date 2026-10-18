@@ -36,11 +36,15 @@
  *
  *   ROWS ARE OPENED BY A LINK, the title cell (`rowHref`), never by a
  *   clickable `<tr>`: a link is reachable by keyboard, announced, and opens in
- *   a new tab when asked to. A tap elsewhere on the row or card is PASSED ON
- *   to that link (`rowTapLink`, src/lib/listView.ts) — never one that began on
- *   the checkbox, the actions button or any other control — so on a phone the
- *   whole card is the target while the link stays the only way in for a
- *   keyboard or a screen reader.
+ *   a new tab when asked to. A tap elsewhere on a CARD is PASSED ON to that
+ *   link (`rowTapLink`, src/lib/listView.ts) — never one that began on the
+ *   checkbox, the actions button or any other control, nor one whose press
+ *   closed a menu drawn over the page — so on a phone the whole card is the
+ *   target while the link stays the only way in for a keyboard or a screen
+ *   reader. While rows are picked, a tap on a card picks or drops it instead,
+ *   as a mail app does: a tap that misses the checkbox never opens a record
+ *   and loses the picks. The wide TABLE keeps the link alone: a pointer
+ *   reaches it easily, and a double-click on a cell selects a word to copy.
  *
  *   CLAY (docs/DECISIONS.md row 209): the list is ONE resting tray
  *   (`lv-surface`); its rows are flat, divided by hairlines. A selected row
@@ -190,20 +194,33 @@ export function DataList<T>({
     );
   };
 
-  // The tap is replayed on the link with its modifier keys, so Ctrl/⌘ still opens a new tab.
-  const onRowTap = (e: React.MouseEvent<HTMLElement>) => {
+  // A menu drawn over the page (`Anchored`) has no scrim and closes on the
+  // press itself, so the click that follows lands on the card: noted at the
+  // press, while the menu is still there, that click only closed the menu.
+  const pressClosedMenu = useRef(false);
+  const onCardPress = (e: React.PointerEvent<HTMLElement>) => {
+    pressClosedMenu.current = e.currentTarget.contains(e.target as Node) && !!document.querySelector('[data-anchored]');
+  };
+  // The tap is replayed on the link with its modifier keys, so Ctrl/⌘ still
+  // opens a new tab — unless rows are being picked: then it picks this one.
+  const onCardTap = (e: React.MouseEvent<HTMLElement>, key: string, on: boolean) => {
     const link = rowTapLink<Element>({
       target: e.target as Element,
       row: e.currentTarget,
       button: e.button,
       defaultPrevented: e.defaultPrevented,
       selection: window.getSelection?.()?.toString() ?? '',
+      closedMenu: pressClosedMenu.current,
     });
-    link?.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey })
-    );
+    if (!link) return;
+    if (chosen.length > 0) toggleRow(key, !on);
+    else link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey }));
   };
-  const tapProps = (opens: boolean) => (opens ? { onClick: onRowTap, 'data-row-tap': '' } : {});
+  const tapProps = (key: string, on: boolean) => ({
+    onPointerDownCapture: onCardPress,
+    onClick: (e: React.MouseEvent<HTMLElement>) => onCardTap(e, key, on),
+    'data-row-tap': '',
+  });
 
   const actionsMenu = (row: T) => {
     const entries = rowActions?.(row) ?? [];
@@ -249,15 +266,8 @@ export function DataList<T>({
           {list.map((row) => {
             const key = rowKey(row);
             const on = !!selection?.selected.has(key);
-            const opens = !!rowHref?.(row);
             return (
-              <tr
-                key={key}
-                data-row={key}
-                aria-selected={selection ? on : undefined}
-                {...tapProps(opens)}
-                className={`${on ? 'bg-surface-selected' : ''} ${opens ? 'cursor-pointer hover:bg-white/[0.03]' : ''}`}
-              >
+              <tr key={key} data-row={key} aria-selected={selection ? on : undefined} className={on ? 'bg-surface-selected' : ''}>
                 {selection && (
                   // The selected row's second cue: a 2px gold bar at its
                   // inline start (logical, so it mirrors in Arabic), held in
@@ -303,7 +313,7 @@ export function DataList<T>({
             key={key}
             data-row={key}
             aria-selected={selection ? on : undefined}
-            {...tapProps(opens)}
+            {...(opens ? tapProps(key, on) : {})}
             className={`flex items-start gap-2 py-2 pe-1 ps-3 ${selection ? `border-s-2 ${on ? 'border-s-gold bg-surface-selected' : 'border-s-transparent'}` : ''} ${
               opens ? 'cursor-pointer transition-colors active:bg-[var(--clay-well-bg)]' : ''
             }`}

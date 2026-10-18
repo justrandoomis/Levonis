@@ -12,6 +12,7 @@
  *   5. the Today dock opens delivery settings and the share window;
  *   6. right-to-left details: arrow keys follow the drawn direction, codes
  *      are typed left to right.
+ *   7. what the review of this wave found, each pinned where it was fixed.
  *
  * The Sorani of the shared pieces is pinned in tests/soraniStorefrontGaps.test.ts.
  */
@@ -25,6 +26,7 @@ import { addDays, baghdadDayStart, baghdadToday, isDay, ledgerRange } from '../s
 import { bulkInverse, UNDO_MAX_CALLS } from '../src/components/merchant/catalog/bulkUndo';
 import { COUNTER_STRINGS } from '../src/components/merchant/counter/strings';
 import { ACCOUNT_WORDS } from '../src/components/merchant/shell/accountWords';
+import { toast, toastQueue } from '../src/lib/toastStore';
 
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 /** Source without comments, so a sentence about a pattern never satisfies it. */
@@ -50,8 +52,8 @@ function row() {
     querySelector: (selector: string) => (selector === '[data-row-link]' ? LINK : null),
   };
 }
-const tap = (target: ReturnType<typeof el> | null, over: Partial<{ button: number; defaultPrevented: boolean; selection: string }> = {}) =>
-  rowTapLink({ target, row: row(), button: 0, defaultPrevented: false, selection: '', ...over });
+const tap = (target: ReturnType<typeof el> | null, over: Partial<{ button: number; defaultPrevented: boolean; selection: string; closedMenu: boolean }> = {}) =>
+  rowTapLink({ target, row: row(), button: 0, defaultPrevented: false, selection: '', closedMenu: false, ...over });
 
 test('a tap on the empty part of a card opens its title link', () => {
   assert.equal(tap(el(['div'])), LINK);
@@ -73,8 +75,8 @@ test('a tap that began on a control acts for that control, never opens the row',
 test('DataList passes the tap on with its modifier keys, and the row never becomes a control', () => {
   const d = code('src/components/ui/DataList.tsx');
   assert.match(d, /<Link to=\{href\} data-row-link /);
-  assert.match(d, /const tapProps = \(opens: boolean\) => \(opens \? \{ onClick: onRowTap, 'data-row-tap': '' \} : \{\}\);/);
-  assert.equal(d.match(/\{\.\.\.tapProps\(opens\)\}/g)?.length, 2, 'both the table row and the card');
+  assert.match(d, /onClick: \(e: React\.MouseEvent<HTMLElement>\) => onCardTap\(e, key, on\),\s*'data-row-tap': '',/);
+  assert.equal(d.match(/\{\.\.\.\(opens \? tapProps\(key, on\) : \{\}\)\}/g)?.length, 1, 'the card only — the wide table keeps its link');
   assert.match(d, /ctrlKey: e\.ctrlKey, metaKey: e\.metaKey, shiftKey: e\.shiftKey, altKey: e\.altKey/);
   assert.match(d, /active:bg-\[var\(--clay-well-bg\)\]/, 'a pressed card shows it is pressed');
   assert.doesNotMatch(d, /<(tr|li)\b[^>]*(role=|tabIndex|onKeyDown)/);
@@ -97,14 +99,13 @@ test('the workspace has a language, account, help and sign-out menu — top bar 
 
   const menu = code('src/components/merchant/shell/AccountMenu.tsx');
   assert.match(menu, /\['ar', 'العربية'\],\s*\['en', 'English'\],\s*\['ckb', 'کوردی'\],/, 'each language in its own name');
-  assert.match(menu, /setLang\(next\);/, 'applied at once');
-  assert.match(menu, /api\.patch\('\/api\/profile', \{ locale: next \}\)\.catch\(\(\) => undefined\)/, 'kept on the profile, best effort');
+  assert.match(menu, /setLang\(next\);/, 'applied at once — and `setLang` keeps it on the profile (section 7 below)');
   assert.match(menu, /export const ACCOUNT_PATH = '\/settings';/);
   assert.match(menu, /export const HELP_PATH = '\/support';/);
   assert.match(menu, /await auth\?\.logout\(\);[\s\S]{0,200}go\(SIGNED_OUT_PATH\);/, 'signs out, then lands on sign-in');
   assert.match(menu, /resolveLink\(path\)/, 'a platform page from a store’s own address is another site');
   assert.match(menu, /<Menu\s+label=\{say\(loc, W\.you\)\}/);
-  assert.match(menu, /<Segmented\s+group="ws-language"/, 'the phone’s language switch is the shared radiogroup');
+  assert.match(menu, /<div role="group" aria-label=\{say\(loc, W\.language\)\}/, 'the phone’s language switch: three buttons, chosen on a press');
   assert.match(menu, /import \{ ACCOUNT_WORDS as W \} from '\.\/accountWords';/, 'its words ride in its own chunk');
   for (const [k, words] of Object.entries(ACCOUNT_WORDS)) {
     const [ar, en, ckb] = words as readonly string[];
@@ -256,4 +257,100 @@ test('arrow keys follow the reading direction; codes are typed left to right', (
     assert.match(code(f), /<Input ltr value=\{(form|v)\.sku\} maxLength=\{64\} spellCheck=\{false\} autoCapitalize="off" autoCorrect="off"/, `${f}: the SKU`);
   }
   assert.match(code('src/components/merchant/dashboard/StoreSettingsTab.tsx'), /ltr\s*type="tel"\s*inputMode="tel"/, 'the contact phone');
+});
+
+// ------------------------------------------------------------------ 7. after review
+
+test('a press that closed a menu drawn over the page only closed it — the card does not open', () => {
+  assert.equal(tap(el(['div']), { closedMenu: true }), null);
+  const d = code('src/components/ui/DataList.tsx');
+  // Noted at the press, while the menu is still there: `Anchored` has no
+  // scrim and closes on that same pointerdown, so the click lands on the card.
+  assert.match(d, /pressClosedMenu\.current = e\.currentTarget\.contains\(e\.target as Node\) && !!document\.querySelector\('\[data-anchored\]'\);/);
+  assert.match(d, /onPointerDownCapture: onCardPress,/);
+  assert.match(d, /closedMenu: pressClosedMenu\.current,/);
+  const overlay = code('src/components/ui/Overlay.tsx');
+  assert.match(overlay, /data-anchored=\{testId \?\? true\}/, 'the mark the card looks for');
+  assert.match(overlay, /document\.addEventListener\('pointerdown', onDown\);/);
+});
+
+test('the wide table passes no click on: a double-click on a cell selects a word to copy', () => {
+  const d = code('src/components/ui/DataList.tsx');
+  assert.match(d, /<tr key=\{key\} data-row=\{key\} aria-selected=\{selection \? on : undefined\} className=\{on \? 'bg-surface-selected' : ''\}>/);
+  assert.doesNotMatch(d, /<tr\b[^>]*(onClick|tapProps|data-row-tap)/);
+});
+
+test('while rows are picked, a tap on a card picks or drops it — never opens the record and loses the picks', () => {
+  const d = code('src/components/ui/DataList.tsx');
+  assert.match(d, /if \(!link\) return;\s*if \(chosen\.length > 0\) toggleRow\(key, !on\);\s*else link\.dispatchEvent\(/);
+});
+
+test('one bulk «تراجع» at a time: a newer change drops the older, and an undo never runs beside a bulk', () => {
+  // The toast store replaces a toast that carries the same id.
+  const undo = (n: number) => ({ id: 'catalog-bulk-undo', action: { label: 'Undo', onClick: () => n } });
+  toast.success('first', undo(1));
+  toast.success('second', undo(2));
+  const mine = toastQueue().filter((t) => t.id === 'catalog-bulk-undo');
+  assert.equal(mine.length, 1, 'two undo toasts side by side');
+  assert.equal(mine[0].title, 'second');
+  toast.dismiss('catalog-bulk-undo');
+
+  const m = code('src/components/merchant/catalog/CatalogManager.tsx');
+  assert.match(m, /const UNDO_TOAST = 'catalog-bulk-undo';/);
+  assert.match(m, /\{ id: UNDO_TOAST, action: \{ label: s\.undo, onClick: \(\) => void undoBulk\(back, gen\) \} \}/);
+  assert.match(m, /const dropUndo = \(\) => \{\s*undoGen\.current\+\+;\s*toast\.dismiss\(UNDO_TOAST\);\s*\};/);
+  const bulk = /async function bulk\([\s\S]*?\n {2}\}\n/.exec(m)?.[0] ?? '';
+  // `busy` is read from a ref: the undo's closure belongs to an older render.
+  assert.match(bulk, /if \(!ids\.length \|\| busyRef\.current\) return;\s*hold\(true\);\s*dropUndo\(\);\s*const gen = undoGen\.current;/);
+  assert.match(bulk, /await reload\(\);[\s\S]*toast\.success\(s\.bulkDone/, 'the list is replaced before busy lets go and before the undo is offered');
+  assert.match(bulk, /finally \{\s*hold\(false\);\s*\}/);
+  const back = /async function undoBulk\([\s\S]*?\n {2}\}\n/.exec(m)?.[0] ?? '';
+  assert.match(back, /if \(busyRef\.current \|\| gen !== undoGen\.current\) return;\s*hold\(true\);\s*dropUndo\(\);/);
+  assert.match(back, /finally \{\s*await reload\(\);\s*hold\(false\);\s*\}/);
+  assert.match(m, /const load = useCallback\(\(\) => \{\s*const n = \+\+seq\.current;\s*setError\(null\);\s*return catalogApi/, 'reload can be awaited');
+  // Every other change drops the standing undo too.
+  assert.match(m, /onSaved=\{changed\}/);
+  assert.match(m, /onImported=\{changed\}/);
+  assert.equal(m.match(/toast\.success\([^;]*\);\s*changed\(\);/g)?.length, 2, 'delete and duplicate');
+});
+
+test('a ledger page that answers after the period changed is dropped — the list always matches its controls', () => {
+  const l = code('src/components/merchant/finance/FinanceLedger.tsx');
+  const more = /const loadMore = \(\) => \{[\s\S]*?\n {2}\};/.exec(l)?.[0] ?? '';
+  assert.match(more, /const mine = seq\.current;/);
+  assert.match(more, /\.then\(\(d\) => \{\s*if \(mine !== seq\.current\) return;\s*setEntries/);
+  assert.match(more, /\.catch\(\(\) => mine === seq\.current && setMore\('error'\)\)/);
+  assert.match(l, /const mine = \+\+seq\.current;\s*setError\(null\);\s*setMore\('idle'\);/, 'a new period starts with its own «more»');
+});
+
+test('ledger lines are dated in Baghdad days, as the period filters them', () => {
+  assert.match(code('src/components/merchant/finance/FinanceLedger.tsx'), /\{ day: 'numeric', month: 'short', timeZone: 'Asia\/Baghdad' \}/);
+  // 22:30 UTC on the 1st is 01:30 on the 2nd in Baghdad: inside «2 Oct – 2 Oct», and labelled the 2nd.
+  const r = ledgerRange('custom', Date.parse('2026-10-18T09:00:00Z'), { from: '2026-10-02', to: '2026-10-02' });
+  assert.ok(r.ok);
+  const at = '2026-10-01T22:30:00.000Z';
+  assert.ok(at >= r.range.from && at < r.range.to);
+  assert.equal(new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'Asia/Baghdad' }).format(new Date(at)), '2 Oct');
+});
+
+test('a language chosen in the workspace is written to the profile once, quietly — by `setLang` alone', () => {
+  const menu = code('src/components/merchant/shell/AccountMenu.tsx');
+  assert.doesNotMatch(menu, /api\.patch|\/api\/profile|lib\/api'/);
+  const ctx = code('src/LanguageContext.tsx');
+  assert.match(ctx, /\.patch\('\/api\/profile', \{ locale: next \}, \{ mascot: 'silent' \}\)/);
+  assert.match(ctx, /if \(signedInRef\.current\) void persistLocale\(next\);/);
+});
+
+test('the phone’s language switch changes the language on a press, never as the arrow keys move', () => {
+  const menu = code('src/components/merchant/shell/AccountMenu.tsx');
+  assert.doesNotMatch(menu, /<Segmented|role="radiogroup"|onKeyDown/);
+  assert.match(menu, /lang=\{code\}\s*aria-pressed=\{on\}\s*onClick=\{\(\) => a\.chooseLanguage\(code\)\}/);
+  assert.match(menu, /min-h-11 min-w-0/, '44 px targets');
+});
+
+test('from sm up the dock doors wrap — no door hides behind a scrollbar a mouse cannot reach', () => {
+  const cls = /data-quick-dock className="([^"]*)"/.exec(code('src/components/merchant/counter/QuickDock.tsx'))?.[1] ?? '';
+  assert.ok(cls.includes('sm:flex-wrap') && cls.includes('sm:overflow-visible'), cls);
+  assert.doesNotMatch(cls, /lg:flex-wrap|lg:overflow-visible/);
+  assert.ok(cls.includes('overflow-x-auto') && cls.includes('hide-scrollbar'), 'the phone row still scrolls under the finger');
 });

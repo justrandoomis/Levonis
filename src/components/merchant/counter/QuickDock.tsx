@@ -65,12 +65,14 @@ export default function QuickDock() {
       <h2 id="cc-dock" className="text-[15px] font-bold text-text-primary">
         {s.dock.title}
       </h2>
-      {/* Edge to edge on a phone only (the row scrolls under the 16 px gutter);
-          from `sm` up it is a row inside its column — `bleed-x` is the viewport
-          bleed and would cross the side column on a desk. In the 340 px side
-          column at `lg` the doors WRAP: a hidden scrollbar there left the
-          last door clipped with no way to reach it by mouse (§3.2). */}
-      <nav aria-label={s.dock.title} data-quick-dock className="-mx-4 -my-2 flex gap-2 overflow-x-auto px-4 py-2 hide-scrollbar sm:mx-0 sm:px-0 lg:flex-wrap lg:overflow-visible">
+      {/* Edge to edge on a phone only (the row scrolls under the 16 px gutter,
+          where a finger swipes it); from `sm` up it is a row inside its
+          column — `bleed-x` is the viewport bleed and would cross the side
+          column on a desk — and the doors WRAP: a mouse has no swipe, and a
+          hidden scrollbar left the last door clipped with no way to reach it
+          (§3.2), in the 340 px side column at `lg` and, with seven doors, in
+          the full-width column of a 640–950 px window too. */}
+      <nav aria-label={s.dock.title} data-quick-dock className="-mx-4 -my-2 flex gap-2 overflow-x-auto px-4 py-2 hide-scrollbar sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         {doors.map((d) => {
           const Icon = d.icon;
           if ('open' in d) {

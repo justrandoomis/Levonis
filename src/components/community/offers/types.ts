@@ -3,6 +3,7 @@
  * `/my-offers`, `/orders/:id`) and the words for their closed vocabularies.
  */
 import { api } from '../../../lib/api';
+import { CKB_MONTHS } from '../../orders/format';
 import type { OfferDeliveryMethod } from '../requests/api';
 
 export type Loc = (ar: string, en: string, ckb?: string) => string;
@@ -140,11 +141,14 @@ export function offerStateLabel(o: Pick<OfferV2, 'state' | 'stale' | 'expired' |
   return { text: loc('قائم', 'Open', 'کراوە'), tone: 'info' };
 }
 
-/** «صالح حتى ٣ أكتوبر» in the reader's calendar, or null. */
+/** «3 تشرين الأول», «3 Oct», «3ی تشرینی یەکەم» — in the reader's calendar, or null. */
 export function validUntil(iso: string | null, lang: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
+  // Sorani months by hand, as order dates write them: `Intl` has none, and
+  // the Arabic ones are not Sorani.
+  if (lang === 'ckb') return `${d.getDate()}ی ${CKB_MONTHS[d.getMonth()]}`;
   // Latin digits in every language, as every other figure in the app.
   return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'ar-IQ-u-nu-latn', { day: 'numeric', month: 'short' });
 }

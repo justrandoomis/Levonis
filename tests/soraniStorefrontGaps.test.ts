@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { ROOT } from './fixtures/d1';
 import { formatDate, formatDateTime } from '../src/components/orders/format';
+import { validUntil } from '../src/components/community/offers/types';
 import { dayLabel } from '../worker/lib/deliveryDay';
 
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
@@ -119,6 +120,12 @@ test('the shared pieces every merchant screen shows speak Sorani: DataList selec
     assert.deepEqual(twoLanguageLoc(f), [], `${f} still passes Arabic and English only`);
     assert.doesNotMatch(read(f), /OWNER: Sorani to be written by hand/, `${f} still says its Sorani is missing`);
   }
+  // «تا …» on «عروضي» names its day in Sorani months, as order dates do.
+  const until = validUntil('2026-10-03T12:00:00Z', 'ckb');
+  assert.equal(until, '3ی تشرینی یەکەم');
+  assert.doesNotMatch(until ?? '', /تشرين الأول|[٠-٩]/, 'no Arabic month and no Arabic-Indic digit');
+  assert.match(validUntil('2026-10-03T12:00:00Z', 'ar') ?? '', /تشرين/);
+  assert.match(validUntil('2026-10-03T12:00:00Z', 'en') ?? '', /Oct/);
   const list = read('src/components/ui/DataList.tsx');
   assert.ok(list.includes("loc('تحديد الكل', 'Select all', 'هەمووی هەڵبژێرە')"));
   assert.ok(list.includes("loc('إلغاء التحديد', 'Clear selection', 'پاککردنەوەی هەڵبژاردن')"));

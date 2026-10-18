@@ -56,6 +56,7 @@ export default function FinanceLedger({
   const first = useCallback(() => {
     const mine = ++seq.current;
     setError(null);
+    setMore('idle');
     financeApi
       .ledger({ kind, from, to })
       .then((d) => {
@@ -70,17 +71,21 @@ export default function FinanceLedger({
     first();
   }, [first, version]);
 
+  // A page that answers after the period or the kind changed belongs to the
+  // old list: dropped, entries and cursor both, as `first` drops its own.
   const loadMore = () => {
     if (!cursor) return;
+    const mine = seq.current;
     setMore('loading');
     financeApi
       .ledger({ kind, from, to, cursor })
       .then((d) => {
+        if (mine !== seq.current) return;
         setEntries((was) => [...(was ?? []), ...d.entries]);
         setCursor(d.next_cursor);
         setMore('idle');
       })
-      .catch(() => setMore('error'));
+      .catch(() => mine === seq.current && setMore('error'));
   };
 
   const choosePeriod = (id: string) => {
@@ -112,8 +117,9 @@ export default function FinanceLedger({
     custom: s.periodCustom,
   };
 
+  // In Baghdad days, as the period above filters them — never the device's own zone.
   const date = (iso: string) =>
-    new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'ar-IQ', { day: 'numeric', month: 'short' }).format(new Date(iso));
+    new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'ar-IQ', { day: 'numeric', month: 'short', timeZone: 'Asia/Baghdad' }).format(new Date(iso));
 
   const filterLabels: Record<string, string> = {
     all: s.filterAll,

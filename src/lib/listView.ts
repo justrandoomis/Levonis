@@ -44,8 +44,10 @@ export function isWideLayout(width: number, wideAt: number, wasWide: boolean | n
  * A tap is NOT passed on when it began on something that acts for itself (a
  * checkbox, a button, a link — the title link included —, a field, a menu or
  * a dialog drawn from the row), when it is not the main button, when someone
- * already handled it, when it ended a text selection, or when it came through
- * a portal from outside the row.
+ * already handled it, when it ended a text selection, when it came through
+ * a portal from outside the row, or when its press closed a menu drawn over
+ * the page (that menu has no scrim: the press that closes it is not a tap on
+ * the row).
  */
 export const ROW_TAP_SKIP =
   'a,button,input,select,textarea,label,summary,[role="button"],[role="checkbox"],[role="switch"],[role="menu"],[role="menuitem"],[role="dialog"],[contenteditable="true"],[data-row-tap-skip]';
@@ -57,11 +59,13 @@ export interface RowTap<L> {
   defaultPrevented: boolean;
   /** The page's selected text when the tap ended. */
   selection: string;
+  /** A menu drawn over the page was open when this tap was pressed: the press closed it. */
+  closedMenu: boolean;
 }
 
 /** The row's link a tap on the row should open, or null to leave the tap alone. */
 export function rowTapLink<L>(tap: RowTap<L>): L | null {
-  if (tap.defaultPrevented || tap.button !== 0 || tap.selection) return null;
+  if (tap.defaultPrevented || tap.button !== 0 || tap.selection || tap.closedMenu) return null;
   if (!tap.target || !tap.row.contains(tap.target)) return null;
   if (tap.target.closest(ROW_TAP_SKIP)) return null;
   return tap.row.querySelector('[data-row-link]');
