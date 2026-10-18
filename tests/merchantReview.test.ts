@@ -479,6 +479,72 @@ test('note_internal never reaches the applicant — not their GET, not their wri
   assert.match(seen[0]!, /Please add a clearer photo/, 'the public reason does reach them');
 });
 
+test('an admin who applied reads their own application WITHOUT the staff note; another reviewer still reads it', async () => {
+  const w = world();
+  const own = await submitted(w, ASSIST2, 'Assistant Prints');
+  grant(w.raw, ASSIST2.id);
+  assert.equal((await decide(w, OWNER, own, 'start-review')).status, 200);
+  assert.equal((await decide(w, OWNER, own, 'request-changes', { reason_public: 'Please add a clearer photo', note_internal: NOTE })).status, 200);
+
+  const mine = await get(w.appAs(ASSIST2), `${BASE}/${own}`);
+  assert.equal(mine.status, 200);
+  const text = await mine.text();
+  assert.ok(!text.includes(NOTE), 'the staff note reached its own applicant');
+  const body = JSON.parse(text);
+  assert.equal(body.application.own, true);
+  assert.equal(body.application.note_internal, '');
+  assert.equal(body.application.reason_public, 'Please add a clearer photo', 'the public reason is theirs to read');
+
+  const other = await json(await get(w.appAs(FULL), `${BASE}/${own}`));
+  assert.equal(other.application.note_internal, NOTE);
+});
+
+test('a DRAFT is never a reviewer\'s: no filter lists it, the detail and the photo answer 404, nothing is opened', async () => {
+  const w = world();
+  grant(w.raw, ASSIST.id);
+  // A complete draft, photo included, never sent.
+  const app = w.appAs(APPLICANT);
+  const saved = await put(app, '/api/merchant-application', { legal_name: NAME, dob: DOB, social_link: LINK, public_name: 'Orbit Prints' });
+  assert.equal(saved.status, 200);
+  const id = (await json(saved)).application.id as string;
+  assert.equal((await app.request('/api/merchant-application/photo', { method: 'POST', body: photoForm() })).status, 200);
+
+  for (const who of [OWNER, FULL, ASSIST]) {
+    const filtered = await get(w.appAs(who), `${BASE}?state=draft`);
+    assert.equal(filtered.status, 400, `${who.id}: ?state=draft`);
+    assert.equal((await json(filtered)).code, 'STATE_FILTER_INVALID');
+    for (const f of ['queue', 'all']) {
+      const list = await json(await get(w.appAs(who), `${BASE}?state=${f}`));
+      assert.ok(!(list.applications as Array<{ id: string }>).some((a) => a.id === id), `${who.id}: ${f} lists the draft`);
+    }
+    const detail = await get(w.appAs(who), `${BASE}/${id}`);
+    assert.equal(detail.status, 404, `${who.id}: detail`);
+    const body = await detail.text();
+    for (const v of PII) assert.ok(!body.includes(v), `${who.id}: the detail carries a private value`);
+    assert.equal((await get(w.appAs(who), `${BASE}/${id}/photo`)).status, 404, `${who.id}: photo`);
+  }
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action IN ('merchant_application.view','merchant_application.photo_view')"), 0, 'nothing was opened');
+
+  // A submitted application reopened by its applicant is a draft again: closed to reviewers while it is edited.
+  const sent = await post(app, '/api/merchant-application/submit', { operation_id: op('submit-draft') });
+  assert.equal(sent.status, 200, await sent.clone().text());
+  assert.equal((await get(w.appAs(OWNER), `${BASE}/${id}`)).status, 200);
+  assert.equal((await put(app, '/api/merchant-application', { public_bio: 'Prints to order, fast.' })).status, 200);
+  assert.equal((await get(w.appAs(OWNER), `${BASE}/${id}`)).status, 404);
+  assert.equal((await get(w.appAs(OWNER), `${BASE}/${id}/photo`)).status, 404);
+});
+
+test("a reviewer's operation id never takes a server namespace ('purge:', 'create:', 'srv:')", async () => {
+  const w = world();
+  const id = await submitted(w);
+  for (const reserved of [`purge:${id}`, `create:${id}`, 'srv:abcdefgh1234']) {
+    const out = await post(w.appAs(OWNER), `${BASE}/${id}/start-review`, { revision: 1, operation_id: reserved });
+    assert.equal(out.status, 400, reserved);
+    assert.equal((await json(out)).code, 'OPERATION_ID_INVALID');
+  }
+  assert.equal(appState(w.raw, id)!.state, 'submitted');
+});
+
 // ------------------------------------------------------------------ approve
 
 test('approve stamps the merchant row and creates NO store; /api/merchant/me then says approved', async () => {

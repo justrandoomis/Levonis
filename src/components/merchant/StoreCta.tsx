@@ -4,9 +4,12 @@
  * Shown on /subscription. It has four states and each is a real answer, not
  * a placeholder:
  *
- *   - not eligible  → nothing is rendered. Advertising a store button to
- *                     someone who cannot open one is the kind of dead control
- *                     the mandate is explicitly about.
+ *   - no store, not approved yet → the MERCHANT APPLICATION, PLUS or not:
+ *                     applying needs no PLUS (owner decision C3), so this
+ *                     page never sells one before it.
+ *   - approved (or an older server), not eligible → nothing is rendered.
+ *                     Advertising a store button to someone who cannot open
+ *                     one is the kind of dead control the mandate is about.
  *   - eligible, no store → "Create your store", the actual next step.
  *   - has a store   → its address, and a way into managing it.
  *   - restricted    → why, in plain words, and what to do about it.
@@ -23,6 +26,7 @@ import { Store, ArrowRight, ExternalLink, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { merchantApi, type MerchantMe } from '../../lib/merchant';
+import { applicationCta, approvalReason } from '../merchantApplication/approvalWords';
 
 export default function StoreCta() {
   const { loc } = useLanguage();
@@ -55,7 +59,8 @@ export default function StoreCta() {
   }, [authLoaded, isAuthenticated]);
 
   if (!loaded || !me) return null;
-  if (!me.eligible && !me.store) return null;
+  const applying = !me.store && me.approved === false;
+  if (!me.eligible && !me.store && !applying) return null;
 
   const restricted = me.store && !me.selling.canSell;
 
@@ -75,7 +80,9 @@ export default function StoreCta() {
             <h3 className="text-text-primary font-bold text-[15px] leading-tight">
               {me.store
                 ? loc('متجرك في مجتمع ليفو', 'Your store in the Levo community', 'فرۆشگاکەت لە کۆمەڵگەی Levo')
-                : loc('أنشئ متجرك في ليفو', 'Create your Levo store', 'فرۆشگای Levo خۆت دروست بکە')}
+                : applying
+                  ? loc('طلب اعتماد التاجر', 'Merchant application', 'داواکاریی پەسەندکردنی بازرگان')
+                  : loc('أنشئ متجرك في ليفو', 'Create your Levo store', 'فرۆشگای Levo خۆت دروست بکە')}
             </h3>
             <p className="text-text-secondary text-[12px] mt-1 leading-relaxed">
               {me.store
@@ -84,7 +91,9 @@ export default function StoreCta() {
                     'Manage your products, orders and offers from your store dashboard.',
                     'بەرهەم و داواکاری و ئۆفەرەکانت لە داشبۆردی فرۆشگاکەتەوە بەڕێوە ببە.'
                   )
-                : loc(
+                : applying
+                  ? approvalReason(me.application, loc)
+                  : loc(
                     'عضويتك PLUS فعّالة. اختر اسمًا وعنوانًا وابدأ البيع.',
                     'Your PLUS membership is active. Pick a name and an address, and start selling.',
                     'ئەندامێتی PLUS چالاکە. ناو و ناونیشانێک هەڵبژێرە و دەست بە فرۆشتن بکە.'
@@ -131,7 +140,7 @@ export default function StoreCta() {
             to="/merchant/start"
             className="lv-button lv-button-primary w-full min-h-[48px]"
           >
-            {loc('أنشئ متجرك', 'Create your store', 'فرۆشگاکەت دروست بکە')}
+            {applying ? applicationCta(me.application, loc) : loc('أنشئ متجرك', 'Create your store', 'فرۆشگاکەت دروست بکە')}
             <ArrowRight className="w-4 h-4 rtl:rotate-180" />
           </Link>
         )}

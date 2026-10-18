@@ -20,7 +20,7 @@ import {
   type DraftPatch,
 } from '../../lib/merchantApplication';
 import type { ApplicationState } from '../../lib/merchant';
-import { APPLICANT_STRINGS } from './applicantStrings';
+import { APPLICANT_STRINGS, LIST_SEPARATOR } from './applicantStrings';
 
 /**
  * THE MERCHANT APPLICATION — FORM AND TRACKER (Community V3 push 1.2,
@@ -98,10 +98,16 @@ export default function MerchantApplicationPanel({ onApproved }: { onApproved: (
     setSocial('');
   };
 
+  /**
+   * `refill: false` keeps the review and public fields AS TYPED: a photo
+   * upload or a withdrawal saves none of them, so refilling from the server
+   * would wipe unsaved words — and, after «قدّم من جديد», the whole carried-over
+   * draft (the upload creates a new, empty one).
+   */
   const take = useCallback(
-    (next: ApplicantAnswer) => {
+    (next: ApplicantAnswer, refill = true) => {
       setAnswer(next);
-      fillFrom(next.application);
+      if (refill) fillFrom(next.application);
       const state = next.application?.state;
       setEditing(state === 'draft' || state === 'changes_requested' || (!next.application && next.can?.apply === true));
     },
@@ -123,11 +129,14 @@ export default function MerchantApplicationPanel({ onApproved }: { onApproved: (
     };
   }, [attempt, take]);
 
-  const reload = useCallback(async () => {
-    const d = await applicationApi.get();
-    take(d);
-    return d;
-  }, [take]);
+  const reload = useCallback(
+    async (refill = true) => {
+      const d = await applicationApi.get();
+      take(d, refill);
+      return d;
+    },
+    [take]
+  );
 
   const app = answer?.application ?? null;
   const state: ApplicationState | 'none' = app ? app.state : 'none';
@@ -171,47 +180,65 @@ export default function MerchantApplicationPanel({ onApproved }: { onApproved: (
   function refusal(e: unknown): string {
     if (e instanceof ApiError && e.code === 'APPLICATION_INCOMPLETE' && Array.isArray(e.details?.missing)) {
       const names = (e.details!.missing as string[]).map((m) => t.missingNames[m] ?? m);
-      return `${t.missing} ${names.join('، ')}`;
+      return `${t.missing} ${names.join(LIST_SEPARATOR[lang] ?? LIST_SEPARATOR.ar)}`;
     }
+    // A refused field is NAMED: a save sends up to nine of them.
+    const field = e instanceof ApiError && e.code === 'APPLICATION_FIELD_INVALID' ? e.details?.field : undefined;
+    if (typeof field === 'string' && t.missingNames[field]) return `${t.fieldInvalid} ${t.missingNames[field]}`;
     return apiRefusal(e, rl, t.failed);
   }
 
-  async function save(): Promise<boolean> {
+  /** The application as the server saved it, or null when nothing was saved. */
+  async function save(): Promise<ApplicantView | null> {
     const p = patch();
     if (typeof p === 'string') {
       setError(p);
-      return false;
+      return null;
     }
     setBusy('save');
     setError('');
     setInfo('');
+    let saved: ApplicantView;
     try {
-      await applicationApi.save(p);
-      clearPrivate();
-      await reload();
-      setInfo(t.saved);
-      return true;
+      saved = (await applicationApi.save(p)).application;
     } catch (e) {
       setError(refusal(e));
-      return false;
+      setBusy(null);
+      return null;
+    }
+    // The server holds it now: what was typed privately is cleared and «saved»
+    // is said, whatever the re-read below does.
+    clearPrivate();
+    setInfo(t.saved);
+    try {
+      await reload();
+    } catch {
+      // The next load shows it; the save itself succeeded.
     } finally {
       setBusy(null);
     }
+    return saved;
   }
 
   async function send() {
-    // Unsaved words are saved first, so what is sent is what is on screen.
-    if (!(await save())) return;
-    const current = (await applicationApi.get()).application;
+    // Unsaved words are saved first, so what is sent is what is on screen —
+    // and the application submitted is the one that save answered with.
+    const current = await save();
     if (!current || current.state !== 'draft') return;
     setBusy('send');
     setError('');
     try {
       await applicationApi.submit(operationFor(current, 'submit'));
-      await reload();
-      setInfo(t.sent);
     } catch (e) {
       setError(refusal(e));
+      setBusy(null);
+      return;
+    }
+    setInfo(t.sent);
+    try {
+      await reload();
+    } catch {
+      // Sent; the next load shows it.
     } finally {
       setBusy(null);
     }
@@ -224,7 +251,7 @@ export default function MerchantApplicationPanel({ onApproved }: { onApproved: (
     setInfo('');
     try {
       await applicationApi.photo(file);
-      await reload();
+      await reload(false);
     } catch (e) {
       setError(refusal(e));
     } finally {
@@ -239,7 +266,7 @@ export default function MerchantApplicationPanel({ onApproved }: { onApproved: (
     try {
       await applicationApi.withdraw(operationFor(app, 'withdraw'));
       setConfirmWithdraw(false);
-      await reload();
+      await reload(false);
     } catch (e) {
       setError(refusal(e));
     } finally {

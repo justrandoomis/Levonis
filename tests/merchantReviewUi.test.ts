@@ -22,13 +22,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REVIEWER_STRINGS } from '../src/components/merchantApplication/reviewerStrings';
-import { APPLICANT_STRINGS } from '../src/components/merchantApplication/applicantStrings';
+import { APPLICANT_STRINGS, LIST_SEPARATOR } from '../src/components/merchantApplication/applicantStrings';
 import { applicationCta, applicationStateWord, approvalReason, type Loc } from '../src/components/merchantApplication/approvalWords';
 import { storeStatus } from '../src/components/merchant/shell/status';
 import { W } from '../src/components/merchant/shell/strings';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
 import { ageOn, latestAdultDob, namePartOk, socialLinkOk } from '../src/lib/merchantApplication';
 import type { ApplicationState, MerchantMe } from '../src/lib/merchant';
+import { parseSocialLink } from '../worker/lib/merchantApproval';
 
 const ROOT = join(import.meta.dirname, '..');
 /** The source without its comments — comments quote what the code must not do. */
@@ -210,7 +211,7 @@ test('the applicant screen: no PLUS before applying (C3), honest states, apply a
   assert.match(panel, /<Link to="\/settings"/, 'the way to verify the phone (C6)');
   // The private values are typed, never filled from the server, and forgotten once saved.
   assert.doesNotMatch(panel, /setGiven\(app|setDob\(app|setSocial\(app/);
-  assert.match(panel, /await applicationApi\.save\(p\);\s*clearPrivate\(\);/);
+  assert.match(panel, /saved = \(await applicationApi\.save\(p\)\)\.application;[\s\S]{0,200}?clearPrivate\(\);/);
 
   const start = code('src/pages/MerchantStart.tsx');
   const gate = start.indexOf('if (me && me.approved !== true)');
@@ -229,4 +230,105 @@ test('the applicant screen: no PLUS before applying (C3), honest states, apply a
   assert.match(card, /approvalReason\(me\.application, loc\)/);
   assert.match(card, /applicationStateWord\(me\.application\.state, loc\)/);
   assert.match(card, /<Link to="\/merchant\/start"/);
+});
+
+/** The body of one top-level function of a source file (up to the next top-level declaration). */
+function fnBody(src: string, signature: string): string {
+  const at = src.indexOf(signature);
+  assert.ok(at >= 0, `${signature} not found`);
+  const rest = src.slice(at + signature.length);
+  const end = rest.search(/\n(?:export default |export )?(?:function|const|interface|type) /);
+  return rest.slice(0, end < 0 ? undefined : end);
+}
+
+test('C3 at every entry point: a member with no approval is sent to the application, never to /subscription', () => {
+  const hub = fnBody(code('src/pages/Community.tsx'), 'function YourStore(');
+  assert.match(hub, /const applying = !me\.store && me\.approved === false;/);
+  assert.match(hub, /if \(!me\.store && !applying && !me\.eligible\) return null;/, 'the plan gates only the store, never the application');
+  assert.match(hub, /applicationCta\(me\.application, loc\)/);
+  assert.doesNotMatch(hub, /\/subscription/);
+
+  const onlooker = fnBody(code('src/pages/community/Request.tsx'), 'function OnlookerCard(');
+  assert.match(onlooker, /href="\/merchant\/start"/);
+  assert.match(onlooker, /applicationCta\(/);
+  assert.doesNotMatch(onlooker, /\/subscription|aboutPlus|me\?\.eligible/);
+
+  const cta = code('src/components/merchant/StoreCta.tsx');
+  assert.match(cta, /const applying = !me\.store && me\.approved === false;/);
+  assert.match(cta, /if \(!me\.eligible && !me\.store && !applying\) return null;/);
+  assert.match(cta, /applying \? applicationCta\(me\.application, loc\)/);
+});
+
+test('the applicant form keeps what was typed: a photo upload or a withdrawal never refills the fields from the server', () => {
+  const panel = code('src/components/merchantApplication/MerchantApplicationPanel.tsx');
+  assert.match(panel, /\(next: ApplicantAnswer, refill = true\) => \{\s*setAnswer\(next\);\s*if \(refill\) fillFrom\(next\.application\);/);
+  const upload = panel.slice(panel.indexOf('async function uploadPhoto('), panel.indexOf('async function withdraw('));
+  assert.match(upload, /await applicationApi\.photo\(file\);\s*await reload\(false\);/);
+  assert.doesNotMatch(upload, /await reload\(\);/);
+  const withdraw = panel.slice(panel.indexOf('async function withdraw('), panel.indexOf('if (!answer && loadError)'));
+  assert.match(withdraw, /await reload\(false\);/);
+});
+
+test('save and send: a failed re-read never turns a done save or send into a failure, and send submits what save answered', () => {
+  const panel = code('src/components/merchantApplication/MerchantApplicationPanel.tsx');
+  const save = panel.slice(panel.indexOf('async function save()'), panel.indexOf('async function send()'));
+  assert.match(save, /Promise<ApplicantView \| null>/);
+  // «saved» is said, and the private fields cleared, BEFORE the re-read — which has its own try.
+  assert.ok(save.indexOf('setInfo(t.saved)') < save.indexOf('await reload()'));
+  assert.match(save, /try \{\s*await reload\(\);\s*\} catch \{/);
+  const send = panel.slice(panel.indexOf('async function send()'), panel.indexOf('async function uploadPhoto('));
+  assert.match(send, /const current = await save\(\);/);
+  assert.doesNotMatch(send, /applicationApi\.get\(/, 'no second, unguarded read');
+  assert.match(send, /try \{\s*await reload\(\);\s*\} catch \{/);
+});
+
+test('a refused field is NAMED in three languages, lists join in the reader\'s own comma, and the browser checks the link as the server does', () => {
+  const panel = code('src/components/merchantApplication/MerchantApplicationPanel.tsx');
+  assert.match(panel, /e\.code === 'APPLICATION_FIELD_INVALID' \? e\.details\?\.field/);
+  assert.match(panel, /names\.join\(LIST_SEPARATOR\[lang\] \?\? LIST_SEPARATOR\.ar\)/);
+  assert.doesNotMatch(panel, /join\('، '\)/);
+  assert.deepEqual(LIST_SEPARATOR, { ar: '، ', en: ', ', ckb: '، ' });
+  // Every field the server can name in APPLICATION_FIELD_INVALID has a label in every language.
+  const server = readFileSync(join(ROOT, 'worker/routes/merchantApplication.ts'), 'utf8');
+  const named = [...new Set([...server.matchAll(/fieldInvalid\('([a-z_]+)'\)|, '([a-z_]+)', \d+\)/g)].map((m) => m[1] ?? m[2]))];
+  for (const f of ['legal_name', 'dob', 'social_link', 'governorate', 'activity_kind', 'activity_description', 'public_name', 'public_bio', 'public_links']) {
+    assert.ok(named.includes(f), `the server names ${f}`);
+  }
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(APPLICANT_STRINGS[lang].fieldInvalid.trim());
+    for (const f of named) assert.ok(APPLICANT_STRINGS[lang].missingNames[f], `${lang}: no label for ${f}`);
+  }
+  assert.notEqual(APPLICANT_STRINGS.ckb.fieldInvalid, APPLICANT_STRINGS.ar.fieldInvalid);
+  for (const f of named) assert.notEqual(APPLICANT_STRINGS.ckb.missingNames[f], APPLICANT_STRINGS.ar.missingNames[f], `ckb.${f} copies the Arabic`);
+
+  // PARITY: the browser's link check and the server's agree on every case.
+  const cases = [
+    'instagram.com/orbit.prints',
+    'https://www.instagram.com/orbit.prints',
+    'http://m.instagram.com/orbit',
+    'https://www.facebook.com/orbitprints',
+    'https://web.facebook.com/orbitprints/',
+    'https://fb.com/orbit',
+    'https://m.fb.com/x',
+    'https://web.instagram.com/x',
+    'https://user@instagram.com/x',
+    'https://user:pw@facebook.com/x',
+    'https://instagram.com:8443/x',
+    'https://instagram.com/',
+    'https://example.com/orbit',
+    'ftp://instagram.com/x',
+    'javascript:alert(1)',
+    '',
+  ];
+  for (const c of cases) assert.equal(socialLinkOk(c), parseSocialLink(c) !== null, `browser and server disagree on «${c}»`);
+});
+
+test('AdminKyc: a refusal reads in the admin\'s language by its code, and no admin is offered a decision on their own case', () => {
+  const kyc = code('src/components/AdminKyc.tsx');
+  assert.doesNotMatch(kyc, /\(err as Error\)\?\.message/, 'a raw «Arabic / English» server sentence');
+  assert.match(kyc, /const failure = \(err: unknown\) => apiRefusal\(err, refusalLang\(lang\), t\.actionError\);/);
+  assert.match(kyc, /r\.state === 'pending' && r\.user_id !== viewerId && \(/);
+  assert.match(kyc, /shownCase\.state === 'reviewing'\) && shownCase\.user_id !== viewerId && \(/);
+  assert.match(kyc, /ownRequest: 'ئەمە داواکاریی خۆتە؛ بەڕێوەبەرێکی تر بڕیاری لەسەر دەدات\.'/);
+  assert.equal(REFUSAL_STRINGS.SELF_DECISION_FORBIDDEN.ckb === REFUSAL_STRINGS.SELF_DECISION_FORBIDDEN.ar, false);
 });

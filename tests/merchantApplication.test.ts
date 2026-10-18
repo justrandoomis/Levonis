@@ -59,6 +59,7 @@ import {
   parseSocialLink,
   submittedNoticeText,
   sweepMerchantApplicationRetention,
+  validClientOperationId,
   type ApplicationAction,
 } from '../worker/lib/merchantApproval';
 
@@ -73,6 +74,17 @@ const DOB = '1990-07-14';
 const LINK = 'https://www.instagram.com/qorvan.testprints.example';
 const PII = [NAME.given, NAME.father, NAME.grandfather, DOB, 'qorvan.testprints.example'];
 
+/** The in-memory bucket with R2's prefix listing, which the C7 purge reads. */
+function listingBucket() {
+  const b = memoryBucket();
+  return Object.assign(b, {
+    async list(o: { prefix?: string; cursor?: string } = {}) {
+      const objects = [...b.objects.keys()].filter((k) => !o.prefix || k.startsWith(o.prefix)).sort().map((key) => ({ key }));
+      return { objects, truncated: false as const, delimitedPrefixes: [] as string[] };
+    },
+  });
+}
+
 function world(opts: { key?: string | null; privateBucket?: boolean; images?: boolean; phone?: boolean; through?: string } = {}) {
   const raw: DatabaseSync = opts.through ? dbThrough(opts.through) : freshDb();
   raw.exec(`
@@ -85,7 +97,7 @@ function world(opts: { key?: string | null; privateBucket?: boolean; images?: bo
     raw.exec(`INSERT INTO telegram_links (user_id, telegram_user_id, chat_id, phone_e164, verified_at)
               VALUES ('u_app', 9100001, 9100001, '+9647700000000', '2026-01-01T00:00:00.000Z')`);
   }
-  const bucket = memoryBucket();
+  const bucket = listingBucket();
   const legacy = memoryBucket();
   const images = imagesDouble();
   const env: Record<string, unknown> = { BUCKET: legacy };
@@ -499,7 +511,7 @@ test('C7: 90 days after a withdrawal the sealed values are blanked, the photo de
   assert.ok(await w.bucket.head(photo));
 
   const due = await sweepMerchantApplicationRetention({ ...w.env, DB: w.db } as never, new Date(Date.parse(until) + 1000).toISOString());
-  assert.deepEqual(due, { scanned: 1, purged: 1, photo_failures: 0 });
+  assert.deepEqual(due, { scanned: 1, purged: 1, photo_failures: 0, failures: 0 });
   const r = appRow(w.raw, id)!;
   assert.equal(r.legal_name_enc, '');
   assert.equal(r.dob_enc, '');
@@ -516,6 +528,139 @@ test('C7: 90 days after a withdrawal the sealed values are blanked, the photo de
 });
 
 // ------------------------------------------------------- append-only, grants
+
+const sweepAt = (w: ReturnType<typeof world>, at: string) => sweepMerchantApplicationRetention({ ...w.env, DB: w.db } as never, at);
+const keysUnder = (w: ReturnType<typeof world>, id: string) => [...w.bucket.objects.keys()].filter((k) => k.startsWith(`merchant-review/${id}/`)).sort();
+const after = (until: string, ms = 1000) => new Date(Date.parse(until) + ms).toISOString();
+
+test("C7: no client takes the sweep's operation id — a withdraw sent as 'purge:<id>' is still purged", async () => {
+  const w = world();
+  const { id } = await completeDraft(w);
+  // A client id never carries ':' — every server id lives in a ':' namespace.
+  for (const reserved of [`purge:${id}`, `create:${id}`, 'srv:abcdefgh1234']) assert.equal(validClientOperationId(reserved), false, reserved);
+  assert.equal(validClientOperationId('op-withdraw-01'), true);
+
+  const out = await post(w.app, '/api/merchant-application/withdraw', { operation_id: `purge:${id}` });
+  assert.equal(out.status, 200, await out.clone().text());
+  const ops = all<{ operation_id: string }>(w.raw, 'SELECT operation_id FROM merchant_application_events WHERE application_id = ?', id).map((e) => e.operation_id);
+  assert.ok(!ops.includes(`purge:${id}`), 'the client id never lands in a server namespace');
+  // Even an event already holding `purge:<id>` (whatever wrote it) cannot block the purge: the sweep's id is fresh.
+  w.raw
+    .prepare(
+      `INSERT INTO merchant_application_events (id, application_id, revision, actor_id, actor_kind, action, reason_public, at, operation_id)
+       VALUES ('mape_seeded', ?, 1, 'u_app', 'applicant', 'withdrawn', '', '2026-01-01T00:00:00.000Z', ?)`
+    )
+    .run(id, `purge:${id}`);
+
+  const until = appRow(w.raw, id)!.retention_until!;
+  assert.deepEqual(await sweepAt(w, after(until)), { scanned: 1, purged: 1, photo_failures: 0, failures: 0 });
+  const r = appRow(w.raw, id)!;
+  assert.ok(r.purged_at);
+  assert.equal(r.legal_name_enc, '');
+  assert.equal(r.dob_enc, '');
+  assert.equal(r.social_link_enc, '');
+});
+
+test('C7: a blanking that fails for any reason but a lost race is REPORTED and retried, never counted as purged', async () => {
+  const w = world();
+  const { id } = await completeDraft(w);
+  assert.equal((await post(w.app, '/api/merchant-application/withdraw', { operation_id: 'op-withdraw-fail' })).status, 200);
+  const until = appRow(w.raw, id)!.retention_until!;
+  w.raw.exec(`CREATE TRIGGER fail_purged_event BEFORE INSERT ON merchant_application_events
+              WHEN NEW.action = 'purged' BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;`);
+  assert.deepEqual(await sweepAt(w, after(until)), { scanned: 1, purged: 0, photo_failures: 0, failures: 1 });
+  assert.equal(appRow(w.raw, id)!.purged_at, null, 'nothing pretended to be purged');
+  w.raw.exec('DROP TRIGGER fail_purged_event');
+  assert.deepEqual(await sweepAt(w, after(until, 2000)), { scanned: 1, purged: 1, photo_failures: 0, failures: 0 });
+  assert.ok(appRow(w.raw, id)!.purged_at);
+});
+
+test("C7: the purge empties the application's whole private prefix, not only the current photo", async () => {
+  const w = world();
+  const { id } = await completeDraft(w);
+  // An object a failed replace-delete or a lost upload race left behind.
+  await w.bucket.put(`merchant-review/${id}/photo/leftover01.webp`, new Uint8Array([1, 2, 3]));
+  assert.equal(keysUnder(w, id).length, 2);
+  assert.equal((await post(w.app, '/api/merchant-application/withdraw', { operation_id: 'op-withdraw-pre' })).status, 200);
+  const until = appRow(w.raw, id)!.retention_until!;
+  assert.equal((await sweepAt(w, after(until))).purged, 1);
+  assert.deepEqual(keysUnder(w, id), [], 'no photograph of this person survives');
+});
+
+test('two overlapping photo uploads: one wins, the loser deletes its own object — nothing is left unreferenced', async () => {
+  const w = world();
+  const { id } = await completeDraft(w);
+  const first = appRow(w.raw, id)!.photo_key!;
+  // Hold every store until BOTH uploads have read the application (photo P0), then let them land one by one.
+  const put = w.bucket.put.bind(w.bucket);
+  const held: Array<() => void> = [];
+  let bothHeld!: () => void;
+  const both = new Promise<void>((r) => (bothHeld = r));
+  w.bucket.put = (async (...args: Parameters<typeof put>) => {
+    await new Promise<void>((release) => {
+      held.push(release);
+      if (held.length === 2) bothHeld();
+    });
+    return put(...args);
+  }) as typeof w.bucket.put;
+  const a = uploadPhoto(w.app);
+  const b = uploadPhoto(w.app);
+  await both;
+  held[0]();
+  const firstDone = await Promise.race([a, b]);
+  held[1]();
+  const statuses = [(await a).status, (await b).status].sort();
+  w.bucket.put = put;
+  assert.deepEqual(statuses, [200, 409], `one wins (first answered ${firstDone.status})`);
+  const now = appRow(w.raw, id)!.photo_key!;
+  assert.notEqual(now, first);
+  assert.deepEqual(keysUnder(w, id), [now], 'only the referenced photo is stored');
+});
+
+test('a refused photo never moves a SUBMITTED application back to draft', async () => {
+  const w = world();
+  const { id } = await completeDraft(w);
+  assert.equal((await post(w.app, '/api/merchant-application/submit', { operation_id: 'op-submit-photo' })).status, 200);
+  const before = appRow(w.raw, id)!;
+  assert.equal(before.state, 'submitted');
+
+  w.images.state.mode = 'throw9422';
+  const refused = await uploadPhoto(w.app);
+  assert.equal(refused.status, 400);
+  assert.equal((await json(refused)).code, 'PHOTO_UNREADABLE');
+  const still = appRow(w.raw, id)!;
+  assert.equal(still.state, 'submitted', 'still with the reviewer');
+  assert.equal(still.revision, before.revision);
+  assert.deepEqual(keysUnder(w, id), [before.photo_key], 'nothing new stored');
+
+  // A photo that IS stored reopens it, as any edit does.
+  w.images.state.mode = 'ok';
+  const ok = await uploadPhoto(w.app);
+  assert.equal(ok.status, 200, await ok.clone().text());
+  const reopened = appRow(w.raw, id)!;
+  assert.equal(reopened.state, 'draft');
+  assert.equal(reopened.revision, before.revision + 1);
+  assert.deepEqual(keysUnder(w, id), [reopened.photo_key]);
+});
+
+test('submit re-checks completeness in its own write: a draft blanked after the check is not submitted', async () => {
+  const w = world();
+  const { id } = await completeDraft(w);
+  const checked = appRow(w.raw, id)!;
+  // A draft save lands between the route's completeness check and the submit batch (draft saves keep the revision).
+  w.raw.prepare("UPDATE merchant_applications SET public_name = '' WHERE id = ?").run(id);
+  const out = await applyTransition(w.db, { application: checked, action: 'submit', actor: { id: 'u_app', kind: 'applicant' }, operationId: 'op-submit-stale' });
+  assert.deepEqual(out, { ok: false, code: 'APPLICATION_CHANGED' });
+  assert.equal(appRow(w.raw, id)!.state, 'draft');
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM merchant_application_events WHERE application_id = ? AND action = 'submitted'", id), 0);
+});
+
+test('the activity description keeps its line breaks; spaces and blank-line runs collapse', async () => {
+  const w = world();
+  const saved = await put(w.app, '/api/merchant-application', { activity_description: '  line   one\r\n\r\n\r\n\nline two  \nthree ' });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  assert.equal((await json(saved)).application.review.activity_description, 'line one\n\nline two\nthree');
+});
 
 test('the event trail rejects UPDATE and DELETE', async () => {
   const w = world();
@@ -576,5 +721,5 @@ test('a database without 0204 fails closed: no application, no approval, no gran
     await canReviewMerchants({ DB: w.db, INITIAL_ADMIN_EMAIL: 'boss@x.co' }, { id: 'u_rev', role: 'admin', email: 'r@example.test', admin_scope: 'assistant' }),
     false
   );
-  assert.deepEqual(await sweepMerchantApplicationRetention({ ...w.env, DB: w.db } as never), { scanned: 0, purged: 0, photo_failures: 0 });
+  assert.deepEqual(await sweepMerchantApplicationRetention({ ...w.env, DB: w.db } as never), { scanned: 0, purged: 0, photo_failures: 0, failures: 0 });
 });

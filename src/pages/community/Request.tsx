@@ -40,6 +40,7 @@ import { api, ApiError } from '../../lib/api';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { merchantApi, type MerchantMe } from '../../lib/merchant';
 import { merchantHref } from '../../lib/merchantRoutes';
+import { applicationCta } from '../../components/merchantApplication/approvalWords';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import { printApi } from '../../lib/printApi';
 import { formatDate } from '../../components/orders/format';
@@ -1231,6 +1232,7 @@ function ModelDoors({ requestId, files, skip, lang, s }: { requestId: string; fi
 function OnlookerCard({ me, onNewRequest }: { me: MerchantMe | null; onNewRequest?: () => void }) {
   const s = useRequestStrings();
   const { user } = useAuth();
+  const { loc } = useLanguage();
   return (
     <div className="lv-surface space-y-3 p-4" data-request-onlooker>
       <div>
@@ -1244,12 +1246,15 @@ function OnlookerCard({ me, onNewRequest }: { me: MerchantMe | null; onNewReques
       </div>
       <div className="border-t border-border-subtle pt-3">
         <p className="text-[12.5px] leading-relaxed text-text-secondary">{s.printForOthers}</p>
+        {/* Every way to selling starts at the merchant application — never a
+            PLUS page before it (owner decision C3). /merchant/start signs a
+            visitor in first and sends an approved store owner on to the store. */}
         <a
-          href={user && me?.eligible ? '/merchant/start' : '/subscription'}
+          href="/merchant/start"
           className="mt-1 inline-flex min-h-11 items-center rounded text-[12.5px] font-semibold text-text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           data-request-onlooker-store
         >
-          {user && me?.eligible ? s.openYourStore : s.aboutPlus}
+          {user && (me?.store || me?.approved === true) ? s.openYourStore : applicationCta(user ? me?.application : null, loc)}
         </a>
       </div>
     </div>

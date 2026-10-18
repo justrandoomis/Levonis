@@ -81,7 +81,6 @@ const ar = {
   signInAndAsk: 'سجّل الدخول واطلب',
   printForOthers: 'تطبع لغيرك؟ العروض تُقدَّم من متجر على Levonis.',
   openYourStore: 'افتح متجرك',
-  aboutPlus: 'اعرف عن PLUS والمتاجر',
   // ---- the customer's offers
   noOffersYet: 'لا عروض بعد. نُعلمك حين يصل أول عرض.',
   sortOffers: 'ترتيب العروض',
@@ -406,7 +405,6 @@ const en: typeof ar = {
   signInAndAsk: 'Sign in and ask',
   printForOthers: 'You print for others? Offers are made from a store on Levonis.',
   openYourStore: 'Open your store',
-  aboutPlus: 'About PLUS and stores',
   noOffersYet: 'No offers yet. We will tell you when the first one arrives.',
   sortOffers: 'Sort offers',
   sortPrice: 'Lowest total',
@@ -719,7 +717,6 @@ const ckb: typeof ar = {
   signInAndAsk: 'بچۆ ژوورەوە و داوا بکە',
   printForOthers: 'بۆ خەڵک چاپ دەکەیت؟ ئۆفەرەکان لە فرۆشگایەکی سەر Levonis پێشکەش دەکرێن.',
   openYourStore: 'فرۆشگاکەت بکەرەوە',
-  aboutPlus: 'دەربارەی PLUS و فرۆشگاکان',
   noOffersYet: 'هێشتا هیچ ئۆفەرێک نییە. کاتێک یەکەم ئۆفەر گەیشت ئاگادارت دەکەینەوە.',
   sortOffers: 'ڕیزکردنی ئۆفەرەکان',
   // Short enough for a 360 px segment (review 2026-09-30: «کەمترین کۆی…» was cut).

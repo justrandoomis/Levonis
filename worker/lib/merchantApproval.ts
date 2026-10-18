@@ -35,7 +35,7 @@ import { auditStatements } from './audit';
 import { newId } from './crypto';
 import { changedExactlyOne, isLostRace } from './gifts/fence';
 import { HttpError, isPlatformAdmin } from './http';
-import { deleteMediaObject } from './mediaStorage';
+import { deleteMediaObject, mediaBucket } from './mediaStorage';
 
 // ------------------------------------------------------------------ states
 
@@ -279,15 +279,27 @@ export type TransitionOutcome =
   | { ok: true; replay: boolean; state: ApplicationState; revision: number }
   | { ok: false; code: 'APPLICATION_STATE_INVALID' | 'APPLICATION_CHANGED' | 'SELF_DECISION_FORBIDDEN' | 'OPERATION_REUSED' | 'OPERATION_ID_INVALID' };
 
+/** The stored shape of an operation id: a client's, or one of the server's own (`srv:…`, `create:…`, `purge:…`). */
 const OPERATION_ID = /^[A-Za-z0-9:_-]{8,80}$/;
+/**
+ * A CLIENT's operation id never carries ':'. Every id the server mints itself
+ * lives in a ':' namespace (`srv:`, `create:`, `purge:`), so no client can
+ * take one of them — `operation_id` is UNIQUE across the whole event trail,
+ * and a client holding the sweep's id would stop the C7 purge of its row.
+ */
+const CLIENT_OPERATION_ID = /^[A-Za-z0-9_-]{8,80}$/;
 
 export function validOperationId(v: unknown): v is string {
   return typeof v === 'string' && OPERATION_ID.test(v);
 }
 
-/** The caller's operation id when it sent a valid one, a fresh server id otherwise. */
+export function validClientOperationId(v: unknown): v is string {
+  return typeof v === 'string' && CLIENT_OPERATION_ID.test(v);
+}
+
+/** The caller's operation id when it sent a valid CLIENT one, a fresh server id otherwise. */
 export function operationIdFrom(v: unknown): string {
-  return validOperationId(v) ? v : `srv:${newId()}`;
+  return validClientOperationId(v) ? v : `srv:${newId()}`;
 }
 
 export function retentionUntil(now: string): string {
@@ -371,9 +383,16 @@ export async function applyTransition(db: D1Database, req: TransitionRequest): P
     binds.push(retentionUntil(now));
   }
 
+  // SUBMIT re-checks completeness IN the write: a draft save keeps the revision,
+  // so one landing between the route's check and this batch (a blanked public
+  // name) would otherwise slip through the state + revision fence.
+  const complete =
+    req.action === 'submit'
+      ? ` AND length(trim(public_name)) >= 2 AND legal_name_enc <> '' AND dob_enc <> '' AND social_link_enc <> '' AND photo_key IS NOT NULL`
+      : '';
   const statements: D1PreparedStatement[] = [
     db
-      .prepare(`UPDATE merchant_applications SET ${sets.join(', ')} WHERE id = ? AND state = ? AND revision = ?`)
+      .prepare(`UPDATE merchant_applications SET ${sets.join(', ')} WHERE id = ? AND state = ? AND revision = ?${complete}`)
       .bind(...binds, app.id, app.state, app.revision),
     ...changedExactlyOne(db),
     eventStatement(db, {
@@ -629,6 +648,8 @@ export interface RetentionReport {
   scanned: number;
   purged: number;
   photo_failures: number;
+  /** Rows whose blanking batch failed for a reason other than a concurrent purge (retried next run). */
+  failures: number;
 }
 
 /**
@@ -637,16 +658,22 @@ export interface RetentionReport {
  * event trail stays (it never held a value) and gains a 'purged' row.
  *
  * The photo goes FIRST: a row blanked while its object survived would lose
- * the only pointer to a personal photograph. A photo that cannot be deleted
- * leaves its row for the next run. Bounded per run; a missing table is an
- * empty pass.
+ * the only pointer to a personal photograph. EVERY object under the
+ * application's own prefix goes, not only the current `photo_key` — a photo
+ * replaced while its delete failed, or an upload that lost a race, is still
+ * this person's photograph. A photo that cannot be deleted leaves its row for
+ * the next run. Bounded per run; a missing table is an empty pass.
+ *
+ * The 'purged' event takes a FRESH server id: the `purged_at IS NULL` fence
+ * with `changedExactlyOne` is what makes a purge happen once. Only a lost
+ * race counts as "already purged"; any other failure is reported.
  */
 export async function sweepMerchantApplicationRetention(
   env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
   now: string = new Date().toISOString(),
   limit = 25
 ): Promise<RetentionReport> {
-  const report: RetentionReport = { scanned: 0, purged: 0, photo_failures: 0 };
+  const report: RetentionReport = { scanned: 0, purged: 0, photo_failures: 0, failures: 0 };
   let rows: Array<{ id: string; revision: number; photo_key: string | null }>;
   try {
     rows = (
@@ -665,14 +692,12 @@ export async function sweepMerchantApplicationRetention(
   }
   for (const r of rows) {
     report.scanned += 1;
-    if (r.photo_key) {
-      try {
-        await deleteMediaObject(env, 'private', r.photo_key);
-      } catch {
-        report.photo_failures += 1;
-        console.error('merchant application retention: photo delete failed', r.id);
-        continue;
-      }
+    try {
+      for (const key of await reviewObjectKeys(env, r.id, r.photo_key)) await deleteMediaObject(env, 'private', key);
+    } catch {
+      report.photo_failures += 1;
+      console.error('merchant application retention: photo delete failed', r.id);
+      continue;
     }
     const res = await env.DB.batch([
       env.DB.prepare(
@@ -689,13 +714,38 @@ export async function sweepMerchantApplicationRetention(
         actorKind: 'system',
         action: 'purged',
         at: now,
-        operationId: `purge:${r.id}`,
+        operationId: `purge:${newId()}`,
       }),
-    ]).catch((e: unknown) => {
-      if (isLostRace(e) || /UNIQUE constraint failed/.test(e instanceof Error ? e.message : String(e))) return null;
-      throw e;
-    });
-    if (res) report.purged += 1;
+    ]).then(
+      () => 'purged' as const,
+      (e: unknown) => {
+        // A concurrent sweep purged it first: nothing to do.
+        if (isLostRace(e)) return 'raced' as const;
+        console.error('merchant application retention: blanking failed', r.id);
+        return 'failed' as const;
+      }
+    );
+    if (res === 'purged') report.purged += 1;
+    if (res === 'failed') report.failures += 1;
   }
   return report;
+}
+
+/** The current photo and every other object stored under this application's own private prefix. */
+async function reviewObjectKeys(
+  env: Pick<Env, 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
+  applicationId: string,
+  photoKey: string | null
+): Promise<string[]> {
+  const keys = new Set<string>(photoKey ? [photoKey] : []);
+  const bucket = mediaBucket(env, 'private');
+  let cursor: string | undefined;
+  for (let page = 0; page < 20; page++) {
+    const listed = await bucket.list({ prefix: `merchant-review/${applicationId}/`, cursor });
+    for (const o of listed.objects) keys.add(o.key);
+    if (!listed.truncated) return [...keys];
+    cursor = listed.cursor;
+  }
+  // More pages than any application can hold: refuse rather than blank a row whose objects survive.
+  throw new Error('merchant application retention: listing did not end');
 }

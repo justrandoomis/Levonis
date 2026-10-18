@@ -182,16 +182,32 @@ export function namePartOk(v: string): boolean {
   return t.length >= 2 && t.length <= 60 && /^[\p{L}\p{M}](?:[\p{L}\p{M}'’.\- ]{0,58}[\p{L}\p{M}.])?$/u.test(t);
 }
 
-const SOCIAL_HOSTS = /^(?:(?:www|m|web)\.)?(?:instagram\.com|facebook\.com|fb\.com)$/i;
+/** EXACTLY the server's host set (`parseSocialLink`, worker/lib/merchantApproval.ts); a parity test holds them together. */
+const SOCIAL_HOSTS = new Set([
+  'instagram.com',
+  'www.instagram.com',
+  'm.instagram.com',
+  'facebook.com',
+  'www.facebook.com',
+  'm.facebook.com',
+  'web.facebook.com',
+  'fb.com',
+  'www.fb.com',
+]);
 
-/** An Instagram or Facebook page link — the activity link the reviewer opens. */
+/** An Instagram or Facebook page link — the activity link the reviewer opens. The server's rule, checked first here. */
 export function socialLinkOk(v: string): boolean {
   const t = v.trim();
   if (!t || t.length > 300) return false;
+  let u: URL;
   try {
-    const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`);
-    return (u.protocol === 'https:' || u.protocol === 'http:') && SOCIAL_HOSTS.test(u.hostname) && u.pathname.replace(/\/+$/, '') !== '';
+    u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`);
   } catch {
     return false;
   }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+  if (u.username || u.password || u.port) return false;
+  if (!SOCIAL_HOSTS.has(u.hostname.toLowerCase())) return false;
+  const path = u.pathname.replace(/\/+$/, '');
+  return !!path && path !== '/';
 }

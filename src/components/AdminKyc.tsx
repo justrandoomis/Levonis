@@ -4,6 +4,8 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api } from '../lib/api';
+import { useAuth } from '../AuthContext';
+import { apiRefusal, refusalLang } from '../lib/refusalStrings';
 import { Overlay } from './ui/Overlay';
 
 /**
@@ -60,6 +62,7 @@ const STRINGS = {
     snapshotNote: 'هذه نسخة منسوخة من محتوى العنوان وقت الطلب — تعديل العنوان المحفوظ لاحقًا لا يغيّرها.',
     version: 'النسخة',
     actionError: 'تعذر تنفيذ الإجراء',
+    ownRequest: 'هذا طلبك أنت؛ يقرّره أدمن آخر.',
     rolesGap: 'ملاحظة: يوجد حاليًا دور إداري واحد؛ فصل صلاحيات مراجعة الهوية عن الدعم والمالية بانتظار نموذج أدوار.',
   },
   en: {
@@ -104,6 +107,7 @@ const STRINGS = {
     snapshotNote: 'This is a snapshot copy of the address contents at request time — later edits of the saved address never change it.',
     version: 'Version',
     actionError: 'The action failed',
+    ownRequest: 'This is your own request; another admin decides it.',
     rolesGap: 'Note: a single admin role exists today; identity-review vs support vs finance separation is pending a roles model.',
   },
   ckb: {
@@ -148,6 +152,7 @@ const STRINGS = {
     snapshotNote: 'ئەمە وێنەیەکی لەبەرگیراوەی ناوەڕۆکی ناونیشانەکەیە لە کاتی داواکاریدا — دەستکاری دواتری ناونیشانە پاشەکەوتکراوەکە نایگۆڕێت.',
     version: 'وەشان',
     actionError: 'کردارەکە سەرکەوتوو نەبوو',
+    ownRequest: 'ئەمە داواکاریی خۆتە؛ بەڕێوەبەرێکی تر بڕیاری لەسەر دەدات.',
     rolesGap: 'تێبینی: ئێستا تەنها یەک ڕۆڵی بەڕێوەبەر هەیە؛ جیاکردنەوەی دەسەڵاتی پێداچوونەوەی ناسنامە لە پشتگیری و دارایی چاوەڕوانی مۆدێلی ڕۆڵەکانە.',
   },
 } as const;
@@ -211,6 +216,10 @@ const STATE_STYLE: Record<string, string> = {
 export default function AdminKyc() {
   const { lang } = useLanguage();
   const t = STRINGS[lang] || STRINGS.ar;
+  /** The viewer: an admin never decides their own case (the server answers SELF_DECISION_FORBIDDEN). */
+  const viewerId = useAuth().user?.id ?? null;
+  /** A refusal in the reader's language by its code (a Sorani admin never reads the server's «Arabic / English» pair). */
+  const failure = (err: unknown) => apiRefusal(err, refusalLang(lang), t.actionError);
 
   const [tab, setTab] = useState<Tab>('identity');
   const [stateFilter, setStateFilter] = useState('submitted');
@@ -275,11 +284,11 @@ export default function AdminKyc() {
         setCases(data.cases);
       }
     } catch (err) {
-      setLoadError((err as Error)?.message || t.loadError);
+      setLoadError(apiRefusal(err, refusalLang(lang), t.loadError));
     } finally {
       setIsLoading(false);
     }
-  }, [tab, stateFilter, addrFilter, t.loadError]);
+  }, [tab, stateFilter, addrFilter, t.loadError, lang]);
 
   useEffect(() => {
     load();
@@ -292,7 +301,7 @@ export default function AdminKyc() {
       const data = await api.get<{ case: CaseDetail }>(`/api/kyc/admin/cases/${id}`);
       setDetail(data.case);
     } catch (err) {
-      setActionError((err as Error)?.message || t.actionError);
+      setActionError(failure(err));
     }
   };
 
@@ -315,7 +324,7 @@ export default function AdminKyc() {
       setDetail(null);
       await load();
     } catch (err) {
-      setActionError((err as Error)?.message || t.actionError);
+      setActionError(failure(err));
     } finally {
       setBusy(false);
     }
@@ -340,7 +349,7 @@ export default function AdminKyc() {
       await api.post(`/api/kyc/admin/address/${id}/decision`, { approve, reason });
       await load();
     } catch (err) {
-      setActionError((err as Error)?.message || t.actionError);
+      setActionError(failure(err));
     } finally {
       setBusy(false);
     }
@@ -484,7 +493,10 @@ export default function AdminKyc() {
                 <span className="font-bold">{t.customerReason}</span> {r.reason}
               </p>
               <p className="text-[11px] text-text-muted mt-1">{t.snapshotNote}</p>
-              {r.state === 'pending' && (
+              {r.state === 'pending' && r.user_id === viewerId && (
+                <p className="text-[12px] text-text-muted mt-3" data-kyc-own-request>{t.ownRequest}</p>
+              )}
+              {r.state === 'pending' && r.user_id !== viewerId && (
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => decideAddress(r.id, true)}
@@ -589,7 +601,10 @@ export default function AdminKyc() {
               <p className="text-[12px] text-warning mt-3">{shownCase.reason}</p>
             )}
 
-            {(shownCase.state === 'submitted' || shownCase.state === 'reviewing') && (
+            {(shownCase.state === 'submitted' || shownCase.state === 'reviewing') && shownCase.user_id === viewerId && (
+              <p className="mt-5 border-t border-border-subtle pt-4 text-[12px] text-text-muted" data-kyc-own-request>{t.ownRequest}</p>
+            )}
+            {(shownCase.state === 'submitted' || shownCase.state === 'reviewing') && shownCase.user_id !== viewerId && (
               <div className="mt-5 border-t border-border-subtle pt-4">
                 <p className="text-[12px] font-bold text-text-secondary mb-2">{t.decisions}</p>
                 <div className="flex gap-2 flex-wrap">

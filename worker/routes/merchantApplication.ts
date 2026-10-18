@@ -188,6 +188,9 @@ async function requireReady(env: Env, photo = false): Promise<void> {
   );
 }
 
+const changedNow = () =>
+  conflict('تغيّر الطلب للتو؛ حدّث الصفحة ثم أعد المحاولة / The application just changed; refresh and try again', 'APPLICATION_CHANGED');
+
 const fieldInvalid = (field: string) =>
   badRequest('أحد حقول الطلب غير صالح / One of the application fields is not valid', 'APPLICATION_FIELD_INVALID', { field });
 
@@ -213,6 +216,24 @@ function plainText(v: unknown, field: string, max: number, min = 0): string {
   if (typeof v !== 'string') throw fieldInvalid(field);
   const t = v.replace(/\s+/g, ' ').trim();
   if (t.length < min || t.length > max) throw fieldInvalid(field);
+  return t;
+}
+
+/**
+ * Text written in paragraphs (a textarea): line breaks are KEPT — the reviewer
+ * reads it with its lines — while each line's spaces collapse and a run of
+ * blank lines becomes one.
+ */
+function paragraphText(v: unknown, field: string, max: number): string {
+  if (typeof v !== 'string') throw fieldInvalid(field);
+  const t = v
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (t.length > max) throw fieldInvalid(field);
   return t;
 }
 
@@ -246,7 +267,7 @@ function parseDraft(body: Record<string, unknown>): DraftPatch {
     if (body.activity_kind !== '' && !(ACTIVITY_KINDS as readonly unknown[]).includes(body.activity_kind)) throw fieldInvalid('activity_kind');
     out.activity_kind = String(body.activity_kind);
   }
-  if (body.activity_description !== undefined) out.activity_description = plainText(body.activity_description, 'activity_description', 1000);
+  if (body.activity_description !== undefined) out.activity_description = paragraphText(body.activity_description, 'activity_description', 1000);
   if (body.public_name !== undefined) {
     const n = plainText(body.public_name, 'public_name', 60);
     if (n.length === 1) throw fieldInvalid('public_name');
@@ -342,36 +363,44 @@ async function editableApplication(c: Context<AppContext>, userId: string): Prom
     if (!/UNIQUE constraint failed: merchant_applications\.user_id/.test(msg)) throw e;
     const again = await latestApplication(db, userId);
     if (again && again.state === 'draft') return again;
-    throw conflict('تغيّر الطلب للتو؛ حدّث الصفحة ثم أعد المحاولة / The application just changed; refresh and try again', 'APPLICATION_CHANGED');
+    throw changedNow();
   }
   return applicationById(db, id);
 }
 
-/** One guarded write to a DRAFT at the revision it was read at, with its audit row. */
+/**
+ * One guarded write to a DRAFT at the revision it was read at, with its audit
+ * row. `photoKeyWas` (the photo write) also fences on the photo it replaces:
+ * draft writes keep the revision, so two overlapping uploads would otherwise
+ * both win and the first one's object would be left unreferenced.
+ */
 async function writeDraft(
   db: D1Database,
   app: ApplicationRow,
   cols: Array<[string, string | null]>,
   actorId: string,
   auditAction: string,
-  auditDetail: Record<string, unknown>
+  auditDetail: Record<string, unknown>,
+  photoKeyWas?: string | null
 ): Promise<void> {
   const now = new Date().toISOString();
   const { statements: auditRows } = await auditStatements(db, actorId, auditAction, app.id, auditDetail);
+  const photoFence = photoKeyWas === undefined ? '' : ' AND photo_key IS ?';
+  const photoBind = photoKeyWas === undefined ? [] : [photoKeyWas];
   try {
     await db.batch([
       db
         .prepare(
           `UPDATE merchant_applications SET ${cols.map(([k]) => `${k} = ?`).join(', ')}, updated_at = ?
-            WHERE id = ? AND state = 'draft' AND revision = ?`
+            WHERE id = ? AND state = 'draft' AND revision = ?${photoFence}`
         )
-        .bind(...cols.map(([, v]) => v), now, app.id, app.revision),
+        .bind(...cols.map(([, v]) => v), now, app.id, app.revision, ...photoBind),
       ...changedExactlyOne(db),
       ...auditRows,
     ]);
   } catch (e) {
     if (isLostRace(e)) {
-      throw conflict('تغيّر الطلب للتو؛ حدّث الصفحة ثم أعد المحاولة / The application just changed; refresh and try again', 'APPLICATION_CHANGED');
+      throw changedNow();
     }
     throw e;
   }
@@ -461,11 +490,16 @@ merchantApplicationRoutes.post('/photo', async (c) => {
   }
 
   const db = c.env.DB;
-  const app = await guarded(() => editableApplication(c, user.id));
+  // A SUBMITTED application is reopened only once the new photo is stored and
+  // re-encoded: a refused photo never moves it back to draft. (Its id does not
+  // change on a reopen, so the object goes under the right prefix either way.)
+  const latest = await guarded(() => latestApplication(db, user.id));
+  const reopens = !!latest && (latest.state === 'submitted' || latest.state === 'changes_requested');
+  const target = reopens ? latest! : await guarded(() => editableApplication(c, user.id));
   let stored: { key: string; converted: boolean };
   try {
     stored = await storeMedia(c.env, {
-      placement: { visibility: 'private', domain: 'merchant-review', entityId: app.id, kind: 'photo', objectId: newId() },
+      placement: { visibility: 'private', domain: 'merchant-review', entityId: target.id, kind: 'photo', objectId: newId() },
       bytes: buf,
       mime: kind.mime,
       ownerId: user.id,
@@ -479,21 +513,28 @@ merchantApplicationRoutes.post('/photo', async (c) => {
     throw badRequest('تعذّرت قراءة الصورة؛ جرّب صورة أخرى / The photo could not be read; try another one', 'PHOTO_UNREADABLE');
   }
   if (!stored.converted) {
-    await deleteMediaObject(c.env, 'private', stored.key).catch(() => console.error('merchant application: unconverted photo left for the sweep', app.id));
+    await deleteMediaObject(c.env, 'private', stored.key).catch(() => console.error('merchant application: unconverted photo left for the C7 purge', target.id));
     throw unavailable(
       'استقبال طلبات اعتماد التجار غير مفعّل بعد على هذا الخادم / Merchant applications cannot be received on this server yet',
       'MERCHANT_REVIEW_NOT_CONFIGURED'
     );
   }
+  let app: ApplicationRow;
   try {
-    await guarded(() => writeDraft(db, app, [['photo_key', stored.key]], user.id, 'merchant_application.photo_set', { revision: app.revision }));
+    app = reopens ? await guarded(() => editableApplication(c, user.id)) : target;
+    if (app.id !== target.id) throw changedNow();
+    // Compare-and-set on the photo it replaces: of two overlapping uploads one wins, the other's object is deleted.
+    await guarded(() =>
+      writeDraft(db, app, [['photo_key', stored.key]], user.id, 'merchant_application.photo_set', { revision: app.revision }, app.photo_key)
+    );
   } catch (e) {
-    await deleteMediaObject(c.env, 'private', stored.key).catch(() => console.error('merchant application: orphan photo left for the sweep', app.id));
+    // Any object left here sits under the application's prefix, which the C7 purge empties.
+    await deleteMediaObject(c.env, 'private', stored.key).catch(() => console.error('merchant application: orphan photo left for the C7 purge', target.id));
     throw e;
   }
   if (app.photo_key && app.photo_key !== stored.key) {
-    // The replaced photo: deleted now; a failure leaves an unreferenced object the orphan sweep removes.
-    await deleteMediaObject(c.env, 'private', app.photo_key).catch(() => console.error('merchant application: replaced photo left for the sweep', app.id));
+    // The replaced photo: deleted now; a failure leaves an object under the application's prefix, which the C7 purge empties.
+    await deleteMediaObject(c.env, 'private', app.photo_key).catch(() => console.error('merchant application: replaced photo left for the C7 purge', app.id));
   }
   return c.json({ success: true, application: applicantView(await applicationById(db, app.id)) });
 });

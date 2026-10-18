@@ -94,12 +94,18 @@ const ar = {
   invalidPublicName: 'الاسم العام من حرفين إلى 60 حرفًا.',
   invalidLinks: 'الروابط العامة حتى 5، وكل رابط يبدأ بـ https://',
   missing: 'ينقص الطلب:',
+  fieldInvalid: 'راجع هذا الحقل ثم احفظ:',
   missingNames: {
     legal_name: 'الاسم الثلاثي',
     dob: 'تاريخ الميلاد',
     social_link: 'رابط النشاط',
     photo: 'الصورة الشخصية',
     public_name: 'الاسم العام',
+    governorate: 'المحافظة',
+    activity_kind: 'نوع النشاط',
+    activity_description: 'وصف النشاط',
+    public_bio: 'النبذة القصيرة',
+    public_links: 'الروابط العامة',
   } as Record<string, string>,
   failed: 'تعذّر إتمام العملية. حاول مجددًا.',
 };
@@ -185,12 +191,18 @@ const en: Strings = {
   invalidPublicName: 'The public name is 2 to 60 characters.',
   invalidLinks: 'Up to 5 public links, each starting with https://',
   missing: 'The application still needs:',
+  fieldInvalid: 'Check this field, then save:',
   missingNames: {
     legal_name: 'three-part name',
     dob: 'date of birth',
     social_link: 'activity link',
     photo: 'personal photo',
     public_name: 'public name',
+    governorate: 'governorate',
+    activity_kind: 'kind of activity',
+    activity_description: 'activity description',
+    public_bio: 'short bio',
+    public_links: 'public links',
   },
   failed: 'That did not work. Try again.',
 };
@@ -274,15 +286,27 @@ const ckb: Strings = {
   invalidPublicName: 'ناوی گشتی لە 2 تا 60 پیتە.',
   invalidLinks: 'تا 5 بەستەری گشتی، هەر یەکەیان بە https:// دەست پێ دەکات',
   missing: 'داواکارییەکە هێشتا پێویستی بەمانەیە:',
+  fieldInvalid: 'ئەم خانەیە بپشکنە و پاشان پاشەکەوت بکە:',
   missingNames: {
     legal_name: 'ناوی سیانی',
     dob: 'ڕێکەوتی لەدایکبوون',
     social_link: 'بەستەری چالاکی',
     photo: 'وێنەی کەسی',
     public_name: 'ناوی گشتی',
+    governorate: 'پارێزگا',
+    activity_kind: 'جۆری چالاکی',
+    activity_description: 'وەسفی چالاکی',
+    public_bio: 'دەربارەی کورت',
+    public_links: 'بەستەرە گشتییەکان',
   },
   failed: 'سەرکەوتوو نەبوو. دووبارە هەوڵ بدەوە.',
 };
 
 export const APPLICANT_STRINGS = { ar, en, ckb } as const;
+/**
+ * How a list of field names is joined: the Arabic comma in Arabic and Sorani,
+ * the Latin one in English. Punctuation, not words — so it lives outside the
+ * tables whose Sorani must never equal the Arabic.
+ */
+export const LIST_SEPARATOR: Readonly<Record<keyof typeof APPLICANT_STRINGS, string>> = { ar: '، ', en: ', ', ckb: '، ' };
 export type ApplicantStrings = Strings;

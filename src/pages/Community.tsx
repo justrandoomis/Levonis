@@ -53,6 +53,7 @@ import FollowingPanel from '../components/community/hub/FollowingPanel';
 import { RequestListSkeleton, StoreListSkeleton, StoreMark } from '../components/community/hub/parts';
 import { NoResults, SearchLine } from '../components/community/hub/search';
 import { useHubStrings } from '../components/community/hub/strings';
+import { applicationCta, approvalReason } from '../components/merchantApplication/approvalWords';
 import { TAB_IDS, canonicalParams, resolveTab, type CommunityTab } from '../components/community/hub/tabs';
 import { useCommunityFeed, type CommunityFeed } from '../components/community/hub/useCommunityFeed';
 import { forgetHome } from '../components/community/hub/useHomeData';
@@ -539,20 +540,25 @@ function StoresPanel({ q, viewer, me, onClear }: { q: string; viewer: string; me
 
 /**
  * The viewer's own place in the directory: their store, one tap from its
- * workspace — or, for a member whose plan lets them open one, the way to.
+ * workspace — or the way to one. A member with no approval yet is shown the
+ * MERCHANT APPLICATION whatever their plan: applying needs no PLUS (owner
+ * decision C3). An approved member opens their store when their plan lets
+ * them; an older server (no `approved` in its answer) keeps the plan gate.
  * Nothing for anyone else: a button to a door that will not open is the dead
  * control the mandate forbids (src/components/merchant/StoreCta.tsx).
  */
 function YourStore({ me }: { me: MerchantMe | null }) {
-  const { dir } = useLanguage();
+  const { dir, loc } = useLanguage();
   const s = useHubStrings();
-  if (!me || (!me.store && !me.eligible)) return null;
+  if (!me) return null;
+  const applying = !me.store && me.approved === false;
+  if (!me.store && !applying && !me.eligible) return null;
   const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
   const to = me.store ? merchantHref.home() : '/merchant/start';
   return (
     <Link
       to={to}
-      data-community-your-store={me.store ? 'manage' : 'create'}
+      data-community-your-store={me.store ? 'manage' : applying ? 'apply' : 'create'}
       className="lv-surface mb-4 flex items-center gap-3 px-4 py-3 active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       {me.store ? (
@@ -563,9 +569,11 @@ function YourStore({ me }: { me: MerchantMe | null }) {
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-semibold text-text-primary">{me.store ? s.yourStore : s.createStore}</span>
+        <span className="block truncate text-[14px] font-semibold text-text-primary">
+          {me.store ? s.yourStore : applying ? applicationCta(me.application, loc) : s.createStore}
+        </span>
         <span dir={me.store ? 'auto' : undefined} className="block truncate text-start text-[12px] text-text-secondary">
-          {me.store ? me.store.name : s.yourStoreHint}
+          {me.store ? me.store.name : applying ? approvalReason(me.application, loc) : s.yourStoreHint}
         </span>
       </span>
       <Chevron aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />

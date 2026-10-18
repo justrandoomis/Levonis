@@ -19,7 +19,7 @@ import {
   isMissingSchema,
   reviewerNoticeText,
   transitionRefusal,
-  validOperationId,
+  validClientOperationId,
   type ApplicationAction,
   type ApplicationState,
   type LegalName,
@@ -152,7 +152,12 @@ function listView(r: ListRow, reviewerId: string) {
   };
 }
 
-const QUEUE_FILTERS = ['queue', 'all', ...APPLICATION_STATES] as const;
+/**
+ * A DRAFT IS NEVER A REVIEWER'S: it was never sent (or was reopened by its
+ * applicant and is being edited). No filter lists it, and neither the detail
+ * nor the photo opens it — its private values stay the applicant's alone.
+ */
+const QUEUE_FILTERS = ['queue', 'all', ...APPLICATION_STATES.filter((s) => s !== 'draft')] as const;
 
 adminMerchantApplicationRoutes.get('/', async (c) => {
   await requireReviewer(c);
@@ -275,7 +280,7 @@ adminMerchantApplicationRoutes.post('/reviewers/:userId/grant', requireOwner, as
   }
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const sentOperation = body?.operation_id;
-  const operationId = validOperationId(sentOperation) ? sentOperation : `srv:${newId()}`;
+  const operationId = validClientOperationId(sentOperation) ? sentOperation : `srv:${newId()}`;
   const reason = shortText(body?.reason, 300);
   const db = c.env.DB;
   const id = newId('acg');
@@ -392,7 +397,10 @@ adminMerchantApplicationRoutes.get('/:id', async (c) => {
       .bind(id)
       .first<DetailRow>()
   );
-  if (!row) throw notFound('Application not found');
+  // A draft was never sent: nothing of it is opened, not even its existence.
+  if (!row || row.state === 'draft') throw notFound('Application not found');
+  // A reviewer reading their OWN application is its applicant here: no staff note.
+  const own = row.user_id === reviewer.id;
 
   // NO AUDIT, NO DETAIL: the view is recorded before a single value is opened,
   // and a failed audit write fails the request.
@@ -428,8 +436,9 @@ adminMerchantApplicationRoutes.get('/:id', async (c) => {
       ...listView(row, reviewer.id),
       decided_revision: row.decided_revision,
       reason_public: row.reason_public,
-      // Staff only. The applicant's routes never select this column.
-      note_internal: row.note_internal,
+      // Staff only. The applicant's routes never select this column, and an
+      // admin who applied never reads it on their own application either.
+      note_internal: own ? '' : row.note_internal,
       retention_until: row.retention_until,
       review: { governorate: row.governorate, activity_kind: row.activity_kind, activity_description: row.activity_description },
       private: {
@@ -468,9 +477,9 @@ adminMerchantApplicationRoutes.get('/:id/photo', async (c) => {
   const id = applicationIdParam(c);
   const db = c.env.DB;
   const row = await guarded(() =>
-    db.prepare('SELECT photo_key FROM merchant_applications WHERE id = ?').bind(id).first<{ photo_key: string | null }>()
+    db.prepare('SELECT state, photo_key FROM merchant_applications WHERE id = ?').bind(id).first<{ state: string; photo_key: string | null }>()
   );
-  if (!row) throw notFound('Application not found');
+  if (!row || row.state === 'draft') throw notFound('Application not found');
   const key = row.photo_key ?? '';
   if (!key || !key.startsWith(`merchant-review/${id}/`)) throw notFound('No photo');
 
@@ -519,7 +528,8 @@ for (const d of DECISIONS) {
     const revision = body?.revision;
     if (typeof revision !== 'number' || !Number.isInteger(revision) || revision < 1) throw revisionRequired();
     const operationId = body?.operation_id;
-    if (!validOperationId(operationId)) throw transitionRefusal('OPERATION_ID_INVALID');
+    // A client id never takes a server namespace (`srv:`, `create:`, `purge:`).
+    if (!validClientOperationId(operationId)) throw transitionRefusal('OPERATION_ID_INVALID');
     const reasonPublic = typeof body?.reason_public === 'string' ? body.reason_public.trim() : '';
     const noteInternal = typeof body?.note_internal === 'string' ? body.note_internal.trim() : '';
     if (d.action === 'start_review' && (reasonPublic || noteInternal)) {
